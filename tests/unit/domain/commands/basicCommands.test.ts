@@ -1,5 +1,10 @@
-import { createSampleProject } from '../sampleProject';
-import { AlignElementCommand, DeleteElementCommand, SetZOrderCommand } from './basicCommands';
+import {
+  AlignElementCommand,
+  DeleteElementCommand,
+  SetZOrderCommand,
+  UpdateElementFrameCommand,
+} from '../../../../src/domain/commands/basicCommands';
+import { createSampleProject } from '../../../../src/domain/sampleProject';
 
 describe('editor commands', () => {
   it('aligns an element to page horizontal center immutably', () => {
@@ -27,5 +32,33 @@ describe('editor commands', () => {
 
     expect(next.elements['text-subtitle']).toBeUndefined();
     expect(next.pages[0]?.elementIds).not.toContain('text-subtitle');
+  });
+
+  it('updates element position, size, and rotation immutably', () => {
+    const project = createSampleProject();
+    const command = new UpdateElementFrameCommand('image-hero', {
+      x: 42,
+      y: 84,
+      width: 640,
+      height: 320,
+      rotation: 12,
+    });
+    const next = command.execute(project);
+
+    expect(next).not.toBe(project);
+    expect(next.elements['image-hero']).toMatchObject({
+      x: 42,
+      y: 84,
+      width: 640,
+      height: 320,
+      rotation: 12,
+    });
+    expect(project.elements['image-hero']).toMatchObject({
+      x: 360,
+      y: 210,
+      width: 1200,
+      height: 650,
+      rotation: 0,
+    });
   });
 });

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { AppServices } from '../../app/composition';
+import { UpdateElementFrameCommand, type ElementFramePatch } from '../../domain/commands/basicCommands';
 import type { ProjectDocument, SelectionState } from '../../domain/model';
 import type { ModelState } from '../../services/interfaces';
 
@@ -11,10 +12,11 @@ export function useEditorViewModel(services: AppServices) {
   const [modelStates, setModelStates] = useState<ModelState[]>([]);
   const [hasLoadedProject, setHasLoadedProject] = useState(false);
   const activePageId = project.pages[0]?.id ?? '';
-  const selection = useMemo<SelectionState>(
-    () => ({ pageId: activePageId, elementIds: ['image-hero'] }),
-    [activePageId],
-  );
+  const [selectedElementIds, setSelectedElementIds] = useState<string[]>(['image-hero']);
+  const selection = useMemo<SelectionState>(() => ({ pageId: activePageId, elementIds: selectedElementIds }), [
+    activePageId,
+    selectedElementIds,
+  ]);
 
   useEffect(() => {
     void services.modelSetupService.getModelStates().then(setModelStates);
@@ -44,6 +46,14 @@ export function useEditorViewModel(services: AppServices) {
     setModelStates(next);
   }
 
+  function selectElement(elementId: string) {
+    setSelectedElementIds([elementId]);
+  }
+
+  function updateElementFrame(elementId: string, patch: ElementFramePatch) {
+    setProject((currentProject) => new UpdateElementFrameCommand(elementId, patch).execute(currentProject));
+  }
+
   return {
     project,
     activePageId,
@@ -52,5 +62,7 @@ export function useEditorViewModel(services: AppServices) {
     setActiveTab,
     modelStates,
     downloadRequiredModels,
+    selectElement,
+    updateElementFrame,
   };
 }

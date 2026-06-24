@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
-import { createAppServices } from '../../app/composition';
-import { EditorShell } from './EditorShell';
+import userEvent from '@testing-library/user-event';
+import { createAppServices } from '../../../../src/app/composition';
+import { EditorShell } from '../../../../src/ui/editor/EditorShell';
 
 describe('EditorShell', () => {
   it('renders the approved editor shell landmarks', () => {
@@ -16,5 +17,15 @@ describe('EditorShell', () => {
       'aria-selected',
       'true',
     );
+  });
+
+  it('switches to the layers panel from the header view menu', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.click(screen.getByRole('button', { name: 'View' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Toggle Layers Panel' }));
+
+    expect(screen.getByRole('tab', { name: 'Layers' })).toHaveAttribute('aria-selected', 'true');
   });
 });

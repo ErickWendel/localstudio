@@ -1,5 +1,5 @@
-import { createSampleProject } from '../domain/sampleProject';
-import { IndexedDbProjectRepository } from './indexedDbProjectRepository';
+import { createSampleProject } from '../../../src/domain/sampleProject';
+import { IndexedDbProjectRepository } from '../../../src/services/indexedDbProjectRepository';
 
 describe('IndexedDbProjectRepository', () => {
   it('saves and loads the current project', async () => {

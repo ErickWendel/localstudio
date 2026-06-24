@@ -15,7 +15,13 @@ export function EditorShell({ services }: EditorShellProps) {
 
   return (
     <div className="app-shell">
-      <TopToolbar project={vm.project} language="PT-BR" />
+      <TopToolbar
+        project={vm.project}
+        language="PT-BR"
+        onSelectLayers={() => {
+          vm.setActiveTab('layers');
+        }}
+      />
       <div className="editor-grid">
         <PageRail project={vm.project} activePageId={vm.activePageId} />
         <section className="workspace-column" aria-label="Canvas workspace">
@@ -23,6 +29,8 @@ export function EditorShell({ services }: EditorShellProps) {
             project={vm.project}
             activePageId={vm.activePageId}
             selection={vm.selection}
+            onSelectElement={vm.selectElement}
+            onUpdateElementFrame={vm.updateElementFrame}
           />
           <PromptBar />
         </section>

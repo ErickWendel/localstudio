@@ -1,4 +1,4 @@
-import { InMemoryModelSetupService } from './modelSetupService';
+import { InMemoryModelSetupService } from '../../../src/services/modelSetupService';
 
 describe('InMemoryModelSetupService', () => {
   it('downloads required models in parallel and exposes progress', async () => {

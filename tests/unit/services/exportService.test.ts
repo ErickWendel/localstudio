@@ -1,5 +1,5 @@
-import { createSampleProject } from '../domain/sampleProject';
-import { BrowserExportService } from './exportService';
+import { createSampleProject } from '../../../src/domain/sampleProject';
+import { BrowserExportService } from '../../../src/services/exportService';
 
 describe('BrowserExportService', () => {
   it('creates export file names for page images and PDF', () => {

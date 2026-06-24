@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
-import { createSampleProject } from '../../domain/sampleProject';
-import { CanvasWorkspace } from './CanvasWorkspace';
+import { createSampleProject } from '../../../../src/domain/sampleProject';
+import { CanvasWorkspace } from '../../../../src/ui/editor/CanvasWorkspace';
 
 describe('CanvasWorkspace', () => {
   it('renders page elements and selected image toolbar', () => {

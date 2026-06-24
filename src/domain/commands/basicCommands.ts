@@ -1,8 +1,9 @@
-import type { ProjectDocument } from '../model';
+import type { BaseElement, ProjectDocument } from '../model';
 import type { EditorCommand } from './types';
 
 export type AlignMode = 'horizontal-center' | 'vertical-center' | 'page-center';
 export type ZOrderMode = 'front' | 'back' | 'forward' | 'backward';
+export type ElementFramePatch = Partial<Pick<BaseElement, 'height' | 'rotation' | 'width' | 'x' | 'y'>>;
 
 export class AlignElementCommand implements EditorCommand {
   readonly description = 'Align element';
@@ -91,6 +92,34 @@ export class DeleteElementCommand implements EditorCommand {
           ? { ...page, elementIds: page.elementIds.filter((id) => id !== this.elementId) }
           : page,
       ),
+    };
+  }
+}
+
+export class UpdateElementFrameCommand implements EditorCommand {
+  readonly description = 'Update element frame';
+
+  constructor(
+    private readonly elementId: string,
+    private readonly patch: ElementFramePatch,
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    const element = project.elements[this.elementId];
+    if (!element || element.locked) return project;
+
+    return {
+      ...project,
+      elements: {
+        ...project.elements,
+        [this.elementId]: {
+          ...element,
+          ...this.patch,
+          width: this.patch.width === undefined ? element.width : Math.max(1, this.patch.width),
+          height: this.patch.height === undefined ? element.height : Math.max(1, this.patch.height),
+        },
+      },
+      updatedAt: new Date().toISOString(),
     };
   }
 }

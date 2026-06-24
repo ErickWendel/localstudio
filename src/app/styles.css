@@ -107,6 +107,13 @@ button {
   margin-left: 16px;
 }
 
+.toolbar-menu-shell {
+  position: relative;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+}
+
 .toolbar-menu-item {
   height: 100%;
   padding: 0 12px;
@@ -120,6 +127,7 @@ button {
   line-height: 16px;
   transition:
     background-color 140ms ease,
+    box-shadow 140ms ease,
     color 140ms ease;
 }
 
@@ -127,6 +135,58 @@ button {
 .stitch-icon-button:hover {
   color: var(--ew-green-fixed);
   background: var(--ew-raised);
+}
+
+.toolbar-menu-item-active {
+  color: var(--ew-green-fixed);
+  background: rgba(55, 253, 118, 0.1);
+  box-shadow: inset 0 -2px 0 var(--ew-green);
+}
+
+.toolbar-dropdown {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  z-index: 100;
+  min-width: 190px;
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border: 1px solid var(--ew-border);
+  border-radius: 6px;
+  background: rgba(12, 22, 13, 0.98);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.45),
+    0 0 16px rgba(55, 253, 118, 0.08);
+}
+
+.toolbar-dropdown-item {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ew-text);
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.toolbar-dropdown-item:hover:not(:disabled) {
+  border-color: rgba(55, 253, 118, 0.28);
+  background: rgba(55, 253, 118, 0.1);
+  color: var(--ew-green-fixed);
+  transform: translateX(2px);
+}
+
+.toolbar-dropdown-item:disabled {
+  color: rgba(193, 201, 189, 0.38);
+  cursor: not-allowed;
 }
 
 .toolbar-divider {
@@ -191,7 +251,18 @@ button {
   cursor: pointer;
   transition:
     background-color 140ms ease,
-    color 140ms ease;
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.stitch-icon-button:active,
+.floating-toolbar-button:active,
+.icon-button:active,
+.rail-action-button:active,
+.compact-action:active,
+.download-models-button:active,
+.export-button:active {
+  transform: translateY(1px);
 }
 
 .material-symbols-outlined {
@@ -224,11 +295,14 @@ button {
   font-weight: 600;
   letter-spacing: 0.1em;
   line-height: 12px;
-  transition: border-color 140ms ease;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
 }
 
 .language-chip:hover {
   border-color: rgba(236, 255, 233, 0.5);
+  box-shadow: 0 0 12px rgba(55, 253, 118, 0.12);
 }
 
 .language-flag {
@@ -251,7 +325,10 @@ button {
   letter-spacing: 0.1em;
   line-height: 16px;
   text-transform: uppercase;
-  transition: filter 140ms ease;
+  transition:
+    box-shadow 140ms ease,
+    filter 140ms ease,
+    transform 140ms ease;
 }
 
 .export-button .material-symbols-outlined {
@@ -260,6 +337,7 @@ button {
 
 .export-button:hover {
   filter: brightness(1.1);
+  box-shadow: 0 0 18px rgba(55, 253, 118, 0.28);
 }
 
 .profile-avatar {
@@ -346,7 +424,8 @@ button {
   transition:
     border-color 140ms ease,
     color 140ms ease,
-    opacity 140ms ease;
+    opacity 140ms ease,
+    transform 140ms ease;
 }
 
 .slide-item-active .slide-thumb {
@@ -357,6 +436,7 @@ button {
 
 .slide-thumb:hover {
   border-color: var(--ew-muted);
+  transform: translateY(-1px);
 }
 
 .slide-number,
@@ -406,11 +486,14 @@ button {
   cursor: pointer;
   transition:
     background-color 140ms ease,
-    color 140ms ease;
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
 }
 
 .rail-action-button:hover {
   color: var(--ew-text);
+  border-color: rgba(55, 253, 118, 0.36);
   background: var(--ew-raised);
 }
 
@@ -603,6 +686,16 @@ button {
   padding: 0 8px 0 16px;
   color: var(--ew-green);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.prompt-bar:focus-within {
+  border-color: rgba(55, 253, 118, 0.65);
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.5),
+    0 0 20px rgba(55, 253, 118, 0.16);
 }
 
 .prompt-bar input {
@@ -649,12 +742,22 @@ button {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    text-shadow 140ms ease;
+}
+
+.panel-tab:hover {
+  background: rgba(55, 253, 118, 0.06);
+  color: var(--ew-green-fixed);
 }
 
 .panel-tab-active {
   border-bottom-color: var(--ew-green);
   color: var(--ew-green);
   background: var(--ew-panel);
+  text-shadow: 0 0 10px rgba(55, 253, 118, 0.24);
 }
 
 .right-panel-body {
@@ -715,6 +818,24 @@ button {
   display: grid;
   gap: 8px;
   padding: 12px;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.tool-card:hover,
+.model-row:hover,
+.layer-row:hover,
+.compact-action:hover,
+.property-row:hover {
+  border-color: rgba(55, 253, 118, 0.3);
+  box-shadow: 0 0 16px rgba(55, 253, 118, 0.08);
+}
+
+.tool-card:hover,
+.model-row:hover {
+  transform: translateY(-1px);
 }
 
 .tool-card-heading,
@@ -833,6 +954,11 @@ button {
   padding: 0 10px;
   color: var(--ew-text);
   font-size: 12px;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
 }
 
 .layer-search {
@@ -888,6 +1014,15 @@ button {
   color: var(--ew-green);
   font-weight: 800;
   cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.download-models-button:hover {
+  background: rgba(55, 253, 118, 0.14);
+  box-shadow: 0 0 18px rgba(55, 253, 118, 0.14);
 }
 
 .icon-button {
@@ -901,10 +1036,32 @@ button {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 4px;
   cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
 }
 
 .icon-button:hover,
 .icon-button-active {
   color: var(--ew-green);
   border-color: var(--ew-green);
+}
+
+.toolbar-menu-item:focus-visible,
+.toolbar-dropdown-item:focus-visible,
+.stitch-icon-button:focus-visible,
+.language-chip:focus-visible,
+.export-button:focus-visible,
+.profile-avatar:focus-visible,
+.slide-thumb:focus-visible,
+.rail-action-button:focus-visible,
+.floating-toolbar-button:focus-visible,
+.panel-tab:focus-visible,
+.download-models-button:focus-visible,
+.icon-button:focus-visible,
+.compact-action:focus-visible,
+.color-swatch:focus-visible {
+  outline: 2px solid rgba(55, 253, 118, 0.8);
+  outline-offset: 2px;
 }

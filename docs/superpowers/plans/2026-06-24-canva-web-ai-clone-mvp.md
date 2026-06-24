@@ -1,6 +1,6 @@
 # Canva Web AI Clone MVP Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Build the local-only EW Canvas AI MVP: a browser-based layered slides/image editor with the approved Stitch shell, tabbed right panel, command model, local persistence, export flows, and mocked browser-AI workflows.
 
@@ -90,7 +90,7 @@ Responsibilities:
 - Create: `src/app/styles.css`
 - Create: `src/test/testUtils.tsx`
 
-- [ ] **Step 1: Initialize dependencies**
+- [x] **Step 1: Initialize dependencies**
 
 Run:
 
@@ -102,7 +102,7 @@ npm install -D typescript vite @vitejs/plugin-react vitest jsdom @testing-librar
 
 Expected: `package.json`, `package-lock.json`, and `node_modules` are created.
 
-- [ ] **Step 2: Replace `package.json` scripts**
+- [x] **Step 2: Replace `package.json` scripts**
 
 Use this content as the target shape:
 
@@ -138,7 +138,7 @@ Use this content as the target shape:
 
 Keep the installed dependency versions that npm wrote.
 
-- [ ] **Step 3: Add Vite and TypeScript config**
+- [x] **Step 3: Add Vite and TypeScript config**
 
 `vite.config.ts`:
 
@@ -195,7 +195,7 @@ export default defineConfig({
 }
 ```
 
-- [ ] **Step 4: Add lint/format/test bootstraps**
+- [x] **Step 4: Add lint/format/test bootstraps**
 
 `eslint.config.js`:
 
@@ -245,7 +245,7 @@ import '@testing-library/jest-dom/vitest';
 import 'fake-indexeddb/auto';
 ```
 
-- [ ] **Step 5: Add app entry files**
+- [x] **Step 5: Add app entry files**
 
 `index.html`:
 
@@ -287,7 +287,7 @@ export function App() {
 }
 ```
 
-- [ ] **Step 6: Add Husky pre-commit hook**
+- [x] **Step 6: Add Husky pre-commit hook**
 
 Run:
 
@@ -304,7 +304,7 @@ npm run typecheck
 npm run test
 ```
 
-- [ ] **Step 7: Verify scaffold**
+- [x] **Step 7: Verify scaffold**
 
 Run:
 
@@ -317,7 +317,7 @@ npm run build
 
 Expected: all commands pass.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add package.json package-lock.json index.html vite.config.ts tsconfig.json tsconfig.node.json eslint.config.js prettier.config.cjs playwright.config.ts src .husky
@@ -333,7 +333,7 @@ git commit -m "chore: scaffold React editor app"
 - Create: `src/domain/sampleProject.ts`
 - Create: `src/domain/model.test.ts`
 
-- [ ] **Step 1: Write model tests**
+- [x] **Step 1: Write model tests**
 
 `src/domain/model.test.ts`:
 
@@ -361,7 +361,7 @@ describe('project model', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -371,7 +371,7 @@ npm run test -- src/domain/model.test.ts
 
 Expected: FAIL because `sampleProject` does not exist.
 
-- [ ] **Step 3: Implement model types**
+- [x] **Step 3: Implement model types**
 
 `src/domain/model.ts`:
 
@@ -460,7 +460,7 @@ export interface SelectionState {
 }
 ```
 
-- [ ] **Step 4: Implement sample project**
+- [x] **Step 4: Implement sample project**
 
 `src/domain/sampleProject.ts`:
 
@@ -574,7 +574,7 @@ export function createSampleProject(): ProjectDocument {
 }
 ```
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 Run:
 
@@ -585,7 +585,7 @@ npm run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/domain
@@ -603,7 +603,7 @@ git commit -m "feat: define editor document model"
 - Create: `src/domain/commands/index.ts`
 - Create: `src/domain/commands/basicCommands.test.ts`
 
-- [ ] **Step 1: Write command tests**
+- [x] **Step 1: Write command tests**
 
 `src/domain/commands/basicCommands.test.ts`:
 
@@ -641,7 +641,7 @@ describe('editor commands', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 npm run test -- src/domain/commands/basicCommands.test.ts
@@ -649,7 +649,7 @@ npm run test -- src/domain/commands/basicCommands.test.ts
 
 Expected: FAIL because command classes do not exist.
 
-- [ ] **Step 3: Add command interface**
+- [x] **Step 3: Add command interface**
 
 `src/domain/commands/types.ts`:
 
@@ -662,7 +662,7 @@ export interface EditorCommand {
 }
 ```
 
-- [ ] **Step 4: Add basic commands**
+- [x] **Step 4: Add basic commands**
 
 `src/domain/commands/basicCommands.ts`:
 
@@ -763,7 +763,7 @@ export class DeleteElementCommand implements EditorCommand {
 }
 ```
 
-- [ ] **Step 5: Add AI command classes with real behavior**
+- [x] **Step 5: Add AI command classes with real behavior**
 
 `src/domain/commands/aiCommands.ts`:
 
@@ -812,7 +812,7 @@ export * from './basicCommands';
 export * from './aiCommands';
 ```
 
-- [ ] **Step 6: Verify**
+- [x] **Step 6: Verify**
 
 ```bash
 npm run test -- src/domain/commands/basicCommands.test.ts
@@ -821,7 +821,7 @@ npm run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/domain/commands
@@ -841,7 +841,7 @@ git commit -m "feat: add immutable editor commands"
 - Create: `src/test/fakeServices.ts`
 - Create: `src/services/modelSetupService.test.ts`
 
-- [ ] **Step 1: Write model setup tests**
+- [x] **Step 1: Write model setup tests**
 
 `src/services/modelSetupService.test.ts`:
 
@@ -864,7 +864,7 @@ describe('InMemoryModelSetupService', () => {
 });
 ```
 
-- [ ] **Step 2: Run failing test**
+- [x] **Step 2: Run failing test**
 
 ```bash
 npm run test -- src/services/modelSetupService.test.ts
@@ -872,7 +872,7 @@ npm run test -- src/services/modelSetupService.test.ts
 
 Expected: FAIL because service does not exist.
 
-- [ ] **Step 3: Define service interfaces**
+- [x] **Step 3: Define service interfaces**
 
 `src/services/interfaces.ts`:
 
@@ -923,7 +923,7 @@ export interface MagicEraserService {
 }
 ```
 
-- [ ] **Step 4: Implement model setup service**
+- [x] **Step 4: Implement model setup service**
 
 `src/services/modelSetupService.ts`:
 
@@ -980,7 +980,7 @@ export class InMemoryModelSetupService implements ModelSetupService {
 }
 ```
 
-- [ ] **Step 5: Implement mock AI services and composition**
+- [x] **Step 5: Implement mock AI services and composition**
 
 `src/services/inMemoryAiServices.ts`:
 
@@ -1047,7 +1047,7 @@ export function createAppServices() {
 export type AppServices = ReturnType<typeof createAppServices>;
 ```
 
-- [ ] **Step 6: Verify**
+- [x] **Step 6: Verify**
 
 ```bash
 npm run test -- src/services/modelSetupService.test.ts
@@ -1056,7 +1056,7 @@ npm run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/services src/app/composition.ts
@@ -1081,7 +1081,7 @@ git commit -m "feat: add service interfaces and mock providers"
 - Create: `src/ui/components/IconButton.tsx`
 - Create: `src/ui/editor/EditorShell.test.tsx`
 
-- [ ] **Step 1: Write shell render test**
+- [x] **Step 1: Write shell render test**
 
 `src/ui/editor/EditorShell.test.tsx`:
 
@@ -1103,7 +1103,7 @@ describe('EditorShell', () => {
 });
 ```
 
-- [ ] **Step 2: Run failing test**
+- [x] **Step 2: Run failing test**
 
 ```bash
 npm run test -- src/ui/editor/EditorShell.test.tsx
@@ -1111,7 +1111,7 @@ npm run test -- src/ui/editor/EditorShell.test.tsx
 
 Expected: FAIL because `EditorShell` does not exist.
 
-- [ ] **Step 3: Add global styles matching Stitch handoff**
+- [x] **Step 3: Add global styles matching Stitch handoff**
 
 `src/app/styles.css`:
 
@@ -1177,7 +1177,7 @@ select {
 }
 ```
 
-- [ ] **Step 4: Add reusable icon button**
+- [x] **Step 4: Add reusable icon button**
 
 `src/ui/components/IconButton.tsx`:
 
@@ -1229,7 +1229,7 @@ Append to `src/app/styles.css`:
 }
 ```
 
-- [ ] **Step 5: Implement shell components**
+- [x] **Step 5: Implement shell components**
 
 `src/ui/editor/EditorShell.tsx`:
 
@@ -1303,7 +1303,7 @@ export function App() {
 }
 ```
 
-- [ ] **Step 6: Implement toolbar, rail, canvas, and prompt**
+- [x] **Step 6: Implement toolbar, rail, canvas, and prompt**
 
 Use the Stitch handoff for visual details. Include exact component behavior:
 
@@ -1315,7 +1315,7 @@ Use the Stitch handoff for visual details. Include exact component behavior:
 
 `PromptBar` renders the prompt input below the main canvas with spark, microphone, and submit buttons.
 
-- [ ] **Step 7: Verify**
+- [x] **Step 7: Verify**
 
 ```bash
 npm run test -- src/ui/editor/EditorShell.test.tsx
@@ -1325,7 +1325,7 @@ npm run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/App.tsx src/app src/ui
@@ -1346,7 +1346,7 @@ git commit -m "feat: build approved editor shell"
 - Create: `src/ui/editor/LayersPanel.tsx`
 - Create: `src/ui/editor/RightPanel.test.tsx`
 
-- [ ] **Step 1: Write tab behavior test**
+- [x] **Step 1: Write tab behavior test**
 
 `src/ui/editor/RightPanel.test.tsx`:
 
@@ -1384,7 +1384,7 @@ describe('RightPanel', () => {
 });
 ```
 
-- [ ] **Step 2: Run failing test**
+- [x] **Step 2: Run failing test**
 
 ```bash
 npm run test -- src/ui/editor/RightPanel.test.tsx
@@ -1392,7 +1392,7 @@ npm run test -- src/ui/editor/RightPanel.test.tsx
 
 Expected: FAIL until components exist.
 
-- [ ] **Step 3: Implement tabs and panels**
+- [x] **Step 3: Implement tabs and panels**
 
 Implement:
 
@@ -1402,7 +1402,7 @@ Implement:
 
 Use text and labels from `docs/design/stitch/ew-canvas-ai/screens/*.html`.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 ```bash
 npm run test -- src/ui/editor/RightPanel.test.tsx
@@ -1412,7 +1412,7 @@ npm run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/ui/components src/ui/editor/RightPanel.tsx src/ui/editor/AiToolsPanel.tsx src/ui/editor/DesignPanel.tsx src/ui/editor/LayersPanel.tsx
@@ -1427,7 +1427,7 @@ git commit -m "feat: implement editor right panel tabs"
 - Modify: `src/ui/editor/CanvasWorkspace.tsx`
 - Create: `src/ui/editor/CanvasWorkspace.test.tsx`
 
-- [ ] **Step 1: Write canvas rendering test**
+- [x] **Step 1: Write canvas rendering test**
 
 `src/ui/editor/CanvasWorkspace.test.tsx`:
 
@@ -1454,7 +1454,7 @@ describe('CanvasWorkspace', () => {
 });
 ```
 
-- [ ] **Step 2: Run failing test**
+- [x] **Step 2: Run failing test**
 
 ```bash
 npm run test -- src/ui/editor/CanvasWorkspace.test.tsx
@@ -1462,13 +1462,13 @@ npm run test -- src/ui/editor/CanvasWorkspace.test.tsx
 
 Expected: FAIL until the component renders document elements and selection controls.
 
-- [ ] **Step 3: Implement Konva rendering**
+- [x] **Step 3: Implement Konva rendering**
 
 Use `Stage`, `Layer`, `Rect`, `Text`, and `Image` from `react-konva`.
 
 For image assets without object URLs, render a technical fallback rectangle with label `Selected Image`. Render text elements with absolute page coordinates scaled to fit the visible 16:9 canvas.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 ```bash
 npm run test -- src/ui/editor/CanvasWorkspace.test.tsx
@@ -1477,7 +1477,7 @@ npm run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/ui/editor/CanvasWorkspace.tsx src/ui/editor/CanvasWorkspace.test.tsx
@@ -1494,7 +1494,7 @@ git commit -m "feat: render document elements on canvas"
 - Modify: `src/app/composition.ts`
 - Modify: `src/ui/editor/useEditorViewModel.ts`
 
-- [ ] **Step 1: Write repository test**
+- [x] **Step 1: Write repository test**
 
 `src/services/indexedDbProjectRepository.test.ts`:
 
@@ -1516,7 +1516,7 @@ describe('IndexedDbProjectRepository', () => {
 });
 ```
 
-- [ ] **Step 2: Implement repository with `idb`**
+- [x] **Step 2: Implement repository with `idb`**
 
 `src/services/indexedDbProjectRepository.ts`:
 
@@ -1555,7 +1555,7 @@ export class IndexedDbProjectRepository implements ProjectRepository {
 }
 ```
 
-- [ ] **Step 3: Wire repository into composition**
+- [x] **Step 3: Wire repository into composition**
 
 Update `createAppServices()` to include:
 
@@ -1565,7 +1565,7 @@ projectRepository: new IndexedDbProjectRepository(),
 
 Update `useEditorViewModel` to load saved project on mount and autosave after changes.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 ```bash
 npm run test -- src/services/indexedDbProjectRepository.test.ts
@@ -1574,7 +1574,7 @@ npm run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/services/indexedDbProjectRepository.ts src/services/indexedDbProjectRepository.test.ts src/app/composition.ts src/ui/editor/useEditorViewModel.ts
@@ -1591,7 +1591,7 @@ git commit -m "feat: persist projects in IndexedDB"
 - Modify: `src/services/interfaces.ts`
 - Modify: `src/ui/editor/TopToolbar.tsx`
 
-- [ ] **Step 1: Write export service test**
+- [x] **Step 1: Write export service test**
 
 `src/services/exportService.test.ts`:
 
@@ -1610,7 +1610,7 @@ describe('BrowserExportService', () => {
 });
 ```
 
-- [ ] **Step 2: Implement export service**
+- [x] **Step 2: Implement export service**
 
 `src/services/exportService.ts`:
 
@@ -1637,13 +1637,13 @@ export class BrowserExportService {
 }
 ```
 
-- [ ] **Step 3: Wire export button**
+- [x] **Step 3: Wire export button**
 
 `TopToolbar` should show the export button treatment from `docs/design/stitch/ew-canvas-ai/screens/design.html`.
 
 Clicking Export in MVP opens a compact menu or uses a basic `window.alert('Export PNG/PDF wiring ready')` until canvas export wiring is added in a later task. The visible UI must match the design now.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 ```bash
 npm run test -- src/services/exportService.test.ts
@@ -1652,7 +1652,7 @@ npm run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/services/exportService.ts src/services/exportService.test.ts src/ui/editor/TopToolbar.tsx
@@ -1669,7 +1669,7 @@ git commit -m "feat: add local export service shell"
 - Modify: `src/ui/editor/useEditorViewModel.ts`
 - Create: `src/ui/editor/aiFlows.test.tsx`
 
-- [ ] **Step 1: Write AI flow tests**
+- [x] **Step 1: Write AI flow tests**
 
 `src/ui/editor/aiFlows.test.tsx`:
 
@@ -1698,7 +1698,7 @@ describe('mocked AI flows', () => {
 });
 ```
 
-- [ ] **Step 2: Implement callbacks**
+- [x] **Step 2: Implement callbacks**
 
 `useEditorViewModel` exposes:
 
@@ -1711,7 +1711,7 @@ async function downloadRequiredModels() {
 
 Pass it to `AiToolsPanel`.
 
-- [ ] **Step 3: Wire buttons**
+- [x] **Step 3: Wire buttons**
 
 `AiToolsPanel` button:
 
@@ -1723,7 +1723,7 @@ Pass it to `AiToolsPanel`.
 
 Floating toolbar keeps `aria-label="Remove Background"` and `aria-label="Translate This Design"`.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 ```bash
 npm run test -- src/ui/editor/aiFlows.test.tsx
@@ -1732,7 +1732,7 @@ npm run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/ui/editor
@@ -1747,7 +1747,7 @@ git commit -m "feat: wire mocked AI editor flows"
 - Create: `tests/e2e/editor.spec.ts`
 - Modify: `playwright.config.ts`
 
-- [ ] **Step 1: Configure Playwright**
+- [x] **Step 1: Configure Playwright**
 
 `playwright.config.ts`:
 
@@ -1774,7 +1774,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 2: Write E2E tests**
+- [x] **Step 2: Write E2E tests**
 
 `tests/e2e/editor.spec.ts`:
 
@@ -1805,7 +1805,7 @@ test('downloads required model states', async ({ page }) => {
 });
 ```
 
-- [ ] **Step 3: Run Playwright install if needed**
+- [x] **Step 3: Run Playwright install if needed**
 
 Run:
 
@@ -1815,7 +1815,7 @@ npx playwright install chromium
 
 Expected: Chromium browser is available.
 
-- [ ] **Step 4: Verify E2E**
+- [x] **Step 4: Verify E2E**
 
 ```bash
 npm run e2e
@@ -1823,7 +1823,7 @@ npm run e2e
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add playwright.config.ts tests/e2e/editor.spec.ts
@@ -1837,7 +1837,7 @@ git commit -m "test: add editor Playwright coverage"
 **Files:**
 - Modify: `README.md`
 
-- [ ] **Step 1: Create README**
+- [x] **Step 1: Create README**
 
 `README.md`:
 
@@ -1864,7 +1864,7 @@ Approved Stitch handoff lives at:
 The canonical header comes from `screens/ai-tools.html`, with the export button treatment from `screens/design.html`.
 ```
 
-- [ ] **Step 2: Run complete verification**
+- [x] **Step 2: Run complete verification**
 
 ```bash
 npm run lint
@@ -1876,7 +1876,7 @@ npm run e2e
 
 Expected: all pass.
 
-- [ ] **Step 3: Start dev server for manual review**
+- [x] **Step 3: Start dev server for manual review**
 
 ```bash
 npm run dev -- --host 127.0.0.1
@@ -1884,12 +1884,45 @@ npm run dev -- --host 127.0.0.1
 
 Expected: app available at `http://127.0.0.1:5173/`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add README.md
 git commit -m "docs: add local development handoff"
 ```
+
+---
+
+### Remaining Work / Design Compliance Cleanup
+
+These items were identified after the first implementation pass and must be handled before treating the MVP as review-ready on `main`.
+
+Completed implementation commits on `feat/ew-canvas-ai-mvp`:
+
+- `7206e64` scaffolded React/Vite tooling.
+- `b448990` defined the editor document model.
+- `511d222` added immutable editor commands.
+- `4aba185` added service interfaces and mock providers.
+- `2583b27` built the editor shell.
+- `dd9da2c` implemented right-panel tabs.
+- `f66a3ab` rendered document elements on the canvas.
+- `faf23ee` added IndexedDB persistence.
+- `4fb0493` added the local export service shell.
+- `feaa47e` wired mocked AI editor flows.
+- `4ee7fa2` added Playwright coverage.
+- `bd43352` added the README handoff.
+- `d297a32` aligned the editor shell with the Stitch design.
+
+- [x] **Header menu interactions:** File, Edit, View, and Help open Stitch-styled dropdown menus. Actions backed by local state/services are wired; future actions render disabled.
+- [x] **Hover/focus animation polish:** strengthened hover, active, and focus-visible states for the toolbar, rail, right-panel tabs, prompt bar, model rows, and selection toolbar without changing the Stitch visual language.
+- [x] **Konva editability:** element selection, drag, resize, and rotate are enabled with Konva `Transformer`; changes persist through immutable document state updates while preserving `page.elementIds` z-order.
+- [x] **Test organization:** unit/component tests moved from `src` to `tests/unit`, shared setup moved to `tests/setup`, and Playwright specs remain in `tests/e2e`.
+- [ ] **Main branch integration:** merge `feat/ew-canvas-ai-mvp` into `main`.
+
+Cleanup verification note:
+
+- `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build` passed on the cleanup branch before the user requested skipping test iteration.
+- `npm run e2e` was intentionally deferred for faster iteration after Playwright exposed stale/browser-flow failures during this cleanup pass.
 
 ---
 

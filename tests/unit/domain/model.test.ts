@@ -1,4 +1,4 @@
-import { createSampleProject } from './sampleProject';
+import { createSampleProject } from '../../../src/domain/sampleProject';
 
 describe('project model', () => {
   it('creates a page-based layered project', () => {

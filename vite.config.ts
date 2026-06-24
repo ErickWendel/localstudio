@@ -7,6 +7,6 @@ export default defineConfig({
     environment: 'jsdom',
     exclude: ['tests/e2e/**', 'node_modules/**', 'dist/**'],
     globals: true,
-    setupFiles: './src/test/testUtils.tsx',
+    setupFiles: './tests/setup/testUtils.tsx',
   },
 });

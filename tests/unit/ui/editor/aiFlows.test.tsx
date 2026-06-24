@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { createAppServices } from '../../app/composition';
-import { EditorShell } from './EditorShell';
+import { createAppServices } from '../../../../src/app/composition';
+import { EditorShell } from '../../../../src/ui/editor/EditorShell';
 
 describe('mocked AI flows', () => {
   it('downloads required models from AI Tools panel', async () => {
