@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AetherCanvas AI</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&amp;family=Orbitron:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "inverse-surface": "#dbe6d7",
+                        "tertiary": "#fff9f4",
+                        "primary-fixed-dim": "#00e563",
+                        "on-error": "#690005",
+                        "error": "#ffb4ab",
+                        "primary": "#ecffe9",
+                        "outline-variant": "#3b4b3b",
+                        "on-tertiary": "#402d00",
+                        "outline": "#859583",
+                        "surface": "#0c160d",
+                        "surface-container": "#192219",
+                        "on-primary": "#003913",
+                        "secondary-fixed": "#bee9ff",
+                        "on-secondary-fixed-variant": "#004d65",
+                        "primary-container": "#37fd76",
+                        "on-secondary-fixed": "#001f2a",
+                        "inverse-on-surface": "#293329",
+                        "error-container": "#93000a",
+                        "on-surface": "#dbe6d7",
+                        "tertiary-fixed-dim": "#e7c17a",
+                        "on-tertiary-fixed-variant": "#5c4305",
+                        "on-tertiary-container": "#795d1f",
+                        "secondary-fixed-dim": "#7cd1f8",
+                        "secondary-container": "#007699",
+                        "on-primary-container": "#00712d",
+                        "surface-container-high": "#232c23",
+                        "on-background": "#dbe6d7",
+                        "on-primary-fixed": "#002108",
+                        "background": "#0c160d",
+                        "on-secondary-container": "#dff3ff",
+                        "on-primary-fixed-variant": "#00531f",
+                        "on-error-container": "#ffdad6",
+                        "inverse-primary": "#006e2b",
+                        "surface-variant": "#2e372d",
+                        "surface-container-low": "#151e15",
+                        "surface-tint": "#00e563",
+                        "surface-bright": "#323c31",
+                        "on-surface-variant": "#bacbb7",
+                        "on-secondary": "#003547",
+                        "tertiary-fixed": "#ffdea3",
+                        "surface-dim": "#0c160d",
+                        "tertiary-container": "#ffd88e",
+                        "surface-container-highest": "#2e372d",
+                        "primary-fixed": "#69ff89",
+                        "surface-container-lowest": "#071008",
+                        "secondary": "#7cd1f8",
+                        "on-tertiary-fixed": "#261900"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    spacing: {
+                        "sidebar-width": "280px",
+                        "unit": "4px",
+                        "toolbar-width": "48px",
+                        "panel-padding": "16px",
+                        "gutter": "12px"
+                    },
+                    fontFamily: {
+                        "button-label": ["Orbitron"],
+                        "code-label": ["Open Sans"],
+                        "body-sm": ["Open Sans"],
+                        "body-main": ["Open Sans"],
+                        "headline-md": ["Orbitron"],
+                        "display-lg": ["Orbitron"]
+                    },
+                    fontSize: {
+                        "button-label": ["14px", { "lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "600" }],
+                        "code-label": ["11px", { "lineHeight": "14px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "body-main": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "1.2", "letterSpacing": "0.02em", "fontWeight": "600" }],
+                        "display-lg": ["48px", { "lineHeight": "1.1", "letterSpacing": "0.05em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .neon-glow {
+            box-shadow: inset 0 0 10px rgba(55, 253, 118, 0.1);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #3b4b3b;
+            border-radius: 4px;
+        }
+        .selection-ring {
+            position: relative;
+        }
+        .selection-ring::before,
+        .selection-ring::after,
+        .selection-ring span::before,
+        .selection-ring span::after {
+            content: '';
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-color: #37FD76;
+            border-style: solid;
+        }
+        .selection-ring::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+        .selection-ring::after { top: -1px; right: -1px; border-width: 2px 2px 0 0; }
+        .selection-ring span::before { bottom: -1px; left: -1px; border-width: 0 0 2px 2px; }
+        .selection-ring span::after { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+
+        /* Normalizing screen resolution container */
+        .viewport-container {
+            width: 1280px;
+            height: 1024px;
+            margin: 0 auto;
+            position: relative;
+            background: #0c160d;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+    </style>
+</head>
+<body class="bg-surface-container-lowest text-on-surface h-screen w-full flex items-center justify-center font-body-main selection:bg-primary-container selection:text-on-primary-container overflow-auto">
+<div class="viewport-container shadow-2xl">
+<!-- Top Toolbar (Updated to match canonical header) -->
+<header class="bg-surface-container docked full-width top-0 border-b border-outline-variant flex justify-between items-center w-full px-panel-padding h-toolbar-width z-50 shrink-0">
+<div class="flex items-center gap-6 h-full">
+<h1 class="font-headline-md text-headline-md text-primary-fixed uppercase tracking-wider">AetherCanvas AI</h1>
+<nav class="hidden md:flex items-center gap-1 h-full ml-4">
+<button class="h-full px-3 text-on-surface-variant font-medium hover:bg-surface-bright transition-colors font-button-label text-button-label">File</button>
+<button class="h-full px-3 text-on-surface-variant font-medium hover:bg-surface-bright transition-colors font-button-label text-button-label">Edit</button>
+<button class="h-full px-3 text-on-surface-variant font-medium hover:bg-surface-bright transition-colors font-button-label text-button-label">View</button>
+<button class="h-full px-3 text-on-surface-variant font-medium hover:bg-surface-bright transition-colors font-button-label text-button-label">Help</button>
+</nav>
+<div class="h-6 w-px bg-outline-variant mx-2 hidden md:block"></div>
+<div class="hidden md:flex items-center gap-2">
+<span class="text-on-surface font-body-sm text-body-sm font-semibold truncate max-w-[150px]" title="Untitled AI Deck">Untitled AI Deck</span>
+<span class="px-2 py-0.5 border border-outline-variant rounded-DEFAULT font-code-label text-code-label text-on-surface-variant">Local only</span>
+</div>
+</div>
+<div class="flex items-center gap-4 h-full">
+<div class="flex items-center gap-1">
+<button class="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-bright rounded-DEFAULT transition-colors" title="Undo">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">undo</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-bright rounded-DEFAULT transition-colors" title="Redo">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">redo</span>
+</button>
+</div>
+<div class="h-6 w-px bg-outline-variant mx-1"></div>
+<div class="flex items-center gap-2">
+<button class="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-bright rounded-DEFAULT transition-colors" title="Zoom Out">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">remove</span>
+</button>
+<span class="font-code-label text-code-label text-on-surface-variant min-w-[36px] text-center">100%</span>
+<button class="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-bright rounded-DEFAULT transition-colors" title="Zoom In">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">zoom_in</span>
+</button>
+</div>
+<div class="flex items-center gap-3 ml-2">
+<div class="flex items-center gap-1.5 px-2 py-1 bg-surface border border-outline/20 rounded-DEFAULT cursor-pointer hover:border-primary/50 transition-colors h-8">
+<span class="text-[14px]">🇧🇷</span>
+<span class="font-button-label text-[10px] text-on-surface uppercase">PT-BR</span>
+</div>
+</div>
+<button class="h-8 px-4 bg-primary-container text-on-primary-container font-button-label text-[12px] uppercase rounded-DEFAULT hover:brightness-110 transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">ios_share</span>
+<span>Export</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-bright border border-outline-variant overflow-hidden flex items-center justify-center shrink-0 ml-2 cursor-pointer">
+<img alt="User Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCmm7qTXKl8PqEnDuyk7_WMk-bC9XNneOjBrGxvIfN51dKGTvsJJeQrLbj3rhc2Rrh-KTFNN4-MtqJu6LxX8rOw1e3A6j3PZuiQ06lXpCXwH0yJ34FX1CXyIJjqzc26HAdM_ugcXiGZWEwDESUy5eDTw9e8i5D15WwB1xNzy5ScOlRsgIwmrBpa8AbZRD3gxt8VoE5u7Lmo46sdGR98t_0BSoKMS9LcJVVZO7rQP8dXBkmZnhVKuLiN0-QawzC_ZYsgA7sV7OqI89k"/>
+</div>
+</div>
+</header>
+<div class="flex-1 flex overflow-hidden">
+<!-- Left Sidebar (Rail) -->
+<aside class="w-[80px] bg-surface-container-low border-r border-outline-variant flex flex-col items-center py-4 gap-4 z-40 shrink-0 custom-scrollbar overflow-y-auto">
+<div class="w-full px-2 flex flex-col gap-3">
+<!-- Slide 1 (Active) -->
+<div class="relative group cursor-pointer flex flex-col items-center gap-1">
+<div class="w-14 h-9 bg-white border-2 border-primary-container rounded-DEFAULT overflow-hidden relative shadow-[0_0_8px_rgba(55,253,118,0.3)]">
+<img alt="Slide 1 Preview" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDxLlFG7jN0rdk0EKlYEx52o5V3KS1NDbDwL0XggrcRZHT5sUesL197Hh5wScBBtN-Y4y0eGFCeCwYpI2DspF8vLIeG3nWioq2IWiZmvvdbQT-96UQnaQrlLhWaRMo2qLzPu1BK6rH471td1jQ14f8t6aPtG9fgzf-E_jR-LViFfpr982j61ZDmVZMuXnimBPbHVgnrO4URwqkhnY84Ru3srdABS4tAj0HaBvE0HmmwEXodA1l5qvWiSCrEZmfTXteWwYIJlFk8A9g"/>
+</div>
+<span class="font-code-label text-code-label text-primary-container">1</span>
+</div>
+<!-- Slide 2 -->
+<div class="relative group cursor-pointer flex flex-col items-center gap-1">
+<div class="w-14 h-9 bg-surface border border-outline-variant rounded-DEFAULT overflow-hidden hover:border-outline transition-colors">
+<div class="w-full h-full flex items-center justify-center text-outline-variant">
+<span class="material-symbols-outlined text-[16px]">horizontal_rule</span>
+</div>
+</div>
+<span class="font-code-label text-code-label text-on-surface-variant">2</span>
+</div>
+<!-- Slide 3 -->
+<div class="relative group cursor-pointer flex flex-col items-center gap-1">
+<div class="w-14 h-9 bg-surface border border-outline-variant rounded-DEFAULT overflow-hidden hover:border-outline transition-colors">
+<div class="w-full h-full flex items-center justify-center text-outline-variant">
+<span class="material-symbols-outlined text-[16px]">horizontal_rule</span>
+</div>
+</div>
+<span class="font-code-label text-code-label text-on-surface-variant">3</span>
+</div>
+</div>
+<div class="mt-auto w-full px-2 flex flex-col gap-2">
+<button class="w-full aspect-square border border-outline/20 flex flex-col items-center justify-center gap-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-bright transition-colors rounded-DEFAULT group" title="Add Page">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">note_add</span>
+<span class="font-code-label text-code-label text-[9px] uppercase tracking-tighter">Add</span>
+</button>
+<button class="w-full aspect-square border border-outline/20 flex flex-col items-center justify-center gap-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-bright transition-colors rounded-DEFAULT group" title="Import Assets">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">add_photo_alternate</span>
+<span class="font-code-label text-code-label text-[9px] uppercase tracking-tighter">Import</span>
+</button>
+</div>
+</aside>
+<!-- Center Workspace -->
+<main class="flex-1 bg-surface-container-lowest relative overflow-hidden flex flex-col items-center justify-center shadow-inner gap-6">
+<!-- Grid Background Pattern -->
+<div class="absolute inset-0 opacity-[0.03] pointer-events-none" style="background-image: linear-gradient(#37FD76 1px, transparent 1px), linear-gradient(90deg, #37FD76 1px, transparent 1px); background-size: 40px 40px;"></div>
+<!-- The Canvas -->
+<div class="w-[850px] aspect-video bg-white relative shadow-2xl selection-ring border border-transparent outline outline-1 outline-outline-variant/30">
+<span></span>
+<!-- Slide Content -->
+<div class="absolute inset-2 overflow-hidden rounded-sm bg-black">
+<img alt="Futuristic megalopolis" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC9ZxABu1Hu50xFXKtMFDg-mJg3KeChxCyQoEZmh1uzGiKMKrEY9HPXwqCDFQAqmqH9ITPSFTvCd6yYYzfaxbhOPjg2vlsTpIXhgIx49TFrv8g0UpZpTC1_8VQn53B62z4J7Gnm7250yjunNpp_eoT207n-orfESk5wluvKXhSuTtSPa7Ly6FenE9c28iYJi4Up8C9cufsv9Dha3yMUOWbfdgMW8ngmKuH2hOXDgS_0Nk6AZjPln6_UFN4Q3n_s9xrxcCs0u8FLeW4"/>
+<!-- Selection Box on Canvas -->
+<div class="absolute inset-8 border border-primary-container bg-primary-container/5 pointer-events-none selection-ring">
+<span></span>
+<!-- Control Points -->
+<div class="absolute -top-1.5 -left-1.5 w-3 h-3 bg-background border border-primary-container"></div>
+<div class="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-background border border-primary-container"></div>
+<div class="absolute -top-1.5 -right-1.5 w-3 h-3 bg-background border border-primary-container"></div>
+<div class="absolute top-1/2 -translate-y-1/2 -right-1.5 w-3 h-3 bg-background border border-primary-container"></div>
+<div class="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-background border border-primary-container"></div>
+<div class="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-background border border-primary-container"></div>
+<div class="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-background border border-primary-container"></div>
+<div class="absolute top-1/2 -translate-y-1/2 -left-1.5 w-3 h-3 bg-background border border-primary-container"></div>
+<!-- Text Element -->
+<div class="absolute inset-0 flex items-center justify-center p-8 backdrop-blur-sm bg-black/30">
+<h2 class="font-display-lg text-display-lg text-white font-bold tracking-widest uppercase drop-shadow-[0_0_10px_rgba(55,253,118,0.8)] text-center leading-tight">AI Design<br/>Revolution</h2>
+</div>
+</div>
+</div>
+<!-- Floating Canvas Toolbar -->
+<div class="absolute -top-12 left-1/2 -translate-x-1/2 h-9 bg-background/90 backdrop-blur-md border border-outline-variant rounded-DEFAULT flex items-center px-1 gap-1 shadow-lg pointer-events-auto">
+<button class="w-7 h-7 flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-bright rounded-sm transition-colors" title="Align Center">
+<span class="material-symbols-outlined text-[18px]">align_horizontal_center</span>
+</button>
+<div class="w-px h-4 bg-outline-variant mx-1"></div>
+<button class="w-7 h-7 flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-bright rounded-sm transition-colors" title="Bring Forward">
+<span class="material-symbols-outlined text-[18px]">flip_to_front</span>
+</button>
+<button class="w-7 h-7 flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-bright rounded-sm transition-colors" title="Send Backward">
+<span class="material-symbols-outlined text-[18px]">flip_to_back</span>
+</button>
+<div class="w-px h-4 bg-outline-variant mx-1"></div>
+<button class="w-7 h-7 flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-bright rounded-sm transition-colors" title="Duplicate">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+<button class="w-7 h-7 flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-bright rounded-sm transition-colors" title="Lock">
+<span class="material-symbols-outlined text-[18px]">lock</span>
+</button>
+<div class="w-px h-4 bg-outline-variant mx-1"></div>
+<button class="w-7 h-7 flex items-center justify-center text-on-surface-variant hover:text-primary-container hover:bg-primary-container/10 rounded-sm transition-colors" title="Remove Background">
+<span class="material-symbols-outlined text-[18px]">no_photography</span>
+</button>
+<button class="w-7 h-7 flex items-center justify-center text-on-surface-variant hover:text-primary-container hover:bg-primary-container/10 rounded-sm transition-colors" title="Translate This Design">
+<span class="material-symbols-outlined text-[18px]">translate</span>
+</button>
+<div class="w-px h-4 bg-outline-variant mx-1"></div>
+<button class="w-7 h-7 flex items-center justify-center text-error hover:text-error-container hover:bg-error/10 rounded-sm transition-colors" title="Delete">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</div>
+<!-- Command Prompt Bar -->
+<div class="w-[850px] h-12 bg-surface-container border border-outline-variant rounded-full flex items-center px-4 gap-3 shadow-[0_4px_20px_rgba(0,0,0,0.5)] z-50 shrink-0">
+<span class="material-symbols-outlined text-[20px] text-primary-container">auto_awesome</span>
+<input class="flex-1 bg-transparent border-none text-[13px] font-body-main text-on-surface placeholder:text-on-surface-variant/50 p-0 focus:ring-0" placeholder="Describe slide structure or organize current content..." type="text"/>
+<button class="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-primary-container transition-colors">
+<span class="material-symbols-outlined text-[20px]">mic</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center bg-primary-container/10 text-primary-container rounded-full hover:bg-primary-container hover:text-on-primary-container transition-all">
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</div>
+<!-- Zoom indicator floating bottom left -->
+<div class="absolute bottom-4 left-4 bg-background/80 backdrop-blur-sm border border-outline-variant px-3 py-1.5 rounded-DEFAULT flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">visibility</span>
+<span class="font-code-label text-code-label text-on-surface">100% Canvas</span>
+</div>
+</main>
+<!-- Right Sidebar (Properties & Tools) -->
+<aside class="w-sidebar-width bg-surface-container-low border-l border-outline-variant flex flex-col z-40 shrink-0 custom-scrollbar overflow-y-auto">
+<!-- Sidebar Header / Tabs -->
+<div class="flex w-full border-b border-outline-variant bg-surface-container shrink-0 h-10">
+<button class="flex-1 flex items-center justify-center gap-1.5 text-primary-container font-button-label text-button-label uppercase bg-surface border-b-2 border-primary-container transition-colors font-bold">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">palette</span>
+<span class="text-[10px]">Design</span>
+</button>
+<button class="flex-1 flex items-center justify-center gap-1.5 text-on-surface-variant font-button-label text-button-label uppercase hover:bg-surface-bright transition-colors border-r border-outline-variant">
+<span class="material-symbols-outlined text-[16px]">stacks</span>
+<span class="text-[10px]">Layers</span>
+</button>
+<button class="flex-1 flex items-center justify-center gap-1.5 text-on-surface-variant font-button-label text-button-label uppercase hover:bg-surface-bright transition-colors border-r border-outline-variant">
+<span class="material-symbols-outlined text-[16px]">auto_awesome</span>
+<span class="text-[10px]">AI Tools</span>
+</button>
+</div>
+<!-- Design Panel Content -->
+<div class="flex-1 overflow-y-auto p-4 flex flex-col gap-6 custom-scrollbar">
+<!-- Page Size -->
+<div class="flex flex-col gap-2">
+<h3 class="font-headline-md text-[11px] uppercase tracking-widest text-on-surface-variant">Page Size</h3>
+<div class="flex items-center justify-between p-2 bg-surface border border-outline-variant rounded-DEFAULT">
+<div class="flex flex-col">
+<span class="text-[13px] font-semibold">16:9 Presentation</span>
+<span class="text-[10px] text-outline">1920 x 1080 px</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant">aspect_ratio</span>
+</div>
+</div>
+<!-- Background -->
+<div class="flex flex-col gap-2">
+<h3 class="font-headline-md text-[11px] uppercase tracking-widest text-on-surface-variant">Background</h3>
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-sm border border-outline-variant bg-[#0c160d]"></div>
+<button class="flex-1 h-8 bg-surface border border-outline-variant text-button-label text-[11px] uppercase hover:bg-surface-bright transition-colors">Image Background</button>
+<div class="flex gap-1">
+<button class="w-8 h-8 flex items-center justify-center border border-outline-variant hover:text-error transition-colors"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+<button class="w-8 h-8 flex items-center justify-center border border-outline-variant hover:text-primary transition-colors"><span class="material-symbols-outlined text-[18px]">sync</span></button>
+</div>
+</div>
+</div>
+<!-- Theme Palette -->
+<div class="flex flex-col gap-2">
+<h3 class="font-headline-md text-[11px] uppercase tracking-widest text-on-surface-variant">Theme Palette</h3>
+<div class="flex gap-1.5 mb-1">
+<div class="flex-1 aspect-square bg-[#00e563] rounded-sm"></div>
+<div class="flex-1 aspect-square bg-[#37fd76] rounded-sm"></div>
+<div class="flex-1 aspect-square bg-[#192219] rounded-sm"></div>
+<div class="flex-1 aspect-square bg-[#2e372d] rounded-sm"></div>
+<div class="flex-1 aspect-square bg-[#859583] rounded-sm"></div>
+</div>
+<button class="w-full h-8 bg-primary-container text-on-primary-container font-button-label text-button-label uppercase neon-glow hover:brightness-110 transition-all rounded-DEFAULT">Apply Palette</button>
+</div>
+<!-- Typography -->
+<div class="flex flex-col gap-3">
+<h3 class="font-headline-md text-[11px] uppercase tracking-widest text-on-surface-variant">Typography</h3>
+<div class="flex flex-col gap-2">
+<div class="flex items-center justify-between"><span class="text-[11px] text-outline">Title (Orbitron)</span><div class="flex items-center gap-2"><span class="text-[11px]">48px</span><span class="material-symbols-outlined text-[16px] cursor-pointer">unfold_more</span></div></div>
+<div class="flex items-center justify-between"><span class="text-[11px] text-outline">Body (Open Sans)</span><div class="flex items-center gap-2"><span class="text-[11px]">14px</span><span class="material-symbols-outlined text-[16px] cursor-pointer">unfold_more</span></div></div>
+<div class="flex gap-1 mt-1">
+<button class="flex-1 h-7 border border-outline-variant flex items-center justify-center bg-surface-bright"><span class="material-symbols-outlined text-[18px]">format_align_left</span></button>
+<button class="flex-1 h-7 border border-outline-variant flex items-center justify-center"><span class="material-symbols-outlined text-[18px]">format_align_center</span></button>
+<button class="flex-1 h-7 border border-outline-variant flex items-center justify-center"><span class="material-symbols-outlined text-[18px]">format_align_right</span></button>
+</div>
+</div>
+</div>
+<!-- Layout -->
+<div class="flex flex-col gap-2">
+<h3 class="font-headline-md text-[11px] uppercase tracking-widest text-on-surface-variant">Layout</h3>
+<div class="grid grid-cols-2 gap-2">
+<div class="flex items-center justify-between p-1.5 border border-outline-variant rounded-sm bg-surface"><span class="text-[10px] uppercase">Grid</span><div class="w-6 h-3 bg-primary-container rounded-full relative"><div class="absolute right-0.5 top-0.5 w-2 h-2 bg-on-primary-container rounded-full"></div></div></div>
+<div class="flex items-center justify-between p-1.5 border border-outline-variant rounded-sm bg-surface"><span class="text-[10px] uppercase">Snap</span><div class="w-6 h-3 bg-primary-container rounded-full relative"><div class="absolute right-0.5 top-0.5 w-2 h-2 bg-on-primary-container rounded-full"></div></div></div>
+<div class="flex items-center justify-between p-1.5 border border-outline-variant rounded-sm bg-surface"><span class="text-[10px] uppercase">Guides</span><div class="w-6 h-3 bg-outline-variant rounded-full relative"><div class="absolute left-0.5 top-0.5 w-2 h-2 bg-on-surface-variant rounded-full"></div></div></div>
+<div class="flex items-center justify-between p-1.5 border border-outline-variant rounded-sm bg-surface"><span class="text-[10px] uppercase">Safe Area</span><div class="w-6 h-3 bg-outline-variant rounded-full relative"><div class="absolute left-0.5 top-0.5 w-2 h-2 bg-on-surface-variant rounded-full"></div></div></div>
+</div>
+</div>
+<!-- Element Style -->
+<div class="flex flex-col gap-3">
+<h3 class="font-headline-md text-[11px] uppercase tracking-widest text-on-surface-variant">Element Style</h3>
+<div class="flex flex-col gap-2">
+<div class="flex items-center justify-between"><span class="text-[11px] text-outline">Opacity</span><span class="text-[11px]">100%</span></div>
+<div class="h-1 w-full bg-outline-variant rounded-full overflow-hidden"><div class="h-full w-full bg-primary-container"></div></div>
+<div class="flex items-center justify-between mt-1"><span class="text-[11px] text-outline">Corner Radius</span><span class="text-[11px]">4px</span></div>
+<div class="flex items-center justify-between p-2 border border-outline-variant rounded-sm bg-surface mt-1"><span class="text-[11px]">Blend: Screen</span><span class="material-symbols-outlined text-[16px]">expand_more</span></div>
+</div>
+</div>
+<!-- Text-to-Palette (Bottom) -->
+<div class="mt-4 p-3 border border-primary-container/30 bg-primary-container/5 rounded-DEFAULT flex flex-col gap-2">
+<div class="flex items-center gap-2"><span class="material-symbols-outlined text-primary-container text-[18px]">auto_awesome</span><span class="text-[10px] font-bold uppercase tracking-tighter">Text-to-Palette</span></div>
+<div class="flex gap-2">
+<input class="flex-1 bg-transparent border border-outline-variant text-[11px] px-2 py-1 focus:ring-0" placeholder="Vibrant Cyberpunk..." type="text"/>
+<button class="w-7 h-7 bg-primary-container text-on-primary-container flex items-center justify-center rounded-sm"><span class="material-symbols-outlined text-[16px]">send</span></button>
+</div>
+</div>
+</div>
+</aside>
+</div>
+</div>
+</body></html>

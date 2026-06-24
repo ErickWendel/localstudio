@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AetherCanvas AI - Layers</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;800&amp;family=Open+Sans:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-secondary": "#003547",
+                    "on-error": "#690005",
+                    "inverse-surface": "#dbe6d7",
+                    "tertiary-container": "#ffd88e",
+                    "on-surface": "#dbe6d7",
+                    "primary-fixed": "#69ff89",
+                    "surface-bright": "#323c31",
+                    "error-container": "#93000a",
+                    "on-error-container": "#ffdad6",
+                    "tertiary-fixed": "#ffdea3",
+                    "on-tertiary-fixed": "#261900",
+                    "error": "#ffb4ab",
+                    "primary-fixed-dim": "#00e563",
+                    "primary-container": "#37fd76",
+                    "inverse-primary": "#006e2b",
+                    "on-secondary-container": "#dff3ff",
+                    "secondary-container": "#007699",
+                    "on-tertiary-fixed-variant": "#5c4305",
+                    "on-tertiary-container": "#795d1f",
+                    "tertiary-fixed-dim": "#e7c17a",
+                    "secondary": "#7cd1f8",
+                    "on-primary-container": "#00712d",
+                    "surface-variant": "#2e372d",
+                    "on-secondary-fixed-variant": "#004d65",
+                    "surface-container-highest": "#2e372d",
+                    "background": "#0c160d",
+                    "on-background": "#dbe6d7",
+                    "on-primary-fixed-variant": "#00531f",
+                    "surface-tint": "#00e563",
+                    "primary": "#ecffe9",
+                    "on-tertiary": "#402d00",
+                    "surface-container-lowest": "#071008",
+                    "surface-container-low": "#151e15",
+                    "surface-container": "#192219",
+                    "tertiary": "#fff9f4",
+                    "secondary-fixed-dim": "#7cd1f8",
+                    "on-primary-fixed": "#002108",
+                    "surface-dim": "#0c160d",
+                    "outline": "#859583",
+                    "secondary-fixed": "#bee9ff",
+                    "outline-variant": "#3b4b3b",
+                    "on-secondary-fixed": "#001f2a",
+                    "inverse-on-surface": "#293329",
+                    "surface-container-high": "#232c23",
+                    "surface": "#0c160d",
+                    "on-surface-variant": "#bacbb7",
+                    "on-primary": "#003913"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "gutter": "12px",
+                    "sidebar-width": "280px",
+                    "unit": "4px",
+                    "toolbar-width": "48px",
+                    "panel-padding": "16px"
+            },
+            "fontFamily": {
+                    "headline-md": ["Orbitron"],
+                    "button-label": ["Orbitron"],
+                    "body-main": ["Open Sans"],
+                    "code-label": ["Open Sans"],
+                    "display-lg": ["Orbitron"],
+                    "body-sm": ["Open Sans"]
+            },
+            "fontSize": {
+                    "headline-md": ["24px", {"lineHeight": "1.2", "letterSpacing": "0.02em", "fontWeight": "600"}],
+                    "button-label": ["14px", {"lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "600"}],
+                    "body-main": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "code-label": ["11px", {"lineHeight": "14px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "body-sm": ["12px", {"lineHeight": "16px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #0c160d;
+            color: #dbe6d7;
+            width: 1280px;
+            height: 1024px;
+            margin: 0 auto;
+            position: relative;
+        }
+        
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1A1A1A;
+            border-radius: 2px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #37FD76;
+        }
+        
+        .neon-glow {
+            box-shadow: 0 0 10px rgba(55, 253, 118, 0.4);
+        }
+        
+        .layer-row:hover {
+             background-color: #192219;
+        }
+        .layer-row.active {
+            border: 1px solid #37FD76;
+            background-color: #071008;
+        }
+        
+        .canvas-container {
+            width: 920px;
+            height: 520px;
+        }
+    </style>
+</head>
+<body class="flex flex-col overflow-hidden font-body-main text-body-main selection:bg-primary-container selection:text-on-primary-container">
+<!-- Canonical Header -->
+<header class="bg-surface-container border-b border-outline-variant flex justify-between items-center w-full px-panel-padding h-toolbar-width z-50">
+<div class="flex items-center gap-gutter">
+<span class="font-display-lg text-headline-md text-primary uppercase tracking-wider">AetherCanvas AI</span>
+<nav class="hidden md:flex gap-4 ml-6">
+<a class="text-on-surface-variant font-medium hover:bg-surface-bright transition-colors px-2 py-1 rounded text-button-label font-button-label" href="#">File</a>
+<a class="text-on-surface-variant font-medium hover:bg-surface-bright transition-colors px-2 py-1 rounded text-button-label font-button-label" href="#">Edit</a>
+<a class="text-on-surface-variant font-medium hover:bg-surface-bright transition-colors px-2 py-1 rounded text-button-label font-button-label" href="#">View</a>
+<a class="text-on-surface-variant font-medium hover:bg-surface-bright transition-colors px-2 py-1 rounded text-button-label font-button-label" href="#">Help</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 border border-outline-variant rounded px-2 py-1 bg-surface">
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">language</span>
+<span class="font-code-label text-code-label text-on-surface">PT-BR</span>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant border-r border-outline-variant pr-4">
+<button class="hover:bg-surface-bright transition-colors p-1 rounded"><span class="material-symbols-outlined" data-icon="undo">undo</span></button>
+<button class="hover:bg-surface-bright transition-colors p-1 rounded"><span class="material-symbols-outlined" data-icon="redo">redo</span></button>
+<button class="hover:bg-surface-bright transition-colors p-1 rounded"><span class="material-symbols-outlined" data-icon="zoom_in">zoom_in</span></button>
+<button class="hover:bg-surface-bright transition-colors p-1 rounded"><span class="material-symbols-outlined" data-icon="cloud_done">cloud_done</span></button>
+</div>
+<button class="border border-outline-variant text-on-surface font-button-label text-button-label uppercase px-4 py-2 hover:bg-surface-bright transition-colors">Prepare AI Models</button>
+<button class="bg-primary-container text-black font-button-label text-button-label uppercase px-6 py-2 neon-glow hover:opacity-90 transition-opacity">Export</button>
+<div class="w-8 h-8 rounded-full bg-surface-variant border border-outline-variant overflow-hidden ml-2 flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant">person</span>
+</div>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden relative">
+<!-- Left Page Rail -->
+<aside class="w-20 border-r border-outline-variant bg-surface-container-low flex flex-col items-center py-4 gap-4 z-40">
+<div class="w-12 h-12 border border-primary-container bg-surface flex items-center justify-center rounded cursor-pointer relative">
+<span class="font-code-label text-code-label text-primary-container font-bold">1</span>
+<div class="absolute -right-1 -top-1 w-2 h-2 rounded-full bg-primary-container shadow-[0_0_5px_#37fd76]"></div>
+</div>
+<div class="w-12 h-12 border border-outline-variant bg-surface-container hover:border-on-surface-variant flex items-center justify-center rounded cursor-pointer transition-colors">
+<span class="font-code-label text-code-label text-on-surface-variant">2</span>
+</div>
+<div class="w-12 h-12 border border-outline-variant bg-surface-container hover:border-on-surface-variant flex items-center justify-center rounded cursor-pointer transition-colors">
+<span class="font-code-label text-code-label text-on-surface-variant">3</span>
+</div>
+<button class="mt-auto w-10 h-10 rounded border border-outline-variant flex items-center justify-center text-on-surface-variant hover:text-primary-container hover:border-primary-container transition-all">
+<span class="material-symbols-outlined">add</span>
+</button>
+</aside>
+<!-- Main Canvas Area -->
+<main class="flex-1 relative bg-background overflow-hidden flex flex-col items-center justify-center p-12">
+<!-- Canvas -->
+<div class="canvas-container relative bg-surface-container border border-outline-variant shadow-2xl flex">
+<div class="w-1/2 p-12 flex flex-col justify-center border-r border-outline-variant bg-surface">
+<h1 class="font-display-lg text-[42px] text-primary uppercase mb-4 leading-tight font-bold">AI Design<br/><span class="text-primary-container">Revolution</span></h1>
+<p class="font-body-main text-body-main text-on-surface-variant max-w-sm">Harness the power of neural networks to generate perfect layouts in milliseconds. Your creative limits have just been shattered.</p>
+<div class="mt-8 flex gap-4">
+<div class="w-10 h-10 rounded border border-primary-container flex items-center justify-center text-primary-container"><span class="material-symbols-outlined">bolt</span></div>
+<div class="w-10 h-10 rounded border border-outline-variant flex items-center justify-center text-on-surface-variant"><span class="material-symbols-outlined">memory</span></div>
+</div>
+</div>
+<!-- Selected Image on Canvas -->
+<div class="w-1/2 relative border-2 border-primary-container group">
+<!-- Corner brackets for selection -->
+<div class="absolute -top-[2px] -left-[2px] w-4 h-4 border-t-2 border-l-2 border-primary-container"></div>
+<div class="absolute -top-[2px] -right-[2px] w-4 h-4 border-t-2 border-r-2 border-primary-container"></div>
+<div class="absolute -bottom-[2px] -left-[2px] w-4 h-4 border-b-2 border-l-2 border-primary-container"></div>
+<div class="absolute -bottom-[2px] -right-[2px] w-4 h-4 border-b-2 border-r-2 border-primary-container"></div>
+<div class="bg-cover bg-center w-full h-full opacity-90" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAW5xG5fXeoL294VE1xFJkHirKPXO0j-eSHpJeVvMr9os6v-nGlAV9l9WtwPuu41Izwejohm74vEkWMA_SbRz5Kp9xfljrZsXufq50FXWEJgceUFQxOajGZazgOojB_DcoOqRV73Z28kM-GvU0uIKDzp8dZbLf7KvIOmT6FGnjEgWhOh6bmKpTl7Ye89Pyj4RqfQS8v8V_H5SgQSimpOPm9OwR9NHLfPmfnGdciwfILxZIml4y58eary9RX8HzW_h-0NLmkE2oZiis')"></div>
+<!-- Floating Context Menu -->
+<div class="absolute -top-14 left-1/2 -translate-x-1/2 bg-surface-container-highest border border-outline-variant rounded px-3 py-1.5 flex items-center gap-3 shadow-lg">
+<button class="p-1 hover:bg-surface-bright rounded text-on-surface-variant hover:text-white"><span class="material-symbols-outlined text-[20px]">edit</span></button>
+<button class="p-1 hover:bg-surface-bright rounded text-on-surface-variant hover:text-white"><span class="material-symbols-outlined text-[20px]">content_copy</span></button>
+<div class="w-px h-6 bg-outline-variant"></div>
+<button class="p-1 hover:bg-surface-bright rounded text-on-surface-variant hover:text-primary-container"><span class="material-symbols-outlined text-[20px]">auto_awesome</span></button>
+</div>
+</div>
+</div>
+<!-- Global Prompt Bar -->
+<div class="absolute bottom-12 left-1/2 -translate-x-1/2 w-full max-w-3xl bg-surface-container border border-outline-variant p-3 flex items-center gap-4 shadow-2xl rounded">
+<span class="material-symbols-outlined text-primary-container ml-2">smart_toy</span>
+<input class="flex-1 bg-transparent border-none text-body-main font-body-main text-on-surface placeholder:text-on-surface-variant focus:ring-0 focus:outline-none" placeholder="Describe layout changes or generate assets..." type="text"/>
+<button class="bg-primary-container text-black font-button-label text-button-label uppercase px-6 py-2 neon-glow hover:opacity-90">Generate</button>
+</div>
+</main>
+<!-- Right SideNavBar (Layers Active) -->
+<aside class="w-sidebar-width bg-surface-container-low border-l border-outline-variant flex flex-col z-40 relative">
+<!-- Tabs -->
+<div class="flex border-b border-outline-variant">
+<button class="flex-1 py-4 text-center text-primary border-b-2 border-primary font-button-label text-button-label uppercase tracking-widest bg-surface-container-lowest">
+                Layers
+            </button>
+<button class="flex-1 py-4 text-center text-on-surface-variant border-b-2 border-transparent hover:text-white transition-colors font-button-label text-button-label uppercase tracking-widest">
+                Design
+            </button>
+<button class="flex-1 py-4 text-center text-on-surface-variant border-b-2 border-transparent hover:text-white transition-colors font-button-label text-button-label uppercase tracking-widest">
+                AI Tools
+            </button>
+</div>
+<div class="p-panel-padding flex flex-col h-full overflow-hidden">
+<!-- Filter & Actions -->
+<div class="flex items-center gap-2 mb-4">
+<div class="relative flex-1">
+<span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant">search</span>
+<input class="w-full bg-surface border border-outline-variant rounded pl-8 pr-2 py-1.5 text-body-sm font-body-main text-on-surface focus:border-primary-container focus:ring-0" placeholder="Filter layers..." type="text"/>
+</div>
+<div class="flex bg-surface border border-outline-variant rounded">
+<button class="p-1.5 text-on-surface-variant hover:text-white border-r border-outline-variant" title="Bring to Front"><span class="material-symbols-outlined text-[18px]">flip_to_front</span></button>
+<button class="p-1.5 text-on-surface-variant hover:text-white" title="Send to Back"><span class="material-symbols-outlined text-[18px]">flip_to_back</span></button>
+</div>
+</div>
+<div class="flex justify-between items-center mb-2 px-1">
+<span class="font-code-label text-code-label text-on-surface-variant">5 layers on current page</span>
+<div class="flex gap-1">
+<button class="p-1 text-on-surface-variant hover:text-white" title="Group"><span class="material-symbols-outlined text-[16px]">group</span></button>
+<button class="p-1 text-on-surface-variant hover:text-white" title="Ungroup"><span class="material-symbols-outlined text-[16px]">ungroup</span></button>
+</div>
+</div>
+<!-- Layer Stack -->
+<div class="flex-1 overflow-y-auto border border-outline-variant bg-surface flex flex-col">
+<!-- Title Layer -->
+<div class="layer-row flex items-center px-3 py-2.5 border-b border-outline-variant cursor-pointer group">
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant cursor-grab mr-2 opacity-50 group-hover:opacity-100">drag_indicator</span>
+<span class="material-symbols-outlined text-[18px] text-on-surface-variant mr-1">visibility</span>
+<span class="material-symbols-outlined text-[18px] text-on-surface-variant mr-2 opacity-30 hover:opacity-100">lock_open</span>
+<span class="material-symbols-outlined text-[20px] text-secondary mr-2">title</span>
+<span class="font-body-sm text-body-sm text-on-surface truncate flex-1">'AI Design Revolution'</span>
+</div>
+<!-- Subtitle Layer -->
+<div class="layer-row flex items-center px-3 py-2.5 border-b border-outline-variant cursor-pointer group">
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant cursor-grab mr-2 opacity-50 group-hover:opacity-100">drag_indicator</span>
+<span class="material-symbols-outlined text-[18px] text-on-surface-variant mr-1">visibility</span>
+<span class="material-symbols-outlined text-[18px] text-on-surface-variant mr-2 opacity-30 hover:opacity-100">lock_open</span>
+<span class="material-symbols-outlined text-[20px] text-secondary mr-2">title</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate flex-1">Subtitle Text</span>
+</div>
+<!-- Selected Image Layer -->
+<div class="layer-row active flex items-center px-3 py-2.5 border-b border-outline-variant cursor-pointer group relative">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary-container"></div>
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant cursor-grab mr-2 opacity-50 group-hover:opacity-100 ml-1">drag_indicator</span>
+<span class="material-symbols-outlined text-[18px] text-primary-container mr-1">visibility</span>
+<span class="material-symbols-outlined text-[18px] text-on-surface-variant mr-2 opacity-30 hover:opacity-100">lock_open</span>
+<span class="material-symbols-outlined text-[20px] text-tertiary-fixed-dim mr-2">image</span>
+<span class="font-body-sm text-body-sm text-primary-container font-semibold truncate flex-1">Selected Image</span>
+</div>
+<!-- Background Shape Layer -->
+<div class="layer-row flex items-center px-3 py-2.5 border-b border-outline-variant cursor-pointer group">
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant cursor-grab mr-2 opacity-50 group-hover:opacity-100">drag_indicator</span>
+<span class="material-symbols-outlined text-[18px] text-on-surface-variant mr-1">visibility</span>
+<span class="material-symbols-outlined text-[18px] text-on-surface-variant mr-2">lock</span>
+<span class="material-symbols-outlined text-[20px] text-primary-fixed mr-2">rectangle</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate flex-1">Background Shape</span>
+</div>
+<!-- Page Background Layer -->
+<div class="layer-row flex items-center px-3 py-2.5 cursor-pointer group opacity-70">
+<span class="material-symbols-outlined text-[14px] text-transparent cursor-default mr-2">drag_indicator</span>
+<span class="material-symbols-outlined text-[18px] text-on-surface-variant mr-1">visibility</span>
+<span class="material-symbols-outlined text-[18px] text-on-surface-variant mr-2">lock</span>
+<span class="material-symbols-outlined text-[20px] text-on-surface-variant mr-2">wallpaper</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate flex-1 italic">Page Background</span>
+</div>
+</div>
+<!-- Selected Layer Properties (Bottom) -->
+<div class="mt-6 border-t border-outline-variant pt-4">
+<h3 class="font-code-label text-code-label text-primary-container mb-4 uppercase tracking-wider">Properties: Selected Image</h3>
+<div class="space-y-4">
+<div class="flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Opacity</span>
+<div class="flex items-center gap-3">
+<input class="w-32 accent-primary-container h-1 bg-outline-variant rounded-lg appearance-none" max="100" min="0" type="range" value="80"/>
+<span class="font-code-label text-code-label text-on-surface w-10 text-right">80%</span>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Blend Mode</span>
+<select class="bg-surface border border-outline-variant text-body-sm font-body-main text-on-surface py-1.5 pl-2 pr-8 rounded focus:border-primary-container focus:ring-0">
+<option>Normal</option>
+<option>Multiply</option>
+<option selected="">Screen</option>
+<option>Overlay</option>
+</select>
+</div>
+<div class="flex gap-2 pt-2">
+<button class="flex-1 py-2 border border-primary-container bg-primary-container/10 text-primary-container font-button-label text-[10px] uppercase rounded flex items-center justify-center gap-1.5">
+<span class="material-symbols-outlined text-[16px]">visibility</span> Visible
+                        </button>
+<button class="flex-1 py-2 border border-outline-variant text-on-surface-variant hover:text-white font-button-label text-[10px] uppercase rounded flex items-center justify-center gap-1.5">
+<span class="material-symbols-outlined text-[16px]">lock_open</span> Unlocked
+                        </button>
+</div>
+</div>
+</div>
+</div>
+</aside>
+</div>
+</body></html>

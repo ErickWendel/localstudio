@@ -1,0 +1,58 @@
+<h2>MVP Architecture</h2>
+<p class="subtitle">Browser-only editor with testable service boundaries and explicit AI capability ports.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Canva Web AI Clone - Local MVP</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-items:stretch">
+      <div class="placeholder" style="min-height:150px">
+        <strong>React App Shell</strong><br>
+        Toolbar<br>
+        Page rail<br>
+        Properties panel<br>
+        First-run model setup
+      </div>
+      <div class="placeholder" style="min-height:150px">
+        <strong>Editor Core</strong><br>
+        Project document<br>
+        Pages/slides<br>
+        Elements<br>
+        Selection + transforms<br>
+        Immutable commands
+      </div>
+      <div class="placeholder" style="min-height:150px">
+        <strong>Canvas Renderer</strong><br>
+        React Konva stage<br>
+        Text/image/shape layers<br>
+        Export snapshots
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:14px">
+      <div class="placeholder">
+        <strong>Local Storage</strong><br>
+        IndexedDB projects<br>
+        Asset blobs<br>
+        Model readiness cache
+      </div>
+      <div class="placeholder">
+        <strong>AI Service Ports</strong><br>
+        Translator<br>
+        Palette generator<br>
+        Background remover<br>
+        Smart crop
+      </div>
+      <div class="placeholder">
+        <strong>Exports</strong><br>
+        PNG/JPEG per page<br>
+        PDF deck<br>
+        Browser download
+      </div>
+    </div>
+
+    <div style="margin-top:14px" class="placeholder">
+      <strong>Provider adapters:</strong>
+      Chrome Built-in AI for translation and palette JSON; Transformers.js/Hugging Face models only for vision capabilities Chrome does not provide.
+    </div>
+  </div>
+</div>
