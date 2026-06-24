@@ -6,9 +6,10 @@ import type { ModelState } from '../../services/interfaces';
 export type RightPanelTab = 'design' | 'layers' | 'ai-tools';
 
 export function useEditorViewModel(services: AppServices) {
-  const [project] = useState<ProjectDocument>(services.initialProject);
+  const [project, setProject] = useState<ProjectDocument>(services.initialProject);
   const [activeTab, setActiveTab] = useState<RightPanelTab>('ai-tools');
   const [modelStates, setModelStates] = useState<ModelState[]>([]);
+  const [hasLoadedProject, setHasLoadedProject] = useState(false);
   const activePageId = project.pages[0]?.id ?? '';
   const selection = useMemo<SelectionState>(
     () => ({ pageId: activePageId, elementIds: ['image-hero'] }),
@@ -18,6 +19,25 @@ export function useEditorViewModel(services: AppServices) {
   useEffect(() => {
     void services.modelSetupService.getModelStates().then(setModelStates);
   }, [services.modelSetupService]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    void services.projectRepository.loadProject().then((savedProject) => {
+      if (!isMounted) return;
+      if (savedProject) setProject(savedProject);
+      setHasLoadedProject(true);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [services.projectRepository]);
+
+  useEffect(() => {
+    if (!hasLoadedProject) return;
+    void services.projectRepository.saveProject(project);
+  }, [hasLoadedProject, project, services.projectRepository]);
 
   return { project, activePageId, selection, activeTab, setActiveTab, modelStates };
 }
