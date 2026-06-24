@@ -42,6 +42,7 @@ export interface BaseElement {
   height: number;
   rotation: number;
   locked: boolean;
+  visible: boolean;
   opacity: number;
 }
 

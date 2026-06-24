@@ -1,4 +1,4 @@
-import { Eye, GripVertical, Image, Lock, Search, Square, Type } from 'lucide-react';
+import { Eye, EyeOff, GripVertical, Image, Lock, Search, Square, Trash2, Type, Unlock } from 'lucide-react';
 import type { DesignElement, ProjectDocument, SelectionState } from '../../domain/model';
 import { IconButton } from '../components/IconButton';
 import { PanelSection } from '../components/PanelSection';
@@ -8,6 +8,10 @@ interface LayersPanelProps {
   activePageId: string;
   selection: SelectionState;
   onSelectElement?: (elementId: string) => void;
+  onSetElementVisibility?: (elementId: string, visible: boolean) => void;
+  onSetElementLock?: (elementId: string, locked: boolean) => void;
+  onDeleteElement?: (elementId: string) => void;
+  onReorderElement?: (elementId: string, targetElementId: string) => void;
 }
 
 function isDesignElement(element: DesignElement | undefined): element is DesignElement {
@@ -28,8 +32,18 @@ function getLayerIcon(element: DesignElement) {
   return Square;
 }
 
-export function LayersPanel({ project, activePageId, selection, onSelectElement }: LayersPanelProps) {
+export function LayersPanel({
+  project,
+  activePageId,
+  selection,
+  onSelectElement,
+  onSetElementVisibility,
+  onSetElementLock,
+  onDeleteElement,
+  onReorderElement,
+}: LayersPanelProps) {
   const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
+  const selectedElementId = selection.elementIds[0];
   const layers =
     [...(page?.elementIds ?? [])]
       .reverse()
@@ -41,6 +55,8 @@ export function LayersPanel({ project, activePageId, selection, onSelectElement 
         icon: getLayerIcon(element),
         selected: selection.elementIds.includes(element.id),
         type: element.type,
+        visible: element.visible !== false,
+        locked: element.locked,
       })) ?? [];
   const selectedLayer = layers.find((layer) => layer.selected);
 
@@ -63,6 +79,21 @@ export function LayersPanel({ project, activePageId, selection, onSelectElement 
                 tabIndex={0}
                 aria-label={layer.name}
                 aria-pressed={layer.selected}
+                draggable
+                onDragStart={(event) => {
+                  event.dataTransfer.setData('text/plain', layer.id);
+                  event.dataTransfer.effectAllowed = 'move';
+                }}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = 'move';
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  const draggedElementId = event.dataTransfer.getData('text/plain');
+                  if (!draggedElementId || draggedElementId === layer.id) return;
+                  onReorderElement?.(draggedElementId, layer.id);
+                }}
                 onClick={() => {
                   onSelectElement?.(layer.id);
                 }}
@@ -82,20 +113,30 @@ export function LayersPanel({ project, activePageId, selection, onSelectElement 
                   }}
                 >
                   <IconButton
-                    label={`Toggle ${layer.name} visibility`}
+                    active={!layer.visible}
+                    label={layer.visible ? `Hide ${layer.name}` : `Show ${layer.name}`}
                     onClick={() => {
-                      // Visibility controls are visual-only in the MVP.
+                      onSetElementVisibility?.(layer.id, !layer.visible);
                     }}
                   >
-                    <Eye size={13} />
+                    {layer.visible ? <Eye size={13} /> : <EyeOff size={13} />}
                   </IconButton>
                   <IconButton
-                    label={`Lock ${layer.name}`}
+                    active={layer.locked}
+                    label={layer.locked ? `Unlock ${layer.name}` : `Lock ${layer.name}`}
                     onClick={() => {
-                      // Lock controls are visual-only in the MVP.
+                      onSetElementLock?.(layer.id, !layer.locked);
                     }}
                   >
-                    <Lock size={13} />
+                    {layer.locked ? <Unlock size={13} /> : <Lock size={13} />}
+                  </IconButton>
+                  <IconButton
+                    label={`Delete ${layer.name}`}
+                    onClick={() => {
+                      onDeleteElement?.(layer.id);
+                    }}
+                  >
+                    <Trash2 size={13} />
                   </IconButton>
                 </span>
               </article>
@@ -111,7 +152,7 @@ export function LayersPanel({ project, activePageId, selection, onSelectElement 
       <PanelSection title="Selected Layer">
         <div className="property-row">
           <span>Type</span>
-          <strong>{selectedLayer?.type ?? 'None'}</strong>
+          <strong>{selectedLayer?.type ?? (selectedElementId ? 'Missing' : 'None')}</strong>
         </div>
         <div className="property-row">
           <span>Z-order</span>

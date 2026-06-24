@@ -1,5 +1,8 @@
 import type { ProjectDocument } from './model';
 
+export const SAMPLE_HERO_IMAGE_URL =
+  'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRe1Oh1Q3hIcQYKNHc_GwRcQnT6uSgL02RVLBpt4tWMfYKZ2Ja97objCe8&s=10';
+
 export function createSampleProject(): ProjectDocument {
   const now = new Date('2026-06-24T00:00:00.000Z').toISOString();
 
@@ -14,6 +17,7 @@ export function createSampleProject(): ProjectDocument {
         type: 'image',
         name: 'Futuristic landscape',
         mimeType: 'image/png',
+        objectUrl: SAMPLE_HERO_IMAGE_URL,
       },
     },
     pages: [
@@ -53,6 +57,7 @@ export function createSampleProject(): ProjectDocument {
         height: 1080,
         rotation: 0,
         locked: false,
+        visible: true,
         opacity: 1,
         fill: '#050D10',
       },
@@ -66,6 +71,7 @@ export function createSampleProject(): ProjectDocument {
         height: 650,
         rotation: 0,
         locked: false,
+        visible: true,
         opacity: 1,
       },
       'text-subtitle': {
@@ -78,6 +84,7 @@ export function createSampleProject(): ProjectDocument {
         height: 80,
         rotation: 0,
         locked: false,
+        visible: true,
         opacity: 1,
         fontFamily: 'Open Sans',
         fontSize: 40,
@@ -95,6 +102,7 @@ export function createSampleProject(): ProjectDocument {
         height: 170,
         rotation: 0,
         locked: false,
+        visible: true,
         opacity: 1,
         fontFamily: 'Orbitron',
         fontSize: 96,

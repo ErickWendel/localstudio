@@ -1,4 +1,4 @@
-import type { BaseElement, ProjectDocument } from '../model';
+import type { Asset, BaseElement, ImageElement, ProjectDocument } from '../model';
 import type { EditorCommand } from './types';
 
 export type AlignMode = 'horizontal-center' | 'vertical-center' | 'page-center';
@@ -81,17 +81,127 @@ export class DeleteElementCommand implements EditorCommand {
   ) {}
 
   execute(project: ProjectDocument): ProjectDocument {
+    const element = project.elements[this.elementId];
     const { [this.elementId]: deleted, ...remainingElements } = project.elements;
     void deleted;
+    const shouldDeleteAsset =
+      element?.type === 'image' &&
+      !Object.values(remainingElements).some(
+        (remainingElement) =>
+          remainingElement.type === 'image' && remainingElement.assetId === element.assetId,
+      );
+    const { [element?.type === 'image' ? element.assetId : '']: deletedAsset, ...remainingAssets } =
+      project.assets;
+    void deletedAsset;
 
     return {
       ...project,
+      assets: shouldDeleteAsset ? remainingAssets : project.assets,
       elements: remainingElements,
       pages: project.pages.map((page) =>
         page.id === this.pageId
           ? { ...page, elementIds: page.elementIds.filter((id) => id !== this.elementId) }
           : page,
       ),
+    };
+  }
+}
+
+export class ReorderElementCommand implements EditorCommand {
+  readonly description = 'Reorder element';
+
+  constructor(
+    private readonly pageId: string,
+    private readonly elementId: string,
+    private readonly targetIndex: number,
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    return {
+      ...project,
+      pages: project.pages.map((page) => {
+        if (page.id !== this.pageId || !page.elementIds.includes(this.elementId)) return page;
+        const without = page.elementIds.filter((id) => id !== this.elementId);
+        const next = [...without];
+        next.splice(Math.max(0, Math.min(this.targetIndex, next.length)), 0, this.elementId);
+        return { ...page, elementIds: next };
+      }),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+}
+
+export class SetElementVisibilityCommand implements EditorCommand {
+  readonly description = 'Set element visibility';
+
+  constructor(
+    private readonly elementId: string,
+    private readonly visible: boolean,
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    const element = project.elements[this.elementId];
+    if (!element) return project;
+
+    return {
+      ...project,
+      elements: {
+        ...project.elements,
+        [this.elementId]: { ...element, visible: this.visible },
+      },
+      updatedAt: new Date().toISOString(),
+    };
+  }
+}
+
+export class SetElementLockCommand implements EditorCommand {
+  readonly description = 'Set element lock';
+
+  constructor(
+    private readonly elementId: string,
+    private readonly locked: boolean,
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    const element = project.elements[this.elementId];
+    if (!element) return project;
+
+    return {
+      ...project,
+      elements: {
+        ...project.elements,
+        [this.elementId]: { ...element, locked: this.locked },
+      },
+      updatedAt: new Date().toISOString(),
+    };
+  }
+}
+
+export class AddImageElementCommand implements EditorCommand {
+  readonly description = 'Add image element';
+
+  constructor(
+    private readonly pageId: string,
+    private readonly payload: { asset: Asset; element: ImageElement },
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    return {
+      ...project,
+      assets: {
+        ...project.assets,
+        [this.payload.asset.id]: this.payload.asset,
+      },
+      elements: {
+        ...project.elements,
+        [this.payload.element.id]: this.payload.element,
+      },
+      pages: project.pages.map((page) =>
+        page.id === this.pageId
+          ? { ...page, elementIds: [...page.elementIds, this.payload.element.id] }
+          : page,
+      ),
+      updatedAt: new Date().toISOString(),
     };
   }
 }

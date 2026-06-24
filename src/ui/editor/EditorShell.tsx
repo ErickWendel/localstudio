@@ -23,7 +23,13 @@ export function EditorShell({ services }: EditorShellProps) {
         }}
       />
       <div className="editor-grid">
-        <PageRail project={vm.project} activePageId={vm.activePageId} />
+        <PageRail
+          project={vm.project}
+          activePageId={vm.activePageId}
+          onImportImage={(file) => {
+            void vm.importImageFile(file);
+          }}
+        />
         <section className="workspace-column" aria-label="Canvas workspace">
           <CanvasWorkspace
             project={vm.project}
@@ -42,6 +48,10 @@ export function EditorShell({ services }: EditorShellProps) {
           activePageId={vm.activePageId}
           selection={vm.selection}
           onSelectElement={vm.selectElement}
+          onSetElementVisibility={vm.setElementVisibility}
+          onSetElementLock={vm.setElementLock}
+          onDeleteElement={vm.deleteElement}
+          onReorderElement={vm.reorderElement}
           modelStates={vm.modelStates}
           onDownloadRequiredModels={vm.downloadRequiredModels}
         />

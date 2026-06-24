@@ -1,7 +1,11 @@
 import {
   AlignElementCommand,
+  AddImageElementCommand,
   DeleteElementCommand,
+  ReorderElementCommand,
   SetZOrderCommand,
+  SetElementLockCommand,
+  SetElementVisibilityCommand,
   UpdateElementFrameCommand,
   UpdateTextContentCommand,
 } from '../../../../src/domain/commands/basicCommands';
@@ -33,6 +37,16 @@ describe('editor commands', () => {
 
     expect(next.elements['text-subtitle']).toBeUndefined();
     expect(next.pages[0]?.elementIds).not.toContain('text-subtitle');
+  });
+
+  it('deletes an image element and its owned asset', () => {
+    const project = createSampleProject();
+    const command = new DeleteElementCommand('page-1', 'image-hero');
+    const next = command.execute(project);
+
+    expect(next.elements['image-hero']).toBeUndefined();
+    expect(next.assets['asset-hero']).toBeUndefined();
+    expect(next.pages[0]?.elementIds).not.toContain('image-hero');
   });
 
   it('updates element position, size, and rotation immutably', () => {
@@ -71,5 +85,67 @@ describe('editor commands', () => {
     expect(next).not.toBe(project);
     expect(next.elements['text-title']).toMatchObject({ text: 'Edited headline' });
     expect(project.elements['text-title']).toMatchObject({ text: 'AI Design Revolution' });
+  });
+
+  it('reorders an element within the page z-order immutably', () => {
+    const project = createSampleProject();
+    const command = new ReorderElementCommand('page-1', 'shape-bg', 3);
+    const next = command.execute(project);
+
+    expect(next).not.toBe(project);
+    expect(next.pages[0]?.elementIds).toEqual([
+      'image-hero',
+      'text-subtitle',
+      'text-title',
+      'shape-bg',
+    ]);
+    expect(project.pages[0]?.elementIds).toEqual([
+      'shape-bg',
+      'image-hero',
+      'text-subtitle',
+      'text-title',
+    ]);
+  });
+
+  it('sets element visibility and lock state immutably', () => {
+    const project = createSampleProject();
+    const hidden = new SetElementVisibilityCommand('image-hero', false).execute(project);
+    const locked = new SetElementLockCommand('image-hero', true).execute(hidden);
+
+    expect(hidden.elements['image-hero']).toMatchObject({ visible: false });
+    expect(locked.elements['image-hero']).toMatchObject({ locked: true, visible: false });
+    expect(project.elements['image-hero']).toMatchObject({ locked: false, visible: true });
+  });
+
+  it('adds an imported image as the topmost layer', () => {
+    const project = createSampleProject();
+    const command = new AddImageElementCommand('page-1', {
+      asset: {
+        id: 'asset-imported',
+        type: 'image',
+        name: 'Imported image',
+        mimeType: 'image/png',
+        objectUrl: 'data:image/png;base64,abc',
+      },
+      element: {
+        id: 'image-imported',
+        type: 'image',
+        assetId: 'asset-imported',
+        x: 480,
+        y: 240,
+        width: 960,
+        height: 540,
+        rotation: 0,
+        locked: false,
+        opacity: 1,
+        visible: true,
+      },
+    });
+    const next = command.execute(project);
+
+    expect(next.assets['asset-imported']).toMatchObject({ objectUrl: 'data:image/png;base64,abc' });
+    expect(next.elements['image-imported']).toMatchObject({ assetId: 'asset-imported' });
+    expect(next.pages[0]?.elementIds.at(-1)).toBe('image-imported');
+    expect(project.assets['asset-imported']).toBeUndefined();
   });
 });

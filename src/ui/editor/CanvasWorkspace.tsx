@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type Konva from 'konva';
-import { Layer, Rect, Stage, Text, Transformer } from 'react-konva';
+import { Image as KonvaImage, Layer, Rect, Stage, Text, Transformer } from 'react-konva';
 import type { ElementFramePatch } from '../../domain/commands/basicCommands';
 import type { DesignElement, ProjectDocument, SelectionState } from '../../domain/model';
 import { FloatingSelectionToolbar } from './FloatingSelectionToolbar';
@@ -14,8 +14,49 @@ interface CanvasWorkspaceProps {
   onUpdateTextContent?: (elementId: string, text: string) => void;
 }
 
+interface CommonElementProps {
+  draggable: boolean;
+  height: number;
+  opacity: number;
+  ref: (node: Konva.Node | null) => void;
+  rotation: number;
+  width: number;
+  x: number;
+  y: number;
+  onClick: () => void;
+  onDblClick: () => void;
+  onDblTap: () => void;
+  onDragEnd: (event: Konva.KonvaEventObject<DragEvent>) => void;
+  onTap: () => void;
+  onTransformEnd: (event: Konva.KonvaEventObject<Event>) => void;
+}
+
 function isDesignElement(element: DesignElement | undefined): element is DesignElement {
   return Boolean(element);
+}
+
+function useCanvasImage(src: string | undefined) {
+  const [loadedImage, setLoadedImage] = useState<{
+    src: string;
+    image: HTMLImageElement;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!src) return;
+
+    const nextImage = new window.Image();
+    let isActive = true;
+    nextImage.addEventListener('load', () => {
+      if (isActive) setLoadedImage({ src, image: nextImage });
+    });
+    nextImage.src = src;
+
+    return () => {
+      isActive = false;
+    };
+  }, [src]);
+
+  return loadedImage && loadedImage.src === src ? loadedImage.image : undefined;
 }
 
 export function CanvasWorkspace({
@@ -34,8 +75,13 @@ export function CanvasWorkspace({
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [editingTextValue, setEditingTextValue] = useState('');
   const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
-  const visibleElements = page?.elementIds.map((id) => project.elements[id]).filter(isDesignElement) ?? [];
+  const visibleElements =
+    page?.elementIds
+      .map((id) => project.elements[id])
+      .filter(isDesignElement)
+      .filter((element) => element.visible !== false) ?? [];
   const hasSelection = selection.elementIds.length > 0;
+  const selectedElement = project.elements[selection.elementIds[0] ?? ''];
   const stageWidth = stageSize.width;
   const stageHeight = stageSize.height;
   const scaleX = page ? stageWidth / page.width : 1;
@@ -127,7 +173,7 @@ export function CanvasWorkspace({
     setEditingTextValue('');
   }
 
-  function getCommonElementProps(element: DesignElement) {
+  function getCommonElementProps(element: DesignElement): CommonElementProps {
     return {
       draggable: !element.locked,
       height: element.height * scaleY,
@@ -184,14 +230,12 @@ export function CanvasWorkspace({
                 }
 
                 if (element.type === 'image') {
+                  const asset = project.assets[element.assetId];
                   return (
-                    <Rect
-                      {...commonProps}
+                    <CanvasImageElement
                       key={element.id}
-                      fill="#101B1D"
-                      stroke="#37FD76"
-                      strokeWidth={1}
-                      cornerRadius={6}
+                      assetUrl={asset?.objectUrl}
+                      commonProps={commonProps}
                     />
                   );
                 }
@@ -218,6 +262,8 @@ export function CanvasWorkspace({
                 borderDash={[6, 4]}
                 borderStroke="#37FD76"
                 ignoreStroke
+                resizeEnabled={!selectedElement?.locked}
+                rotateEnabled={!selectedElement?.locked}
                 enabledAnchors={[
                   'top-left',
                   'top-center',
@@ -288,4 +334,27 @@ export function CanvasWorkspace({
       </div>
     </div>
   );
+}
+
+interface CanvasImageElementProps {
+  assetUrl: string | undefined;
+  commonProps: CommonElementProps;
+}
+
+function CanvasImageElement({ assetUrl, commonProps }: CanvasImageElementProps) {
+  const image = useCanvasImage(assetUrl);
+
+  if (!image) {
+    return (
+      <Rect
+        {...commonProps}
+        fill="#101B1D"
+        stroke="#37FD76"
+        strokeWidth={1}
+        cornerRadius={6}
+      />
+    );
+  }
+
+  return <KonvaImage {...commonProps} image={image} cornerRadius={6} />;
 }

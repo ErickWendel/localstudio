@@ -16,6 +16,10 @@ interface RightPanelProps {
   activePageId: string;
   selection: SelectionState;
   onSelectElement?: (elementId: string) => void;
+  onSetElementVisibility?: (elementId: string, visible: boolean) => void;
+  onSetElementLock?: (elementId: string, locked: boolean) => void;
+  onDeleteElement?: (elementId: string) => void;
+  onReorderElement?: (elementId: string, targetElementId: string) => void;
 }
 
 const tabs: Array<SegmentedTab<RightPanelTab>> = [
@@ -33,6 +37,10 @@ export function RightPanel({
   activePageId,
   selection,
   onSelectElement,
+  onSetElementVisibility,
+  onSetElementLock,
+  onDeleteElement,
+  onReorderElement,
 }: RightPanelProps) {
   return (
     <aside className="right-panel" aria-label="Editor tools">
@@ -50,6 +58,10 @@ export function RightPanel({
             activePageId={activePageId}
             selection={selection}
             {...(onSelectElement ? { onSelectElement } : {})}
+            {...(onSetElementVisibility ? { onSetElementVisibility } : {})}
+            {...(onSetElementLock ? { onSetElementLock } : {})}
+            {...(onDeleteElement ? { onDeleteElement } : {})}
+            {...(onReorderElement ? { onReorderElement } : {})}
           />
         ) : null}
         {activeTab === 'design' ? <DesignPanel /> : null}
