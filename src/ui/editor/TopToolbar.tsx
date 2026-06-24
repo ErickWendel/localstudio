@@ -8,6 +8,10 @@ interface TopToolbarProps {
 }
 
 export function TopToolbar({ project, language }: TopToolbarProps) {
+  function handleExportClick() {
+    window.alert(`Export PNG/PDF wiring ready for ${project.name}`);
+  }
+
   return (
     <header className="top-toolbar">
       <div className="brand-lockup" aria-label="EW Canvas AI">
@@ -39,7 +43,7 @@ export function TopToolbar({ project, language }: TopToolbarProps) {
       <IconButton label="User profile">
         <UserRound size={16} />
       </IconButton>
-      <button className="export-button font-orbitron" type="button">
+      <button className="export-button font-orbitron" type="button" onClick={handleExportClick}>
         <Download size={15} />
         Export
       </button>

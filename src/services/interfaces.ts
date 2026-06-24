@@ -16,6 +16,12 @@ export interface ProjectRepository {
   saveProject(project: ProjectDocument): Promise<void>;
 }
 
+export interface ExportService {
+  getPageImageFileName(project: ProjectDocument, pageId: string, extension: 'png' | 'jpeg'): string;
+  getPdfFileName(project: ProjectDocument): string;
+  downloadDataUrl(dataUrl: string, fileName: string): void;
+}
+
 export interface ModelSetupService {
   getModelStates(): Promise<ModelState[]>;
   downloadRequiredModels(): Promise<ModelState[]>;
