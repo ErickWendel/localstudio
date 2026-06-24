@@ -1917,7 +1917,7 @@ Completed implementation commits on `feat/ew-canvas-ai-mvp`:
 - [x] **Hover/focus animation polish:** strengthened hover, active, and focus-visible states for the toolbar, rail, right-panel tabs, prompt bar, model rows, and selection toolbar without changing the Stitch visual language.
 - [x] **Konva editability:** element selection, drag, resize, and rotate are enabled with Konva `Transformer`; changes persist through immutable document state updates while preserving `page.elementIds` z-order.
 - [x] **Test organization:** unit/component tests moved from `src` to `tests/unit`, shared setup moved to `tests/setup`, and Playwright specs remain in `tests/e2e`.
-- [ ] **Main branch integration:** merge `feat/ew-canvas-ai-mvp` into `main`.
+- [x] **Main branch integration:** merged `feat/ew-canvas-ai-mvp` into `main`.
 
 Cleanup verification note:
 
