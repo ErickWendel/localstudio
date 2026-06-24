@@ -16,8 +16,8 @@ export function CanvasWorkspace({ project, activePageId, selection }: CanvasWork
   const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
   const visibleElements = page?.elementIds.map((id) => project.elements[id]).filter(isDesignElement) ?? [];
   const hasSelection = selection.elementIds.length > 0;
-  const stageWidth = 960;
-  const stageHeight = 540;
+  const stageWidth = 768;
+  const stageHeight = 432;
   const scale = page ? stageWidth / page.width : 1;
 
   return (
