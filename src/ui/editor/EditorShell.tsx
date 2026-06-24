@@ -38,6 +38,10 @@ export function EditorShell({ services }: EditorShellProps) {
         <RightPanel
           activeTab={vm.activeTab}
           onTabChange={vm.setActiveTab}
+          project={vm.project}
+          activePageId={vm.activePageId}
+          selection={vm.selection}
+          onSelectElement={vm.selectElement}
           modelStates={vm.modelStates}
           onDownloadRequiredModels={vm.downloadRequiredModels}
         />

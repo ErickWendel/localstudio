@@ -999,10 +999,11 @@ button {
   gap: 8px;
   padding: 0 6px;
   color: var(--ew-muted);
+  cursor: pointer;
   font-size: 12px;
 }
 
-.layer-row span {
+.layer-row-name {
   min-width: 0;
   flex: 1;
   color: var(--ew-text);
@@ -1014,6 +1015,18 @@ button {
 .layer-row .icon-button {
   width: 26px;
   height: 26px;
+}
+
+.layer-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.layer-row-static {
+  cursor: default;
+  opacity: 0.72;
 }
 
 .layer-row-selected {

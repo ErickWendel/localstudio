@@ -1,4 +1,5 @@
 import { Brush, Layers3, Sparkles } from 'lucide-react';
+import type { ProjectDocument, SelectionState } from '../../domain/model';
 import type { ModelState } from '../../services/interfaces';
 import { SegmentedTabs, type SegmentedTab } from '../components/SegmentedTabs';
 import { AiToolsPanel } from './AiToolsPanel';
@@ -11,6 +12,10 @@ interface RightPanelProps {
   onTabChange: (tab: RightPanelTab) => void;
   modelStates: ModelState[];
   onDownloadRequiredModels?: () => Promise<void>;
+  project: ProjectDocument;
+  activePageId: string;
+  selection: SelectionState;
+  onSelectElement?: (elementId: string) => void;
 }
 
 const tabs: Array<SegmentedTab<RightPanelTab>> = [
@@ -24,6 +29,10 @@ export function RightPanel({
   onTabChange,
   modelStates,
   onDownloadRequiredModels,
+  project,
+  activePageId,
+  selection,
+  onSelectElement,
 }: RightPanelProps) {
   return (
     <aside className="right-panel" aria-label="Editor tools">
@@ -35,7 +44,14 @@ export function RightPanel({
             onDownloadRequiredModels={onDownloadRequiredModels}
           />
         ) : null}
-        {activeTab === 'layout' ? <LayersPanel /> : null}
+        {activeTab === 'layout' ? (
+          <LayersPanel
+            project={project}
+            activePageId={activePageId}
+            selection={selection}
+            {...(onSelectElement ? { onSelectElement } : {})}
+          />
+        ) : null}
         {activeTab === 'design' ? <DesignPanel /> : null}
       </div>
     </aside>
