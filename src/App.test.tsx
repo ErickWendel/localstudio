@@ -6,6 +6,6 @@ describe('App', () => {
   it('renders the application root', () => {
     render(<App />);
 
-    expect(screen.getByTestId('app-root')).toHaveTextContent('EW Canvas AI');
+    expect(screen.getByText('EW Canvas AI')).toBeInTheDocument();
   });
 });
