@@ -6,13 +6,13 @@ import {
   MockSmartCropService,
   MockTranslatorService,
 } from '../services/inMemoryAiServices';
-import { IndexedDbProjectRepository } from '../services/indexedDbProjectRepository';
+import { DisabledProjectRepository } from '../services/disabledProjectRepository';
 import { InMemoryModelSetupService } from '../services/modelSetupService';
 
 export function createAppServices() {
   return {
     initialProject: createSampleProject(),
-    projectRepository: new IndexedDbProjectRepository(),
+    projectRepository: new DisabledProjectRepository(),
     modelSetupService: new InMemoryModelSetupService(),
     translatorService: new MockTranslatorService(),
     paletteService: new MockPaletteService(),
