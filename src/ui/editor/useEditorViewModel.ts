@@ -39,5 +39,18 @@ export function useEditorViewModel(services: AppServices) {
     void services.projectRepository.saveProject(project);
   }, [hasLoadedProject, project, services.projectRepository]);
 
-  return { project, activePageId, selection, activeTab, setActiveTab, modelStates };
+  async function downloadRequiredModels() {
+    const next = await services.modelSetupService.downloadRequiredModels();
+    setModelStates(next);
+  }
+
+  return {
+    project,
+    activePageId,
+    selection,
+    activeTab,
+    setActiveTab,
+    modelStates,
+    downloadRequiredModels,
+  };
 }

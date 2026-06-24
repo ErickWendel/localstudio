@@ -6,6 +6,7 @@ import { StatusPill } from '../components/StatusPill';
 
 interface AiToolsPanelProps {
   modelStates: ModelState[];
+  onDownloadRequiredModels?: (() => Promise<void>) | undefined;
 }
 
 const localTools = [
@@ -27,10 +28,23 @@ function statusTone(status: ModelState['status']) {
   return 'neutral';
 }
 
-export function AiToolsPanel({ modelStates }: AiToolsPanelProps) {
+function formatStatus(status: ModelState['status']) {
+  return status
+    .split('-')
+    .map((word) => word[0]?.toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+export function AiToolsPanel({ modelStates, onDownloadRequiredModels }: AiToolsPanelProps) {
   return (
     <div className="panel-stack">
-      <button className="download-models-button" type="button">
+      <button
+        className="download-models-button"
+        type="button"
+        onClick={() => {
+          void onDownloadRequiredModels?.();
+        }}
+      >
         Download Required Models
       </button>
       <PanelSection title="Local Chrome AI">
@@ -64,7 +78,7 @@ export function AiToolsPanel({ modelStates }: AiToolsPanelProps) {
                 </IconButton>
               </div>
               <div className="model-row-meta">
-                <StatusPill label={model.status.replace('-', ' ')} tone={statusTone(model.status)} />
+                <StatusPill label={formatStatus(model.status)} tone={statusTone(model.status)} />
                 <span>{model.progress}%</span>
               </div>
               <div className="model-progress" aria-label={`${model.label} progress`}>

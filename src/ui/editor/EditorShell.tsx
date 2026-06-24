@@ -30,6 +30,7 @@ export function EditorShell({ services }: EditorShellProps) {
           activeTab={vm.activeTab}
           onTabChange={vm.setActiveTab}
           modelStates={vm.modelStates}
+          onDownloadRequiredModels={vm.downloadRequiredModels}
         />
       </div>
     </div>

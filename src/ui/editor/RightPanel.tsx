@@ -10,6 +10,7 @@ interface RightPanelProps {
   activeTab: RightPanelTab;
   onTabChange: (tab: RightPanelTab) => void;
   modelStates: ModelState[];
+  onDownloadRequiredModels?: () => Promise<void>;
 }
 
 const tabs: Array<SegmentedTab<RightPanelTab>> = [
@@ -18,12 +19,22 @@ const tabs: Array<SegmentedTab<RightPanelTab>> = [
   { id: 'layers', label: 'Layers', icon: Layers3 },
 ];
 
-export function RightPanel({ activeTab, onTabChange, modelStates }: RightPanelProps) {
+export function RightPanel({
+  activeTab,
+  onTabChange,
+  modelStates,
+  onDownloadRequiredModels,
+}: RightPanelProps) {
   return (
     <aside className="right-panel" aria-label="Editor tools">
       <SegmentedTabs tabs={tabs} activeTab={activeTab} onTabChange={onTabChange} />
       <div className="right-panel-body">
-        {activeTab === 'ai-tools' ? <AiToolsPanel modelStates={modelStates} /> : null}
+        {activeTab === 'ai-tools' ? (
+          <AiToolsPanel
+            modelStates={modelStates}
+            onDownloadRequiredModels={onDownloadRequiredModels}
+          />
+        ) : null}
         {activeTab === 'design' ? <DesignPanel /> : null}
         {activeTab === 'layers' ? <LayersPanel /> : null}
       </div>
