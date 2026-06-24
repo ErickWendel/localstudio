@@ -18,6 +18,48 @@ The initial AI feature set is balanced:
 
 Chrome Built-in AI is the primary provider for language/design tasks. Hugging Face / Transformers.js browser models are used only when required for vision capabilities Chrome does not currently provide.
 
+## Implementation Status at 2026-06-24 Wrap-Up
+
+The current `main` branch contains a working browser-only editor shell aligned with the approved Stitch/EW Academy direction. The implementation is still an MVP scaffold, but the core local editor loop is now usable enough for iteration.
+
+Ready now:
+
+- React/Vite/TypeScript app scaffold with strict typing, ESLint, Prettier, Husky pre-commit hooks, Vitest, Testing Library, and Playwright configuration.
+- Approved dark EW Canvas AI shell with top toolbar, left slide rail, central Konva canvas, prompt bar, and right panel tabs ordered as `Layout`, `Design`, and `AI Tools`.
+- Local document model for projects, pages, assets, and layered text/image/shape elements.
+- Immutable command classes for alignment, z-order, frame transforms, text updates, layer reorder, visibility, locking, deletion, and adding imported image elements.
+- IndexedDB project persistence with startup normalization for older saved local documents.
+- Canvas element selection, drag, resize, rotate, text double-click editing, and locked-element transform prevention.
+- Layout panel selection sync: clicking a layer selects the matching canvas element.
+- Layout panel layer controls: drag/drop layer order, hide/show, lock/unlock, and delete.
+- Left rail local image import from disk. Imported images are inserted as topmost layers and selected immediately.
+- Image elements render actual image assets. The seeded selected image uses the provided remote image URL and preserves its natural `516 x 387` dimensions instead of scaling up. Imported images preserve natural size and only scale down when larger than the page.
+- AI Tools panel includes mocked local model readiness/download states and local Chrome AI tool cards.
+- Export service shell and mocked AI provider seams exist for later real provider work.
+- Unit/component tests are under `tests/unit`; browser specs are under `tests/e2e`.
+- Latest verified local checks: `npm run lint`, `npm run typecheck`, and `npm run test` pass.
+
+Known limitations in the current implementation:
+
+- Real Chrome Built-in AI providers are not wired yet.
+- Real Transformers.js / Hugging Face vision models are not wired yet.
+- AI actions are mocked UI flows, not real image/text transformations.
+- Export is still a service shell; production-quality canvas-to-PNG/PDF output needs implementation and browser verification.
+- Layer drag/drop works through the app UI and tested callbacks, but should receive more Playwright coverage after interaction stabilizes.
+- Page background is displayed as a static layer row and is not yet a fully editable/selectable element.
+- Undo/redo, duplicate, richer alignment commands, multi-select, and real property editing remain incomplete.
+- Local image assets are stored as data URLs in the document for now; larger asset blob storage remains a later hardening task.
+
+Next implementation priorities:
+
+1. Finish non-AI editor fundamentals: undo/redo command history, duplicate, full layer z-order buttons, alignment controls, and editable property fields.
+2. Harden asset storage: split large image blobs from project metadata while keeping document assets referenceable by ID.
+3. Complete export: current page PNG/JPEG and all-page PDF from the actual Konva stage at configured page dimensions.
+4. Add Playwright coverage for layer reorder, hide/show, lock/unlock, delete, local image import, and text editing.
+5. Build first-run AI setup UX with actual browser capability checks and provider readiness state.
+6. Wire real Chrome Built-in AI translation and prompt-to-palette providers.
+7. Wire the first real browser vision provider, starting with background removal or Magic Eraser segmentation.
+
 ## Goals
 
 - Provide a usable layered slide/image editor that runs entirely in the browser.
