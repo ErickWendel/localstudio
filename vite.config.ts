@@ -5,8 +5,9 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'jsdom',
-    exclude: ['tests/e2e/**', 'node_modules/**', 'dist/**'],
+    exclude: ['.worktrees/**', 'dist/**', 'node_modules/**', 'tests/e2e/**'],
     globals: true,
+    include: ['tests/unit/**/*.test.ts', 'tests/unit/**/*.test.tsx'],
     setupFiles: './tests/setup/testUtils.tsx',
   },
 });

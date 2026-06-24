@@ -14,9 +14,9 @@ interface RightPanelProps {
 }
 
 const tabs: Array<SegmentedTab<RightPanelTab>> = [
-  { id: 'ai-tools', label: 'AI Tools', icon: Sparkles },
+  { id: 'layout', label: 'Layout', icon: Layers3 },
   { id: 'design', label: 'Design', icon: Brush },
-  { id: 'layers', label: 'Layers', icon: Layers3 },
+  { id: 'ai-tools', label: 'AI Tools', icon: Sparkles },
 ];
 
 export function RightPanel({
@@ -35,8 +35,8 @@ export function RightPanel({
             onDownloadRequiredModels={onDownloadRequiredModels}
           />
         ) : null}
+        {activeTab === 'layout' ? <LayersPanel /> : null}
         {activeTab === 'design' ? <DesignPanel /> : null}
-        {activeTab === 'layers' ? <LayersPanel /> : null}
       </div>
     </aside>
   );

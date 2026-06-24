@@ -12,7 +12,7 @@ test('renders the editor shell and tabs', async ({ page }) => {
   await page.getByRole('tab', { name: 'Design' }).click();
   await expect(page.getByText('16:9 Presentation')).toBeVisible();
 
-  await page.getByRole('tab', { name: 'Layers' }).click();
+  await page.getByRole('tab', { name: 'Layout' }).click();
   await expect(page.getByText('5 layers on current page')).toBeVisible();
 
   await page.getByRole('tab', { name: 'AI Tools' }).click();
@@ -21,6 +21,7 @@ test('renders the editor shell and tabs', async ({ page }) => {
 
 test('downloads required model states', async ({ page }) => {
   await page.goto('/');
+  await page.getByRole('tab', { name: 'AI Tools' }).click();
   await page.getByRole('button', { name: 'Download Required Models' }).click();
   await expect(page.getByText('Ready').first()).toBeVisible();
 });

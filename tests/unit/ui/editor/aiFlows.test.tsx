@@ -8,6 +8,7 @@ describe('mocked AI flows', () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
 
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
     await user.click(screen.getByRole('button', { name: 'Download Required Models' }));
 
     expect(await screen.findAllByText('Ready')).toHaveLength(3);

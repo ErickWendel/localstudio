@@ -38,3 +38,19 @@ Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
     return { ...canvasContext, canvas: this } as unknown as CanvasRenderingContext2D;
   },
 });
+
+class ResizeObserverMock implements ResizeObserver {
+  observe() {
+    return undefined;
+  }
+
+  unobserve() {
+    return undefined;
+  }
+
+  disconnect() {
+    return undefined;
+  }
+}
+
+globalThis.ResizeObserver = ResizeObserverMock;

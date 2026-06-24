@@ -3,6 +3,7 @@ import {
   DeleteElementCommand,
   SetZOrderCommand,
   UpdateElementFrameCommand,
+  UpdateTextContentCommand,
 } from '../../../../src/domain/commands/basicCommands';
 import { createSampleProject } from '../../../../src/domain/sampleProject';
 
@@ -60,5 +61,15 @@ describe('editor commands', () => {
       height: 650,
       rotation: 0,
     });
+  });
+
+  it('updates text content immutably', () => {
+    const project = createSampleProject();
+    const command = new UpdateTextContentCommand('text-title', 'Edited headline');
+    const next = command.execute(project);
+
+    expect(next).not.toBe(project);
+    expect(next.elements['text-title']).toMatchObject({ text: 'Edited headline' });
+    expect(project.elements['text-title']).toMatchObject({ text: 'AI Design Revolution' });
   });
 });

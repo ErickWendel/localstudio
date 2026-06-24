@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { AppServices } from '../../app/composition';
-import { UpdateElementFrameCommand, type ElementFramePatch } from '../../domain/commands/basicCommands';
+import {
+  UpdateElementFrameCommand,
+  UpdateTextContentCommand,
+  type ElementFramePatch,
+} from '../../domain/commands/basicCommands';
 import type { ProjectDocument, SelectionState } from '../../domain/model';
 import type { ModelState } from '../../services/interfaces';
 
-export type RightPanelTab = 'design' | 'layers' | 'ai-tools';
+export type RightPanelTab = 'layout' | 'design' | 'ai-tools';
 
 export function useEditorViewModel(services: AppServices) {
   const [project, setProject] = useState<ProjectDocument>(services.initialProject);
-  const [activeTab, setActiveTab] = useState<RightPanelTab>('ai-tools');
+  const [activeTab, setActiveTab] = useState<RightPanelTab>('layout');
   const [modelStates, setModelStates] = useState<ModelState[]>([]);
   const [hasLoadedProject, setHasLoadedProject] = useState(false);
   const activePageId = project.pages[0]?.id ?? '';
@@ -54,6 +58,10 @@ export function useEditorViewModel(services: AppServices) {
     setProject((currentProject) => new UpdateElementFrameCommand(elementId, patch).execute(currentProject));
   }
 
+  function updateTextContent(elementId: string, text: string) {
+    setProject((currentProject) => new UpdateTextContentCommand(elementId, text).execute(currentProject));
+  }
+
   return {
     project,
     activePageId,
@@ -64,5 +72,6 @@ export function useEditorViewModel(services: AppServices) {
     downloadRequiredModels,
     selectElement,
     updateElementFrame,
+    updateTextContent,
   };
 }

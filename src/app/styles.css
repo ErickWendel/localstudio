@@ -553,6 +553,22 @@ button {
     #050d10;
 }
 
+.canvas-text-editor {
+  position: absolute;
+  z-index: 8;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--ew-green);
+  border-radius: 2px;
+  outline: 0;
+  background: rgba(5, 13, 16, 0.72);
+  box-shadow: 0 0 18px rgba(55, 253, 118, 0.18);
+  line-height: 1.08;
+  padding: 0;
+  resize: none;
+  transform-origin: top left;
+}
+
 .canvas-image-card {
   position: absolute;
   inset: 18% 18% 20%;

@@ -19,7 +19,7 @@ export function EditorShell({ services }: EditorShellProps) {
         project={vm.project}
         language="PT-BR"
         onSelectLayers={() => {
-          vm.setActiveTab('layers');
+          vm.setActiveTab('layout');
         }}
       />
       <div className="editor-grid">
@@ -31,6 +31,7 @@ export function EditorShell({ services }: EditorShellProps) {
             selection={vm.selection}
             onSelectElement={vm.selectElement}
             onUpdateElementFrame={vm.updateElementFrame}
+            onUpdateTextContent={vm.updateTextContent}
           />
           <PromptBar />
         </section>

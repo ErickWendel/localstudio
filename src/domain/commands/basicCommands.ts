@@ -123,3 +123,29 @@ export class UpdateElementFrameCommand implements EditorCommand {
     };
   }
 }
+
+export class UpdateTextContentCommand implements EditorCommand {
+  readonly description = 'Update text content';
+
+  constructor(
+    private readonly elementId: string,
+    private readonly text: string,
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    const element = project.elements[this.elementId];
+    if (!element || element.type !== 'text' || element.locked) return project;
+
+    return {
+      ...project,
+      elements: {
+        ...project.elements,
+        [this.elementId]: {
+          ...element,
+          text: this.text,
+        },
+      },
+      updatedAt: new Date().toISOString(),
+    };
+  }
+}

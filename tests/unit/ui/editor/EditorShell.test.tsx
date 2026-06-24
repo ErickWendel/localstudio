@@ -13,19 +13,16 @@ describe('EditorShell', () => {
     expect(
       screen.getByPlaceholderText('Describe slide structure or organize current content...'),
     ).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'AI Tools' })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
+    expect(screen.getByRole('tab', { name: 'Layout' })).toHaveAttribute('aria-selected', 'true');
   });
 
-  it('switches to the layers panel from the header view menu', async () => {
+  it('switches to the layout panel from the header view menu', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
 
     await user.click(screen.getByRole('button', { name: 'View' }));
     await user.click(screen.getByRole('menuitem', { name: 'Toggle Layers Panel' }));
 
-    expect(screen.getByRole('tab', { name: 'Layers' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Layout' })).toHaveAttribute('aria-selected', 'true');
   });
 });

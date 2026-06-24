@@ -31,10 +31,10 @@ const modelStates = [
 ];
 
 describe('RightPanel', () => {
-  it('switches between AI Tools, Design, and Layers tabs', async () => {
+  it('switches between Layout, Design, and AI Tools tabs', async () => {
     const user = userEvent.setup();
-    let activeTab: 'design' | 'layers' | 'ai-tools' = 'ai-tools';
-    const onTabChange = vi.fn((tab: 'design' | 'layers' | 'ai-tools') => {
+    let activeTab: 'layout' | 'design' | 'ai-tools' = 'layout';
+    const onTabChange = vi.fn((tab: 'layout' | 'design' | 'ai-tools') => {
       activeTab = tab;
     });
 
@@ -42,16 +42,17 @@ describe('RightPanel', () => {
       <RightPanel activeTab={activeTab} onTabChange={onTabChange} modelStates={modelStates} />,
     );
 
-    expect(screen.getByText('Download Required Models')).toBeInTheDocument();
-    expect(screen.getByText('Background Remover')).toBeInTheDocument();
-    expect(screen.getByText('Magic Eraser')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Layout' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('5 layers on current page')).toBeInTheDocument();
+    expect(screen.getByText('Selected Image')).toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: 'Design' }));
     rerender(<RightPanel activeTab="design" onTabChange={onTabChange} modelStates={modelStates} />);
     expect(screen.getByText('16:9 Presentation')).toBeInTheDocument();
     expect(screen.getByText('Text-to-Palette')).toBeInTheDocument();
-    await user.click(screen.getByRole('tab', { name: 'Layers' }));
-    rerender(<RightPanel activeTab="layers" onTabChange={onTabChange} modelStates={modelStates} />);
-    expect(screen.getByText('5 layers on current page')).toBeInTheDocument();
-    expect(screen.getByText('Selected Image')).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    rerender(<RightPanel activeTab="ai-tools" onTabChange={onTabChange} modelStates={modelStates} />);
+    expect(screen.getByText('Download Required Models')).toBeInTheDocument();
+    expect(screen.getByText('Background Remover')).toBeInTheDocument();
+    expect(screen.getByText('Magic Eraser')).toBeInTheDocument();
   });
 });
