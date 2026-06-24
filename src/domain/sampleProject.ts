@@ -1,7 +1,14 @@
 import type { ProjectDocument } from './model';
+import { fitImageWithinPage } from './imageSizing';
 
 export const SAMPLE_HERO_IMAGE_URL =
   'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRe1Oh1Q3hIcQYKNHc_GwRcQnT6uSgL02RVLBpt4tWMfYKZ2Ja97objCe8&s=10';
+export const SAMPLE_HERO_IMAGE_SIZE = fitImageWithinPage({
+  imageWidth: 516,
+  imageHeight: 387,
+  pageWidth: 1920,
+  pageHeight: 1080,
+});
 
 export function createSampleProject(): ProjectDocument {
   const now = new Date('2026-06-24T00:00:00.000Z').toISOString();
@@ -65,10 +72,10 @@ export function createSampleProject(): ProjectDocument {
         id: 'image-hero',
         type: 'image',
         assetId: 'asset-hero',
-        x: 360,
-        y: 210,
-        width: 1200,
-        height: 650,
+        x: SAMPLE_HERO_IMAGE_SIZE.x,
+        y: SAMPLE_HERO_IMAGE_SIZE.y,
+        width: SAMPLE_HERO_IMAGE_SIZE.width,
+        height: SAMPLE_HERO_IMAGE_SIZE.height,
         rotation: 0,
         locked: false,
         visible: true,

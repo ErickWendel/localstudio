@@ -18,8 +18,8 @@ describe('editor commands', () => {
     const next = command.execute(project);
 
     expect(next).not.toBe(project);
-    expect(next.elements['image-hero']?.x).toBe((1920 - 1200) / 2);
-    expect(project.elements['image-hero']?.x).toBe(360);
+    expect(next.elements['image-hero']?.x).toBe((1920 - 516) / 2);
+    expect(project.elements['image-hero']?.x).toBe(702);
   });
 
   it('brings an element to front by moving its id to the end', () => {
@@ -69,10 +69,10 @@ describe('editor commands', () => {
       rotation: 12,
     });
     expect(project.elements['image-hero']).toMatchObject({
-      x: 360,
-      y: 210,
-      width: 1200,
-      height: 650,
+      x: 702,
+      y: 347,
+      width: 516,
+      height: 387,
       rotation: 0,
     });
   });

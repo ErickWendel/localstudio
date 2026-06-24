@@ -10,8 +10,9 @@ import {
   UpdateTextContentCommand,
   type ElementFramePatch,
 } from '../../domain/commands/basicCommands';
+import { fitImageWithinPage } from '../../domain/imageSizing';
 import type { ProjectDocument, SelectionState } from '../../domain/model';
-import { SAMPLE_HERO_IMAGE_URL } from '../../domain/sampleProject';
+import { SAMPLE_HERO_IMAGE_SIZE, SAMPLE_HERO_IMAGE_URL } from '../../domain/sampleProject';
 import type { ModelState } from '../../services/interfaces';
 
 export type RightPanelTab = 'layout' | 'design' | 'ai-tools';
@@ -22,7 +23,17 @@ function normalizeProjectDocument(project: ProjectDocument): ProjectDocument {
   const elements: ProjectDocument['elements'] = {};
 
   for (const [id, element] of Object.entries(project.elements)) {
-    elements[id] = { ...element, visible: element.visible ?? true };
+    const isLegacyScaledHero =
+      id === 'image-hero' &&
+      element.type === 'image' &&
+      element.assetId === 'asset-hero' &&
+      element.width === 1200 &&
+      element.height === 650;
+    elements[id] = {
+      ...element,
+      ...(isLegacyScaledHero ? SAMPLE_HERO_IMAGE_SIZE : {}),
+      visible: element.visible ?? true,
+    };
   }
 
   if (shouldRestoreHeroImage) {
@@ -30,10 +41,10 @@ function normalizeProjectDocument(project: ProjectDocument): ProjectDocument {
       id: 'image-hero',
       type: 'image',
       assetId: 'asset-hero',
-      x: 360,
-      y: 210,
-      width: 1200,
-      height: 650,
+      x: SAMPLE_HERO_IMAGE_SIZE.x,
+      y: SAMPLE_HERO_IMAGE_SIZE.y,
+      width: SAMPLE_HERO_IMAGE_SIZE.width,
+      height: SAMPLE_HERO_IMAGE_SIZE.height,
       rotation: 0,
       locked: false,
       visible: true,
@@ -87,6 +98,19 @@ function readImageFileAsDataUrl(file: File) {
       reject(reader.error ?? new Error('Image file could not be read.'));
     });
     reader.readAsDataURL(file);
+  });
+}
+
+function readImageSize(src: string) {
+  return new Promise<{ width: number; height: number }>((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener('load', () => {
+      resolve({ width: image.naturalWidth, height: image.naturalHeight });
+    });
+    image.addEventListener('error', () => {
+      reject(new Error('Image dimensions could not be read.'));
+    });
+    image.src = src;
   });
 }
 
@@ -190,13 +214,18 @@ export function useEditorViewModel(services: AppServices) {
 
   async function importImageFile(file: File) {
     const dataUrl = await readImageFileAsDataUrl(file);
+    const imageSize = await readImageSize(dataUrl);
     const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
     if (!page) return;
 
     const assetId = createId('asset');
     const elementId = createId('image');
-    const imageWidth = Math.round(page.width * 0.5);
-    const imageHeight = Math.round(page.height * 0.5);
+    const fittedImage = fitImageWithinPage({
+      imageWidth: imageSize.width,
+      imageHeight: imageSize.height,
+      pageWidth: page.width,
+      pageHeight: page.height,
+    });
 
     setProject((currentProject) =>
       new AddImageElementCommand(activePageId, {
@@ -211,10 +240,10 @@ export function useEditorViewModel(services: AppServices) {
           id: elementId,
           type: 'image',
           assetId,
-          x: Math.round((page.width - imageWidth) / 2),
-          y: Math.round((page.height - imageHeight) / 2),
-          width: imageWidth,
-          height: imageHeight,
+          x: fittedImage.x,
+          y: fittedImage.y,
+          width: fittedImage.width,
+          height: fittedImage.height,
           rotation: 0,
           locked: false,
           visible: true,
