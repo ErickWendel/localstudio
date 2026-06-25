@@ -2,8 +2,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { createAppServices } from '../../../../src/app/composition';
-import type { Asset } from '../../../../src/domain/model';
-import type { BackgroundRemovalService } from '../../../../src/services/interfaces';
+import type { Asset, ProjectDocument } from '../../../../src/domain/model';
+import type { BackgroundRemovalService, ProjectRepository } from '../../../../src/services/interfaces';
 import { InMemoryModelSetupService } from '../../../../src/services/modelSetupService';
 import { EditorShell } from '../../../../src/ui/editor/EditorShell';
 
@@ -26,11 +26,37 @@ class InstantBackgroundRemovalService implements BackgroundRemovalService {
   }
 }
 
+class RejectingProjectRepository implements ProjectRepository {
+  loadProject(): Promise<ProjectDocument | null> {
+    return Promise.resolve(null);
+  }
+
+  saveProject(): Promise<void> {
+    return Promise.reject(new Error('Folder permission denied'));
+  }
+}
+
+class ImportingProjectRepository implements ProjectRepository {
+  constructor(private readonly project: ProjectDocument) {}
+
+  importProject(): Promise<ProjectDocument | null> {
+    return Promise.resolve(this.project);
+  }
+
+  loadProject(): Promise<ProjectDocument | null> {
+    return Promise.resolve(null);
+  }
+
+  saveProject(): Promise<void> {
+    return Promise.resolve();
+  }
+}
+
 describe('EditorShell', () => {
   it('renders the approved editor shell landmarks', () => {
     render(<EditorShell services={createAppServices()} />);
 
-    expect(screen.getByText('EW Canvas AI')).toBeInTheDocument();
+    expect(screen.getByText('LocalStudio.ai')).toBeInTheDocument();
     expect(screen.getByText('Untitled AI Deck')).toBeInTheDocument();
     expect(screen.getByText('PT-BR')).toBeInTheDocument();
     expect(
@@ -94,6 +120,36 @@ describe('EditorShell', () => {
 
     await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
 
+    expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
+  });
+
+  it('keeps persistence disabled when the project folder cannot be saved', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    services.projectRepository = new RejectingProjectRepository();
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+
+    expect(await screen.findByRole('button', { name: 'Persistence disabled' })).toBeInTheDocument();
+  });
+
+  it('imports an existing project from the File menu', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    services.projectRepository = new ImportingProjectRepository({
+      ...services.initialProject,
+      id: 'imported-project',
+      name: 'Imported LocalStudio Project',
+    });
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Import Project' }));
+
+    expect(
+      await screen.findByRole('button', { name: 'Edit project name Imported LocalStudio Project' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
   });
 

@@ -1,8 +1,8 @@
-# EW Canvas AI Stitch Handoff
+# LocalStudio.ai Stitch Handoff
 
 Date: 2026-06-24
 
-This folder contains the approved Google Stitch design artifacts for the Canva Web AI Clone MVP editor shell.
+This folder contains the approved Google Stitch design artifacts for the LocalStudio.ai MVP editor shell.
 
 ## Project
 

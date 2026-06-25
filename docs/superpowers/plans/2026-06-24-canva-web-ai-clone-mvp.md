@@ -1,12 +1,16 @@
-# Canva Web AI Clone MVP Implementation Plan
+# LocalStudio.ai MVP Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
-**Goal:** Build the local-only EW Canvas AI MVP: a browser-based layered slides/image editor with the approved Stitch shell, tabbed right panel, command model, local persistence, export flows, and mocked browser-AI workflows.
+**Goal:** Build the local-only LocalStudio.ai MVP: a browser-based layered slides/image editor with the approved Stitch shell, tabbed right panel, command model, local persistence, export flows, and mocked browser-AI workflows.
 
 **Architecture:** React + Vite renders the approved EW Academy/Stitch UI shell, while domain state lives in immutable TypeScript models updated through command classes. Application services are class-based and injected through a composition root so UI, persistence, export, and AI providers remain testable and replaceable.
 
-**Tech Stack:** React, Vite, TypeScript strict mode, Konva/React Konva, IndexedDB via `idb`, jsPDF, lucide-react, Vitest, Testing Library, fake-indexeddb, Playwright, ESLint, Prettier, Husky.
+**Tech Stack:** React, Vite, TypeScript strict mode, Konva/React Konva, browser File System Access API for project files, lightweight browser storage for preferences/readiness metadata, jsPDF, lucide-react, Vitest, Testing Library, Playwright, ESLint, Prettier, Husky.
+
+**Updated product name:** The MVP product name is `LocalStudio.ai`. Use this in browser titles, headers, README copy, tests, and user-facing docs. Keep `EW Academy` references only for visual identity, color, and typography direction.
+
+**Updated persistence direction:** LocalStudio.ai now uses browser-mediated disk storage with the File System Access API when supported. The current scaffold writes `project.json`, writes `config/localstudio.json`, and creates `assets/`, `config/`, and `cache/` in the selected project folder. Future storage-hardening work should move document-embedded data URLs into files under `assets/` and use `cache/` for generated previews/masks. AI model weights remain in Chrome/Transformers.js provider-managed browser caches.
 
 ---
 
@@ -108,7 +112,7 @@ Use this content as the target shape:
 
 ```json
 {
-  "name": "canva-webai-clone",
+  "name": "localstudio-ai",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -255,7 +259,7 @@ import 'fake-indexeddb/auto';
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EW Canvas AI</title>
+    <title>LocalStudio.ai</title>
   </head>
   <body>
     <div id="root"></div>
@@ -283,7 +287,7 @@ createRoot(document.getElementById('root') as HTMLElement).render(
 
 ```tsx
 export function App() {
-  return <main data-testid="app-root">EW Canvas AI</main>;
+  return <main data-testid="app-root">LocalStudio.ai</main>;
 }
 ```
 
@@ -1080,7 +1084,7 @@ describe('EditorShell', () => {
   it('renders the approved editor shell landmarks', async () => {
     render(<EditorShell services={createAppServices()} />);
 
-    expect(screen.getByText('EW Canvas AI')).toBeInTheDocument();
+    expect(screen.getByText('LocalStudio.ai')).toBeInTheDocument();
     expect(screen.getByText('Untitled AI Deck')).toBeInTheDocument();
     expect(screen.getByText('PT-BR')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Describe slide structure or organize current content...')).toBeInTheDocument();
@@ -1776,7 +1780,7 @@ import { expect, test } from '@playwright/test';
 test('renders the editor shell and tabs', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page.getByText('EW Canvas AI')).toBeVisible();
+  await expect(page.getByText('LocalStudio.ai')).toBeVisible();
   await expect(page.getByText('Untitled AI Deck')).toBeVisible();
   await expect(page.getByPlaceholder('Describe slide structure or organize current content...')).toBeVisible();
 
@@ -1834,7 +1838,7 @@ git commit -m "test: add editor Playwright coverage"
 `README.md`:
 
 ```md
-# EW Canvas AI
+# LocalStudio.ai
 
 Browser-only Canva-style slides and image editor MVP.
 

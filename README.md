@@ -1,4 +1,4 @@
-# EW Canvas AI
+# LocalStudio.ai
 
 Browser-only Canva-style slides and image editor MVP.
 

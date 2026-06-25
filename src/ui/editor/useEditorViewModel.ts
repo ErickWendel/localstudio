@@ -232,7 +232,12 @@ export function useEditorViewModel(services: AppServices) {
 
   useEffect(() => {
     if (!hasLoadedProject || !persistenceEnabled) return;
-    void services.projectRepository.saveProject(project);
+    void services.projectRepository.saveProject(project).catch(() => {
+      setPersistenceEnabled(false);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'false');
+      }
+    });
   }, [hasLoadedProject, persistenceEnabled, project, services.projectRepository]);
 
   useEffect(
@@ -349,13 +354,54 @@ export function useEditorViewModel(services: AppServices) {
     }));
   }
 
-  function setPersistence(nextEnabled: boolean) {
-    setPersistenceEnabled(nextEnabled);
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, String(nextEnabled));
+  async function setPersistence(nextEnabled: boolean) {
+    if (!nextEnabled) {
+      setPersistenceEnabled(false);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'false');
+      }
+      return;
     }
-    if (nextEnabled) {
-      void services.projectRepository.saveProject(project);
+
+    try {
+      await services.projectRepository.saveProject(project);
+      setPersistenceEnabled(true);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'true');
+      }
+    } catch {
+      setPersistenceEnabled(false);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'false');
+      }
+    }
+  }
+
+  async function importProject() {
+    if (!services.projectRepository.importProject) return;
+    try {
+      const importedProject = await services.projectRepository.importProject();
+      if (!importedProject) return;
+      const normalizedProject = normalizeProjectDocument(importedProject);
+      setProject(normalizedProject);
+      setActivePageId(normalizedProject.pages[0]?.id ?? '');
+      const nextSelectedId = normalizedProject.pages[0]?.elementIds.at(-1);
+      setSelectedElementIds(nextSelectedId ? [nextSelectedId] : []);
+      setHistory({ past: [], future: [] });
+      setBackgroundSelectionMode(false);
+      setBackgroundSelectionNotice(undefined);
+      clearBackgroundPreview();
+      clearBackgroundPreparation();
+      clearBackgroundSelectionPoints();
+      setPersistenceEnabled(true);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'true');
+      }
+    } catch {
+      setPersistenceEnabled(false);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'false');
+      }
     }
   }
 
@@ -821,6 +867,7 @@ export function useEditorViewModel(services: AppServices) {
     modelStates,
     setProjectName,
     setPersistence,
+    importProject,
     downloadRequiredModels,
     downloadModel,
     selectElement,

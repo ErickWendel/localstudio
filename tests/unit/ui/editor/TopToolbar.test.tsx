@@ -8,6 +8,8 @@ describe('TopToolbar', () => {
   it('opens Stitch header menus and wires available actions', async () => {
     const user = userEvent.setup();
     const onExport = vi.fn();
+    const onImportProject = vi.fn();
+    const onPersistenceToggle = vi.fn();
     const onSelectLayers = vi.fn();
 
     render(
@@ -15,13 +17,20 @@ describe('TopToolbar', () => {
         project={createSampleProject()}
         language="PT-BR"
         onExport={onExport}
+        onImportProject={onImportProject}
+        onPersistenceToggle={onPersistenceToggle}
         onSelectLayers={onSelectLayers}
       />,
     );
 
     await user.click(screen.getByRole('button', { name: 'File' }));
     expect(screen.getByRole('menuitem', { name: 'New Project' })).toBeDisabled();
-    expect(screen.getByRole('menuitem', { name: 'Save Local' })).toBeDisabled();
+    await user.click(screen.getByRole('menuitem', { name: 'Import Project' }));
+    expect(onImportProject).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Save Local' }));
+    expect(onPersistenceToggle).toHaveBeenCalledWith(true);
+    await user.click(screen.getByRole('button', { name: 'File' }));
     await user.click(screen.getByRole('menuitem', { name: 'Export' }));
     expect(onExport).toHaveBeenCalledTimes(1);
 

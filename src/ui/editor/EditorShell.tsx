@@ -122,7 +122,12 @@ export function EditorShell({ services }: EditorShellProps) {
         onDelete={vm.deleteSelectedElement}
         onDuplicate={vm.duplicateSelectedElement}
         onExport={exportCurrentPageAsPng}
-        onPersistenceToggle={vm.setPersistence}
+        onImportProject={() => {
+          void vm.importProject();
+        }}
+        onPersistenceToggle={(enabled) => {
+          void vm.setPersistence(enabled);
+        }}
         onProjectNameChange={vm.setProjectName}
         onRedo={vm.redo}
         onResetZoom={vm.resetZoom}

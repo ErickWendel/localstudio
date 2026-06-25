@@ -18,7 +18,8 @@ import {
 } from '../services/inMemoryAiServices';
 import { BrowserExportService } from '../services/exportService';
 import { BrowserBackgroundRemovalService } from '../services/browserBackgroundRemovalService';
-import { IndexedDbProjectRepository } from '../services/indexedDbProjectRepository';
+import { BrowserFileSystemProjectRepository } from '../services/browserFileSystemProjectRepository';
+import { DisabledProjectRepository } from '../services/disabledProjectRepository';
 import { BrowserModelSetupService } from '../services/modelSetupService';
 
 export interface AppServices {
@@ -36,7 +37,7 @@ export interface AppServices {
 export function createAppServices(): AppServices {
   return {
     initialProject: createSampleProject(),
-    projectRepository: new IndexedDbProjectRepository(),
+    projectRepository: createProjectRepository(),
     exportService: new BrowserExportService(),
     modelSetupService: new BrowserModelSetupService(),
     translatorService: new MockTranslatorService(),
@@ -45,4 +46,14 @@ export function createAppServices(): AppServices {
     smartGrabService: new MockSmartGrabService(),
     magicEraserService: new MockMagicEraserService(),
   };
+}
+
+function createProjectRepository(): ProjectRepository {
+  if (
+    typeof window !== 'undefined' &&
+    typeof (window as Window & { showDirectoryPicker?: unknown }).showDirectoryPicker === 'function'
+  ) {
+    return new BrowserFileSystemProjectRepository();
+  }
+  return new DisabledProjectRepository();
 }

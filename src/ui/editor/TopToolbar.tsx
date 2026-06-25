@@ -12,6 +12,7 @@ interface TopToolbarProps {
   onDelete?: () => void;
   onDuplicate?: () => void;
   onExport?: () => void;
+  onImportProject?: () => void;
   onPersistenceToggle?: (enabled: boolean) => void;
   onProjectNameChange?: (name: string) => void;
   onRedo?: () => void;
@@ -43,6 +44,7 @@ export function TopToolbar({
   onDelete,
   onDuplicate,
   onExport,
+  onImportProject,
   onPersistenceToggle,
   onProjectNameChange,
   onRedo,
@@ -88,7 +90,8 @@ export function TopToolbar({
   const menuActions: Record<HeaderMenu, HeaderMenuAction[]> = {
     File: [
       { label: 'New Project', disabled: true },
-      { label: 'Save Local', disabled: true },
+      { label: 'Import Project', disabled: !onImportProject, onSelect: onImportProject },
+      { label: 'Save Local', onSelect: () => onPersistenceToggle?.(true) },
       { label: 'Export', onSelect: triggerExport },
     ],
     Edit: [
@@ -120,7 +123,7 @@ export function TopToolbar({
   return (
     <header className="top-toolbar">
       <div className="toolbar-left">
-        <h1 className="toolbar-product-title font-orbitron">EW Canvas AI</h1>
+        <h1 className="toolbar-product-title font-orbitron">LocalStudio.ai</h1>
         <nav className="toolbar-menu" aria-label="Application menu">
           {menuLabels.map((item) => (
             <div className="toolbar-menu-shell" key={item}>

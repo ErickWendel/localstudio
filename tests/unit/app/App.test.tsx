@@ -6,6 +6,6 @@ describe('App', () => {
   it('renders the application root', () => {
     render(<App />);
 
-    expect(screen.getByText('EW Canvas AI')).toBeInTheDocument();
+    expect(screen.getByText('LocalStudio.ai')).toBeInTheDocument();
   });
 });

@@ -1,4 +1,4 @@
-# Canva Web AI Clone MVP Design
+# LocalStudio.ai MVP Design
 
 Date: 2026-06-24
 
@@ -6,7 +6,7 @@ Date: 2026-06-24
 
 Build a browser-only MVP for a Canva-like slides and image editor. The working context is a slide/page-based editor: users create a project with multiple pages, place layered elements on each page, and export pages as images or the full project as a PDF deck.
 
-The MVP is local-only. Projects, assets, setup metadata, and user state live in the browser. There are no accounts, backend services, cloud sync, collaboration, or server-side AI in the MVP.
+The MVP is local-only. Project data lives in user-selected files/folders on disk through the browser File System Access API, while lightweight app preferences and provider readiness metadata may live in browser storage. There are no accounts, backend services, cloud sync, collaboration, or server-side AI in the MVP.
 
 The initial AI feature set is balanced:
 
@@ -25,10 +25,10 @@ The current `main` branch contains a working browser-only editor shell aligned w
 Ready now:
 
 - React/Vite/TypeScript app scaffold with strict typing, ESLint, Prettier, Husky pre-commit hooks, Vitest, Testing Library, and Playwright configuration.
-- Approved dark EW Canvas AI shell with top toolbar, left slide rail, central Konva canvas, prompt bar, and right panel tabs ordered as `Layout`, `Design`, and `AI Tools`.
+- Approved dark LocalStudio.ai shell with top toolbar, left slide rail, central Konva canvas, prompt bar, and right panel tabs ordered as `Layout`, `Design`, and `AI Tools`.
 - Local document model for projects, pages, assets, and layered text/image/shape elements.
 - Immutable command classes for alignment, z-order, frame transforms, text updates, layer reorder, visibility, locking, deletion, and adding imported image elements.
-- IndexedDB project persistence with startup normalization for older saved local documents.
+- File System Access API project persistence scaffold. When supported, clicking the persistence icon or `File > Save Local` asks for a project folder, writes `project.json`, writes `config/localstudio.json`, and creates `assets/`, `config/`, and `cache/` folders. `File > Import Project` opens an existing project folder by reading its `project.json`.
 - Canvas element selection, drag, resize, rotate, text double-click editing, and locked-element transform prevention.
 - Layout panel selection sync: clicking a layer selects the matching canvas element.
 - Layout panel layer controls: drag/drop layer order, hide/show, lock/unlock, and delete.
@@ -42,28 +42,28 @@ Ready now:
 Known limitations in the current implementation:
 
 - Real Chrome Built-in AI providers are not wired yet.
-- Real Transformers.js / Hugging Face vision models are not wired yet.
-- AI actions are mocked UI flows, not real image/text transformations.
+- The first real Transformers.js / Hugging Face vision provider is wired for click-guided background removal through Segment Anything WebGPU.
+- Translation, palette generation, Smart Grab, and Magic Eraser are still mocked or incomplete workflows.
 - Export is still a service shell; production-quality canvas-to-PNG/PDF output needs implementation and browser verification.
 - Layer drag/drop works through the app UI and tested callbacks, but should receive more Playwright coverage after interaction stabilizes.
 - Page background is displayed as a static layer row and is not yet a fully editable/selectable element.
 - Undo/redo, duplicate, richer alignment commands, multi-select, and real property editing remain incomplete.
-- Local image assets are stored as data URLs in the document for now; larger asset blob storage remains a later hardening task.
+- Local image assets are still stored as data URLs inside `project.json`; moving original/imported/generated image blobs into `assets/` is the next storage-hardening step.
 
 Next implementation priorities:
 
 1. Finish non-AI editor fundamentals: undo/redo command history, duplicate, full layer z-order buttons, alignment controls, and editable property fields.
-2. Harden asset storage: split large image blobs from project metadata while keeping document assets referenceable by ID.
+2. Harden File System Access project storage: move original/imported/generated image blobs into `assets/`, keep metadata in `project.json`, and keep generated previews/masks in `cache/`.
 3. Complete export: current page PNG/JPEG and all-page PDF from the actual Konva stage at configured page dimensions.
-4. Add Playwright coverage for layer reorder, hide/show, lock/unlock, delete, local image import, and text editing.
+4. Add Playwright coverage for layer reorder, hide/show, lock/unlock, delete, local image import, filesystem save, and text editing.
 5. Build first-run AI setup UX with actual browser capability checks and provider readiness state.
 6. Wire real Chrome Built-in AI translation and prompt-to-palette providers.
-7. Wire the first real browser vision provider, starting with click-subject background removal through Segment Anything WebGPU.
+7. Build Smart Grab and Magic Eraser on top of the shared Segment Anything WebGPU image editing provider.
 
 ## Goals
 
 - Provide a usable layered slide/image editor that runs entirely in the browser.
-- Support local project persistence through IndexedDB.
+- Support local project persistence through browser-mediated disk storage with the File System Access API.
 - Support PNG/JPEG export per page and PDF export for a deck.
 - Provide an explicit first-run AI setup flow for required local model dependencies.
 - Keep the codebase maintainable through strict typing, command-driven state updates, dependency injection, class-based services, linting, hooks, and automated tests.
@@ -150,7 +150,7 @@ The app is organized into clear layers:
 - Application services: class-based services that coordinate editor actions, persistence, AI operations, setup, and export.
 - Domain model: immutable project/page/element data structures and command objects.
 - Provider adapters: concrete integrations for Chrome Built-in AI and Transformers.js.
-- Infrastructure: IndexedDB repositories, asset blob storage, export utilities, and browser capability detection.
+- Infrastructure: File System Access API project storage, lightweight browser metadata storage, asset blob storage, export utilities, and browser capability detection.
 
 Stateful UI components and application services depend on service interfaces, not concrete providers. Simple presentational components may remain dependency-free. Application composition wires concrete service implementations at startup.
 
@@ -334,14 +334,16 @@ The setup flow checks:
 - Chrome Built-in AI availability for translation and prompt-based palette generation.
 - Required Transformers.js image segmentation model availability for background removal, Smart Grab, and Magic Eraser.
 - WebGPU/WebAssembly support needed by selected browser models.
-- Browser storage availability for project data, assets, and model/provider caches.
+- File System Access API availability and permission state for project data, assets, app config, and app-generated cache artifacts.
+- Browser storage availability for lightweight app preferences, recent project handles, and model/provider readiness metadata.
 
 Caching policy:
 
 - Do not build a custom model cache manager from scratch.
 - Use Chrome's own model availability/download behavior for Chrome Built-in AI.
-- Use Transformers.js browser caching, Web Cache API support, WASM caching, cache keys, or custom cache adapter support where appropriate.
-- Store only app-level readiness metadata in IndexedDB, such as model name, version, capability status, last setup check, and whether setup completed.
+- Use Transformers.js browser caching, Web Cache API support, WASM caching, cache keys, or custom cache adapter support where appropriate. AI model weights and runtime caches may remain in browser/provider-managed storage.
+- Store project-owned metadata, assets, app config, generated previews, generated masks, and other app-generated cache artifacts inside the user-selected project folder/package on disk.
+- Store only lightweight app-level readiness metadata in browser storage, such as model name, version, capability status, last setup check, whether setup completed, and recent project handles.
 - For Hugging Face / Transformers.js models that are not required during startup, show a download icon next to the model/tool name so the user can install that model on demand before running the feature.
 - The top toolbar does not include a global "Prepare AI Models" action.
 - The AI Tools panel includes a "Download Required Models" action that prepares required local models.
@@ -361,17 +363,31 @@ If a required MVP capability is unavailable, show a clear blocking error with th
 
 ## Persistence
 
-Use IndexedDB for local persistence.
+Use the browser File System Access API for local project persistence.
 
-Store:
+The MVP project is saved as a user-selected folder/package on disk. This keeps large project data outside browser quota-managed storage and makes the project portable and inspectable by the user.
 
-- Project documents.
-- Asset metadata.
-- Asset blobs.
-- Setup readiness metadata.
-- User preferences.
+Project folder/package contents:
 
-The app should autosave document changes. Failed persistence must not corrupt the active in-memory document. Large binary assets are stored separately from document metadata and referenced by ID.
+- `project.json`: canonical project document, pages, elements, asset references, project settings, and schema version.
+- `assets/`: original imported assets and generated image assets, addressed by stable asset IDs.
+- `config/`: project-local editor configuration, export settings, and non-secret setup metadata.
+- `cache/`: app-generated thumbnails, previews, masks, derived crop data, and other reproducible project-local artifacts.
+
+Browser storage remains allowed only for lightweight app state:
+
+- Recent project handles or reopen metadata.
+- User preferences that are not project-specific.
+- Provider/model readiness metadata.
+- Permission and setup timestamps.
+
+AI model weights and provider runtime caches are not copied into project folders. Chrome Built-in AI and Transformers.js continue using browser/provider-managed caching for models.
+
+The app should autosave document changes to the active project folder after the user grants access. Failed persistence must not corrupt the active in-memory document or the last good on-disk project state. Writes should use an atomic or staged strategy where practical, such as writing a temporary file and replacing the target after successful serialization.
+
+The persistence status icon is the primary save-to-disk entry point. When users click it while persistence is disabled, LocalStudio.ai requests a project folder and enables autosave only after the initial write succeeds. The File menu exposes the same save action as `Save Local` and exposes `Import Project` for selecting an existing project folder whose `project.json` should replace the current in-memory project.
+
+If the File System Access API is unavailable or the user denies folder/file permissions, the MVP should show a blocking unsupported-browser or permission-required state instead of silently falling back to large IndexedDB project storage. Future non-Chrome fallbacks may use import/export project packages, but that is outside the MVP.
 
 ## Export
 
@@ -435,7 +451,7 @@ Unit tests:
 - Palette JSON validation.
 - Image mask application and transparent asset generation.
 - Service interface behavior with mocked providers.
-- Persistence repository behavior with fake IndexedDB or equivalent browser storage test utilities.
+- Persistence repository behavior with File System Access API mocks, including project folder creation/opening, staged writes, permission-denied states, and lightweight browser metadata storage.
 - Export orchestration with renderer mocks.
 
 Playwright tests:

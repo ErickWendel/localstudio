@@ -1,5 +1,5 @@
 {
-  "name": "canva-webai-clone",
+  "name": "localstudio-ai",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -26,7 +26,6 @@
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",
-    "idb": "^8.0.3",
     "jspdf": "^4.2.1",
     "konva": "^10.3.0",
     "lucide-react": "^1.21.0",
@@ -47,7 +46,6 @@
     "eslint": "^10.5.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
-    "fake-indexeddb": "^6.2.5",
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
     "lint-staged": "^16.4.0",

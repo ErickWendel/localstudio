@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test('renders the editor shell and tabs', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page.getByText('EW Canvas AI')).toBeVisible();
+  await expect(page.getByText('LocalStudio.ai')).toBeVisible();
   await expect(page.getByText('Untitled AI Deck')).toBeVisible();
   await expect(
     page.getByPlaceholder('Describe slide structure or organize current content...'),
