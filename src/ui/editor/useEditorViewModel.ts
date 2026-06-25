@@ -179,13 +179,15 @@ export function useEditorViewModel(services: AppServices) {
   const initialProject = useMemo(() => normalizeProjectDocument(services.initialProject), [
     services.initialProject,
   ]);
+  const shouldRestoreStoredProject = useMemo(
+    () => !services.skipStoredProjectLoad && readPersistencePreference(),
+    [services.skipStoredProjectLoad],
+  );
   const [project, setProject] = useState<ProjectDocument>(initialProject);
   const [activeTab, setActiveTab] = useState<RightPanelTab>('layout');
   const [modelStates, setModelStates] = useState<ModelState[]>([]);
-  const [hasLoadedProject, setHasLoadedProject] = useState(true);
-  const [persistenceEnabled, setPersistenceEnabled] = useState(() =>
-    services.skipStoredProjectLoad ? false : readPersistencePreference(),
-  );
+  const [hasLoadedProject, setHasLoadedProject] = useState(!shouldRestoreStoredProject);
+  const [persistenceEnabled, setPersistenceEnabled] = useState(shouldRestoreStoredProject);
   const [activePageId, setActivePageId] = useState(initialProject.pages[0]?.id ?? '');
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>(['image-hero']);
   const [history, setHistory] = useState<EditorHistory>({ past: [], future: [] });
@@ -202,6 +204,7 @@ export function useEditorViewModel(services: AppServices) {
   const backgroundPreviewTimeoutRef = useRef<number | undefined>(undefined);
   const backgroundPreviewSequenceRef = useRef(0);
   const backgroundPreparationSequenceRef = useRef(0);
+  const skipNextProjectSaveRef = useRef(shouldRestoreStoredProject);
   const selection = useMemo<SelectionState>(() => ({ pageId: activePageId, elementIds: selectedElementIds }), [
     activePageId,
     selectedElementIds,
@@ -234,6 +237,10 @@ export function useEditorViewModel(services: AppServices) {
 
   useEffect(() => {
     if (!hasLoadedProject || !persistenceEnabled) return;
+    if (skipNextProjectSaveRef.current) {
+      skipNextProjectSaveRef.current = false;
+      return;
+    }
     void services.projectRepository.saveProject(project).catch(() => {
       setPersistenceEnabled(false);
       if (typeof window !== 'undefined') {

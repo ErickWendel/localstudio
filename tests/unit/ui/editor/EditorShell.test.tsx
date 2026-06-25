@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { createAppServices } from '../../../../src/app/composition';
@@ -49,6 +49,26 @@ class ImportingProjectRepository implements ProjectRepository {
 
   saveProject(): Promise<void> {
     return Promise.resolve();
+  }
+}
+
+class DeferredLoadingProjectRepository implements ProjectRepository {
+  savedProjects: ProjectDocument[] = [];
+  private resolveLoad: ((project: ProjectDocument | null) => void) | undefined;
+
+  loadProject(): Promise<ProjectDocument | null> {
+    return new Promise((resolve) => {
+      this.resolveLoad = resolve;
+    });
+  }
+
+  saveProject(project: ProjectDocument): Promise<void> {
+    this.savedProjects.push(project);
+    return Promise.resolve();
+  }
+
+  resolveLoadedProject(project: ProjectDocument | null) {
+    this.resolveLoad?.(project);
   }
 }
 
@@ -177,6 +197,29 @@ describe('EditorShell', () => {
     render(<EditorShell services={createAppServices()} />);
 
     expect(await screen.findByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
+  });
+
+  it('loads the last project before autosaving on startup', async () => {
+    const repository = new DeferredLoadingProjectRepository();
+    const services = createAppServices();
+    services.projectRepository = repository;
+    window.localStorage.setItem('ew-canvas-ai.persistence-enabled', 'true');
+    render(<EditorShell services={services} />);
+
+    expect(repository.savedProjects).toHaveLength(0);
+
+    act(() => {
+      repository.resolveLoadedProject({
+        ...services.initialProject,
+        id: 'last-project',
+        name: 'Restored LocalStudio Project',
+      });
+    });
+
+    expect(
+      await screen.findByRole('button', { name: 'Edit project name Restored LocalStudio Project' }),
+    ).toBeInTheDocument();
+    expect(repository.savedProjects).toHaveLength(0);
   });
 
   it('zooms the canvas from the toolbar', async () => {
