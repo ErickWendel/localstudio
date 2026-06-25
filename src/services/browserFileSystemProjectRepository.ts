@@ -68,7 +68,8 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     try {
       const fileHandle = await this.directoryHandle.getFileHandle(PROJECT_FILE_NAME);
       const file = await fileHandle.getFile();
-      return JSON.parse(await file.text()) as ProjectDocument;
+      const project = JSON.parse(await file.text()) as ProjectDocument;
+      return this.hydrateProjectAssets(project);
     } catch (error) {
       if (error instanceof DOMException && error.name === 'NotFoundError') return null;
       throw error;
@@ -157,6 +158,28 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     const writable = await fileHandle.createWritable();
     await writable.write(value);
     await writable.close();
+  }
+
+  private async hydrateProjectAssets(project: ProjectDocument): Promise<ProjectDocument> {
+    if (!this.directoryHandle) return project;
+    const assets: ProjectDocument['assets'] = {};
+    let assetsDirectory: FileSystemDirectoryHandle | undefined;
+
+    for (const [assetId, asset] of Object.entries(project.assets)) {
+      if (asset.storage !== 'file' || !asset.fileName) {
+        assets[assetId] = asset;
+        continue;
+      }
+      assetsDirectory ??= await this.directoryHandle.getDirectoryHandle('assets');
+      const fileHandle = await assetsDirectory.getFileHandle(asset.fileName);
+      const file = await fileHandle.getFile();
+      assets[assetId] = {
+        ...asset,
+        objectUrl: URL.createObjectURL(file),
+      };
+    }
+
+    return { ...project, assets };
   }
 }
 

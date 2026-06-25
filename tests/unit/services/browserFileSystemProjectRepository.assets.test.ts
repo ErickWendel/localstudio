@@ -31,7 +31,7 @@ class MockFileHandle {
     if (value === undefined) return Promise.reject(new DOMException('Not found', 'NotFoundError'));
     if (typeof value === 'string')
       return Promise.resolve({ text: () => Promise.resolve(value), type: 'application/json' });
-    return Promise.resolve({ text: () => value.text(), type: value.type });
+    return Promise.resolve(value);
   }
 }
 
@@ -85,6 +85,10 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
 
     const assetsDirectory = directory.directories.get('assets')!;
     expect(assetsDirectory.files.has('asset-hero.png')).toBe(true);
+    const savedAssetFile = assetsDirectory.files.get('asset-hero.png');
+    expect(savedAssetFile).toBeInstanceOf(Blob);
+    expect((savedAssetFile as Blob).type).toBe('image/png');
+    expect(await (savedAssetFile as Blob).text()).toBe('hello');
     const savedProject = JSON.parse(directory.files.get('project.json') as string) as ProjectDocument;
     const savedAsset = savedProject.assets['asset-hero'];
     if (!savedAsset) throw new Error('Expected asset-hero to be saved in project.json');
@@ -94,5 +98,36 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
       storage: 'file',
     });
     expect(savedAsset.objectUrl).toBeUndefined();
+  });
+
+  it('hydrates file-backed image assets with object URLs on load', async () => {
+    const directory = new MockDirectoryHandle();
+    const assetsDirectory = new MockDirectoryHandle();
+    directory.directories.set('assets', assetsDirectory);
+    assetsDirectory.files.set('asset-hero.png', new Blob(['hello'], { type: 'image/png' }));
+    directory.files.set(
+      'project.json',
+      JSON.stringify({
+        ...createSampleProject(),
+        assets: {
+          'asset-hero': {
+            id: 'asset-hero',
+            type: 'image',
+            name: 'Hero',
+            mimeType: 'image/png',
+            storage: 'file',
+            fileName: 'asset-hero.png',
+          },
+        },
+      }),
+    );
+    const repository = new BrowserFileSystemProjectRepository({
+      pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
+    });
+
+    const loaded = await repository.importProject();
+
+    expect(loaded?.assets['asset-hero']?.objectUrl).toMatch(/^blob:/);
   });
 });
