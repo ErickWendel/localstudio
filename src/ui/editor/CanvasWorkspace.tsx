@@ -12,7 +12,9 @@ interface CanvasWorkspaceProps {
   project: ProjectDocument;
   activePageId: string;
   selection: SelectionState;
+  slideFrameRef?: RefObject<HTMLDivElement | null>;
   stageRef?: RefObject<Konva.Stage | null>;
+  presentationMode?: boolean;
   zoomPercent?: number;
   backgroundSelectionMode?: boolean;
   backgroundSelectionNotice?: string | undefined;
@@ -100,7 +102,9 @@ export function CanvasWorkspace({
   project,
   activePageId,
   selection,
+  slideFrameRef,
   stageRef,
+  presentationMode = false,
   zoomPercent = 100,
   backgroundSelectionMode = false,
   backgroundSelectionNotice,
@@ -149,6 +153,7 @@ export function CanvasWorkspace({
       .filter(isDesignElement)
       .filter((element) => element.visible !== false) ?? [];
   const hasSelection = selection.elementIds.length > 0;
+  const showEditorOverlays = !presentationMode;
   const selectedElement = project.elements[selection.elementIds[0] ?? ''];
   const backgroundSelectionTargetId =
     backgroundSelectionMode && selectedElement?.type === 'image' ? selectedElement.id : undefined;
@@ -460,6 +465,7 @@ export function CanvasWorkspace({
       <div
         className="canvas-frame neon-border"
         aria-label="Slide canvas"
+        ref={slideFrameRef}
         {...(backgroundSelectionTargetId
           ? { 'data-background-selection-target': backgroundSelectionTargetId }
           : {})}
@@ -469,20 +475,23 @@ export function CanvasWorkspace({
           transform: `scale(${zoomPercent / 100})`,
         }}
       >
-        <button
-          aria-label="Translate Current Slide"
-          className="slide-translate-button"
-          disabled={!canTranslateCurrentSlide}
-          title="Translate Current Slide"
-          type="button"
-          onClick={onTranslateCurrentSlide}
-        >
-          <span className="material-symbols-outlined" aria-hidden="true">
-            translate
-          </span>
-        </button>
+        {showEditorOverlays ? (
+          <button
+            aria-label="Translate Current Slide"
+            className="slide-translate-button"
+            disabled={!canTranslateCurrentSlide}
+            title="Translate Current Slide"
+            type="button"
+            onClick={onTranslateCurrentSlide}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              translate
+            </span>
+          </button>
+        ) : null}
         <div className="canvas-artboard" ref={artboardRef} style={{ background: pageBackground }}>
-          {backgroundSelectionMode || backgroundSelectionNotice || processingSelectedImageId || isTranslating || translationNotice ? (
+          {showEditorOverlays &&
+          (backgroundSelectionMode || backgroundSelectionNotice || processingSelectedImageId || isTranslating || translationNotice) ? (
             <div className="background-selection-hint" role="status">
               <span className="material-symbols-outlined" aria-hidden="true">
                 {isTranslating || translationNotice
@@ -573,7 +582,7 @@ export function CanvasWorkspace({
                   />
                 );
               })}
-              {backgroundSelectionTargetId && selectedElement?.type === 'image' ? (
+              {showEditorOverlays && backgroundSelectionTargetId && selectedElement?.type === 'image' ? (
                 <>
                   <BackgroundSelectionPreview
                     element={selectedElement}
@@ -600,7 +609,7 @@ export function CanvasWorkspace({
                   />
                 </>
               ) : null}
-              {backgroundSelectionMode || processingSelectedImageId ? null : (
+              {showEditorOverlays && !backgroundSelectionMode && !processingSelectedImageId ? (
                 <>
                   {dragGuide ? (
                     <>
@@ -627,8 +636,8 @@ export function CanvasWorkspace({
                     </>
                   ) : null}
                 </>
-              )}
-              {backgroundSelectionMode || processingSelectedImageId ? null : (
+              ) : null}
+              {showEditorOverlays && !backgroundSelectionMode && !processingSelectedImageId ? (
                 <Transformer
                   ref={transformerRef}
                   anchorFill="#37FD76"
@@ -654,10 +663,10 @@ export function CanvasWorkspace({
                   }
                   rotateAnchorOffset={28}
                 />
-              )}
+              ) : null}
             </Layer>
           </Stage>
-          {visibleElements.map((element) => {
+          {showEditorOverlays ? visibleElements.map((element) => {
             if (element.type !== 'text' || editingTextId !== element.id) return null;
 
             return (
@@ -696,10 +705,10 @@ export function CanvasWorkspace({
                 }}
               />
             );
-          })}
+          }) : null}
           <span className="canvas-fallback-label">Selected Image</span>
         </div>
-        {hasSelection ? (
+        {showEditorOverlays && hasSelection ? (
           <FloatingSelectionToolbar
             onAlignCenter={onAlignSelectedElement}
             onBringForward={onBringSelectedElementForward}

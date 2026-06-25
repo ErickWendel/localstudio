@@ -20,7 +20,8 @@
 - The Prompt API setup slice is implemented on `main`: the prompt bar has a `+` action menu with `Create image` chip mode, clearing the chip restores the slide-structure prompt, and AI Tools shows Prompt API first under Local Chrome AI with prompt-to-slides copy, startup readiness detection, preparation progress, and hidden prepare action when Chrome already reports readiness.
 - The first Prompt API prompt-to-slides slice is implemented on `main`: default prompt-bar submissions generate active-page slide content through structured JSON task planning, per-element structured JSON layout, local placeholder imagery, remote `https://` image URLs, immutable generated-slide commands, and progressive canvas updates.
 - The Bonsai Image WebGPU create-image slice is implemented on `main`: create-image mode now gates on `Image Generation Models`, redirects to AI Tools when the model is not ready, downloads the optional model row independently, configures size/steps/seed in AI Tools, generates PNG assets through an isolated image-generation service seam, and inserts the result into the active slide as a selected image layer.
-- The Bonsai runtime is now isolated in `src/services/bonsaiImageRuntime.ts`, with the vendored runtime moved under `src/vendor` for Vite lazy-module loading and progress handling hardened for long model setup phases before byte-level progress is emitted.
+- The Bonsai runtime is now isolated in `src/services/bonsaiImageRuntime.ts`, with the vendored runtime moved under `src/vendor` for Vite lazy-module loading, progress handling hardened for long model setup phases before byte-level progress is emitted, and upstream demo DOM/WebGL side effects removed after runtime import.
+- The Canva-style layout slice is implemented on `main`: tools live in a click-toggle left rail, pages/deck navigation moved to the right panel, the center workspace renders scrollable pages, the prompt bar is docked and always visible, fullscreen targets the active slide as a presentation view, and a Text tab inserts LocalStudio.ai title/subtitle/body presets.
 - Latest local non-e2e checks passed after the Bonsai AI Tools configuration work: `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build`.
 
 ## Remaining Work / Spec Gap Checklist
@@ -65,6 +66,7 @@ AI roadmap:
 - [ ] Add schema repair/retry handling when Chrome Prompt API returns invalid structured output.
 - [x] Add the first Bonsai Image WebGPU `Create image` provider/action behind the prompt bar chip.
 - [x] Add basic create-image size presets, step control, seed control, and help text in AI Tools.
+- [x] Remove Bonsai demo DOM/WebGL side effects from the vendored runtime import path.
 - [ ] Harden the Bonsai runtime adapter against the referenced Hugging Face Space/package surface on target Chrome builds.
 - [ ] Add create-image cancellation, generation history, model selection, and deeper error recovery.
 - [ ] Fold palette generation into the Chrome Prompt API prompt-to-slides/design-generation flow instead of exposing a standalone Text-to-Palette AI tool.

@@ -3,6 +3,7 @@ import type {
   BaseElement,
   DesignElement,
   ImageElement,
+  Page,
   PageBackground,
   ProjectDocument,
 } from '../model';
@@ -36,6 +37,25 @@ interface TextTranslationPatch {
 }
 
 type TextTranslationValue = string | TextTranslationPatch;
+
+function collectReferencedAssetIds(project: ProjectDocument): Set<string> {
+  const referencedAssetIds = new Set<string>();
+  for (const element of Object.values(project.elements)) {
+    if (element.type === 'image') referencedAssetIds.add(element.assetId);
+  }
+  for (const page of project.pages) {
+    if (page.background.type === 'asset') referencedAssetIds.add(page.background.assetId);
+  }
+  return referencedAssetIds;
+}
+
+function removeUnreferencedAssets(project: ProjectDocument): ProjectDocument {
+  const referencedAssetIds = collectReferencedAssetIds(project);
+  const assets = Object.fromEntries(
+    Object.entries(project.assets).filter(([assetId]) => referencedAssetIds.has(assetId)),
+  );
+  return { ...project, assets };
+}
 
 export class AlignElementCommand implements EditorCommand {
   readonly description = 'Align element';
@@ -151,28 +171,146 @@ export class DeleteElementCommand implements EditorCommand {
   ) {}
 
   execute(project: ProjectDocument): ProjectDocument {
-    const element = project.elements[this.elementId];
     const { [this.elementId]: deleted, ...remainingElements } = project.elements;
     void deleted;
-    const shouldDeleteAsset =
-      element?.type === 'image' &&
-      !Object.values(remainingElements).some(
-        (remainingElement) =>
-          remainingElement.type === 'image' && remainingElement.assetId === element.assetId,
-      );
-    const { [element?.type === 'image' ? element.assetId : '']: deletedAsset, ...remainingAssets } =
-      project.assets;
-    void deletedAsset;
 
-    return {
+    return removeUnreferencedAssets({
       ...project,
-      assets: shouldDeleteAsset ? remainingAssets : project.assets,
       elements: remainingElements,
       pages: project.pages.map((page) =>
         page.id === this.pageId
           ? { ...page, elementIds: page.elementIds.filter((id) => id !== this.elementId) }
           : page,
       ),
+    });
+  }
+}
+
+export class DuplicatePageCommand implements EditorCommand {
+  readonly description = 'Duplicate page';
+
+  constructor(
+    private readonly pageId: string,
+    private readonly nextPageId: string,
+    private readonly createElementId: (elementId: string) => string,
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    const page = project.pages.find((item) => item.id === this.pageId);
+    if (!page) return project;
+
+    const elementIdPairs = page.elementIds.map((elementId) => [elementId, this.createElementId(elementId)] as const);
+    const elementIdMap = new Map(elementIdPairs);
+    const duplicatedElements = Object.fromEntries(
+      elementIdPairs
+        .map(([sourceElementId, nextElementId]) => {
+          const element = project.elements[sourceElementId];
+          return element ? [nextElementId, { ...element, id: nextElementId, locked: false }] : undefined;
+        })
+        .filter((entry): entry is [string, DesignElement] => Boolean(entry)),
+    );
+    const pageIndex = project.pages.indexOf(page);
+    const duplicatedPage: Page = {
+      ...page,
+      id: this.nextPageId,
+      name: `${page.name} copy`,
+      elementIds: page.elementIds
+        .map((elementId) => elementIdMap.get(elementId))
+        .filter((elementId): elementId is string => Boolean(elementId)),
+      visible: page.visible ?? true,
+    };
+    const pages = [...project.pages];
+    pages.splice(pageIndex + 1, 0, duplicatedPage);
+
+    return {
+      ...project,
+      elements: {
+        ...project.elements,
+        ...duplicatedElements,
+      },
+      pages,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+}
+
+export class DeletePageCommand implements EditorCommand {
+  readonly description = 'Delete page';
+
+  constructor(private readonly pageId: string) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    if (project.pages.length <= 1) return project;
+    const page = project.pages.find((item) => item.id === this.pageId);
+    if (!page) return project;
+    const deletedElementIds = new Set(page.elementIds);
+    const elements = Object.fromEntries(
+      Object.entries(project.elements).filter(([elementId]) => !deletedElementIds.has(elementId)),
+    );
+    return removeUnreferencedAssets({
+      ...project,
+      elements,
+      pages: project.pages.filter((item) => item.id !== this.pageId),
+      updatedAt: new Date().toISOString(),
+    });
+  }
+}
+
+export class ReorderPageCommand implements EditorCommand {
+  readonly description = 'Reorder page';
+
+  constructor(
+    private readonly pageId: string,
+    private readonly targetIndex: number,
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    const currentIndex = project.pages.findIndex((page) => page.id === this.pageId);
+    if (currentIndex < 0) return project;
+    const pages = project.pages.filter((page) => page.id !== this.pageId);
+    pages.splice(Math.max(0, Math.min(this.targetIndex, pages.length)), 0, project.pages[currentIndex]!);
+    return {
+      ...project,
+      pages,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+}
+
+export class RenamePageCommand implements EditorCommand {
+  readonly description = 'Rename page';
+
+  constructor(
+    private readonly pageId: string,
+    private readonly name: string,
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    const nextName = this.name.trim();
+    if (!nextName) return project;
+    return {
+      ...project,
+      pages: project.pages.map((page) => (page.id === this.pageId ? { ...page, name: nextName } : page)),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+}
+
+export class SetPageVisibilityCommand implements EditorCommand {
+  readonly description = 'Set page visibility';
+
+  constructor(
+    private readonly pageId: string,
+    private readonly visible: boolean,
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    return {
+      ...project,
+      pages: project.pages.map((page) =>
+        page.id === this.pageId ? { ...page, visible: this.visible } : page,
+      ),
+      updatedAt: new Date().toISOString(),
     };
   }
 }

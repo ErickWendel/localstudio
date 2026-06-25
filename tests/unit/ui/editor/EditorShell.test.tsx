@@ -165,6 +165,18 @@ function createReadyPrepareTranslationMock() {
   );
 }
 
+async function openLeftTab(user: ReturnType<typeof userEvent.setup>, name: 'AI Tools' | 'Layout') {
+  const tab = screen.getByRole('tab', { name });
+  if (tab.getAttribute('aria-selected') !== 'true') {
+    await user.click(tab);
+  }
+}
+
+async function selectTitleLayer(user: ReturnType<typeof userEvent.setup>) {
+  await openLeftTab(user, 'Layout');
+  await user.click(screen.getByRole('button', { name: 'Title' }));
+}
+
 describe('EditorShell', () => {
   it('renders the approved editor shell landmarks', async () => {
     render(<EditorShell services={createAppServices()} />);
@@ -177,7 +189,7 @@ describe('EditorShell', () => {
     expect(
       screen.getByPlaceholderText('Describe slide structure or organize current content...'),
     ).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Layout' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Layout' })).toHaveAttribute('aria-selected', 'false');
   });
 
   it('switches to the layout panel from the header view menu', async () => {
@@ -193,8 +205,9 @@ describe('EditorShell', () => {
   it('undoes and redoes editor mutations from the toolbar', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
+    await openLeftTab(user, 'Layout');
 
-    await user.click(screen.getByRole('button', { name: 'Delete Selected Image' }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
     expect(screen.queryByRole('button', { name: 'Selected Image' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Undo' }));
@@ -207,8 +220,9 @@ describe('EditorShell', () => {
   it('undoes and redoes editor mutations with keyboard shortcuts', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
+    await openLeftTab(user, 'Layout');
 
-    await user.click(screen.getByRole('button', { name: 'Delete Selected Image' }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
     expect(screen.queryByRole('button', { name: 'Selected Image' })).not.toBeInTheDocument();
 
     await user.keyboard('{Meta>}z{/Meta}');
@@ -223,6 +237,7 @@ describe('EditorShell', () => {
     render(<EditorShell services={createAppServices()} />);
 
     await user.keyboard('{Meta>}a{/Meta}');
+    await openLeftTab(user, 'Layout');
 
     expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
       'data-selected-elements',
@@ -416,7 +431,9 @@ describe('EditorShell', () => {
   });
 
   it('pastes an image from the clipboard as a new selected layer', async () => {
+    const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
+    await openLeftTab(user, 'Layout');
     const image = new File(['image-bytes'], 'clipboard.png', { type: 'image/png' });
 
     fireEvent.paste(screen.getByLabelText('Canvas workspace'), {
@@ -433,7 +450,9 @@ describe('EditorShell', () => {
   });
 
   it('pastes an item-only clipboard image from the window with a fallback name', async () => {
+    const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
+    await openLeftTab(user, 'Layout');
     const image = new File(['image-bytes'], '', { type: 'image/png' });
 
     fireEvent.paste(window, {
@@ -455,6 +474,7 @@ describe('EditorShell', () => {
     const repository = new SavingProjectRepository();
     services.projectRepository = repository;
     render(<EditorShell services={services} />);
+    await openLeftTab(user, 'Layout');
 
     fireEvent.copy(window, {
       clipboardData: createClipboardData(),
@@ -487,11 +507,12 @@ describe('EditorShell', () => {
   it('prefers the latest editor object copy over stale image clipboard data', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
+    await openLeftTab(user, 'Layout');
 
     fireEvent.copy(window, {
       clipboardData: createClipboardData(),
     });
-    await user.click(screen.getByRole('button', { name: 'Title' }));
+    await selectTitleLayer(user);
     fireEvent.copy(window, {
       clipboardData: createClipboardData(),
     });
@@ -509,7 +530,9 @@ describe('EditorShell', () => {
   });
 
   it('imports a newer system image paste instead of an older editor object copy', async () => {
+    const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
+    await openLeftTab(user, 'Layout');
 
     fireEvent.copy(window, {
       clipboardData: createClipboardData(),
@@ -528,7 +551,9 @@ describe('EditorShell', () => {
   });
 
   it('cuts selected objects into the editor clipboard', async () => {
+    const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
+    await openLeftTab(user, 'Layout');
 
     fireEvent.cut(window, {
       clipboardData: createClipboardData(),
@@ -551,6 +576,7 @@ describe('EditorShell', () => {
     const repository = new SavingProjectRepository();
     services.projectRepository = repository;
     render(<EditorShell services={services} />);
+    await openLeftTab(user, 'Layout');
 
     await user.click(screen.getByRole('button', { name: 'Insert Text' }));
     await waitFor(() => {
@@ -570,7 +596,7 @@ describe('EditorShell', () => {
       );
       expect(insertedText).toMatchObject({
         type: 'text',
-        text: 'AI Design Revolution',
+        text: 'Add a heading',
         width: 600,
         height: 240,
         fontFamily: 'Orbitron',
@@ -594,6 +620,7 @@ describe('EditorShell', () => {
   it('deletes the selected layer with Delete and Backspace keystrokes', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
+    await openLeftTab(user, 'Layout');
 
     await user.keyboard('{Delete}');
     expect(screen.queryByRole('button', { name: 'Selected Image' })).not.toBeInTheDocument();
@@ -608,6 +635,7 @@ describe('EditorShell', () => {
   it('duplicates, centers, and changes z-order from the floating toolbar', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
+    await openLeftTab(user, 'Layout');
 
     await user.click(screen.getByRole('button', { name: 'Duplicate' }));
     expect(screen.getByRole('button', { name: 'Selected Image copy' })).toHaveAttribute(
@@ -632,10 +660,9 @@ describe('EditorShell', () => {
     services.translatorService = translator;
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await openLeftTab(user, 'AI Tools');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
-    await user.click(screen.getByRole('tab', { name: 'Layout' }));
-    await user.click(screen.getByRole('button', { name: 'Title' }));
+    await selectTitleLayer(user);
     await user.click(screen.getByRole('button', { name: 'Translate Selected Text' }));
 
     await waitFor(() => {
@@ -653,7 +680,7 @@ describe('EditorShell', () => {
 
     expect(await screen.findByRole('button', { name: 'Current slide language English' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await openLeftTab(user, 'AI Tools');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
     expect(await screen.findByText('Pair: en → pt')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Translate Current Slide' }));
@@ -673,10 +700,9 @@ describe('EditorShell', () => {
     };
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await openLeftTab(user, 'AI Tools');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'es');
-    await user.click(screen.getByRole('tab', { name: 'Layout' }));
-    await user.click(screen.getByRole('button', { name: 'Title' }));
+    await selectTitleLayer(user);
     await user.dblClick(screen.getByRole('button', { name: 'Translate Selected Text' }));
 
     expect(translate).toHaveBeenCalledTimes(1);
@@ -695,10 +721,9 @@ describe('EditorShell', () => {
     };
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await openLeftTab(user, 'AI Tools');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'es');
-    await user.click(screen.getByRole('tab', { name: 'Layout' }));
-    await user.click(screen.getByRole('button', { name: 'Title' }));
+    await selectTitleLayer(user);
     await user.click(screen.getByRole('button', { name: 'Translate Selected Text' }));
 
     expect(await screen.findByText('Chrome Built-in AI translation is not ready.')).toBeInTheDocument();
@@ -717,10 +742,9 @@ describe('EditorShell', () => {
     };
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await openLeftTab(user, 'AI Tools');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'es');
-    await user.click(screen.getByRole('tab', { name: 'Layout' }));
-    await user.click(screen.getByRole('button', { name: 'Title' }));
+    await selectTitleLayer(user);
     await user.click(screen.getByRole('button', { name: 'Translate Selected Text' }));
 
     await waitFor(() => {
@@ -747,7 +771,7 @@ describe('EditorShell', () => {
     services.translatorService = translator;
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'Title' }));
+    await selectTitleLayer(user);
     await user.click(screen.getByRole('button', { name: 'Translate Selected Text' }));
 
     expect(screen.getByRole('tab', { name: 'AI Tools' })).toHaveAttribute('aria-selected', 'true');
@@ -762,7 +786,7 @@ describe('EditorShell', () => {
     services.translatorService = translator;
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await openLeftTab(user, 'AI Tools');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
     await user.click(screen.getByRole('button', { name: 'Translate Current Slide' }));
 
@@ -790,10 +814,9 @@ describe('EditorShell', () => {
     };
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await openLeftTab(user, 'AI Tools');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'en');
-    await user.click(screen.getByRole('tab', { name: 'Layout' }));
-    await user.click(screen.getByRole('button', { name: 'Title' }));
+    await selectTitleLayer(user);
     await user.click(screen.getByRole('button', { name: 'Translate Selected Text' }));
 
     await waitFor(() => {
@@ -810,7 +833,7 @@ describe('EditorShell', () => {
     services.translatorService = translator;
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await openLeftTab(user, 'AI Tools');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
     await user.click(screen.getByRole('button', { name: 'Edit' }));
     await user.click(screen.getByRole('menuitem', { name: 'Translate Deck' }));

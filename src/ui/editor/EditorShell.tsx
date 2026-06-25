@@ -1,11 +1,12 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type Konva from 'konva';
 import type { AppServices } from '../../app/composition';
 import { IMAGE_EDITING_MODEL_ID } from '../../services/modelSetupService';
-import { CanvasWorkspace } from './CanvasWorkspace';
-import { PageRail } from './PageRail';
+import { EditorFooter } from './EditorFooter';
+import { LeftToolPanel } from './LeftToolPanel';
+import { PagesPanel } from './PagesPanel';
 import { PromptBar } from './PromptBar';
-import { RightPanel } from './RightPanel';
+import { ScrollingCanvasWorkspace } from './ScrollingCanvasWorkspace';
 import { TopToolbar } from './TopToolbar';
 import { useEditorViewModel } from './useEditorViewModel';
 
@@ -56,9 +57,13 @@ function writeEditorObjectClipboardMarker(clipboardData: DataTransfer | null) {
 
 export function EditorShell({ services }: EditorShellProps) {
   const vm = useEditorViewModel(services);
+  const [leftPanelOpen, setLeftPanelOpen] = useState(false);
   const stageRef = useRef<Konva.Stage>(null);
+  const workspaceRef = useRef<HTMLElement>(null);
+  const slideFrameRef = useRef<HTMLDivElement>(null);
   const toolbarImageInputRef = useRef<HTMLInputElement>(null);
   const hasSelection = vm.selection.elementIds.length > 0;
+  const activePageIndex = Math.max(0, vm.project.pages.findIndex((page) => page.id === vm.activePageId));
 
   function exportCurrentPageAsPng() {
     const dataUrl = stageRef.current?.toDataURL({ mimeType: 'image/png', pixelRatio: 2 });
@@ -173,7 +178,6 @@ export function EditorShell({ services }: EditorShellProps) {
         canUndo={vm.canUndo}
         hasSelection={hasSelection}
         persistenceEnabled={vm.persistenceEnabled}
-        zoomPercent={vm.zoomPercent}
         canTranslateDeck={vm.canTranslateDeck}
         onDelete={vm.deleteSelectedElement}
         onDuplicate={vm.duplicateSelectedElement}
@@ -190,6 +194,7 @@ export function EditorShell({ services }: EditorShellProps) {
         onResetZoom={vm.resetZoom}
         onSelectLayers={() => {
           vm.setActiveTab('layout');
+          setLeftPanelOpen(true);
         }}
         onTranslateDeck={() => {
           void vm.translateDeck();
@@ -198,25 +203,55 @@ export function EditorShell({ services }: EditorShellProps) {
         onZoomIn={vm.zoomIn}
         onZoomOut={vm.zoomOut}
       />
-      <div className="editor-grid">
-        <PageRail
+      <div className={vm.pagesPanelOpen ? 'editor-grid' : 'editor-grid editor-grid-pages-collapsed'}>
+        <LeftToolPanel
+          activeTab={vm.activeTab}
+          onTabChange={vm.setActiveTab}
+          open={leftPanelOpen}
+          onOpenChange={setLeftPanelOpen}
           project={vm.project}
           activePageId={vm.activePageId}
-          onAddPage={vm.addPage}
+          selection={vm.selection}
+          onSelectElement={vm.selectElement}
+          onSetElementVisibility={vm.setElementVisibility}
+          onSetElementLock={vm.setElementLock}
+          onDeleteElement={vm.deleteElement}
+          onReorderElement={vm.reorderElement}
+          onUpdateElementStyle={vm.updateElementStyle}
+          onUpdatePageBackground={vm.updatePageBackground}
           onImportImage={(file) => {
             void vm.importImageFile(file);
           }}
-          onSelectPage={vm.selectPage}
+          onInsertText={vm.insertTextElement}
+          modelStates={vm.modelStates}
+          attentionModelId={vm.aiToolsAttentionModelId ?? (vm.backgroundSelectionNotice ? IMAGE_EDITING_MODEL_ID : undefined)}
+          createImageOptions={vm.createImageOptions}
+          translationLanguageOptions={vm.translationLanguageOptions}
+          translationPreparation={vm.translationPreparation}
+          translationTargetAttention={vm.translationTargetAttention}
+          translationTargetLanguage={vm.translationTargetLanguage}
+          promptApiAttention={vm.promptApiAttention}
+          promptApiNotice={vm.promptApiNotice}
+          promptPreparation={vm.promptPreparation}
+          onDownloadModel={vm.downloadModel}
+          onCreateImageOptionsChange={vm.setCreateImageOptions}
+          onPreparePromptApi={vm.preparePromptApi}
+          onTranslationTargetLanguageChange={(languageCode) => {
+            void vm.setTranslationTargetLanguage(languageCode);
+          }}
         />
         <section
           className="workspace-column"
           aria-label="Canvas workspace"
+          ref={workspaceRef}
         >
-          <CanvasWorkspace
+          <ScrollingCanvasWorkspace
             project={vm.project}
             activePageId={vm.activePageId}
             selection={vm.selection}
+            slideFrameRef={slideFrameRef}
             stageRef={stageRef}
+            presentationMode={vm.isFullscreen}
             zoomPercent={vm.zoomPercent}
             backgroundSelectionMode={vm.backgroundSelectionMode}
             backgroundSelectionNotice={vm.backgroundSelectionNotice}
@@ -246,7 +281,9 @@ export function EditorShell({ services }: EditorShellProps) {
             onInsertImage={() => {
               toolbarImageInputRef.current?.click();
             }}
-            onInsertText={vm.insertTextElement}
+            onInsertText={() => {
+              vm.insertTextElement();
+            }}
             onSelectElement={vm.selectElement}
             onSendSelectedElementBackward={() => {
               vm.setSelectedElementZOrder('backward');
@@ -254,12 +291,22 @@ export function EditorShell({ services }: EditorShellProps) {
             onTranslateCurrentSlide={() => {
               void vm.translateCurrentSlide();
             }}
+            onTranslatePage={(pageId) => {
+              void vm.translatePage(pageId);
+            }}
             onTranslateSelectedText={() => {
               void vm.translateSelectedText();
             }}
             onUpdateElementFrame={vm.updateElementFrame}
             onUpdateElementFrames={vm.updateElementFrames}
             onUpdateTextContent={vm.updateTextContent}
+            onActivePageFromScroll={vm.activateScrolledPage}
+            onAddPage={vm.addPage}
+            onDeletePage={vm.deletePage}
+            onDuplicatePage={vm.duplicatePage}
+            onRenamePage={vm.renamePage}
+            onReorderPage={vm.reorderPage}
+            onSetPageVisibility={vm.setPageVisibility}
           />
           <input
             ref={toolbarImageInputRef}
@@ -287,37 +334,38 @@ export function EditorShell({ services }: EditorShellProps) {
             onSlidePromptSubmit={(prompt) => vm.generateSlideFromPrompt(prompt)}
           />
         </section>
-        <RightPanel
-          activeTab={vm.activeTab}
-          onTabChange={vm.setActiveTab}
+        {vm.pagesPanelOpen ? (
+          <PagesPanel
           project={vm.project}
           activePageId={vm.activePageId}
-          selection={vm.selection}
-          onSelectElement={vm.selectElement}
-          onSetElementVisibility={vm.setElementVisibility}
-          onSetElementLock={vm.setElementLock}
-          onDeleteElement={vm.deleteElement}
-          onReorderElement={vm.reorderElement}
-          onUpdateElementStyle={vm.updateElementStyle}
-          onUpdatePageBackground={vm.updatePageBackground}
-          modelStates={vm.modelStates}
-          attentionModelId={vm.aiToolsAttentionModelId ?? (vm.backgroundSelectionNotice ? IMAGE_EDITING_MODEL_ID : undefined)}
-          createImageOptions={vm.createImageOptions}
-          translationLanguageOptions={vm.translationLanguageOptions}
-          translationPreparation={vm.translationPreparation}
-          translationTargetAttention={vm.translationTargetAttention}
-          translationTargetLanguage={vm.translationTargetLanguage}
-          promptApiAttention={vm.promptApiAttention}
-          promptApiNotice={vm.promptApiNotice}
-          promptPreparation={vm.promptPreparation}
-          onDownloadModel={vm.downloadModel}
-          onCreateImageOptionsChange={vm.setCreateImageOptions}
-          onPreparePromptApi={vm.preparePromptApi}
-          onTranslationTargetLanguageChange={(languageCode) => {
-            void vm.setTranslationTargetLanguage(languageCode);
-          }}
-        />
+            canTranslate={vm.canTranslateDeck}
+            onAddPage={vm.addPage}
+            onDeletePage={vm.deletePage}
+            onDuplicatePage={vm.duplicatePage}
+            onRenamePage={vm.renamePage}
+            onReorderPage={vm.reorderPage}
+            onSelectPage={vm.selectPage}
+            onSetPageVisibility={vm.setPageVisibility}
+            onTranslatePage={(pageId) => {
+              void vm.translatePage(pageId);
+            }}
+          />
+        ) : null}
       </div>
+      <EditorFooter
+        activePageIndex={activePageIndex}
+        isFullscreen={vm.isFullscreen}
+        pageCount={vm.project.pages.length}
+        pagesPanelOpen={vm.pagesPanelOpen}
+        zoomPercent={vm.zoomPercent}
+        onResetZoom={vm.resetZoom}
+        onToggleFullscreen={() => {
+          void vm.toggleFullscreen(slideFrameRef.current);
+        }}
+        onTogglePagesPanel={vm.togglePagesPanel}
+        onZoomIn={vm.zoomIn}
+        onZoomOut={vm.zoomOut}
+      />
     </div>
   );
 }

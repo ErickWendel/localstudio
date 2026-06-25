@@ -9,9 +9,11 @@ import type { CreateImagePromptOptions } from './imagePromptOptions';
 import { LayersPanel } from './LayersPanel';
 import type { RightPanelTab } from './useEditorViewModel';
 
+type LegacyRightPanelTab = Exclude<RightPanelTab, 'assets' | 'text'>;
+
 interface RightPanelProps {
-  activeTab: RightPanelTab;
-  onTabChange: (tab: RightPanelTab) => void;
+  activeTab: LegacyRightPanelTab;
+  onTabChange: (tab: LegacyRightPanelTab) => void;
   modelStates: ModelState[];
   attentionModelId?: string | undefined;
   createImageOptions?: CreateImagePromptOptions;
@@ -38,7 +40,7 @@ interface RightPanelProps {
   onUpdatePageBackground?: (background: PageBackground) => void;
 }
 
-const tabs: Array<SegmentedTab<RightPanelTab>> = [
+const tabs: Array<SegmentedTab<LegacyRightPanelTab>> = [
   { id: 'layout', label: 'Layout', icon: Layers3 },
   { id: 'design', label: 'Design', icon: Brush },
   { id: 'ai-tools', label: 'AI Tools', icon: Sparkles },

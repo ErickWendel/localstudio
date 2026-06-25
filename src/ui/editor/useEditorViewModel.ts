@@ -6,11 +6,16 @@ import {
   AddImageElementCommand,
   AlignElementCommand,
   DeleteElementCommand,
+  DeletePageCommand,
+  DuplicatePageCommand,
   DuplicateElementCommand,
   PrepareGeneratedSlideCommand,
+  RenamePageCommand,
+  ReorderPageCommand,
   ReorderElementCommand,
   SetElementLockCommand,
   SetElementVisibilityCommand,
+  SetPageVisibilityCommand,
   SetZOrderCommand,
   TranslateTextElementsCommand,
   UpdateElementFramesCommand,
@@ -36,7 +41,8 @@ import { IMAGE_EDITING_MODEL_ID } from '../../services/modelSetupService';
 import { looksLikeImageGenerationRequest } from '../../services/prompts/slideTaskPrompt';
 import { defaultCreateImagePromptOptions, type CreateImagePromptOptions } from './imagePromptOptions';
 
-export type RightPanelTab = 'layout' | 'design' | 'ai-tools';
+export type RightPanelTab = 'layout' | 'text' | 'design' | 'ai-tools' | 'assets';
+export type TextPreset = 'title' | 'subtitle' | 'body';
 
 interface EditorHistory {
   past: ProjectDocument[];
@@ -239,7 +245,7 @@ function normalizeProjectDocument(project: ProjectDocument): ProjectDocument {
         : {}),
     },
     elements,
-    pages: shouldRestoreHeroImage
+    pages: (shouldRestoreHeroImage
       ? project.pages.map((page) =>
           page.id === pageId
             ? {
@@ -252,7 +258,8 @@ function normalizeProjectDocument(project: ProjectDocument): ProjectDocument {
               }
             : page,
         )
-      : project.pages,
+      : project.pages
+    ).map((page) => ({ ...page, visible: page.visible ?? true })),
   };
 }
 
@@ -393,6 +400,8 @@ export function useEditorViewModel(services: AppServices) {
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>(['image-hero']);
   const [history, setHistory] = useState<EditorHistory>({ past: [], future: [] });
   const [zoomPercent, setZoomPercent] = useState(100);
+  const [pagesPanelOpen, setPagesPanelOpen] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [backgroundSelectionMode, setBackgroundSelectionMode] = useState(false);
   const [backgroundSelectionNotice, setBackgroundSelectionNotice] = useState<string | undefined>();
   const [processingElementIds, setProcessingElementIds] = useState<string[]>([]);
@@ -452,6 +461,17 @@ export function useEditorViewModel(services: AppServices) {
   useEffect(() => {
     void services.modelSetupService.getModelStates().then(setModelStates);
   }, [services.modelSetupService]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    function handleFullscreenChange() {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -1016,7 +1036,11 @@ export function useEditorViewModel(services: AppServices) {
     );
   }
 
-  function getTranslatableTextElementIds(scope: TranslationScope, sourceProject = project) {
+  function getTranslatableTextElementIds(
+    scope: TranslationScope,
+    sourceProject = project,
+    options?: { pageId?: string },
+  ) {
     const getVisibleUnlockedTextId = (elementId: string) => {
       const element = sourceProject.elements[elementId];
       if (!element || element.type !== 'text' || element.locked || element.visible === false) return undefined;
@@ -1029,7 +1053,7 @@ export function useEditorViewModel(services: AppServices) {
 
     const pages =
       scope === 'slide'
-        ? sourceProject.pages.filter((page) => page.id === activePageId)
+        ? sourceProject.pages.filter((page) => page.id === (options?.pageId ?? activePageId))
         : sourceProject.pages;
 
     return pages.flatMap((page) =>
@@ -1040,9 +1064,13 @@ export function useEditorViewModel(services: AppServices) {
   async function translateTextScope(
     scope: TranslationScope,
     targetLanguage = 'pt',
-    options?: { sourceLanguage?: string },
+    options?: { pageId?: string; sourceLanguage?: string },
   ) {
-    const elementIds = getTranslatableTextElementIds(scope);
+    const elementIds = getTranslatableTextElementIds(
+      scope,
+      project,
+      options?.pageId ? { pageId: options.pageId } : undefined,
+    );
     if (elementIds.length === 0) return [];
 
     const translatedEntries = await Promise.all(
@@ -1133,7 +1161,7 @@ export function useEditorViewModel(services: AppServices) {
     }
   }
 
-  async function requestTranslation(scope: TranslationScope) {
+  async function requestTranslation(scope: TranslationScope, options?: { pageId?: string }) {
     if (isTranslating) return;
 
     if (!translationTargetLanguage) {
@@ -1153,12 +1181,19 @@ export function useEditorViewModel(services: AppServices) {
     setTranslationNotice(undefined);
     setIsTranslating(true);
     try {
+      const translationOptions =
+        translationPreparation.sourceLanguage || options?.pageId
+          ? {
+              ...(options?.pageId ? { pageId: options.pageId } : {}),
+              ...(translationPreparation.sourceLanguage
+                ? { sourceLanguage: translationPreparation.sourceLanguage }
+                : {}),
+            }
+          : undefined;
       const translatedPageIds = await translateTextScope(
         scope,
         translationTargetLanguage,
-        translationPreparation.sourceLanguage
-          ? { sourceLanguage: translationPreparation.sourceLanguage }
-          : undefined,
+        translationOptions,
       );
       if (translatedPageIds.length > 0) {
         const normalizedTargetLanguage = normalizeLanguageCode(translationTargetLanguage);
@@ -1284,23 +1319,76 @@ export function useEditorViewModel(services: AppServices) {
     );
   }
 
-  function insertTextElement() {
+  function insertTextElement(preset: TextPreset = 'title') {
     const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
     if (!page) return;
     const selectedElement = project.elements[selectedElementIds[0] ?? ''];
-    const templateTextElement =
-      project.elements['text-title']?.type === 'text'
-        ? project.elements['text-title']
-        : Object.values(project.elements).find(
-            (element) => element.type === 'text' && element.fontFamily === 'Orbitron',
-          );
-    const width = templateTextElement?.type === 'text' ? templateTextElement.width : 600;
-    const height = templateTextElement?.type === 'text' ? templateTextElement.height : 240;
+    const titleTemplate = project.elements['text-title'];
+    const subtitleTemplate = project.elements['text-subtitle'];
+    const presetStyles: Record<TextPreset, Omit<Extract<DesignElement, { type: 'text' }>, 'id' | 'locked' | 'opacity' | 'rotation' | 'type' | 'visible' | 'x' | 'y'>> = {
+      title:
+        titleTemplate?.type === 'text'
+          ? {
+              text: 'Add a heading',
+              width: titleTemplate.width,
+              height: titleTemplate.height,
+              fontFamily: titleTemplate.fontFamily,
+              fontSize: titleTemplate.fontSize,
+              fontWeight: titleTemplate.fontWeight,
+              fill: titleTemplate.fill,
+              align: titleTemplate.align,
+            }
+          : {
+              text: 'Add a heading',
+              width: 680,
+              height: 220,
+              fontFamily: 'Orbitron',
+              fontSize: 96,
+              fontWeight: 800,
+              fill: '#37FD76',
+              align: 'center',
+            },
+      subtitle:
+        subtitleTemplate?.type === 'text'
+          ? {
+              text: 'Add a subheading',
+              width: subtitleTemplate.width,
+              height: subtitleTemplate.height,
+              fontFamily: subtitleTemplate.fontFamily,
+              fontSize: subtitleTemplate.fontSize,
+              fontWeight: subtitleTemplate.fontWeight,
+              fill: subtitleTemplate.fill,
+              align: subtitleTemplate.align,
+            }
+          : {
+              text: 'Add a subheading',
+              width: 720,
+              height: 92,
+              fontFamily: 'Open Sans',
+              fontSize: 44,
+              fontWeight: 700,
+              fill: '#FFFFFF',
+              align: 'center',
+            },
+      body: {
+        text: 'Add a little bit of body text',
+        width: 760,
+        height: 120,
+        fontFamily: 'Open Sans',
+        fontSize: 32,
+        fontWeight: 500,
+        fill: '#FFFFFF',
+        align: 'left',
+      },
+    };
+    const style = presetStyles[preset];
+    const width = style.width;
+    const height = style.height;
     const elementId = createId('text');
     const nextElement: DesignElement = {
       id: elementId,
       type: 'text',
-      text: templateTextElement?.type === 'text' ? templateTextElement.text : 'AI Design Revolution',
+      text: style.text,
       x: selectedElement
         ? Math.min(page.width - width, selectedElement.x + PASTED_ELEMENT_OFFSET)
         : (page.width - width) / 2,
@@ -1313,11 +1401,11 @@ export function useEditorViewModel(services: AppServices) {
       locked: false,
       visible: true,
       opacity: 1,
-      fontFamily: templateTextElement?.type === 'text' ? templateTextElement.fontFamily : 'Orbitron',
-      fontSize: templateTextElement?.type === 'text' ? templateTextElement.fontSize : 96,
-      fontWeight: templateTextElement?.type === 'text' ? templateTextElement.fontWeight : 800,
-      fill: templateTextElement?.type === 'text' ? templateTextElement.fill : '#37FD76',
-      align: templateTextElement?.type === 'text' ? templateTextElement.align : 'center',
+      fontFamily: style.fontFamily,
+      fontSize: style.fontSize,
+      fontWeight: style.fontWeight,
+      fill: style.fill,
+      align: style.align,
     };
 
     commitProject(
@@ -1374,6 +1462,70 @@ export function useEditorViewModel(services: AppServices) {
       }),
       { activePageId: pageId, selectedElementIds: [] },
     );
+  }
+
+  function duplicatePage(pageId: string) {
+    const page = project.pages.find((item) => item.id === pageId);
+    if (!page) return;
+    const nextPageId = createId('page');
+    commitProject(
+      (currentProject) =>
+        new DuplicatePageCommand(pageId, nextPageId, (elementId) => createId(`${elementId}-page`)).execute(
+          currentProject,
+        ),
+      { activePageId: nextPageId, selectedElementIds: [] },
+    );
+  }
+
+  function deletePage(pageId: string) {
+    if (project.pages.length <= 1) return;
+    const pageIndex = project.pages.findIndex((page) => page.id === pageId);
+    if (pageIndex < 0) return;
+    const nextPageId =
+      project.pages[pageIndex + 1]?.id ?? project.pages[pageIndex - 1]?.id ?? project.pages[0]?.id ?? '';
+    commitProject(
+      (currentProject) => new DeletePageCommand(pageId).execute(currentProject),
+      { activePageId: nextPageId, selectedElementIds: [] },
+    );
+  }
+
+  function reorderPage(pageId: string, targetIndex: number) {
+    commitProject((currentProject) => new ReorderPageCommand(pageId, targetIndex).execute(currentProject), {
+      activePageId: pageId,
+    });
+  }
+
+  function renamePage(pageId: string, name: string) {
+    commitProject((currentProject) => new RenamePageCommand(pageId, name).execute(currentProject));
+  }
+
+  function setPageVisibility(pageId: string, visible: boolean) {
+    commitProject((currentProject) => new SetPageVisibilityCommand(pageId, visible).execute(currentProject));
+  }
+
+  function activateScrolledPage(pageId: string) {
+    if (pageId === activePageId) return;
+    const page = project.pages.find((item) => item.id === pageId);
+    if (!page) return;
+    setActivePageId(page.id);
+    setSelectedElementIds([]);
+  }
+
+  function togglePagesPanel() {
+    setPagesPanelOpen((current) => !current);
+  }
+
+  async function toggleFullscreen(target?: HTMLElement | null) {
+    if (typeof document === 'undefined') return;
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return;
+      }
+      await (target ?? document.documentElement).requestFullscreen();
+    } catch {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    }
   }
 
   function undo() {
@@ -1688,6 +1840,8 @@ export function useEditorViewModel(services: AppServices) {
     project,
     activePageId,
     zoomPercent,
+    pagesPanelOpen,
+    isFullscreen,
     persistenceEnabled,
     backgroundSelectionMode,
     backgroundSelectionNotice,
@@ -1734,6 +1888,7 @@ export function useEditorViewModel(services: AppServices) {
     canPasteElements: elementClipboard.elements.length > 0,
     translateSelectedText: () => requestTranslation('selection'),
     translateCurrentSlide: () => requestTranslation('slide'),
+    translatePage: (pageId: string) => requestTranslation('slide', { pageId }),
     translateDeck: () => requestTranslation('deck'),
     downloadRequiredModels,
     downloadModel,
@@ -1741,7 +1896,15 @@ export function useEditorViewModel(services: AppServices) {
     selectAllElementsOnActivePage,
     clearSelection,
     selectPage,
+    activateScrolledPage,
     addPage,
+    duplicatePage,
+    deletePage,
+    reorderPage,
+    renamePage,
+    setPageVisibility,
+    togglePagesPanel,
+    toggleFullscreen,
     undo,
     redo,
     zoomIn,

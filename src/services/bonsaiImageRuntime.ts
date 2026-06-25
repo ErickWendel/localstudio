@@ -51,6 +51,8 @@ interface BonsaiPipelineConstructor {
 
 interface BonsaiRuntimeModule {
   BonsaiImagePipeline: BonsaiPipelineConstructor;
+  cleanupBonsaiDemo?: () => Promise<void> | void;
+  destroyBonsaiDemoScene?: () => Promise<void> | void;
 }
 
 interface BrowserBonsaiImageRuntimeOptions {
@@ -81,6 +83,41 @@ async function deleteLegacyBonsaiModelCache() {
   } catch {
     // Best-effort cleanup only. The old cache is not used by the Bonsai runtime.
   }
+}
+
+function snapshotBodyChildren() {
+  if (typeof document === 'undefined') return () => undefined;
+  const body = document.body;
+  const existingChildren = new Set(Array.from(body.children));
+
+  return () => {
+    for (const child of Array.from(body.children)) {
+      if (existingChildren.has(child)) continue;
+      const className = typeof child.className === 'string' ? child.className : '';
+      const isLikelyDemoNode =
+        child instanceof HTMLCanvasElement ||
+        child.querySelector('canvas') !== null ||
+        child.id.toLowerCase().includes('bonsai') ||
+        className.toLowerCase().includes('bonsai');
+      if (isLikelyDemoNode) child.remove();
+    }
+  };
+}
+
+async function cleanupBonsaiDemoSideEffects(module: BonsaiRuntimeModule, removeAddedBodyChildren: () => void) {
+  try {
+    await module.cleanupBonsaiDemo?.();
+  } catch {
+    // The vendored demo cleanup is best-effort. Image generation must still continue.
+  }
+
+  try {
+    await module.destroyBonsaiDemoScene?.();
+  } catch {
+    // The Three.js landing scene is not part of LocalStudio.ai and can fail independently.
+  }
+
+  removeAddedBodyChildren();
 }
 
 function createBonsaiRuntimeProgressController(onProgress: (progress: number) => void) {
@@ -215,7 +252,16 @@ export class BrowserBonsaiImageRuntime implements BonsaiImageRuntime {
   }
 
   private async importRuntimeModule() {
-    if (this.options.importRuntime) return this.options.importRuntime();
-    return (await import('../vendor/bonsai-image-webgpu-runtime.js')) as BonsaiRuntimeModule;
+    const removeAddedBodyChildren = snapshotBodyChildren();
+    try {
+      const module = this.options.importRuntime
+        ? await this.options.importRuntime()
+        : ((await import('../vendor/bonsai-image-webgpu-runtime.js')) as BonsaiRuntimeModule);
+      await cleanupBonsaiDemoSideEffects(module, removeAddedBodyChildren);
+      return module;
+    } catch (error) {
+      removeAddedBodyChildren();
+      throw error;
+    }
   }
 }

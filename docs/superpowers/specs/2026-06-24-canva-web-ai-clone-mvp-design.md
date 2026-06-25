@@ -25,7 +25,7 @@ The current `main` branch contains a working browser-only editor shell aligned w
 Ready now:
 
 - React/Vite/TypeScript app scaffold with strict typing, ESLint, Prettier, Husky pre-commit hooks, Vitest, Testing Library, and Playwright configuration.
-- Approved dark LocalStudio.ai shell with top toolbar, left slide rail, central Konva canvas, prompt bar, and right panel tabs ordered as `Layout`, `Design`, and `AI Tools`.
+- Approved dark LocalStudio.ai shell with top toolbar, collapsed left tool rail, central Konva page workspace, right Pages panel, docked prompt bar, and Canva-style footer controls for zoom/pages/fullscreen.
 - Local document model for projects, pages, assets, and layered text/image/shape elements.
 - Immutable command classes for alignment, z-order, frame transforms, text updates, layer reorder, visibility, locking, deletion, and adding imported image elements.
 - File System Access API project persistence scaffold. When supported, clicking the persistence icon or `File > Save Local` asks for a project folder, writes `project.json`, writes `config/localstudio.json`, and creates `assets/`, `config/`, and `cache/` folders. `File > Import Project` opens an existing project folder by reading its `project.json`.
@@ -34,8 +34,11 @@ Ready now:
 - LocalStudio.ai remembers File System Access directory handles in browser structured storage. It keeps both a global recent project handle and project-name keyed handles, so restarted tabs with `?project=<name>` reopen their own project context instead of whichever project was opened most recently.
 - `File > New Project` opens a blank project in a new tab via `?newProject=1`, consumes that query once, and removes stale project context so refreshes do not recreate blank projects.
 - Canvas element selection, drag, resize, rotate, text double-click editing, and locked-element transform prevention.
+- Left tool rail opens panels only on click and closes the active panel when clicked again. Current panels are `Layout`, `Text`, `Design`, `AI Tools`, and `Assets`.
 - Layout panel selection sync: clicking a layer selects the matching canvas element.
 - Layout panel layer controls: drag/drop layer order, hide/show, lock/unlock, and delete.
+- Text panel adds LocalStudio.ai-styled title, subtitle, and body text presets. Title presets use the Orbitron green heading style; subtitle/body presets use Open Sans readable white text. The old disabled Magic Write placeholder is removed.
+- Pages panel shows deck/page navigation on the right side with page thumbnails, add/select/reorder/duplicate/hide/delete/rename/translate controls, while the center workspace renders pages vertically and activates the closest page while scrolling.
 - Left rail local image import from disk. Imported images are inserted as topmost layers and selected immediately.
 - Image elements render actual image assets. The seeded selected image uses the provided remote image URL and preserves its natural `516 x 387` dimensions instead of scaling up. Imported images preserve natural size and only scale down when larger than the page.
 - AI Tools panel includes local model readiness/download states and local Chrome AI tool cards. The image editing model is consolidated as a shared segmentation dependency for background removal, Smart Grab, and Magic Eraser.
@@ -44,12 +47,13 @@ Ready now:
 - The AI Tools translation card uses a hard-coded Chrome Translator-supported target-language list sorted by language name, with flags shown at the end of each option. Changing the target language prepares the detected source/target pair, shows download progress, and reuses the prepared translator for subsequent text/slide/deck translation.
 - The prompt bar now has a `+` action menu with a `Create image` chip mode, while the default input returns to slide-structure/content-organization prompting when the chip is cleared. Typing into or submitting the gated image mode checks Bonsai image-generation model readiness first and redirects to AI Tools when preparation is required. Accepted prompt submissions clear the prompt input immediately while generation continues.
 - Create image mode now uses a browser-local Bonsai Image WebGPU provider seam behind AI Tools model preparation. If the image generation model is not ready, the prompt redirects to AI Tools and highlights the `Image Generation Models` row. Once ready, generated PNG assets are inserted into the current slide as normal selected image layers. Image generation settings live in the AI Tools `Image Generation Models` card, including common size presets, generation steps, optional seed, and hover/focus help text.
-- The Bonsai runtime adapter is isolated in `src/services/bonsaiImageRuntime.ts`. The vendored WebGPU runtime now lives under `src/vendor` so Vite treats it as a lazy source module instead of importing a static `public/` asset, and the adapter includes model-download progress mapping plus a conservative progress estimate for long runtime setup phases before byte totals are available.
+- The Bonsai runtime adapter is isolated in `src/services/bonsaiImageRuntime.ts`. The vendored WebGPU runtime now lives under `src/vendor` so Vite treats it as a lazy source module instead of importing a static `public/` asset, and the adapter includes model-download progress mapping plus a conservative progress estimate for long runtime setup phases before byte totals are available. The adapter also tears down upstream demo DOM/WebGL side effects after import so the Hugging Face demo scene does not render inside LocalStudio.ai.
 - Chrome Prompt API readiness and preparation are wired behind `ChromePromptService`. The Prompt API card appears first in the Local Chrome AI section, uses prompt-to-slides copy, shows preparation/download progress, and hides the prepare action when Chrome reports the API is ready at startup.
 - Prompt API slide generation is wired from the main prompt bar for the active page. The app asks Chrome Prompt API for a strict structured JSON task list, applies the page/background immediately, asks for one Konva-ready element at a time with structured JSON output, validates/clamps every payload, and commits each generated element through immutable document commands for progressive on-canvas feedback.
 - Prompt-to-slides supports local placeholder imagery through a bundled asset and supports user-provided `https://` image URLs as remote image assets. Requests that look like image generation are blocked outside `Create image` mode with guidance to use the `+` menu.
 - Translated text now gets a first-pass fit treatment: single-line source text has accidental translated whitespace collapsed, the text box expands around its original center first, and height grows if needed before any future manual overflow flow is introduced.
-- New text inserted from the floating selection toolbar follows the seeded template/title styling instead of generic defaults. It inherits the sample title font, weight, color, alignment, box size, and initial content so new text matches the LocalStudio.ai mock deck visual language.
+- New text inserted from the floating selection toolbar defaults to the title preset, and the Text tab exposes title/subtitle/body presets so newly inserted text matches the LocalStudio.ai mock deck visual language.
+- Fullscreen now targets the active slide frame as a presentation view. It keeps the slide background, text, images, and shapes visible while hiding editor-only chrome such as translation icon, selection toolbar, transformer handles, inline text editor, and background-removal hints.
 - Moving canvas elements now shows a neon dotted crosshair through the dragged element center to help judge distance and alignment against the slide while dragging.
 - Editor object copy/cut/paste is wired through browser clipboard events with a LocalStudio-specific clipboard marker. This lets the app prefer the latest copied LocalStudio objects when the clipboard is marked, while still allowing newer external image clipboard pastes to import images instead of being blocked by stale in-memory editor objects.
 - Export service shell and mocked AI provider seams exist for later real provider work.
@@ -62,7 +66,7 @@ Known limitations in the current implementation:
 - The first real Transformers.js / Hugging Face vision provider is wired for click-guided background removal through Segment Anything WebGPU, but it still needs broader browser/device verification and production hardening.
 - Prompt-driven palette generation, Smart Grab, and Magic Eraser are still mocked or incomplete workflows.
 - Chrome Prompt API prompt-to-slides generation supports the active page only. Multi-slide deck generation, schema repair retries, and richer generation history remain incomplete.
-- Create image has the first Bonsai Image WebGPU integration path with basic size/steps/seed controls. Runtime/package hardening against the referenced Space, model selection, cancellation, generation history, and production browser/device verification remain future work.
+- Create image has the first Bonsai Image WebGPU integration path with basic size/steps/seed controls and demo-side-effect cleanup. Model selection, cancellation, generation history, and production browser/device verification remain future work.
 - Export supports the current-page PNG path, but production-quality browser verification and export UX polish remain. PDF export is still missing.
 - Layer drag/drop works through the app UI and tested callbacks, but should receive more Playwright coverage after interaction stabilizes.
 - Page background is displayed as a static layer row and is not yet a fully editable/selectable element.
@@ -72,7 +76,7 @@ Known limitations in the current implementation:
 Next implementation priorities:
 
 1. Finish translation UX hardening: manual overflow controls, richer recovery guidance, browser language availability verification on target Chrome builds, and Playwright coverage.
-2. Finish remaining non-AI editor fundamentals: richer multi-element alignment/distribution, deeper Design-tab property coverage, and more canvas interaction polish.
+2. Finish remaining non-AI editor fundamentals: richer multi-element alignment/distribution, deeper Design-tab property coverage, page thumbnail fidelity, and more canvas interaction polish.
 3. Harden remaining storage edges: generated preview/mask cache files, stale asset cleanup, and stronger save/import error recovery.
 4. Complete export: polish current-page PNG export and add all-page PDF from the actual Konva stage at configured page dimensions. JPEG is deferred unless explicitly reintroduced.
 5. Add Playwright coverage for layer reorder, hide/show, lock/unlock, delete, local image import, filesystem save, text editing, translation flows, and first-run setup.

@@ -26,6 +26,7 @@ describe('App', () => {
   });
 
   it('starts with a blank project when requested from a new project tab', async () => {
+    const user = userEvent.setup();
     window.history.replaceState({}, '', '/?newProject=1');
 
     render(<App />);
@@ -33,6 +34,7 @@ describe('App', () => {
     expect(
       await screen.findByRole('button', { name: 'Edit project name Untitled Project' }),
     ).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Layout' }));
     expect(screen.getByText('1 layers on current page')).toBeInTheDocument();
   });
 

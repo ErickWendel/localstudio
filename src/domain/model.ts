@@ -17,6 +17,7 @@ export interface Page {
   height: number;
   background: PageBackground;
   elementIds: string[];
+  visible?: boolean;
 }
 
 export type PageBackground =

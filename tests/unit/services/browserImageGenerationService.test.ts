@@ -99,6 +99,40 @@ describe('BrowserBonsaiImageRuntime', () => {
     expect(progress).toEqual([3, 27, 55, 97, 100]);
   });
 
+  it('removes Bonsai demo DOM side effects after importing the runtime', async () => {
+    const appRoot = document.createElement('div');
+    appRoot.id = 'root';
+    document.body.appendChild(appRoot);
+    const pipeline = {
+      generate: vi.fn(() => Promise.resolve(new Blob(['image'], { type: 'image/png' }))),
+    };
+    const fromPretrained = vi.fn(() => Promise.resolve(pipeline));
+    const cleanupBonsaiDemo = vi.fn();
+    const destroyBonsaiDemoScene = vi.fn();
+
+    await new BrowserBonsaiImageRuntime({
+      importRuntime: () => {
+        const demoContainer = document.createElement('div');
+        demoContainer.id = 'bonsai-demo';
+        demoContainer.appendChild(document.createElement('canvas'));
+        document.body.appendChild(demoContainer);
+        return Promise.resolve({
+          BonsaiImagePipeline: {
+            from_pretrained: fromPretrained,
+          },
+          cleanupBonsaiDemo,
+          destroyBonsaiDemoScene,
+        });
+      },
+    }).preload('prism-ml/bonsai-image-ternary-4B-mlx-2bit');
+
+    expect(cleanupBonsaiDemo).toHaveBeenCalled();
+    expect(destroyBonsaiDemoScene).toHaveBeenCalled();
+    expect(document.getElementById('root')).toBe(appRoot);
+    expect(document.getElementById('bonsai-demo')).toBeNull();
+    appRoot.remove();
+  });
+
   it('keeps model preload progress moving before byte totals are available', async () => {
     vi.useFakeTimers();
     type TestPipeline = {

@@ -3,8 +3,13 @@ import {
   AlignElementCommand,
   AddImageElementCommand,
   DeleteElementCommand,
+  DeletePageCommand,
+  DuplicatePageCommand,
   DuplicateElementCommand,
+  RenamePageCommand,
+  ReorderPageCommand,
   ReorderElementCommand,
+  SetPageVisibilityCommand,
   SetZOrderCommand,
   SetElementLockCommand,
   SetElementVisibilityCommand,
@@ -71,6 +76,21 @@ describe('editor commands', () => {
     expect(next.elements['image-hero']).toBeUndefined();
     expect(next.assets['asset-hero']).toBeUndefined();
     expect(next.pages[0]?.elementIds).not.toContain('image-hero');
+  });
+
+  it('keeps an image asset when deleting an element if the page background still uses it', () => {
+    const project = createSampleProject();
+    const command = new DeleteElementCommand('page-1', 'image-hero');
+    const next = command.execute({
+      ...project,
+      pages: project.pages.map((page) => ({
+        ...page,
+        background: { type: 'asset', assetId: 'asset-hero', colorFallback: '#050d10' },
+      })),
+    });
+
+    expect(next.elements['image-hero']).toBeUndefined();
+    expect(next.assets['asset-hero']).toBeDefined();
   });
 
   it('updates element position, size, and rotation immutably', () => {
@@ -303,5 +323,60 @@ describe('editor commands', () => {
     expect(next.elements['text-subtitle-pasted']).toMatchObject({ x: subtitle.x + 32, y: subtitle.y + 32 });
     expect(next.pages[0]?.elementIds.slice(-2)).toEqual(['text-title-pasted', 'text-subtitle-pasted']);
     expect(project.elements['text-title-pasted']).toBeUndefined();
+  });
+
+  it('duplicates a page with cloned unlocked elements after the source page', () => {
+    const project = createSampleProject();
+    const next = new DuplicatePageCommand('page-1', 'page-copy', (elementId) => `${elementId}-page-copy`).execute(project);
+
+    expect(next.pages).toHaveLength(2);
+    expect(next.pages[1]).toMatchObject({
+      id: 'page-copy',
+      name: 'Slide 1 copy',
+      visible: true,
+    });
+    expect(next.pages[1]?.elementIds).toEqual([
+      'image-hero-page-copy',
+      'text-subtitle-page-copy',
+      'text-title-page-copy',
+    ]);
+    expect(next.elements['text-title-page-copy']).toMatchObject({
+      id: 'text-title-page-copy',
+      text: 'AI Design Revolution',
+      locked: false,
+    });
+    expect(project.pages).toHaveLength(1);
+  });
+
+  it('deletes a page, its elements, and orphaned assets while preserving other pages', () => {
+    const project = createSampleProject();
+    const duplicate = new DuplicatePageCommand('page-1', 'page-copy', (elementId) => `${elementId}-copy`).execute(project);
+    const next = new DeletePageCommand('page-1').execute(duplicate);
+
+    expect(next.pages).toHaveLength(1);
+    expect(next.pages[0]?.id).toBe('page-copy');
+    expect(next.elements['image-hero']).toBeUndefined();
+    expect(next.assets['asset-hero']).toBeDefined();
+  });
+
+  it('does not delete the last remaining page', () => {
+    const project = createSampleProject();
+    const next = new DeletePageCommand('page-1').execute(project);
+
+    expect(next).toBe(project);
+  });
+
+  it('reorders, renames, and hides pages immutably', () => {
+    const project = new DuplicatePageCommand('page-1', 'page-copy', (elementId) => `${elementId}-copy`).execute(
+      createSampleProject(),
+    );
+    const reordered = new ReorderPageCommand('page-copy', 0).execute(project);
+    const renamed = new RenamePageCommand('page-copy', 'Launch Slide').execute(reordered);
+    const hidden = new SetPageVisibilityCommand('page-copy', false).execute(renamed);
+
+    expect(reordered.pages.map((page) => page.id)).toEqual(['page-copy', 'page-1']);
+    expect(renamed.pages[0]?.name).toBe('Launch Slide');
+    expect(hidden.pages[0]).toMatchObject({ id: 'page-copy', visible: false });
+    expect(project.pages.map((page) => page.id)).toEqual(['page-1', 'page-copy']);
   });
 });

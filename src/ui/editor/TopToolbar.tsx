@@ -10,7 +10,6 @@ interface TopToolbarProps {
   canUndo?: boolean;
   hasSelection?: boolean;
   persistenceEnabled?: boolean;
-  zoomPercent?: number;
   canTranslateDeck?: boolean;
   onDelete?: () => void;
   onDuplicate?: () => void;
@@ -47,7 +46,6 @@ export function TopToolbar({
   canUndo = false,
   hasSelection = false,
   persistenceEnabled = false,
-  zoomPercent = 100,
   canTranslateDeck = false,
   onDelete,
   onDuplicate,
@@ -105,16 +103,16 @@ export function TopToolbar({
       { label: 'Export', onSelect: triggerExport },
     ],
     Edit: [
-      { label: 'Undo', disabled: !canUndo, onSelect: onUndo },
+  { label: 'Undo', disabled: !canUndo, onSelect: onUndo },
       { label: 'Redo', disabled: !canRedo, onSelect: onRedo },
       { label: 'Duplicate', disabled: !hasSelection, onSelect: onDuplicate },
       { label: 'Delete', disabled: !hasSelection, onSelect: onDelete },
       { label: 'Translate Deck', disabled: !canTranslateDeck || !onTranslateDeck, onSelect: onTranslateDeck },
     ],
     View: [
-      { label: 'Zoom Out', onSelect: onZoomOut },
-      { label: '100%', onSelect: onResetZoom },
-      { label: 'Zoom In', onSelect: onZoomIn },
+      { label: 'Zoom Out', disabled: !onZoomOut, onSelect: onZoomOut },
+      { label: '100%', disabled: !onResetZoom, onSelect: onResetZoom },
+      { label: 'Zoom In', disabled: !onZoomIn, onSelect: onZoomIn },
       onSelectLayers
         ? { label: 'Toggle Layers Panel', onSelect: onSelectLayers }
         : { label: 'Toggle Layers Panel', disabled: true },
@@ -250,36 +248,6 @@ export function TopToolbar({
           >
             <span className="material-symbols-outlined" aria-hidden="true">
               redo
-            </span>
-          </button>
-        </div>
-        <div className="toolbar-divider" />
-        <div className="zoom-group" aria-label="Zoom controls">
-          <button
-            className="stitch-icon-button"
-            disabled={zoomPercent <= 50}
-            title="Zoom Out"
-            type="button"
-            aria-label="Zoom Out"
-            onClick={onZoomOut}
-          >
-            <span className="material-symbols-outlined" aria-hidden="true">
-              remove
-            </span>
-          </button>
-          <button className="zoom-value" type="button" aria-label="Reset zoom" onClick={onResetZoom}>
-            {zoomPercent}%
-          </button>
-          <button
-            className="stitch-icon-button"
-            disabled={zoomPercent >= 200}
-            title="Zoom In"
-            type="button"
-            aria-label="Zoom In"
-            onClick={onZoomIn}
-          >
-            <span className="material-symbols-outlined" aria-hidden="true">
-              zoom_in
             </span>
           </button>
         </div>

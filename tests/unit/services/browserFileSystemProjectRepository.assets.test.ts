@@ -50,6 +50,11 @@ class MockDirectoryHandle {
     }
     return Promise.resolve(this.directories.get(name)!);
   }
+  removeEntry(name: string): Promise<void> {
+    this.files.delete(name);
+    this.directories.delete(name);
+    return Promise.resolve();
+  }
   queryPermission(): Promise<PermissionState> {
     return Promise.resolve('granted');
   }
@@ -222,6 +227,20 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
       mimeType: 'image/png',
       objectUrl: 'blob:generated-image',
     };
+    project.elements['image-generated'] = {
+      id: 'image-generated',
+      type: 'image',
+      assetId: 'asset-generated',
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      rotation: 0,
+      locked: false,
+      visible: true,
+      opacity: 1,
+    };
+    project.pages[0]?.elementIds.push('image-generated');
 
     await repository.saveProject(project);
 
@@ -240,5 +259,31 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
       storage: 'file',
     });
     expect(savedAsset.objectUrl).toBeUndefined();
+  });
+
+  it('removes stale file-backed assets from project metadata and assets folder on save', async () => {
+    const directory = new MockDirectoryHandle();
+    const assetsDirectory = new MockDirectoryHandle();
+    directory.directories.set('assets', assetsDirectory);
+    assetsDirectory.files.set('asset-stale.png', new Blob(['stale'], { type: 'image/png' }));
+    const repository = new BrowserFileSystemProjectRepository({
+      pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
+    });
+    const project = createSampleProject();
+    project.assets['asset-stale'] = {
+      id: 'asset-stale',
+      type: 'image',
+      name: 'Stale image',
+      mimeType: 'image/png',
+      storage: 'file',
+      fileName: 'asset-stale.png',
+    };
+
+    await repository.saveProject(project);
+
+    const savedProject = JSON.parse(directory.files.get('project.json') as string) as ProjectDocument;
+    expect(savedProject.assets['asset-stale']).toBeUndefined();
+    expect(assetsDirectory.files.has('asset-stale.png')).toBe(false);
   });
 });
