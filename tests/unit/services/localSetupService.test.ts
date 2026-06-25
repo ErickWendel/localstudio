@@ -9,8 +9,8 @@ describe('BrowserLocalSetupService', () => {
 
   it('reports filesystem and chrome translation readiness', async () => {
     vi.stubGlobal('showDirectoryPicker', vi.fn());
-    vi.stubGlobal('translation', {
-      canTranslate: vi.fn().mockResolvedValue('readily'),
+    vi.stubGlobal('Translator', {
+      availability: vi.fn().mockResolvedValue('available'),
     });
     const service = new BrowserLocalSetupService();
 
@@ -22,7 +22,7 @@ describe('BrowserLocalSetupService', () => {
 
   it('reports missing browser capabilities as unavailable', async () => {
     vi.stubGlobal('showDirectoryPicker', undefined);
-    vi.stubGlobal('translation', undefined);
+    vi.stubGlobal('Translator', undefined);
     const service = new BrowserLocalSetupService();
 
     const state = await service.checkReadiness();
@@ -31,10 +31,22 @@ describe('BrowserLocalSetupService', () => {
     expect(state.chromeTranslation.status).toBe('unavailable');
   });
 
-  it('reports chrome translation after-download as needing setup', async () => {
+  it('reports downloadable chrome translation as needing setup', async () => {
     vi.stubGlobal('showDirectoryPicker', vi.fn());
-    vi.stubGlobal('translation', {
-      canTranslate: vi.fn().mockResolvedValue('after-download'),
+    vi.stubGlobal('Translator', {
+      availability: vi.fn().mockResolvedValue('downloadable'),
+    });
+    const service = new BrowserLocalSetupService();
+
+    const state = await service.checkReadiness();
+
+    expect(state.chromeTranslation.status).toBe('needs-setup');
+  });
+
+  it('reports downloading chrome translation as needing setup', async () => {
+    vi.stubGlobal('showDirectoryPicker', vi.fn());
+    vi.stubGlobal('Translator', {
+      availability: vi.fn().mockResolvedValue('downloading'),
     });
     const service = new BrowserLocalSetupService();
 

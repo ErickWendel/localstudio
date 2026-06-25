@@ -2,16 +2,16 @@ import type { LocalSetupService, LocalSetupState, SetupCapabilityState } from '.
 
 export const SETUP_COMPLETE_KEY = 'localstudio.ai.setup-complete';
 
-type TranslationReadiness = 'no' | 'readily' | 'after-download';
+type TranslationAvailability = 'unavailable' | 'available' | 'downloadable' | 'downloading' | (string & {});
 
-type TranslationApi = {
-  canTranslate?: (options: { sourceLanguage: string; targetLanguage: string }) => Promise<TranslationReadiness>;
+type TranslatorApi = {
+  availability?: (options: { sourceLanguage: string; targetLanguage: string }) => Promise<TranslationAvailability>;
 };
 
 type SetupWindow = Window &
   typeof globalThis & {
     showDirectoryPicker?: unknown;
-    translation?: TranslationApi;
+    Translator?: TranslatorApi;
   };
 
 export class BrowserLocalSetupService implements LocalSetupService {
@@ -49,8 +49,8 @@ export class BrowserLocalSetupService implements LocalSetupService {
 
   private async checkChromeTranslation(): Promise<SetupCapabilityState> {
     const browserWindow = window as SetupWindow;
-    const canTranslate = browserWindow.translation?.canTranslate;
-    if (!canTranslate) {
+    const translator = browserWindow.Translator;
+    if (!translator?.availability) {
       return {
         label: 'Chrome Translation',
         status: 'unavailable',
@@ -59,11 +59,11 @@ export class BrowserLocalSetupService implements LocalSetupService {
     }
 
     try {
-      const result = await canTranslate({ sourceLanguage: 'en', targetLanguage: 'pt' });
-      if (result === 'readily') {
+      const result = await translator.availability({ sourceLanguage: 'en', targetLanguage: 'pt' });
+      if (result === 'available') {
         return { label: 'Chrome Translation', status: 'ready', detail: 'Translation is ready.' };
       }
-      if (result === 'after-download') {
+      if (result === 'downloadable' || result === 'downloading') {
         return {
           label: 'Chrome Translation',
           status: 'needs-setup',

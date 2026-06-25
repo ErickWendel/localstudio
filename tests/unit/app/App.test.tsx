@@ -50,8 +50,8 @@ describe('App', () => {
     const user = userEvent.setup();
     window.localStorage.clear();
     vi.stubGlobal('showDirectoryPicker', vi.fn());
-    vi.stubGlobal('translation', {
-      canTranslate: vi.fn().mockResolvedValue('readily'),
+    vi.stubGlobal('Translator', {
+      availability: vi.fn().mockResolvedValue('available'),
     });
 
     render(<App />);

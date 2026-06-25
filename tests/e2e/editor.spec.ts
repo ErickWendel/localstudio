@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test';
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('localstudio.ai.setup-complete', 'true');
+  });
+});
+
 test('renders the editor shell and tabs', async ({ page }) => {
   await page.goto('/');
 
@@ -20,6 +26,9 @@ test('renders the editor shell and tabs', async ({ page }) => {
 });
 
 test('downloads required model states', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('ew-canvas-ai.model.image-editing-models.ready', 'true');
+  });
   await page.goto('/');
   await page.getByRole('tab', { name: 'AI Tools' }).click();
   await page.getByRole('button', { name: 'Download Required Models' }).click();
