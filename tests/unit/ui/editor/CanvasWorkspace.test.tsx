@@ -16,6 +16,7 @@ describe('CanvasWorkspace', () => {
     );
 
     expect(screen.getByLabelText('Slide canvas')).toBeInTheDocument();
+    expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-drag-guide', 'idle');
     expect(container.querySelector('canvas')).toBeInTheDocument();
     expect(screen.getByLabelText('Remove Background')).toBeInTheDocument();
   });

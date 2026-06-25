@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import type Konva from 'konva';
-import { Circle, Image as KonvaImage, Layer, Rect, Stage, Text, Transformer } from 'react-konva';
+import { Circle, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transformer } from 'react-konva';
 import type { ElementFramePatch } from '../../domain/commands/basicCommands';
 import type { DesignElement, ProjectDocument, SelectionState } from '../../domain/model';
 import { getNormalizedElementPoint } from './backgroundSelection';
@@ -60,6 +60,7 @@ interface CommonElementProps {
   onDblClick: () => void;
   onDblTap: () => void;
   onDragEnd: (event: Konva.KonvaEventObject<DragEvent>) => void;
+  onDragMove: (event: Konva.KonvaEventObject<DragEvent>) => void;
   onMouseEnter: (event: Konva.KonvaEventObject<MouseEvent>) => void;
   onMouseLeave: (event: Konva.KonvaEventObject<MouseEvent>) => void;
   onMouseMove: (event: Konva.KonvaEventObject<MouseEvent>) => void;
@@ -140,6 +141,7 @@ export function CanvasWorkspace({
   const [fontRenderVersion, setFontRenderVersion] = useState(0);
   const [processingBlinkOn, setProcessingBlinkOn] = useState(false);
   const [backgroundPreviewPoint, setBackgroundPreviewPoint] = useState<{ x: number; y: number } | null>(null);
+  const [dragGuide, setDragGuide] = useState<{ x: number; y: number } | null>(null);
   const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
   const visibleElements =
     page?.elementIds
@@ -256,6 +258,7 @@ export function CanvasWorkspace({
   }
 
   function handleDragEnd(elementId: string, event: Konva.KonvaEventObject<DragEvent>) {
+    setDragGuide(null);
     const element = project.elements[elementId];
     if (!element) return;
     const nextX = toDocumentX(event.target.x());
@@ -286,6 +289,15 @@ export function CanvasWorkspace({
     }
 
     onUpdateElementFrame?.(elementId, { x: nextX, y: nextY });
+  }
+
+  function handleDragMove(event: Konva.KonvaEventObject<DragEvent>) {
+    const node = event.target;
+    const rect = node.getClientRect({ skipShadow: true, skipStroke: true });
+    setDragGuide({
+      x: rect.x + rect.width / 2,
+      y: rect.y + rect.height / 2,
+    });
   }
 
   function handleTransformEnd(elementId: string, event: Konva.KonvaEventObject<Event>) {
@@ -400,6 +412,7 @@ export function CanvasWorkspace({
       onDragEnd: (event: Konva.KonvaEventObject<DragEvent>) => {
         handleDragEnd(element.id, event);
       },
+      onDragMove: handleDragMove,
       onMouseEnter: (event: Konva.KonvaEventObject<MouseEvent>) => {
         if (!isBackgroundSelectionTarget && !isProcessing) return;
         const container = event.target.getStage()?.container();
@@ -451,6 +464,7 @@ export function CanvasWorkspace({
           ? { 'data-background-selection-target': backgroundSelectionTargetId }
           : {})}
         data-selected-elements={selection.elementIds.join(',')}
+        data-drag-guide={dragGuide ? 'active' : 'idle'}
         style={{
           transform: `scale(${zoomPercent / 100})`,
         }}
@@ -586,6 +600,34 @@ export function CanvasWorkspace({
                   />
                 </>
               ) : null}
+              {backgroundSelectionMode || processingSelectedImageId ? null : (
+                <>
+                  {dragGuide ? (
+                    <>
+                      <Line
+                        listening={false}
+                        points={[dragGuide.x, 0, dragGuide.x, stageHeight]}
+                        stroke="#37FD76"
+                        strokeWidth={1}
+                        opacity={0.78}
+                        dash={[2, 7]}
+                        shadowBlur={10}
+                        shadowColor="#37FD76"
+                      />
+                      <Line
+                        listening={false}
+                        points={[0, dragGuide.y, stageWidth, dragGuide.y]}
+                        stroke="#37FD76"
+                        strokeWidth={1}
+                        opacity={0.78}
+                        dash={[2, 7]}
+                        shadowBlur={10}
+                        shadowColor="#37FD76"
+                      />
+                    </>
+                  ) : null}
+                </>
+              )}
               {backgroundSelectionMode || processingSelectedImageId ? null : (
                 <Transformer
                   ref={transformerRef}

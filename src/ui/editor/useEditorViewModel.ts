@@ -944,7 +944,7 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function pasteCopiedElements() {
-    if (elementClipboard.elements.length === 0) return;
+    if (elementClipboard.elements.length === 0) return false;
     const pastedElements = elementClipboard.elements.map((element) => ({
       ...element,
       id: createId(`${element.id}-copy`),
@@ -962,6 +962,7 @@ export function useEditorViewModel(services: AppServices) {
       assets: elementClipboard.assets,
       elements: pastedElements.map((element) => ({ ...element })),
     });
+    return true;
   }
 
   function deleteElement(elementId: string) {
@@ -1022,13 +1023,19 @@ export function useEditorViewModel(services: AppServices) {
     const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
     if (!page) return;
     const selectedElement = project.elements[selectedElementIds[0] ?? ''];
-    const width = 420;
-    const height = 96;
+    const templateTextElement =
+      project.elements['text-title']?.type === 'text'
+        ? project.elements['text-title']
+        : Object.values(project.elements).find(
+            (element) => element.type === 'text' && element.fontFamily === 'Orbitron',
+          );
+    const width = templateTextElement?.type === 'text' ? templateTextElement.width : 600;
+    const height = templateTextElement?.type === 'text' ? templateTextElement.height : 240;
     const elementId = createId('text');
     const nextElement: DesignElement = {
       id: elementId,
       type: 'text',
-      text: 'New text',
+      text: templateTextElement?.type === 'text' ? templateTextElement.text : 'AI Design Revolution',
       x: selectedElement
         ? Math.min(page.width - width, selectedElement.x + PASTED_ELEMENT_OFFSET)
         : (page.width - width) / 2,
@@ -1041,11 +1048,11 @@ export function useEditorViewModel(services: AppServices) {
       locked: false,
       visible: true,
       opacity: 1,
-      fontFamily: 'Open Sans',
-      fontSize: 48,
-      fontWeight: 700,
-      fill: '#FFFFFF',
-      align: 'center',
+      fontFamily: templateTextElement?.type === 'text' ? templateTextElement.fontFamily : 'Orbitron',
+      fontSize: templateTextElement?.type === 'text' ? templateTextElement.fontSize : 96,
+      fontWeight: templateTextElement?.type === 'text' ? templateTextElement.fontWeight : 800,
+      fill: templateTextElement?.type === 'text' ? templateTextElement.fill : '#37FD76',
+      align: templateTextElement?.type === 'text' ? templateTextElement.align : 'center',
     };
 
     commitProject(

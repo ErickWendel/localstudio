@@ -13,6 +13,9 @@ interface EditorShellProps {
   services: AppServices;
 }
 
+const EDITOR_OBJECT_CLIPBOARD_TYPE = 'application/x-localstudio-editor-elements';
+const EDITOR_OBJECT_CLIPBOARD_MARKER = '1';
+
 function isEditablePasteTarget(target: EventTarget | null) {
   return (
     target instanceof HTMLInputElement ||
@@ -35,6 +38,20 @@ function getClipboardImageFile(clipboardData: DataTransfer | null) {
   }
 
   return undefined;
+}
+
+function hasEditorObjectClipboardMarker(clipboardData: DataTransfer | null) {
+  if (!clipboardData) return false;
+  if (clipboardData.types && Array.from(clipboardData.types).includes(EDITOR_OBJECT_CLIPBOARD_TYPE)) {
+    return true;
+  }
+  return clipboardData.getData?.(EDITOR_OBJECT_CLIPBOARD_TYPE) === EDITOR_OBJECT_CLIPBOARD_MARKER;
+}
+
+function writeEditorObjectClipboardMarker(clipboardData: DataTransfer | null) {
+  if (!clipboardData) return;
+  clipboardData.setData(EDITOR_OBJECT_CLIPBOARD_TYPE, EDITOR_OBJECT_CLIPBOARD_MARKER);
+  clipboardData.setData('text/plain', 'LocalStudio.ai editor elements');
 }
 
 export function EditorShell({ services }: EditorShellProps) {
@@ -80,20 +97,6 @@ export function EditorShell({ services }: EditorShellProps) {
         return;
       }
 
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'c') {
-        if (isEditablePasteTarget(event.target) || !hasSelection) return;
-        event.preventDefault();
-        vm.copySelectedElements();
-        return;
-      }
-
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'x') {
-        if (isEditablePasteTarget(event.target) || !hasSelection) return;
-        event.preventDefault();
-        vm.cutSelectedElements();
-        return;
-      }
-
       if (event.key === 'Escape' && (vm.backgroundSelectionMode || vm.backgroundSelectionNotice)) {
         event.preventDefault();
         vm.cancelBackgroundSelectionMode();
@@ -123,10 +126,25 @@ export function EditorShell({ services }: EditorShellProps) {
   }, [hasSelection, vm]);
 
   useEffect(() => {
+    function handleCopy(event: ClipboardEvent) {
+      if (isEditablePasteTarget(event.target) || !hasSelection) return;
+      event.preventDefault();
+      vm.copySelectedElements();
+      writeEditorObjectClipboardMarker(event.clipboardData);
+    }
+
+    function handleCut(event: ClipboardEvent) {
+      if (isEditablePasteTarget(event.target) || !hasSelection) return;
+      event.preventDefault();
+      vm.cutSelectedElements();
+      writeEditorObjectClipboardMarker(event.clipboardData);
+    }
+
     function handlePaste(event: ClipboardEvent) {
       if (isEditablePasteTarget(event.target)) return;
-      const imageFile = getClipboardImageFile(event.clipboardData);
       event.preventDefault();
+      if (hasEditorObjectClipboardMarker(event.clipboardData) && vm.pasteCopiedElements()) return;
+      const imageFile = getClipboardImageFile(event.clipboardData);
       if (imageFile) {
         void vm.importImageFile(imageFile);
         return;
@@ -134,11 +152,15 @@ export function EditorShell({ services }: EditorShellProps) {
       vm.pasteCopiedElements();
     }
 
+    window.addEventListener('copy', handleCopy);
+    window.addEventListener('cut', handleCut);
     window.addEventListener('paste', handlePaste);
     return () => {
+      window.removeEventListener('copy', handleCopy);
+      window.removeEventListener('cut', handleCut);
       window.removeEventListener('paste', handlePaste);
     };
-  }, [vm]);
+  }, [hasSelection, vm]);
 
   return (
     <div className="app-shell">

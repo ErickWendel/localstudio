@@ -16,7 +16,8 @@
 
 - Tasks 1-3 are implemented on `main`: file-backed asset persistence, project hydration/storage hardening, and first-run setup readiness checks.
 - Tasks 4-6 are implemented on `main`: `ChromeTranslatorService`, `TranslateTextElementsCommand`, selected-text translation, current-slide translation, `Edit > Translate Deck`, AI Tools target-language selection, translation pair preparation progress, translator caching, busy guards, basic error notices, detector fallback normalization, and first-pass translated text fitting.
-- Latest local non-e2e checks passed after the translation compatibility work: `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build`.
+- The latest editor ergonomics slice is implemented on `main`: inserted text now follows the seeded LocalStudio.ai template title style, moving elements shows a dotted neon center crosshair, and copy/cut/paste uses browser clipboard events plus a LocalStudio marker so the latest clipboard source wins between editor objects and external images.
+- Latest local non-e2e checks passed after the editor ergonomics and clipboard work: `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build`.
 
 ## Remaining Work / Spec Gap Checklist
 
@@ -32,7 +33,11 @@ Core editor:
 
 - [x] Build real Design-tab property controls for selected text/image/shape/page settings.
 - [x] Make the page background editable from the Design tab instead of only showing a static layer row.
-- [ ] Add multi-select and multi-element alignment/distribution.
+- [x] Make inserted text inherit the approved mock/template title typography, color, and frame defaults.
+- [x] Add dotted crosshair movement guides while dragging canvas elements.
+- [x] Fix editor object copy/cut/paste so copied LocalStudio objects replace the previous editor clipboard while newer external image clipboard data can still be pasted as images.
+- [x] Add select-all, shift multi-select, and grouped movement for selected elements.
+- [ ] Add richer multi-element alignment/distribution.
 - [ ] Add richer layer operations and property editing coverage in Playwright.
 
 Storage:

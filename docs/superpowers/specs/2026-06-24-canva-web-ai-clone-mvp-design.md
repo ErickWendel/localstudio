@@ -43,6 +43,9 @@ Ready now:
 - Chrome Built-in AI translation is wired behind `TranslatorService` for selected text, current slide, and full deck scopes. The visible entry points are the selected-text floating toolbar action, the slide translate icon above the canvas, and `Edit > Translate Deck`. The first translation attempt redirects to AI Tools until the user chooses a default target language in `Translate Design > Translate to`.
 - The AI Tools translation card uses a hard-coded Chrome Translator-supported target-language list sorted by language name, with flags shown at the end of each option. Changing the target language prepares the detected source/target pair, shows download progress, and reuses the prepared translator for subsequent text/slide/deck translation.
 - Translated text now gets a first-pass fit treatment: single-line source text has accidental translated whitespace collapsed, the text box expands around its original center first, and height grows if needed before any future manual overflow flow is introduced.
+- New text inserted from the floating selection toolbar follows the seeded template/title styling instead of generic defaults. It inherits the sample title font, weight, color, alignment, box size, and initial content so new text matches the LocalStudio.ai mock deck visual language.
+- Moving canvas elements now shows a neon dotted crosshair through the dragged element center to help judge distance and alignment against the slide while dragging.
+- Editor object copy/cut/paste is wired through browser clipboard events with a LocalStudio-specific clipboard marker. This lets the app prefer the latest copied LocalStudio objects when the clipboard is marked, while still allowing newer external image clipboard pastes to import images instead of being blocked by stale in-memory editor objects.
 - Export service shell and mocked AI provider seams exist for later real provider work.
 - Unit/component tests are under `tests/unit`; browser specs are under `tests/e2e`.
 - Latest verified local checks: `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build` pass.
@@ -55,13 +58,13 @@ Known limitations in the current implementation:
 - Export supports the current-page PNG path, but production-quality browser verification and export UX polish remain. PDF export is still missing.
 - Layer drag/drop works through the app UI and tested callbacks, but should receive more Playwright coverage after interaction stabilizes.
 - Page background is displayed as a static layer row and is not yet a fully editable/selectable element.
-- Undo/redo, duplicate, delete shortcuts, zoom controls, basic alignment, and z-order actions are implemented. Multi-select, richer multi-element alignment, and real property editing remain incomplete.
+- Undo/redo, duplicate, delete shortcuts, zoom controls, select all, shift multi-select, grouped movement, copy/cut/paste of editor objects, image clipboard paste/import, basic alignment, and z-order actions are implemented. Richer multi-element alignment/distribution remains incomplete.
 - Some historical or remote seeded assets may still hydrate with runtime object/data URLs, but newly imported/generated file-backed assets are stored through the project `assets/` folder.
 
 Next implementation priorities:
 
 1. Finish translation UX hardening: manual overflow controls, richer recovery guidance, browser language availability verification on target Chrome builds, and Playwright coverage.
-2. Finish remaining non-AI editor fundamentals: real Design-tab property fields, page background editability, multi-select, and multi-element alignment.
+2. Finish remaining non-AI editor fundamentals: richer multi-element alignment/distribution, deeper Design-tab property coverage, and more canvas interaction polish.
 3. Harden remaining storage edges: generated preview/mask cache files, stale asset cleanup, and stronger save/import error recovery.
 4. Complete export: polish current-page PNG export and add all-page PDF from the actual Konva stage at configured page dimensions. JPEG is deferred unless explicitly reintroduced.
 5. Add Playwright coverage for layer reorder, hide/show, lock/unlock, delete, local image import, filesystem save, text editing, translation flows, and first-run setup.

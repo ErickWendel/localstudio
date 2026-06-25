@@ -135,6 +135,21 @@ function createDeferred<T>() {
   return { promise, reject, resolve };
 }
 
+function createClipboardData(options: { editorObject?: boolean; files?: File[] } = {}) {
+  const data = new Map<string, string>();
+  if (options.editorObject) data.set('application/x-localstudio-editor-elements', '1');
+
+  return {
+    files: options.files ?? [],
+    items: [],
+    types: Array.from(data.keys()),
+    getData: vi.fn((type: string) => data.get(type) ?? ''),
+    setData: vi.fn((type: string, value: string) => {
+      data.set(type, value);
+    }),
+  };
+}
+
 function createReadyPrepareTranslationMock() {
   return vi.fn(
     (
@@ -440,12 +455,11 @@ describe('EditorShell', () => {
     services.projectRepository = repository;
     render(<EditorShell services={services} />);
 
-    await user.keyboard('{Meta>}c{/Meta}');
+    fireEvent.copy(window, {
+      clipboardData: createClipboardData(),
+    });
     fireEvent.paste(window, {
-      clipboardData: {
-        files: [],
-        items: [],
-      },
+      clipboardData: createClipboardData({ editorObject: true }),
     });
 
     expect(screen.getByRole('button', { name: 'Selected Image copy' })).toHaveAttribute(
@@ -469,18 +483,59 @@ describe('EditorShell', () => {
     });
   });
 
-  it('cuts selected objects into the editor clipboard', async () => {
+  it('prefers the latest editor object copy over stale image clipboard data', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
 
-    await user.keyboard('{Meta>}x{/Meta}');
+    fireEvent.copy(window, {
+      clipboardData: createClipboardData(),
+    });
+    await user.click(screen.getByRole('button', { name: 'Title' }));
+    fireEvent.copy(window, {
+      clipboardData: createClipboardData(),
+    });
+
+    const staleImage = new File(['stale-image'], 'stale-system-image.png', { type: 'image/png' });
+    fireEvent.paste(window, {
+      clipboardData: createClipboardData({ editorObject: true, files: [staleImage] }),
+    });
+
+    expect(await screen.findByRole('button', { name: 'Title copy' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.queryByRole('button', { name: 'stale-system-image.png' })).not.toBeInTheDocument();
+  });
+
+  it('imports a newer system image paste instead of an older editor object copy', async () => {
+    render(<EditorShell services={createAppServices()} />);
+
+    fireEvent.copy(window, {
+      clipboardData: createClipboardData(),
+    });
+
+    const image = new File(['new-image'], 'new-system-image.png', { type: 'image/png' });
+    fireEvent.paste(window, {
+      clipboardData: createClipboardData({ files: [image] }),
+    });
+
+    expect(await screen.findByRole('button', { name: 'new-system-image.png' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.queryByRole('button', { name: 'Selected Image copy' })).not.toBeInTheDocument();
+  });
+
+  it('cuts selected objects into the editor clipboard', async () => {
+    render(<EditorShell services={createAppServices()} />);
+
+    fireEvent.cut(window, {
+      clipboardData: createClipboardData(),
+    });
     expect(screen.queryByRole('button', { name: 'Selected Image' })).not.toBeInTheDocument();
 
     fireEvent.paste(window, {
-      clipboardData: {
-        files: [],
-        items: [],
-      },
+      clipboardData: createClipboardData({ editorObject: true }),
     });
 
     expect(await screen.findByRole('button', { name: 'Selected Image copy' })).toHaveAttribute(
@@ -491,7 +546,10 @@ describe('EditorShell', () => {
 
   it('inserts text and images from the floating toolbar', async () => {
     const user = userEvent.setup();
-    render(<EditorShell services={createAppServices()} />);
+    const services = createAppServices();
+    const repository = new SavingProjectRepository();
+    services.projectRepository = repository;
+    render(<EditorShell services={services} />);
 
     await user.click(screen.getByRole('button', { name: 'Insert Text' }));
     await waitFor(() => {
@@ -500,6 +558,26 @@ describe('EditorShell', () => {
           .getAllByRole('button', { name: /text-/ })
           .find((element) => element.getAttribute('aria-pressed') === 'true'),
       ).toBeTruthy();
+    });
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await waitFor(() => {
+      const insertedText = Object.values(repository.savedProjects.at(-1)?.elements ?? {}).find(
+        (element) =>
+          element.type === 'text' &&
+          element.id !== 'text-title' &&
+          element.id !== 'text-subtitle',
+      );
+      expect(insertedText).toMatchObject({
+        type: 'text',
+        text: 'AI Design Revolution',
+        width: 600,
+        height: 240,
+        fontFamily: 'Orbitron',
+        fontSize: 96,
+        fontWeight: 800,
+        fill: '#37FD76',
+        align: 'center',
+      });
     });
 
     const image = new File(['image-bytes'], 'toolbar-image.png', { type: 'image/png' });
