@@ -53,6 +53,7 @@ export function EditorShell({ services }: EditorShellProps) {
 
   function openBlankProjectInNewTab() {
     const url = new URL(window.location.href);
+    url.searchParams.delete('project');
     url.searchParams.set('newProject', '1');
     window.open(url.toString(), '_blank', 'noopener,noreferrer');
   }

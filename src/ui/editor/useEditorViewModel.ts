@@ -56,6 +56,17 @@ function readPersistencePreference() {
   return window.localStorage.getItem(PERSISTENCE_PREFERENCE_KEY) === 'true';
 }
 
+function writeProjectNameToUrl(projectName: string) {
+  if (typeof window === 'undefined') return;
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.set('project', projectName);
+  window.history.replaceState(
+    window.history.state,
+    '',
+    `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`,
+  );
+}
+
 function normalizeProjectDocument(project: ProjectDocument): ProjectDocument {
   const shouldRestoreHeroImage = Boolean(project.assets['asset-hero']) && !project.elements['image-hero'];
   const pageId = project.pages[0]?.id;
@@ -219,13 +230,16 @@ export function useEditorViewModel(services: AppServices) {
 
     if (!persistenceEnabled) return;
 
-    void services.projectRepository.loadProject().then((savedProject) => {
+    void services.projectRepository.loadProject(
+      services.storedProjectName ? { projectName: services.storedProjectName } : undefined,
+    ).then((savedProject) => {
       if (!isMounted) return;
       if (savedProject) {
         const normalizedProject = normalizeProjectDocument(savedProject);
         setProject(normalizedProject);
         setActivePageId(normalizedProject.pages[0]?.id ?? '');
         setSelectedElementIds(['image-hero'].filter((id) => Boolean(normalizedProject.elements[id])));
+        writeProjectNameToUrl(normalizedProject.name);
       }
       setHasLoadedProject(true);
     });
@@ -233,7 +247,7 @@ export function useEditorViewModel(services: AppServices) {
     return () => {
       isMounted = false;
     };
-  }, [persistenceEnabled, services.projectRepository]);
+  }, [persistenceEnabled, services.projectRepository, services.storedProjectName]);
 
   useEffect(() => {
     if (!hasLoadedProject || !persistenceEnabled) return;
@@ -241,12 +255,17 @@ export function useEditorViewModel(services: AppServices) {
       skipNextProjectSaveRef.current = false;
       return;
     }
-    void services.projectRepository.saveProject(project).catch(() => {
-      setPersistenceEnabled(false);
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'false');
-      }
-    });
+    void services.projectRepository
+      .saveProject(project)
+      .then(() => {
+        writeProjectNameToUrl(project.name);
+      })
+      .catch(() => {
+        setPersistenceEnabled(false);
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'false');
+        }
+      });
   }, [hasLoadedProject, persistenceEnabled, project, services.projectRepository]);
 
   useEffect(
@@ -375,6 +394,7 @@ export function useEditorViewModel(services: AppServices) {
     try {
       await services.projectRepository.saveProject(project);
       setPersistenceEnabled(true);
+      writeProjectNameToUrl(project.name);
       if (typeof window !== 'undefined') {
         window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'true');
       }
@@ -403,6 +423,7 @@ export function useEditorViewModel(services: AppServices) {
       clearBackgroundPreparation();
       clearBackgroundSelectionPoints();
       setPersistenceEnabled(true);
+      writeProjectNameToUrl(normalizedProject.name);
       if (typeof window !== 'undefined') {
         window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'true');
       }

@@ -25,6 +25,7 @@ import { BrowserModelSetupService } from '../services/modelSetupService';
 export interface AppServices {
   initialProject: ProjectDocument;
   skipStoredProjectLoad: boolean;
+  storedProjectName?: string;
   projectRepository: ProjectRepository;
   exportService: ExportService;
   modelSetupService: ModelSetupService;
@@ -38,12 +39,14 @@ export interface AppServices {
 interface CreateAppServicesOptions {
   initialProject?: ProjectDocument;
   skipStoredProjectLoad?: boolean;
+  storedProjectName?: string;
 }
 
 export function createAppServices(options: CreateAppServicesOptions = {}): AppServices {
   return {
     initialProject: options.initialProject ?? createSampleProject(),
     skipStoredProjectLoad: options.skipStoredProjectLoad ?? false,
+    ...(options.storedProjectName ? { storedProjectName: options.storedProjectName } : {}),
     projectRepository: createProjectRepository(),
     exportService: new BrowserExportService(),
     modelSetupService: new BrowserModelSetupService(),

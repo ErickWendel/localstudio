@@ -29,4 +29,12 @@ describe('App', () => {
 
     expect(window.location.search).toBe('?theme=dark');
   });
+
+  it('removes stale project context when opening a new blank project tab', () => {
+    window.history.replaceState({}, '', '/?project=Old+Deck&newProject=1');
+
+    render(<App />);
+
+    expect(window.location.search).toBe('');
+  });
 });

@@ -71,13 +71,16 @@ class MockDirectoryHandle {
 
 class MemoryRecentProjectHandleStore implements RecentProjectHandleStore {
   handle: FileSystemDirectoryHandle | null = null;
+  handles = new Map<string, FileSystemDirectoryHandle>();
 
-  load(): Promise<FileSystemDirectoryHandle | null> {
+  load(projectName?: string): Promise<FileSystemDirectoryHandle | null> {
+    if (projectName) return Promise.resolve(this.handles.get(projectName) ?? null);
     return Promise.resolve(this.handle);
   }
 
-  save(handle: FileSystemDirectoryHandle): Promise<void> {
+  save(handle: FileSystemDirectoryHandle, projectName?: string): Promise<void> {
     this.handle = handle;
+    if (projectName) this.handles.set(projectName, handle);
     return Promise.resolve();
   }
 }
@@ -152,5 +155,29 @@ describe('BrowserFileSystemProjectRepository', () => {
 
     expect(loaded?.id).toBe(project.id);
     expect(loaded?.name).toBe(project.name);
+  });
+
+  it('reopens a project folder by project name instead of the global recent folder', async () => {
+    const alphaDirectory = new MockDirectoryHandle();
+    const betaDirectory = new MockDirectoryHandle();
+    const recentProjectStore = new MemoryRecentProjectHandleStore();
+    const alphaProject = { ...createSampleProject(), id: 'alpha', name: 'Alpha Deck' };
+    const betaProject = { ...createSampleProject(), id: 'beta', name: 'Beta Deck' };
+
+    await new BrowserFileSystemProjectRepository({
+      pickDirectory: () => Promise.resolve(alphaDirectory as unknown as FileSystemDirectoryHandle),
+      recentProjectStore,
+    }).saveProject(alphaProject);
+    await new BrowserFileSystemProjectRepository({
+      pickDirectory: () => Promise.resolve(betaDirectory as unknown as FileSystemDirectoryHandle),
+      recentProjectStore,
+    }).saveProject(betaProject);
+
+    const loaded = await new BrowserFileSystemProjectRepository({ recentProjectStore }).loadProject({
+      projectName: 'Alpha Deck',
+    });
+
+    expect(loaded?.id).toBe('alpha');
+    expect(loaded?.name).toBe('Alpha Deck');
   });
 });

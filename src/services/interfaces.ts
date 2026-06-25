@@ -14,7 +14,7 @@ export interface ModelState {
 
 export interface ProjectRepository {
   importProject?(): Promise<ProjectDocument | null>;
-  loadProject(): Promise<ProjectDocument | null>;
+  loadProject(options?: { projectName?: string }): Promise<ProjectDocument | null>;
   saveProject(project: ProjectDocument): Promise<void>;
 }
 

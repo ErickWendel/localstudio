@@ -7,8 +7,8 @@ interface FileSystemProjectRepositoryOptions {
 }
 
 export interface RecentProjectHandleStore {
-  load(): Promise<FileSystemDirectoryHandle | null>;
-  save(handle: FileSystemDirectoryHandle): Promise<void>;
+  load(projectName?: string): Promise<FileSystemDirectoryHandle | null>;
+  save(handle: FileSystemDirectoryHandle, projectName?: string): Promise<void>;
 }
 
 type PermissionCapableDirectoryHandle = FileSystemDirectoryHandle & {
@@ -36,12 +36,14 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     const pickDirectory = this.options.pickDirectory ?? getBrowserDirectoryPicker();
     this.directoryHandle = await pickDirectory();
     await this.recentProjectStore.save(this.directoryHandle);
-    return this.loadProject();
+    const project = await this.loadProject();
+    if (project) await this.recentProjectStore.save(this.directoryHandle, project.name);
+    return project;
   }
 
-  async loadProject(): Promise<ProjectDocument | null> {
+  async loadProject(options?: { projectName?: string }): Promise<ProjectDocument | null> {
     if (!this.directoryHandle) {
-      this.directoryHandle = await this.recentProjectStore.load();
+      this.directoryHandle = await this.recentProjectStore.load(options?.projectName);
     }
     if (!this.directoryHandle) return null;
     await this.ensureReadWritePermission(this.directoryHandle);
@@ -57,7 +59,7 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
   }
 
   async saveProject(project: ProjectDocument): Promise<void> {
-    const directoryHandle = await this.ensureProjectDirectory();
+    const directoryHandle = await this.ensureProjectDirectory(project.name);
     await Promise.all([
       directoryHandle.getDirectoryHandle('assets', { create: true }),
       directoryHandle.getDirectoryHandle('cache', { create: true }),
@@ -74,14 +76,14 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     });
   }
 
-  private async ensureProjectDirectory(): Promise<FileSystemDirectoryHandle> {
+  private async ensureProjectDirectory(projectName?: string): Promise<FileSystemDirectoryHandle> {
     if (!this.directoryHandle) {
       const pickDirectory = this.options.pickDirectory ?? getBrowserDirectoryPicker();
       this.directoryHandle = await pickDirectory();
-      await this.recentProjectStore.save(this.directoryHandle);
     }
     const directoryHandle = this.directoryHandle;
     await this.ensureReadWritePermission(directoryHandle);
+    await this.recentProjectStore.save(directoryHandle, projectName);
     return directoryHandle;
   }
 
@@ -122,18 +124,28 @@ class BrowserRecentProjectHandleStore implements RecentProjectHandleStore {
   private readonly handleKey = 'last-project-directory';
   private readonly localStorageKey = 'localstudio.ai.last-project.available';
 
-  async load(): Promise<FileSystemDirectoryHandle | null> {
+  async load(projectName?: string): Promise<FileSystemDirectoryHandle | null> {
     if (typeof window === 'undefined') return null;
-    if (window.localStorage.getItem(this.localStorageKey) !== 'true') return null;
     const database = await this.openDatabase();
+    if (projectName) {
+      return (await this.getValue<FileSystemDirectoryHandle>(database, this.getProjectHandleKey(projectName))) ?? null;
+    }
+    if (window.localStorage.getItem(this.localStorageKey) !== 'true') return null;
     return (await this.getValue<FileSystemDirectoryHandle>(database, this.handleKey)) ?? null;
   }
 
-  async save(handle: FileSystemDirectoryHandle): Promise<void> {
+  async save(handle: FileSystemDirectoryHandle, projectName?: string): Promise<void> {
     if (typeof window === 'undefined') return;
     const database = await this.openDatabase();
     await this.putValue(database, this.handleKey, handle);
+    if (projectName) {
+      await this.putValue(database, this.getProjectHandleKey(projectName), handle);
+    }
     window.localStorage.setItem(this.localStorageKey, 'true');
+  }
+
+  private getProjectHandleKey(projectName: string) {
+    return `project-directory:${projectName.trim().toLocaleLowerCase()}`;
   }
 
   private openDatabase() {

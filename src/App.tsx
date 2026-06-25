@@ -9,6 +9,7 @@ export function App() {
     const shouldStartBlankProject = url.searchParams.get('newProject') === '1';
     if (shouldStartBlankProject) {
       url.searchParams.delete('newProject');
+      url.searchParams.delete('project');
       window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
     }
 
@@ -18,7 +19,10 @@ export function App() {
             initialProject: createBlankProject(),
             skipStoredProjectLoad: true,
           }
-        : undefined,
+        : (() => {
+            const storedProjectName = url.searchParams.get('project');
+            return storedProjectName ? { storedProjectName } : {};
+          })(),
     );
   }, []);
 

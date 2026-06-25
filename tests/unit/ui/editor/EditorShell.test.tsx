@@ -36,6 +36,19 @@ class RejectingProjectRepository implements ProjectRepository {
   }
 }
 
+class SavingProjectRepository implements ProjectRepository {
+  savedProjects: ProjectDocument[] = [];
+
+  loadProject(): Promise<ProjectDocument | null> {
+    return Promise.resolve(null);
+  }
+
+  saveProject(project: ProjectDocument): Promise<void> {
+    this.savedProjects.push(project);
+    return Promise.resolve();
+  }
+}
+
 class ImportingProjectRepository implements ProjectRepository {
   constructor(private readonly project: ProjectDocument) {}
 
@@ -143,6 +156,18 @@ describe('EditorShell', () => {
     expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
   });
 
+  it('writes the persisted project name into the tab URL', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    services.projectRepository = new SavingProjectRepository();
+    window.history.replaceState({}, '', '/');
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+
+    expect(window.location.search).toBe('?project=Untitled+AI+Deck');
+  });
+
   it('keeps persistence disabled when the project folder cannot be saved', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
@@ -171,6 +196,7 @@ describe('EditorShell', () => {
       await screen.findByRole('button', { name: 'Edit project name Imported LocalStudio Project' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
+    expect(window.location.search).toBe('?project=Imported+LocalStudio+Project');
   });
 
   it('opens a blank project in a new tab from the File menu', async () => {
