@@ -148,6 +148,21 @@ describe('EditorShell', () => {
     );
   });
 
+  it('enters and cancels background subject selection from the floating toolbar', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Remove Background' }));
+
+    expect(screen.getByText('Click the main object to keep. Everything else will be removed.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel Background Selection' })).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+
+    expect(screen.queryByText('Click the main object to keep. Everything else will be removed.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove Background' })).toBeInTheDocument();
+  });
+
   it('exports the current slide as a PNG file', async () => {
     const user = userEvent.setup();
     const services = createAppServices();

@@ -26,7 +26,11 @@ export class MockPaletteService implements PaletteService {
 }
 
 export class MockBackgroundRemovalService implements BackgroundRemovalService {
-  removeBackground(assetId: string): Promise<{ assetId: string }> {
+  removeBackground(
+    assetId: string,
+    options?: { subjectPoint?: { x: number; y: number } },
+  ): Promise<{ assetId: string }> {
+    void options;
     return Promise.resolve({ assetId: `${assetId}-transparent` });
   }
 }

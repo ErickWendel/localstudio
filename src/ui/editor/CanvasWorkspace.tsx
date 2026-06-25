@@ -3,6 +3,7 @@ import type Konva from 'konva';
 import { Image as KonvaImage, Layer, Rect, Stage, Text, Transformer } from 'react-konva';
 import type { ElementFramePatch } from '../../domain/commands/basicCommands';
 import type { DesignElement, ProjectDocument, SelectionState } from '../../domain/model';
+import { getNormalizedElementPoint } from './backgroundSelection';
 import { FloatingSelectionToolbar } from './FloatingSelectionToolbar';
 
 interface CanvasWorkspaceProps {
@@ -11,8 +12,12 @@ interface CanvasWorkspaceProps {
   selection: SelectionState;
   stageRef?: RefObject<Konva.Stage | null>;
   zoomPercent?: number;
+  backgroundSelectionMode?: boolean;
   onAlignSelectedElement?: () => void;
   onBringSelectedElementForward?: () => void;
+  onBackgroundSelectionToggle?: () => void;
+  onBackgroundSubjectPick?: (elementId: string, point: { x: number; y: number }) => void;
+  onCancelBackgroundSelection?: () => void;
   onDeleteSelectedElement?: () => void;
   onDuplicateSelectedElement?: () => void;
   onSelectElement?: (elementId: string) => void;
@@ -30,7 +35,7 @@ interface CommonElementProps {
   width: number;
   x: number;
   y: number;
-  onClick: () => void;
+  onClick: (event: Konva.KonvaEventObject<MouseEvent>) => void;
   onDblClick: () => void;
   onDblTap: () => void;
   onDragEnd: (event: Konva.KonvaEventObject<DragEvent>) => void;
@@ -72,8 +77,12 @@ export function CanvasWorkspace({
   selection,
   stageRef,
   zoomPercent = 100,
+  backgroundSelectionMode = false,
   onAlignSelectedElement,
+  onBackgroundSelectionToggle,
+  onBackgroundSubjectPick,
   onBringSelectedElementForward,
+  onCancelBackgroundSelection,
   onDeleteSelectedElement,
   onDuplicateSelectedElement,
   onSelectElement,
@@ -191,9 +200,25 @@ export function CanvasWorkspace({
     setEditingTextValue('');
   }
 
+  function pickBackgroundSubject(element: DesignElement, event: Konva.KonvaEventObject<MouseEvent>) {
+    if (element.type !== 'image') return;
+    const stage = event.target.getStage();
+    const pointer = stage?.getPointerPosition();
+    if (!pointer) return;
+
+    onBackgroundSubjectPick?.(
+      element.id,
+      getNormalizedElementPoint({
+        element,
+        pointer,
+        scale: { x: scaleX, y: scaleY },
+      }),
+    );
+  }
+
   function getCommonElementProps(element: DesignElement): CommonElementProps {
     return {
-      draggable: !element.locked,
+      draggable: !element.locked && !backgroundSelectionMode,
       height: element.height * scaleY,
       opacity: element.opacity,
       ref: (node: Konva.Node | null) => {
@@ -203,7 +228,11 @@ export function CanvasWorkspace({
       width: element.width * scaleX,
       x: element.x * scaleX,
       y: element.y * scaleY,
-      onClick: () => {
+      onClick: (event: Konva.KonvaEventObject<MouseEvent>) => {
+        if (backgroundSelectionMode) {
+          pickBackgroundSubject(element, event);
+          return;
+        }
         onSelectElement?.(element.id);
       },
       onDblClick: () => {
@@ -227,7 +256,11 @@ export function CanvasWorkspace({
   return (
     <div className="canvas-workspace">
       <div
-        className="canvas-frame neon-border"
+        className={
+          backgroundSelectionMode
+            ? 'canvas-frame neon-border canvas-frame-bg-selection'
+            : 'canvas-frame neon-border'
+        }
         aria-label="Slide canvas"
         data-selected-elements={selection.elementIds.join(',')}
         style={{
@@ -235,6 +268,17 @@ export function CanvasWorkspace({
         }}
       >
         <div className="canvas-artboard" ref={artboardRef} style={{ background: pageBackground }}>
+          {backgroundSelectionMode ? (
+            <div className="background-selection-hint" role="status">
+              <span className="material-symbols-outlined" aria-hidden="true">
+                ads_click
+              </span>
+              <span>Click the main object to keep. Everything else will be removed.</span>
+              <button type="button" onClick={onCancelBackgroundSelection}>
+                Esc
+              </button>
+            </div>
+          ) : null}
           <Stage ref={stageRef} height={stageHeight} width={stageWidth}>
             <Layer>
               <Rect fill={pageBackground} height={stageHeight} listening={false} width={stageWidth} x={0} y={0} />
@@ -351,7 +395,9 @@ export function CanvasWorkspace({
             onBringForward={onBringSelectedElementForward}
             onDelete={onDeleteSelectedElement}
             onDuplicate={onDuplicateSelectedElement}
+            onBackgroundSelectionToggle={onBackgroundSelectionToggle}
             onSendBackward={onSendSelectedElementBackward}
+            backgroundSelectionActive={backgroundSelectionMode}
           />
         ) : null}
       </div>

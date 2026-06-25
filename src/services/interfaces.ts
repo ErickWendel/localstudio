@@ -39,7 +39,10 @@ export interface PaletteService {
 }
 
 export interface BackgroundRemovalService {
-  removeBackground(assetId: string): Promise<{ assetId: string }>;
+  removeBackground(
+    assetId: string,
+    options?: { subjectPoint?: { x: number; y: number } },
+  ): Promise<{ assetId: string }>;
 }
 
 export interface SmartGrabService {

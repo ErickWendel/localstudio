@@ -40,6 +40,12 @@ export function EditorShell({ services }: EditorShellProps) {
         return;
       }
 
+      if (event.key === 'Escape' && vm.backgroundSelectionMode) {
+        event.preventDefault();
+        vm.cancelBackgroundSelectionMode();
+        return;
+      }
+
       if (event.key !== 'Delete' && event.key !== 'Backspace') return;
       const target = event.target;
       if (
@@ -117,12 +123,18 @@ export function EditorShell({ services }: EditorShellProps) {
             selection={vm.selection}
             stageRef={stageRef}
             zoomPercent={vm.zoomPercent}
+            backgroundSelectionMode={vm.backgroundSelectionMode}
             onAlignSelectedElement={() => {
               vm.alignSelectedElement('page-center');
+            }}
+            onBackgroundSelectionToggle={vm.toggleBackgroundSelectionMode}
+            onBackgroundSubjectPick={(elementId, point) => {
+              void vm.pickBackgroundSubject(elementId, point);
             }}
             onBringSelectedElementForward={() => {
               vm.setSelectedElementZOrder('forward');
             }}
+            onCancelBackgroundSelection={vm.cancelBackgroundSelectionMode}
             onDeleteSelectedElement={vm.deleteSelectedElement}
             onDuplicateSelectedElement={vm.duplicateSelectedElement}
             onSelectElement={vm.selectElement}

@@ -150,6 +150,7 @@ export function useEditorViewModel(services: AppServices) {
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>(['image-hero']);
   const [history, setHistory] = useState<EditorHistory>({ past: [], future: [] });
   const [zoomPercent, setZoomPercent] = useState(100);
+  const [backgroundSelectionMode, setBackgroundSelectionMode] = useState(false);
   const selection = useMemo<SelectionState>(() => ({ pageId: activePageId, elementIds: selectedElementIds }), [
     activePageId,
     selectedElementIds,
@@ -218,6 +219,7 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function selectElement(elementId: string) {
+    setBackgroundSelectionMode(false);
     setSelectedElementIds([elementId]);
   }
 
@@ -244,6 +246,7 @@ export function useEditorViewModel(services: AppServices) {
   function selectPage(pageId: string) {
     const page = project.pages.find((item) => item.id === pageId);
     if (!page) return;
+    setBackgroundSelectionMode(false);
     setActivePageId(page.id);
     const nextSelectedId = page.elementIds.at(-1);
     setSelectedElementIds(nextSelectedId ? [nextSelectedId] : []);
@@ -282,6 +285,7 @@ export function useEditorViewModel(services: AppServices) {
   function deleteSelectedElement() {
     const elementId = selectedElementIds[0];
     if (!elementId) return;
+    setBackgroundSelectionMode(false);
     deleteElement(elementId);
   }
 
@@ -390,6 +394,24 @@ export function useEditorViewModel(services: AppServices) {
     setZoomPercent(100);
   }
 
+  function toggleBackgroundSelectionMode() {
+    const element = project.elements[selectedElementIds[0] ?? ''];
+    if (element?.type !== 'image') return;
+    setBackgroundSelectionMode((current) => !current);
+  }
+
+  function cancelBackgroundSelectionMode() {
+    setBackgroundSelectionMode(false);
+  }
+
+  async function pickBackgroundSubject(elementId: string, subjectPoint: { x: number; y: number }) {
+    const element = project.elements[elementId];
+    if (!element || element.type !== 'image') return;
+
+    await services.backgroundRemovalService.removeBackground(element.assetId, { subjectPoint });
+    setBackgroundSelectionMode(false);
+  }
+
   async function importImageFile(file: File) {
     const dataUrl = await readImageFileAsDataUrl(file);
     const imageSize = await readImageSize(dataUrl);
@@ -438,6 +460,7 @@ export function useEditorViewModel(services: AppServices) {
     activePageId,
     zoomPercent,
     persistenceEnabled,
+    backgroundSelectionMode,
     canUndo: history.past.length > 0,
     canRedo: history.future.length > 0,
     selection,
@@ -455,6 +478,9 @@ export function useEditorViewModel(services: AppServices) {
     zoomIn,
     zoomOut,
     resetZoom,
+    toggleBackgroundSelectionMode,
+    cancelBackgroundSelectionMode,
+    pickBackgroundSubject,
     deleteSelectedElement,
     duplicateSelectedElement,
     alignSelectedElement,

@@ -1,6 +1,7 @@
 interface ToolbarAction {
   label: string;
   icon: string;
+  active?: boolean;
   onClick?: (() => void) | undefined;
   tone?: 'default' | 'ai' | 'danger';
 }
@@ -8,17 +9,21 @@ interface ToolbarAction {
 interface FloatingSelectionToolbarProps {
   onAlignCenter?: (() => void) | undefined;
   onBringForward?: (() => void) | undefined;
+  onBackgroundSelectionToggle?: (() => void) | undefined;
   onDelete?: (() => void) | undefined;
   onDuplicate?: (() => void) | undefined;
   onSendBackward?: (() => void) | undefined;
+  backgroundSelectionActive?: boolean;
 }
 
 export function FloatingSelectionToolbar({
   onAlignCenter,
+  onBackgroundSelectionToggle,
   onBringForward,
   onDelete,
   onDuplicate,
   onSendBackward,
+  backgroundSelectionActive = false,
 }: FloatingSelectionToolbarProps) {
   const groups: ToolbarAction[][] = [
     [{ label: 'Align Center', icon: 'align_horizontal_center', onClick: onAlignCenter }],
@@ -31,7 +36,13 @@ export function FloatingSelectionToolbar({
       { label: 'Lock', icon: 'lock' },
     ],
     [
-      { label: 'Remove Background', icon: 'no_photography', tone: 'ai' },
+      {
+        label: backgroundSelectionActive ? 'Cancel Background Selection' : 'Remove Background',
+        icon: backgroundSelectionActive ? 'ads_click' : 'no_photography',
+        active: backgroundSelectionActive,
+        onClick: onBackgroundSelectionToggle,
+        tone: 'ai',
+      },
       { label: 'Translate This Design', icon: 'translate', tone: 'ai' },
     ],
     [{ label: 'Delete', icon: 'delete', onClick: onDelete, tone: 'danger' }],
@@ -44,7 +55,9 @@ export function FloatingSelectionToolbar({
           {groupIndex > 0 ? <span className="floating-toolbar-divider" aria-hidden="true" /> : null}
           {group.map((action) => (
             <button
-              className={`floating-toolbar-button floating-toolbar-button-${action.tone ?? 'default'}`}
+              className={`floating-toolbar-button floating-toolbar-button-${action.tone ?? 'default'}${
+                action.active ? ' floating-toolbar-button-active' : ''
+              }`}
               key={action.label}
               title={action.label}
               aria-label={action.label}

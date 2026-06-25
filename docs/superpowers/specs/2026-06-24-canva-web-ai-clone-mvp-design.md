@@ -276,7 +276,11 @@ The user selects an image element and removes its background.
 Behavior:
 
 - Use the WebML Community Segment Anything WebGPU example as the implementation reference because it demonstrates in-browser SAM segmentation with `Xenova/slimsam-77-uniform`, `SamModel`, `AutoProcessor`, WebGPU execution, positive/negative point prompts, mask preview, and cut-out generation.
+- Clicking the floating toolbar `Remove Background` icon enters a background-selection mode instead of immediately changing the image.
+- Show a Stitch-styled hint: `Click the main object to keep. Everything else will be removed.`
+- While background-selection mode is active, use a green/crosshair canvas cursor treatment so the user understands the next click is a segmentation prompt.
 - Ask the user to click the image subject to segment. Background removal is not fully automatic in the first implementation.
+- Convert the click into a normalized subject point relative to the selected image and pass that point to the segmentation provider.
 - Generate a subject mask from the clicked point.
 - Produce a transparent PNG asset where the selected subject remains opaque and the background becomes transparent.
 - Let the user replace the original image layer or create a duplicate layer.
