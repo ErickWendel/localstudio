@@ -1371,7 +1371,8 @@ describe('RightPanel', () => {
       <RightPanel activeTab={activeTab} onTabChange={onTabChange} modelStates={modelStates} />,
     );
 
-    expect(screen.getByText('Download Required Models')).toBeInTheDocument();
+    expect(screen.queryByText('Download Required Models')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Download Image Editing Models' })).toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: 'Design' }));
     rerender(<RightPanel activeTab="design" onTabChange={onTabChange} modelStates={modelStates} />);
     expect(screen.getByText('16:9 Presentation')).toBeInTheDocument();
@@ -1394,8 +1395,8 @@ Expected: FAIL until components exist.
 
 Implement:
 
-- `AiToolsPanel`: download all button, rows for Translate Design, Text-to-Palette, Image Editing Models with download icons/progress.
-- `DesignPanel`: page size, background, palette swatches, typography, layout toggles, element style, compact Text-to-Palette.
+- `AiToolsPanel`: download all button, rows for Prompt API, Translate Design, and Image Editing Models with download icons/progress. Text-to-Palette is not a standalone AI tool; palette generation belongs inside the Prompt API design-generation flow.
+- `DesignPanel`: page size, background, palette swatches, typography, layout toggles, and element style controls.
 - `LayersPanel`: search input, layer rows with drag/eye/lock/type icons, selected image highlighted, group/z-order actions, properties.
 
 Use text and labels from `docs/design/stitch/ew-canvas-ai/screens/*.html`.
@@ -1678,11 +1679,11 @@ import { createAppServices } from '../../app/composition';
 import { EditorShell } from './EditorShell';
 
 describe('mocked AI flows', () => {
-  it('downloads required models from AI Tools panel', async () => {
+  it('downloads an image editing model from AI Tools panel', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
 
-    await user.click(screen.getByRole('button', { name: 'Download Required Models' }));
+    await user.click(screen.getByRole('button', { name: 'Download Image Editing Models' }));
 
     expect(await screen.findByText('Ready')).toBeInTheDocument();
   });
@@ -1698,12 +1699,12 @@ describe('mocked AI flows', () => {
 
 - [x] **Step 2: Implement callbacks**
 
-`useEditorViewModel` exposes:
+`useEditorViewModel` exposes per-model downloads:
 
 ```ts
-async function downloadRequiredModels() {
-  const next = await services.modelSetupService.downloadRequiredModels();
-  setModelStates(next);
+async function downloadModel(id: string) {
+  const next = await services.modelSetupService.downloadModel(id);
+  setModelStates((current) => current.map((model) => (model.id === next.id ? next : model)));
 }
 ```
 
@@ -1711,11 +1712,11 @@ Pass it to `AiToolsPanel`.
 
 - [x] **Step 3: Wire buttons**
 
-`AiToolsPanel` button:
+`AiToolsPanel` per-model button:
 
 ```tsx
-<button type="button" onClick={onDownloadRequiredModels}>
-  Download Required Models
+<button type="button" aria-label={`Download ${model.label}`} onClick={() => onDownloadModel(model.id)}>
+  <Download />
 </button>
 ```
 
@@ -1793,12 +1794,13 @@ test('renders the editor shell and tabs', async ({ page }) => {
   await expect(page.getByText('5 layers on current page')).toBeVisible();
 
   await page.getByRole('tab', { name: 'AI Tools' }).click();
-  await expect(page.getByRole('button', { name: 'Download Required Models' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Download Required Models' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Download Image Editing Models' })).toBeVisible();
 });
 
 test('downloads required model states', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Download Required Models' }).click();
+  await page.getByRole('button', { name: 'Download Image Editing Models' }).click();
   await expect(page.getByText('Ready').first()).toBeVisible();
 });
 ```

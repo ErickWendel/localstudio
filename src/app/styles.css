@@ -993,11 +993,55 @@ button {
   background: rgba(255, 180, 171, 0.1);
 }
 
-.prompt-bar {
+.prompt-stack {
   position: relative;
   z-index: 1;
   width: min(800px, 86%);
   align-self: end;
+  display: grid;
+  gap: 10px;
+}
+
+.prompt-examples {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.prompt-example-chip {
+  max-width: min(100%, 280px);
+  min-height: 30px;
+  border: 1px solid rgba(55, 253, 118, 0.2);
+  border-radius: 999px;
+  background: rgba(5, 13, 16, 0.86);
+  color: rgba(255, 255, 255, 0.76);
+  padding: 6px 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  font-size: 11px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.24);
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.prompt-example-chip:hover,
+.prompt-example-chip:focus-visible {
+  border-color: rgba(55, 253, 118, 0.58);
+  color: var(--ew-green);
+  box-shadow:
+    0 8px 22px rgba(0, 0, 0, 0.24),
+    0 0 16px rgba(55, 253, 118, 0.14);
+  outline: 0;
+  transform: translateY(-1px);
+}
+
+.prompt-bar {
   display: flex;
   align-items: center;
   gap: 10px;

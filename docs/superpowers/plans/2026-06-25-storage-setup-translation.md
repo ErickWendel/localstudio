@@ -59,7 +59,7 @@ AI roadmap:
 - [x] Move Prompt API to the first Local Chrome AI card with prompt-to-slides copy, preparation progress, and hidden prepare action when ready on startup.
 - [ ] Build actual Prompt API prompt-to-slides generation from the prepared Chrome Prompt API provider.
 - [ ] Add the future `Create image` provider/action behind the prompt bar chip.
-- [ ] Wire Chrome Built-in AI prompt-to-palette provider.
+- [ ] Fold palette generation into the Chrome Prompt API prompt-to-slides/design-generation flow instead of exposing a standalone Text-to-Palette AI tool.
 - [ ] Build Smart Grab on the shared Segment Anything WebGPU provider.
 - [ ] Build Magic Eraser on the shared Segment Anything WebGPU provider.
 

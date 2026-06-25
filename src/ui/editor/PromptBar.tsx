@@ -6,11 +6,28 @@ interface PromptBarProps {
   onCreateImagePromptIntent?: () => Promise<boolean>;
 }
 
+const slidePromptExamples = [
+  'A slide with the title Why Web AI Matters and a subtitle about private AI running in the browser',
+  'A slide with a placeholder image on the left, the title Local AI Is Faster in the middle, and subtext below',
+  'A slide with a large centered title Web AI Benefits, two bullet points about privacy and offline use, and a footer note',
+  'A slide with three columns about Web AI: Privacy, Speed, and No Backend, each with an icon placeholder and one sentence',
+  'A slide with a black background, green title Run AI Directly In The Browser, short subtitle, and a call-to-action button',
+];
+
+const imagePromptExamples = [
+  'An icy Bonsai tree, in a rainy forest with snowy mountains in the background, photo realistic',
+  'A neon green browser-native design studio floating inside a dark futuristic workspace',
+  'A cinematic close-up of a laptop editing slides with glowing green UI reflections',
+  'A realistic product hero image for a local-first AI creative editor, dark background',
+  'A cyberpunk classroom with holographic slide canvases and black-and-green lighting',
+];
+
 export function PromptBar({ onCreateImagePromptIntent }: PromptBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [mode, setMode] = useState<'create-image' | null>(null);
   const [value, setValue] = useState('');
+  const examples = mode === 'create-image' ? imagePromptExamples : slidePromptExamples;
 
   useEffect(() => {
     if (mode !== 'create-image') return;
@@ -28,74 +45,92 @@ export function PromptBar({ onCreateImagePromptIntent }: PromptBarProps) {
   }
 
   return (
-    <form
-      className="prompt-bar"
-      aria-label="Slide structure prompt"
-      onSubmit={(event) => {
-        event.preventDefault();
-        void guardPromptIntent();
-      }}
-    >
-      <div className="prompt-action-shell">
-        <button
-          aria-expanded={menuOpen}
-          aria-label="Prompt actions"
-          className="prompt-action-button"
-          type="button"
-          onClick={() => {
-            setMenuOpen((current) => !current);
-          }}
-        >
-          <Plus size={18} />
-        </button>
-        {menuOpen ? (
-          <div className="prompt-action-menu" role="menu">
-            <button
-              role="menuitem"
-              type="button"
-              onClick={() => {
-                activateCreateImageMode();
-              }}
-            >
-              <ImagePlus size={15} />
-              <span>Create image</span>
-            </button>
-          </div>
-        ) : null}
+    <div className="prompt-stack">
+      <div className="prompt-examples" aria-label={mode === 'create-image' ? 'Image prompt examples' : 'Slide prompt examples'}>
+        {examples.map((example) => (
+          <button
+            key={example}
+            className="prompt-example-chip"
+            type="button"
+            onClick={() => {
+              setValue(example);
+              inputRef.current?.focus();
+              void guardPromptIntent();
+            }}
+          >
+            {example}
+          </button>
+        ))}
       </div>
-      {mode === 'create-image' ? (
-        <span className="prompt-mode-token">
-          <ImagePlus size={15} />
-          Create image
-        </span>
-      ) : null}
-      <input
-        ref={inputRef}
-        type="text"
-        placeholder={mode === 'create-image' ? '' : 'Describe slide structure or organize current content...'}
-        aria-label={mode === 'create-image' ? 'Create image prompt' : 'Slide structure prompt'}
-        value={value}
-        onFocus={() => {
+      <form
+        className="prompt-bar"
+        aria-label="Slide structure prompt"
+        onSubmit={(event) => {
+          event.preventDefault();
           void guardPromptIntent();
         }}
-        onChange={(event) => {
-          const nextValue = event.target.value;
-          if (mode === 'create-image' && value.length > 0 && nextValue.length === 0) {
-            setMode(null);
-            setValue('');
-            return;
-          }
+      >
+        <div className="prompt-action-shell">
+          <button
+            aria-expanded={menuOpen}
+            aria-label="Prompt actions"
+            className="prompt-action-button"
+            type="button"
+            onClick={() => {
+              setMenuOpen((current) => !current);
+            }}
+          >
+            <Plus size={18} />
+          </button>
+          {menuOpen ? (
+            <div className="prompt-action-menu" role="menu">
+              <button
+                role="menuitem"
+                type="button"
+                onClick={() => {
+                  activateCreateImageMode();
+                }}
+              >
+                <ImagePlus size={15} />
+                <span>Create image</span>
+              </button>
+            </div>
+          ) : null}
+        </div>
+        {mode === 'create-image' ? (
+          <span className="prompt-mode-token">
+            <ImagePlus size={15} />
+            Create image
+          </span>
+        ) : null}
+        <input
+          ref={inputRef}
+          type="text"
+          placeholder={mode === 'create-image' ? '' : 'Describe slide structure or organize current content...'}
+          aria-label={mode === 'create-image' ? 'Create image prompt' : 'Slide structure prompt'}
+          value={value}
+          onFocus={() => {
+            void guardPromptIntent();
+          }}
+          onChange={(event) => {
+            const nextValue = event.target.value;
+            if (mode === 'create-image' && value.length > 0 && nextValue.length === 0) {
+              setMode(null);
+              setValue('');
+              return;
+            }
 
-          setValue(nextValue);
-          void guardPromptIntent();
-        }}
-      />
-      <IconButton label="Record voice prompt">
-        <Mic size={16} />
-      </IconButton>
-      <IconButton label="Submit prompt">
-        <SendHorizontal size={16} />
-      </IconButton>
-    </form>
+            setValue(nextValue);
+            void guardPromptIntent();
+          }}
+        />
+        <IconButton label="Record voice prompt">
+          <Mic size={16} />
+        </IconButton>
+        <IconButton label="Submit prompt">
+          <SendHorizontal size={16} />
+        </IconButton>
+      </form>
+    </div>
   );
 }

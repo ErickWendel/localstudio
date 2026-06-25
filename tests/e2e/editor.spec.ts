@@ -22,7 +22,8 @@ test('renders the editor shell and tabs', async ({ page }) => {
   await expect(page.getByText('4 layers on current page')).toBeVisible();
 
   await page.getByRole('tab', { name: 'AI Tools' }).click();
-  await expect(page.getByRole('button', { name: 'Download Required Models' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Download Required Models' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Download Image Editing Models' })).toBeVisible();
 });
 
 test('downloads required model states', async ({ page }) => {
@@ -31,6 +32,6 @@ test('downloads required model states', async ({ page }) => {
   });
   await page.goto('/');
   await page.getByRole('tab', { name: 'AI Tools' }).click();
-  await page.getByRole('button', { name: 'Download Required Models' }).click();
+  await page.getByRole('button', { name: 'Download Image Editing Models' }).click();
   await expect(page.getByText('Ready').first()).toBeVisible();
 });

@@ -1,4 +1,4 @@
-import { AlignCenter, CaseSensitive, Image, Palette, Square, Type } from 'lucide-react';
+import { AlignCenter, CaseSensitive, Image, Square, Type } from 'lucide-react';
 import type {
   DesignElement,
   PageBackground,
@@ -241,16 +241,6 @@ export function DesignPanel({
           </label>
         </PanelSection>
       ) : null}
-
-      <PanelSection title="AI Palette">
-        <div className="tool-card compact-tool">
-          <div className="tool-card-heading">
-            <Palette size={18} />
-            <strong>Text-to-Palette</strong>
-          </div>
-          <p>Apply generated colors to the current design.</p>
-        </div>
-      </PanelSection>
     </div>
   );
 }

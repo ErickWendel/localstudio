@@ -1,4 +1,4 @@
-import { Download, ImagePlus, Languages, Palette, ScanSearch } from 'lucide-react';
+import { Download, ImagePlus, Languages, ScanSearch } from 'lucide-react';
 import type { ModelState } from '../../services/interfaces';
 import { IconButton } from '../components/IconButton';
 import { PanelSection } from '../components/PanelSection';
@@ -14,7 +14,6 @@ interface AiToolsPanelProps {
   promptApiAttention?: boolean | undefined;
   promptApiNotice?: string | undefined;
   promptPreparation?: { availability: string; progress: number; status: 'idle' | 'downloading' | 'ready' | 'failed' } | undefined;
-  onDownloadRequiredModels?: (() => Promise<void>) | undefined;
   onDownloadModel?: ((id: string) => Promise<void>) | undefined;
   onPreparePromptApi?: (() => Promise<void>) | undefined;
   onTranslationTargetLanguageChange?: ((languageCode: string) => void) | undefined;
@@ -30,11 +29,6 @@ const localTools = [
     title: 'Translate Design',
     description: 'Translate visible text using the detected startup language.',
     icon: Languages,
-  },
-  {
-    title: 'Text-to-Palette',
-    description: 'Generate precise color schemes from text prompts.',
-    icon: Palette,
   },
 ];
 
@@ -61,22 +55,12 @@ export function AiToolsPanel({
   promptApiAttention = false,
   promptApiNotice,
   promptPreparation = { availability: 'unavailable', progress: 0, status: 'idle' },
-  onDownloadRequiredModels,
   onDownloadModel,
   onPreparePromptApi,
   onTranslationTargetLanguageChange,
 }: AiToolsPanelProps) {
   return (
     <div className="panel-stack">
-      <button
-        className="download-models-button"
-        type="button"
-        onClick={() => {
-          void onDownloadRequiredModels?.();
-        }}
-      >
-        Download Required Models
-      </button>
       <PanelSection title="Local Chrome AI">
         <div className="tool-card-list">
           {localTools.map((tool) => {
@@ -208,7 +192,7 @@ export function AiToolsPanel({
                       </div>
                       <span className="translation-source-note">
                         {promptPreparation.status === 'ready'
-                          ? 'Prompt API ready'
+                          ? ''
                           : promptApiNotice ?? `Availability: ${promptPreparation.availability}`}
                       </span>
                     </div>

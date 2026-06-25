@@ -53,7 +53,7 @@ describe('RightPanel', () => {
     );
     expect(screen.getByText('1920 x 1080')).toBeInTheDocument();
     expect(screen.getByLabelText('Canvas background color')).toHaveValue('#050d10');
-    expect(screen.getByText('Text-to-Palette')).toBeInTheDocument();
+    expect(screen.queryByText('Text-to-Palette')).not.toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
     rerender(
       <RightPanel
@@ -65,7 +65,7 @@ describe('RightPanel', () => {
         modelStates={modelStates}
       />,
     );
-    expect(screen.getByText('Download Required Models')).toBeInTheDocument();
+    expect(screen.queryByText('Download Required Models')).not.toBeInTheDocument();
     expect(screen.getByText('Image Editing Models')).toBeInTheDocument();
     expect(screen.getByText('Segmentation model for image editing.')).toBeInTheDocument();
     expect(screen.queryByText('Background Remover')).not.toBeInTheDocument();

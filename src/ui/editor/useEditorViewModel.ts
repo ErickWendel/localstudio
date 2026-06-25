@@ -438,10 +438,13 @@ export function useEditorViewModel(services: AppServices) {
     let isMounted = true;
     void services.promptService.checkAvailability().then((availability) => {
       if (!isMounted) return;
-      setPromptPreparation({
-        availability,
-        progress: availability === 'ready' ? 100 : 0,
-        status: availability === 'ready' ? 'ready' : 'idle',
+      setPromptPreparation((current) => {
+        if (current.status === 'ready') return current;
+        return {
+          availability,
+          progress: availability === 'ready' ? 100 : 0,
+          status: availability === 'ready' ? 'ready' : 'idle',
+        };
       });
     });
     return () => {
@@ -593,7 +596,7 @@ export function useEditorViewModel(services: AppServices) {
     setPromptPreparation((current) => ({
       availability,
       progress: availability === 'ready' ? 100 : current.progress,
-      status: availability === 'ready' ? 'ready' : current.status === 'ready' ? 'idle' : current.status,
+      status: availability === 'ready' ? 'ready' : current.status === 'ready' ? 'ready' : current.status,
     }));
     return availability;
   }

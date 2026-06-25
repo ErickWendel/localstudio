@@ -300,7 +300,6 @@ export function EditorShell({ services }: EditorShellProps) {
           promptApiAttention={vm.promptApiAttention}
           promptApiNotice={vm.promptApiNotice}
           promptPreparation={vm.promptPreparation}
-          onDownloadRequiredModels={vm.downloadRequiredModels}
           onDownloadModel={vm.downloadModel}
           onPreparePromptApi={vm.preparePromptApi}
           onTranslationTargetLanguageChange={(languageCode) => {

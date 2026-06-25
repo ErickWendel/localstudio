@@ -11,7 +11,7 @@ The MVP is local-only. Project data lives in user-selected files/folders on disk
 The initial AI feature set is balanced:
 
 - Translate design text.
-- Generate a color palette from a text prompt.
+- Generate a color palette from a Prompt API design prompt.
 - Remove image backgrounds.
 - Smart Grab for object-aware image editing.
 - Magic Eraser with user-guided browser segmentation.
@@ -56,7 +56,7 @@ Known limitations in the current implementation:
 
 - Chrome Built-in AI translation is wired with target-language selection, pair preparation progress, busy guards, basic error notices, detector fallback normalization, and first-pass fit-to-frame behavior. It still needs richer manual overflow controls, richer recovery guidance, broader browser/device verification, and Playwright coverage.
 - The first real Transformers.js / Hugging Face vision provider is wired for click-guided background removal through Segment Anything WebGPU, but it still needs broader browser/device verification and production hardening.
-- Palette generation, Smart Grab, and Magic Eraser are still mocked or incomplete workflows.
+- Prompt-driven palette generation, Smart Grab, and Magic Eraser are still mocked or incomplete workflows.
 - Chrome Prompt API setup is wired, but the actual prompt-to-slides generation flow is not implemented yet. The `Create image` prompt chip is a UI placeholder for a future image-generation provider.
 - Export supports the current-page PNG path, but production-quality browser verification and export UX polish remain. PDF export is still missing.
 - Layer drag/drop works through the app UI and tested callbacks, but should receive more Playwright coverage after interaction stabilizes.
@@ -72,7 +72,7 @@ Next implementation priorities:
 4. Complete export: polish current-page PNG export and add all-page PDF from the actual Konva stage at configured page dimensions. JPEG is deferred unless explicitly reintroduced.
 5. Add Playwright coverage for layer reorder, hide/show, lock/unlock, delete, local image import, filesystem save, text editing, translation flows, and first-run setup.
 6. Build Prompt API prompt-to-slides generation from the prepared Chrome Prompt API provider.
-7. Wire Chrome Built-in AI prompt-to-palette provider.
+7. Fold palette generation into the prepared Chrome Prompt API design-generation flow.
 8. Build the future `Create image` provider/action behind the prompt bar chip.
 9. Build Smart Grab and Magic Eraser on top of the shared Segment Anything WebGPU image editing provider.
 
@@ -291,9 +291,9 @@ Translation result rules:
 - Translated changes participate in undo/redo as atomic commands per requested scope.
 - Locked or hidden text elements are skipped unless the user explicitly enables an advanced option later. The MVP default is to translate visible, unlocked text only.
 
-### Text-to-Palette
+### Prompt API Palette Generation
 
-The user enters a prompt such as `Verão na Itália` or `Tecnologia Cyberpunk`.
+The user enters a design prompt such as `Verão na Itália` or `Tecnologia Cyberpunk` through the main Prompt API bar, not a separate AI Tools card.
 
 Behavior:
 
@@ -365,7 +365,7 @@ Purpose:
 
 The setup flow checks:
 
-- Chrome Built-in AI availability for translation and prompt-based palette generation.
+- Chrome Built-in AI availability for translation and Prompt API design-generation flows, including palette generation.
 - Chrome Built-in AI language detection and translation readiness before enabling selected-text, slide, or deck translation actions.
 - Required Transformers.js image segmentation model availability for background removal, Smart Grab, and Magic Eraser.
 - WebGPU/WebAssembly support needed by selected browser models.
@@ -388,7 +388,7 @@ Caching policy:
 - Store only lightweight app-level readiness metadata in browser storage, such as model name, version, capability status, last setup check, whether setup completed, and recent project handles.
 - For Hugging Face / Transformers.js models that are not required during startup, show a download icon next to the model/tool name so the user can install that model on demand before running the feature.
 - The top toolbar does not include a global "Prepare AI Models" action.
-- The AI Tools panel includes a "Download Required Models" action that prepares required local models.
+- The AI Tools panel exposes per-model download actions and progress instead of a global "Download Required Models" toolbar action.
 - The AI Tools panel lists one shared `Image Editing Models` dependency with the subtitle `Segmentation model for image editing.` This single Segment Anything model powers Background Remover, Smart Grab, and Magic Eraser.
 - Each required model dependency shows independent readiness/progress state so future parallel downloads can be tracked separately.
 - Optional/deferred models remain visible as downloadable capabilities inside the AI Tools panel.
@@ -504,7 +504,7 @@ Playwright tests:
 - Move, resize, align, and layer elements.
 - Use bring forward/send backward controls.
 - Translate text with mocked provider.
-- Generate and apply palette with mocked provider.
+- Generate and apply Prompt API palette suggestions with mocked provider.
 - Remove background with mocked provider.
 - Smart Grab with mocked provider.
 - Magic Eraser mask preview and apply flow with mocked provider.

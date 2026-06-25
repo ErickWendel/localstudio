@@ -20,7 +20,6 @@ interface RightPanelProps {
   promptApiAttention?: boolean;
   promptApiNotice?: string | undefined;
   promptPreparation?: { availability: string; progress: number; status: 'idle' | 'downloading' | 'ready' | 'failed' };
-  onDownloadRequiredModels?: () => Promise<void>;
   onDownloadModel?: (id: string) => Promise<void>;
   onPreparePromptApi?: () => Promise<void>;
   onTranslationTargetLanguageChange?: (languageCode: string) => void;
@@ -54,7 +53,6 @@ export function RightPanel({
   promptApiAttention,
   promptApiNotice,
   promptPreparation,
-  onDownloadRequiredModels,
   onDownloadModel,
   onPreparePromptApi,
   onTranslationTargetLanguageChange,
@@ -84,7 +82,6 @@ export function RightPanel({
             promptApiAttention={promptApiAttention}
             promptApiNotice={promptApiNotice}
             promptPreparation={promptPreparation}
-            onDownloadRequiredModels={onDownloadRequiredModels}
             onDownloadModel={onDownloadModel}
             onPreparePromptApi={onPreparePromptApi}
             onTranslationTargetLanguageChange={onTranslationTargetLanguageChange}
