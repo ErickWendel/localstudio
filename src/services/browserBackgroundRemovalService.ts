@@ -157,8 +157,8 @@ export class BrowserBackgroundRemovalService implements BackgroundRemovalService
 
     return {
       asset: {
-        ...asset,
         id: `${asset.id}-bg-removed-${Date.now().toString(36)}`,
+        type: 'image',
         name: `${asset.name} BG Removed`,
         mimeType: 'image/png',
         objectUrl: transparentImage.objectUrl,

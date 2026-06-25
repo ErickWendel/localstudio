@@ -36,6 +36,16 @@ class RejectingProjectRepository implements ProjectRepository {
   }
 }
 
+class RejectingLoadProjectRepository implements ProjectRepository {
+  loadProject(): Promise<ProjectDocument | null> {
+    return Promise.reject(new DOMException('Missing asset file', 'NotFoundError'));
+  }
+
+  saveProject(): Promise<void> {
+    return Promise.resolve();
+  }
+}
+
 class SavingProjectRepository implements ProjectRepository {
   savedProjects: ProjectDocument[] = [];
 
@@ -263,6 +273,18 @@ describe('EditorShell', () => {
       await screen.findByRole('button', { name: 'Edit project name Restored LocalStudio Project' }),
     ).toBeInTheDocument();
     expect(repository.savedProjects).toHaveLength(0);
+  });
+
+  it('disables persistence and keeps the initial project when startup restore fails', async () => {
+    const services = createAppServices();
+    services.projectRepository = new RejectingLoadProjectRepository();
+    window.localStorage.setItem('ew-canvas-ai.persistence-enabled', 'true');
+
+    render(<EditorShell services={services} />);
+
+    expect(screen.getByText('Untitled AI Deck')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Persistence disabled' })).toBeInTheDocument();
+    expect(window.localStorage.getItem('ew-canvas-ai.persistence-enabled')).toBe('false');
   });
 
   it('zooms the canvas from the toolbar', async () => {

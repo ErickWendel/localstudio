@@ -230,19 +230,27 @@ export function useEditorViewModel(services: AppServices) {
 
     if (!persistenceEnabled) return;
 
-    void services.projectRepository.loadProject(
-      services.storedProjectName ? { projectName: services.storedProjectName } : undefined,
-    ).then((savedProject) => {
-      if (!isMounted) return;
-      if (savedProject) {
-        const normalizedProject = normalizeProjectDocument(savedProject);
-        setProject(normalizedProject);
-        setActivePageId(normalizedProject.pages[0]?.id ?? '');
-        setSelectedElementIds(['image-hero'].filter((id) => Boolean(normalizedProject.elements[id])));
-        writeProjectNameToUrl(normalizedProject.name);
-      }
-      setHasLoadedProject(true);
-    });
+    void services.projectRepository
+      .loadProject(services.storedProjectName ? { projectName: services.storedProjectName } : undefined)
+      .then((savedProject) => {
+        if (!isMounted) return;
+        if (savedProject) {
+          const normalizedProject = normalizeProjectDocument(savedProject);
+          setProject(normalizedProject);
+          setActivePageId(normalizedProject.pages[0]?.id ?? '');
+          setSelectedElementIds(['image-hero'].filter((id) => Boolean(normalizedProject.elements[id])));
+          writeProjectNameToUrl(normalizedProject.name);
+        }
+        setHasLoadedProject(true);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setPersistenceEnabled(false);
+        setHasLoadedProject(true);
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'false');
+        }
+      });
 
     return () => {
       isMounted = false;
