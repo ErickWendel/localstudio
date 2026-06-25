@@ -1,6 +1,7 @@
 import type { Asset } from '../domain/model';
 import type {
   BackgroundRemovalService,
+  ImageGenerationService,
   MagicEraserService,
   PaletteService,
   SmartGrabService,
@@ -37,6 +38,21 @@ export class MockPaletteService implements PaletteService {
     return Promise.resolve({
       name: prompt || 'EW Neon',
       colors: ['#37FD76', '#050D10', '#FFFFFF', '#91999D', '#00779A'],
+    });
+  }
+}
+
+export class MockImageGenerationService implements ImageGenerationService {
+  generateImage(prompt: string): Promise<Asset> {
+    const safeName = prompt.trim() || 'Generated image';
+    const safeId = safeName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32) || 'image';
+    return Promise.resolve({
+      id: `asset-generated-${safeId}`,
+      type: 'image',
+      name: `${safeName}.png`,
+      mimeType: 'image/png',
+      objectUrl:
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lMFeWAAAAABJRU5ErkJggg==',
     });
   }
 }

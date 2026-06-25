@@ -28,6 +28,10 @@ import { fitImageWithinPage } from '../../domain/imageSizing';
 import type { DesignElement, Page, PageBackground, ProjectDocument, SelectionState } from '../../domain/model';
 import { SAMPLE_HERO_IMAGE_SIZE, SAMPLE_HERO_IMAGE_URL } from '../../domain/sampleProject';
 import type { ModelState, PromptApiAvailability } from '../../services/interfaces';
+import {
+  DEFAULT_IMAGE_GENERATION_SIZE,
+  IMAGE_GENERATION_MODEL_ID,
+} from '../../services/imageGenerationModels';
 import { IMAGE_EDITING_MODEL_ID } from '../../services/modelSetupService';
 import { looksLikeImageGenerationRequest } from '../../services/prompts/slideTaskPrompt';
 
@@ -78,6 +82,7 @@ const PERSISTENCE_PREFERENCE_KEY = 'ew-canvas-ai.persistence-enabled';
 const TRANSLATION_TARGET_LANGUAGE_KEY = 'localstudio.ai.translation-target-language';
 const IMAGE_EDITING_MODEL_REQUIRED_MESSAGE = 'You must download the image editing tools first.';
 const PROMPT_API_REQUIRED_MESSAGE = 'Prompt API must be prepared before using prompt-to-slides.';
+const IMAGE_GENERATION_MODEL_REQUIRED_MESSAGE = 'Download image generation models before creating images.';
 const IMAGE_PROMPT_MODE_REQUIRED_MESSAGE = 'Use Create image from the + menu to generate images.';
 const BACKGROUND_PREVIEW_DEBOUNCE_MS = 120;
 const DEFAULT_SLIDE_LANGUAGE_CODE = 'pt';
@@ -408,6 +413,10 @@ export function useEditorViewModel(services: AppServices) {
   const [promptGenerationNotice, setPromptGenerationNotice] = useState<string | undefined>();
   const [promptGenerationStatus, setPromptGenerationStatus] = useState<string | undefined>();
   const [isGeneratingSlide, setIsGeneratingSlide] = useState(false);
+  const [createImageNotice, setCreateImageNotice] = useState<string | undefined>();
+  const [createImageStatus, setCreateImageStatus] = useState<string | undefined>();
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [aiToolsAttentionModelId, setAiToolsAttentionModelId] = useState<string | undefined>();
   const [pageLanguageCodes, setPageLanguageCodes] = useState<Record<string, string>>({});
   const [elementClipboard, setElementClipboard] = useState<ElementClipboardState>({
     assets: {},
@@ -582,6 +591,10 @@ export function useEditorViewModel(services: AppServices) {
     if (next.some((state) => state.id === IMAGE_EDITING_MODEL_ID && state.status === 'ready')) {
       setBackgroundSelectionNotice(undefined);
     }
+    if (next.some((state) => state.id === IMAGE_GENERATION_MODEL_ID && state.status === 'ready')) {
+      setCreateImageNotice(undefined);
+      setAiToolsAttentionModelId(undefined);
+    }
   }
 
   async function downloadModel(id: string) {
@@ -597,6 +610,27 @@ export function useEditorViewModel(services: AppServices) {
     if (id === IMAGE_EDITING_MODEL_ID && next.status === 'ready') {
       setBackgroundSelectionNotice(undefined);
     }
+    if (id === IMAGE_GENERATION_MODEL_ID && next.status === 'ready') {
+      setCreateImageNotice(undefined);
+      setAiToolsAttentionModelId(undefined);
+    }
+  }
+
+  function isImageGenerationReady() {
+    return modelStates.some((state) => state.id === IMAGE_GENERATION_MODEL_ID && state.status === 'ready');
+  }
+
+  function ensureImageGenerationReadyForPrompt() {
+    if (isImageGenerationReady()) {
+      setCreateImageNotice(undefined);
+      setAiToolsAttentionModelId(undefined);
+      return true;
+    }
+
+    setActiveTab('ai-tools');
+    setAiToolsAttentionModelId(IMAGE_GENERATION_MODEL_ID);
+    setCreateImageNotice(IMAGE_GENERATION_MODEL_REQUIRED_MESSAGE);
+    return false;
   }
 
   async function refreshPromptApiAvailability() {
@@ -715,6 +749,61 @@ export function useEditorViewModel(services: AppServices) {
     } finally {
       setPromptGenerationStatus(undefined);
       setIsGeneratingSlide(false);
+    }
+  }
+
+  async function generateImageFromPrompt(prompt: string) {
+    const trimmedPrompt = prompt.trim();
+    if (!trimmedPrompt || isGeneratingImage) return;
+
+    const isReady = ensureImageGenerationReadyForPrompt();
+    if (!isReady) return;
+
+    const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
+    if (!page) return;
+
+    setCreateImageNotice(undefined);
+    setCreateImageStatus('Generating image...');
+    setIsGeneratingImage(true);
+    try {
+      const asset = await services.imageGenerationService.generateImage(trimmedPrompt, {
+        onProgress: (state) => {
+          setCreateImageStatus(`${state.label} ${state.progress}%`);
+        },
+      });
+      const elementId = createId('image-generated');
+      const fittedImage = fitImageWithinPage({
+        imageWidth: DEFAULT_IMAGE_GENERATION_SIZE,
+        imageHeight: DEFAULT_IMAGE_GENERATION_SIZE,
+        pageWidth: page.width,
+        pageHeight: page.height,
+      });
+
+      commitProject(
+        (currentProject) =>
+          new AddImageElementCommand(activePageId, {
+            asset,
+            element: {
+              id: elementId,
+              type: 'image',
+              assetId: asset.id,
+              x: fittedImage.x,
+              y: fittedImage.y,
+              width: fittedImage.width,
+              height: fittedImage.height,
+              rotation: 0,
+              locked: false,
+              visible: true,
+              opacity: 1,
+            },
+          }).execute(currentProject),
+        { selectedElementIds: [elementId] },
+      );
+    } catch (error) {
+      setCreateImageNotice(error instanceof Error ? error.message : 'Image generation failed.');
+    } finally {
+      setCreateImageStatus(undefined);
+      setIsGeneratingImage(false);
     }
   }
 
@@ -1609,10 +1698,16 @@ export function useEditorViewModel(services: AppServices) {
     promptApiNotice,
     promptGenerationNotice,
     promptGenerationStatus,
+    createImageNotice,
+    createImageStatus,
+    isGeneratingImage,
     isGeneratingSlide,
+    aiToolsAttentionModelId,
     preparePromptApi,
     ensurePromptApiReadyForPrompt,
+    ensureImageGenerationReadyForPrompt,
     generateSlideFromPrompt,
+    generateImageFromPrompt,
     setTranslationTargetLanguage,
     canTranslateSelection: !isTranslating && getTranslatableTextElementIds('selection').length > 0,
     canTranslateCurrentSlide: !isTranslating && getTranslatableTextElementIds('slide').length > 0,

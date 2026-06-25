@@ -1,6 +1,7 @@
 import type { Asset } from '../domain/model';
 import type { BackgroundRemovalService } from './interfaces';
-import { IMAGE_EDITING_TRANSFORMERS_MODEL_ID, TRANSFORMERS_CACHE_KEY } from './modelSetupService';
+import { TRANSFORMERS_CACHE_KEY } from './imageGenerationModels';
+import { IMAGE_EDITING_TRANSFORMERS_MODEL_ID } from './modelSetupService';
 
 interface SamImageInput {
   data: Uint8Array | Uint8ClampedArray;

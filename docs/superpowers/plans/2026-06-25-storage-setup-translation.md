@@ -19,6 +19,7 @@
 - The latest editor ergonomics slice is implemented on `main`: inserted text now follows the seeded LocalStudio.ai template title style, moving elements shows a dotted neon center crosshair, and copy/cut/paste uses browser clipboard events plus a LocalStudio marker so the latest clipboard source wins between editor objects and external images.
 - The Prompt API setup slice is implemented on `main`: the prompt bar has a `+` action menu with `Create image` chip mode, clearing the chip restores the slide-structure prompt, and AI Tools shows Prompt API first under Local Chrome AI with prompt-to-slides copy, startup readiness detection, preparation progress, and hidden prepare action when Chrome already reports readiness.
 - The first Prompt API prompt-to-slides slice is implemented on `main`: default prompt-bar submissions generate active-page slide content through structured JSON task planning, per-element structured JSON layout, local placeholder imagery, remote `https://` image URLs, immutable generated-slide commands, and progressive canvas updates.
+- The first Bonsai Image WebGPU create-image slice is implemented on `main`: create-image mode now gates on `Image Generation Models`, redirects to AI Tools when the model is not ready, downloads the optional model row independently, generates PNG assets through an isolated image-generation service seam, and inserts the result into the active slide as a selected image layer.
 - Latest local non-e2e checks passed after the Prompt API prompt-bar/setup work: `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build`.
 
 ## Remaining Work / Spec Gap Checklist
@@ -61,7 +62,9 @@ AI roadmap:
 - [x] Build actual Prompt API prompt-to-slides generation from the prepared Chrome Prompt API provider for the active page.
 - [ ] Expand Prompt API prompt-to-slides generation to multi-slide deck creation.
 - [ ] Add schema repair/retry handling when Chrome Prompt API returns invalid structured output.
-- [ ] Add the future `Create image` provider/action behind the prompt bar chip.
+- [x] Add the first Bonsai Image WebGPU `Create image` provider/action behind the prompt bar chip.
+- [ ] Harden the Bonsai runtime adapter against the referenced Hugging Face Space/package surface on target Chrome builds.
+- [ ] Add create-image cancellation, generation history, and richer size/seed/step controls.
 - [ ] Fold palette generation into the Chrome Prompt API prompt-to-slides/design-generation flow instead of exposing a standalone Text-to-Palette AI tool.
 - [ ] Build Smart Grab on the shared Segment Anything WebGPU provider.
 - [ ] Build Magic Eraser on the shared Segment Anything WebGPU provider.

@@ -3,10 +3,14 @@ import { useEffect, useRef, useState } from 'react';
 import { IconButton } from '../components/IconButton';
 
 interface PromptBarProps {
+  createImageNotice?: string | undefined;
+  createImageStatus?: string | undefined;
   generationNotice?: string | undefined;
   generationStatus?: string | undefined;
+  isGeneratingImage?: boolean;
   isGeneratingSlide?: boolean;
-  onCreateImagePromptIntent?: () => Promise<boolean>;
+  onCreateImagePromptIntent?: () => boolean | Promise<boolean>;
+  onCreateImageSubmit?: (prompt: string) => Promise<void>;
   onSlidePromptSubmit?: (prompt: string) => Promise<void>;
 }
 
@@ -27,10 +31,14 @@ const imagePromptExamples = [
 ];
 
 export function PromptBar({
+  createImageNotice,
+  createImageStatus,
   generationNotice,
   generationStatus,
+  isGeneratingImage = false,
   isGeneratingSlide,
   onCreateImagePromptIntent,
+  onCreateImageSubmit,
   onSlidePromptSubmit,
 }: PromptBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -56,9 +64,11 @@ export function PromptBar({
 
   async function submitPrompt() {
     const trimmedValue = value.trim();
-    if (!trimmedValue || isGeneratingSlide) return;
+    if (!trimmedValue || isGeneratingSlide || isGeneratingImage) return;
     if (mode === 'create-image') {
-      await guardPromptIntent();
+      const canCreateImage = await guardPromptIntent();
+      if (!canCreateImage) return;
+      await onCreateImageSubmit?.(trimmedValue);
       return;
     }
     await onSlidePromptSubmit?.(trimmedValue);
@@ -82,8 +92,18 @@ export function PromptBar({
           </button>
         ))}
       </div>
-      {generationStatus ? <div className="prompt-generation-status">{generationStatus}</div> : null}
-      {generationNotice ? (
+      {mode === 'create-image' && createImageStatus ? (
+        <div className="prompt-generation-status">{createImageStatus}</div>
+      ) : null}
+      {mode !== 'create-image' && generationStatus ? (
+        <div className="prompt-generation-status">{generationStatus}</div>
+      ) : null}
+      {mode === 'create-image' && createImageNotice ? (
+        <div className="prompt-generation-notice" role="tooltip">
+          {createImageNotice}
+        </div>
+      ) : null}
+      {mode !== 'create-image' && generationNotice ? (
         <div className="prompt-generation-notice" role="tooltip">
           {generationNotice}
         </div>
@@ -154,7 +174,8 @@ export function PromptBar({
           <Mic size={16} />
         </IconButton>
         <IconButton
-          label={isGeneratingSlide ? 'Generating slide' : 'Submit prompt'}
+          disabled={isGeneratingSlide || isGeneratingImage}
+          label={isGeneratingImage ? 'Generating image' : isGeneratingSlide ? 'Generating slide' : 'Submit prompt'}
           onClick={() => {
             void submitPrompt();
           }}

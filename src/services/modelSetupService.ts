@@ -1,10 +1,16 @@
 import type { ModelSetupService, ModelState } from './interfaces';
+import {
+  IMAGE_GENERATION_MODEL_ID,
+  IMAGE_GENERATION_READY_KEY,
+  IMAGE_GENERATION_TRANSFORMERS_MODEL_ID,
+  TRANSFORMERS_CACHE_KEY,
+} from './imageGenerationModels';
+import { BrowserBonsaiImageRuntime } from './browserImageGenerationService';
 
 export const IMAGE_EDITING_MODEL_ID = 'image-editing-models';
 export const IMAGE_EDITING_TRANSFORMERS_MODEL_ID = 'Xenova/slimsam-77-uniform';
 
 const IMAGE_EDITING_READY_KEY = 'ew-canvas-ai.model.image-editing-models.ready';
-export const TRANSFORMERS_CACHE_KEY = 'ew-canvas-ai-transformers-cache';
 
 interface ModelStorage {
   getItem(key: string): string | null;
@@ -13,6 +19,10 @@ interface ModelStorage {
 
 export interface ImageEditingModelLoader {
   loadImageEditingModel(): Promise<void>;
+}
+
+export interface ImageGenerationModelLoader {
+  loadImageGenerationModel(): Promise<void>;
 }
 
 const initialStates: ModelState[] = [
@@ -24,6 +34,15 @@ const initialStates: ModelState[] = [
     status: 'needs-download',
     progress: 0,
     required: true,
+  },
+  {
+    id: IMAGE_GENERATION_MODEL_ID,
+    label: 'Image Generation Models',
+    description: 'Bonsai Image WebGPU text-to-image model.',
+    provider: 'transformers',
+    status: 'needs-download',
+    progress: 0,
+    required: false,
   },
 ];
 
@@ -53,17 +72,27 @@ export class TransformersImageEditingModelLoader implements ImageEditingModelLoa
   }
 }
 
+export class TransformersImageGenerationModelLoader implements ImageGenerationModelLoader {
+  async loadImageGenerationModel(): Promise<void> {
+    await new BrowserBonsaiImageRuntime().preload(IMAGE_GENERATION_TRANSFORMERS_MODEL_ID);
+  }
+}
+
 export class BrowserModelSetupService implements ModelSetupService {
   private states: ModelState[];
 
   constructor(
     private readonly imageEditingModelLoader: ImageEditingModelLoader = new TransformersImageEditingModelLoader(),
     private readonly storage: ModelStorage | undefined = getBrowserStorage(),
+    private readonly imageGenerationModelLoader: ImageGenerationModelLoader = new TransformersImageGenerationModelLoader(),
   ) {
     const imageEditingModelReady = storage?.getItem(IMAGE_EDITING_READY_KEY) === 'true';
+    const imageGenerationModelReady = storage?.getItem(IMAGE_GENERATION_READY_KEY) === 'true';
     this.states = initialStates.map((state) =>
       state.id === IMAGE_EDITING_MODEL_ID && imageEditingModelReady
         ? { ...state, status: 'ready', progress: 100 }
+        : state.id === IMAGE_GENERATION_MODEL_ID && imageGenerationModelReady
+          ? { ...state, status: 'ready', progress: 100 }
         : { ...state },
     );
   }
@@ -87,11 +116,18 @@ export class BrowserModelSetupService implements ModelSetupService {
     this.setModelState(id, { status: 'downloading', progress: 10 });
 
     try {
-      await this.imageEditingModelLoader.loadImageEditingModel();
-      this.storage?.setItem(IMAGE_EDITING_READY_KEY, 'true');
+      if (id === IMAGE_EDITING_MODEL_ID) {
+        await this.imageEditingModelLoader.loadImageEditingModel();
+        this.storage?.setItem(IMAGE_EDITING_READY_KEY, 'true');
+      }
+      if (id === IMAGE_GENERATION_MODEL_ID) {
+        await this.imageGenerationModelLoader.loadImageGenerationModel();
+        this.storage?.setItem(IMAGE_GENERATION_READY_KEY, 'true');
+      }
       return this.setModelState(id, { status: 'ready', progress: 100 });
     } catch {
-      this.storage?.setItem(IMAGE_EDITING_READY_KEY, 'false');
+      if (id === IMAGE_EDITING_MODEL_ID) this.storage?.setItem(IMAGE_EDITING_READY_KEY, 'false');
+      if (id === IMAGE_GENERATION_MODEL_ID) this.storage?.setItem(IMAGE_GENERATION_READY_KEY, 'false');
       return this.setModelState(id, { status: 'failed', progress: 0 });
     }
   }

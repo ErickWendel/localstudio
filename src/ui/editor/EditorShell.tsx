@@ -275,10 +275,14 @@ export function EditorShell({ services }: EditorShellProps) {
             }}
           />
           <PromptBar
+            createImageNotice={vm.createImageNotice}
+            createImageStatus={vm.createImageStatus}
             generationNotice={vm.promptGenerationNotice}
             generationStatus={vm.promptGenerationStatus}
+            isGeneratingImage={vm.isGeneratingImage}
             isGeneratingSlide={vm.isGeneratingSlide}
-            onCreateImagePromptIntent={() => vm.ensurePromptApiReadyForPrompt()}
+            onCreateImagePromptIntent={() => vm.ensureImageGenerationReadyForPrompt()}
+            onCreateImageSubmit={(prompt) => vm.generateImageFromPrompt(prompt)}
             onSlidePromptSubmit={(prompt) => vm.generateSlideFromPrompt(prompt)}
           />
         </section>
@@ -296,7 +300,7 @@ export function EditorShell({ services }: EditorShellProps) {
           onUpdateElementStyle={vm.updateElementStyle}
           onUpdatePageBackground={vm.updatePageBackground}
           modelStates={vm.modelStates}
-          attentionModelId={vm.backgroundSelectionNotice ? IMAGE_EDITING_MODEL_ID : undefined}
+          attentionModelId={vm.aiToolsAttentionModelId ?? (vm.backgroundSelectionNotice ? IMAGE_EDITING_MODEL_ID : undefined)}
           translationLanguageOptions={vm.translationLanguageOptions}
           translationPreparation={vm.translationPreparation}
           translationTargetAttention={vm.translationTargetAttention}

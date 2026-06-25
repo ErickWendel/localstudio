@@ -3,6 +3,7 @@ import type { ProjectDocument } from '../domain/model';
 import type {
   BackgroundRemovalService,
   ExportService,
+  ImageGenerationService,
   LocalSetupService,
   MagicEraserService,
   ModelSetupService,
@@ -21,6 +22,7 @@ import { ChromeTranslatorService } from '../services/chromeTranslatorService';
 import { ChromePromptService } from '../services/chromePromptService';
 import { BrowserExportService } from '../services/exportService';
 import { BrowserBackgroundRemovalService } from '../services/browserBackgroundRemovalService';
+import { BrowserImageGenerationService } from '../services/browserImageGenerationService';
 import { BrowserFileSystemProjectRepository } from '../services/browserFileSystemProjectRepository';
 import { DisabledProjectRepository } from '../services/disabledProjectRepository';
 import { BrowserLocalSetupService } from '../services/localSetupService';
@@ -36,6 +38,7 @@ export interface AppServices {
   modelSetupService: ModelSetupService;
   translatorService: TranslatorService;
   promptService: PromptService;
+  imageGenerationService: ImageGenerationService;
   paletteService: PaletteService;
   backgroundRemovalService: BackgroundRemovalService;
   smartGrabService: SmartGrabService;
@@ -59,6 +62,7 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     modelSetupService: new BrowserModelSetupService(),
     translatorService: new ChromeTranslatorService(),
     promptService: new ChromePromptService(),
+    imageGenerationService: new BrowserImageGenerationService(),
     paletteService: new MockPaletteService(),
     backgroundRemovalService: new BrowserBackgroundRemovalService(),
     smartGrabService: new MockSmartGrabService(),

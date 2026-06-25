@@ -6,7 +6,13 @@ import type {
   GeneratedSlideTask,
   GeneratedSlideTasksDocument,
 } from '../../../../src/domain/generatedSlide';
-import type { PromptApiAvailability, PromptService, TranslatorService } from '../../../../src/services/interfaces';
+import type {
+  ImageGenerationService,
+  PromptApiAvailability,
+  PromptService,
+  TranslatorService,
+} from '../../../../src/services/interfaces';
+import { MockImageGenerationService } from '../../../../src/services/inMemoryAiServices';
 import { InMemoryModelSetupService } from '../../../../src/services/modelSetupService';
 import { EditorShell } from '../../../../src/ui/editor/EditorShell';
 
@@ -84,6 +90,25 @@ class TestPromptService implements PromptService {
   );
 }
 
+class SlowImageGenerationService implements ImageGenerationService {
+  generateImage = vi.fn(
+    (_prompt: string, options?: Parameters<ImageGenerationService['generateImage']>[1]) =>
+      new Promise<Awaited<ReturnType<ImageGenerationService['generateImage']>>>((resolve) => {
+        options?.onProgress?.({ label: 'Generating image 1/4', progress: 25 });
+        setTimeout(() => {
+          resolve({
+            id: 'asset-slow-generated',
+            type: 'image',
+            name: 'slow.png',
+            mimeType: 'image/png',
+            objectUrl:
+              'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lMFeWAAAAABJRU5ErkJggg==',
+          });
+        }, 40);
+      }),
+  );
+}
+
 describe('mocked AI flows', () => {
   it('downloads required models from AI Tools panel', async () => {
     const user = userEvent.setup();
@@ -95,8 +120,10 @@ describe('mocked AI flows', () => {
     expect(screen.queryByRole('button', { name: 'Download Required Models' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Download Image Editing Models' }));
 
-    expect(await screen.findAllByText('Ready')).toHaveLength(1);
+    expect(await screen.findByText('Image Editing Models')).toBeInTheDocument();
+    expect(screen.getAllByText('Ready').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Image Editing Models')).toBeInTheDocument();
+    expect(screen.getByText('Image Generation Models')).toBeInTheDocument();
   });
 
   it('exposes selected-object AI shortcuts', () => {
@@ -179,10 +206,10 @@ describe('mocked AI flows', () => {
     ).toBeInTheDocument();
   });
 
-  it('redirects create image prompt typing to AI Tools when Prompt API is not ready', async () => {
+  it('redirects create image prompt typing to AI Tools when image generation models are not ready', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
-    services.promptService = new TestPromptService('unavailable');
+    services.modelSetupService = new InMemoryModelSetupService();
     render(<EditorShell services={services} />);
 
     await user.click(screen.getByRole('button', { name: 'Prompt actions' }));
@@ -192,26 +219,22 @@ describe('mocked AI flows', () => {
     await waitFor(() => {
       expect(screen.getByRole('tab', { name: 'AI Tools' })).toHaveAttribute('aria-selected', 'true');
     });
-    expect(screen.getByRole('article', { name: 'Prompt API' })).toHaveClass('tool-card-attention');
-    expect(screen.getByText('Prompt API must be prepared before using prompt-to-slides.')).toBeInTheDocument();
+    expect(screen.getByRole('article', { name: 'Image Generation Models' })).toHaveClass('model-row-attention');
+    expect(screen.getByText('Download image generation models before creating images.')).toBeInTheDocument();
   });
 
-  it('prepares Prompt API from AI Tools before allowing create image prompts', async () => {
+  it('downloads image generation models before allowing create image prompts', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
-    const promptService = new TestPromptService('downloadable');
-    services.promptService = promptService;
+    services.modelSetupService = new InMemoryModelSetupService();
     render(<EditorShell services={services} />);
 
     await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
-    await user.click(screen.getByRole('button', { name: 'Prepare Prompt API' }));
+    await user.click(screen.getByRole('button', { name: 'Download Image Generation Models' }));
 
     await waitFor(() => {
-      expect(promptService.preparePromptApi).toHaveBeenCalled();
-      expect(screen.queryByRole('button', { name: 'Prepare Prompt API' })).not.toBeInTheDocument();
+      expect(screen.getByRole('article', { name: 'Image Generation Models' })).toHaveTextContent('Ready');
     });
-    expect(screen.getAllByText('Ready').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('100%').length).toBeGreaterThanOrEqual(1);
 
     await user.click(screen.getByRole('tab', { name: 'Layout' }));
     await user.click(screen.getByRole('button', { name: 'Prompt actions' }));
@@ -220,6 +243,48 @@ describe('mocked AI flows', () => {
 
     expect(screen.getByRole('tab', { name: 'Layout' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByLabelText('Create image prompt')).toHaveValue('neon cover');
+  });
+
+  it('generates an image from create image mode and inserts it into the active slide', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    services.modelSetupService = new InMemoryModelSetupService();
+    services.imageGenerationService = new MockImageGenerationService();
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await user.click(screen.getByRole('button', { name: 'Download Image Generation Models' }));
+    await user.click(screen.getByRole('tab', { name: 'Layout' }));
+    await user.click(screen.getByRole('button', { name: 'Prompt actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Create image' }));
+    await user.type(screen.getByLabelText('Create image prompt'), 'A neon bonsai browser');
+    await user.click(screen.getByRole('button', { name: 'Submit prompt' }));
+
+    expect(await screen.findByText('A neon bonsai browser.png')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Undo' })).not.toBeDisabled();
+  });
+
+  it('blocks duplicate create image submissions while generation is running', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const imageGenerationService = new SlowImageGenerationService();
+    services.modelSetupService = new InMemoryModelSetupService();
+    services.imageGenerationService = imageGenerationService;
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await user.click(screen.getByRole('button', { name: 'Download Image Generation Models' }));
+    await user.click(screen.getByRole('tab', { name: 'Layout' }));
+    await user.click(screen.getByRole('button', { name: 'Prompt actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Create image' }));
+    await user.type(screen.getByLabelText('Create image prompt'), 'A slow generated image');
+    await user.click(screen.getByRole('button', { name: 'Submit prompt' }));
+    await user.click(screen.getByRole('button', { name: 'Generating image' }));
+
+    expect(await screen.findByText('Generating image 1/4 25%')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(imageGenerationService.generateImage).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('shows ready Prompt API first without a prepare action when available on startup', async () => {

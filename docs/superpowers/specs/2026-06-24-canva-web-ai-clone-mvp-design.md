@@ -42,7 +42,8 @@ Ready now:
 - Click-guided background removal is wired through the shared Segment Anything WebGPU-style image editing provider. The flow blocks until the model is ready, prepares the selected image, previews the selected subject in blue, supports right-click positive refinement points, applies removal on left click, and tightens the selected image bounds after extraction.
 - Chrome Built-in AI translation is wired behind `TranslatorService` for selected text, current slide, and full deck scopes. The visible entry points are the selected-text floating toolbar action, the slide translate icon above the canvas, and `Edit > Translate Deck`. The first translation attempt redirects to AI Tools until the user chooses a default target language in `Translate Design > Translate to`.
 - The AI Tools translation card uses a hard-coded Chrome Translator-supported target-language list sorted by language name, with flags shown at the end of each option. Changing the target language prepares the detected source/target pair, shows download progress, and reuses the prepared translator for subsequent text/slide/deck translation.
-- The prompt bar now has a `+` action menu with a `Create image` chip mode, while the default input returns to slide-structure/content-organization prompting when the chip is cleared. Typing into the gated prompt mode checks Chrome Prompt API readiness first and redirects to AI Tools when preparation is required.
+- The prompt bar now has a `+` action menu with a `Create image` chip mode, while the default input returns to slide-structure/content-organization prompting when the chip is cleared. Typing into or submitting the gated image mode checks Bonsai image-generation model readiness first and redirects to AI Tools when preparation is required.
+- Create image mode now uses a browser-local Bonsai Image WebGPU provider seam behind AI Tools model preparation. If the image generation model is not ready, the prompt redirects to AI Tools and highlights the `Image Generation Models` row. Once ready, generated PNG assets are inserted into the current slide as normal selected image layers.
 - Chrome Prompt API readiness and preparation are wired behind `ChromePromptService`. The Prompt API card appears first in the Local Chrome AI section, uses prompt-to-slides copy, shows preparation/download progress, and hides the prepare action when Chrome reports the API is ready at startup.
 - Prompt API slide generation is wired from the main prompt bar for the active page. The app asks Chrome Prompt API for a strict structured JSON task list, applies the page/background immediately, asks for one Konva-ready element at a time with structured JSON output, validates/clamps every payload, and commits each generated element through immutable document commands for progressive on-canvas feedback.
 - Prompt-to-slides supports local placeholder imagery through a bundled asset and supports user-provided `https://` image URLs as remote image assets. Requests that look like image generation are blocked outside `Create image` mode with guidance to use the `+` menu.
@@ -59,7 +60,8 @@ Known limitations in the current implementation:
 - Chrome Built-in AI translation is wired with target-language selection, pair preparation progress, busy guards, basic error notices, detector fallback normalization, and first-pass fit-to-frame behavior. It still needs richer manual overflow controls, richer recovery guidance, broader browser/device verification, and Playwright coverage.
 - The first real Transformers.js / Hugging Face vision provider is wired for click-guided background removal through Segment Anything WebGPU, but it still needs broader browser/device verification and production hardening.
 - Prompt-driven palette generation, Smart Grab, and Magic Eraser are still mocked or incomplete workflows.
-- Chrome Prompt API prompt-to-slides generation supports the active page only. Multi-slide deck generation, schema repair retries, richer generation history, and the future `Create image` provider remain incomplete.
+- Chrome Prompt API prompt-to-slides generation supports the active page only. Multi-slide deck generation, schema repair retries, and richer generation history remain incomplete.
+- Create image has the first Bonsai Image WebGPU integration path only. Runtime/package hardening against the referenced Space, model selection, cancellation, richer generation controls, generation history, and production browser/device verification remain future work.
 - Export supports the current-page PNG path, but production-quality browser verification and export UX polish remain. PDF export is still missing.
 - Layer drag/drop works through the app UI and tested callbacks, but should receive more Playwright coverage after interaction stabilizes.
 - Page background is displayed as a static layer row and is not yet a fully editable/selectable element.
@@ -76,7 +78,7 @@ Next implementation priorities:
 6. Expand Prompt API prompt-to-slides generation to multi-slide deck creation.
 7. Add Prompt API schema repair/retry UX for invalid structured output.
 8. Fold palette generation into the prepared Chrome Prompt API design-generation flow.
-9. Build the future `Create image` provider/action behind the prompt bar chip.
+9. Harden the Bonsai `Create image` provider/action with production browser verification, cancellation, generation history, and richer controls.
 10. Build Smart Grab and Magic Eraser on top of the shared Segment Anything WebGPU image editing provider.
 
 ## Goals

@@ -1,5 +1,6 @@
 import { createAppServices } from '../../../src/app/composition';
 import { BrowserFileSystemProjectRepository } from '../../../src/services/browserFileSystemProjectRepository';
+import { BrowserImageGenerationService } from '../../../src/services/browserImageGenerationService';
 import { DisabledProjectRepository } from '../../../src/services/disabledProjectRepository';
 
 describe('createAppServices', () => {
@@ -29,5 +30,9 @@ describe('createAppServices', () => {
     });
 
     expect(createAppServices().projectRepository).toBeInstanceOf(DisabledProjectRepository);
+  });
+
+  it('wires the browser image generation service', () => {
+    expect(createAppServices().imageGenerationService).toBeInstanceOf(BrowserImageGenerationService);
   });
 });

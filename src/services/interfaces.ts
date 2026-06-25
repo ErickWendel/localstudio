@@ -84,6 +84,18 @@ export interface PromptService {
   ): Promise<GeneratedSlideElement>;
 }
 
+export interface ImageGenerationOptions {
+  height?: number;
+  seed?: number;
+  steps?: number;
+  width?: number;
+  onProgress?: (state: { label: string; progress: number }) => void;
+}
+
+export interface ImageGenerationService {
+  generateImage(prompt: string, options?: ImageGenerationOptions): Promise<Asset>;
+}
+
 export interface PaletteService {
   generatePalette(prompt: string): Promise<{ name: string; colors: string[] }>;
 }
