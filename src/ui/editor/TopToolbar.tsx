@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ProjectDocument } from '../../domain/model';
 
 interface TopToolbarProps {
@@ -55,6 +55,14 @@ export function TopToolbar({
   const [openMenu, setOpenMenu] = useState<HeaderMenu | null>(null);
   const [isEditingProjectName, setIsEditingProjectName] = useState(false);
   const [projectNameDraft, setProjectNameDraft] = useState(project.name);
+  const projectNameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isEditingProjectName) return;
+
+    projectNameInputRef.current?.focus();
+    projectNameInputRef.current?.select();
+  }, [isEditingProjectName]);
 
   function triggerExport() {
     if (onExport) {
@@ -157,6 +165,7 @@ export function TopToolbar({
             <input
               aria-label="Project name"
               className="project-title-input"
+              ref={projectNameInputRef}
               value={projectNameDraft}
               onBlur={commitProjectName}
               onChange={(event) => {

@@ -65,4 +65,18 @@ describe('TopToolbar', () => {
 
     expect(onProjectNameChange).toHaveBeenCalledWith('Demo Deck');
   });
+
+  it('selects the full project name when entering rename mode', async () => {
+    const user = userEvent.setup();
+    const project = createSampleProject();
+
+    render(<TopToolbar project={project} language="PT-BR" />);
+
+    await user.click(screen.getByRole('button', { name: 'Edit project name Untitled AI Deck' }));
+
+    const input = screen.getByRole<HTMLInputElement>('textbox', { name: 'Project name' });
+    expect(input).toHaveFocus();
+    expect(input.selectionStart).toBe(0);
+    expect(input.selectionEnd).toBe(project.name.length);
+  });
 });
