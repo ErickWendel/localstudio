@@ -215,7 +215,12 @@ button {
 }
 
 .project-title {
+  min-width: 0;
   max-width: 150px;
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  background: transparent;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -223,6 +228,30 @@ button {
   font-size: 14px;
   font-weight: 600;
   line-height: 20px;
+}
+
+.project-title-button {
+  cursor: text;
+  padding: 0;
+}
+
+.project-title-button:hover {
+  color: var(--ew-green);
+}
+
+.project-title-input {
+  width: min(220px, 24vw);
+  height: 26px;
+  border: 1px solid var(--ew-green);
+  border-radius: 4px;
+  outline: 0;
+  background: rgba(5, 13, 16, 0.92);
+  color: var(--ew-text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  padding: 2px 7px;
+  box-shadow: 0 0 12px rgba(55, 253, 118, 0.14);
 }
 
 .local-only-badge {
@@ -269,6 +298,14 @@ button {
   opacity: 0.42;
   cursor: not-allowed;
   transform: none;
+}
+
+.persistence-off {
+  color: var(--ew-dim);
+}
+
+.persistence-on {
+  color: var(--ew-green);
 }
 
 .stitch-icon-button:active,
@@ -565,8 +602,8 @@ button {
   width: min(800px, 86%);
   aspect-ratio: 16 / 9;
   border-radius: 0;
-  background: #ffffff;
-  padding: 16px;
+  background: #050d10;
+  padding: 0;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.52);
   transform-origin: center;
   transition: transform 160ms ease;
@@ -630,14 +667,6 @@ button {
   color: var(--ew-text);
   font-size: 18px;
   font-weight: 700;
-}
-
-.canvas-size {
-  position: absolute;
-  right: 14px;
-  bottom: 10px;
-  color: var(--ew-dim);
-  font-size: 10px;
 }
 
 .neon-border {

@@ -21,4 +21,12 @@ describe('project model', () => {
 
     expect(project.elements[topElementId!]?.type).toBe('text');
   });
+
+  it('sizes the title text box for multiline editing handles', () => {
+    const project = createSampleProject();
+    const title = project.elements['text-title'];
+
+    expect(title?.type).toBe('text');
+    expect(title?.height).toBeGreaterThanOrEqual(220);
+  });
 });

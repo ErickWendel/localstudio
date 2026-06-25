@@ -12,6 +12,8 @@ interface TopToolbarProps {
   onDelete?: () => void;
   onDuplicate?: () => void;
   onExport?: () => void;
+  onPersistenceToggle?: (enabled: boolean) => void;
+  onProjectNameChange?: (name: string) => void;
   onRedo?: () => void;
   onResetZoom?: () => void;
   onSelectLayers?: () => void;
@@ -41,6 +43,8 @@ export function TopToolbar({
   onDelete,
   onDuplicate,
   onExport,
+  onPersistenceToggle,
+  onProjectNameChange,
   onRedo,
   onResetZoom,
   onSelectLayers,
@@ -49,6 +53,8 @@ export function TopToolbar({
   onZoomOut,
 }: TopToolbarProps) {
   const [openMenu, setOpenMenu] = useState<HeaderMenu | null>(null);
+  const [isEditingProjectName, setIsEditingProjectName] = useState(false);
+  const [projectNameDraft, setProjectNameDraft] = useState(project.name);
 
   function triggerExport() {
     if (onExport) {
@@ -61,6 +67,14 @@ export function TopToolbar({
 
   function closeMenu() {
     setOpenMenu(null);
+  }
+
+  function commitProjectName() {
+    const nextName = projectNameDraft.trim();
+    if (nextName && nextName !== project.name) {
+      onProjectNameChange?.(nextName);
+    }
+    setIsEditingProjectName(false);
   }
 
   const menuActions: Record<HeaderMenu, HeaderMenuAction[]> = {
@@ -139,9 +153,40 @@ export function TopToolbar({
         </nav>
         <div className="toolbar-divider toolbar-divider-menu" />
         <div className="project-group">
-          <span className="project-title" title={project.name}>
-            {project.name}
-          </span>
+          {isEditingProjectName ? (
+            <input
+              aria-label="Project name"
+              className="project-title-input"
+              value={projectNameDraft}
+              onBlur={commitProjectName}
+              onChange={(event) => {
+                setProjectNameDraft(event.target.value);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  setProjectNameDraft(project.name);
+                  setIsEditingProjectName(false);
+                }
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  commitProjectName();
+                }
+              }}
+            />
+          ) : (
+            <button
+              className="project-title project-title-button"
+              title={project.name}
+              type="button"
+              aria-label={`Edit project name ${project.name}`}
+              onClick={() => {
+                setProjectNameDraft(project.name);
+                setIsEditingProjectName(true);
+              }}
+            >
+              {project.name}
+            </button>
+          )}
           <span className="local-only-badge">Local only</span>
         </div>
       </div>
@@ -149,10 +194,12 @@ export function TopToolbar({
         <div className="toolbar-icon-group" aria-label="Editing actions">
           <button
             className={persistenceEnabled ? 'stitch-icon-button persistence-on' : 'stitch-icon-button persistence-off'}
-            disabled
             title={persistenceEnabled ? 'Persistence enabled' : 'Persistence disabled'}
             type="button"
             aria-label={persistenceEnabled ? 'Persistence enabled' : 'Persistence disabled'}
+            onClick={() => {
+              onPersistenceToggle?.(!persistenceEnabled);
+            }}
           >
             <span className="material-symbols-outlined" aria-hidden="true">
               {persistenceEnabled ? 'cloud_done' : 'cloud_off'}

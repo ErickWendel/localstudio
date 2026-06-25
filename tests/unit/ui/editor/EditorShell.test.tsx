@@ -41,6 +41,40 @@ describe('EditorShell', () => {
     expect(screen.queryByRole('button', { name: 'Selected Image' })).not.toBeInTheDocument();
   });
 
+  it('undoes and redoes editor mutations with keyboard shortcuts', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Delete Selected Image' }));
+    expect(screen.queryByRole('button', { name: 'Selected Image' })).not.toBeInTheDocument();
+
+    await user.keyboard('{Meta>}z{/Meta}');
+    expect(screen.getByRole('button', { name: 'Selected Image' })).toBeInTheDocument();
+
+    await user.keyboard('{Meta>}{Shift>}z{/Shift}{/Meta}');
+    expect(screen.queryByRole('button', { name: 'Selected Image' })).not.toBeInTheDocument();
+  });
+
+  it('renames the project from the toolbar', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Edit project name Untitled AI Deck' }));
+    await user.clear(screen.getByRole('textbox', { name: 'Project name' }));
+    await user.type(screen.getByRole('textbox', { name: 'Project name' }), 'Browser Deck{Enter}');
+
+    expect(screen.getByRole('button', { name: 'Edit project name Browser Deck' })).toBeInTheDocument();
+  });
+
+  it('toggles persistence from disabled to enabled', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+
+    expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
+  });
+
   it('zooms the canvas from the toolbar', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
@@ -118,5 +152,11 @@ describe('EditorShell', () => {
     await user.click(screen.getByRole('button', { name: 'Export' }));
 
     expect(downloadDataUrl).toHaveBeenCalledWith(expect.stringMatching(/^data:image\/png/), 'slide.png');
+  });
+
+  it('does not show the page size overlay on the canvas', () => {
+    render(<EditorShell services={createAppServices()} />);
+
+    expect(screen.queryByText('1920 x 1080')).not.toBeInTheDocument();
   });
 });

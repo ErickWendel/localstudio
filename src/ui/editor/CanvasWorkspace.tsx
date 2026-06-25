@@ -272,6 +272,7 @@ export function CanvasWorkspace({
                     fontStyle={element.fontWeight >= 700 ? 'bold' : 'normal'}
                     fill={element.fill}
                     align={element.align}
+                    lineHeight={0.9}
                     visible={editingTextId !== element.id}
                   />
                 );
@@ -349,9 +350,6 @@ export function CanvasWorkspace({
             element.type === 'text' ? <span key={element.id}>{element.text}</span> : null,
           )}
         </div>
-        <span className="canvas-size">
-          {page?.width} x {page?.height}
-        </span>
         {hasSelection ? (
           <FloatingSelectionToolbar
             onAlignCenter={onAlignSelectedElement}

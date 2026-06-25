@@ -42,7 +42,7 @@ describe('editor commands', () => {
       type: 'text',
       text: 'AI Design Revolution',
       x: 464,
-      y: 444,
+      y: 404,
       locked: false,
     });
     expect(next.pages[0]?.elementIds.at(-1)).toBe('text-title-copy');

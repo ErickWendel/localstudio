@@ -28,6 +28,18 @@ export function EditorShell({ services }: EditorShellProps) {
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
+      const isUndoShortcut =
+        (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z' && !event.shiftKey;
+      const isRedoShortcut =
+        ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z' && event.shiftKey) ||
+        ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'y');
+      if (isUndoShortcut || isRedoShortcut) {
+        event.preventDefault();
+        if (isUndoShortcut) vm.undo();
+        if (isRedoShortcut) vm.redo();
+        return;
+      }
+
       if (event.key !== 'Delete' && event.key !== 'Backspace') return;
       const target = event.target;
       if (
@@ -58,10 +70,13 @@ export function EditorShell({ services }: EditorShellProps) {
         canRedo={vm.canRedo}
         canUndo={vm.canUndo}
         hasSelection={hasSelection}
+        persistenceEnabled={vm.persistenceEnabled}
         zoomPercent={vm.zoomPercent}
         onDelete={vm.deleteSelectedElement}
         onDuplicate={vm.duplicateSelectedElement}
         onExport={exportCurrentPageAsPng}
+        onPersistenceToggle={vm.setPersistence}
+        onProjectNameChange={vm.setProjectName}
         onRedo={vm.redo}
         onResetZoom={vm.resetZoom}
         onSelectLayers={() => {

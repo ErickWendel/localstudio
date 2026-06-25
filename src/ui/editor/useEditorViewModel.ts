@@ -137,7 +137,8 @@ export function useEditorViewModel(services: AppServices) {
   const [project, setProject] = useState<ProjectDocument>(initialProject);
   const [activeTab, setActiveTab] = useState<RightPanelTab>('layout');
   const [modelStates, setModelStates] = useState<ModelState[]>([]);
-  const [hasLoadedProject, setHasLoadedProject] = useState(false);
+  const [hasLoadedProject, setHasLoadedProject] = useState(true);
+  const [persistenceEnabled, setPersistenceEnabled] = useState(false);
   const [activePageId, setActivePageId] = useState(initialProject.pages[0]?.id ?? '');
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>(['image-hero']);
   const [history, setHistory] = useState<EditorHistory>({ past: [], future: [] });
@@ -154,6 +155,8 @@ export function useEditorViewModel(services: AppServices) {
   useEffect(() => {
     let isMounted = true;
 
+    if (!persistenceEnabled) return;
+
     void services.projectRepository.loadProject().then((savedProject) => {
       if (!isMounted) return;
       if (savedProject) {
@@ -168,12 +171,12 @@ export function useEditorViewModel(services: AppServices) {
     return () => {
       isMounted = false;
     };
-  }, [services.projectRepository]);
+  }, [persistenceEnabled, services.projectRepository]);
 
   useEffect(() => {
-    if (!hasLoadedProject) return;
+    if (!hasLoadedProject || !persistenceEnabled) return;
     void services.projectRepository.saveProject(project);
-  }, [hasLoadedProject, project, services.projectRepository]);
+  }, [hasLoadedProject, persistenceEnabled, project, services.projectRepository]);
 
   async function downloadRequiredModels() {
     const next = await services.modelSetupService.downloadRequiredModels();
@@ -209,6 +212,23 @@ export function useEditorViewModel(services: AppServices) {
 
   function selectElement(elementId: string) {
     setSelectedElementIds([elementId]);
+  }
+
+  function setProjectName(name: string) {
+    const nextName = name.trim();
+    if (!nextName) return;
+    commitProject((currentProject) => ({
+      ...currentProject,
+      name: nextName,
+      updatedAt: new Date().toISOString(),
+    }));
+  }
+
+  function setPersistence(nextEnabled: boolean) {
+    setPersistenceEnabled(nextEnabled);
+    if (nextEnabled) {
+      void services.projectRepository.saveProject(project);
+    }
   }
 
   function selectPage(pageId: string) {
@@ -407,12 +427,15 @@ export function useEditorViewModel(services: AppServices) {
     project,
     activePageId,
     zoomPercent,
+    persistenceEnabled,
     canUndo: history.past.length > 0,
     canRedo: history.future.length > 0,
     selection,
     activeTab,
     setActiveTab,
     modelStates,
+    setProjectName,
+    setPersistence,
     downloadRequiredModels,
     selectElement,
     selectPage,

@@ -30,9 +30,39 @@ describe('TopToolbar', () => {
     expect(onSelectLayers).toHaveBeenCalledTimes(1);
   });
 
-  it('shows persistence as disabled by default near editing actions', () => {
-    render(<TopToolbar project={createSampleProject()} language="PT-BR" />);
+  it('toggles persistence from the toolbar status icon', async () => {
+    const user = userEvent.setup();
+    const onPersistenceToggle = vi.fn();
 
-    expect(screen.getByRole('button', { name: 'Persistence disabled' })).toBeDisabled();
+    render(
+      <TopToolbar
+        project={createSampleProject()}
+        language="PT-BR"
+        onPersistenceToggle={onPersistenceToggle}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+
+    expect(onPersistenceToggle).toHaveBeenCalledWith(true);
+  });
+
+  it('edits the project name inline', async () => {
+    const user = userEvent.setup();
+    const onProjectNameChange = vi.fn();
+
+    render(
+      <TopToolbar
+        project={createSampleProject()}
+        language="PT-BR"
+        onProjectNameChange={onProjectNameChange}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Edit project name Untitled AI Deck' }));
+    await user.clear(screen.getByRole('textbox', { name: 'Project name' }));
+    await user.type(screen.getByRole('textbox', { name: 'Project name' }), 'Demo Deck{Enter}');
+
+    expect(onProjectNameChange).toHaveBeenCalledWith('Demo Deck');
   });
 });
