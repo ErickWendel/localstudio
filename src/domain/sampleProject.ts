@@ -9,6 +9,29 @@ export const SAMPLE_HERO_IMAGE_SIZE = {
   height: 735,
 };
 
+export function createBlankProject(): ProjectDocument {
+  const now = new Date('2026-06-24T00:00:00.000Z').toISOString();
+
+  return {
+    id: `project-${Date.now().toString(36)}`,
+    name: 'Untitled Project',
+    createdAt: now,
+    updatedAt: now,
+    assets: {},
+    pages: [
+      {
+        id: 'page-1',
+        name: 'Slide 1',
+        width: 1920,
+        height: 1080,
+        background: { type: 'color', color: '#050D10' },
+        elementIds: [],
+      },
+    ],
+    elements: {},
+  };
+}
+
 export function createSampleProject(): ProjectDocument {
   const now = new Date('2026-06-24T00:00:00.000Z').toISOString();
 

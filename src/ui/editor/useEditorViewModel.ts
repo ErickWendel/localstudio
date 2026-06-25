@@ -183,7 +183,9 @@ export function useEditorViewModel(services: AppServices) {
   const [activeTab, setActiveTab] = useState<RightPanelTab>('layout');
   const [modelStates, setModelStates] = useState<ModelState[]>([]);
   const [hasLoadedProject, setHasLoadedProject] = useState(true);
-  const [persistenceEnabled, setPersistenceEnabled] = useState(readPersistencePreference);
+  const [persistenceEnabled, setPersistenceEnabled] = useState(() =>
+    services.skipStoredProjectLoad ? false : readPersistencePreference(),
+  );
   const [activePageId, setActivePageId] = useState(initialProject.pages[0]?.id ?? '');
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>(['image-hero']);
   const [history, setHistory] = useState<EditorHistory>({ past: [], future: [] });

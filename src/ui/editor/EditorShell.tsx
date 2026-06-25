@@ -51,6 +51,12 @@ export function EditorShell({ services }: EditorShellProps) {
     );
   }
 
+  function openBlankProjectInNewTab() {
+    const url = new URL(window.location.href);
+    url.searchParams.set('newProject', '1');
+    window.open(url.toString(), '_blank', 'noopener,noreferrer');
+  }
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       const isUndoShortcut =
@@ -125,6 +131,7 @@ export function EditorShell({ services }: EditorShellProps) {
         onImportProject={() => {
           void vm.importProject();
         }}
+        onNewProject={openBlankProjectInNewTab}
         onPersistenceToggle={(enabled) => {
           void vm.setPersistence(enabled);
         }}

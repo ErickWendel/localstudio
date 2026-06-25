@@ -1,5 +1,8 @@
 import { createSampleProject } from '../../../src/domain/sampleProject';
-import { BrowserFileSystemProjectRepository } from '../../../src/services/browserFileSystemProjectRepository';
+import {
+  BrowserFileSystemProjectRepository,
+  type RecentProjectHandleStore,
+} from '../../../src/services/browserFileSystemProjectRepository';
 
 class MockWritable {
   constructor(private readonly onClose: (value: string) => void) {}
@@ -66,11 +69,25 @@ class MockDirectoryHandle {
   }
 }
 
+class MemoryRecentProjectHandleStore implements RecentProjectHandleStore {
+  handle: FileSystemDirectoryHandle | null = null;
+
+  load(): Promise<FileSystemDirectoryHandle | null> {
+    return Promise.resolve(this.handle);
+  }
+
+  save(handle: FileSystemDirectoryHandle): Promise<void> {
+    this.handle = handle;
+    return Promise.resolve();
+  }
+}
+
 describe('BrowserFileSystemProjectRepository', () => {
   it('creates the project folder structure and writes project metadata', async () => {
     const directory = new MockDirectoryHandle();
     const repository = new BrowserFileSystemProjectRepository({
       pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
     });
     const project = createSampleProject();
 
@@ -93,6 +110,7 @@ describe('BrowserFileSystemProjectRepository', () => {
     const directory = new MockDirectoryHandle();
     const repository = new BrowserFileSystemProjectRepository({
       pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
     });
     const project = createSampleProject();
 
@@ -109,11 +127,30 @@ describe('BrowserFileSystemProjectRepository', () => {
     directory.files.set('project.json', JSON.stringify({ ...project, name: 'Imported Project' }));
     const repository = new BrowserFileSystemProjectRepository({
       pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
     });
 
     const importedProject = await repository.importProject();
 
     expect(importedProject?.name).toBe('Imported Project');
     expect(directory.directories.size).toBe(0);
+  });
+
+  it('reopens the last project folder from the recent handle store', async () => {
+    const directory = new MockDirectoryHandle();
+    const recentProjectStore = new MemoryRecentProjectHandleStore();
+    const project = createSampleProject();
+    const firstRepository = new BrowserFileSystemProjectRepository({
+      pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
+      recentProjectStore,
+    });
+
+    await firstRepository.saveProject(project);
+    const secondRepository = new BrowserFileSystemProjectRepository({ recentProjectStore });
+
+    const loaded = await secondRepository.loadProject();
+
+    expect(loaded?.id).toBe(project.id);
+    expect(loaded?.name).toBe(project.name);
   });
 });

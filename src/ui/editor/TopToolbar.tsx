@@ -13,6 +13,7 @@ interface TopToolbarProps {
   onDuplicate?: () => void;
   onExport?: () => void;
   onImportProject?: () => void;
+  onNewProject?: () => void;
   onPersistenceToggle?: (enabled: boolean) => void;
   onProjectNameChange?: (name: string) => void;
   onRedo?: () => void;
@@ -45,6 +46,7 @@ export function TopToolbar({
   onDuplicate,
   onExport,
   onImportProject,
+  onNewProject,
   onPersistenceToggle,
   onProjectNameChange,
   onRedo,
@@ -89,7 +91,7 @@ export function TopToolbar({
 
   const menuActions: Record<HeaderMenu, HeaderMenuAction[]> = {
     File: [
-      { label: 'New Project', disabled: true },
+      { label: 'New Project', disabled: !onNewProject, onSelect: onNewProject },
       { label: 'Import Project', disabled: !onImportProject, onSelect: onImportProject },
       { label: 'Save Local', onSelect: () => onPersistenceToggle?.(true) },
       { label: 'Export', onSelect: triggerExport },

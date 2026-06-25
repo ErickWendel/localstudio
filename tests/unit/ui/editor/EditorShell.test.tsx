@@ -153,6 +153,21 @@ describe('EditorShell', () => {
     expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
   });
 
+  it('opens a blank project in a new tab from the File menu', async () => {
+    const user = userEvent.setup();
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'New Project' }));
+
+    expect(openSpy).toHaveBeenCalledTimes(1);
+    expect(openSpy.mock.calls[0]?.[0]).toContain('newProject=1');
+    expect(openSpy.mock.calls[0]?.[1]).toBe('_blank');
+    expect(openSpy.mock.calls[0]?.[2]).toContain('noopener');
+    openSpy.mockRestore();
+  });
+
   it('restores enabled persistence after remounting', async () => {
     const user = userEvent.setup();
     const { unmount } = render(<EditorShell services={createAppServices()} />);

@@ -24,6 +24,7 @@ import { BrowserModelSetupService } from '../services/modelSetupService';
 
 export interface AppServices {
   initialProject: ProjectDocument;
+  skipStoredProjectLoad: boolean;
   projectRepository: ProjectRepository;
   exportService: ExportService;
   modelSetupService: ModelSetupService;
@@ -34,9 +35,15 @@ export interface AppServices {
   magicEraserService: MagicEraserService;
 }
 
-export function createAppServices(): AppServices {
+interface CreateAppServicesOptions {
+  initialProject?: ProjectDocument;
+  skipStoredProjectLoad?: boolean;
+}
+
+export function createAppServices(options: CreateAppServicesOptions = {}): AppServices {
   return {
-    initialProject: createSampleProject(),
+    initialProject: options.initialProject ?? createSampleProject(),
+    skipStoredProjectLoad: options.skipStoredProjectLoad ?? false,
     projectRepository: createProjectRepository(),
     exportService: new BrowserExportService(),
     modelSetupService: new BrowserModelSetupService(),

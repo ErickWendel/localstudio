@@ -9,6 +9,7 @@ describe('TopToolbar', () => {
     const user = userEvent.setup();
     const onExport = vi.fn();
     const onImportProject = vi.fn();
+    const onNewProject = vi.fn();
     const onPersistenceToggle = vi.fn();
     const onSelectLayers = vi.fn();
 
@@ -18,13 +19,16 @@ describe('TopToolbar', () => {
         language="PT-BR"
         onExport={onExport}
         onImportProject={onImportProject}
+        onNewProject={onNewProject}
         onPersistenceToggle={onPersistenceToggle}
         onSelectLayers={onSelectLayers}
       />,
     );
 
     await user.click(screen.getByRole('button', { name: 'File' }));
-    expect(screen.getByRole('menuitem', { name: 'New Project' })).toBeDisabled();
+    await user.click(screen.getByRole('menuitem', { name: 'New Project' }));
+    expect(onNewProject).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'File' }));
     await user.click(screen.getByRole('menuitem', { name: 'Import Project' }));
     expect(onImportProject).toHaveBeenCalledTimes(1);
     await user.click(screen.getByRole('button', { name: 'File' }));

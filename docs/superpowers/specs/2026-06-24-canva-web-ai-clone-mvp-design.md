@@ -376,7 +376,7 @@ Project folder/package contents:
 
 Browser storage remains allowed only for lightweight app state:
 
-- Recent project handles or reopen metadata.
+- Recent project handles or reopen metadata. Because File System Access handles cannot be serialized into `localStorage`, the app stores a lightweight `localStorage` marker and stores the actual last project directory handle in browser-managed structured storage.
 - User preferences that are not project-specific.
 - Provider/model readiness metadata.
 - Permission and setup timestamps.
@@ -385,7 +385,7 @@ AI model weights and provider runtime caches are not copied into project folders
 
 The app should autosave document changes to the active project folder after the user grants access. Failed persistence must not corrupt the active in-memory document or the last good on-disk project state. Writes should use an atomic or staged strategy where practical, such as writing a temporary file and replacing the target after successful serialization.
 
-The persistence status icon is the primary save-to-disk entry point. When users click it while persistence is disabled, LocalStudio.ai requests a project folder and enables autosave only after the initial write succeeds. The File menu exposes the same save action as `Save Local` and exposes `Import Project` for selecting an existing project folder whose `project.json` should replace the current in-memory project.
+The persistence status icon is the primary save-to-disk entry point. When users click it while persistence is disabled, LocalStudio.ai requests a project folder and enables autosave only after the initial write succeeds. The File menu exposes the same save action as `Save Local` and exposes `Import Project` for selecting an existing project folder whose `project.json` should replace the current in-memory project. After a project folder is saved or imported, LocalStudio.ai remembers it locally and attempts to reopen its `project.json` on page restart.
 
 If the File System Access API is unavailable or the user denies folder/file permissions, the MVP should show a blocking unsupported-browser or permission-required state instead of silently falling back to large IndexedDB project storage. Future non-Chrome fallbacks may use import/export project packages, but that is outside the MVP.
 

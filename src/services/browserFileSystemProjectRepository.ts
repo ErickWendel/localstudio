@@ -3,6 +3,12 @@ import type { ProjectRepository } from './interfaces';
 
 interface FileSystemProjectRepositoryOptions {
   pickDirectory?: () => Promise<FileSystemDirectoryHandle>;
+  recentProjectStore?: RecentProjectHandleStore;
+}
+
+export interface RecentProjectHandleStore {
+  load(): Promise<FileSystemDirectoryHandle | null>;
+  save(handle: FileSystemDirectoryHandle): Promise<void>;
 }
 
 type PermissionCapableDirectoryHandle = FileSystemDirectoryHandle & {
@@ -20,16 +26,23 @@ const PROJECT_CONFIG_FILE_NAME = 'localstudio.json';
 
 export class BrowserFileSystemProjectRepository implements ProjectRepository {
   private directoryHandle: FileSystemDirectoryHandle | null = null;
+  private readonly recentProjectStore: RecentProjectHandleStore;
 
-  constructor(private readonly options: FileSystemProjectRepositoryOptions = {}) {}
+  constructor(private readonly options: FileSystemProjectRepositoryOptions = {}) {
+    this.recentProjectStore = options.recentProjectStore ?? new BrowserRecentProjectHandleStore();
+  }
 
   async importProject(): Promise<ProjectDocument | null> {
     const pickDirectory = this.options.pickDirectory ?? getBrowserDirectoryPicker();
     this.directoryHandle = await pickDirectory();
+    await this.recentProjectStore.save(this.directoryHandle);
     return this.loadProject();
   }
 
   async loadProject(): Promise<ProjectDocument | null> {
+    if (!this.directoryHandle) {
+      this.directoryHandle = await this.recentProjectStore.load();
+    }
     if (!this.directoryHandle) return null;
     await this.ensureReadWritePermission(this.directoryHandle);
 
@@ -65,6 +78,7 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     if (!this.directoryHandle) {
       const pickDirectory = this.options.pickDirectory ?? getBrowserDirectoryPicker();
       this.directoryHandle = await pickDirectory();
+      await this.recentProjectStore.save(this.directoryHandle);
     }
     const directoryHandle = this.directoryHandle;
     await this.ensureReadWritePermission(directoryHandle);
@@ -99,6 +113,71 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     const writable = await fileHandle.createWritable();
     await writable.write(value);
     await writable.close();
+  }
+}
+
+class BrowserRecentProjectHandleStore implements RecentProjectHandleStore {
+  private readonly databaseName = 'localstudio-ai-recent-projects';
+  private readonly objectStoreName = 'handles';
+  private readonly handleKey = 'last-project-directory';
+  private readonly localStorageKey = 'localstudio.ai.last-project.available';
+
+  async load(): Promise<FileSystemDirectoryHandle | null> {
+    if (typeof window === 'undefined') return null;
+    if (window.localStorage.getItem(this.localStorageKey) !== 'true') return null;
+    const database = await this.openDatabase();
+    return (await this.getValue<FileSystemDirectoryHandle>(database, this.handleKey)) ?? null;
+  }
+
+  async save(handle: FileSystemDirectoryHandle): Promise<void> {
+    if (typeof window === 'undefined') return;
+    const database = await this.openDatabase();
+    await this.putValue(database, this.handleKey, handle);
+    window.localStorage.setItem(this.localStorageKey, 'true');
+  }
+
+  private openDatabase() {
+    return new Promise<IDBDatabase>((resolve, reject) => {
+      const request = window.indexedDB.open(this.databaseName, 1);
+      request.onupgradeneeded = () => {
+        request.result.createObjectStore(this.objectStoreName);
+      };
+      request.onerror = () => {
+        reject(request.error ?? new Error('Could not open recent project storage.'));
+      };
+      request.onsuccess = () => {
+        resolve(request.result);
+      };
+    });
+  }
+
+  private getValue<T>(database: IDBDatabase, key: string) {
+    return new Promise<T | undefined>((resolve, reject) => {
+      const transaction = database.transaction(this.objectStoreName, 'readonly');
+      const request = transaction.objectStore(this.objectStoreName).get(key);
+      request.onerror = () => {
+        reject(request.error ?? new Error('Could not read recent project handle.'));
+      };
+      request.onsuccess = () => {
+        resolve(request.result as T | undefined);
+      };
+    });
+  }
+
+  private putValue(database: IDBDatabase, key: string, value: unknown) {
+    return new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(this.objectStoreName, 'readwrite');
+      const request = transaction.objectStore(this.objectStoreName).put(value, key);
+      request.onerror = () => {
+        reject(request.error ?? new Error('Could not save recent project handle.'));
+      };
+      transaction.oncomplete = () => {
+        resolve();
+      };
+      transaction.onerror = () => {
+        reject(transaction.error ?? new Error('Could not commit recent project handle.'));
+      };
+    });
   }
 }
 
