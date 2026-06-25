@@ -13,6 +13,7 @@ interface RightPanelProps {
   modelStates: ModelState[];
   attentionModelId?: string | undefined;
   onDownloadRequiredModels?: () => Promise<void>;
+  onDownloadModel?: (id: string) => Promise<void>;
   project: ProjectDocument;
   activePageId: string;
   selection: SelectionState;
@@ -35,6 +36,7 @@ export function RightPanel({
   modelStates,
   attentionModelId,
   onDownloadRequiredModels,
+  onDownloadModel,
   project,
   activePageId,
   selection,
@@ -53,6 +55,7 @@ export function RightPanel({
             modelStates={modelStates}
             attentionModelId={attentionModelId}
             onDownloadRequiredModels={onDownloadRequiredModels}
+            onDownloadModel={onDownloadModel}
           />
         ) : null}
         {activeTab === 'layout' ? (

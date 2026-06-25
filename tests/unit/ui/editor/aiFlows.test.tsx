@@ -1,12 +1,15 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createAppServices } from '../../../../src/app/composition';
+import { InMemoryModelSetupService } from '../../../../src/services/modelSetupService';
 import { EditorShell } from '../../../../src/ui/editor/EditorShell';
 
 describe('mocked AI flows', () => {
   it('downloads required models from AI Tools panel', async () => {
     const user = userEvent.setup();
-    render(<EditorShell services={createAppServices()} />);
+    const services = createAppServices();
+    services.modelSetupService = new InMemoryModelSetupService();
+    render(<EditorShell services={services} />);
 
     await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
     await user.click(screen.getByRole('button', { name: 'Download Required Models' }));

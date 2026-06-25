@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AppServices } from '../../app/composition';
 import {
   AddImageElementCommand,
@@ -19,6 +19,7 @@ import { fitImageWithinPage } from '../../domain/imageSizing';
 import type { Page, ProjectDocument, SelectionState } from '../../domain/model';
 import { SAMPLE_HERO_IMAGE_SIZE, SAMPLE_HERO_IMAGE_URL } from '../../domain/sampleProject';
 import type { ModelState } from '../../services/interfaces';
+import { IMAGE_EDITING_MODEL_ID } from '../../services/modelSetupService';
 
 export type RightPanelTab = 'layout' | 'design' | 'ai-tools';
 
@@ -27,7 +28,28 @@ interface EditorHistory {
   future: ProjectDocument[];
 }
 
+interface BackgroundPreviewState {
+  elementId: string;
+  maskUrl?: string;
+  pending: boolean;
+  score?: number;
+}
+
+interface BackgroundPreparationState {
+  elementId: string;
+  progress: number;
+  status: 'preparing' | 'ready' | 'failed';
+}
+
+interface BackgroundSelectionPoint {
+  x: number;
+  y: number;
+  positive: boolean;
+}
+
 const PERSISTENCE_PREFERENCE_KEY = 'ew-canvas-ai.persistence-enabled';
+const IMAGE_EDITING_MODEL_REQUIRED_MESSAGE = 'You must download the image editing tools first.';
+const BACKGROUND_PREVIEW_DEBOUNCE_MS = 120;
 
 function readPersistencePreference() {
   if (typeof window === 'undefined') return false;
@@ -137,6 +159,22 @@ function createId(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}`;
 }
 
+function waitForNextPaint() {
+  if (typeof window === 'undefined') return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        resolve();
+      });
+    });
+  });
+}
+
+function getMinimumTextHeight(text: string, fontSize: number) {
+  const lineCount = Math.max(1, text.split('\n').length);
+  return Math.ceil(lineCount * fontSize * 1.08 + Math.max(12, fontSize * 0.18));
+}
+
 export function useEditorViewModel(services: AppServices) {
   const initialProject = useMemo(() => normalizeProjectDocument(services.initialProject), [
     services.initialProject,
@@ -151,6 +189,17 @@ export function useEditorViewModel(services: AppServices) {
   const [history, setHistory] = useState<EditorHistory>({ past: [], future: [] });
   const [zoomPercent, setZoomPercent] = useState(100);
   const [backgroundSelectionMode, setBackgroundSelectionMode] = useState(false);
+  const [backgroundSelectionNotice, setBackgroundSelectionNotice] = useState<string | undefined>();
+  const [processingElementIds, setProcessingElementIds] = useState<string[]>([]);
+  const [backgroundPreview, setBackgroundPreview] = useState<BackgroundPreviewState | undefined>();
+  const [backgroundPreparation, setBackgroundPreparation] = useState<BackgroundPreparationState | undefined>();
+  const [, setBackgroundSelectionPoints] = useState<Record<string, BackgroundSelectionPoint[]>>(
+    {},
+  );
+  const backgroundSelectionPointsRef = useRef<Record<string, BackgroundSelectionPoint[]>>({});
+  const backgroundPreviewTimeoutRef = useRef<number | undefined>(undefined);
+  const backgroundPreviewSequenceRef = useRef(0);
+  const backgroundPreparationSequenceRef = useRef(0);
   const selection = useMemo<SelectionState>(() => ({ pageId: activePageId, elementIds: selectedElementIds }), [
     activePageId,
     selectedElementIds,
@@ -186,9 +235,71 @@ export function useEditorViewModel(services: AppServices) {
     void services.projectRepository.saveProject(project);
   }, [hasLoadedProject, persistenceEnabled, project, services.projectRepository]);
 
+  useEffect(
+    () => () => {
+      if (backgroundPreviewTimeoutRef.current !== undefined) {
+        window.clearTimeout(backgroundPreviewTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
+  function clearBackgroundPreview() {
+    backgroundPreviewSequenceRef.current += 1;
+    if (backgroundPreviewTimeoutRef.current !== undefined) {
+      window.clearTimeout(backgroundPreviewTimeoutRef.current);
+      backgroundPreviewTimeoutRef.current = undefined;
+    }
+    setBackgroundPreview(undefined);
+  }
+
+  function clearBackgroundPreparation() {
+    backgroundPreparationSequenceRef.current += 1;
+    setBackgroundPreparation(undefined);
+  }
+
+  function clearBackgroundSelectionPoints(elementId?: string) {
+    if (!elementId) {
+      backgroundSelectionPointsRef.current = {};
+      setBackgroundSelectionPoints({});
+      return;
+    }
+    const { [elementId]: removed, ...remainingPoints } = backgroundSelectionPointsRef.current;
+    void removed;
+    backgroundSelectionPointsRef.current = remainingPoints;
+    setBackgroundSelectionPoints(remainingPoints);
+  }
+
+  function isBackgroundPreparationReady(elementId: string) {
+    return backgroundPreparation?.elementId === elementId && backgroundPreparation.status === 'ready';
+  }
+
   async function downloadRequiredModels() {
+    setModelStates((currentStates) =>
+      currentStates.map((state) =>
+        state.required && state.status !== 'ready' ? { ...state, status: 'downloading', progress: 10 } : state,
+      ),
+    );
     const next = await services.modelSetupService.downloadRequiredModels();
     setModelStates(next);
+    if (next.some((state) => state.id === IMAGE_EDITING_MODEL_ID && state.status === 'ready')) {
+      setBackgroundSelectionNotice(undefined);
+    }
+  }
+
+  async function downloadModel(id: string) {
+    setModelStates((currentStates) =>
+      currentStates.map((state) =>
+        state.id === id && state.status !== 'ready' ? { ...state, status: 'downloading', progress: 10 } : state,
+      ),
+    );
+    const next = await services.modelSetupService.downloadModel(id);
+    setModelStates((currentStates) =>
+      currentStates.map((state) => (state.id === id ? next : state)),
+    );
+    if (id === IMAGE_EDITING_MODEL_ID && next.status === 'ready') {
+      setBackgroundSelectionNotice(undefined);
+    }
   }
 
   function commitProject(
@@ -219,7 +330,12 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function selectElement(elementId: string) {
+    if (processingElementIds.includes(elementId)) return;
     setBackgroundSelectionMode(false);
+    setBackgroundSelectionNotice(undefined);
+    clearBackgroundPreview();
+    clearBackgroundPreparation();
+    clearBackgroundSelectionPoints();
     setSelectedElementIds([elementId]);
   }
 
@@ -247,17 +363,40 @@ export function useEditorViewModel(services: AppServices) {
     const page = project.pages.find((item) => item.id === pageId);
     if (!page) return;
     setBackgroundSelectionMode(false);
+    setBackgroundSelectionNotice(undefined);
+    clearBackgroundPreview();
+    clearBackgroundPreparation();
+    clearBackgroundSelectionPoints();
     setActivePageId(page.id);
     const nextSelectedId = page.elementIds.at(-1);
     setSelectedElementIds(nextSelectedId ? [nextSelectedId] : []);
   }
 
   function updateElementFrame(elementId: string, patch: ElementFramePatch) {
-    commitProject((currentProject) => new UpdateElementFrameCommand(elementId, patch).execute(currentProject));
+    commitProject((currentProject) => {
+      const element = currentProject.elements[elementId];
+      const nextPatch =
+        element?.type === 'text'
+          ? patch.height === undefined
+            ? patch
+            : {
+                ...patch,
+                height: Math.max(patch.height, getMinimumTextHeight(element.text, element.fontSize)),
+              }
+          : patch;
+      return new UpdateElementFrameCommand(elementId, nextPatch).execute(currentProject);
+    });
   }
 
   function updateTextContent(elementId: string, text: string) {
-    commitProject((currentProject) => new UpdateTextContentCommand(elementId, text).execute(currentProject));
+    commitProject((currentProject) => {
+      const nextProject = new UpdateTextContentCommand(elementId, text).execute(currentProject);
+      const element = nextProject.elements[elementId];
+      if (!element || element.type !== 'text') return nextProject;
+      const minimumHeight = getMinimumTextHeight(element.text, element.fontSize);
+      if (element.height >= minimumHeight) return nextProject;
+      return new UpdateElementFrameCommand(elementId, { height: minimumHeight }).execute(nextProject);
+    });
   }
 
   function setElementVisibility(elementId: string, visible: boolean) {
@@ -285,13 +424,19 @@ export function useEditorViewModel(services: AppServices) {
   function deleteSelectedElement() {
     const elementId = selectedElementIds[0];
     if (!elementId) return;
+    if (processingElementIds.includes(elementId)) return;
     setBackgroundSelectionMode(false);
+    setBackgroundSelectionNotice(undefined);
+    clearBackgroundPreview();
+    clearBackgroundPreparation();
+    clearBackgroundSelectionPoints(elementId);
     deleteElement(elementId);
   }
 
   function duplicateSelectedElement() {
     const elementId = selectedElementIds[0];
     if (!elementId) return;
+    if (processingElementIds.includes(elementId)) return;
     const nextElementId = createId(`${elementId}-copy`);
     commitProject(
       (currentProject) =>
@@ -397,23 +542,221 @@ export function useEditorViewModel(services: AppServices) {
   function toggleBackgroundSelectionMode() {
     const element = project.elements[selectedElementIds[0] ?? ''];
     if (element?.type !== 'image') return;
-    setBackgroundSelectionMode((current) => {
-      const nextEnabled = !current;
-      if (nextEnabled) setActiveTab('ai-tools');
-      return nextEnabled;
-    });
+    if (processingElementIds.includes(element.id)) return;
+    if (backgroundSelectionMode) {
+      setBackgroundSelectionMode(false);
+      setBackgroundSelectionNotice(undefined);
+      clearBackgroundPreview();
+      clearBackgroundPreparation();
+      clearBackgroundSelectionPoints(element.id);
+      return;
+    }
+
+    const imageEditingModel = modelStates.find((state) => state.id === IMAGE_EDITING_MODEL_ID);
+    if (imageEditingModel?.status !== 'ready') {
+      setActiveTab('ai-tools');
+      setBackgroundSelectionNotice(IMAGE_EDITING_MODEL_REQUIRED_MESSAGE);
+      return;
+    }
+
+    setBackgroundSelectionNotice(undefined);
+    setBackgroundSelectionMode(true);
+    clearBackgroundSelectionPoints(element.id);
+    prepareBackgroundSelection(element.id);
   }
 
   function cancelBackgroundSelectionMode() {
     setBackgroundSelectionMode(false);
+    setBackgroundSelectionNotice(undefined);
+    clearBackgroundPreview();
+    clearBackgroundPreparation();
+    clearBackgroundSelectionPoints();
+  }
+
+  function prepareBackgroundSelection(elementId: string) {
+    const element = project.elements[elementId];
+    if (!element || element.type !== 'image') return;
+    const asset = project.assets[element.assetId];
+    if (!asset) return;
+
+    const sequence = backgroundPreparationSequenceRef.current + 1;
+    backgroundPreparationSequenceRef.current = sequence;
+    setBackgroundPreparation({ elementId, progress: 4, status: 'preparing' });
+
+    void (async () => {
+      try {
+        await services.backgroundRemovalService.prepareBackgroundRemoval(asset, {
+          onProgress: (progress) => {
+            if (backgroundPreparationSequenceRef.current !== sequence) return;
+            setBackgroundPreparation({
+              elementId,
+              progress: Math.max(4, Math.min(100, Math.round(progress))),
+              status: progress >= 100 ? 'ready' : 'preparing',
+            });
+          },
+        });
+        if (backgroundPreparationSequenceRef.current !== sequence) return;
+        setBackgroundPreparation({ elementId, progress: 100, status: 'ready' });
+      } catch {
+        if (backgroundPreparationSequenceRef.current !== sequence) return;
+        setBackgroundPreparation({ elementId, progress: 0, status: 'failed' });
+      }
+    })();
+  }
+
+  function getBackgroundSelectionPointSet(
+    elementId: string,
+    point: { x: number; y: number },
+    positive: boolean,
+  ) {
+    return [...(backgroundSelectionPointsRef.current[elementId] ?? []), { ...point, positive }];
+  }
+
+  function setBackgroundSelectionPointSet(elementId: string, points: BackgroundSelectionPoint[]) {
+    backgroundSelectionPointsRef.current = {
+      ...backgroundSelectionPointsRef.current,
+      [elementId]: points,
+    };
+    setBackgroundSelectionPoints(backgroundSelectionPointsRef.current);
+  }
+
+  function previewBackgroundSubject(elementId: string, subjectPoint: { x: number; y: number }) {
+    if (!backgroundSelectionMode || processingElementIds.includes(elementId)) return;
+    if (!isBackgroundPreparationReady(elementId)) return;
+    const element = project.elements[elementId];
+    if (!element || element.type !== 'image') return;
+    const asset = project.assets[element.assetId];
+    if (!asset) return;
+
+    const sequence = backgroundPreviewSequenceRef.current + 1;
+    backgroundPreviewSequenceRef.current = sequence;
+    if (backgroundPreviewTimeoutRef.current !== undefined) {
+      window.clearTimeout(backgroundPreviewTimeoutRef.current);
+    }
+    const points = getBackgroundSelectionPointSet(elementId, subjectPoint, true);
+    setBackgroundPreview((currentPreview) => {
+      const shouldKeepCurrentPreview = currentPreview?.elementId === elementId;
+      return {
+        elementId,
+        pending: true,
+        ...(shouldKeepCurrentPreview && currentPreview.maskUrl ? { maskUrl: currentPreview.maskUrl } : {}),
+        ...(shouldKeepCurrentPreview && currentPreview.score !== undefined ? { score: currentPreview.score } : {}),
+      };
+    });
+
+    backgroundPreviewTimeoutRef.current = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const result = await services.backgroundRemovalService.previewBackgroundMask(asset, { points });
+          if (backgroundPreviewSequenceRef.current !== sequence) return;
+          setBackgroundPreview({
+            elementId,
+            maskUrl: result.maskUrl,
+            pending: false,
+            score: result.score,
+          });
+        } catch {
+          if (backgroundPreviewSequenceRef.current !== sequence) return;
+          setBackgroundPreview((currentPreview) =>
+            currentPreview?.elementId === elementId ? { ...currentPreview, pending: false } : currentPreview,
+          );
+        }
+      })();
+    }, BACKGROUND_PREVIEW_DEBOUNCE_MS);
+  }
+
+  function refineBackgroundSubject(elementId: string, subjectPoint: { x: number; y: number }) {
+    if (!backgroundSelectionMode || processingElementIds.includes(elementId)) return;
+    if (!isBackgroundPreparationReady(elementId)) return;
+    const element = project.elements[elementId];
+    if (!element || element.type !== 'image') return;
+    const asset = project.assets[element.assetId];
+    if (!asset) return;
+    const points = getBackgroundSelectionPointSet(elementId, subjectPoint, true);
+    setBackgroundSelectionPointSet(elementId, points);
+    const sequence = backgroundPreviewSequenceRef.current + 1;
+    backgroundPreviewSequenceRef.current = sequence;
+    if (backgroundPreviewTimeoutRef.current !== undefined) {
+      window.clearTimeout(backgroundPreviewTimeoutRef.current);
+      backgroundPreviewTimeoutRef.current = undefined;
+    }
+    setBackgroundPreview((currentPreview) => {
+      const shouldKeepCurrentPreview = currentPreview?.elementId === elementId;
+      return {
+        elementId,
+        pending: true,
+        ...(shouldKeepCurrentPreview && currentPreview.maskUrl ? { maskUrl: currentPreview.maskUrl } : {}),
+        ...(shouldKeepCurrentPreview && currentPreview.score !== undefined ? { score: currentPreview.score } : {}),
+      };
+    });
+
+    void (async () => {
+      try {
+        const result = await services.backgroundRemovalService.previewBackgroundMask(asset, { points });
+        if (backgroundPreviewSequenceRef.current !== sequence) return;
+        setBackgroundPreview({
+          elementId,
+          maskUrl: result.maskUrl,
+          pending: false,
+          score: result.score,
+        });
+      } catch {
+        if (backgroundPreviewSequenceRef.current !== sequence) return;
+        setBackgroundPreview({ elementId, pending: false });
+      }
+    })();
   }
 
   async function pickBackgroundSubject(elementId: string, subjectPoint: { x: number; y: number }) {
+    if (processingElementIds.includes(elementId)) return;
+    if (!isBackgroundPreparationReady(elementId)) return;
     const element = project.elements[elementId];
     if (!element || element.type !== 'image') return;
+    const asset = project.assets[element.assetId];
+    if (!asset) return;
 
-    await services.backgroundRemovalService.removeBackground(element.assetId, { subjectPoint });
     setBackgroundSelectionMode(false);
+    setBackgroundSelectionNotice(undefined);
+    clearBackgroundPreview();
+    clearBackgroundPreparation();
+    const points = getBackgroundSelectionPointSet(elementId, subjectPoint, true);
+    clearBackgroundSelectionPoints(elementId);
+    setProcessingElementIds((currentIds) =>
+      currentIds.includes(elementId) ? currentIds : [...currentIds, elementId],
+    );
+    await waitForNextPaint();
+
+    try {
+      const result = await services.backgroundRemovalService.removeBackground(asset, { points });
+      commitProject(
+        (currentProject) => ({
+          ...currentProject,
+          assets: {
+            ...currentProject.assets,
+            [result.asset.id]: result.asset,
+          },
+          elements: {
+            ...currentProject.elements,
+            [elementId]: {
+              ...element,
+              assetId: result.asset.id,
+              ...(result.bounds
+                ? {
+                    x: element.x + element.width * result.bounds.x,
+                    y: element.y + element.height * result.bounds.y,
+                    width: Math.max(1, element.width * result.bounds.width),
+                    height: Math.max(1, element.height * result.bounds.height),
+                  }
+                : {}),
+            },
+          },
+          updatedAt: new Date().toISOString(),
+        }),
+        { selectedElementIds: [elementId] },
+      );
+    } finally {
+      setProcessingElementIds((currentIds) => currentIds.filter((id) => id !== elementId));
+    }
   }
 
   async function importImageFile(file: File) {
@@ -424,6 +767,7 @@ export function useEditorViewModel(services: AppServices) {
 
     const assetId = createId('asset');
     const elementId = createId('image');
+    const imageName = file.name.trim() || 'Pasted image';
     const fittedImage = fitImageWithinPage({
       imageWidth: imageSize.width,
       imageHeight: imageSize.height,
@@ -437,7 +781,7 @@ export function useEditorViewModel(services: AppServices) {
         asset: {
           id: assetId,
           type: 'image',
-          name: file.name,
+          name: imageName,
           mimeType: file.type || 'image/*',
           objectUrl: dataUrl,
         },
@@ -465,6 +809,10 @@ export function useEditorViewModel(services: AppServices) {
     zoomPercent,
     persistenceEnabled,
     backgroundSelectionMode,
+    backgroundSelectionNotice,
+    processingElementIds,
+    backgroundPreview,
+    backgroundPreparation,
     canUndo: history.past.length > 0,
     canRedo: history.future.length > 0,
     selection,
@@ -474,6 +822,7 @@ export function useEditorViewModel(services: AppServices) {
     setProjectName,
     setPersistence,
     downloadRequiredModels,
+    downloadModel,
     selectElement,
     selectPage,
     addPage,
@@ -484,6 +833,8 @@ export function useEditorViewModel(services: AppServices) {
     resetZoom,
     toggleBackgroundSelectionMode,
     cancelBackgroundSelectionMode,
+    previewBackgroundSubject,
+    refineBackgroundSubject,
     pickBackgroundSubject,
     deleteSelectedElement,
     duplicateSelectedElement,

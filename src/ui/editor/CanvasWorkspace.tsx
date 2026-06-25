@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import type Konva from 'konva';
-import { Image as KonvaImage, Layer, Rect, Stage, Text, Transformer } from 'react-konva';
+import { Circle, Image as KonvaImage, Layer, Rect, Stage, Text, Transformer } from 'react-konva';
 import type { ElementFramePatch } from '../../domain/commands/basicCommands';
 import type { DesignElement, ProjectDocument, SelectionState } from '../../domain/model';
 import { getNormalizedElementPoint } from './backgroundSelection';
 import { FloatingSelectionToolbar } from './FloatingSelectionToolbar';
+
+const TEXT_FRAME_PADDING = 6;
 
 interface CanvasWorkspaceProps {
   project: ProjectDocument;
@@ -13,8 +15,16 @@ interface CanvasWorkspaceProps {
   stageRef?: RefObject<Konva.Stage | null>;
   zoomPercent?: number;
   backgroundSelectionMode?: boolean;
+  backgroundSelectionNotice?: string | undefined;
+  processingElementIds?: string[];
+  backgroundPreview?: { elementId: string; maskUrl?: string; pending: boolean; score?: number } | undefined;
+  backgroundPreparation?:
+    | { elementId: string; progress: number; status: 'preparing' | 'ready' | 'failed' }
+    | undefined;
   onAlignSelectedElement?: () => void;
   onBringSelectedElementForward?: () => void;
+  onBackgroundPreviewPoint?: (elementId: string, point: { x: number; y: number }) => void;
+  onBackgroundRefinePoint?: (elementId: string, point: { x: number; y: number }) => void;
   onBackgroundSelectionToggle?: () => void;
   onBackgroundSubjectPick?: (elementId: string, point: { x: number; y: number }) => void;
   onCancelBackgroundSelection?: () => void;
@@ -36,11 +46,13 @@ interface CommonElementProps {
   x: number;
   y: number;
   onClick: (event: Konva.KonvaEventObject<MouseEvent>) => void;
+  onContextMenu: (event: Konva.KonvaEventObject<PointerEvent>) => void;
   onDblClick: () => void;
   onDblTap: () => void;
   onDragEnd: (event: Konva.KonvaEventObject<DragEvent>) => void;
   onMouseEnter: (event: Konva.KonvaEventObject<MouseEvent>) => void;
   onMouseLeave: (event: Konva.KonvaEventObject<MouseEvent>) => void;
+  onMouseMove: (event: Konva.KonvaEventObject<MouseEvent>) => void;
   onTap: () => void;
   onTransformEnd: (event: Konva.KonvaEventObject<Event>) => void;
 }
@@ -80,7 +92,13 @@ export function CanvasWorkspace({
   stageRef,
   zoomPercent = 100,
   backgroundSelectionMode = false,
+  backgroundSelectionNotice,
+  processingElementIds = [],
+  backgroundPreview,
+  backgroundPreparation,
   onAlignSelectedElement,
+  onBackgroundPreviewPoint,
+  onBackgroundRefinePoint,
   onBackgroundSelectionToggle,
   onBackgroundSubjectPick,
   onBringSelectedElementForward,
@@ -99,6 +117,8 @@ export function CanvasWorkspace({
   const [stageSize, setStageSize] = useState({ width: 768, height: 432 });
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [editingTextValue, setEditingTextValue] = useState('');
+  const [processingBlinkOn, setProcessingBlinkOn] = useState(false);
+  const [backgroundPreviewPoint, setBackgroundPreviewPoint] = useState<{ x: number; y: number } | null>(null);
   const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
   const visibleElements =
     page?.elementIds
@@ -109,6 +129,18 @@ export function CanvasWorkspace({
   const selectedElement = project.elements[selection.elementIds[0] ?? ''];
   const backgroundSelectionTargetId =
     backgroundSelectionMode && selectedElement?.type === 'image' ? selectedElement.id : undefined;
+  const activeBackgroundPreparation =
+    backgroundSelectionTargetId && backgroundPreparation?.elementId === backgroundSelectionTargetId
+      ? backgroundPreparation
+      : undefined;
+  const backgroundSelectionReady =
+    Boolean(backgroundSelectionTargetId) && activeBackgroundPreparation?.status === 'ready';
+  const hasProcessingElements = processingElementIds.length > 0;
+  const activeProcessingBlink = hasProcessingElements && processingBlinkOn;
+  const processingSelectedImageId =
+    selectedElement?.type === 'image' && processingElementIds.includes(selectedElement.id)
+      ? selectedElement.id
+      : undefined;
   const stageWidth = stageSize.width;
   const stageHeight = stageSize.height;
   const scaleX = page ? stageWidth / page.width : 1;
@@ -153,6 +185,24 @@ export function CanvasWorkspace({
     textInputRef.current?.focus();
     textInputRef.current?.select();
   }, [editingTextId]);
+
+  useEffect(() => {
+    if (backgroundSelectionMode || hasProcessingElements) return;
+    const stageContainer = stageRef?.current?.container();
+    if (stageContainer) stageContainer.style.cursor = '';
+  }, [backgroundSelectionMode, hasProcessingElements, stageRef]);
+
+  useEffect(() => {
+    if (!hasProcessingElements) return;
+
+    const intervalId = window.setInterval(() => {
+      setProcessingBlinkOn((current) => !current);
+    }, 420);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [hasProcessingElements]);
 
   function toDocumentX(value: number) {
     return value / scaleX;
@@ -206,27 +256,48 @@ export function CanvasWorkspace({
 
   function pickBackgroundSubject(element: DesignElement, event: Konva.KonvaEventObject<MouseEvent>) {
     if (element.id !== backgroundSelectionTargetId || element.type !== 'image') return;
+    if (!backgroundSelectionReady) return;
     const stage = event.target.getStage();
     const pointer = stage?.getPointerPosition();
     if (!pointer) return;
+    const normalizedPoint = getNormalizedElementPoint({
+      element,
+      pointer,
+      scale: { x: scaleX, y: scaleY },
+    });
 
-    onBackgroundSubjectPick?.(
-      element.id,
-      getNormalizedElementPoint({
-        element,
-        pointer,
-        scale: { x: scaleX, y: scaleY },
-      }),
-    );
+    if (event.evt.button === 2) {
+      event.evt.preventDefault();
+      onBackgroundRefinePoint?.(element.id, normalizedPoint);
+      return;
+    }
+
+    onBackgroundSubjectPick?.(element.id, normalizedPoint);
+  }
+
+  function getBackgroundPreviewPoint(element: DesignElement, event: Konva.KonvaEventObject<MouseEvent>) {
+    const stage = event.target.getStage();
+    const pointer = stage?.getPointerPosition();
+    if (!pointer) return null;
+    const normalizedPoint = getNormalizedElementPoint({
+      element,
+      pointer,
+      scale: { x: scaleX, y: scaleY },
+    });
+    return {
+      x: element.x * scaleX + normalizedPoint.x * element.width * scaleX,
+      y: element.y * scaleY + normalizedPoint.y * element.height * scaleY,
+    };
   }
 
   function getCommonElementProps(element: DesignElement): CommonElementProps {
     const isBackgroundSelectionTarget = element.id === backgroundSelectionTargetId;
+    const isProcessing = processingElementIds.includes(element.id);
 
     return {
-      draggable: !element.locked && !backgroundSelectionMode,
+      draggable: !element.locked && !backgroundSelectionMode && !isProcessing,
       height: element.height * scaleY,
-      opacity: element.opacity,
+      opacity: isProcessing && activeProcessingBlink ? 0.38 : element.opacity,
       ref: (node: Konva.Node | null) => {
         nodeRefs.current[element.id] = node;
       },
@@ -235,11 +306,17 @@ export function CanvasWorkspace({
       x: element.x * scaleX,
       y: element.y * scaleY,
       onClick: (event: Konva.KonvaEventObject<MouseEvent>) => {
+        if (isProcessing) return;
         if (backgroundSelectionMode) {
           pickBackgroundSubject(element, event);
           return;
         }
         onSelectElement?.(element.id);
+      },
+      onContextMenu: (event: Konva.KonvaEventObject<PointerEvent>) => {
+        event.evt.preventDefault();
+        if (isProcessing || !backgroundSelectionMode) return;
+        pickBackgroundSubject(element, event);
       },
       onDblClick: () => {
         startTextEditing(element);
@@ -251,16 +328,33 @@ export function CanvasWorkspace({
         handleDragEnd(element.id, event);
       },
       onMouseEnter: (event: Konva.KonvaEventObject<MouseEvent>) => {
-        if (!isBackgroundSelectionTarget) return;
+        if (!isBackgroundSelectionTarget && !isProcessing) return;
         const container = event.target.getStage()?.container();
-        if (container) container.style.cursor = 'pointer';
+        if (container) container.style.cursor = isProcessing ? 'progress' : 'crosshair';
       },
       onMouseLeave: (event: Konva.KonvaEventObject<MouseEvent>) => {
-        if (!isBackgroundSelectionTarget) return;
+        if (!isBackgroundSelectionTarget && !isProcessing) return;
+        if (isBackgroundSelectionTarget) setBackgroundPreviewPoint(null);
         const container = event.target.getStage()?.container();
         if (container) container.style.cursor = '';
       },
+      onMouseMove: (event: Konva.KonvaEventObject<MouseEvent>) => {
+        if (!isBackgroundSelectionTarget || !backgroundSelectionReady) return;
+        const nextPreviewPoint = getBackgroundPreviewPoint(element, event);
+        setBackgroundPreviewPoint(nextPreviewPoint);
+        if (nextPreviewPoint) {
+          onBackgroundPreviewPoint?.(
+            element.id,
+            getNormalizedElementPoint({
+              element,
+              pointer: nextPreviewPoint,
+              scale: { x: scaleX, y: scaleY },
+            }),
+          );
+        }
+      },
       onTap: () => {
+        if (isProcessing) return;
         onSelectElement?.(element.id);
       },
       onTransformEnd: (event: Konva.KonvaEventObject<Event>) => {
@@ -283,15 +377,37 @@ export function CanvasWorkspace({
         }}
       >
         <div className="canvas-artboard" ref={artboardRef} style={{ background: pageBackground }}>
-          {backgroundSelectionMode ? (
+          {backgroundSelectionMode || backgroundSelectionNotice || processingSelectedImageId ? (
             <div className="background-selection-hint" role="status">
               <span className="material-symbols-outlined" aria-hidden="true">
-                ads_click
+                {processingSelectedImageId ? 'auto_fix_high' : backgroundSelectionNotice ? 'download' : 'ads_click'}
               </span>
-              <span>Click the main object to keep. Everything else will be removed.</span>
-              <button type="button" onClick={onCancelBackgroundSelection}>
-                Esc
-              </button>
+              <span>
+                {getBackgroundSelectionMessage({
+                  backgroundPreparation: activeBackgroundPreparation,
+                  backgroundPreview,
+                  backgroundSelectionTargetId,
+                  backgroundSelectionNotice,
+                  processingSelectedImageId,
+                })}
+              </span>
+              {activeBackgroundPreparation?.status === 'preparing' ? (
+                <span
+                  aria-label="Image extraction progress"
+                  aria-valuemax={100}
+                  aria-valuemin={0}
+                  aria-valuenow={activeBackgroundPreparation.progress}
+                  className="background-selection-progress"
+                  role="progressbar"
+                >
+                  <span style={{ width: `${activeBackgroundPreparation.progress}%` }} />
+                </span>
+              ) : null}
+              {processingSelectedImageId ? null : (
+                <button type="button" onClick={onCancelBackgroundSelection}>
+                  Esc
+                </button>
+              )}
             </div>
           ) : null}
           <Stage ref={stageRef} height={stageHeight} width={stageWidth}>
@@ -332,51 +448,65 @@ export function CanvasWorkspace({
                     fill={element.fill}
                     align={element.align}
                     lineHeight={0.9}
+                    padding={TEXT_FRAME_PADDING * scaleY}
                     visible={editingTextId !== element.id}
                   />
                 );
               })}
               {backgroundSelectionTargetId && selectedElement?.type === 'image' ? (
-                <Rect
-                  dash={[8, 5]}
-                  height={selectedElement.height * scaleY}
-                  listening={false}
-                  opacity={1}
-                  rotation={selectedElement.rotation}
-                  shadowBlur={18}
-                  shadowColor="#37FD76"
-                  stroke="#37FD76"
-                  strokeWidth={2}
-                  width={selectedElement.width * scaleX}
-                  x={selectedElement.x * scaleX}
-                  y={selectedElement.y * scaleY}
-                />
+                <>
+                  <BackgroundSelectionPreview
+                    element={selectedElement}
+                    maskUrl={
+                      backgroundPreview?.elementId === selectedElement.id ? backgroundPreview.maskUrl : undefined
+                    }
+                    pending={backgroundPreview?.elementId === selectedElement.id && backgroundPreview.pending}
+                    point={backgroundPreviewPoint}
+                    scale={{ x: scaleX, y: scaleY }}
+                  />
+                  <Rect
+                    dash={[8, 5]}
+                    height={selectedElement.height * scaleY}
+                    listening={false}
+                    opacity={1}
+                    rotation={selectedElement.rotation}
+                    shadowBlur={18}
+                    shadowColor="#37FD76"
+                    stroke="#37FD76"
+                    strokeWidth={2}
+                    width={selectedElement.width * scaleX}
+                    x={selectedElement.x * scaleX}
+                    y={selectedElement.y * scaleY}
+                  />
+                </>
               ) : null}
-              <Transformer
-                ref={transformerRef}
-                anchorFill="#37FD76"
-                anchorSize={8}
-                anchorStroke="#0C160D"
-                borderDash={[6, 4]}
-                borderStroke="#37FD76"
-                ignoreStroke
-                resizeEnabled={!selectedElement?.locked}
-                rotateEnabled={!selectedElement?.locked}
-                enabledAnchors={[
-                  'top-left',
-                  'top-center',
-                  'top-right',
-                  'middle-left',
-                  'middle-right',
-                  'bottom-left',
-                  'bottom-center',
-                  'bottom-right',
-                ]}
-                boundBoxFunc={(oldBox, newBox) =>
-                  newBox.width < 8 || newBox.height < 8 ? oldBox : newBox
-                }
-                rotateAnchorOffset={28}
-              />
+              {backgroundSelectionMode || processingSelectedImageId ? null : (
+                <Transformer
+                  ref={transformerRef}
+                  anchorFill="#37FD76"
+                  anchorSize={8}
+                  anchorStroke="#0C160D"
+                  borderDash={[6, 4]}
+                  borderStroke="#37FD76"
+                  ignoreStroke
+                  resizeEnabled={!selectedElement?.locked}
+                  rotateEnabled={!selectedElement?.locked}
+                  enabledAnchors={[
+                    'top-left',
+                    'top-center',
+                    'top-right',
+                    'middle-left',
+                    'middle-right',
+                    'bottom-left',
+                    'bottom-center',
+                    'bottom-right',
+                  ]}
+                  boundBoxFunc={(oldBox, newBox) =>
+                    newBox.width < 8 || newBox.height < 8 ? oldBox : newBox
+                  }
+                  rotateAnchorOffset={28}
+                />
+              )}
             </Layer>
           </Stage>
           {visibleElements.map((element) => {
@@ -396,6 +526,7 @@ export function CanvasWorkspace({
                   fontWeight: element.fontWeight,
                   height: `${element.height * scaleY}px`,
                   left: `${element.x * scaleX}px`,
+                  padding: `${TEXT_FRAME_PADDING * scaleY}px`,
                   textAlign: element.align,
                   top: `${element.y * scaleY}px`,
                   transform: `rotate(${element.rotation}deg)`,
@@ -429,11 +560,89 @@ export function CanvasWorkspace({
             onBackgroundSelectionToggle={onBackgroundSelectionToggle}
             onSendBackward={onSendSelectedElementBackward}
             backgroundSelectionActive={backgroundSelectionMode}
+            disabled={Boolean(processingSelectedImageId)}
           />
         ) : null}
       </div>
     </div>
   );
+}
+
+interface BackgroundSelectionPreviewProps {
+  element: DesignElement;
+  maskUrl: string | undefined;
+  pending?: boolean;
+  point: { x: number; y: number } | null;
+  scale: { x: number; y: number };
+}
+
+function BackgroundSelectionPreview({ element, maskUrl, pending = false, point, scale }: BackgroundSelectionPreviewProps) {
+  const maskImage = useCanvasImage(maskUrl);
+  const x = element.x * scale.x;
+  const y = element.y * scale.y;
+  const width = element.width * scale.x;
+  const height = element.height * scale.y;
+
+  return (
+    <>
+      {maskImage ? (
+        <KonvaImage
+          listening={false}
+          image={maskImage}
+          opacity={pending ? 0.62 : 1}
+          rotation={element.rotation}
+          width={width}
+          height={height}
+          x={x}
+          y={y}
+        />
+      ) : null}
+      {point ? (
+        <Circle
+          listening={false}
+          radius={7}
+          shadowBlur={14}
+          shadowColor="#37FD76"
+          fill="#37FD76"
+          stroke="#001B0A"
+          strokeWidth={2}
+          x={point.x}
+          y={point.y}
+        />
+      ) : null}
+    </>
+  );
+}
+
+interface BackgroundSelectionMessageOptions {
+  backgroundPreparation:
+    | { elementId: string; progress: number; status: 'preparing' | 'ready' | 'failed' }
+    | undefined;
+  backgroundPreview: { elementId: string; maskUrl?: string; pending: boolean; score?: number } | undefined;
+  backgroundSelectionNotice: string | undefined;
+  backgroundSelectionTargetId: string | undefined;
+  processingSelectedImageId: string | undefined;
+}
+
+function getBackgroundSelectionMessage({
+  backgroundPreparation,
+  backgroundPreview,
+  backgroundSelectionNotice,
+  backgroundSelectionTargetId,
+  processingSelectedImageId,
+}: BackgroundSelectionMessageOptions) {
+  if (processingSelectedImageId) return 'Removing background...';
+  if (backgroundSelectionNotice) return backgroundSelectionNotice;
+  if (backgroundPreparation?.status === 'failed') return 'Image extraction failed. Try background removal again.';
+  if (backgroundPreparation?.status === 'preparing') return 'Extracting image embedding...';
+  const previewScore =
+    backgroundPreview && backgroundPreview.elementId === backgroundSelectionTargetId
+      ? backgroundPreview.score
+      : undefined;
+  if (previewScore !== undefined) {
+    return `Segment score: ${previewScore.toFixed(2)}`;
+  }
+  return 'Right click adds areas to keep. Left click applies the background removal.';
 }
 
 interface CanvasImageElementProps {

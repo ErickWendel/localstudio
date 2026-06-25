@@ -1,4 +1,4 @@
-import type { ProjectDocument } from '../domain/model';
+import type { Asset, ProjectDocument } from '../domain/model';
 
 export type ModelStatus = 'unavailable' | 'needs-download' | 'downloading' | 'ready' | 'failed';
 
@@ -39,10 +39,18 @@ export interface PaletteService {
 }
 
 export interface BackgroundRemovalService {
+  prepareBackgroundRemoval(
+    asset: Asset,
+    options?: { onProgress?: (progress: number) => void },
+  ): Promise<void>;
+  previewBackgroundMask(
+    asset: Asset,
+    options?: { points?: Array<{ x: number; y: number; positive: boolean }>; subjectPoint?: { x: number; y: number } },
+  ): Promise<{ maskUrl: string; score: number }>;
   removeBackground(
-    assetId: string,
-    options?: { subjectPoint?: { x: number; y: number } },
-  ): Promise<{ assetId: string }>;
+    asset: Asset,
+    options?: { points?: Array<{ x: number; y: number; positive: boolean }>; subjectPoint?: { x: number; y: number } },
+  ): Promise<{ asset: Asset; bounds?: { x: number; y: number; width: number; height: number } }>;
 }
 
 export interface SmartGrabService {

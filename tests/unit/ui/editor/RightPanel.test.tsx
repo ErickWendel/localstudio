@@ -128,6 +128,7 @@ describe('RightPanel', () => {
     expect(screen.getByRole('button', { name: 'Download Image Editing Models' })).not.toHaveClass(
       'icon-button-attention',
     );
+    expect(screen.getByRole('button', { name: 'Download Image Editing Models' })).toBeDisabled();
   });
 
   it('exposes layer controls for visibility, lock, delete, and drag order', async () => {

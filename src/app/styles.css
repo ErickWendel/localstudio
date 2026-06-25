@@ -654,6 +654,22 @@ button {
   cursor: pointer;
 }
 
+.background-selection-progress {
+  width: 96px;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.background-selection-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0072bd, var(--ew-green));
+  transition: width 160ms ease;
+}
+
 .canvas-text-editor {
   position: absolute;
   z-index: 8;
@@ -663,9 +679,9 @@ button {
   border-radius: 2px;
   outline: 0;
   background: rgba(5, 13, 16, 0.72);
+  box-sizing: border-box;
   box-shadow: 0 0 18px rgba(55, 253, 118, 0.18);
   line-height: 1.08;
-  padding: 0;
   resize: none;
   transform-origin: top left;
 }
@@ -764,6 +780,13 @@ button {
 .floating-toolbar-button:hover {
   color: var(--ew-green-fixed);
   background: var(--ew-raised);
+}
+
+.floating-toolbar-button:disabled,
+.floating-toolbar-button:disabled:hover {
+  color: rgba(255, 255, 255, 0.28);
+  background: transparent;
+  cursor: progress;
 }
 
 .floating-toolbar-button-ai:hover {
@@ -1191,6 +1214,18 @@ button {
 .icon-button-active {
   color: var(--ew-green);
   border-color: var(--ew-green);
+}
+
+.icon-button:disabled {
+  color: rgba(255, 255, 255, 0.28);
+  border-color: rgba(255, 255, 255, 0.08);
+  cursor: not-allowed;
+  transform: none;
+}
+
+.icon-button:disabled:hover {
+  color: rgba(255, 255, 255, 0.28);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 .icon-button-attention {

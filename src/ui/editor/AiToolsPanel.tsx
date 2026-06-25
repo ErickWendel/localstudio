@@ -8,6 +8,7 @@ interface AiToolsPanelProps {
   modelStates: ModelState[];
   attentionModelId?: string | undefined;
   onDownloadRequiredModels?: (() => Promise<void>) | undefined;
+  onDownloadModel?: ((id: string) => Promise<void>) | undefined;
 }
 
 const localTools = [
@@ -36,7 +37,12 @@ function formatStatus(status: ModelState['status']) {
     .join(' ');
 }
 
-export function AiToolsPanel({ modelStates, attentionModelId, onDownloadRequiredModels }: AiToolsPanelProps) {
+export function AiToolsPanel({
+  modelStates,
+  attentionModelId,
+  onDownloadRequiredModels,
+  onDownloadModel,
+}: AiToolsPanelProps) {
   return (
     <div className="panel-stack">
       <button
@@ -81,7 +87,14 @@ export function AiToolsPanel({ modelStates, attentionModelId, onDownloadRequired
                     <strong>{model.label}</strong>
                     {model.description ? <span>{model.description}</span> : null}
                   </div>
-                  <IconButton label={`Download ${model.label}`} attention={needsAttention}>
+                  <IconButton
+                    label={`Download ${model.label}`}
+                    attention={needsAttention}
+                    disabled={model.status === 'ready' || model.status === 'downloading'}
+                    onClick={() => {
+                      void onDownloadModel?.(model.id);
+                    }}
+                  >
                     <Download size={14} />
                   </IconButton>
                 </div>

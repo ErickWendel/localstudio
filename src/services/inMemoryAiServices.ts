@@ -1,3 +1,4 @@
+import type { Asset } from '../domain/model';
 import type {
   BackgroundRemovalService,
   MagicEraserService,
@@ -26,12 +27,42 @@ export class MockPaletteService implements PaletteService {
 }
 
 export class MockBackgroundRemovalService implements BackgroundRemovalService {
-  removeBackground(
-    assetId: string,
+  prepareBackgroundRemoval(
+    asset: Asset,
+    options?: { onProgress?: (progress: number) => void },
+  ): Promise<void> {
+    void asset;
+    options?.onProgress?.(100);
+    return Promise.resolve();
+  }
+
+  previewBackgroundMask(
+    asset: Asset,
     options?: { subjectPoint?: { x: number; y: number } },
-  ): Promise<{ assetId: string }> {
+  ): Promise<{ maskUrl: string; score: number }> {
+    void asset;
     void options;
-    return Promise.resolve({ assetId: `${assetId}-transparent` });
+    return Promise.resolve({
+      maskUrl:
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGOSHzRgAAAAABJRU5ErkJggg==',
+      score: 0.9,
+    });
+  }
+
+  removeBackground(
+    asset: Asset,
+    options?: { subjectPoint?: { x: number; y: number } },
+  ): Promise<{ asset: Asset; bounds: { x: number; y: number; width: number; height: number } }> {
+    void options;
+    return Promise.resolve({
+      asset: {
+        ...asset,
+        id: `${asset.id}-transparent`,
+        name: `${asset.name} BG Removed`,
+        mimeType: 'image/png',
+      },
+      bounds: { x: 0, y: 0, width: 1, height: 1 },
+    });
   }
 }
 

@@ -2,7 +2,29 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { createAppServices } from '../../../../src/app/composition';
+import type { Asset } from '../../../../src/domain/model';
+import type { BackgroundRemovalService } from '../../../../src/services/interfaces';
+import { InMemoryModelSetupService } from '../../../../src/services/modelSetupService';
 import { EditorShell } from '../../../../src/ui/editor/EditorShell';
+
+class InstantBackgroundRemovalService implements BackgroundRemovalService {
+  prepareBackgroundRemoval(
+    asset: Asset,
+    options?: { onProgress?: (progress: number) => void },
+  ): Promise<void> {
+    void asset;
+    options?.onProgress?.(100);
+    return Promise.resolve();
+  }
+
+  previewBackgroundMask(): Promise<{ maskUrl: string; score: number }> {
+    return Promise.resolve({ maskUrl: 'data:image/png;base64,test', score: 0.9 });
+  }
+
+  removeBackground(asset: Asset): Promise<{ asset: Asset }> {
+    return Promise.resolve({ asset });
+  }
+}
 
 describe('EditorShell', () => {
   it('renders the approved editor shell landmarks', () => {
@@ -114,6 +136,23 @@ describe('EditorShell', () => {
     );
   });
 
+  it('pastes an item-only clipboard image from the window with a fallback name', async () => {
+    render(<EditorShell services={createAppServices()} />);
+    const image = new File(['image-bytes'], '', { type: 'image/png' });
+
+    fireEvent.paste(window, {
+      clipboardData: {
+        files: [],
+        items: [{ kind: 'file', type: 'image/png', getAsFile: () => image }],
+      },
+    });
+
+    expect(await screen.findByRole('button', { name: 'Pasted image' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
   it('deletes the selected layer with Delete and Backspace keystrokes', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
@@ -148,14 +187,17 @@ describe('EditorShell', () => {
     );
   });
 
-  it('enters and cancels background subject selection from the floating toolbar', async () => {
+  it('blocks background subject selection until image editing models are downloaded', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
 
     await user.click(screen.getByRole('button', { name: 'Remove Background' }));
 
-    expect(screen.getByText('Click the main object to keep. Everything else will be removed.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Cancel Background Selection' })).toBeInTheDocument();
+    expect(screen.getByText('You must download the image editing tools first.')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Right click adds areas to keep. Left click applies the background removal.'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove Background' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'AI Tools' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('button', { name: 'Download Image Editing Models' })).toHaveClass(
       'icon-button-attention',
@@ -163,7 +205,30 @@ describe('EditorShell', () => {
 
     await user.keyboard('{Escape}');
 
-    expect(screen.queryByText('Click the main object to keep. Everything else will be removed.')).not.toBeInTheDocument();
+    expect(screen.queryByText('You must download the image editing tools first.')).not.toBeInTheDocument();
+  });
+
+  it('enters and cancels background subject selection after image editing models are ready', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    services.modelSetupService = new InMemoryModelSetupService();
+    services.backgroundRemovalService = new InstantBackgroundRemovalService();
+    await services.modelSetupService.downloadModel('image-editing-models');
+
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'Remove Background' }));
+
+    expect(
+      await screen.findByText('Right click adds areas to keep. Left click applies the background removal.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel Background Selection' })).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+
+    expect(
+      screen.queryByText('Right click adds areas to keep. Left click applies the background removal.'),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Remove Background' })).toBeInTheDocument();
   });
 

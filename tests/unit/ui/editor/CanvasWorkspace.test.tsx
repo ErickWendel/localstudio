@@ -46,10 +46,50 @@ describe('CanvasWorkspace', () => {
       />,
     );
 
-    expect(screen.getByText('Click the main object to keep. Everything else will be removed.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Right click adds areas to keep. Left click applies the background removal.'),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText('Slide canvas')).not.toHaveClass('canvas-frame-bg-selection');
     expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-background-selection-target', 'image-hero');
 
     await user.click(screen.getByRole('button', { name: 'Cancel Background Selection' }));
+  });
+
+  it('shows selected image processing feedback while background removal runs', () => {
+    const project = createSampleProject();
+
+    render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
+        processingElementIds={['image-hero']}
+      />,
+    );
+
+    expect(screen.getByText('Removing background...')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cancel Background Selection' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove Background' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
+  });
+
+  it('shows image extraction progress before segmentation is ready', () => {
+    const project = createSampleProject();
+
+    render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
+        backgroundSelectionMode
+        backgroundPreparation={{ elementId: 'image-hero', progress: 42, status: 'preparing' }}
+      />,
+    );
+
+    expect(screen.getByText('Extracting image embedding...')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: 'Image extraction progress' })).toHaveAttribute(
+      'aria-valuenow',
+      '42',
+    );
   });
 });

@@ -14,6 +14,7 @@ interface FloatingSelectionToolbarProps {
   onDuplicate?: (() => void) | undefined;
   onSendBackward?: (() => void) | undefined;
   backgroundSelectionActive?: boolean;
+  disabled?: boolean;
 }
 
 export function FloatingSelectionToolbar({
@@ -24,6 +25,7 @@ export function FloatingSelectionToolbar({
   onDuplicate,
   onSendBackward,
   backgroundSelectionActive = false,
+  disabled = false,
 }: FloatingSelectionToolbarProps) {
   const groups: ToolbarAction[][] = [
     [{ label: 'Align Center', icon: 'align_horizontal_center', onClick: onAlignCenter }],
@@ -61,6 +63,7 @@ export function FloatingSelectionToolbar({
               key={action.label}
               title={action.label}
               aria-label={action.label}
+              disabled={disabled}
               type="button"
               onClick={action.onClick}
             >
