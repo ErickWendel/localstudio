@@ -18,7 +18,7 @@ interface BonsaiImageRuntimeGenerateOptions {
 }
 
 export interface BonsaiImageRuntime {
-  preload(modelId: string): Promise<void>;
+  preload(modelId: string, options?: { onProgress?: (progress: number) => void }): Promise<void>;
   generate(options: BonsaiImageRuntimeGenerateOptions): Promise<Blob>;
 }
 
@@ -44,6 +44,13 @@ interface BrowserImageGenerationServiceOptions {
   runtime?: BonsaiImageRuntime;
 }
 
+interface BonsaiModelManifest {
+  total_bytes?: number | undefined;
+  files: Array<{ remote_path: string; size: number }>;
+}
+
+const BONSAI_MODEL_CACHE_NAME = 'localstudio-ai-bonsai-image-models-v1';
+
 function defaultCreateId(prefix: string) {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return `${prefix}-${crypto.randomUUID()}`;
@@ -67,8 +74,8 @@ async function resultToBlob(result: BonsaiPipelineResult | Blob) {
 export class BrowserBonsaiImageRuntime implements BonsaiImageRuntime {
   private pipelinePromise: Promise<BonsaiPipeline> | undefined;
 
-  preload(modelId: string): Promise<void> {
-    return this.loadPipeline(modelId).then(() => undefined);
+  async preload(modelId: string, options?: { onProgress?: (progress: number) => void }): Promise<void> {
+    await preloadBonsaiModelFiles(modelId, options);
   }
 
   async generate(options: BonsaiImageRuntimeGenerateOptions): Promise<Blob> {
@@ -106,6 +113,66 @@ export class BrowserBonsaiImageRuntime implements BonsaiImageRuntime {
     });
     return this.pipelinePromise;
   }
+}
+
+function modelFileUrl(modelId: string, remotePath: string) {
+  return `https://huggingface.co/${modelId}/resolve/main/${remotePath
+    .split('/')
+    .map((part) => encodeURIComponent(part))
+    .join('/')}`;
+}
+
+async function fetchModelManifest(modelId: string): Promise<BonsaiModelManifest> {
+  const response = await fetch(modelFileUrl(modelId, 'manifest.json'));
+  if (!response.ok) {
+    throw new Error(`Bonsai model manifest download failed: ${response.status} ${response.statusText}`);
+  }
+  const manifest = (await response.json()) as Partial<BonsaiModelManifest>;
+  if (!Array.isArray(manifest.files)) {
+    throw new Error('Bonsai model manifest is missing its file list.');
+  }
+  return {
+    total_bytes: manifest.total_bytes,
+    files: manifest.files.filter(
+      (file): file is { remote_path: string; size: number } =>
+        typeof file.remote_path === 'string' && Number.isFinite(file.size),
+    ),
+  };
+}
+
+async function preloadBonsaiModelFiles(modelId: string, options?: { onProgress?: (progress: number) => void }) {
+  if (typeof fetch !== 'function') {
+    throw new Error('Browser fetch is required to download Bonsai image models.');
+  }
+  if (typeof caches === 'undefined') {
+    throw new Error('Browser Cache API is required to store Bonsai image models.');
+  }
+
+  const manifest = await fetchModelManifest(modelId);
+  const cache = await caches.open(BONSAI_MODEL_CACHE_NAME);
+  const totalBytes =
+    manifest.total_bytes ?? manifest.files.reduce((total, file) => total + Math.max(0, file.size), 0);
+  let loadedBytes = 0;
+
+  for (const file of manifest.files) {
+    const url = modelFileUrl(modelId, file.remote_path);
+    const cachedResponse = await cache.match(url);
+    if (cachedResponse) {
+      loadedBytes += file.size;
+      options?.onProgress?.((loadedBytes / totalBytes) * 100);
+      continue;
+    }
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Bonsai model file download failed for ${file.remote_path}: ${response.status} ${response.statusText}`);
+    }
+    await cache.put(url, response.clone());
+    loadedBytes += file.size;
+    options?.onProgress?.((loadedBytes / totalBytes) * 100);
+  }
+
+  options?.onProgress?.(100);
 }
 
 export class BrowserImageGenerationService implements ImageGenerationService {

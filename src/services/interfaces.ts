@@ -11,6 +11,7 @@ export interface ModelState {
   id: string;
   label: string;
   description?: string;
+  error?: string | undefined;
   provider: 'chrome' | 'transformers';
   status: ModelStatus;
   progress: number;
@@ -32,7 +33,7 @@ export interface ExportService {
 export interface ModelSetupService {
   getModelStates(): Promise<ModelState[]>;
   downloadRequiredModels(): Promise<ModelState[]>;
-  downloadModel(id: string): Promise<ModelState>;
+  downloadModel(id: string, options?: { onProgress?: (progress: number) => void }): Promise<ModelState>;
 }
 
 export type SetupCapabilityStatus = 'unavailable' | 'needs-setup' | 'ready';

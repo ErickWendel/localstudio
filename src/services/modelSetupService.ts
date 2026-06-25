@@ -22,7 +22,7 @@ export interface ImageEditingModelLoader {
 }
 
 export interface ImageGenerationModelLoader {
-  loadImageGenerationModel(): Promise<void>;
+  loadImageGenerationModel(options?: { onProgress?: (progress: number) => void }): Promise<void>;
 }
 
 const initialStates: ModelState[] = [
@@ -73,8 +73,8 @@ export class TransformersImageEditingModelLoader implements ImageEditingModelLoa
 }
 
 export class TransformersImageGenerationModelLoader implements ImageGenerationModelLoader {
-  async loadImageGenerationModel(): Promise<void> {
-    await new BrowserBonsaiImageRuntime().preload(IMAGE_GENERATION_TRANSFORMERS_MODEL_ID);
+  async loadImageGenerationModel(options?: { onProgress?: (progress: number) => void }): Promise<void> {
+    await new BrowserBonsaiImageRuntime().preload(IMAGE_GENERATION_TRANSFORMERS_MODEL_ID, options);
   }
 }
 
@@ -108,12 +108,12 @@ export class BrowserModelSetupService implements ModelSetupService {
     return this.getModelStates();
   }
 
-  async downloadModel(id: string): Promise<ModelState> {
+  async downloadModel(id: string, options?: { onProgress?: (progress: number) => void }): Promise<ModelState> {
     const current = this.states.find((state) => state.id === id);
     if (!current) throw new Error(`Unknown model: ${id}`);
     if (current.status === 'ready') return { ...current };
 
-    this.setModelState(id, { status: 'downloading', progress: 10 });
+    this.setModelState(id, { status: 'downloading', progress: 10, error: undefined });
 
     try {
       if (id === IMAGE_EDITING_MODEL_ID) {
@@ -121,14 +121,22 @@ export class BrowserModelSetupService implements ModelSetupService {
         this.storage?.setItem(IMAGE_EDITING_READY_KEY, 'true');
       }
       if (id === IMAGE_GENERATION_MODEL_ID) {
-        await this.imageGenerationModelLoader.loadImageGenerationModel();
+        await this.imageGenerationModelLoader.loadImageGenerationModel({
+          onProgress: (progress) => {
+            const boundedProgress = Math.max(10, Math.min(99, Math.round(progress)));
+            this.setModelState(id, { status: 'downloading', progress: boundedProgress, error: undefined });
+            options?.onProgress?.(boundedProgress);
+          },
+        });
         this.storage?.setItem(IMAGE_GENERATION_READY_KEY, 'true');
       }
-      return this.setModelState(id, { status: 'ready', progress: 100 });
-    } catch {
+      options?.onProgress?.(100);
+      return this.setModelState(id, { status: 'ready', progress: 100, error: undefined });
+    } catch (error) {
       if (id === IMAGE_EDITING_MODEL_ID) this.storage?.setItem(IMAGE_EDITING_READY_KEY, 'false');
       if (id === IMAGE_GENERATION_MODEL_ID) this.storage?.setItem(IMAGE_GENERATION_READY_KEY, 'false');
-      return this.setModelState(id, { status: 'failed', progress: 0 });
+      const message = error instanceof Error ? error.message : 'Model download failed.';
+      return this.setModelState(id, { status: 'failed', progress: 0, error: message });
     }
   }
 
@@ -152,12 +160,13 @@ export class InMemoryModelSetupService implements ModelSetupService {
     return this.getModelStates();
   }
 
-  downloadModel(id: string): Promise<ModelState> {
+  downloadModel(id: string, options?: { onProgress?: (progress: number) => void }): Promise<ModelState> {
     const current = this.states.find((state) => state.id === id);
     if (!current) throw new Error(`Unknown model: ${id}`);
 
+    options?.onProgress?.(100);
     this.states = this.states.map((state) =>
-      state.id === id ? { ...state, status: 'ready', progress: 100 } : state,
+      state.id === id ? { ...state, status: 'ready', progress: 100, error: undefined } : state,
     );
     return Promise.resolve({ ...this.states.find((state) => state.id === id)! });
   }

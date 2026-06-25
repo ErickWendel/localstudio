@@ -237,6 +237,9 @@ export function AiToolsPanel({
                 <div className="model-progress" aria-label={`${model.label} progress`}>
                   <span style={{ width: `${model.progress}%` }} />
                 </div>
+                {model.status === 'failed' && model.error ? (
+                  <span className="translation-source-note">{model.error}</span>
+                ) : null}
               </article>
             );
           })}

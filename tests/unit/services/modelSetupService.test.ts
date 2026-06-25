@@ -61,7 +61,10 @@ describe('BrowserModelSetupService', () => {
 
   it('downloads image generation models independently', async () => {
     const loadImageEditingModel = vi.fn().mockResolvedValue(undefined);
-    const loadImageGenerationModel = vi.fn().mockResolvedValue(undefined);
+    const loadImageGenerationModel = vi.fn((options?: { onProgress?: (progress: number) => void }) => {
+      options?.onProgress?.(55);
+      return Promise.resolve();
+    });
     const imageEditingLoader: ImageEditingModelLoader = {
       loadImageEditingModel,
     };
@@ -70,11 +73,15 @@ describe('BrowserModelSetupService', () => {
     };
     const service = new BrowserModelSetupService(imageEditingLoader, createStorage(), imageGenerationLoader);
 
-    const state = await service.downloadModel(IMAGE_GENERATION_MODEL_ID);
+    const progress: number[] = [];
+    const state = await service.downloadModel(IMAGE_GENERATION_MODEL_ID, {
+      onProgress: (value) => progress.push(value),
+    });
 
     expect(loadImageGenerationModel).toHaveBeenCalledTimes(1);
     expect(loadImageEditingModel).not.toHaveBeenCalled();
     expect(state).toMatchObject({ id: IMAGE_GENERATION_MODEL_ID, status: 'ready', progress: 100 });
+    expect(progress).toEqual([55, 100]);
   });
 
   it('restores ready state from browser cache metadata', async () => {

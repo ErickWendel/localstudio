@@ -1,4 +1,8 @@
-import { BrowserImageGenerationService, type BonsaiImageRuntime } from '../../../src/services/browserImageGenerationService';
+import {
+  BrowserBonsaiImageRuntime,
+  BrowserImageGenerationService,
+  type BonsaiImageRuntime,
+} from '../../../src/services/browserImageGenerationService';
 import {
   DEFAULT_IMAGE_GENERATION_SIZE,
   DEFAULT_IMAGE_GENERATION_STEPS,
@@ -57,5 +61,53 @@ describe('BrowserImageGenerationService', () => {
     await expect(service.generateImage('   ')).rejects.toThrow('Enter a prompt before generating an image.');
 
     expect(runtime.generate).not.toHaveBeenCalled();
+  });
+});
+
+describe('BrowserBonsaiImageRuntime', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('preloads Bonsai model files from the Hugging Face manifest into browser cache', async () => {
+    const put = vi.fn(() => Promise.resolve());
+    const match = vi.fn(() => Promise.resolve(undefined));
+    const open = vi.fn(() => Promise.resolve({ match, put }));
+    const fetch = vi.fn((url: string) => {
+      if (url.endsWith('/manifest.json')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              total_bytes: 30,
+              files: [
+                { remote_path: 'text_encoder-mlx-4bit/config.json', size: 10 },
+                { remote_path: 'vae/config.json', size: 20 },
+              ],
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+      return Promise.resolve(new Response('file', { status: 200 }));
+    });
+    const progress: number[] = [];
+    vi.stubGlobal('fetch', fetch);
+    vi.stubGlobal('caches', { open });
+
+    await new BrowserBonsaiImageRuntime().preload('prism-ml/bonsai-image-ternary-4B-mlx-2bit', {
+      onProgress: (value) => progress.push(Math.round(value)),
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      'https://huggingface.co/prism-ml/bonsai-image-ternary-4B-mlx-2bit/resolve/main/manifest.json',
+    );
+    expect(fetch).toHaveBeenCalledWith(
+      'https://huggingface.co/prism-ml/bonsai-image-ternary-4B-mlx-2bit/resolve/main/text_encoder-mlx-4bit/config.json',
+    );
+    expect(fetch).toHaveBeenCalledWith(
+      'https://huggingface.co/prism-ml/bonsai-image-ternary-4B-mlx-2bit/resolve/main/vae/config.json',
+    );
+    expect(put).toHaveBeenCalledTimes(2);
+    expect(progress).toEqual([33, 100, 100]);
   });
 });

@@ -603,7 +603,15 @@ export function useEditorViewModel(services: AppServices) {
         state.id === id && state.status !== 'ready' ? { ...state, status: 'downloading', progress: 10 } : state,
       ),
     );
-    const next = await services.modelSetupService.downloadModel(id);
+    const next = await services.modelSetupService.downloadModel(id, {
+      onProgress: (progress) => {
+        setModelStates((currentStates) =>
+          currentStates.map((state) =>
+            state.id === id ? { ...state, status: 'downloading', progress } : state,
+          ),
+        );
+      },
+    });
     setModelStates((currentStates) =>
       currentStates.map((state) => (state.id === id ? next : state)),
     );
