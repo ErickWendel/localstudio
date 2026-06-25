@@ -21,4 +21,12 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Edit project name Untitled Project' })).toBeInTheDocument();
     expect(screen.getByText('1 layers on current page')).toBeInTheDocument();
   });
+
+  it('removes the new project query string after consuming it', () => {
+    window.history.replaceState({}, '', '/?newProject=1&theme=dark');
+
+    render(<App />);
+
+    expect(window.location.search).toBe('?theme=dark');
+  });
 });
