@@ -65,56 +65,81 @@ describe('BrowserImageGenerationService', () => {
 });
 
 describe('BrowserBonsaiImageRuntime', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it('preloads Bonsai model files from the Hugging Face manifest into browser cache', async () => {
-    const put = vi.fn((_url: string, response: Response) => response.arrayBuffer().then(() => undefined));
-    const match = vi.fn(() => Promise.resolve(undefined));
-    const open = vi.fn(() => Promise.resolve({ match, put }));
-    const fetch = vi.fn((url: string) => {
-      if (url.endsWith('/manifest.json')) {
-        return Promise.resolve(
-          new Response(
-            JSON.stringify({
-              total_bytes: 30,
-              files: [
-                { remote_path: 'text_encoder-mlx-4bit/config.json', size: 10 },
-                { remote_path: 'vae/config.json', size: 20 },
-              ],
-            }),
-            { status: 200 },
-          ),
-        );
-      }
-      const stream = new ReadableStream<Uint8Array>({
-        start(controller) {
-          controller.enqueue(new Uint8Array(5));
-          controller.enqueue(new Uint8Array(5));
-          controller.close();
-        },
-      });
-      return Promise.resolve(new Response(stream, { status: 200 }));
+  it('preloads the Bonsai demo runtime with from_pretrained and maps component progress', async () => {
+    const pipeline = {
+      generate: vi.fn(() =>
+        Promise.resolve({
+          toBlob: () => new Blob(['image'], { type: 'image/png' }),
+        }),
+      ),
+    };
+    const fromPretrained = vi.fn((_modelId: string, options?: { onProgress?: (progress: unknown) => void }) => {
+      options?.onProgress?.({ phase: 'init' });
+      options?.onProgress?.({ component: 'text_encoder', loaded: 850_000_000, total: 1_700_000_000 });
+      options?.onProgress?.({ component: 'text_encoder', loaded: 1_700_000_000, total: 1_700_000_000 });
+      options?.onProgress?.({ component: 'transformer', loaded: 1_300_000_000, total: 1_300_000_000 });
+      options?.onProgress?.({ component: 'vae', loaded: 95_000_000, total: 95_000_000 });
+      return Promise.resolve(pipeline);
     });
     const progress: number[] = [];
-    vi.stubGlobal('fetch', fetch);
-    vi.stubGlobal('caches', { open });
 
-    await new BrowserBonsaiImageRuntime().preload('prism-ml/bonsai-image-ternary-4B-mlx-2bit', {
+    await new BrowserBonsaiImageRuntime({
+      cacheName: 'test-cache',
+      importRuntime: () =>
+        Promise.resolve({
+          BonsaiImagePipeline: {
+            from_pretrained: fromPretrained,
+          },
+        }),
+    }).preload('prism-ml/bonsai-image-ternary-4B-mlx-2bit', {
       onProgress: (value) => progress.push(Math.round(value)),
     });
 
-    expect(fetch).toHaveBeenCalledWith(
-      'https://huggingface.co/prism-ml/bonsai-image-ternary-4B-mlx-2bit/resolve/main/manifest.json',
+    expect(fromPretrained).toHaveBeenCalledWith(
+      'prism-ml/bonsai-image-ternary-4B-mlx-2bit',
+      expect.objectContaining({ cacheName: 'test-cache' }),
     );
-    expect(fetch).toHaveBeenCalledWith(
-      'https://huggingface.co/prism-ml/bonsai-image-ternary-4B-mlx-2bit/resolve/main/text_encoder-mlx-4bit/config.json',
+    expect(progress).toEqual([1, 27, 55, 97, 100]);
+  });
+
+  it('generates with the Bonsai demo runtime after loading it once', async () => {
+    const pipeline = {
+      generate: vi.fn(() =>
+        Promise.resolve({
+          toBlob: () => new Blob(['image'], { type: 'image/png' }),
+        }),
+      ),
+    };
+    const fromPretrained = vi.fn(() => Promise.resolve(pipeline));
+    const runtime = new BrowserBonsaiImageRuntime({
+      importRuntime: () =>
+        Promise.resolve({
+          BonsaiImagePipeline: {
+            from_pretrained: fromPretrained,
+          },
+        }),
+    });
+
+    const blob = await runtime.generate({
+      modelId: 'prism-ml/bonsai-image-ternary-4B-mlx-2bit',
+      prompt: 'A neon bonsai tree',
+      height: 512,
+      width: 512,
+      steps: 4,
+      seed: 123,
+    });
+
+    expect(fromPretrained).toHaveBeenCalledTimes(1);
+    expect(pipeline.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: 'A neon bonsai tree',
+        height: 512,
+        width: 512,
+        guidance_scale: 1,
+        num_inference_steps: 4,
+        seed: 123,
+      }),
     );
-    expect(fetch).toHaveBeenCalledWith(
-      'https://huggingface.co/prism-ml/bonsai-image-ternary-4B-mlx-2bit/resolve/main/vae/config.json',
-    );
-    expect(put).toHaveBeenCalledTimes(2);
-    expect(progress).toEqual([17, 33, 50, 67, 100]);
+    expect(blob.type).toBe('image/png');
   });
 });

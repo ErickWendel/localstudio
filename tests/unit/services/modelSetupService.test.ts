@@ -106,7 +106,7 @@ describe('BrowserModelSetupService', () => {
     const loadImageGenerationModel = vi.fn().mockResolvedValue(undefined);
     const service = new BrowserModelSetupService(
       { loadImageEditingModel },
-      createStorage({ 'ew-canvas-ai.model.image-generation-models.ready': 'true' }),
+      createStorage({ 'ew-canvas-ai.model.image-generation-models.runtime-v1.ready': 'true' }),
       { loadImageGenerationModel },
     );
 

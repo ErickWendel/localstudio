@@ -4,12 +4,12 @@ import {
   DEFAULT_IMAGE_GENERATION_SIZE,
   DEFAULT_IMAGE_GENERATION_STEPS,
   IMAGE_GENERATION_TRANSFORMERS_MODEL_ID,
-  TRANSFORMERS_CACHE_KEY,
 } from './imageGenerationModels';
 
 interface BonsaiImageRuntimeGenerateOptions {
   height: number;
   modelId: string;
+  onLoadProgress?: (progress: number) => void;
   prompt: string;
   seed?: number;
   steps: number;
@@ -26,6 +26,14 @@ interface BonsaiPipelineResult {
   toBlob?: () => Blob | Promise<Blob>;
 }
 
+interface BonsaiRuntimeProgress {
+  component?: string;
+  fromCache?: boolean;
+  loaded?: number;
+  phase?: string;
+  total?: number;
+}
+
 interface BonsaiPipeline {
   generate(options: {
     callback_on_step_end?: (_pipeline: unknown, step: number) => void;
@@ -38,18 +46,39 @@ interface BonsaiPipeline {
   }): Promise<BonsaiPipelineResult | Blob>;
 }
 
+interface BonsaiPipelineConstructor {
+  from_pretrained(
+    modelId: string,
+    options?: {
+      cacheName?: string;
+      onProgress?: (progress: BonsaiRuntimeProgress) => void;
+      signal?: AbortSignal;
+    },
+  ): Promise<BonsaiPipeline>;
+}
+
+interface BonsaiRuntimeModule {
+  BonsaiImagePipeline: BonsaiPipelineConstructor;
+}
+
 interface BrowserImageGenerationServiceOptions {
   createId?: (prefix: string) => string;
   createObjectUrl?: (blob: Blob) => string;
   runtime?: BonsaiImageRuntime;
 }
 
-interface BonsaiModelManifest {
-  total_bytes?: number | undefined;
-  files: Array<{ remote_path: string; size: number }>;
+interface BrowserBonsaiImageRuntimeOptions {
+  cacheName?: string;
+  importRuntime?: () => Promise<BonsaiRuntimeModule>;
 }
 
-const BONSAI_MODEL_CACHE_NAME = 'localstudio-ai-bonsai-image-models-v1';
+const BONSAI_RUNTIME_CACHE_NAME = 'localstudio-ai-bonsai-image-runtime-v1';
+const LEGACY_BONSAI_MODEL_CACHE_NAME = 'localstudio-ai-bonsai-image-models-v1';
+const BONSAI_COMPONENT_TOTALS: Record<string, number> = {
+  text_encoder: 1_700_000_000,
+  transformer: 1_300_000_000,
+  vae: 95_000_000,
+};
 
 function defaultCreateId(prefix: string) {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -74,12 +103,17 @@ async function resultToBlob(result: BonsaiPipelineResult | Blob) {
 export class BrowserBonsaiImageRuntime implements BonsaiImageRuntime {
   private pipelinePromise: Promise<BonsaiPipeline> | undefined;
 
+  constructor(private readonly options: BrowserBonsaiImageRuntimeOptions = {}) {}
+
   async preload(modelId: string, options?: { onProgress?: (progress: number) => void }): Promise<void> {
-    await preloadBonsaiModelFiles(modelId, options);
+    await this.loadPipeline(modelId, options?.onProgress ? { onProgress: options.onProgress } : {});
   }
 
   async generate(options: BonsaiImageRuntimeGenerateOptions): Promise<Blob> {
-    const pipeline = await this.loadPipeline(options.modelId);
+    const pipeline = await this.loadPipeline(
+      options.modelId,
+      options.onLoadProgress ? { onProgress: options.onLoadProgress } : {},
+    );
     const result = await pipeline.generate({
       prompt: options.prompt,
       height: options.height,
@@ -94,140 +128,71 @@ export class BrowserBonsaiImageRuntime implements BonsaiImageRuntime {
     return resultToBlob(result);
   }
 
-  private async loadPipeline(modelId: string): Promise<BonsaiPipeline> {
-    this.pipelinePromise ??= import('@huggingface/transformers').then(async (module) => {
-      module.env.useBrowserCache = true;
-      module.env.cacheKey = TRANSFORMERS_CACHE_KEY;
-
-      const pipelineFactory = (module as unknown as {
-        pipeline?: (
-          task: string,
-          model: string,
-          options: { device: 'webgpu' },
-        ) => Promise<BonsaiPipeline>;
-      }).pipeline;
-      if (typeof pipelineFactory !== 'function') {
-        throw new Error('Bonsai Image WebGPU runtime is unavailable in this browser build.');
+  private async loadPipeline(
+    modelId: string,
+    options: { onProgress?: (progress: number) => void } = {},
+  ): Promise<BonsaiPipeline> {
+    this.pipelinePromise ??= this.importRuntimeModule().then(async (module) => {
+      const preloadOptions: {
+        cacheName: string;
+        onProgress?: (progress: BonsaiRuntimeProgress) => void;
+      } = {
+        cacheName: this.options.cacheName ?? BONSAI_RUNTIME_CACHE_NAME,
+      };
+      if (options.onProgress) {
+        preloadOptions.onProgress = createBonsaiRuntimeProgressReporter(options.onProgress);
       }
-      return pipelineFactory('text-to-image', modelId, { device: 'webgpu' });
+      const pipeline = await module.BonsaiImagePipeline.from_pretrained(modelId, preloadOptions);
+      void deleteLegacyBonsaiModelCache();
+      return pipeline;
     });
     return this.pipelinePromise;
   }
+
+  private async importRuntimeModule() {
+    if (this.options.importRuntime) return this.options.importRuntime();
+    const runtimeUrl = '/vendor/bonsai-image-webgpu-runtime.js';
+    return (await import(/* @vite-ignore */ runtimeUrl)) as BonsaiRuntimeModule;
+  }
 }
 
-function modelFileUrl(modelId: string, remotePath: string) {
-  return `https://huggingface.co/${modelId}/resolve/main/${remotePath
-    .split('/')
-    .map((part) => encodeURIComponent(part))
-    .join('/')}`;
+async function deleteLegacyBonsaiModelCache() {
+  if (typeof caches === 'undefined') return;
+  try {
+    await caches.delete(LEGACY_BONSAI_MODEL_CACHE_NAME);
+  } catch {
+    // Best-effort cleanup only. The old cache is not used by the Bonsai runtime.
+  }
 }
 
-async function fetchModelManifest(modelId: string): Promise<BonsaiModelManifest> {
-  const response = await fetch(modelFileUrl(modelId, 'manifest.json'));
-  if (!response.ok) {
-    throw new Error(`Bonsai model manifest download failed: ${response.status} ${response.statusText}`);
-  }
-  const manifest = (await response.json()) as Partial<BonsaiModelManifest>;
-  if (!Array.isArray(manifest.files)) {
-    throw new Error('Bonsai model manifest is missing its file list.');
-  }
-  return {
-    total_bytes: manifest.total_bytes,
-    files: manifest.files.filter(
-      (file): file is { remote_path: string; size: number } =>
-        typeof file.remote_path === 'string' && Number.isFinite(file.size),
-    ),
-  };
-}
-
-async function preloadBonsaiModelFiles(modelId: string, options?: { onProgress?: (progress: number) => void }) {
-  if (typeof fetch !== 'function') {
-    throw new Error('Browser fetch is required to download Bonsai image models.');
-  }
-  if (typeof caches === 'undefined') {
-    throw new Error('Browser Cache API is required to store Bonsai image models.');
-  }
-
-  const manifest = await fetchModelManifest(modelId);
-  const cache = await caches.open(BONSAI_MODEL_CACHE_NAME);
-  const totalBytes =
-    manifest.total_bytes ?? manifest.files.reduce((total, file) => total + Math.max(0, file.size), 0);
-  const progressTotalBytes = Math.max(1, totalBytes);
-  let loadedBytes = 0;
+function createBonsaiRuntimeProgressReporter(onProgress: (progress: number) => void) {
+  const componentProgress = new Map<string, { loaded: number; total: number }>();
   let lastProgress = -1;
-  const reportProgress = (progress: number) => {
-    const boundedProgress = Math.max(0, Math.min(100, progress));
-    if (boundedProgress <= lastProgress) return;
-    lastProgress = boundedProgress;
-    options?.onProgress?.(boundedProgress);
+  const report = () => {
+    const total = Object.values(BONSAI_COMPONENT_TOTALS).reduce((sum, value) => sum + value, 0);
+    const loaded = Object.entries(BONSAI_COMPONENT_TOTALS).reduce((sum, [component, fallbackTotal]) => {
+      const progress = componentProgress.get(component);
+      return sum + Math.min(progress?.loaded ?? 0, progress?.total ?? fallbackTotal);
+    }, 0);
+    const nextProgress = Math.max(0, Math.min(100, Math.round((loaded / total) * 100)));
+    if (nextProgress <= lastProgress) return;
+    lastProgress = nextProgress;
+    onProgress(nextProgress);
   };
 
-  for (const file of manifest.files) {
-    const url = modelFileUrl(modelId, file.remote_path);
-    const cachedResponse = await cache.match(url);
-    if (cachedResponse) {
-      loadedBytes += file.size;
-      reportProgress((loadedBytes / progressTotalBytes) * 100);
-      continue;
+  return (progress: BonsaiRuntimeProgress) => {
+    if (progress.phase === 'init') {
+      onProgress(1);
+      return;
     }
-
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Bonsai model file download failed for ${file.remote_path}: ${response.status} ${response.statusText}`);
-    }
-    await cacheResponseWithProgress({
-      cache,
-      expectedFileSize: file.size,
-      onProgress: (downloadedFileBytes) => {
-        reportProgress(((loadedBytes + downloadedFileBytes) / progressTotalBytes) * 100);
-      },
-      response,
-      url,
+    if (!progress.component) return;
+    const fallbackTotal = BONSAI_COMPONENT_TOTALS[progress.component] ?? progress.total ?? 1;
+    componentProgress.set(progress.component, {
+      loaded: Math.max(0, progress.loaded ?? 0),
+      total: Math.max(1, progress.total ?? fallbackTotal),
     });
-    loadedBytes += file.size;
-    reportProgress((loadedBytes / progressTotalBytes) * 100);
-  }
-
-  reportProgress(100);
-}
-
-async function cacheResponseWithProgress({
-  cache,
-  expectedFileSize,
-  onProgress,
-  response,
-  url,
-}: {
-  cache: Cache;
-  expectedFileSize: number;
-  onProgress: (downloadedFileBytes: number) => void;
-  response: Response;
-  url: string;
-}) {
-  if (!response.body || typeof TransformStream === 'undefined') {
-    await cache.put(url, response.clone());
-    onProgress(expectedFileSize);
-    return;
-  }
-
-  let downloadedBytes = 0;
-  const countingStream = response.body.pipeThrough(
-    new TransformStream<Uint8Array, Uint8Array>({
-      transform(chunk, controller) {
-        downloadedBytes += chunk.byteLength;
-        onProgress(Math.min(expectedFileSize, downloadedBytes));
-        controller.enqueue(chunk);
-      },
-    }),
-  );
-  const countedResponse = new Response(countingStream, {
-    headers: response.headers,
-    status: response.status,
-    statusText: response.statusText,
-  });
-
-  await cache.put(url, countedResponse);
-  onProgress(expectedFileSize);
+    report();
+  };
 }
 
 export class BrowserImageGenerationService implements ImageGenerationService {
@@ -249,6 +214,12 @@ export class BrowserImageGenerationService implements ImageGenerationService {
       width: options.width ?? DEFAULT_IMAGE_GENERATION_SIZE,
       steps,
       ...(options.seed !== undefined ? { seed: options.seed } : {}),
+      onLoadProgress: (progress) => {
+        options.onProgress?.({
+          label: 'Preparing image model',
+          progress: Math.max(1, Math.min(99, Math.round(progress))),
+        });
+      },
       onStep: (step, totalSteps) => {
         options.onProgress?.({
           label: `Generating image ${step}/${totalSteps}`,
