@@ -58,11 +58,12 @@ Next implementation priorities:
 
 1. Finish remaining non-AI editor fundamentals: real Design-tab property fields, page background editability, multi-select, and multi-element alignment.
 2. Harden File System Access project storage: move original/imported/generated image blobs into `assets/`, keep metadata in `project.json`, and keep generated previews/masks in `cache/`.
-3. Complete export: polish current-page PNG export and add all-page PDF from the actual Konva stage at configured page dimensions. JPEG is deferred unless explicitly reintroduced.
-4. Add Playwright coverage for layer reorder, hide/show, lock/unlock, delete, local image import, filesystem save, and text editing.
-5. Build first-run AI setup UX with actual browser capability checks and provider readiness state.
-6. Wire real Chrome Built-in AI translation and prompt-to-palette providers.
-7. Build Smart Grab and Magic Eraser on top of the shared Segment Anything WebGPU image editing provider.
+3. Build first-run AI setup UX with actual browser capability checks and provider readiness state.
+4. Wire real Chrome Built-in AI translation providers for selected text, current slide translation, and full deck translation.
+5. Complete export: polish current-page PNG export and add all-page PDF from the actual Konva stage at configured page dimensions. JPEG is deferred unless explicitly reintroduced.
+6. Add Playwright coverage for layer reorder, hide/show, lock/unlock, delete, local image import, filesystem save, text editing, translation flows, and first-run setup.
+7. Wire Chrome Built-in AI prompt-to-palette provider.
+8. Build Smart Grab and Magic Eraser on top of the shared Segment Anything WebGPU image editing provider.
 
 ## Goals
 
@@ -249,17 +250,30 @@ This structure supports undo/redo, unit testing, and predictable failure behavio
 
 ### Translate Design
 
-The user can translate text on the current page or the full project.
+The user can translate text at three scopes: selected text, current slide, or the full deck.
 
 Behavior:
 
 - Detect text elements and source language where available.
 - Show the detected current language in the top toolbar near the user/profile area after startup language detection completes.
-- When the user clicks Translate Design, preselect the translation flow using the detected current language as context so the user starts by choosing or confirming the target language.
+- When the user clicks a translation action, preselect the translation flow using the detected current language as context so the user starts by choosing or confirming the target language.
 - Use Chrome Built-in AI translation and language detection APIs after setup confirms support.
 - Preserve text element position, font size, color, alignment, and style metadata.
 - If translated text overflows, flag the element and offer fit-to-box resizing.
 - Apply changes through `TranslateTextCommand`.
+
+Translation entry points:
+
+- Selected text: when a text element is selected, the contextual/floating toolbar exposes a translate action. It translates only that selected text element.
+- Current slide: each slide/page surface exposes a compact translate icon near the top of the slide controls. It translates every visible text element on the active slide.
+- Full deck: `Edit > Translate Deck` translates text elements across all slides in the project automatically after the user confirms the target language.
+
+Translation result rules:
+
+- Text, slide, and deck translation all use the same Chrome Built-in AI provider interface and command pipeline.
+- Translation must preserve the document hierarchy: selected-text translation updates one element, slide translation updates elements on the active page only, and deck translation updates text elements on every page.
+- Translated changes participate in undo/redo as atomic commands per requested scope.
+- Locked or hidden text elements are skipped unless the user explicitly enables an advanced option later. The MVP default is to translate visible, unlocked text only.
 
 ### Text-to-Palette
 
@@ -336,10 +350,18 @@ Purpose:
 The setup flow checks:
 
 - Chrome Built-in AI availability for translation and prompt-based palette generation.
+- Chrome Built-in AI language detection and translation readiness before enabling selected-text, slide, or deck translation actions.
 - Required Transformers.js image segmentation model availability for background removal, Smart Grab, and Magic Eraser.
 - WebGPU/WebAssembly support needed by selected browser models.
 - File System Access API availability and permission state for project data, assets, app config, and app-generated cache artifacts.
 - Browser storage availability for lightweight app preferences, recent project handles, and model/provider readiness metadata.
+
+First-run setup scope for the next implementation pass:
+
+- Storage readiness is checked first because project persistence, asset files, and generated cache files are prerequisites for reliable local editing.
+- Chrome Built-in AI readiness is checked next for language detection and translation. If Chrome reports translation unavailable or needs setup, translation controls remain disabled and the AI Tools panel explains the missing capability.
+- Transformers.js image editing readiness remains available through the AI Tools panel. The image editing model can be downloaded on demand unless a future flow requires it at startup.
+- The setup screen must not copy AI model weights into the project folder. It only coordinates browser/provider-managed readiness and local project folder readiness.
 
 Caching policy:
 
