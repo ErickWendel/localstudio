@@ -61,7 +61,7 @@ Create these files:
 - Modify: `src/services/browserFileSystemProjectRepository.ts`
 - Test: `tests/unit/services/browserFileSystemProjectRepository.assets.test.ts`
 
-- [ ] **Step 1: Write the failing asset persistence test**
+- [x] **Step 1: Write the failing asset persistence test**
 
 Create `tests/unit/services/browserFileSystemProjectRepository.assets.test.ts` with this test harness and assertions:
 
@@ -162,7 +162,7 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
 });
 ```
 
-- [ ] **Step 2: Run the failing test**
+- [x] **Step 2: Run the failing test**
 
 Run:
 
@@ -172,7 +172,7 @@ npm run test -- --run tests/unit/services/browserFileSystemProjectRepository.ass
 
 Expected: FAIL because `fileName`/`storage` are not written and assets are not moved into `assets/`.
 
-- [ ] **Step 3: Add persistent asset metadata**
+- [x] **Step 3: Add persistent asset metadata**
 
 Modify `src/domain/model.ts`:
 
@@ -188,7 +188,7 @@ export interface Asset {
 }
 ```
 
-- [ ] **Step 4: Implement data URL asset extraction**
+- [x] **Step 4: Implement data URL asset extraction**
 
 In `src/services/browserFileSystemProjectRepository.ts`, add helpers near the constants:
 
@@ -261,7 +261,7 @@ private async writeBlobFile(directoryHandle: FileSystemDirectoryHandle, fileName
 }
 ```
 
-- [ ] **Step 5: Run the asset persistence test**
+- [x] **Step 5: Run the asset persistence test**
 
 Run:
 
@@ -271,7 +271,7 @@ npm run test -- --run tests/unit/services/browserFileSystemProjectRepository.ass
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/domain/model.ts src/services/browserFileSystemProjectRepository.ts tests/unit/services/browserFileSystemProjectRepository.assets.test.ts
