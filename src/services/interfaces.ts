@@ -30,6 +30,25 @@ export interface ModelSetupService {
   downloadModel(id: string): Promise<ModelState>;
 }
 
+export type SetupCapabilityStatus = 'unavailable' | 'needs-setup' | 'ready';
+
+export interface SetupCapabilityState {
+  label: string;
+  status: SetupCapabilityStatus;
+  detail: string;
+}
+
+export interface LocalSetupState {
+  fileSystem: SetupCapabilityState;
+  chromeTranslation: SetupCapabilityState;
+}
+
+export interface LocalSetupService {
+  checkReadiness(): Promise<LocalSetupState>;
+  markSetupComplete(): void;
+  hasCompletedSetup(): boolean;
+}
+
 export interface TranslatorService {
   detectLanguage(text: string): Promise<string>;
   translate(text: string, targetLanguage: string): Promise<string>;

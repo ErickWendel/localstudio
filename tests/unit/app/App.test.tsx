@@ -1,10 +1,18 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 import { App } from '../../../src/App';
+import { SETUP_COMPLETE_KEY } from '../../../src/services/localSetupService';
 
 describe('App', () => {
+  beforeEach(() => {
+    window.localStorage.setItem(SETUP_COMPLETE_KEY, 'true');
+  });
+
   afterEach(() => {
     window.history.replaceState({}, '', '/');
+    window.localStorage.clear();
+    vi.unstubAllGlobals();
   });
 
   it('renders the application root', () => {
@@ -36,5 +44,23 @@ describe('App', () => {
     render(<App />);
 
     expect(window.location.search).toBe('');
+  });
+
+  it('shows first-run setup before entering the editor', async () => {
+    const user = userEvent.setup();
+    window.localStorage.clear();
+    vi.stubGlobal('showDirectoryPicker', vi.fn());
+    vi.stubGlobal('translation', {
+      canTranslate: vi.fn().mockResolvedValue('readily'),
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText('LocalStudio.ai runs locally in this browser.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Continue to editor' }));
+
+    expect(window.localStorage.getItem(SETUP_COMPLETE_KEY)).toBe('true');
+    expect(await screen.findByText('Untitled AI Deck')).toBeInTheDocument();
   });
 });

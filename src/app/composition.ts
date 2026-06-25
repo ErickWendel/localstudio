@@ -3,6 +3,7 @@ import type { ProjectDocument } from '../domain/model';
 import type {
   BackgroundRemovalService,
   ExportService,
+  LocalSetupService,
   MagicEraserService,
   ModelSetupService,
   PaletteService,
@@ -20,6 +21,7 @@ import { BrowserExportService } from '../services/exportService';
 import { BrowserBackgroundRemovalService } from '../services/browserBackgroundRemovalService';
 import { BrowserFileSystemProjectRepository } from '../services/browserFileSystemProjectRepository';
 import { DisabledProjectRepository } from '../services/disabledProjectRepository';
+import { BrowserLocalSetupService } from '../services/localSetupService';
 import { BrowserModelSetupService } from '../services/modelSetupService';
 
 export interface AppServices {
@@ -28,6 +30,7 @@ export interface AppServices {
   storedProjectName?: string;
   projectRepository: ProjectRepository;
   exportService: ExportService;
+  localSetupService: LocalSetupService;
   modelSetupService: ModelSetupService;
   translatorService: TranslatorService;
   paletteService: PaletteService;
@@ -49,6 +52,7 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     ...(options.storedProjectName ? { storedProjectName: options.storedProjectName } : {}),
     projectRepository: createProjectRepository(),
     exportService: new BrowserExportService(),
+    localSetupService: new BrowserLocalSetupService(),
     modelSetupService: new BrowserModelSetupService(),
     translatorService: new MockTranslatorService(),
     paletteService: new MockPaletteService(),
