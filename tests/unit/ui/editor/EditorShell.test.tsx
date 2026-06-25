@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { createAppServices } from '../../../../src/app/composition';
@@ -60,6 +60,8 @@ class SavingProjectRepository implements ProjectRepository {
 }
 
 class ImportingProjectRepository implements ProjectRepository {
+  savedProjects: ProjectDocument[] = [];
+
   constructor(private readonly project: ProjectDocument) {}
 
   importProject(): Promise<ProjectDocument | null> {
@@ -70,7 +72,8 @@ class ImportingProjectRepository implements ProjectRepository {
     return Promise.resolve(null);
   }
 
-  saveProject(): Promise<void> {
+  saveProject(project: ProjectDocument): Promise<void> {
+    this.savedProjects.push(project);
     return Promise.resolve();
   }
 }
@@ -224,6 +227,36 @@ describe('EditorShell', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
     expect(window.location.search).toBe('?project=Imported+LocalStudio+Project');
+  });
+
+  it('preserves hydrated sample hero object URLs during import normalization', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const repository = new ImportingProjectRepository({
+      ...services.initialProject,
+      id: 'imported-project',
+      name: 'Imported Hydrated Project',
+      assets: {
+        ...services.initialProject.assets,
+        'asset-hero': {
+          ...services.initialProject.assets['asset-hero']!,
+          objectUrl: 'blob:hydrated-hero',
+          storage: 'file',
+          fileName: 'asset-hero.png',
+        },
+      },
+    });
+    services.projectRepository = repository;
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Import Project' }));
+
+    await waitFor(() => {
+      expect(repository.savedProjects.at(-1)?.assets['asset-hero']?.objectUrl).toBe(
+        'blob:hydrated-hero',
+      );
+    });
   });
 
   it('opens a blank project in a new tab from the File menu', async () => {

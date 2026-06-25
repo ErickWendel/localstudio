@@ -110,7 +110,7 @@ function normalizeProjectDocument(project: ProjectDocument): ProjectDocument {
         ? {
             'asset-hero': {
               ...project.assets['asset-hero'],
-              objectUrl: SAMPLE_HERO_IMAGE_URL,
+              objectUrl: project.assets['asset-hero'].objectUrl ?? SAMPLE_HERO_IMAGE_URL,
             },
           }
         : {}),
