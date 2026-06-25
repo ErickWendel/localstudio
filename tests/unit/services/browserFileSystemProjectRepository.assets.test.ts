@@ -1,3 +1,4 @@
+import { afterEach, vi } from 'vitest';
 import type { ProjectDocument } from '../../../src/domain/model';
 import { createSampleProject } from '../../../src/domain/sampleProject';
 import {
@@ -69,6 +70,10 @@ class MemoryRecentProjectHandleStore implements RecentProjectHandleStore {
 }
 
 describe('BrowserFileSystemProjectRepository asset files', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('moves data URL image assets into assets/ and saves metadata in project.json', async () => {
     const directory = new MockDirectoryHandle();
     const repository = new BrowserFileSystemProjectRepository({
@@ -198,5 +203,42 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
     });
 
     await expect(repository.importProject()).rejects.toMatchObject({ name: 'NotFoundError' });
+  });
+
+  it('moves blob URL image assets into assets/ and saves metadata in project.json', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      blob: () => Promise.resolve(new Blob(['generated'], { type: 'image/png' })),
+    } as Response);
+    const directory = new MockDirectoryHandle();
+    const repository = new BrowserFileSystemProjectRepository({
+      pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
+    });
+    const project = createSampleProject();
+    project.assets['asset-generated'] = {
+      id: 'asset-generated',
+      type: 'image',
+      name: 'Generated image',
+      mimeType: 'image/png',
+      objectUrl: 'blob:generated-image',
+    };
+
+    await repository.saveProject(project);
+
+    expect(globalThis.fetch).toHaveBeenCalledWith('blob:generated-image');
+    const assetsDirectory = directory.directories.get('assets')!;
+    expect(assetsDirectory.files.has('asset-generated.png')).toBe(true);
+    const savedAssetFile = assetsDirectory.files.get('asset-generated.png');
+    expect(savedAssetFile).toBeInstanceOf(Blob);
+    expect(await (savedAssetFile as Blob).text()).toBe('generated');
+    const savedProject = JSON.parse(directory.files.get('project.json') as string) as ProjectDocument;
+    const savedAsset = savedProject.assets['asset-generated'];
+    if (!savedAsset) throw new Error('Expected asset-generated to be saved in project.json');
+    expect(savedAsset).toMatchObject({
+      id: 'asset-generated',
+      fileName: 'asset-generated.png',
+      storage: 'file',
+    });
+    expect(savedAsset.objectUrl).toBeUndefined();
   });
 });

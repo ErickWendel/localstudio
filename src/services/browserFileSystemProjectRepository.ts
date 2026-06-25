@@ -34,11 +34,21 @@ function isDataUrl(value: string | undefined): value is string {
   return Boolean(value?.startsWith('data:'));
 }
 
+function isBlobUrl(value: string | undefined): value is string {
+  return Boolean(value?.startsWith('blob:'));
+}
+
 function dataUrlToBlob(dataUrl: string) {
   const [metadata, base64 = ''] = dataUrl.split(',');
   const mimeType = metadata?.match(/^data:(.*?);base64$/)?.[1] ?? 'application/octet-stream';
   const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
   return new Blob([bytes], { type: mimeType });
+}
+
+async function objectUrlToBlob(objectUrl: string) {
+  if (isDataUrl(objectUrl)) return dataUrlToBlob(objectUrl);
+  const response = await fetch(objectUrl);
+  return response.blob();
 }
 
 export class BrowserFileSystemProjectRepository implements ProjectRepository {
@@ -93,18 +103,15 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
 
     for (const [assetId, asset] of Object.entries(project.assets)) {
       if (asset.storage === 'file' && asset.fileName) {
-        if (isDataUrl(asset.objectUrl)) {
-          await this.writeBlobFile(assetsDirectory, asset.fileName, dataUrlToBlob(asset.objectUrl));
-        }
         const assetForDisk = { ...asset };
         delete assetForDisk.objectUrl;
         projectForDisk.assets[assetId] = assetForDisk;
         continue;
       }
 
-      if (!isDataUrl(asset.objectUrl)) continue;
+      if (!isDataUrl(asset.objectUrl) && !isBlobUrl(asset.objectUrl)) continue;
       const fileName = asset.fileName ?? `${assetId}.${getAssetFileExtension(asset.mimeType)}`;
-      await this.writeBlobFile(assetsDirectory, fileName, dataUrlToBlob(asset.objectUrl));
+      await this.writeBlobFile(assetsDirectory, fileName, await objectUrlToBlob(asset.objectUrl));
       const assetForDisk = { ...asset };
       delete assetForDisk.objectUrl;
       projectForDisk.assets[assetId] = {
