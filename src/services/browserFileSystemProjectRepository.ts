@@ -24,6 +24,23 @@ type WindowWithDirectoryPicker = Window &
 const PROJECT_FILE_NAME = 'project.json';
 const PROJECT_CONFIG_FILE_NAME = 'localstudio.json';
 
+function getAssetFileExtension(mimeType: string) {
+  if (mimeType === 'image/jpeg') return 'jpg';
+  if (mimeType === 'image/webp') return 'webp';
+  return 'png';
+}
+
+function isDataUrl(value: string | undefined): value is string {
+  return Boolean(value?.startsWith('data:'));
+}
+
+function dataUrlToBlob(dataUrl: string) {
+  const [metadata, base64 = ''] = dataUrl.split(',');
+  const mimeType = metadata?.match(/^data:(.*?);base64$/)?.[1] ?? 'application/octet-stream';
+  const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+  return new Blob([bytes], { type: mimeType });
+}
+
 export class BrowserFileSystemProjectRepository implements ProjectRepository {
   private directoryHandle: FileSystemDirectoryHandle | null = null;
   private readonly recentProjectStore: RecentProjectHandleStore;
@@ -60,13 +77,31 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
 
   async saveProject(project: ProjectDocument): Promise<void> {
     const directoryHandle = await this.ensureProjectDirectory(project.name);
+    const assetsDirectory = await directoryHandle.getDirectoryHandle('assets', { create: true });
     await Promise.all([
-      directoryHandle.getDirectoryHandle('assets', { create: true }),
       directoryHandle.getDirectoryHandle('cache', { create: true }),
       directoryHandle.getDirectoryHandle('config', { create: true }),
     ]);
 
-    await this.writeJsonFile(directoryHandle, PROJECT_FILE_NAME, project);
+    const projectForDisk: ProjectDocument = {
+      ...project,
+      assets: { ...project.assets },
+    };
+
+    for (const [assetId, asset] of Object.entries(project.assets)) {
+      if (!isDataUrl(asset.objectUrl)) continue;
+      const fileName = asset.fileName ?? `${assetId}.${getAssetFileExtension(asset.mimeType)}`;
+      await this.writeBlobFile(assetsDirectory, fileName, dataUrlToBlob(asset.objectUrl));
+      const assetForDisk = { ...asset };
+      delete assetForDisk.objectUrl;
+      projectForDisk.assets[assetId] = {
+        ...assetForDisk,
+        fileName,
+        storage: 'file',
+      };
+    }
+
+    await this.writeJsonFile(directoryHandle, PROJECT_FILE_NAME, projectForDisk);
     const configDirectory = await directoryHandle.getDirectoryHandle('config', { create: true });
     await this.writeJsonFile(configDirectory, PROJECT_CONFIG_FILE_NAME, {
       app: 'LocalStudio.ai',
@@ -111,6 +146,13 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
   }
 
   private async writeTextFile(directoryHandle: FileSystemDirectoryHandle, fileName: string, value: string) {
+    const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(value);
+    await writable.close();
+  }
+
+  private async writeBlobFile(directoryHandle: FileSystemDirectoryHandle, fileName: string, value: Blob) {
     const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
     const writable = await fileHandle.createWritable();
     await writable.write(value);

@@ -29,6 +29,8 @@ export interface Asset {
   name: string;
   mimeType: string;
   objectUrl?: string;
+  fileName?: string;
+  storage?: 'inline' | 'file' | 'remote';
 }
 
 export type DesignElement = TextElement | ImageElement | ShapeElement;
