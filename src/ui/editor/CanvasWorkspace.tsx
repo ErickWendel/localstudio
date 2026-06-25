@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import type Konva from 'konva';
 import { Image as KonvaImage, Layer, Rect, Stage, Text, Transformer } from 'react-konva';
 import type { ElementFramePatch } from '../../domain/commands/basicCommands';
@@ -9,8 +9,14 @@ interface CanvasWorkspaceProps {
   project: ProjectDocument;
   activePageId: string;
   selection: SelectionState;
+  stageRef?: RefObject<Konva.Stage | null>;
   zoomPercent?: number;
+  onAlignSelectedElement?: () => void;
+  onBringSelectedElementForward?: () => void;
+  onDeleteSelectedElement?: () => void;
+  onDuplicateSelectedElement?: () => void;
   onSelectElement?: (elementId: string) => void;
+  onSendSelectedElementBackward?: () => void;
   onUpdateElementFrame?: (elementId: string, patch: ElementFramePatch) => void;
   onUpdateTextContent?: (elementId: string, text: string) => void;
 }
@@ -64,8 +70,14 @@ export function CanvasWorkspace({
   project,
   activePageId,
   selection,
+  stageRef,
   zoomPercent = 100,
+  onAlignSelectedElement,
+  onBringSelectedElementForward,
+  onDeleteSelectedElement,
+  onDuplicateSelectedElement,
   onSelectElement,
+  onSendSelectedElementBackward,
   onUpdateElementFrame,
   onUpdateTextContent,
 }: CanvasWorkspaceProps) {
@@ -223,8 +235,9 @@ export function CanvasWorkspace({
         }}
       >
         <div className="canvas-artboard" ref={artboardRef} style={{ background: pageBackground }}>
-          <Stage height={stageHeight} width={stageWidth}>
+          <Stage ref={stageRef} height={stageHeight} width={stageWidth}>
             <Layer>
+              <Rect fill={pageBackground} height={stageHeight} listening={false} width={stageWidth} x={0} y={0} />
               {visibleElements.map((element) => {
                 const commonProps = getCommonElementProps(element);
 
@@ -339,7 +352,15 @@ export function CanvasWorkspace({
         <span className="canvas-size">
           {page?.width} x {page?.height}
         </span>
-        {hasSelection ? <FloatingSelectionToolbar /> : null}
+        {hasSelection ? (
+          <FloatingSelectionToolbar
+            onAlignCenter={onAlignSelectedElement}
+            onBringForward={onBringSelectedElementForward}
+            onDelete={onDeleteSelectedElement}
+            onDuplicate={onDuplicateSelectedElement}
+            onSendBackward={onSendSelectedElementBackward}
+          />
+        ) : null}
       </div>
     </div>
   );

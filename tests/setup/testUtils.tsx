@@ -40,6 +40,12 @@ Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
   },
 });
 
+Object.defineProperty(HTMLCanvasElement.prototype, 'toDataURL', {
+  value() {
+    return 'data:image/png;base64,test';
+  },
+});
+
 class ResizeObserverMock implements ResizeObserver {
   observe() {
     return undefined;

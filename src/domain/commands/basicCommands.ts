@@ -1,4 +1,4 @@
-import type { Asset, BaseElement, ImageElement, ProjectDocument } from '../model';
+import type { Asset, BaseElement, DesignElement, ImageElement, ProjectDocument } from '../model';
 import type { EditorCommand } from './types';
 
 export type AlignMode = 'horizontal-center' | 'vertical-center' | 'page-center';
@@ -68,6 +68,44 @@ export class SetZOrderCommand implements EditorCommand {
         next.splice(targetIndex, 0, this.elementId);
         return { ...page, elementIds: next };
       }),
+    };
+  }
+}
+
+export class DuplicateElementCommand implements EditorCommand {
+  readonly description = 'Duplicate element';
+
+  constructor(
+    private readonly pageId: string,
+    private readonly elementId: string,
+    private readonly nextElementId: string,
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    const element = project.elements[this.elementId];
+    const page = project.pages.find((item) => item.id === this.pageId);
+    if (!element || !page || element.locked) return project;
+
+    const nextElement: DesignElement = {
+      ...element,
+      id: this.nextElementId,
+      x: element.x + 24,
+      y: element.y + 24,
+      locked: false,
+    };
+
+    return {
+      ...project,
+      elements: {
+        ...project.elements,
+        [this.nextElementId]: nextElement,
+      },
+      pages: project.pages.map((item) =>
+        item.id === this.pageId
+          ? { ...item, elementIds: [...item.elementIds, this.nextElementId] }
+          : item,
+      ),
+      updatedAt: new Date().toISOString(),
     };
   }
 }

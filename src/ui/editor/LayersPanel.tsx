@@ -20,8 +20,14 @@ function isDesignElement(element: DesignElement | undefined): element is DesignE
 
 function getLayerLabel(element: DesignElement, project: ProjectDocument) {
   if (element.id === 'text-title') return 'Title';
+  if (element.id.startsWith('text-title-copy')) return 'Title copy';
   if (element.id === 'text-subtitle') return 'Subtitle';
+  if (element.id.startsWith('text-subtitle-copy')) return 'Subtitle copy';
   if (element.id === 'image-hero') return 'Selected Image';
+  if (element.type === 'image' && element.assetId === 'asset-hero') return 'Selected Image copy';
+  if (element.type === 'image' && element.id.includes('-copy')) {
+    return `${project.assets[element.assetId]?.name ?? 'Imported Image'} copy`;
+  }
   if (element.type === 'image') return project.assets[element.assetId]?.name ?? 'Imported Image';
   if (element.type === 'shape') return 'Background Shape';
   return element.id;

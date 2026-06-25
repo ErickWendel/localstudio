@@ -2,13 +2,18 @@ import { useEffect, useMemo, useState } from 'react';
 import type { AppServices } from '../../app/composition';
 import {
   AddImageElementCommand,
+  AlignElementCommand,
   DeleteElementCommand,
+  DuplicateElementCommand,
   ReorderElementCommand,
   SetElementLockCommand,
   SetElementVisibilityCommand,
+  SetZOrderCommand,
   UpdateElementFrameCommand,
   UpdateTextContentCommand,
+  type AlignMode,
   type ElementFramePatch,
+  type ZOrderMode,
 } from '../../domain/commands/basicCommands';
 import { fitImageWithinPage } from '../../domain/imageSizing';
 import type { Page, ProjectDocument, SelectionState } from '../../domain/model';
@@ -244,6 +249,35 @@ export function useEditorViewModel(services: AppServices) {
     });
   }
 
+  function deleteSelectedElement() {
+    const elementId = selectedElementIds[0];
+    if (!elementId) return;
+    deleteElement(elementId);
+  }
+
+  function duplicateSelectedElement() {
+    const elementId = selectedElementIds[0];
+    if (!elementId) return;
+    const nextElementId = createId(`${elementId}-copy`);
+    commitProject(
+      (currentProject) =>
+        new DuplicateElementCommand(activePageId, elementId, nextElementId).execute(currentProject),
+      { selectedElementIds: [nextElementId] },
+    );
+  }
+
+  function alignSelectedElement(mode: AlignMode) {
+    const elementId = selectedElementIds[0];
+    if (!elementId) return;
+    commitProject((currentProject) => new AlignElementCommand(activePageId, elementId, mode).execute(currentProject));
+  }
+
+  function setSelectedElementZOrder(mode: ZOrderMode) {
+    const elementId = selectedElementIds[0];
+    if (!elementId) return;
+    commitProject((currentProject) => new SetZOrderCommand(activePageId, elementId, mode).execute(currentProject));
+  }
+
   function reorderElement(elementId: string, targetElementId: string) {
     commitProject((currentProject) => {
       const page = currentProject.pages.find((item) => item.id === activePageId);
@@ -388,6 +422,10 @@ export function useEditorViewModel(services: AppServices) {
     zoomIn,
     zoomOut,
     resetZoom,
+    deleteSelectedElement,
+    duplicateSelectedElement,
+    alignSelectedElement,
+    setSelectedElementZOrder,
     updateElementFrame,
     updateTextContent,
     setElementVisibility,

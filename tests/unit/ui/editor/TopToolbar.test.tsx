@@ -29,4 +29,10 @@ describe('TopToolbar', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Toggle Layers Panel' }));
     expect(onSelectLayers).toHaveBeenCalledTimes(1);
   });
+
+  it('shows persistence as disabled by default near editing actions', () => {
+    render(<TopToolbar project={createSampleProject()} language="PT-BR" />);
+
+    expect(screen.getByRole('button', { name: 'Persistence disabled' })).toBeDisabled();
+  });
 });

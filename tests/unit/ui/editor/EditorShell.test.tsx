@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { vi } from 'vitest';
 import { createAppServices } from '../../../../src/app/composition';
 import { EditorShell } from '../../../../src/ui/editor/EditorShell';
 
@@ -66,5 +67,56 @@ describe('EditorShell', () => {
       'aria-pressed',
       'true',
     );
+  });
+
+  it('deletes the selected layer with Delete and Backspace keystrokes', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.keyboard('{Delete}');
+    expect(screen.queryByRole('button', { name: 'Selected Image' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    await user.click(screen.getByRole('button', { name: 'Selected Image' }));
+
+    await user.keyboard('{Backspace}');
+    expect(screen.queryByRole('button', { name: 'Selected Image' })).not.toBeInTheDocument();
+  });
+
+  it('duplicates, centers, and changes z-order from the floating toolbar', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Duplicate' }));
+    expect(screen.getByRole('button', { name: 'Selected Image copy' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Align Center' }));
+    await user.click(screen.getByRole('button', { name: 'Send Backward' }));
+    await user.click(screen.getByRole('button', { name: 'Bring Forward' }));
+
+    expect(screen.getByRole('button', { name: 'Selected Image copy' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  it('exports the current slide as a PNG file', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const downloadDataUrl = vi.fn();
+    services.exportService = {
+      getPageImageFileName: () => 'slide.png',
+      getPdfFileName: () => 'deck.pdf',
+      downloadDataUrl,
+    };
+
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'Export' }));
+
+    expect(downloadDataUrl).toHaveBeenCalledWith(expect.stringMatching(/^data:image\/png/), 'slide.png');
   });
 });

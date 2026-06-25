@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react';
+import type Konva from 'konva';
 import type { AppServices } from '../../app/composition';
 import { CanvasWorkspace } from './CanvasWorkspace';
 import { PageRail } from './PageRail';
@@ -12,6 +14,41 @@ interface EditorShellProps {
 
 export function EditorShell({ services }: EditorShellProps) {
   const vm = useEditorViewModel(services);
+  const stageRef = useRef<Konva.Stage>(null);
+  const hasSelection = vm.selection.elementIds.length > 0;
+
+  function exportCurrentPageAsPng() {
+    const dataUrl = stageRef.current?.toDataURL({ mimeType: 'image/png', pixelRatio: 2 });
+    if (!dataUrl) return;
+    services.exportService.downloadDataUrl(
+      dataUrl,
+      services.exportService.getPageImageFileName(vm.project, vm.activePageId, 'png'),
+    );
+  }
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Delete' && event.key !== 'Backspace') return;
+      const target = event.target;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target instanceof HTMLElement && target.isContentEditable)
+      ) {
+        return;
+      }
+
+      if (!hasSelection) return;
+      event.preventDefault();
+      vm.deleteSelectedElement();
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [hasSelection, vm]);
 
   return (
     <div className="app-shell">
@@ -20,7 +57,11 @@ export function EditorShell({ services }: EditorShellProps) {
         language="PT-BR"
         canRedo={vm.canRedo}
         canUndo={vm.canUndo}
+        hasSelection={hasSelection}
         zoomPercent={vm.zoomPercent}
+        onDelete={vm.deleteSelectedElement}
+        onDuplicate={vm.duplicateSelectedElement}
+        onExport={exportCurrentPageAsPng}
         onRedo={vm.redo}
         onResetZoom={vm.resetZoom}
         onSelectLayers={() => {
@@ -59,8 +100,20 @@ export function EditorShell({ services }: EditorShellProps) {
             project={vm.project}
             activePageId={vm.activePageId}
             selection={vm.selection}
+            stageRef={stageRef}
             zoomPercent={vm.zoomPercent}
+            onAlignSelectedElement={() => {
+              vm.alignSelectedElement('page-center');
+            }}
+            onBringSelectedElementForward={() => {
+              vm.setSelectedElementZOrder('forward');
+            }}
+            onDeleteSelectedElement={vm.deleteSelectedElement}
+            onDuplicateSelectedElement={vm.duplicateSelectedElement}
             onSelectElement={vm.selectElement}
+            onSendSelectedElementBackward={() => {
+              vm.setSelectedElementZOrder('backward');
+            }}
             onUpdateElementFrame={vm.updateElementFrame}
             onUpdateTextContent={vm.updateTextContent}
           />

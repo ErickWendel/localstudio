@@ -6,7 +6,11 @@ interface TopToolbarProps {
   language: string;
   canRedo?: boolean;
   canUndo?: boolean;
+  hasSelection?: boolean;
+  persistenceEnabled?: boolean;
   zoomPercent?: number;
+  onDelete?: () => void;
+  onDuplicate?: () => void;
   onExport?: () => void;
   onRedo?: () => void;
   onResetZoom?: () => void;
@@ -31,7 +35,11 @@ export function TopToolbar({
   language,
   canRedo = false,
   canUndo = false,
+  hasSelection = false,
+  persistenceEnabled = false,
   zoomPercent = 100,
+  onDelete,
+  onDuplicate,
   onExport,
   onRedo,
   onResetZoom,
@@ -64,8 +72,8 @@ export function TopToolbar({
     Edit: [
       { label: 'Undo', disabled: !canUndo, onSelect: onUndo },
       { label: 'Redo', disabled: !canRedo, onSelect: onRedo },
-      { label: 'Duplicate', disabled: true },
-      { label: 'Delete', disabled: true },
+      { label: 'Duplicate', disabled: !hasSelection, onSelect: onDuplicate },
+      { label: 'Delete', disabled: !hasSelection, onSelect: onDelete },
     ],
     View: [
       { label: 'Zoom Out', onSelect: onZoomOut },
@@ -139,6 +147,17 @@ export function TopToolbar({
       </div>
       <div className="toolbar-right">
         <div className="toolbar-icon-group" aria-label="Editing actions">
+          <button
+            className={persistenceEnabled ? 'stitch-icon-button persistence-on' : 'stitch-icon-button persistence-off'}
+            disabled
+            title={persistenceEnabled ? 'Persistence enabled' : 'Persistence disabled'}
+            type="button"
+            aria-label={persistenceEnabled ? 'Persistence enabled' : 'Persistence disabled'}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              {persistenceEnabled ? 'cloud_done' : 'cloud_off'}
+            </span>
+          </button>
           <button
             className="stitch-icon-button"
             disabled={!canUndo}

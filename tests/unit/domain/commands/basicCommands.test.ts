@@ -2,6 +2,7 @@ import {
   AlignElementCommand,
   AddImageElementCommand,
   DeleteElementCommand,
+  DuplicateElementCommand,
   ReorderElementCommand,
   SetZOrderCommand,
   SetElementLockCommand,
@@ -28,6 +29,24 @@ describe('editor commands', () => {
     const next = command.execute(project);
 
     expect(next.pages[0]?.elementIds.at(-1)).toBe('image-hero');
+  });
+
+  it('duplicates an element as the topmost unlocked copy', () => {
+    const project = createSampleProject();
+    const command = new DuplicateElementCommand('page-1', 'text-title', 'text-title-copy');
+    const next = command.execute(project);
+
+    expect(next).not.toBe(project);
+    expect(next.elements['text-title-copy']).toMatchObject({
+      id: 'text-title-copy',
+      type: 'text',
+      text: 'AI Design Revolution',
+      x: 464,
+      y: 444,
+      locked: false,
+    });
+    expect(next.pages[0]?.elementIds.at(-1)).toBe('text-title-copy');
+    expect(project.elements['text-title-copy']).toBeUndefined();
   });
 
   it('deletes an element and removes it from z-order', () => {
@@ -103,6 +122,16 @@ describe('editor commands', () => {
       'text-subtitle',
       'text-title',
     ]);
+  });
+
+  it('moves an element forward and backward in z-order immutably', () => {
+    const project = createSampleProject();
+    const forward = new SetZOrderCommand('page-1', 'image-hero', 'forward').execute(project);
+    const backward = new SetZOrderCommand('page-1', 'text-title', 'backward').execute(project);
+
+    expect(forward.pages[0]?.elementIds).toEqual(['text-subtitle', 'image-hero', 'text-title']);
+    expect(backward.pages[0]?.elementIds).toEqual(['image-hero', 'text-title', 'text-subtitle']);
+    expect(project.pages[0]?.elementIds).toEqual(['image-hero', 'text-subtitle', 'text-title']);
   });
 
   it('sets element visibility and lock state immutably', () => {
