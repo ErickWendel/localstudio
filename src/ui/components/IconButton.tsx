@@ -4,16 +4,25 @@ interface IconButtonProps {
   label: string;
   children: ReactNode;
   active?: boolean;
+  attention?: boolean;
   onClick?: () => void;
 }
 
-export function IconButton({ label, children, active = false, onClick }: IconButtonProps) {
+export function IconButton({ label, children, active = false, attention = false, onClick }: IconButtonProps) {
+  const className = [
+    'icon-button',
+    active ? 'icon-button-active' : '',
+    attention ? 'icon-button-attention' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <button
       aria-label={label}
       title={label}
       onClick={onClick}
-      className={active ? 'icon-button icon-button-active' : 'icon-button'}
+      className={className}
       type="button"
     >
       {children}

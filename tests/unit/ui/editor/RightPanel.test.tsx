@@ -92,6 +92,44 @@ describe('RightPanel', () => {
     expect(onSelectElement).toHaveBeenCalledWith('text-title');
   });
 
+  it('highlights the image editing model download when background selection needs it', () => {
+    render(
+      <RightPanel
+        activeTab="ai-tools"
+        onTabChange={vi.fn()}
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
+        modelStates={modelStates}
+        attentionModelId="image-editing-models"
+      />,
+    );
+
+    expect(screen.getByRole('article', { name: 'Image Editing Models' })).toHaveClass('model-row-attention');
+    expect(screen.getByRole('button', { name: 'Download Image Editing Models' })).toHaveClass(
+      'icon-button-attention',
+    );
+  });
+
+  it('does not pulse a ready image editing model', () => {
+    render(
+      <RightPanel
+        activeTab="ai-tools"
+        onTabChange={vi.fn()}
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
+        modelStates={[{ ...modelStates[0]!, status: 'ready' as const, progress: 100 }]}
+        attentionModelId="image-editing-models"
+      />,
+    );
+
+    expect(screen.getByRole('article', { name: 'Image Editing Models' })).not.toHaveClass('model-row-attention');
+    expect(screen.getByRole('button', { name: 'Download Image Editing Models' })).not.toHaveClass(
+      'icon-button-attention',
+    );
+  });
+
   it('exposes layer controls for visibility, lock, delete, and drag order', async () => {
     const user = userEvent.setup();
     const onSetVisibility = vi.fn();

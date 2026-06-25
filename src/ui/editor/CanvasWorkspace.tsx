@@ -39,6 +39,8 @@ interface CommonElementProps {
   onDblClick: () => void;
   onDblTap: () => void;
   onDragEnd: (event: Konva.KonvaEventObject<DragEvent>) => void;
+  onMouseEnter: (event: Konva.KonvaEventObject<MouseEvent>) => void;
+  onMouseLeave: (event: Konva.KonvaEventObject<MouseEvent>) => void;
   onTap: () => void;
   onTransformEnd: (event: Konva.KonvaEventObject<Event>) => void;
 }
@@ -105,6 +107,8 @@ export function CanvasWorkspace({
       .filter((element) => element.visible !== false) ?? [];
   const hasSelection = selection.elementIds.length > 0;
   const selectedElement = project.elements[selection.elementIds[0] ?? ''];
+  const backgroundSelectionTargetId =
+    backgroundSelectionMode && selectedElement?.type === 'image' ? selectedElement.id : undefined;
   const stageWidth = stageSize.width;
   const stageHeight = stageSize.height;
   const scaleX = page ? stageWidth / page.width : 1;
@@ -201,7 +205,7 @@ export function CanvasWorkspace({
   }
 
   function pickBackgroundSubject(element: DesignElement, event: Konva.KonvaEventObject<MouseEvent>) {
-    if (element.type !== 'image') return;
+    if (element.id !== backgroundSelectionTargetId || element.type !== 'image') return;
     const stage = event.target.getStage();
     const pointer = stage?.getPointerPosition();
     if (!pointer) return;
@@ -217,6 +221,8 @@ export function CanvasWorkspace({
   }
 
   function getCommonElementProps(element: DesignElement): CommonElementProps {
+    const isBackgroundSelectionTarget = element.id === backgroundSelectionTargetId;
+
     return {
       draggable: !element.locked && !backgroundSelectionMode,
       height: element.height * scaleY,
@@ -244,6 +250,16 @@ export function CanvasWorkspace({
       onDragEnd: (event: Konva.KonvaEventObject<DragEvent>) => {
         handleDragEnd(element.id, event);
       },
+      onMouseEnter: (event: Konva.KonvaEventObject<MouseEvent>) => {
+        if (!isBackgroundSelectionTarget) return;
+        const container = event.target.getStage()?.container();
+        if (container) container.style.cursor = 'pointer';
+      },
+      onMouseLeave: (event: Konva.KonvaEventObject<MouseEvent>) => {
+        if (!isBackgroundSelectionTarget) return;
+        const container = event.target.getStage()?.container();
+        if (container) container.style.cursor = '';
+      },
       onTap: () => {
         onSelectElement?.(element.id);
       },
@@ -256,12 +272,11 @@ export function CanvasWorkspace({
   return (
     <div className="canvas-workspace">
       <div
-        className={
-          backgroundSelectionMode
-            ? 'canvas-frame neon-border canvas-frame-bg-selection'
-            : 'canvas-frame neon-border'
-        }
+        className="canvas-frame neon-border"
         aria-label="Slide canvas"
+        {...(backgroundSelectionTargetId
+          ? { 'data-background-selection-target': backgroundSelectionTargetId }
+          : {})}
         data-selected-elements={selection.elementIds.join(',')}
         style={{
           transform: `scale(${zoomPercent / 100})`,
@@ -321,6 +336,22 @@ export function CanvasWorkspace({
                   />
                 );
               })}
+              {backgroundSelectionTargetId && selectedElement?.type === 'image' ? (
+                <Rect
+                  dash={[8, 5]}
+                  height={selectedElement.height * scaleY}
+                  listening={false}
+                  opacity={1}
+                  rotation={selectedElement.rotation}
+                  shadowBlur={18}
+                  shadowColor="#37FD76"
+                  stroke="#37FD76"
+                  strokeWidth={2}
+                  width={selectedElement.width * scaleX}
+                  x={selectedElement.x * scaleX}
+                  y={selectedElement.y * scaleY}
+                />
+              ) : null}
               <Transformer
                 ref={transformerRef}
                 anchorFill="#37FD76"

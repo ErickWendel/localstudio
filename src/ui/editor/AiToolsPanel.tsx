@@ -6,6 +6,7 @@ import { StatusPill } from '../components/StatusPill';
 
 interface AiToolsPanelProps {
   modelStates: ModelState[];
+  attentionModelId?: string | undefined;
   onDownloadRequiredModels?: (() => Promise<void>) | undefined;
 }
 
@@ -35,7 +36,7 @@ function formatStatus(status: ModelState['status']) {
     .join(' ');
 }
 
-export function AiToolsPanel({ modelStates, onDownloadRequiredModels }: AiToolsPanelProps) {
+export function AiToolsPanel({ modelStates, attentionModelId, onDownloadRequiredModels }: AiToolsPanelProps) {
   return (
     <div className="panel-stack">
       <button
@@ -66,27 +67,34 @@ export function AiToolsPanel({ modelStates, onDownloadRequiredModels }: AiToolsP
       </PanelSection>
       <PanelSection title="Cached Browser Models">
         <div className="model-list">
-          {modelStates.map((model) => (
-            <article className="model-row" key={model.id}>
-              <div className="model-row-main">
-                <ScanSearch size={17} />
-                <div className="model-row-title">
-                  <strong>{model.label}</strong>
-                  {model.description ? <span>{model.description}</span> : null}
+          {modelStates.map((model) => {
+            const needsAttention = attentionModelId === model.id && model.status !== 'ready';
+            return (
+              <article
+                aria-label={model.label}
+                className={needsAttention ? 'model-row model-row-attention' : 'model-row'}
+                key={model.id}
+              >
+                <div className="model-row-main">
+                  <ScanSearch size={17} />
+                  <div className="model-row-title">
+                    <strong>{model.label}</strong>
+                    {model.description ? <span>{model.description}</span> : null}
+                  </div>
+                  <IconButton label={`Download ${model.label}`} attention={needsAttention}>
+                    <Download size={14} />
+                  </IconButton>
                 </div>
-                <IconButton label={`Download ${model.label}`}>
-                  <Download size={14} />
-                </IconButton>
-              </div>
-              <div className="model-row-meta">
-                <StatusPill label={formatStatus(model.status)} tone={statusTone(model.status)} />
-                <span>{model.progress}%</span>
-              </div>
-              <div className="model-progress" aria-label={`${model.label} progress`}>
-                <span style={{ width: `${model.progress}%` }} />
-              </div>
-            </article>
-          ))}
+                <div className="model-row-meta">
+                  <StatusPill label={formatStatus(model.status)} tone={statusTone(model.status)} />
+                  <span>{model.progress}%</span>
+                </div>
+                <div className="model-progress" aria-label={`${model.label} progress`}>
+                  <span style={{ width: `${model.progress}%` }} />
+                </div>
+              </article>
+            );
+          })}
         </div>
       </PanelSection>
     </div>

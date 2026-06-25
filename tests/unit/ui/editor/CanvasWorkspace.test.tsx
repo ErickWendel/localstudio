@@ -47,7 +47,8 @@ describe('CanvasWorkspace', () => {
     );
 
     expect(screen.getByText('Click the main object to keep. Everything else will be removed.')).toBeInTheDocument();
-    expect(screen.getByLabelText('Slide canvas')).toHaveClass('canvas-frame-bg-selection');
+    expect(screen.getByLabelText('Slide canvas')).not.toHaveClass('canvas-frame-bg-selection');
+    expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-background-selection-target', 'image-hero');
 
     await user.click(screen.getByRole('button', { name: 'Cancel Background Selection' }));
   });

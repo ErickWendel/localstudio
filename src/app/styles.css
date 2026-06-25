@@ -618,18 +618,6 @@ button {
   background: #050d10;
 }
 
-.canvas-frame-bg-selection {
-  box-shadow:
-    0 24px 64px rgba(0, 0, 0, 0.52),
-    0 0 0 1px rgba(55, 253, 118, 0.64),
-    0 0 28px rgba(55, 253, 118, 0.18);
-}
-
-.canvas-frame-bg-selection .canvas-artboard,
-.canvas-frame-bg-selection canvas {
-  cursor: crosshair;
-}
-
 .background-selection-hint {
   position: absolute;
   left: 50%;
@@ -966,6 +954,11 @@ button {
   transform: translateY(-1px);
 }
 
+.model-row-attention {
+  border-color: rgba(55, 253, 118, 0.55);
+  box-shadow: 0 0 22px rgba(55, 253, 118, 0.14);
+}
+
 .tool-card-heading,
 .model-row-main,
 .model-row-meta,
@@ -1198,6 +1191,25 @@ button {
 .icon-button-active {
   color: var(--ew-green);
   border-color: var(--ew-green);
+}
+
+.icon-button-attention {
+  color: var(--ew-green);
+  border-color: var(--ew-green);
+  animation: model-download-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes model-download-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(55, 253, 118, 0);
+    transform: translateY(0);
+  }
+
+  50% {
+    box-shadow: 0 0 18px rgba(55, 253, 118, 0.35);
+    transform: translateY(-1px);
+  }
 }
 
 .toolbar-menu-item:focus-visible,

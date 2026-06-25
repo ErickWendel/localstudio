@@ -158,6 +158,7 @@ export function EditorShell({ services }: EditorShellProps) {
           onDeleteElement={vm.deleteElement}
           onReorderElement={vm.reorderElement}
           modelStates={vm.modelStates}
+          attentionModelId={vm.backgroundSelectionMode ? 'image-editing-models' : undefined}
           onDownloadRequiredModels={vm.downloadRequiredModels}
         />
       </div>

@@ -397,7 +397,11 @@ export function useEditorViewModel(services: AppServices) {
   function toggleBackgroundSelectionMode() {
     const element = project.elements[selectedElementIds[0] ?? ''];
     if (element?.type !== 'image') return;
-    setBackgroundSelectionMode((current) => !current);
+    setBackgroundSelectionMode((current) => {
+      const nextEnabled = !current;
+      if (nextEnabled) setActiveTab('ai-tools');
+      return nextEnabled;
+    });
   }
 
   function cancelBackgroundSelectionMode() {

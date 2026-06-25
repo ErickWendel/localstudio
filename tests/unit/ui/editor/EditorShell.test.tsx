@@ -156,6 +156,10 @@ describe('EditorShell', () => {
 
     expect(screen.getByText('Click the main object to keep. Everything else will be removed.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cancel Background Selection' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'AI Tools' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('button', { name: 'Download Image Editing Models' })).toHaveClass(
+      'icon-button-attention',
+    );
 
     await user.keyboard('{Escape}');
 

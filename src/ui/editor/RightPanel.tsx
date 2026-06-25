@@ -11,6 +11,7 @@ interface RightPanelProps {
   activeTab: RightPanelTab;
   onTabChange: (tab: RightPanelTab) => void;
   modelStates: ModelState[];
+  attentionModelId?: string | undefined;
   onDownloadRequiredModels?: () => Promise<void>;
   project: ProjectDocument;
   activePageId: string;
@@ -32,6 +33,7 @@ export function RightPanel({
   activeTab,
   onTabChange,
   modelStates,
+  attentionModelId,
   onDownloadRequiredModels,
   project,
   activePageId,
@@ -49,6 +51,7 @@ export function RightPanel({
         {activeTab === 'ai-tools' ? (
           <AiToolsPanel
             modelStates={modelStates}
+            attentionModelId={attentionModelId}
             onDownloadRequiredModels={onDownloadRequiredModels}
           />
         ) : null}
