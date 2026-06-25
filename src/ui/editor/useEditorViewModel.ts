@@ -24,7 +24,7 @@ import {
 import { fitImageWithinPage } from '../../domain/imageSizing';
 import type { DesignElement, Page, PageBackground, ProjectDocument, SelectionState } from '../../domain/model';
 import { SAMPLE_HERO_IMAGE_SIZE, SAMPLE_HERO_IMAGE_URL } from '../../domain/sampleProject';
-import type { ModelState } from '../../services/interfaces';
+import type { ModelState, PromptApiAvailability } from '../../services/interfaces';
 import { IMAGE_EDITING_MODEL_ID } from '../../services/modelSetupService';
 
 export type RightPanelTab = 'layout' | 'design' | 'ai-tools';
@@ -59,6 +59,12 @@ interface TranslationPreparationState {
   status: 'idle' | 'downloading' | 'ready' | 'failed';
 }
 
+interface PromptPreparationState {
+  availability: PromptApiAvailability;
+  progress: number;
+  status: 'idle' | 'downloading' | 'ready' | 'failed';
+}
+
 interface ElementClipboardState {
   assets: ProjectDocument['assets'];
   elements: DesignElement[];
@@ -67,6 +73,7 @@ interface ElementClipboardState {
 const PERSISTENCE_PREFERENCE_KEY = 'ew-canvas-ai.persistence-enabled';
 const TRANSLATION_TARGET_LANGUAGE_KEY = 'localstudio.ai.translation-target-language';
 const IMAGE_EDITING_MODEL_REQUIRED_MESSAGE = 'You must download the image editing tools first.';
+const PROMPT_API_REQUIRED_MESSAGE = 'Prompt API must be prepared before using prompt-to-slides.';
 const BACKGROUND_PREVIEW_DEBOUNCE_MS = 120;
 const DEFAULT_SLIDE_LANGUAGE_CODE = 'pt';
 const PASTED_ELEMENT_OFFSET = 32;
@@ -386,6 +393,13 @@ export function useEditorViewModel(services: AppServices) {
     progress: 0,
     status: readTranslationTargetLanguage() ? 'ready' : 'idle',
   });
+  const [promptPreparation, setPromptPreparation] = useState<PromptPreparationState>({
+    availability: 'unavailable',
+    progress: 0,
+    status: 'idle',
+  });
+  const [promptApiAttention, setPromptApiAttention] = useState(false);
+  const [promptApiNotice, setPromptApiNotice] = useState<string | undefined>();
   const [pageLanguageCodes, setPageLanguageCodes] = useState<Record<string, string>>({});
   const [elementClipboard, setElementClipboard] = useState<ElementClipboardState>({
     assets: {},
@@ -419,6 +433,21 @@ export function useEditorViewModel(services: AppServices) {
   useEffect(() => {
     void services.modelSetupService.getModelStates().then(setModelStates);
   }, [services.modelSetupService]);
+
+  useEffect(() => {
+    let isMounted = true;
+    void services.promptService.checkAvailability().then((availability) => {
+      if (!isMounted) return;
+      setPromptPreparation({
+        availability,
+        progress: availability === 'ready' ? 100 : 0,
+        status: availability === 'ready' ? 'ready' : 'idle',
+      });
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [services.promptService]);
 
   useEffect(() => {
     let isMounted = true;
@@ -557,6 +586,67 @@ export function useEditorViewModel(services: AppServices) {
     if (id === IMAGE_EDITING_MODEL_ID && next.status === 'ready') {
       setBackgroundSelectionNotice(undefined);
     }
+  }
+
+  async function refreshPromptApiAvailability() {
+    const availability = await services.promptService.checkAvailability();
+    setPromptPreparation((current) => ({
+      availability,
+      progress: availability === 'ready' ? 100 : current.progress,
+      status: availability === 'ready' ? 'ready' : current.status === 'ready' ? 'idle' : current.status,
+    }));
+    return availability;
+  }
+
+  async function preparePromptApi() {
+    setPromptApiNotice(undefined);
+    setPromptApiAttention(false);
+    setPromptPreparation((current) => ({
+      ...current,
+      progress: 4,
+      status: 'downloading',
+    }));
+    try {
+      await services.promptService.preparePromptApi({
+        onProgress: (progress) => {
+          setPromptPreparation((current) => ({
+            ...current,
+            availability: progress >= 100 ? 'ready' : current.availability,
+            progress: Math.max(4, Math.min(100, Math.round(progress))),
+            status: progress >= 100 ? 'ready' : 'downloading',
+          }));
+        },
+      });
+      setPromptPreparation({ availability: 'ready', progress: 100, status: 'ready' });
+      setPromptApiNotice('Prompt API ready');
+    } catch (error) {
+      setPromptPreparation({ availability: 'unavailable', progress: 0, status: 'failed' });
+      setPromptApiAttention(true);
+      setPromptApiNotice(error instanceof Error ? error.message : 'Chrome Prompt API could not be prepared.');
+    }
+  }
+
+  async function ensurePromptApiReadyForPrompt() {
+    if (promptPreparation.status === 'ready') {
+      setPromptApiAttention(false);
+      setPromptApiNotice(undefined);
+      return true;
+    }
+
+    const availability =
+      promptPreparation.status === 'downloading'
+        ? promptPreparation.availability
+        : await refreshPromptApiAvailability();
+    if (availability === 'ready') {
+      setPromptApiAttention(false);
+      setPromptApiNotice(undefined);
+      return true;
+    }
+
+    setActiveTab('ai-tools');
+    setPromptApiAttention(true);
+    setPromptApiNotice(PROMPT_API_REQUIRED_MESSAGE);
+    return false;
   }
 
   function commitProject(
@@ -1445,6 +1535,11 @@ export function useEditorViewModel(services: AppServices) {
     translationPreparation,
     isTranslating,
     translationNotice,
+    promptPreparation,
+    promptApiAttention,
+    promptApiNotice,
+    preparePromptApi,
+    ensurePromptApiReadyForPrompt,
     setTranslationTargetLanguage,
     canTranslateSelection: !isTranslating && getTranslatableTextElementIds('selection').length > 0,
     canTranslateCurrentSlide: !isTranslating && getTranslatableTextElementIds('slide').length > 0,

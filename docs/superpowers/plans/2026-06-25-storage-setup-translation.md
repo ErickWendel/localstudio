@@ -17,7 +17,8 @@
 - Tasks 1-3 are implemented on `main`: file-backed asset persistence, project hydration/storage hardening, and first-run setup readiness checks.
 - Tasks 4-6 are implemented on `main`: `ChromeTranslatorService`, `TranslateTextElementsCommand`, selected-text translation, current-slide translation, `Edit > Translate Deck`, AI Tools target-language selection, translation pair preparation progress, translator caching, busy guards, basic error notices, detector fallback normalization, and first-pass translated text fitting.
 - The latest editor ergonomics slice is implemented on `main`: inserted text now follows the seeded LocalStudio.ai template title style, moving elements shows a dotted neon center crosshair, and copy/cut/paste uses browser clipboard events plus a LocalStudio marker so the latest clipboard source wins between editor objects and external images.
-- Latest local non-e2e checks passed after the editor ergonomics and clipboard work: `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build`.
+- The Prompt API setup slice is implemented on `main`: the prompt bar has a `+` action menu with `Create image` chip mode, clearing the chip restores the slide-structure prompt, and AI Tools shows Prompt API first under Local Chrome AI with prompt-to-slides copy, startup readiness detection, preparation progress, and hidden prepare action when Chrome already reports readiness.
+- Latest local non-e2e checks passed after the Prompt API prompt-bar/setup work: `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build`.
 
 ## Remaining Work / Spec Gap Checklist
 
@@ -53,6 +54,11 @@ Export:
 
 AI roadmap:
 
+- [x] Add prompt bar `+` action menu with `Create image` chip mode and default slide-structure fallback when the chip is cleared.
+- [x] Wire direct Chrome Prompt API readiness/preparation through a `ChromePromptService`.
+- [x] Move Prompt API to the first Local Chrome AI card with prompt-to-slides copy, preparation progress, and hidden prepare action when ready on startup.
+- [ ] Build actual Prompt API prompt-to-slides generation from the prepared Chrome Prompt API provider.
+- [ ] Add the future `Create image` provider/action behind the prompt bar chip.
 - [ ] Wire Chrome Built-in AI prompt-to-palette provider.
 - [ ] Build Smart Grab on the shared Segment Anything WebGPU provider.
 - [ ] Build Magic Eraser on the shared Segment Anything WebGPU provider.
@@ -74,6 +80,7 @@ Modify these existing files:
 - `src/domain/model.ts`: add persistent asset metadata fields while preserving `objectUrl` for render-time object/data URLs.
 - `src/domain/commands/basicCommands.ts`: add `TranslateTextElementsCommand` for selected text, slide, and deck translation updates.
 - `src/services/interfaces.ts`: extend repository/model setup/translation contracts for asset persistence, setup readiness, and translation availability.
+- `src/services/chromePromptService.ts`: Chrome Built-in AI Prompt API adapter for startup availability checks, preparation/download progress, and ready-state tracking.
 - `src/services/browserFileSystemProjectRepository.ts`: move data URL image assets into `assets/`, remove embedded data URLs from saved `project.json`, and hydrate file assets on load.
 - `src/services/inMemoryAiServices.ts`: keep deterministic test translator behavior.
 - `src/services/modelSetupService.ts`: expose setup/capability state for Chrome translation and local storage readiness.

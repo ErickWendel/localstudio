@@ -17,8 +17,12 @@ interface RightPanelProps {
   translationPreparation?: { progress: number; sourceLanguage?: string; status: 'idle' | 'downloading' | 'ready' | 'failed' };
   translationTargetAttention?: boolean;
   translationTargetLanguage?: string;
+  promptApiAttention?: boolean;
+  promptApiNotice?: string | undefined;
+  promptPreparation?: { availability: string; progress: number; status: 'idle' | 'downloading' | 'ready' | 'failed' };
   onDownloadRequiredModels?: () => Promise<void>;
   onDownloadModel?: (id: string) => Promise<void>;
+  onPreparePromptApi?: () => Promise<void>;
   onTranslationTargetLanguageChange?: (languageCode: string) => void;
   project: ProjectDocument;
   activePageId: string;
@@ -47,8 +51,12 @@ export function RightPanel({
   translationPreparation,
   translationTargetAttention,
   translationTargetLanguage,
+  promptApiAttention,
+  promptApiNotice,
+  promptPreparation,
   onDownloadRequiredModels,
   onDownloadModel,
+  onPreparePromptApi,
   onTranslationTargetLanguageChange,
   project,
   activePageId,
@@ -73,8 +81,12 @@ export function RightPanel({
             translationPreparation={translationPreparation}
             translationTargetAttention={translationTargetAttention}
             translationTargetLanguage={translationTargetLanguage}
+            promptApiAttention={promptApiAttention}
+            promptApiNotice={promptApiNotice}
+            promptPreparation={promptPreparation}
             onDownloadRequiredModels={onDownloadRequiredModels}
             onDownloadModel={onDownloadModel}
+            onPreparePromptApi={onPreparePromptApi}
             onTranslationTargetLanguageChange={onTranslationTargetLanguageChange}
           />
         ) : null}

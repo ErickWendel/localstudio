@@ -1034,6 +1034,77 @@ button {
   color: rgba(145, 153, 157, 0.74);
 }
 
+.prompt-action-shell {
+  position: relative;
+}
+
+.prompt-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ew-text);
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.prompt-action-button:hover,
+.prompt-action-button[aria-expanded='true'] {
+  background: rgba(55, 253, 118, 0.12);
+  color: var(--ew-green);
+  transform: translateY(-1px);
+}
+
+.prompt-action-menu {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 10px);
+  z-index: 10;
+  min-width: 190px;
+  padding: 8px;
+  border: 1px solid var(--ew-border);
+  border-radius: 10px;
+  background: #111;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+}
+
+.prompt-action-menu button {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ew-text);
+  padding: 9px 10px;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.prompt-action-menu button:hover {
+  background: rgba(55, 253, 118, 0.12);
+  color: var(--ew-green);
+}
+
+.prompt-mode-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #7eb6ff;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .right-panel {
   min-height: 0;
   border-left: 1px solid var(--ew-border);
@@ -1286,6 +1357,11 @@ button {
 .translation-target-control select:focus {
   border-color: var(--ew-green);
   box-shadow: 0 0 0 2px rgba(55, 253, 118, 0.14);
+}
+
+.compact-action-full {
+  width: 100%;
+  justify-content: center;
 }
 
 .translation-preparation {

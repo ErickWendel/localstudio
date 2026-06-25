@@ -274,7 +274,9 @@ export function EditorShell({ services }: EditorShellProps) {
               event.target.value = '';
             }}
           />
-          <PromptBar />
+          <PromptBar
+            onCreateImagePromptIntent={() => vm.ensurePromptApiReadyForPrompt()}
+          />
         </section>
         <RightPanel
           activeTab={vm.activeTab}
@@ -295,8 +297,12 @@ export function EditorShell({ services }: EditorShellProps) {
           translationPreparation={vm.translationPreparation}
           translationTargetAttention={vm.translationTargetAttention}
           translationTargetLanguage={vm.translationTargetLanguage}
+          promptApiAttention={vm.promptApiAttention}
+          promptApiNotice={vm.promptApiNotice}
+          promptPreparation={vm.promptPreparation}
           onDownloadRequiredModels={vm.downloadRequiredModels}
           onDownloadModel={vm.downloadModel}
+          onPreparePromptApi={vm.preparePromptApi}
           onTranslationTargetLanguageChange={(languageCode) => {
             void vm.setTranslationTargetLanguage(languageCode);
           }}

@@ -42,6 +42,8 @@ Ready now:
 - Click-guided background removal is wired through the shared Segment Anything WebGPU-style image editing provider. The flow blocks until the model is ready, prepares the selected image, previews the selected subject in blue, supports right-click positive refinement points, applies removal on left click, and tightens the selected image bounds after extraction.
 - Chrome Built-in AI translation is wired behind `TranslatorService` for selected text, current slide, and full deck scopes. The visible entry points are the selected-text floating toolbar action, the slide translate icon above the canvas, and `Edit > Translate Deck`. The first translation attempt redirects to AI Tools until the user chooses a default target language in `Translate Design > Translate to`.
 - The AI Tools translation card uses a hard-coded Chrome Translator-supported target-language list sorted by language name, with flags shown at the end of each option. Changing the target language prepares the detected source/target pair, shows download progress, and reuses the prepared translator for subsequent text/slide/deck translation.
+- The prompt bar now has a `+` action menu with a `Create image` chip mode, while the default input returns to slide-structure/content-organization prompting when the chip is cleared. Typing into the gated prompt mode checks Chrome Prompt API readiness first and redirects to AI Tools when preparation is required.
+- Chrome Prompt API readiness and preparation are wired behind `ChromePromptService`. The Prompt API card appears first in the Local Chrome AI section, uses prompt-to-slides copy, shows preparation/download progress, and hides the prepare action when Chrome reports the API is ready at startup.
 - Translated text now gets a first-pass fit treatment: single-line source text has accidental translated whitespace collapsed, the text box expands around its original center first, and height grows if needed before any future manual overflow flow is introduced.
 - New text inserted from the floating selection toolbar follows the seeded template/title styling instead of generic defaults. It inherits the sample title font, weight, color, alignment, box size, and initial content so new text matches the LocalStudio.ai mock deck visual language.
 - Moving canvas elements now shows a neon dotted crosshair through the dragged element center to help judge distance and alignment against the slide while dragging.
@@ -55,6 +57,7 @@ Known limitations in the current implementation:
 - Chrome Built-in AI translation is wired with target-language selection, pair preparation progress, busy guards, basic error notices, detector fallback normalization, and first-pass fit-to-frame behavior. It still needs richer manual overflow controls, richer recovery guidance, broader browser/device verification, and Playwright coverage.
 - The first real Transformers.js / Hugging Face vision provider is wired for click-guided background removal through Segment Anything WebGPU, but it still needs broader browser/device verification and production hardening.
 - Palette generation, Smart Grab, and Magic Eraser are still mocked or incomplete workflows.
+- Chrome Prompt API setup is wired, but the actual prompt-to-slides generation flow is not implemented yet. The `Create image` prompt chip is a UI placeholder for a future image-generation provider.
 - Export supports the current-page PNG path, but production-quality browser verification and export UX polish remain. PDF export is still missing.
 - Layer drag/drop works through the app UI and tested callbacks, but should receive more Playwright coverage after interaction stabilizes.
 - Page background is displayed as a static layer row and is not yet a fully editable/selectable element.
@@ -68,8 +71,10 @@ Next implementation priorities:
 3. Harden remaining storage edges: generated preview/mask cache files, stale asset cleanup, and stronger save/import error recovery.
 4. Complete export: polish current-page PNG export and add all-page PDF from the actual Konva stage at configured page dimensions. JPEG is deferred unless explicitly reintroduced.
 5. Add Playwright coverage for layer reorder, hide/show, lock/unlock, delete, local image import, filesystem save, text editing, translation flows, and first-run setup.
-6. Wire Chrome Built-in AI prompt-to-palette provider.
-7. Build Smart Grab and Magic Eraser on top of the shared Segment Anything WebGPU image editing provider.
+6. Build Prompt API prompt-to-slides generation from the prepared Chrome Prompt API provider.
+7. Wire Chrome Built-in AI prompt-to-palette provider.
+8. Build the future `Create image` provider/action behind the prompt bar chip.
+9. Build Smart Grab and Magic Eraser on top of the shared Segment Anything WebGPU image editing provider.
 
 ## Goals
 

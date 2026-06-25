@@ -7,6 +7,7 @@ import type {
   MagicEraserService,
   ModelSetupService,
   PaletteService,
+  PromptService,
   ProjectRepository,
   SmartGrabService,
   TranslatorService,
@@ -17,6 +18,7 @@ import {
   MockSmartGrabService,
 } from '../services/inMemoryAiServices';
 import { ChromeTranslatorService } from '../services/chromeTranslatorService';
+import { ChromePromptService } from '../services/chromePromptService';
 import { BrowserExportService } from '../services/exportService';
 import { BrowserBackgroundRemovalService } from '../services/browserBackgroundRemovalService';
 import { BrowserFileSystemProjectRepository } from '../services/browserFileSystemProjectRepository';
@@ -33,6 +35,7 @@ export interface AppServices {
   localSetupService: LocalSetupService;
   modelSetupService: ModelSetupService;
   translatorService: TranslatorService;
+  promptService: PromptService;
   paletteService: PaletteService;
   backgroundRemovalService: BackgroundRemovalService;
   smartGrabService: SmartGrabService;
@@ -55,6 +58,7 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     localSetupService: new BrowserLocalSetupService(),
     modelSetupService: new BrowserModelSetupService(),
     translatorService: new ChromeTranslatorService(),
+    promptService: new ChromePromptService(),
     paletteService: new MockPaletteService(),
     backgroundRemovalService: new BrowserBackgroundRemovalService(),
     smartGrabService: new MockSmartGrabService(),

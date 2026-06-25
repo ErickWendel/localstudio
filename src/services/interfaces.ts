@@ -59,6 +59,13 @@ export interface TranslatorService {
   translate(text: string, targetLanguage: string, options?: { sourceLanguage?: string }): Promise<string>;
 }
 
+export type PromptApiAvailability = 'unavailable' | 'downloadable' | 'downloading' | 'ready';
+
+export interface PromptService {
+  checkAvailability(): Promise<PromptApiAvailability>;
+  preparePromptApi(options?: { onProgress?: (progress: number) => void }): Promise<void>;
+}
+
 export interface PaletteService {
   generatePalette(prompt: string): Promise<{ name: string; colors: string[] }>;
 }

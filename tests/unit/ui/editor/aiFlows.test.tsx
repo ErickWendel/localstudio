@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createAppServices } from '../../../../src/app/composition';
 import type { TranslatorService } from '../../../../src/services/interfaces';
@@ -30,6 +30,13 @@ class PreparingTranslatorService implements TranslatorService {
 }
 
 describe('mocked AI flows', () => {
+  afterEach(() => {
+    Object.defineProperty(window, 'LanguageModel', {
+      configurable: true,
+      value: undefined,
+    });
+  });
+
   it('downloads required models from AI Tools panel', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
@@ -48,6 +55,112 @@ describe('mocked AI flows', () => {
 
     expect(screen.getByLabelText('Remove Background')).toBeInTheDocument();
     expect(screen.getByLabelText('Translate Selected Text')).toBeInTheDocument();
+  });
+
+  it('selects create image mode from the prompt plus menu', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    expect(screen.queryByText('Create image')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Prompt actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Create image' }));
+
+    expect(screen.getByText('Create image')).toBeInTheDocument();
+    expect(screen.getByLabelText('Create image prompt')).toHaveFocus();
+  });
+
+  it('clears create image mode when the prompt text is deleted', async () => {
+    const user = userEvent.setup();
+    const promptApi = {
+      availability: vi.fn().mockResolvedValue('available'),
+      create: vi.fn(),
+    };
+    Object.defineProperty(window, 'LanguageModel', {
+      configurable: true,
+      value: promptApi,
+    });
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Prompt actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Create image' }));
+    await user.type(screen.getByLabelText('Create image prompt'), 'hero image');
+
+    await user.clear(screen.getByLabelText('Create image prompt'));
+
+    await waitFor(() => {
+      expect(screen.queryByText('Create image')).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole('textbox', { name: 'Slide structure prompt' })).toHaveValue('');
+    expect(
+      screen.getByPlaceholderText('Describe slide structure or organize current content...'),
+    ).toBeInTheDocument();
+  });
+
+  it('redirects create image prompt typing to AI Tools when Prompt API is not ready', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Prompt actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Create image' }));
+    await user.type(screen.getByLabelText('Create image prompt'), 'cyberpunk course cover');
+
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: 'AI Tools' })).toHaveAttribute('aria-selected', 'true');
+    });
+    expect(screen.getByRole('article', { name: 'Prompt API' })).toHaveClass('tool-card-attention');
+    expect(screen.getByText('Prompt API must be prepared before using prompt-to-slides.')).toBeInTheDocument();
+  });
+
+  it('prepares Prompt API from AI Tools before allowing create image prompts', async () => {
+    const user = userEvent.setup();
+    const promptApi = {
+      availability: vi.fn().mockResolvedValue('downloadable'),
+      create: vi.fn(({ monitor }: { monitor?: (monitorTarget: EventTarget) => void } = {}) => {
+        const target = new EventTarget();
+        monitor?.(target);
+        target.dispatchEvent(new CustomEvent('downloadprogress', { detail: { loaded: 1, total: 1 } }));
+        return Promise.resolve({ destroy: vi.fn(), prompt: vi.fn() });
+      }),
+    };
+    Object.defineProperty(window, 'LanguageModel', {
+      configurable: true,
+      value: promptApi,
+    });
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await user.click(screen.getByRole('button', { name: 'Prepare Prompt API' }));
+
+    expect(await screen.findByText('Prompt API ready')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Layout' }));
+    await user.click(screen.getByRole('button', { name: 'Prompt actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Create image' }));
+    await user.type(screen.getByLabelText('Create image prompt'), 'neon cover');
+
+    expect(screen.getByRole('tab', { name: 'Layout' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByLabelText('Create image prompt')).toHaveValue('neon cover');
+  });
+
+  it('shows ready Prompt API first without a prepare action when available on startup', async () => {
+    const user = userEvent.setup();
+    const promptApi = {
+      availability: vi.fn().mockResolvedValue('available'),
+      create: vi.fn(),
+    };
+    Object.defineProperty(window, 'LanguageModel', {
+      configurable: true,
+      value: promptApi,
+    });
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+
+    await screen.findByText('Prompt API ready');
+    expect(screen.getAllByRole('article')[0]).toHaveAccessibleName('Prompt API');
+    expect(screen.getByText('Prompt to slides using Chrome Built-in AI.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Prepare Prompt API' })).not.toBeInTheDocument();
   });
 
   it('configures the default translation target from AI Tools', async () => {

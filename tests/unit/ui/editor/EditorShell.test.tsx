@@ -173,6 +173,7 @@ describe('EditorShell', () => {
     expect(screen.getByText('Untitled AI Deck')).toBeInTheDocument();
     expect(screen.getByText('PT')).toBeInTheDocument();
     expect(await screen.findByText('EN')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Prompt actions' })).toBeInTheDocument();
     expect(
       screen.getByPlaceholderText('Describe slide structure or organize current content...'),
     ).toBeInTheDocument();

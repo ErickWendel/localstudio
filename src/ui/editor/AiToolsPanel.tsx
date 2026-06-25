@@ -1,4 +1,4 @@
-import { Download, Languages, Palette, ScanSearch } from 'lucide-react';
+import { Download, ImagePlus, Languages, Palette, ScanSearch } from 'lucide-react';
 import type { ModelState } from '../../services/interfaces';
 import { IconButton } from '../components/IconButton';
 import { PanelSection } from '../components/PanelSection';
@@ -11,12 +11,21 @@ interface AiToolsPanelProps {
   translationPreparation?: { progress: number; sourceLanguage?: string; status: 'idle' | 'downloading' | 'ready' | 'failed' } | undefined;
   translationTargetAttention?: boolean | undefined;
   translationTargetLanguage?: string | undefined;
+  promptApiAttention?: boolean | undefined;
+  promptApiNotice?: string | undefined;
+  promptPreparation?: { availability: string; progress: number; status: 'idle' | 'downloading' | 'ready' | 'failed' } | undefined;
   onDownloadRequiredModels?: (() => Promise<void>) | undefined;
   onDownloadModel?: ((id: string) => Promise<void>) | undefined;
+  onPreparePromptApi?: (() => Promise<void>) | undefined;
   onTranslationTargetLanguageChange?: ((languageCode: string) => void) | undefined;
 }
 
 const localTools = [
+  {
+    title: 'Prompt API',
+    description: 'Prompt to slides using Chrome Built-in AI.',
+    icon: ImagePlus,
+  },
   {
     title: 'Translate Design',
     description: 'Translate visible text using the detected startup language.',
@@ -49,8 +58,12 @@ export function AiToolsPanel({
   translationPreparation = { progress: 0, status: 'idle' },
   translationTargetAttention = false,
   translationTargetLanguage = '',
+  promptApiAttention = false,
+  promptApiNotice,
+  promptPreparation = { availability: 'unavailable', progress: 0, status: 'idle' },
   onDownloadRequiredModels,
   onDownloadModel,
+  onPreparePromptApi,
   onTranslationTargetLanguageChange,
 }: AiToolsPanelProps) {
   return (
@@ -71,11 +84,13 @@ export function AiToolsPanel({
             return (
               <article
                 className={
-                  tool.title === 'Translate Design' && translationTargetAttention
+                  (tool.title === 'Translate Design' && translationTargetAttention) ||
+                  (tool.title === 'Prompt API' && promptApiAttention)
                     ? 'tool-card tool-card-attention'
                     : 'tool-card'
                 }
                 key={tool.title}
+                aria-label={tool.title}
               >
                 <div className="tool-card-heading">
                   <Icon size={18} />
@@ -150,6 +165,54 @@ export function AiToolsPanel({
                       </div>
                     ) : null}
                   </label>
+                ) : null}
+                {tool.title === 'Prompt API' ? (
+                  <div className="translation-target-control">
+                    {promptPreparation.status === 'ready' ? null : (
+                      <button
+                        className="compact-action compact-action-full"
+                        disabled={promptPreparation.status === 'downloading'}
+                        type="button"
+                        onClick={() => {
+                          void onPreparePromptApi?.();
+                        }}
+                      >
+                        <Download size={14} />
+                        <span>Prepare Prompt API</span>
+                      </button>
+                    )}
+                    <div className="translation-preparation" aria-label="Prompt API preparation">
+                      <div className="translation-preparation-meta">
+                        <StatusPill
+                          label={
+                            promptPreparation.status === 'downloading'
+                              ? 'Downloading'
+                              : promptPreparation.status === 'ready'
+                                ? 'Ready'
+                                : promptPreparation.status === 'failed'
+                                  ? 'Failed'
+                                  : 'Pending'
+                          }
+                          tone={
+                            promptPreparation.status === 'ready'
+                              ? 'success'
+                              : promptPreparation.status === 'downloading'
+                                ? 'warning'
+                                : 'neutral'
+                          }
+                        />
+                        <span>{promptPreparation.progress}%</span>
+                      </div>
+                      <div className="model-progress">
+                        <span style={{ width: `${promptPreparation.progress}%` }} />
+                      </div>
+                      <span className="translation-source-note">
+                        {promptPreparation.status === 'ready'
+                          ? 'Prompt API ready'
+                          : promptApiNotice ?? `Availability: ${promptPreparation.availability}`}
+                      </span>
+                    </div>
+                  </div>
                 ) : null}
               </article>
             );
