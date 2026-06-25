@@ -19,8 +19,8 @@ describe('editor commands', () => {
     const next = command.execute(project);
 
     expect(next).not.toBe(project);
-    expect(next.elements['image-hero']?.x).toBe((1920 - 516) / 2);
-    expect(project.elements['image-hero']?.x).toBe(702);
+    expect(next.elements['image-hero']?.x).toBe((1920 - 980) / 2);
+    expect(project.elements['image-hero']?.x).toBe(55);
   });
 
   it('brings an element to front by moving its id to the end', () => {
@@ -41,8 +41,8 @@ describe('editor commands', () => {
       id: 'text-title-copy',
       type: 'text',
       text: 'AI Design Revolution',
-      x: 464,
-      y: 404,
+      x: 1184,
+      y: 464,
       locked: false,
     });
     expect(next.pages[0]?.elementIds.at(-1)).toBe('text-title-copy');
@@ -88,10 +88,10 @@ describe('editor commands', () => {
       rotation: 12,
     });
     expect(project.elements['image-hero']).toMatchObject({
-      x: 702,
-      y: 347,
-      width: 516,
-      height: 387,
+      x: 55,
+      y: 200,
+      width: 980,
+      height: 735,
       rotation: 0,
     });
   });

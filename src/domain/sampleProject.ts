@@ -1,14 +1,13 @@
 import type { ProjectDocument } from './model';
-import { fitImageWithinPage } from './imageSizing';
 
 export const SAMPLE_HERO_IMAGE_URL =
   'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRe1Oh1Q3hIcQYKNHc_GwRcQnT6uSgL02RVLBpt4tWMfYKZ2Ja97objCe8&s=10';
-export const SAMPLE_HERO_IMAGE_SIZE = fitImageWithinPage({
-  imageWidth: 516,
-  imageHeight: 387,
-  pageWidth: 1920,
-  pageHeight: 1080,
-});
+export const SAMPLE_HERO_IMAGE_SIZE = {
+  x: 55,
+  y: 200,
+  width: 980,
+  height: 735,
+};
 
 export function createSampleProject(): ProjectDocument {
   const now = new Date('2026-06-24T00:00:00.000Z').toISOString();
@@ -55,9 +54,9 @@ export function createSampleProject(): ProjectDocument {
         id: 'text-subtitle',
         type: 'text',
         text: 'Browser-native creative automation',
-        x: 580,
-        y: 690,
-        width: 760,
+        x: 1160,
+        y: 700,
+        width: 600,
         height: 80,
         rotation: 0,
         locked: false,
@@ -73,9 +72,9 @@ export function createSampleProject(): ProjectDocument {
         id: 'text-title',
         type: 'text',
         text: 'AI Design Revolution',
-        x: 440,
-        y: 380,
-        width: 1040,
+        x: 1160,
+        y: 440,
+        width: 600,
         height: 240,
         rotation: 0,
         locked: false,
