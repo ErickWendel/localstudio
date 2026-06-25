@@ -1395,6 +1395,12 @@ button {
   position: relative;
   display: inline-grid;
   place-items: center;
+  z-index: 1;
+}
+
+.translation-target-help:hover,
+.translation-target-help:focus-within {
+  z-index: 80;
 }
 
 .translation-target-help .material-symbols-outlined {
@@ -1409,8 +1415,8 @@ button {
   position: absolute;
   left: 50%;
   bottom: calc(100% + 8px);
-  z-index: 14;
-  width: 220px;
+  z-index: 1000;
+  width: min(260px, calc(100vw - 48px));
   transform: translateX(-50%);
   border: 1px solid rgba(55, 253, 118, 0.34);
   border-radius: 4px;
@@ -1430,6 +1436,18 @@ button {
 .translation-target-help:focus-within .translation-target-tooltip {
   opacity: 1;
   transform: translateX(-50%) translateY(-2px);
+}
+
+.image-generation-settings .translation-target-tooltip {
+  left: 0;
+  right: auto;
+  width: min(230px, calc(100vw - 80px));
+  transform: translateY(4px);
+}
+
+.image-generation-settings .translation-target-help:hover .translation-target-tooltip,
+.image-generation-settings .translation-target-help:focus-within .translation-target-tooltip {
+  transform: translateY(-2px);
 }
 
 .translation-target-control select {

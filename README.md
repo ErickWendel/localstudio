@@ -2,6 +2,14 @@
 
 Browser-only Canva-style slides and image editor MVP.
 
+## Current MVP Snapshot
+
+- LocalStudio.ai editor shell with layered slide canvas, Layout/Design/AI Tools panels, local image import, text editing, layer controls, copy/paste, undo/redo, zoom, and PNG export path.
+- Local-first persistence through the browser File System Access API, with project metadata and assets saved to a user-selected folder.
+- Browser-local AI flows for background removal via Segment Anything-style WebGPU segmentation, Chrome Built-in AI translation, Chrome Prompt API prompt-to-slides, and Bonsai Image WebGPU create-image generation.
+- AI Tools owns local model/API setup, translation target selection, Prompt API readiness, and image-generation size/steps/seed configuration.
+- Latest verified checks: `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build`.
+
 ## Scripts
 
 - `npm run dev` starts the Vite dev server.

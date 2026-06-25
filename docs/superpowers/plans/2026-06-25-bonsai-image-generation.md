@@ -16,7 +16,9 @@
 
 **Source Context:** The referenced Hugging Face Space is `webml-community/bonsai-image-webgpu`. Its metadata points at `prism-ml/bonsai-image-ternary-4B-mlx-2bit` and `prism-ml/bonsai-image-binary-4B-mlx-1bit`. The Space bundle loads a pipeline with model progress for `text_encoder`, `transformer`, and `vae`, caches model chunks in IndexedDB, and generates with `prompt`, `height`, `width`, `guidance_scale: 1`, `num_inference_steps`, `seed`, and step callbacks.
 
-**Implementation Choice:** Start with the ternary Bonsai model. Defer binary/ternary model selection, cancellation, generation history, and advanced controls.
+**Implementation Choice:** Start with the ternary Bonsai model. Basic size presets, step count, and optional seed are configured in AI Tools. Defer binary/ternary model selection, cancellation, generation history, guidance controls, and production browser/device hardening.
+
+**Current Status:** Implemented and pushed to `main` in commit `b6ac868`. The Bonsai runtime adapter is isolated in `src/services/bonsaiImageRuntime.ts`, the vendored runtime is loaded from `src/vendor` as a lazy Vite source module, and AI Tools owns the image-generation configuration.
 
 ---
 
@@ -27,7 +29,8 @@ Add one adapter seam and keep editor code simple:
 - `ModelSetupService`: owns readiness/download state for `Image Generation Models`.
 - `ImageGenerationService`: owns text-to-image generation and returns a LocalStudio.ai `Asset`.
 - `BonsaiImageRuntime`: narrow injected adapter for the actual Bonsai WebGPU runtime.
-- `PromptBar`: stays responsible for `Create image` mode and submit UI.
+- `PromptBar`: stays responsible for `Create image` mode and submit UI, but not model configuration.
+- `AiToolsPanel`: owns image-generation configuration for size preset, step count, and optional seed.
 - `useEditorViewModel`: gates model readiness, redirects to AI Tools, calls generation, and inserts the generated image through immutable commands.
 
 Create shared constants in a separate file so model setup and generation do not import each other:
@@ -216,6 +219,7 @@ git commit -m "Add browser image generation service"
   - submit busy label `Generating image`;
   - disabled submit while generating;
   - visible status text while progress is available.
+- [x] Clear the prompt input immediately after an accepted submit while long-running generation continues.
 - [x] Update `EditorShell` props.
 - [x] Add tests for:
   - redirect/highlight when unavailable;
@@ -252,6 +256,9 @@ git commit -m "Wire create image prompt flow"
 - [x] Disable the download button when the model state is `ready`.
 - [x] Keep `Prompt API` under `Local Chrome AI`.
 - [x] Keep `Image Generation Models` under cached browser models.
+- [x] Move create-image size/steps/seed configuration into the `Image Generation Models` card in AI Tools.
+- [x] Add help tooltips explaining that steps trade speed for detail and seed controls repeatable randomness.
+- [x] Use configured image dimensions when generating and fitting the inserted image layer.
 - [x] Remove any stale copy implying this is image editing or Prompt API.
 - [x] Update the MVP spec:
   - create image now has a browser-local Bonsai provider;
@@ -278,7 +285,7 @@ git commit -m "Update create image AI tools docs"
 
 ## Task 5: Final Verification
 
-- [ ] Run non-Playwright verification:
+- [x] Run non-Playwright verification:
 
 ```bash
 npm run lint
@@ -319,7 +326,7 @@ git commit -m "Polish create image generation flow"
 - Binary/ternary Bonsai model selector.
 - Generation cancellation.
 - Image generation history/gallery.
-- Advanced controls for size, seed, steps, guidance, and aspect ratio.
+- Guidance control and additional generation tuning beyond the current size presets, steps, and seed.
 - Production browser/device performance checks.
 - Playwright coverage.
 - Rich error recovery for Hugging Face access/token failures if the public model path ever requires it.
