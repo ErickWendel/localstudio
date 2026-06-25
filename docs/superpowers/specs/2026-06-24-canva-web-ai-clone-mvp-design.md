@@ -13,7 +13,7 @@ The initial AI feature set is balanced:
 - Translate design text.
 - Generate a color palette from a text prompt.
 - Remove image backgrounds.
-- Smart crop / auto-enquadramento.
+- Smart Grab for object-aware image editing.
 - Magic Eraser with user-guided browser segmentation.
 
 Chrome Built-in AI is the primary provider for language/design tasks. Hugging Face / Transformers.js browser models are used only when required for vision capabilities Chrome does not currently provide.
@@ -58,7 +58,7 @@ Next implementation priorities:
 4. Add Playwright coverage for layer reorder, hide/show, lock/unlock, delete, local image import, and text editing.
 5. Build first-run AI setup UX with actual browser capability checks and provider readiness state.
 6. Wire real Chrome Built-in AI translation and prompt-to-palette providers.
-7. Wire the first real browser vision provider, starting with background removal or Magic Eraser segmentation.
+7. Wire the first real browser vision provider, starting with click-subject background removal through Segment Anything WebGPU.
 
 ## Goals
 
@@ -164,15 +164,16 @@ Core service interfaces:
 - `TranslatorService`
 - `PaletteService`
 - `BackgroundRemovalService`
-- `SmartCropService`
+- `SmartGrabService`
 - `MagicEraserService`
 
 Concrete providers:
 
 - `ChromeTranslatorService`
 - `ChromePaletteService`
+- `TransformersImageSegmentationService`
 - `TransformersBackgroundRemovalService`
-- `TransformersSmartCropService`
+- `TransformersSmartGrabService`
 - `TransformersMagicEraserService`
 
 Future providers can be added behind the same interfaces without changing editor UI flows.
@@ -274,8 +275,10 @@ The user selects an image element and removes its background.
 
 Behavior:
 
-- Use a browser-side vision model through Transformers.js / Hugging Face because Chrome Built-in AI does not provide this MVP capability.
-- Produce a transparent PNG asset.
+- Use the WebML Community Segment Anything WebGPU example as the implementation reference because it demonstrates in-browser SAM segmentation with `Xenova/slimsam-77-uniform`, `SamModel`, `AutoProcessor`, WebGPU execution, positive/negative point prompts, mask preview, and cut-out generation.
+- Ask the user to click the image subject to segment. Background removal is not fully automatic in the first implementation.
+- Generate a subject mask from the clicked point.
+- Produce a transparent PNG asset where the selected subject remains opaque and the background becomes transparent.
 - Let the user replace the original image layer or create a duplicate layer.
 - Store the new asset blob locally and update the page through a command.
 
@@ -285,8 +288,7 @@ The user selects an image element, marks the object or region to remove, preview
 
 MVP behavior:
 
-- Use a browser-side segmentation model through Transformers.js / Hugging Face because Chrome Built-in AI does not provide this MVP capability.
-- Prefer the WebML Community Segment Anything WebGPU example as the implementation reference because it demonstrates in-browser SAM-style segmentation with `Xenova/slimsam-77-uniform`, `SamModel`, `AutoProcessor`, WebGPU execution, positive/negative click prompts, mask preview, and cut-out generation.
+- Use the shared Segment Anything WebGPU image segmentation provider because Chrome Built-in AI does not provide this MVP capability.
 - Allow positive and negative point prompts on the selected image.
 - Generate and preview a mask overlay before mutating the document.
 - Let the user erase the selected mask area to transparency, producing a new transparent PNG asset.
@@ -299,17 +301,17 @@ MVP limitation:
 
 SAM3 Tracker WebGPU is not the preferred MVP reference. It is useful for future investigation because it uses newer SAM3 tracker models, but it is broader and heavier than the point-prompt segmentation needed for first-version Magic Eraser.
 
-### Smart Crop / Auto-Enquadramento
+### Smart Grab
 
-The user selects an image and a target frame/aspect ratio.
+The user selects an image and grabs the main subject or a clicked object for image editing actions.
 
 Behavior:
 
-- Use browser-side object detection or segmentation through Transformers.js because Chrome Built-in AI does not provide this MVP capability.
-- Identify the likely main subject.
-- Suggest a crop box centered around the subject.
-- Let the user accept or adjust the crop before applying.
-- Store crop metadata on the image element.
+- Use the shared Segment Anything WebGPU image segmentation provider because Chrome Built-in AI does not provide this MVP capability.
+- Let the user click the subject or object they want to grab.
+- Generate a mask for the clicked object.
+- Use the mask as the basis for future object-aware actions, such as subject extraction, object repositioning, and crop/reframe suggestions.
+- Store derived mask/crop metadata on the image element or edited asset, depending on the action.
 
 ## First-Run AI Setup
 
@@ -325,8 +327,7 @@ Purpose:
 The setup flow checks:
 
 - Chrome Built-in AI availability for translation and prompt-based palette generation.
-- Required Transformers.js model availability for background removal and smart crop.
-- Required segmentation model availability for Magic Eraser.
+- Required Transformers.js image segmentation model availability for background removal, Smart Grab, and Magic Eraser.
 - WebGPU/WebAssembly support needed by selected browser models.
 - Browser storage availability for project data, assets, and model/provider caches.
 
@@ -338,8 +339,9 @@ Caching policy:
 - Store only app-level readiness metadata in IndexedDB, such as model name, version, capability status, last setup check, and whether setup completed.
 - For Hugging Face / Transformers.js models that are not required during startup, show a download icon next to the model/tool name so the user can install that model on demand before running the feature.
 - The top toolbar does not include a global "Prepare AI Models" action.
-- The AI Tools panel includes a "Download Required Models" action that downloads required local models in parallel.
-- Each required model shows independent readiness/progress state so parallel downloads can be tracked separately.
+- The AI Tools panel includes a "Download Required Models" action that prepares required local models.
+- The AI Tools panel lists one shared `Image Editing Models` dependency with the subtitle `Segmentation model for image editing.` This single Segment Anything model powers Background Remover, Smart Grab, and Magic Eraser.
+- Each required model dependency shows independent readiness/progress state so future parallel downloads can be tracked separately.
 - Optional/deferred models remain visible as downloadable capabilities inside the AI Tools panel.
 
 Model and capability rows expose states:
@@ -441,7 +443,7 @@ Playwright tests:
 - Translate text with mocked provider.
 - Generate and apply palette with mocked provider.
 - Remove background with mocked provider.
-- Smart crop with mocked provider.
+- Smart Grab with mocked provider.
 - Magic Eraser mask preview and apply flow with mocked provider.
 - Export PNG/JPEG and PDF flows.
 
@@ -474,7 +476,7 @@ Transformers.js is appropriate for browser-side vision features because it suppo
 
 WebGPU should be treated as a performance path, not an unconditional assumption. Selected vision models must be validated on target Chrome hardware before implementation starts.
 
-For Magic Eraser, `webml-community/segment-anything-webgpu` is the preferred reference over `webml-community/SAM3-Tracker-WebGPU` for the MVP. It is simpler, directly focused on still-image segmentation, and already demonstrates the key interaction pattern needed by the editor: encode image, collect positive/negative points, decode mask, preview, and generate a transparent cutout.
+For image editing segmentation, `webml-community/segment-anything-webgpu` is the preferred reference over `webml-community/SAM3-Tracker-WebGPU` for the MVP. It is simpler, directly focused on still-image segmentation, and already demonstrates the key interaction pattern needed by the editor: encode image, collect positive/negative points, decode mask, preview, and generate a transparent cutout. The shared model is `Xenova/slimsam-77-uniform`.
 
 ## References
 

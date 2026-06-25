@@ -2,7 +2,7 @@ import type {
   BackgroundRemovalService,
   MagicEraserService,
   PaletteService,
-  SmartCropService,
+  SmartGrabService,
   TranslatorService,
 } from './interfaces';
 
@@ -31,8 +31,8 @@ export class MockBackgroundRemovalService implements BackgroundRemovalService {
   }
 }
 
-export class MockSmartCropService implements SmartCropService {
-  suggestCrop(): Promise<{ x: number; y: number; width: number; height: number }> {
+export class MockSmartGrabService implements SmartGrabService {
+  suggestSubjectRegion(): Promise<{ x: number; y: number; width: number; height: number }> {
     return Promise.resolve({ x: 0.1, y: 0.1, width: 0.8, height: 0.8 });
   }
 }

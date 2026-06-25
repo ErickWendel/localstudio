@@ -6,24 +6,9 @@ import { RightPanel } from '../../../../src/ui/editor/RightPanel';
 
 const modelStates = [
   {
-    id: 'background-remover',
-    label: 'Background Remover',
-    provider: 'transformers' as const,
-    status: 'downloading' as const,
-    progress: 42,
-    required: true,
-  },
-  {
-    id: 'smart-crop',
-    label: 'Smart Crop',
-    provider: 'transformers' as const,
-    status: 'ready' as const,
-    progress: 100,
-    required: true,
-  },
-  {
-    id: 'magic-eraser',
-    label: 'Magic Eraser',
+    id: 'image-editing-models',
+    label: 'Image Editing Models',
+    description: 'Segmentation model for image editing.',
     provider: 'transformers' as const,
     status: 'needs-download' as const,
     progress: 0,
@@ -80,8 +65,10 @@ describe('RightPanel', () => {
       />,
     );
     expect(screen.getByText('Download Required Models')).toBeInTheDocument();
-    expect(screen.getByText('Background Remover')).toBeInTheDocument();
-    expect(screen.getByText('Magic Eraser')).toBeInTheDocument();
+    expect(screen.getByText('Image Editing Models')).toBeInTheDocument();
+    expect(screen.getByText('Segmentation model for image editing.')).toBeInTheDocument();
+    expect(screen.queryByText('Background Remover')).not.toBeInTheDocument();
+    expect(screen.queryByText('Magic Eraser')).not.toBeInTheDocument();
   });
 
   it('selects the matching canvas element from a layout row', async () => {

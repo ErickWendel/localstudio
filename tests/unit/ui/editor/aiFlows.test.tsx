@@ -11,7 +11,8 @@ describe('mocked AI flows', () => {
     await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
     await user.click(screen.getByRole('button', { name: 'Download Required Models' }));
 
-    expect(await screen.findAllByText('Ready')).toHaveLength(3);
+    expect(await screen.findAllByText('Ready')).toHaveLength(1);
+    expect(screen.getByText('Image Editing Models')).toBeInTheDocument();
   });
 
   it('exposes selected-object AI shortcuts', () => {

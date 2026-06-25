@@ -7,10 +7,11 @@ describe('InMemoryModelSetupService', () => {
 
     const states = await service.getModelStates();
     expect(states.every((state) => state.status === 'ready')).toBe(true);
-    expect(states.map((state) => state.id)).toEqual([
-      'background-remover',
-      'smart-crop',
-      'magic-eraser',
-    ]);
+    expect(states).toHaveLength(1);
+    expect(states[0]).toMatchObject({
+      id: 'image-editing-models',
+      label: 'Image Editing Models',
+      description: 'Segmentation model for image editing.',
+    });
   });
 });

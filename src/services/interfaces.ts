@@ -5,6 +5,7 @@ export type ModelStatus = 'unavailable' | 'needs-download' | 'downloading' | 're
 export interface ModelState {
   id: string;
   label: string;
+  description?: string;
   provider: 'chrome' | 'transformers';
   status: ModelStatus;
   progress: number;
@@ -41,8 +42,8 @@ export interface BackgroundRemovalService {
   removeBackground(assetId: string): Promise<{ assetId: string }>;
 }
 
-export interface SmartCropService {
-  suggestCrop(
+export interface SmartGrabService {
+  suggestSubjectRegion(
     assetId: string,
     aspectRatio: number,
   ): Promise<{ x: number; y: number; width: number; height: number }>;

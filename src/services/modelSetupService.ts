@@ -2,24 +2,9 @@ import type { ModelSetupService, ModelState } from './interfaces';
 
 const initialStates: ModelState[] = [
   {
-    id: 'background-remover',
-    label: 'Background Remover',
-    provider: 'transformers',
-    status: 'needs-download',
-    progress: 0,
-    required: true,
-  },
-  {
-    id: 'smart-crop',
-    label: 'Smart Crop',
-    provider: 'transformers',
-    status: 'needs-download',
-    progress: 0,
-    required: true,
-  },
-  {
-    id: 'magic-eraser',
-    label: 'Magic Eraser',
+    id: 'image-editing-models',
+    label: 'Image Editing Models',
+    description: 'Segmentation model for image editing.',
     provider: 'transformers',
     status: 'needs-download',
     progress: 0,

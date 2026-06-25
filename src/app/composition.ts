@@ -3,7 +3,7 @@ import {
   MockBackgroundRemovalService,
   MockMagicEraserService,
   MockPaletteService,
-  MockSmartCropService,
+  MockSmartGrabService,
   MockTranslatorService,
 } from '../services/inMemoryAiServices';
 import { BrowserExportService } from '../services/exportService';
@@ -19,7 +19,7 @@ export function createAppServices() {
     translatorService: new MockTranslatorService(),
     paletteService: new MockPaletteService(),
     backgroundRemovalService: new MockBackgroundRemovalService(),
-    smartCropService: new MockSmartCropService(),
+    smartGrabService: new MockSmartGrabService(),
     magicEraserService: new MockMagicEraserService(),
   };
 }

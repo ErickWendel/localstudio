@@ -855,11 +855,12 @@ describe('InMemoryModelSetupService', () => {
 
     const states = await service.getModelStates();
     expect(states.every((state) => state.status === 'ready')).toBe(true);
-    expect(states.map((state) => state.id)).toEqual([
-      'background-remover',
-      'smart-crop',
-      'magic-eraser',
-    ]);
+    expect(states).toHaveLength(1);
+    expect(states[0]).toMatchObject({
+      id: 'image-editing-models',
+      label: 'Image Editing Models',
+      description: 'Segmentation model for image editing.',
+    });
   });
 });
 ```
@@ -914,8 +915,8 @@ export interface BackgroundRemovalService {
   removeBackground(assetId: string): Promise<{ assetId: string }>;
 }
 
-export interface SmartCropService {
-  suggestCrop(assetId: string, aspectRatio: number): Promise<{ x: number; y: number; width: number; height: number }>;
+export interface SmartGrabService {
+  suggestSubjectRegion(assetId: string, aspectRatio: number): Promise<{ x: number; y: number; width: number; height: number }>;
 }
 
 export interface MagicEraserService {
@@ -932,24 +933,9 @@ import type { ModelSetupService, ModelState } from './interfaces';
 
 const initialStates: ModelState[] = [
   {
-    id: 'background-remover',
-    label: 'Background Remover',
-    provider: 'transformers',
-    status: 'needs-download',
-    progress: 0,
-    required: true,
-  },
-  {
-    id: 'smart-crop',
-    label: 'Smart Crop',
-    provider: 'transformers',
-    status: 'needs-download',
-    progress: 0,
-    required: true,
-  },
-  {
-    id: 'magic-eraser',
-    label: 'Magic Eraser',
+    id: 'image-editing-models',
+    label: 'Image Editing Models',
+    description: 'Segmentation model for image editing.',
     provider: 'transformers',
     status: 'needs-download',
     progress: 0,
@@ -985,7 +971,7 @@ export class InMemoryModelSetupService implements ModelSetupService {
 `src/services/inMemoryAiServices.ts`:
 
 ```ts
-import type { BackgroundRemovalService, MagicEraserService, PaletteService, SmartCropService, TranslatorService } from './interfaces';
+import type { BackgroundRemovalService, MagicEraserService, PaletteService, SmartGrabService, TranslatorService } from './interfaces';
 
 export class MockTranslatorService implements TranslatorService {
   async detectLanguage(): Promise<string> {
@@ -1012,8 +998,8 @@ export class MockBackgroundRemovalService implements BackgroundRemovalService {
   }
 }
 
-export class MockSmartCropService implements SmartCropService {
-  async suggestCrop(): Promise<{ x: number; y: number; width: number; height: number }> {
+export class MockSmartGrabService implements SmartGrabService {
+  async suggestSubjectRegion(): Promise<{ x: number; y: number; width: number; height: number }> {
     return { x: 0.1, y: 0.1, width: 0.8, height: 0.8 };
   }
 }
@@ -1029,7 +1015,7 @@ export class MockMagicEraserService implements MagicEraserService {
 
 ```ts
 import { createSampleProject } from '../domain/sampleProject';
-import { MockBackgroundRemovalService, MockMagicEraserService, MockPaletteService, MockSmartCropService, MockTranslatorService } from '../services/inMemoryAiServices';
+import { MockBackgroundRemovalService, MockMagicEraserService, MockPaletteService, MockSmartGrabService, MockTranslatorService } from '../services/inMemoryAiServices';
 import { InMemoryModelSetupService } from '../services/modelSetupService';
 
 export function createAppServices() {
@@ -1039,7 +1025,7 @@ export function createAppServices() {
     translatorService: new MockTranslatorService(),
     paletteService: new MockPaletteService(),
     backgroundRemovalService: new MockBackgroundRemovalService(),
-    smartCropService: new MockSmartCropService(),
+    smartGrabService: new MockSmartGrabService(),
     magicEraserService: new MockMagicEraserService(),
   };
 }
@@ -1356,9 +1342,15 @@ import userEvent from '@testing-library/user-event';
 import { RightPanel } from './RightPanel';
 
 const modelStates = [
-  { id: 'background-remover', label: 'Background Remover', provider: 'transformers' as const, status: 'downloading' as const, progress: 42, required: true },
-  { id: 'smart-crop', label: 'Smart Crop', provider: 'transformers' as const, status: 'ready' as const, progress: 100, required: true },
-  { id: 'magic-eraser', label: 'Magic Eraser', provider: 'transformers' as const, status: 'needs-download' as const, progress: 0, required: true },
+  {
+    id: 'image-editing-models',
+    label: 'Image Editing Models',
+    description: 'Segmentation model for image editing.',
+    provider: 'transformers' as const,
+    status: 'needs-download' as const,
+    progress: 0,
+    required: true,
+  },
 ];
 
 describe('RightPanel', () => {
@@ -1396,7 +1388,7 @@ Expected: FAIL until components exist.
 
 Implement:
 
-- `AiToolsPanel`: download all button, rows for Translate Design, Text-to-Palette, Background Remover, Smart Crop, Magic Eraser with download icons/progress.
+- `AiToolsPanel`: download all button, rows for Translate Design, Text-to-Palette, Image Editing Models with download icons/progress.
 - `DesignPanel`: page size, background, palette swatches, typography, layout toggles, element style, compact Text-to-Palette.
 - `LayersPanel`: search input, layer rows with drag/eye/lock/type icons, selected image highlighted, group/z-order actions, properties.
 

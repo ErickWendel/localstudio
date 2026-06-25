@@ -1,4 +1,4 @@
-import { Download, Eraser, Languages, Palette, ScanSearch, WandSparkles } from 'lucide-react';
+import { Download, Languages, Palette, ScanSearch } from 'lucide-react';
 import type { ModelState } from '../../services/interfaces';
 import { IconButton } from '../components/IconButton';
 import { PanelSection } from '../components/PanelSection';
@@ -69,10 +69,11 @@ export function AiToolsPanel({ modelStates, onDownloadRequiredModels }: AiToolsP
           {modelStates.map((model) => (
             <article className="model-row" key={model.id}>
               <div className="model-row-main">
-                {model.id === 'background-remover' ? <Eraser size={17} /> : null}
-                {model.id === 'smart-crop' ? <ScanSearch size={17} /> : null}
-                {model.id === 'magic-eraser' ? <WandSparkles size={17} /> : null}
-                <strong>{model.label}</strong>
+                <ScanSearch size={17} />
+                <div className="model-row-title">
+                  <strong>{model.label}</strong>
+                  {model.description ? <span>{model.description}</span> : null}
+                </div>
                 <IconButton label={`Download ${model.label}`}>
                   <Download size={14} />
                 </IconButton>
