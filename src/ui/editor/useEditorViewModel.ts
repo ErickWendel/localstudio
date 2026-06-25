@@ -27,6 +27,13 @@ interface EditorHistory {
   future: ProjectDocument[];
 }
 
+const PERSISTENCE_PREFERENCE_KEY = 'ew-canvas-ai.persistence-enabled';
+
+function readPersistencePreference() {
+  if (typeof window === 'undefined') return false;
+  return window.localStorage.getItem(PERSISTENCE_PREFERENCE_KEY) === 'true';
+}
+
 function normalizeProjectDocument(project: ProjectDocument): ProjectDocument {
   const shouldRestoreHeroImage = Boolean(project.assets['asset-hero']) && !project.elements['image-hero'];
   const pageId = project.pages[0]?.id;
@@ -138,7 +145,7 @@ export function useEditorViewModel(services: AppServices) {
   const [activeTab, setActiveTab] = useState<RightPanelTab>('layout');
   const [modelStates, setModelStates] = useState<ModelState[]>([]);
   const [hasLoadedProject, setHasLoadedProject] = useState(true);
-  const [persistenceEnabled, setPersistenceEnabled] = useState(false);
+  const [persistenceEnabled, setPersistenceEnabled] = useState(readPersistencePreference);
   const [activePageId, setActivePageId] = useState(initialProject.pages[0]?.id ?? '');
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>(['image-hero']);
   const [history, setHistory] = useState<EditorHistory>({ past: [], future: [] });
@@ -226,6 +233,9 @@ export function useEditorViewModel(services: AppServices) {
 
   function setPersistence(nextEnabled: boolean) {
     setPersistenceEnabled(nextEnabled);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, String(nextEnabled));
+    }
     if (nextEnabled) {
       void services.projectRepository.saveProject(project);
     }

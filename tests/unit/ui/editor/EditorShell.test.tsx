@@ -75,6 +75,17 @@ describe('EditorShell', () => {
     expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
   });
 
+  it('restores enabled persistence after remounting', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<EditorShell services={createAppServices()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    unmount();
+    render(<EditorShell services={createAppServices()} />);
+
+    expect(await screen.findByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
+  });
+
   it('zooms the canvas from the toolbar', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);

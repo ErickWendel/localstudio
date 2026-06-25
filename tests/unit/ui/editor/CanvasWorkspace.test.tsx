@@ -15,7 +15,19 @@ describe('CanvasWorkspace', () => {
 
     expect(screen.getByLabelText('Slide canvas')).toBeInTheDocument();
     expect(container.querySelector('canvas')).toBeInTheDocument();
-    expect(screen.getByText('AI Design Revolution')).toBeInTheDocument();
     expect(screen.getByLabelText('Remove Background')).toBeInTheDocument();
+  });
+
+  it('does not render document text outside the Konva canvas', () => {
+    const project = createSampleProject();
+    const { container } = render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
+      />,
+    );
+
+    expect(container.querySelector('.canvas-accessible-text')).not.toBeInTheDocument();
   });
 });

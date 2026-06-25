@@ -1,5 +1,10 @@
 import '@testing-library/jest-dom/vitest';
 import 'fake-indexeddb/auto';
+import { beforeEach } from 'vitest';
+
+beforeEach(() => {
+  window.localStorage.clear();
+});
 
 const canvasContext = {
   canvas: document.createElement('canvas'),

@@ -345,11 +345,6 @@ export function CanvasWorkspace({
           })}
           <span className="canvas-fallback-label">Selected Image</span>
         </div>
-        <div className="canvas-accessible-text">
-          {visibleElements.map((element) =>
-            element.type === 'text' ? <span key={element.id}>{element.text}</span> : null,
-          )}
-        </div>
         {hasSelection ? (
           <FloatingSelectionToolbar
             onAlignCenter={onAlignSelectedElement}
