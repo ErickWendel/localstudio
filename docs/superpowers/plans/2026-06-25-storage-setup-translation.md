@@ -284,7 +284,7 @@ git commit -m "feat: persist image assets as files"
 - Modify: `src/services/browserFileSystemProjectRepository.ts`
 - Test: `tests/unit/services/browserFileSystemProjectRepository.assets.test.ts`
 
-- [ ] **Step 1: Add the failing hydration test**
+- [x] **Step 1: Add the failing hydration test**
 
 Append to `tests/unit/services/browserFileSystemProjectRepository.assets.test.ts`:
 
@@ -321,7 +321,7 @@ it('hydrates file-backed image assets with object URLs on load', async () => {
 });
 ```
 
-- [ ] **Step 2: Run the failing hydration test**
+- [x] **Step 2: Run the failing hydration test**
 
 Run:
 
@@ -331,7 +331,7 @@ npm run test -- --run tests/unit/services/browserFileSystemProjectRepository.ass
 
 Expected: FAIL because `loadProject()` returns the disk metadata without hydrating `objectUrl`.
 
-- [ ] **Step 3: Implement asset hydration**
+- [x] **Step 3: Implement asset hydration**
 
 In `src/services/browserFileSystemProjectRepository.ts`, add this method:
 
@@ -366,7 +366,7 @@ const project = JSON.parse(await file.text()) as ProjectDocument;
 return this.hydrateProjectAssets(project);
 ```
 
-- [ ] **Step 4: Run repository tests**
+- [x] **Step 4: Run repository tests**
 
 Run:
 
@@ -376,7 +376,7 @@ npm run test -- --run tests/unit/services/browserFileSystemProjectRepository.tes
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/services/browserFileSystemProjectRepository.ts tests/unit/services/browserFileSystemProjectRepository.assets.test.ts
