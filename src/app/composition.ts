@@ -15,8 +15,8 @@ import {
   MockMagicEraserService,
   MockPaletteService,
   MockSmartGrabService,
-  MockTranslatorService,
 } from '../services/inMemoryAiServices';
+import { ChromeTranslatorService } from '../services/chromeTranslatorService';
 import { BrowserExportService } from '../services/exportService';
 import { BrowserBackgroundRemovalService } from '../services/browserBackgroundRemovalService';
 import { BrowserFileSystemProjectRepository } from '../services/browserFileSystemProjectRepository';
@@ -54,7 +54,7 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     exportService: new BrowserExportService(),
     localSetupService: new BrowserLocalSetupService(),
     modelSetupService: new BrowserModelSetupService(),
-    translatorService: new MockTranslatorService(),
+    translatorService: new ChromeTranslatorService(),
     paletteService: new MockPaletteService(),
     backgroundRemovalService: new BrowserBackgroundRemovalService(),
     smartGrabService: new MockSmartGrabService(),

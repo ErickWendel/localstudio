@@ -4,11 +4,14 @@ import type { ProjectDocument } from '../../domain/model';
 interface TopToolbarProps {
   project: ProjectDocument;
   language: string;
+  languageFlag?: string;
+  languageLabel?: string;
   canRedo?: boolean;
   canUndo?: boolean;
   hasSelection?: boolean;
   persistenceEnabled?: boolean;
   zoomPercent?: number;
+  canTranslateDeck?: boolean;
   onDelete?: () => void;
   onDuplicate?: () => void;
   onExport?: () => void;
@@ -19,6 +22,7 @@ interface TopToolbarProps {
   onRedo?: () => void;
   onResetZoom?: () => void;
   onSelectLayers?: () => void;
+  onTranslateDeck?: () => void;
   onUndo?: () => void;
   onZoomIn?: () => void;
   onZoomOut?: () => void;
@@ -37,11 +41,14 @@ const menuLabels: HeaderMenu[] = ['File', 'Edit', 'View', 'Help'];
 export function TopToolbar({
   project,
   language,
+  languageFlag = '🇧🇷',
+  languageLabel = language,
   canRedo = false,
   canUndo = false,
   hasSelection = false,
   persistenceEnabled = false,
   zoomPercent = 100,
+  canTranslateDeck = false,
   onDelete,
   onDuplicate,
   onExport,
@@ -52,6 +59,7 @@ export function TopToolbar({
   onRedo,
   onResetZoom,
   onSelectLayers,
+  onTranslateDeck,
   onUndo,
   onZoomIn,
   onZoomOut,
@@ -101,6 +109,7 @@ export function TopToolbar({
       { label: 'Redo', disabled: !canRedo, onSelect: onRedo },
       { label: 'Duplicate', disabled: !hasSelection, onSelect: onDuplicate },
       { label: 'Delete', disabled: !hasSelection, onSelect: onDelete },
+      { label: 'Translate Deck', disabled: !canTranslateDeck || !onTranslateDeck, onSelect: onTranslateDeck },
     ],
     View: [
       { label: 'Zoom Out', onSelect: onZoomOut },
@@ -274,9 +283,9 @@ export function TopToolbar({
             </span>
           </button>
         </div>
-        <button className="language-chip" type="button" aria-label={`Current language ${language}`}>
+        <button className="language-chip" type="button" aria-label={`Current slide language ${languageLabel}`}>
           <span className="language-flag" aria-hidden="true">
-            🇧🇷
+            {languageFlag}
           </span>
           <span>{language}</span>
         </button>

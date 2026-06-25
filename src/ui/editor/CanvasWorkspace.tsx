@@ -21,6 +21,10 @@ interface CanvasWorkspaceProps {
   backgroundPreparation?:
     | { elementId: string; progress: number; status: 'preparing' | 'ready' | 'failed' }
     | undefined;
+  canTranslateCurrentSlide?: boolean;
+  canTranslateSelection?: boolean;
+  isTranslating?: boolean;
+  translationNotice?: string | undefined;
   onAlignSelectedElement?: () => void;
   onBringSelectedElementForward?: () => void;
   onBackgroundPreviewPoint?: (elementId: string, point: { x: number; y: number }) => void;
@@ -28,11 +32,17 @@ interface CanvasWorkspaceProps {
   onBackgroundSelectionToggle?: () => void;
   onBackgroundSubjectPick?: (elementId: string, point: { x: number; y: number }) => void;
   onCancelBackgroundSelection?: () => void;
+  onClearSelection?: () => void;
   onDeleteSelectedElement?: () => void;
   onDuplicateSelectedElement?: () => void;
-  onSelectElement?: (elementId: string) => void;
+  onInsertImage?: () => void;
+  onInsertText?: () => void;
+  onSelectElement?: (elementId: string, options?: { additive?: boolean }) => void;
   onSendSelectedElementBackward?: () => void;
+  onTranslateCurrentSlide?: () => void;
+  onTranslateSelectedText?: () => void;
   onUpdateElementFrame?: (elementId: string, patch: ElementFramePatch) => void;
+  onUpdateElementFrames?: (patches: Record<string, ElementFramePatch>) => void;
   onUpdateTextContent?: (elementId: string, text: string) => void;
 }
 
@@ -96,6 +106,10 @@ export function CanvasWorkspace({
   processingElementIds = [],
   backgroundPreview,
   backgroundPreparation,
+  canTranslateCurrentSlide = false,
+  canTranslateSelection = false,
+  isTranslating = false,
+  translationNotice,
   onAlignSelectedElement,
   onBackgroundPreviewPoint,
   onBackgroundRefinePoint,
@@ -103,11 +117,17 @@ export function CanvasWorkspace({
   onBackgroundSubjectPick,
   onBringSelectedElementForward,
   onCancelBackgroundSelection,
+  onClearSelection,
   onDeleteSelectedElement,
   onDuplicateSelectedElement,
+  onInsertImage,
+  onInsertText,
   onSelectElement,
   onSendSelectedElementBackward,
+  onTranslateCurrentSlide,
+  onTranslateSelectedText,
   onUpdateElementFrame,
+  onUpdateElementFrames,
   onUpdateTextContent,
 }: CanvasWorkspaceProps) {
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -117,6 +137,7 @@ export function CanvasWorkspace({
   const [stageSize, setStageSize] = useState({ width: 768, height: 432 });
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [editingTextValue, setEditingTextValue] = useState('');
+  const [fontRenderVersion, setFontRenderVersion] = useState(0);
   const [processingBlinkOn, setProcessingBlinkOn] = useState(false);
   const [backgroundPreviewPoint, setBackgroundPreviewPoint] = useState<{ x: number; y: number } | null>(null);
   const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
@@ -151,8 +172,10 @@ export function CanvasWorkspace({
       : page?.background.colorFallback ?? '#050D10';
 
   useEffect(() => {
-    const selectedNode = nodeRefs.current[selection.elementIds[0] ?? ''];
-    transformerRef.current?.nodes(selectedNode ? [selectedNode] : []);
+    const selectedNodes = selection.elementIds
+      .map((elementId) => nodeRefs.current[elementId])
+      .filter((node): node is Konva.Node => Boolean(node));
+    transformerRef.current?.nodes(selectedNodes);
     transformerRef.current?.getLayer()?.batchDraw();
   }, [selection.elementIds, project]);
 
@@ -187,6 +210,26 @@ export function CanvasWorkspace({
   }, [editingTextId]);
 
   useEffect(() => {
+    const fontSet = document.fonts;
+    if (!fontSet) return;
+    let isMounted = true;
+
+    void Promise.all([
+      fontSet.load('800 96px Orbitron'),
+      fontSet.load('600 40px "Open Sans"'),
+      fontSet.ready,
+    ]).then(() => {
+      if (!isMounted) return;
+      setFontRenderVersion((currentVersion) => currentVersion + 1);
+      stageRef?.current?.batchDraw();
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [stageRef]);
+
+  useEffect(() => {
     if (backgroundSelectionMode || hasProcessingElements) return;
     const stageContainer = stageRef?.current?.container();
     if (stageContainer) stageContainer.style.cursor = '';
@@ -213,10 +256,36 @@ export function CanvasWorkspace({
   }
 
   function handleDragEnd(elementId: string, event: Konva.KonvaEventObject<DragEvent>) {
-    onUpdateElementFrame?.(elementId, {
-      x: toDocumentX(event.target.x()),
-      y: toDocumentY(event.target.y()),
+    const element = project.elements[elementId];
+    if (!element) return;
+    const nextX = toDocumentX(event.target.x());
+    const nextY = toDocumentY(event.target.y());
+    const deltaX = nextX - element.x;
+    const deltaY = nextY - element.y;
+    const selectedMovableElementIds = selection.elementIds.filter((selectedElementId) => {
+      const selected = project.elements[selectedElementId];
+      return selected && !selected.locked;
     });
+
+    if (selectedMovableElementIds.length > 1 && selection.elementIds.includes(elementId)) {
+      onUpdateElementFrames?.(
+        Object.fromEntries(
+          selectedMovableElementIds.map((selectedElementId) => {
+            const selected = project.elements[selectedElementId]!;
+            return [
+              selectedElementId,
+              {
+                x: selected.x + deltaX,
+                y: selected.y + deltaY,
+              },
+            ];
+          }),
+        ),
+      );
+      return;
+    }
+
+    onUpdateElementFrame?.(elementId, { x: nextX, y: nextY });
   }
 
   function handleTransformEnd(elementId: string, event: Konva.KonvaEventObject<Event>) {
@@ -311,6 +380,10 @@ export function CanvasWorkspace({
           pickBackgroundSubject(element, event);
           return;
         }
+        if (event.evt.shiftKey) {
+          onSelectElement?.(element.id, { additive: true });
+          return;
+        }
         onSelectElement?.(element.id);
       },
       onContextMenu: (event: Konva.KonvaEventObject<PointerEvent>) => {
@@ -363,6 +436,12 @@ export function CanvasWorkspace({
     };
   }
 
+  function handleStagePointerDown(event: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
+    if (backgroundSelectionMode || editingTextId) return;
+    if (event.target !== event.target.getStage()) return;
+    onClearSelection?.();
+  }
+
   return (
     <div className="canvas-workspace">
       <div
@@ -376,22 +455,43 @@ export function CanvasWorkspace({
           transform: `scale(${zoomPercent / 100})`,
         }}
       >
+        <button
+          aria-label="Translate Current Slide"
+          className="slide-translate-button"
+          disabled={!canTranslateCurrentSlide}
+          title="Translate Current Slide"
+          type="button"
+          onClick={onTranslateCurrentSlide}
+        >
+          <span className="material-symbols-outlined" aria-hidden="true">
+            translate
+          </span>
+        </button>
         <div className="canvas-artboard" ref={artboardRef} style={{ background: pageBackground }}>
-          {backgroundSelectionMode || backgroundSelectionNotice || processingSelectedImageId ? (
+          {backgroundSelectionMode || backgroundSelectionNotice || processingSelectedImageId || isTranslating || translationNotice ? (
             <div className="background-selection-hint" role="status">
               <span className="material-symbols-outlined" aria-hidden="true">
-                {processingSelectedImageId ? 'auto_fix_high' : backgroundSelectionNotice ? 'download' : 'ads_click'}
+                {isTranslating || translationNotice
+                  ? 'translate'
+                  : processingSelectedImageId
+                    ? 'auto_fix_high'
+                    : backgroundSelectionNotice
+                      ? 'download'
+                      : 'ads_click'}
               </span>
               <span>
-                {getBackgroundSelectionMessage({
-                  backgroundPreparation: activeBackgroundPreparation,
-                  backgroundPreview,
-                  backgroundSelectionTargetId,
-                  backgroundSelectionNotice,
-                  processingSelectedImageId,
-                })}
+                {isTranslating
+                  ? 'Translating text...'
+                  : translationNotice ??
+                    getBackgroundSelectionMessage({
+                      backgroundPreparation: activeBackgroundPreparation,
+                      backgroundPreview,
+                      backgroundSelectionTargetId,
+                      backgroundSelectionNotice,
+                      processingSelectedImageId,
+                    })}
               </span>
-              {activeBackgroundPreparation?.status === 'preparing' ? (
+              {activeBackgroundPreparation?.status === 'preparing' && !isTranslating ? (
                 <span
                   aria-label="Image extraction progress"
                   aria-valuemax={100}
@@ -403,14 +503,20 @@ export function CanvasWorkspace({
                   <span style={{ width: `${activeBackgroundPreparation.progress}%` }} />
                 </span>
               ) : null}
-              {processingSelectedImageId ? null : (
+              {processingSelectedImageId || isTranslating ? null : (
                 <button type="button" onClick={onCancelBackgroundSelection}>
                   Esc
                 </button>
               )}
             </div>
           ) : null}
-          <Stage ref={stageRef} height={stageHeight} width={stageWidth}>
+          <Stage
+            ref={stageRef}
+            height={stageHeight}
+            width={stageWidth}
+            onMouseDown={handleStagePointerDown}
+            onTouchStart={handleStagePointerDown}
+          >
             <Layer>
               <Rect fill={pageBackground} height={stageHeight} listening={false} width={stageWidth} x={0} y={0} />
               {visibleElements.map((element) => {
@@ -440,7 +546,7 @@ export function CanvasWorkspace({
                 return (
                   <Text
                     {...commonProps}
-                    key={element.id}
+                    key={`${element.id}-font-${fontRenderVersion}`}
                     text={element.text}
                     fontFamily={element.fontFamily}
                     fontSize={element.fontSize * scaleY}
@@ -557,10 +663,14 @@ export function CanvasWorkspace({
             onBringForward={onBringSelectedElementForward}
             onDelete={onDeleteSelectedElement}
             onDuplicate={onDuplicateSelectedElement}
+            onInsertImage={onInsertImage}
+            onInsertText={onInsertText}
             onBackgroundSelectionToggle={onBackgroundSelectionToggle}
             onSendBackward={onSendSelectedElementBackward}
+            onTranslateSelectedText={onTranslateSelectedText}
             backgroundSelectionActive={backgroundSelectionMode}
-            disabled={Boolean(processingSelectedImageId)}
+            canTranslateSelection={canTranslateSelection}
+            disabled={Boolean(processingSelectedImageId) || isTranslating}
           />
         ) : null}
       </div>

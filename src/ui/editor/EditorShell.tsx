@@ -40,6 +40,7 @@ function getClipboardImageFile(clipboardData: DataTransfer | null) {
 export function EditorShell({ services }: EditorShellProps) {
   const vm = useEditorViewModel(services);
   const stageRef = useRef<Konva.Stage>(null);
+  const toolbarImageInputRef = useRef<HTMLInputElement>(null);
   const hasSelection = vm.selection.elementIds.length > 0;
 
   function exportCurrentPageAsPng() {
@@ -69,6 +70,27 @@ export function EditorShell({ services }: EditorShellProps) {
         event.preventDefault();
         if (isUndoShortcut) vm.undo();
         if (isRedoShortcut) vm.redo();
+        return;
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'a') {
+        if (isEditablePasteTarget(event.target)) return;
+        event.preventDefault();
+        vm.selectAllElementsOnActivePage();
+        return;
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'c') {
+        if (isEditablePasteTarget(event.target) || !hasSelection) return;
+        event.preventDefault();
+        vm.copySelectedElements();
+        return;
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'x') {
+        if (isEditablePasteTarget(event.target) || !hasSelection) return;
+        event.preventDefault();
+        vm.cutSelectedElements();
         return;
       }
 
@@ -104,10 +126,12 @@ export function EditorShell({ services }: EditorShellProps) {
     function handlePaste(event: ClipboardEvent) {
       if (isEditablePasteTarget(event.target)) return;
       const imageFile = getClipboardImageFile(event.clipboardData);
-      if (!imageFile) return;
-
       event.preventDefault();
-      void vm.importImageFile(imageFile);
+      if (imageFile) {
+        void vm.importImageFile(imageFile);
+        return;
+      }
+      vm.pasteCopiedElements();
     }
 
     window.addEventListener('paste', handlePaste);
@@ -120,12 +144,15 @@ export function EditorShell({ services }: EditorShellProps) {
     <div className="app-shell">
       <TopToolbar
         project={vm.project}
-        language="PT-BR"
+        language={vm.activeSlideLanguage.displayCode}
+        languageFlag={vm.activeSlideLanguage.flag}
+        languageLabel={vm.activeSlideLanguage.label}
         canRedo={vm.canRedo}
         canUndo={vm.canUndo}
         hasSelection={hasSelection}
         persistenceEnabled={vm.persistenceEnabled}
         zoomPercent={vm.zoomPercent}
+        canTranslateDeck={vm.canTranslateDeck}
         onDelete={vm.deleteSelectedElement}
         onDuplicate={vm.duplicateSelectedElement}
         onExport={exportCurrentPageAsPng}
@@ -141,6 +168,9 @@ export function EditorShell({ services }: EditorShellProps) {
         onResetZoom={vm.resetZoom}
         onSelectLayers={() => {
           vm.setActiveTab('layout');
+        }}
+        onTranslateDeck={() => {
+          void vm.translateDeck();
         }}
         onUndo={vm.undo}
         onZoomIn={vm.zoomIn}
@@ -171,6 +201,10 @@ export function EditorShell({ services }: EditorShellProps) {
             processingElementIds={vm.processingElementIds}
             backgroundPreview={vm.backgroundPreview}
             backgroundPreparation={vm.backgroundPreparation}
+            canTranslateCurrentSlide={vm.canTranslateCurrentSlide}
+            canTranslateSelection={vm.canTranslateSelection}
+            isTranslating={vm.isTranslating}
+            translationNotice={vm.translationNotice}
             onAlignSelectedElement={() => {
               vm.alignSelectedElement('page-center');
             }}
@@ -184,14 +218,39 @@ export function EditorShell({ services }: EditorShellProps) {
               vm.setSelectedElementZOrder('forward');
             }}
             onCancelBackgroundSelection={vm.cancelBackgroundSelectionMode}
+            onClearSelection={vm.clearSelection}
             onDeleteSelectedElement={vm.deleteSelectedElement}
             onDuplicateSelectedElement={vm.duplicateSelectedElement}
+            onInsertImage={() => {
+              toolbarImageInputRef.current?.click();
+            }}
+            onInsertText={vm.insertTextElement}
             onSelectElement={vm.selectElement}
             onSendSelectedElementBackward={() => {
               vm.setSelectedElementZOrder('backward');
             }}
+            onTranslateCurrentSlide={() => {
+              void vm.translateCurrentSlide();
+            }}
+            onTranslateSelectedText={() => {
+              void vm.translateSelectedText();
+            }}
             onUpdateElementFrame={vm.updateElementFrame}
+            onUpdateElementFrames={vm.updateElementFrames}
             onUpdateTextContent={vm.updateTextContent}
+          />
+          <input
+            ref={toolbarImageInputRef}
+            aria-label="Insert image file"
+            className="visually-hidden-input"
+            type="file"
+            accept="image/*"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              void vm.importImageFile(file);
+              event.target.value = '';
+            }}
           />
           <PromptBar />
         </section>
@@ -206,10 +265,19 @@ export function EditorShell({ services }: EditorShellProps) {
           onSetElementLock={vm.setElementLock}
           onDeleteElement={vm.deleteElement}
           onReorderElement={vm.reorderElement}
+          onUpdateElementStyle={vm.updateElementStyle}
+          onUpdatePageBackground={vm.updatePageBackground}
           modelStates={vm.modelStates}
           attentionModelId={vm.backgroundSelectionNotice ? IMAGE_EDITING_MODEL_ID : undefined}
+          translationLanguageOptions={vm.translationLanguageOptions}
+          translationPreparation={vm.translationPreparation}
+          translationTargetAttention={vm.translationTargetAttention}
+          translationTargetLanguage={vm.translationTargetLanguage}
           onDownloadRequiredModels={vm.downloadRequiredModels}
           onDownloadModel={vm.downloadModel}
+          onTranslationTargetLanguageChange={(languageCode) => {
+            void vm.setTranslationTargetLanguage(languageCode);
+          }}
         />
       </div>
     </div>

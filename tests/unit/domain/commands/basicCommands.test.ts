@@ -1,4 +1,5 @@
 import {
+  AddElementsCommand,
   AlignElementCommand,
   AddImageElementCommand,
   DeleteElementCommand,
@@ -8,7 +9,11 @@ import {
   SetElementLockCommand,
   SetElementVisibilityCommand,
   UpdateElementFrameCommand,
+  UpdateElementFramesCommand,
+  UpdateElementStyleCommand,
+  UpdatePageBackgroundCommand,
   UpdateTextContentCommand,
+  TranslateTextElementsCommand,
 } from '../../../../src/domain/commands/basicCommands';
 import { createSampleProject } from '../../../../src/domain/sampleProject';
 
@@ -96,6 +101,20 @@ describe('editor commands', () => {
     });
   });
 
+  it('updates multiple element frames in one immutable command', () => {
+    const project = createSampleProject();
+    const next = new UpdateElementFramesCommand({
+      'image-hero': { x: 100, y: 220 },
+      'text-title': { x: 1200, y: 460 },
+    }).execute(project);
+
+    expect(next).not.toBe(project);
+    expect(next.elements['image-hero']).toMatchObject({ x: 100, y: 220 });
+    expect(next.elements['text-title']).toMatchObject({ x: 1200, y: 460 });
+    expect(project.elements['image-hero']).toMatchObject({ x: 55, y: 200 });
+    expect(project.elements['text-title']).toMatchObject({ x: 1160, y: 440 });
+  });
+
   it('updates text content immutably', () => {
     const project = createSampleProject();
     const command = new UpdateTextContentCommand('text-title', 'Edited headline');
@@ -104,6 +123,100 @@ describe('editor commands', () => {
     expect(next).not.toBe(project);
     expect(next.elements['text-title']).toMatchObject({ text: 'Edited headline' });
     expect(project.elements['text-title']).toMatchObject({ text: 'AI Design Revolution' });
+  });
+
+  it('updates text style immutably', () => {
+    const project = createSampleProject();
+    const next = new UpdateElementStyleCommand('text-title', {
+      align: 'left',
+      fill: '#ffffff',
+      fontSize: 72,
+      fontWeight: 900,
+      opacity: 0.7,
+    }).execute(project);
+
+    expect(next).not.toBe(project);
+    expect(next.elements['text-title']).toMatchObject({
+      align: 'left',
+      fill: '#ffffff',
+      fontSize: 72,
+      fontWeight: 900,
+      opacity: 0.7,
+    });
+    expect(project.elements['text-title']).toMatchObject({
+      align: 'center',
+      fill: '#37FD76',
+      fontSize: 96,
+      opacity: 1,
+    });
+  });
+
+  it('updates page background immutably', () => {
+    const project = createSampleProject();
+    const next = new UpdatePageBackgroundCommand('page-1', {
+      type: 'color',
+      color: '#000000',
+    }).execute(project);
+
+    expect(next).not.toBe(project);
+    expect(next.pages[0]?.background).toEqual({ type: 'color', color: '#000000' });
+    expect(project.pages[0]?.background).toEqual({ type: 'color', color: '#050D10' });
+  });
+
+  it('translates multiple unlocked text elements immutably', () => {
+    const project = createSampleProject();
+    const command = new TranslateTextElementsCommand({
+      'text-title': 'Revolucao do Design AI',
+      'text-subtitle': 'Automacao criativa local',
+    });
+    const next = command.execute(project);
+
+    expect(next).not.toBe(project);
+    expect(next.elements['text-title']).toMatchObject({ text: 'Revolucao do Design AI' });
+    expect(next.elements['text-subtitle']).toMatchObject({ text: 'Automacao criativa local' });
+    expect(project.elements['text-title']).toMatchObject({ text: 'AI Design Revolution' });
+  });
+
+  it('applies translated text layout patches immutably', () => {
+    const project = createSampleProject();
+    const next = new TranslateTextElementsCommand({
+      'text-title': {
+        text: 'Revolucion de diseno AI',
+        width: 840,
+        x: 1040,
+      },
+    }).execute(project);
+
+    expect(next.elements['text-title']).toMatchObject({
+      text: 'Revolucion de diseno AI',
+      width: 840,
+      x: 1040,
+    });
+    expect(project.elements['text-title']).toMatchObject({
+      text: 'AI Design Revolution',
+      fontSize: 96,
+      width: 600,
+      x: 1160,
+    });
+  });
+
+  it('skips locked text translations', () => {
+    const project = {
+      ...createSampleProject(),
+      elements: {
+        ...createSampleProject().elements,
+        'text-title': {
+          ...createSampleProject().elements['text-title']!,
+          locked: true,
+        },
+      },
+    };
+    const next = new TranslateTextElementsCommand({
+      'text-title': 'Locked translation',
+    }).execute(project);
+
+    expect(next).toBe(project);
+    expect(next.elements['text-title']).toMatchObject({ text: 'AI Design Revolution' });
   });
 
   it('reorders an element within the page z-order immutably', () => {
@@ -174,5 +287,21 @@ describe('editor commands', () => {
     expect(next.elements['image-imported']).toMatchObject({ assetId: 'asset-imported' });
     expect(next.pages[0]?.elementIds.at(-1)).toBe('image-imported');
     expect(project.assets['asset-imported']).toBeUndefined();
+  });
+
+  it('adds multiple pasted elements as topmost layers', () => {
+    const project = createSampleProject();
+    const title = project.elements['text-title']!;
+    const subtitle = project.elements['text-subtitle']!;
+    const command = new AddElementsCommand('page-1', [
+      { ...title, id: 'text-title-pasted', x: title.x + 32, y: title.y + 32 },
+      { ...subtitle, id: 'text-subtitle-pasted', x: subtitle.x + 32, y: subtitle.y + 32 },
+    ]);
+    const next = command.execute(project);
+
+    expect(next.elements['text-title-pasted']).toMatchObject({ x: title.x + 32, y: title.y + 32 });
+    expect(next.elements['text-subtitle-pasted']).toMatchObject({ x: subtitle.x + 32, y: subtitle.y + 32 });
+    expect(next.pages[0]?.elementIds.slice(-2)).toEqual(['text-title-pasted', 'text-subtitle-pasted']);
+    expect(project.elements['text-title-pasted']).toBeUndefined();
   });
 });

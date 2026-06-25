@@ -7,8 +7,13 @@ import { StatusPill } from '../components/StatusPill';
 interface AiToolsPanelProps {
   modelStates: ModelState[];
   attentionModelId?: string | undefined;
+  translationLanguageOptions?: Array<{ code: string; flag: string; label: string }> | undefined;
+  translationPreparation?: { progress: number; sourceLanguage?: string; status: 'idle' | 'downloading' | 'ready' | 'failed' } | undefined;
+  translationTargetAttention?: boolean | undefined;
+  translationTargetLanguage?: string | undefined;
   onDownloadRequiredModels?: (() => Promise<void>) | undefined;
   onDownloadModel?: ((id: string) => Promise<void>) | undefined;
+  onTranslationTargetLanguageChange?: ((languageCode: string) => void) | undefined;
 }
 
 const localTools = [
@@ -40,8 +45,13 @@ function formatStatus(status: ModelState['status']) {
 export function AiToolsPanel({
   modelStates,
   attentionModelId,
+  translationLanguageOptions = [],
+  translationPreparation = { progress: 0, status: 'idle' },
+  translationTargetAttention = false,
+  translationTargetLanguage = '',
   onDownloadRequiredModels,
   onDownloadModel,
+  onTranslationTargetLanguageChange,
 }: AiToolsPanelProps) {
   return (
     <div className="panel-stack">
@@ -59,13 +69,88 @@ export function AiToolsPanel({
           {localTools.map((tool) => {
             const Icon = tool.icon;
             return (
-              <article className="tool-card" key={tool.title}>
+              <article
+                className={
+                  tool.title === 'Translate Design' && translationTargetAttention
+                    ? 'tool-card tool-card-attention'
+                    : 'tool-card'
+                }
+                key={tool.title}
+              >
                 <div className="tool-card-heading">
                   <Icon size={18} />
                   <strong>{tool.title}</strong>
                   <StatusPill label="LOCAL" tone="success" />
                 </div>
                 <p>{tool.description}</p>
+                {tool.title === 'Translate Design' ? (
+                  <label className="translation-target-control">
+                    <span className="translation-target-label">
+                      Translate to:
+                      <span className="translation-target-help">
+                        <span
+                          aria-describedby="translation-target-tooltip"
+                          className="material-symbols-outlined"
+                          tabIndex={0}
+                        >
+                          info
+                        </span>
+                        <span id="translation-target-tooltip" className="translation-target-tooltip" role="tooltip">
+                          Choose the language that will be used for all translations in this deck.
+                        </span>
+                      </span>
+                    </span>
+                    <select
+                      aria-label="Translate to"
+                      aria-describedby="translation-target-tooltip"
+                      disabled={translationPreparation.status === 'downloading'}
+                      value={translationTargetLanguage}
+                      onChange={(event) => {
+                        onTranslationTargetLanguageChange?.(event.target.value);
+                      }}
+                    >
+                      <option value="">Choose language</option>
+                      {translationLanguageOptions.map((language) => (
+                        <option key={language.code} value={language.code}>
+                          {language.label} ({language.code}) {language.flag}
+                        </option>
+                      ))}
+                    </select>
+                    {translationTargetLanguage ? (
+                      <div className="translation-preparation" aria-label="Translation language preparation">
+                        <div className="translation-preparation-meta">
+                          <StatusPill
+                            label={
+                              translationPreparation.status === 'downloading'
+                                ? 'Downloading'
+                                : translationPreparation.status === 'ready'
+                                  ? 'Ready'
+                                  : translationPreparation.status === 'failed'
+                                    ? 'Failed'
+                                    : 'Pending'
+                            }
+                            tone={
+                              translationPreparation.status === 'ready'
+                                ? 'success'
+                                : translationPreparation.status === 'downloading'
+                                  ? 'warning'
+                                  : 'neutral'
+                            }
+                          />
+                          <span>{translationPreparation.progress}%</span>
+                        </div>
+                        <div className="model-progress">
+                          <span style={{ width: `${translationPreparation.progress}%` }} />
+                        </div>
+                        {translationPreparation.sourceLanguage ? (
+                          <span className="translation-source-note">
+                            Pair: {translationPreparation.sourceLanguage} → {translationTargetLanguage}
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </label>
+                ) : null}
               </article>
             );
           })}

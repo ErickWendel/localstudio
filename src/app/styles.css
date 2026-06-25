@@ -758,6 +758,40 @@ button {
   transition: transform 160ms ease;
 }
 
+.slide-translate-button {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  z-index: 9;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgba(55, 253, 118, 0.42);
+  border-radius: 4px;
+  background: rgba(5, 13, 16, 0.82);
+  color: var(--ew-green);
+  cursor: pointer;
+  box-shadow: 0 0 24px rgba(55, 253, 118, 0.12);
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease,
+    background 140ms ease;
+}
+
+.slide-translate-button:hover:not(:disabled) {
+  border-color: var(--ew-green);
+  background: rgba(55, 253, 118, 0.12);
+  box-shadow: 0 0 30px rgba(55, 253, 118, 0.2);
+  transform: translateY(-1px);
+}
+
+.slide-translate-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
 .canvas-artboard {
   position: relative;
   width: 100%;
@@ -1131,6 +1165,11 @@ button {
   box-shadow: 0 0 22px rgba(55, 253, 118, 0.14);
 }
 
+.tool-card-attention {
+  border-color: rgba(55, 253, 118, 0.62);
+  box-shadow: 0 0 24px rgba(55, 253, 118, 0.16);
+}
+
 .tool-card-heading,
 .model-row-main,
 .model-row-meta,
@@ -1177,6 +1216,94 @@ button {
   color: var(--ew-muted);
   font-size: 11px;
   line-height: 1.35;
+}
+
+.translation-target-control {
+  display: grid;
+  gap: 6px;
+  color: var(--ew-muted);
+  font-size: 11px;
+}
+
+.translation-target-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.translation-target-help {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+}
+
+.translation-target-help .material-symbols-outlined {
+  color: var(--ew-green);
+  cursor: help;
+  font-size: 15px;
+  line-height: 1;
+  outline: 0;
+}
+
+.translation-target-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  z-index: 14;
+  width: 220px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(55, 253, 118, 0.34);
+  border-radius: 4px;
+  background: rgba(5, 13, 16, 0.98);
+  box-shadow: 0 0 24px rgba(55, 253, 118, 0.14);
+  color: var(--ew-text);
+  opacity: 0;
+  padding: 8px 9px;
+  pointer-events: none;
+  line-height: 1.35;
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+
+.translation-target-help:hover .translation-target-tooltip,
+.translation-target-help:focus-within .translation-target-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-2px);
+}
+
+.translation-target-control select {
+  width: 100%;
+  border: 1px solid rgba(55, 253, 118, 0.32);
+  border-radius: 4px;
+  background: #050d10;
+  color: var(--ew-text);
+  padding: 8px 9px;
+  font: inherit;
+  outline: 0;
+}
+
+.translation-target-control select:focus {
+  border-color: var(--ew-green);
+  box-shadow: 0 0 0 2px rgba(55, 253, 118, 0.14);
+}
+
+.translation-preparation {
+  display: grid;
+  gap: 6px;
+}
+
+.translation-preparation-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--ew-muted);
+  font-size: 10px;
+}
+
+.translation-source-note {
+  color: var(--ew-dim);
+  font-size: 10px;
 }
 
 .model-row-meta {
@@ -1237,6 +1364,62 @@ button {
 .property-row strong {
   color: var(--ew-text);
   font-size: 12px;
+}
+
+.design-control {
+  display: grid;
+  grid-template-columns: minmax(76px, 0.8fr) minmax(0, 1.2fr);
+  align-items: center;
+  min-height: 38px;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: #000;
+  color: var(--ew-muted);
+  font-size: 12px;
+  padding: 6px 10px;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.design-control:hover,
+.design-control:focus-within {
+  border-color: rgba(55, 253, 118, 0.36);
+  box-shadow: 0 0 16px rgba(55, 253, 118, 0.08);
+}
+
+.design-control input,
+.design-control select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(55, 253, 118, 0.24);
+  border-radius: 4px;
+  background: #050d10;
+  color: var(--ew-text);
+  font: inherit;
+  outline: 0;
+  padding: 7px 8px;
+}
+
+.design-control input[type='color'] {
+  height: 30px;
+  padding: 3px;
+}
+
+.design-control input[type='range'] {
+  padding: 0;
+  accent-color: var(--ew-green);
+}
+
+.design-control input:focus,
+.design-control select:focus {
+  border-color: var(--ew-green);
+  box-shadow: 0 0 0 2px rgba(55, 253, 118, 0.14);
+}
+
+.design-selection-summary {
+  cursor: default;
 }
 
 .palette-row {

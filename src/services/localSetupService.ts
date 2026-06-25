@@ -66,8 +66,8 @@ export class BrowserLocalSetupService implements LocalSetupService {
       if (result === 'downloadable' || result === 'downloading') {
         return {
           label: 'Chrome Translation',
-          status: 'needs-setup',
-          detail: 'Chrome must download translation support.',
+          status: 'unavailable',
+          detail: 'Chrome translation is not ready in this browser session.',
         };
       }
     } catch {

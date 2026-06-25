@@ -7,7 +7,7 @@ interface LayersPanelProps {
   project: ProjectDocument;
   activePageId: string;
   selection: SelectionState;
-  onSelectElement?: (elementId: string) => void;
+  onSelectElement?: (elementId: string, options?: { additive?: boolean }) => void;
   onSetElementVisibility?: (elementId: string, visible: boolean) => void;
   onSetElementLock?: (elementId: string, locked: boolean) => void;
   onDeleteElement?: (elementId: string) => void;
@@ -101,12 +101,20 @@ export function LayersPanel({
                   if (!draggedElementId || draggedElementId === layer.id) return;
                   onReorderElement?.(draggedElementId, layer.id);
                 }}
-                onClick={() => {
+                onClick={(event) => {
+                  if (event.shiftKey) {
+                    onSelectElement?.(layer.id, { additive: true });
+                    return;
+                  }
                   onSelectElement?.(layer.id);
                 }}
                 onKeyDown={(event) => {
                   if (event.key !== 'Enter' && event.key !== ' ') return;
                   event.preventDefault();
+                  if (event.shiftKey) {
+                    onSelectElement?.(layer.id, { additive: true });
+                    return;
+                  }
                   onSelectElement?.(layer.id);
                 }}
                 >

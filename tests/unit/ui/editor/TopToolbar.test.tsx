@@ -12,6 +12,7 @@ describe('TopToolbar', () => {
     const onNewProject = vi.fn();
     const onPersistenceToggle = vi.fn();
     const onSelectLayers = vi.fn();
+    const onTranslateDeck = vi.fn();
 
     render(
       <TopToolbar
@@ -22,6 +23,8 @@ describe('TopToolbar', () => {
         onNewProject={onNewProject}
         onPersistenceToggle={onPersistenceToggle}
         onSelectLayers={onSelectLayers}
+        onTranslateDeck={onTranslateDeck}
+        canTranslateDeck
       />,
     );
 
@@ -41,6 +44,10 @@ describe('TopToolbar', () => {
     await user.click(screen.getByRole('button', { name: 'View' }));
     await user.click(screen.getByRole('menuitem', { name: 'Toggle Layers Panel' }));
     expect(onSelectLayers).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Translate Deck' }));
+    expect(onTranslateDeck).toHaveBeenCalledTimes(1);
   });
 
   it('toggles persistence from the toolbar status icon', async () => {

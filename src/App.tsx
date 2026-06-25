@@ -5,6 +5,10 @@ import type { LocalSetupState } from './services/interfaces';
 import { EditorShell } from './ui/editor/EditorShell';
 import { FirstRunSetupScreen } from './ui/setup/FirstRunSetupScreen';
 
+function isSetupReady(setupState: LocalSetupState) {
+  return setupState.fileSystem.status === 'ready' && setupState.chromeTranslation.status === 'ready';
+}
+
 export function App() {
   const services = useMemo(() => {
     const url = new URL(window.location.href);
@@ -29,29 +33,48 @@ export function App() {
   }, []);
 
   const [setupState, setSetupState] = useState<LocalSetupState | undefined>();
-  const [setupComplete, setSetupComplete] = useState(() => services.localSetupService.hasCompletedSetup());
+  const [setupComplete, setSetupComplete] = useState(false);
+  const [isCheckingSetup, setIsCheckingSetup] = useState(true);
 
   useEffect(() => {
-    if (setupComplete) return;
-    void services.localSetupService.checkReadiness().then(setSetupState);
-  }, [services.localSetupService, setupComplete]);
+    let isMounted = true;
+
+    void services.localSetupService.checkReadiness().then((nextSetupState) => {
+      if (!isMounted) return;
+
+      setSetupState(nextSetupState);
+      setSetupComplete(services.localSetupService.hasCompletedSetup() && isSetupReady(nextSetupState));
+      setIsCheckingSetup(false);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [services.localSetupService]);
+
+  if (isCheckingSetup || !setupState) {
+    return (
+      <main className="setup-screen">
+        <p className="setup-loading">Checking local setup...</p>
+      </main>
+    );
+  }
 
   if (!setupComplete) {
-    if (!setupState) {
-      return (
-        <main className="setup-screen">
-          <p className="setup-loading">Checking local setup...</p>
-        </main>
-      );
-    }
-
     return (
       <FirstRunSetupScreen
         setupState={setupState}
         onRefresh={() => {
-          void services.localSetupService.checkReadiness().then(setSetupState);
+          void services.localSetupService.checkReadiness().then((nextSetupState) => {
+            setSetupState(nextSetupState);
+            setSetupComplete(
+              services.localSetupService.hasCompletedSetup() && isSetupReady(nextSetupState),
+            );
+          });
         }}
         onContinue={() => {
+          if (!isSetupReady(setupState)) return;
+
           services.localSetupService.markSetupComplete();
           setSetupComplete(true);
         }}

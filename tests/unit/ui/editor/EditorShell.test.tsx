@@ -3,7 +3,11 @@ import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { createAppServices } from '../../../../src/app/composition';
 import type { Asset, ProjectDocument } from '../../../../src/domain/model';
-import type { BackgroundRemovalService, ProjectRepository } from '../../../../src/services/interfaces';
+import type {
+  BackgroundRemovalService,
+  ProjectRepository,
+  TranslatorService,
+} from '../../../../src/services/interfaces';
 import { InMemoryModelSetupService } from '../../../../src/services/modelSetupService';
 import { EditorShell } from '../../../../src/ui/editor/EditorShell';
 
@@ -59,6 +63,29 @@ class SavingProjectRepository implements ProjectRepository {
   }
 }
 
+class RecordingTranslatorService implements TranslatorService {
+  prepareTranslation = vi.fn(
+    (
+      sourceLanguage: string,
+      targetLanguage: string,
+      options?: { onProgress?: (progress: number) => void },
+    ) => {
+      void sourceLanguage;
+      void targetLanguage;
+      options?.onProgress?.(100);
+      return Promise.resolve();
+    },
+  );
+
+  translate = vi.fn((text: string, targetLanguage: string) =>
+    Promise.resolve(`${targetLanguage}:${text}`),
+  );
+
+  detectLanguage(): Promise<string> {
+    return Promise.resolve('en');
+  }
+}
+
 class ImportingProjectRepository implements ProjectRepository {
   savedProjects: ProjectDocument[] = [];
 
@@ -98,13 +125,39 @@ class DeferredLoadingProjectRepository implements ProjectRepository {
   }
 }
 
+function createDeferred<T>() {
+  let resolve: (value: T) => void = () => undefined;
+  let reject: (error: Error) => void = () => undefined;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, reject, resolve };
+}
+
+function createReadyPrepareTranslationMock() {
+  return vi.fn(
+    (
+      sourceLanguage: string,
+      targetLanguage: string,
+      options?: { onProgress?: (progress: number) => void },
+    ) => {
+      void sourceLanguage;
+      void targetLanguage;
+      options?.onProgress?.(100);
+      return Promise.resolve();
+    },
+  );
+}
+
 describe('EditorShell', () => {
-  it('renders the approved editor shell landmarks', () => {
+  it('renders the approved editor shell landmarks', async () => {
     render(<EditorShell services={createAppServices()} />);
 
     expect(screen.getByText('LocalStudio.ai')).toBeInTheDocument();
     expect(screen.getByText('Untitled AI Deck')).toBeInTheDocument();
-    expect(screen.getByText('PT-BR')).toBeInTheDocument();
+    expect(screen.getByText('PT')).toBeInTheDocument();
+    expect(await screen.findByText('EN')).toBeInTheDocument();
     expect(
       screen.getByPlaceholderText('Describe slide structure or organize current content...'),
     ).toBeInTheDocument();
@@ -147,6 +200,21 @@ describe('EditorShell', () => {
 
     await user.keyboard('{Meta>}{Shift>}z{/Shift}{/Meta}');
     expect(screen.queryByRole('button', { name: 'Selected Image' })).not.toBeInTheDocument();
+  });
+
+  it('selects all elements on the active slide with the select-all shortcut', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.keyboard('{Meta>}a{/Meta}');
+
+    expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+      'data-selected-elements',
+      'image-hero,text-subtitle,text-title',
+    );
+    expect(screen.getByRole('button', { name: 'Selected Image' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Title' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Subtitle' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('renames the project from the toolbar', async () => {
@@ -365,6 +433,85 @@ describe('EditorShell', () => {
     );
   });
 
+  it('copies and pastes selected objects near the original selection', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const repository = new SavingProjectRepository();
+    services.projectRepository = repository;
+    render(<EditorShell services={services} />);
+
+    await user.keyboard('{Meta>}c{/Meta}');
+    fireEvent.paste(window, {
+      clipboardData: {
+        files: [],
+        items: [],
+      },
+    });
+
+    expect(screen.getByRole('button', { name: 'Selected Image copy' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+
+    await waitFor(() => {
+      const savedProject = repository.savedProjects.at(-1);
+      const original = savedProject?.elements['image-hero'];
+      const pasted = Object.values(savedProject?.elements ?? {}).find(
+        (element) => element.type === 'image' && element.id !== 'image-hero',
+      );
+      expect(pasted).toMatchObject({
+        assetId: original?.type === 'image' ? original.assetId : undefined,
+        x: (original?.x ?? 0) + 32,
+        y: (original?.y ?? 0) + 32,
+      });
+    });
+  });
+
+  it('cuts selected objects into the editor clipboard', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.keyboard('{Meta>}x{/Meta}');
+    expect(screen.queryByRole('button', { name: 'Selected Image' })).not.toBeInTheDocument();
+
+    fireEvent.paste(window, {
+      clipboardData: {
+        files: [],
+        items: [],
+      },
+    });
+
+    expect(await screen.findByRole('button', { name: 'Selected Image copy' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  it('inserts text and images from the floating toolbar', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Insert Text' }));
+    await waitFor(() => {
+      expect(
+        screen
+          .getAllByRole('button', { name: /text-/ })
+          .find((element) => element.getAttribute('aria-pressed') === 'true'),
+      ).toBeTruthy();
+    });
+
+    const image = new File(['image-bytes'], 'toolbar-image.png', { type: 'image/png' });
+    await user.click(screen.getByRole('button', { name: 'Insert Image' }));
+    await user.upload(screen.getByLabelText('Insert image file'), image);
+
+    expect(await screen.findByRole('button', { name: 'toolbar-image.png' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
   it('deletes the selected layer with Delete and Backspace keystrokes', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
@@ -397,6 +544,206 @@ describe('EditorShell', () => {
       'aria-pressed',
       'true',
     );
+  });
+
+  it('translates selected text from the floating toolbar', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const translator = new RecordingTranslatorService();
+    services.translatorService = translator;
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
+    await user.click(screen.getByRole('tab', { name: 'Layout' }));
+    await user.click(screen.getByRole('button', { name: 'Title' }));
+    await user.click(screen.getByRole('button', { name: 'Translate Selected Text' }));
+
+    await waitFor(() => {
+      expect(translator.translate).toHaveBeenCalledWith('AI Design Revolution', 'pt', {
+        sourceLanguage: 'en',
+      });
+    });
+  });
+
+  it('updates the header language chip after translating the current slide', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    services.translatorService = new RecordingTranslatorService();
+    render(<EditorShell services={services} />);
+
+    expect(await screen.findByRole('button', { name: 'Current slide language English' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
+    expect(await screen.findByText('Pair: en → pt')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Translate Current Slide' }));
+
+    expect(await screen.findByRole('button', { name: 'Current slide language Portuguese' })).toBeInTheDocument();
+  });
+
+  it('ignores repeated translate clicks while a translation is running', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const translation = createDeferred<string>();
+    const translate = vi.fn().mockReturnValue(translation.promise);
+    services.translatorService = {
+      detectLanguage: vi.fn().mockResolvedValue('en'),
+      prepareTranslation: createReadyPrepareTranslationMock(),
+      translate,
+    };
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await user.selectOptions(screen.getByLabelText('Translate to'), 'es');
+    await user.click(screen.getByRole('tab', { name: 'Layout' }));
+    await user.click(screen.getByRole('button', { name: 'Title' }));
+    await user.dblClick(screen.getByRole('button', { name: 'Translate Selected Text' }));
+
+    expect(translate).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Translating text...')).toBeInTheDocument();
+
+    translation.resolve('Texto traducido');
+  });
+
+  it('shows translation errors instead of leaving an unhandled promise', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    services.translatorService = {
+      detectLanguage: vi.fn().mockResolvedValue('en'),
+      prepareTranslation: createReadyPrepareTranslationMock(),
+      translate: vi.fn().mockRejectedValue(new Error('Chrome Built-in AI translation is not ready.')),
+    };
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await user.selectOptions(screen.getByLabelText('Translate to'), 'es');
+    await user.click(screen.getByRole('tab', { name: 'Layout' }));
+    await user.click(screen.getByRole('button', { name: 'Title' }));
+    await user.click(screen.getByRole('button', { name: 'Translate Selected Text' }));
+
+    expect(await screen.findByText('Chrome Built-in AI translation is not ready.')).toBeInTheDocument();
+  });
+
+  it('fits translated selected text back into the original text frame', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const repository = new SavingProjectRepository();
+    const translate = vi.fn().mockResolvedValue('Revolucion\n de diseno impulsada por inteligencia artificial');
+    services.projectRepository = repository;
+    services.translatorService = {
+      detectLanguage: vi.fn().mockResolvedValue('en'),
+      prepareTranslation: createReadyPrepareTranslationMock(),
+      translate,
+    };
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await user.selectOptions(screen.getByLabelText('Translate to'), 'es');
+    await user.click(screen.getByRole('tab', { name: 'Layout' }));
+    await user.click(screen.getByRole('button', { name: 'Title' }));
+    await user.click(screen.getByRole('button', { name: 'Translate Selected Text' }));
+
+    await waitFor(() => {
+      expect(translate).toHaveBeenCalledWith('AI Design Revolution', 'es', {
+        sourceLanguage: 'en',
+      });
+    });
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+
+    await waitFor(() => {
+      const title = repository.savedProjects.at(-1)?.elements['text-title'];
+      expect(title).toMatchObject({
+        fontSize: 96,
+        text: 'Revolucion de diseno impulsada por inteligencia artificial',
+      });
+      expect(title?.width).toBeGreaterThan(600);
+    });
+  });
+
+  it('redirects the first translation attempt to AI Tools until a target language is selected', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const translator = new RecordingTranslatorService();
+    services.translatorService = translator;
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'Title' }));
+    await user.click(screen.getByRole('button', { name: 'Translate Selected Text' }));
+
+    expect(screen.getByRole('tab', { name: 'AI Tools' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByLabelText('Translate to')).toHaveValue('');
+    expect(translator.translate).not.toHaveBeenCalled();
+  });
+
+  it('translates every visible unlocked text element on the current slide', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const translator = new RecordingTranslatorService();
+    services.translatorService = translator;
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
+    await user.click(screen.getByRole('button', { name: 'Translate Current Slide' }));
+
+    await waitFor(() => {
+      expect(translator.translate).toHaveBeenCalledWith('AI Design Revolution', 'pt', {
+        sourceLanguage: 'en',
+      });
+      expect(translator.translate).toHaveBeenCalledWith('Browser-native creative automation', 'pt', {
+        sourceLanguage: 'en',
+      });
+    });
+  });
+
+  it('uses the prepared source language when translating back to another language', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const translate = vi.fn().mockResolvedValue('AI Design Revolution');
+    services.translatorService = {
+      detectLanguage: vi
+        .fn()
+        .mockResolvedValueOnce('es')
+        .mockResolvedValue('gl'),
+      prepareTranslation: createReadyPrepareTranslationMock(),
+      translate,
+    };
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await user.selectOptions(screen.getByLabelText('Translate to'), 'en');
+    await user.click(screen.getByRole('tab', { name: 'Layout' }));
+    await user.click(screen.getByRole('button', { name: 'Title' }));
+    await user.click(screen.getByRole('button', { name: 'Translate Selected Text' }));
+
+    await waitFor(() => {
+      expect(translate).toHaveBeenCalledWith('AI Design Revolution', 'en', {
+        sourceLanguage: 'es',
+      });
+    });
+  });
+
+  it('translates the full deck from the Edit menu', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const translator = new RecordingTranslatorService();
+    services.translatorService = translator;
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Translate Deck' }));
+
+    await waitFor(() => {
+      expect(translator.translate).toHaveBeenCalledWith('AI Design Revolution', 'pt', {
+        sourceLanguage: 'en',
+      });
+      expect(translator.translate).toHaveBeenCalledWith('Browser-native creative automation', 'pt', {
+        sourceLanguage: 'en',
+      });
+    });
   });
 
   it('blocks background subject selection until image editing models are downloaded', async () => {

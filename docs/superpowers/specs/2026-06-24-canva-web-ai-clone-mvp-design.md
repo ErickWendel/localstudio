@@ -29,6 +29,7 @@ Ready now:
 - Local document model for projects, pages, assets, and layered text/image/shape elements.
 - Immutable command classes for alignment, z-order, frame transforms, text updates, layer reorder, visibility, locking, deletion, and adding imported image elements.
 - File System Access API project persistence scaffold. When supported, clicking the persistence icon or `File > Save Local` asks for a project folder, writes `project.json`, writes `config/localstudio.json`, and creates `assets/`, `config/`, and `cache/` folders. `File > Import Project` opens an existing project folder by reading its `project.json`.
+- File-backed image asset persistence. Imported/generated data URL image assets are written into the project `assets/` folder, while `project.json` stores metadata and relative filenames instead of large inline image payloads.
 - Autosave is active after persistence is enabled. Document mutations write the updated project back to the active project folder, while startup restore skips the hydration save so it does not overwrite the last good project.
 - LocalStudio.ai remembers File System Access directory handles in browser structured storage. It keeps both a global recent project handle and project-name keyed handles, so restarted tabs with `?project=<name>` reopen their own project context instead of whichever project was opened most recently.
 - `File > New Project` opens a blank project in a new tab via `?newProject=1`, consumes that query once, and removes stale project context so refreshes do not recreate blank projects.
@@ -39,31 +40,33 @@ Ready now:
 - Image elements render actual image assets. The seeded selected image uses the provided remote image URL and preserves its natural `516 x 387` dimensions instead of scaling up. Imported images preserve natural size and only scale down when larger than the page.
 - AI Tools panel includes local model readiness/download states and local Chrome AI tool cards. The image editing model is consolidated as a shared segmentation dependency for background removal, Smart Grab, and Magic Eraser.
 - Click-guided background removal is wired through the shared Segment Anything WebGPU-style image editing provider. The flow blocks until the model is ready, prepares the selected image, previews the selected subject in blue, supports right-click positive refinement points, applies removal on left click, and tightens the selected image bounds after extraction.
+- Chrome Built-in AI translation is wired behind `TranslatorService` for selected text, current slide, and full deck scopes. The visible entry points are the selected-text floating toolbar action, the slide translate icon above the canvas, and `Edit > Translate Deck`. The first translation attempt redirects to AI Tools until the user chooses a default target language in `Translate Design > Translate to`.
+- The AI Tools translation card uses a hard-coded Chrome Translator-supported target-language list sorted by language name, with flags shown at the end of each option. Changing the target language prepares the detected source/target pair, shows download progress, and reuses the prepared translator for subsequent text/slide/deck translation.
+- Translated text now gets a first-pass fit treatment: single-line source text has accidental translated whitespace collapsed, the text box expands around its original center first, and height grows if needed before any future manual overflow flow is introduced.
 - Export service shell and mocked AI provider seams exist for later real provider work.
 - Unit/component tests are under `tests/unit`; browser specs are under `tests/e2e`.
 - Latest verified local checks: `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build` pass.
 
 Known limitations in the current implementation:
 
-- Real Chrome Built-in AI providers are not wired yet.
+- Chrome Built-in AI translation is wired with target-language selection, pair preparation progress, busy guards, basic error notices, detector fallback normalization, and first-pass fit-to-frame behavior. It still needs richer manual overflow controls, richer recovery guidance, broader browser/device verification, and Playwright coverage.
 - The first real Transformers.js / Hugging Face vision provider is wired for click-guided background removal through Segment Anything WebGPU, but it still needs broader browser/device verification and production hardening.
-- Translation, palette generation, Smart Grab, and Magic Eraser are still mocked or incomplete workflows.
+- Palette generation, Smart Grab, and Magic Eraser are still mocked or incomplete workflows.
 - Export supports the current-page PNG path, but production-quality browser verification and export UX polish remain. PDF export is still missing.
 - Layer drag/drop works through the app UI and tested callbacks, but should receive more Playwright coverage after interaction stabilizes.
 - Page background is displayed as a static layer row and is not yet a fully editable/selectable element.
 - Undo/redo, duplicate, delete shortcuts, zoom controls, basic alignment, and z-order actions are implemented. Multi-select, richer multi-element alignment, and real property editing remain incomplete.
-- Local image assets are still stored as data URLs inside `project.json`; moving original/imported/generated image blobs into `assets/` is the next storage-hardening step.
+- Some historical or remote seeded assets may still hydrate with runtime object/data URLs, but newly imported/generated file-backed assets are stored through the project `assets/` folder.
 
 Next implementation priorities:
 
-1. Finish remaining non-AI editor fundamentals: real Design-tab property fields, page background editability, multi-select, and multi-element alignment.
-2. Harden File System Access project storage: move original/imported/generated image blobs into `assets/`, keep metadata in `project.json`, and keep generated previews/masks in `cache/`.
-3. Build first-run AI setup UX with actual browser capability checks and provider readiness state.
-4. Wire real Chrome Built-in AI translation providers for selected text, current slide translation, and full deck translation.
-5. Complete export: polish current-page PNG export and add all-page PDF from the actual Konva stage at configured page dimensions. JPEG is deferred unless explicitly reintroduced.
-6. Add Playwright coverage for layer reorder, hide/show, lock/unlock, delete, local image import, filesystem save, text editing, translation flows, and first-run setup.
-7. Wire Chrome Built-in AI prompt-to-palette provider.
-8. Build Smart Grab and Magic Eraser on top of the shared Segment Anything WebGPU image editing provider.
+1. Finish translation UX hardening: manual overflow controls, richer recovery guidance, browser language availability verification on target Chrome builds, and Playwright coverage.
+2. Finish remaining non-AI editor fundamentals: real Design-tab property fields, page background editability, multi-select, and multi-element alignment.
+3. Harden remaining storage edges: generated preview/mask cache files, stale asset cleanup, and stronger save/import error recovery.
+4. Complete export: polish current-page PNG export and add all-page PDF from the actual Konva stage at configured page dimensions. JPEG is deferred unless explicitly reintroduced.
+5. Add Playwright coverage for layer reorder, hide/show, lock/unlock, delete, local image import, filesystem save, text editing, translation flows, and first-run setup.
+6. Wire Chrome Built-in AI prompt-to-palette provider.
+7. Build Smart Grab and Magic Eraser on top of the shared Segment Anything WebGPU image editing provider.
 
 ## Goals
 
@@ -254,24 +257,29 @@ The user can translate text at three scopes: selected text, current slide, or th
 
 Behavior:
 
-- Detect text elements and source language where available.
+- Detect text elements and source language before translating each text value.
 - Show the detected current language in the top toolbar near the user/profile area after startup language detection completes.
-- When the user clicks a translation action, preselect the translation flow using the detected current language as context so the user starts by choosing or confirming the target language.
+- When the user clicks any translation action for the first time without a target language selected, switch to the AI Tools tab and highlight `Translate Design`.
+- `Translate Design` includes a `Translate to:` dropdown listing the Chrome Translator API supported language codes with readable names and flags. The selected target becomes the default for selected text, current slide, and full deck translation.
 - Use Chrome Built-in AI translation and language detection APIs after setup confirms support.
 - Preserve text element position, font size, color, alignment, and style metadata.
-- If translated text overflows, flag the element and offer fit-to-box resizing.
+- Preserve the original visual placement. For single-line source text, collapse accidental translated line breaks/spaces, expand the text box around its original center first, and grow height if needed before considering future manual fit controls.
+- Later, if translated text still overflows after auto-fit, flag the element and offer manual fit-to-box resizing.
 - Apply changes through `TranslateTextCommand`.
 
 Translation entry points:
 
 - Selected text: when a text element is selected, the contextual/floating toolbar exposes a translate action. It translates only that selected text element.
 - Current slide: each slide/page surface exposes a compact translate icon near the top of the slide controls. It translates every visible text element on the active slide.
-- Full deck: `Edit > Translate Deck` translates text elements across all slides in the project automatically after the user confirms the target language.
+- Full deck: `Edit > Translate Deck` translates text elements across all slides in the project automatically after the user chooses the default target language.
 
 Translation result rules:
 
 - Text, slide, and deck translation all use the same Chrome Built-in AI provider interface and command pipeline.
 - Translation must preserve the document hierarchy: selected-text translation updates one element, slide translation updates elements on the active page only, and deck translation updates text elements on every page.
+- The translator must run language detection before translation and use the detected source language when creating the browser translator. If detected source and target language match, the text is left unchanged.
+- Language Detector output must be normalized to Chrome Translator-supported source codes before calling `Translator.availability()` or `Translator.create()`. Known detector aliases/fallbacks include `gl` and `ca` to `es`, `he` to `iw`, `nb`/`nn` to `no`, and Traditional Chinese region tags to `zh-Hant`.
+- Chrome `Translator.availability()` states `available`, `downloadable`, and `downloading` are all valid translation paths. `downloadable` and `downloading` must continue into `Translator.create()` so Chrome can fetch or finish fetching the language pack for that source/target pair.
 - Translated changes participate in undo/redo as atomic commands per requested scope.
 - Locked or hidden text elements are skipped unless the user explicitly enables an advanced option later. The MVP default is to translate visible, unlocked text only.
 

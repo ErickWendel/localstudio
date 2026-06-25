@@ -1,5 +1,6 @@
 import { Brush, Layers3, Sparkles } from 'lucide-react';
-import type { ProjectDocument, SelectionState } from '../../domain/model';
+import type { PageBackground, ProjectDocument, SelectionState } from '../../domain/model';
+import type { ElementStylePatch } from '../../domain/commands/basicCommands';
 import type { ModelState } from '../../services/interfaces';
 import { SegmentedTabs, type SegmentedTab } from '../components/SegmentedTabs';
 import { AiToolsPanel } from './AiToolsPanel';
@@ -12,16 +13,23 @@ interface RightPanelProps {
   onTabChange: (tab: RightPanelTab) => void;
   modelStates: ModelState[];
   attentionModelId?: string | undefined;
+  translationLanguageOptions?: Array<{ code: string; flag: string; label: string }>;
+  translationPreparation?: { progress: number; sourceLanguage?: string; status: 'idle' | 'downloading' | 'ready' | 'failed' };
+  translationTargetAttention?: boolean;
+  translationTargetLanguage?: string;
   onDownloadRequiredModels?: () => Promise<void>;
   onDownloadModel?: (id: string) => Promise<void>;
+  onTranslationTargetLanguageChange?: (languageCode: string) => void;
   project: ProjectDocument;
   activePageId: string;
   selection: SelectionState;
-  onSelectElement?: (elementId: string) => void;
+  onSelectElement?: (elementId: string, options?: { additive?: boolean }) => void;
   onSetElementVisibility?: (elementId: string, visible: boolean) => void;
   onSetElementLock?: (elementId: string, locked: boolean) => void;
   onDeleteElement?: (elementId: string) => void;
   onReorderElement?: (elementId: string, targetElementId: string) => void;
+  onUpdateElementStyle?: (elementId: string, patch: ElementStylePatch) => void;
+  onUpdatePageBackground?: (background: PageBackground) => void;
 }
 
 const tabs: Array<SegmentedTab<RightPanelTab>> = [
@@ -35,8 +43,13 @@ export function RightPanel({
   onTabChange,
   modelStates,
   attentionModelId,
+  translationLanguageOptions,
+  translationPreparation,
+  translationTargetAttention,
+  translationTargetLanguage,
   onDownloadRequiredModels,
   onDownloadModel,
+  onTranslationTargetLanguageChange,
   project,
   activePageId,
   selection,
@@ -45,6 +58,8 @@ export function RightPanel({
   onSetElementLock,
   onDeleteElement,
   onReorderElement,
+  onUpdateElementStyle,
+  onUpdatePageBackground,
 }: RightPanelProps) {
   return (
     <aside className="right-panel" aria-label="Editor tools">
@@ -54,8 +69,13 @@ export function RightPanel({
           <AiToolsPanel
             modelStates={modelStates}
             attentionModelId={attentionModelId}
+            translationLanguageOptions={translationLanguageOptions}
+            translationPreparation={translationPreparation}
+            translationTargetAttention={translationTargetAttention}
+            translationTargetLanguage={translationTargetLanguage}
             onDownloadRequiredModels={onDownloadRequiredModels}
             onDownloadModel={onDownloadModel}
+            onTranslationTargetLanguageChange={onTranslationTargetLanguageChange}
           />
         ) : null}
         {activeTab === 'layout' ? (
@@ -70,7 +90,15 @@ export function RightPanel({
             {...(onReorderElement ? { onReorderElement } : {})}
           />
         ) : null}
-        {activeTab === 'design' ? <DesignPanel /> : null}
+        {activeTab === 'design' ? (
+          <DesignPanel
+            project={project}
+            activePageId={activePageId}
+            selection={selection}
+            {...(onUpdateElementStyle ? { onUpdateElementStyle } : {})}
+            {...(onUpdatePageBackground ? { onUpdatePageBackground } : {})}
+          />
+        ) : null}
       </div>
     </aside>
   );

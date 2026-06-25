@@ -1,9 +1,36 @@
-import type { Asset, BaseElement, DesignElement, ImageElement, ProjectDocument } from '../model';
+import type {
+  Asset,
+  BaseElement,
+  DesignElement,
+  ImageElement,
+  PageBackground,
+  ProjectDocument,
+} from '../model';
 import type { EditorCommand } from './types';
 
 export type AlignMode = 'horizontal-center' | 'vertical-center' | 'page-center';
 export type ZOrderMode = 'front' | 'back' | 'forward' | 'backward';
 export type ElementFramePatch = Partial<Pick<BaseElement, 'height' | 'rotation' | 'width' | 'x' | 'y'>>;
+export type ElementStylePatch = Partial<{
+  align: 'left' | 'center' | 'right';
+  fill: string;
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: number;
+  opacity: number;
+  stroke: string;
+  strokeWidth: number;
+}>;
+
+interface TextTranslationPatch {
+  fontSize?: number;
+  height?: number;
+  width?: number;
+  x?: number;
+  text: string;
+}
+
+type TextTranslationValue = string | TextTranslationPatch;
 
 export class AlignElementCommand implements EditorCommand {
   readonly description = 'Align element';
@@ -244,6 +271,38 @@ export class AddImageElementCommand implements EditorCommand {
   }
 }
 
+export class AddElementsCommand implements EditorCommand {
+  readonly description = 'Add elements';
+
+  constructor(
+    private readonly pageId: string,
+    private readonly elements: DesignElement[],
+    private readonly assets: Record<string, Asset> = {},
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    if (this.elements.length === 0) return project;
+
+    return {
+      ...project,
+      assets: {
+        ...project.assets,
+        ...this.assets,
+      },
+      elements: {
+        ...project.elements,
+        ...Object.fromEntries(this.elements.map((element) => [element.id, element])),
+      },
+      pages: project.pages.map((page) =>
+        page.id === this.pageId
+          ? { ...page, elementIds: [...page.elementIds, ...this.elements.map((element) => element.id)] }
+          : page,
+      ),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+}
+
 export class UpdateElementFrameCommand implements EditorCommand {
   readonly description = 'Update element frame';
 
@@ -272,6 +331,37 @@ export class UpdateElementFrameCommand implements EditorCommand {
   }
 }
 
+export class UpdateElementFramesCommand implements EditorCommand {
+  readonly description = 'Update element frames';
+
+  constructor(private readonly patches: Record<string, ElementFramePatch>) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    const nextElements = { ...project.elements };
+    let didChange = false;
+
+    for (const [elementId, patch] of Object.entries(this.patches)) {
+      const element = nextElements[elementId];
+      if (!element || element.locked) continue;
+      nextElements[elementId] = {
+        ...element,
+        ...patch,
+        width: patch.width === undefined ? element.width : Math.max(1, patch.width),
+        height: patch.height === undefined ? element.height : Math.max(1, patch.height),
+      };
+      didChange = true;
+    }
+
+    if (!didChange) return project;
+
+    return {
+      ...project,
+      elements: nextElements,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+}
+
 export class UpdateTextContentCommand implements EditorCommand {
   readonly description = 'Update text content';
 
@@ -293,6 +383,104 @@ export class UpdateTextContentCommand implements EditorCommand {
           text: this.text,
         },
       },
+      updatedAt: new Date().toISOString(),
+    };
+  }
+}
+
+export class UpdateElementStyleCommand implements EditorCommand {
+  readonly description = 'Update element style';
+
+  constructor(
+    private readonly elementId: string,
+    private readonly patch: ElementStylePatch,
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    const element = project.elements[this.elementId];
+    if (!element || element.locked) return project;
+
+    const opacity =
+      this.patch.opacity === undefined ? element.opacity : Math.max(0, Math.min(1, this.patch.opacity));
+    let nextElement: DesignElement = { ...element, opacity };
+
+    if (element.type === 'text') {
+      nextElement = {
+        ...nextElement,
+        ...(this.patch.align ? { align: this.patch.align } : {}),
+        ...(this.patch.fill ? { fill: this.patch.fill } : {}),
+        ...(this.patch.fontFamily ? { fontFamily: this.patch.fontFamily } : {}),
+        ...(this.patch.fontSize !== undefined ? { fontSize: Math.max(1, this.patch.fontSize) } : {}),
+        ...(this.patch.fontWeight !== undefined ? { fontWeight: this.patch.fontWeight } : {}),
+      };
+    }
+
+    if (element.type === 'shape') {
+      nextElement = {
+        ...nextElement,
+        ...(this.patch.fill ? { fill: this.patch.fill } : {}),
+        ...(this.patch.stroke ? { stroke: this.patch.stroke } : {}),
+        ...(this.patch.strokeWidth !== undefined ? { strokeWidth: Math.max(0, this.patch.strokeWidth) } : {}),
+      };
+    }
+
+    return {
+      ...project,
+      elements: {
+        ...project.elements,
+        [this.elementId]: nextElement,
+      },
+      updatedAt: new Date().toISOString(),
+    };
+  }
+}
+
+export class UpdatePageBackgroundCommand implements EditorCommand {
+  readonly description = 'Update page background';
+
+  constructor(
+    private readonly pageId: string,
+    private readonly background: PageBackground,
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    return {
+      ...project,
+      pages: project.pages.map((page) =>
+        page.id === this.pageId ? { ...page, background: this.background } : page,
+      ),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+}
+
+export class TranslateTextElementsCommand implements EditorCommand {
+  readonly description = 'Translate text elements';
+
+  constructor(private readonly translations: Record<string, TextTranslationValue>) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    const nextElements = { ...project.elements };
+    let didChange = false;
+
+    for (const [elementId, translation] of Object.entries(this.translations)) {
+      const element = nextElements[elementId];
+      if (!element || element.type !== 'text' || element.locked) continue;
+      const patch = typeof translation === 'string' ? { text: translation } : translation;
+      if (patch.text === element.text && patch.fontSize === undefined) continue;
+
+      nextElements[elementId] = {
+        ...element,
+        ...patch,
+      };
+      didChange = true;
+    }
+
+    if (!didChange) return project;
+
+    return {
+      ...project,
+      elements: nextElements,
       updatedAt: new Date().toISOString(),
     };
   }

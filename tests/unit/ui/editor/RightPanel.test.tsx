@@ -51,7 +51,8 @@ describe('RightPanel', () => {
         modelStates={modelStates}
       />,
     );
-    expect(screen.getByText('16:9 Presentation')).toBeInTheDocument();
+    expect(screen.getByText('1920 x 1080')).toBeInTheDocument();
+    expect(screen.getByLabelText('Canvas background color')).toHaveValue('#050d10');
     expect(screen.getByText('Text-to-Palette')).toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
     rerender(
@@ -90,6 +91,29 @@ describe('RightPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Title' }));
 
     expect(onSelectElement).toHaveBeenCalledWith('text-title');
+  });
+
+  it('adds to selection from a layout row with shift click', async () => {
+    const user = userEvent.setup();
+    const onSelectElement = vi.fn();
+
+    render(
+      <RightPanel
+        activeTab="layout"
+        onTabChange={vi.fn()}
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
+        modelStates={modelStates}
+        onSelectElement={onSelectElement}
+      />,
+    );
+
+    await user.keyboard('{Shift>}');
+    await user.click(screen.getByRole('button', { name: 'Title' }));
+    await user.keyboard('{/Shift}');
+
+    expect(onSelectElement).toHaveBeenCalledWith('text-title', { additive: true });
   });
 
   it('highlights the image editing model download when background selection needs it', () => {
@@ -174,5 +198,37 @@ describe('RightPanel', () => {
     fireEvent.drop(subtitleRow, { dataTransfer });
 
     expect(onReorderElement).toHaveBeenCalledWith('text-title', 'text-subtitle');
+  });
+
+  it('updates selected text design properties and page background', async () => {
+    const user = userEvent.setup();
+    const onUpdateElementStyle = vi.fn();
+    const onUpdatePageBackground = vi.fn();
+
+    render(
+      <RightPanel
+        activeTab="design"
+        onTabChange={vi.fn()}
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['text-title'] }}
+        modelStates={modelStates}
+        onUpdateElementStyle={onUpdateElementStyle}
+        onUpdatePageBackground={onUpdatePageBackground}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('Canvas background color'), {
+      target: { value: '#000000' },
+    });
+    expect(onUpdatePageBackground).toHaveBeenCalledWith({ type: 'color', color: '#000000' });
+
+    fireEvent.change(screen.getByLabelText('Selected text color'), {
+      target: { value: '#ffffff' },
+    });
+    expect(onUpdateElementStyle).toHaveBeenCalledWith('text-title', { fill: '#ffffff' });
+
+    await user.selectOptions(screen.getByLabelText('Selected text alignment'), 'left');
+    expect(onUpdateElementStyle).toHaveBeenCalledWith('text-title', { align: 'left' });
   });
 });

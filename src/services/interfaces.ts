@@ -51,7 +51,12 @@ export interface LocalSetupService {
 
 export interface TranslatorService {
   detectLanguage(text: string): Promise<string>;
-  translate(text: string, targetLanguage: string): Promise<string>;
+  prepareTranslation(
+    sourceLanguage: string,
+    targetLanguage: string,
+    options?: { onProgress?: (progress: number) => void },
+  ): Promise<void>;
+  translate(text: string, targetLanguage: string, options?: { sourceLanguage?: string }): Promise<string>;
 }
 
 export interface PaletteService {

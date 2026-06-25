@@ -8,8 +8,23 @@ import type {
 } from './interfaces';
 
 export class MockTranslatorService implements TranslatorService {
-  detectLanguage(): Promise<string> {
-    return Promise.resolve('PT-BR');
+  detectLanguage(text = ''): Promise<string> {
+    if (/\[(pt|es|fr|de|it|en)\]/i.test(text)) {
+      return Promise.resolve(text.match(/\[(pt|es|fr|de|it|en)\]/i)?.[1]?.toLowerCase() ?? 'en');
+    }
+    if (/[áéíóúñ¿¡]/i.test(text)) return Promise.resolve('es');
+    return Promise.resolve('en');
+  }
+
+  prepareTranslation(
+    sourceLanguage: string,
+    targetLanguage: string,
+    options?: { onProgress?: (progress: number) => void },
+  ): Promise<void> {
+    void sourceLanguage;
+    void targetLanguage;
+    options?.onProgress?.(100);
+    return Promise.resolve();
   }
 
   translate(text: string, targetLanguage: string): Promise<string> {

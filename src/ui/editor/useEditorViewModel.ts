@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AppServices } from '../../app/composition';
 import {
+  AddElementsCommand,
   AddImageElementCommand,
   AlignElementCommand,
   DeleteElementCommand,
@@ -9,14 +10,19 @@ import {
   SetElementLockCommand,
   SetElementVisibilityCommand,
   SetZOrderCommand,
+  TranslateTextElementsCommand,
+  UpdateElementFramesCommand,
+  UpdateElementStyleCommand,
   UpdateElementFrameCommand,
+  UpdatePageBackgroundCommand,
   UpdateTextContentCommand,
   type AlignMode,
   type ElementFramePatch,
+  type ElementStylePatch,
   type ZOrderMode,
 } from '../../domain/commands/basicCommands';
 import { fitImageWithinPage } from '../../domain/imageSizing';
-import type { Page, ProjectDocument, SelectionState } from '../../domain/model';
+import type { DesignElement, Page, PageBackground, ProjectDocument, SelectionState } from '../../domain/model';
 import { SAMPLE_HERO_IMAGE_SIZE, SAMPLE_HERO_IMAGE_URL } from '../../domain/sampleProject';
 import type { ModelState } from '../../services/interfaces';
 import { IMAGE_EDITING_MODEL_ID } from '../../services/modelSetupService';
@@ -47,13 +53,112 @@ interface BackgroundSelectionPoint {
   positive: boolean;
 }
 
+interface TranslationPreparationState {
+  progress: number;
+  sourceLanguage?: string;
+  status: 'idle' | 'downloading' | 'ready' | 'failed';
+}
+
+interface ElementClipboardState {
+  assets: ProjectDocument['assets'];
+  elements: DesignElement[];
+}
+
 const PERSISTENCE_PREFERENCE_KEY = 'ew-canvas-ai.persistence-enabled';
+const TRANSLATION_TARGET_LANGUAGE_KEY = 'localstudio.ai.translation-target-language';
 const IMAGE_EDITING_MODEL_REQUIRED_MESSAGE = 'You must download the image editing tools first.';
 const BACKGROUND_PREVIEW_DEBOUNCE_MS = 120;
+const DEFAULT_SLIDE_LANGUAGE_CODE = 'pt';
+const PASTED_ELEMENT_OFFSET = 32;
+export const TRANSLATION_LANGUAGE_OPTIONS = [
+  { code: 'ar', flag: '🇸🇦', label: 'Arabic' },
+  { code: 'bn', flag: '🇧🇩', label: 'Bengali' },
+  { code: 'bg', flag: '🇧🇬', label: 'Bulgarian' },
+  { code: 'zh', flag: '🇨🇳', label: 'Chinese' },
+  { code: 'zh-Hant', flag: '🇹🇼', label: 'Chinese (Traditional)' },
+  { code: 'hr', flag: '🇭🇷', label: 'Croatian' },
+  { code: 'cs', flag: '🇨🇿', label: 'Czech' },
+  { code: 'da', flag: '🇩🇰', label: 'Danish' },
+  { code: 'nl', flag: '🇳🇱', label: 'Dutch' },
+  { code: 'en', flag: '🇺🇸', label: 'English' },
+  { code: 'fi', flag: '🇫🇮', label: 'Finnish' },
+  { code: 'fr', flag: '🇫🇷', label: 'French' },
+  { code: 'de', flag: '🇩🇪', label: 'German' },
+  { code: 'el', flag: '🇬🇷', label: 'Greek' },
+  { code: 'iw', flag: '🇮🇱', label: 'Hebrew' },
+  { code: 'hi', flag: '🇮🇳', label: 'Hindi' },
+  { code: 'hu', flag: '🇭🇺', label: 'Hungarian' },
+  { code: 'id', flag: '🇮🇩', label: 'Indonesian' },
+  { code: 'it', flag: '🇮🇹', label: 'Italian' },
+  { code: 'ja', flag: '🇯🇵', label: 'Japanese' },
+  { code: 'kn', flag: '🇮🇳', label: 'Kannada' },
+  { code: 'ko', flag: '🇰🇷', label: 'Korean' },
+  { code: 'lt', flag: '🇱🇹', label: 'Lithuanian' },
+  { code: 'mr', flag: '🇮🇳', label: 'Marathi' },
+  { code: 'no', flag: '🇳🇴', label: 'Norwegian' },
+  { code: 'pl', flag: '🇵🇱', label: 'Polish' },
+  { code: 'pt', flag: '🇧🇷', label: 'Portuguese' },
+  { code: 'ro', flag: '🇷🇴', label: 'Romanian' },
+  { code: 'ru', flag: '🇷🇺', label: 'Russian' },
+  { code: 'sk', flag: '🇸🇰', label: 'Slovak' },
+  { code: 'sl', flag: '🇸🇮', label: 'Slovenian' },
+  { code: 'es', flag: '🇪🇸', label: 'Spanish' },
+  { code: 'sv', flag: '🇸🇪', label: 'Swedish' },
+  { code: 'ta', flag: '🇮🇳', label: 'Tamil' },
+  { code: 'te', flag: '🇮🇳', label: 'Telugu' },
+  { code: 'th', flag: '🇹🇭', label: 'Thai' },
+  { code: 'tr', flag: '🇹🇷', label: 'Turkish' },
+  { code: 'uk', flag: '🇺🇦', label: 'Ukrainian' },
+  { code: 'vi', flag: '🇻🇳', label: 'Vietnamese' },
+];
+
+function normalizeLanguageCode(languageCode: string | undefined) {
+  const normalized = languageCode?.trim();
+  if (!normalized) return DEFAULT_SLIDE_LANGUAGE_CODE;
+  const lower = normalized.toLowerCase();
+  const aliases: Record<string, string> = {
+    ca: 'es',
+    gl: 'es',
+    he: 'iw',
+    'pt-br': 'pt',
+    'pt-pt': 'pt',
+    nb: 'no',
+    nn: 'no',
+    'zh-hk': 'zh-Hant',
+    'zh-mo': 'zh-Hant',
+    'zh-tw': 'zh-Hant',
+  };
+  const aliased = aliases[lower] ?? lower;
+  if (aliased === 'zh-hant') return 'zh-Hant';
+  if (TRANSLATION_LANGUAGE_OPTIONS.some((option) => option.code === aliased)) return aliased;
+  const baseLanguage = aliased.split('-')[0];
+  if (baseLanguage && TRANSLATION_LANGUAGE_OPTIONS.some((option) => option.code === baseLanguage)) {
+    return baseLanguage;
+  }
+  return DEFAULT_SLIDE_LANGUAGE_CODE;
+}
+
+function getLanguageOption(languageCode: string | undefined) {
+  const code = normalizeLanguageCode(languageCode);
+  return (
+    TRANSLATION_LANGUAGE_OPTIONS.find((option) => option.code === code) ??
+    TRANSLATION_LANGUAGE_OPTIONS.find((option) => option.code === DEFAULT_SLIDE_LANGUAGE_CODE)!
+  );
+}
+
+function getLanguageDisplayCode(languageCode: string) {
+  return languageCode === 'zh-Hant' ? 'ZH-HANT' : languageCode.toUpperCase();
+}
 
 function readPersistencePreference() {
   if (typeof window === 'undefined') return false;
   return window.localStorage.getItem(PERSISTENCE_PREFERENCE_KEY) === 'true';
+}
+
+function readTranslationTargetLanguage() {
+  if (typeof window === 'undefined') return '';
+  const storedTarget = window.localStorage.getItem(TRANSLATION_TARGET_LANGUAGE_KEY);
+  return TRANSLATION_LANGUAGE_OPTIONS.some((option) => option.code === storedTarget) ? storedTarget ?? '' : '';
 }
 
 function writeProjectNameToUrl(projectName: string) {
@@ -186,6 +291,73 @@ function getMinimumTextHeight(text: string, fontSize: number) {
   return Math.ceil(lineCount * fontSize * 1.08 + Math.max(12, fontSize * 0.18));
 }
 
+function getPageTextSample(project: ProjectDocument, pageId: string) {
+  const page = project.pages.find((item) => item.id === pageId);
+  if (!page) return '';
+  return page.elementIds
+    .map((elementId) => project.elements[elementId])
+    .filter((element): element is Extract<ProjectDocument['elements'][string], { type: 'text' }> =>
+      Boolean(element && element.type === 'text' && element.visible !== false && !element.locked),
+    )
+    .map((element) => element.text.trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
+type TranslationScope = 'selection' | 'slide' | 'deck';
+type TranslationPatch = { fontSize?: number; height?: number; text: string; width?: number; x?: number };
+
+function normalizeTranslatedText(originalText: string, translatedText: string) {
+  if (originalText.includes('\n')) return translatedText.trim();
+  return translatedText.replace(/\s+/g, ' ').trim();
+}
+
+function estimateSingleLineTextWidth(text: string, fontSize: number) {
+  return Array.from(text).reduce((width, character) => {
+    if (character === ' ') return width + fontSize * 0.32;
+    if (/[A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÄËÏÖÜÇÑ]/.test(character)) return width + fontSize * 0.68;
+    if (/[ilI.,'’|]/.test(character)) return width + fontSize * 0.34;
+    return width + fontSize * 0.58;
+  }, 0);
+}
+
+function fitTranslatedTextToOriginalFrame(
+  element: Extract<ProjectDocument['elements'][string], { type: 'text' }>,
+  translatedText: string,
+  page?: Page,
+): TranslationPatch {
+  const normalizedText = normalizeTranslatedText(element.text, translatedText);
+  if (normalizedText.includes('\n')) return { text: normalizedText };
+
+  const horizontalPadding = 12;
+  const availableWidth = Math.max(1, element.width - horizontalPadding);
+  const estimatedWidth = estimateSingleLineTextWidth(normalizedText, element.fontSize);
+  if (estimatedWidth <= availableWidth) return { text: normalizedText };
+
+  const desiredWidth = Math.ceil(estimatedWidth + horizontalPadding);
+  const originalCenter = element.x + element.width / 2;
+  const pageWidth = page?.width ?? Math.max(element.x + desiredWidth, originalCenter + desiredWidth / 2);
+  const maxWidthAroundCenter = Math.max(1, 2 * Math.min(originalCenter, pageWidth - originalCenter));
+  const nextWidth = Math.max(element.width, Math.min(desiredWidth, maxWidthAroundCenter));
+  const nextX = Math.max(0, Math.min(pageWidth - nextWidth, originalCenter - nextWidth / 2));
+
+  if (nextWidth >= desiredWidth) {
+    return {
+      text: normalizedText,
+      width: nextWidth,
+      x: nextX,
+    };
+  }
+
+  const estimatedLineCount = Math.max(1, Math.ceil(estimatedWidth / Math.max(1, nextWidth - horizontalPadding)));
+  return {
+    text: normalizedText,
+    width: nextWidth,
+    x: nextX,
+    height: Math.max(element.height, Math.ceil(estimatedLineCount * element.fontSize * 1.08)),
+  };
+}
+
 export function useEditorViewModel(services: AppServices) {
   const initialProject = useMemo(() => normalizeProjectDocument(services.initialProject), [
     services.initialProject,
@@ -208,6 +380,19 @@ export function useEditorViewModel(services: AppServices) {
   const [processingElementIds, setProcessingElementIds] = useState<string[]>([]);
   const [backgroundPreview, setBackgroundPreview] = useState<BackgroundPreviewState | undefined>();
   const [backgroundPreparation, setBackgroundPreparation] = useState<BackgroundPreparationState | undefined>();
+  const [translationTargetLanguage, setTranslationTargetLanguageState] = useState(readTranslationTargetLanguage);
+  const [translationTargetAttention, setTranslationTargetAttention] = useState(false);
+  const [translationPreparation, setTranslationPreparation] = useState<TranslationPreparationState>({
+    progress: 0,
+    status: readTranslationTargetLanguage() ? 'ready' : 'idle',
+  });
+  const [pageLanguageCodes, setPageLanguageCodes] = useState<Record<string, string>>({});
+  const [elementClipboard, setElementClipboard] = useState<ElementClipboardState>({
+    assets: {},
+    elements: [],
+  });
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationNotice, setTranslationNotice] = useState<string | undefined>();
   const [, setBackgroundSelectionPoints] = useState<Record<string, BackgroundSelectionPoint[]>>(
     {},
   );
@@ -215,11 +400,21 @@ export function useEditorViewModel(services: AppServices) {
   const backgroundPreviewTimeoutRef = useRef<number | undefined>(undefined);
   const backgroundPreviewSequenceRef = useRef(0);
   const backgroundPreparationSequenceRef = useRef(0);
+  const languageDetectionSequenceRef = useRef(0);
   const skipNextProjectSaveRef = useRef(shouldRestoreStoredProject);
   const selection = useMemo<SelectionState>(() => ({ pageId: activePageId, elementIds: selectedElementIds }), [
     activePageId,
     selectedElementIds,
   ]);
+  const activeSlideLanguage = useMemo(() => {
+    const option = getLanguageOption(pageLanguageCodes[activePageId]);
+    return {
+      code: option.code,
+      displayCode: getLanguageDisplayCode(option.code),
+      flag: option.flag,
+      label: option.label,
+    };
+  }, [activePageId, pageLanguageCodes]);
 
   useEffect(() => {
     void services.modelSetupService.getModelStates().then(setModelStates);
@@ -238,6 +433,7 @@ export function useEditorViewModel(services: AppServices) {
           const normalizedProject = normalizeProjectDocument(savedProject);
           setProject(normalizedProject);
           setActivePageId(normalizedProject.pages[0]?.id ?? '');
+          setPageLanguageCodes({});
           setSelectedElementIds(['image-hero'].filter((id) => Boolean(normalizedProject.elements[id])));
           writeProjectNameToUrl(normalizedProject.name);
         }
@@ -275,6 +471,26 @@ export function useEditorViewModel(services: AppServices) {
         }
       });
   }, [hasLoadedProject, persistenceEnabled, project, services.projectRepository]);
+
+  useEffect(() => {
+    if (pageLanguageCodes[activePageId]) return;
+    const sampleText = getPageTextSample(project, activePageId);
+    if (!sampleText) return;
+
+    const sequence = languageDetectionSequenceRef.current + 1;
+    languageDetectionSequenceRef.current = sequence;
+
+    void services.translatorService
+      .detectLanguage(sampleText)
+      .then((languageCode) => {
+        if (languageDetectionSequenceRef.current !== sequence) return;
+        setPageLanguageCodes((current) => ({
+          ...current,
+          [activePageId]: normalizeLanguageCode(languageCode),
+        }));
+      })
+      .catch(() => undefined);
+  }, [activePageId, pageLanguageCodes, project, services.translatorService]);
 
   useEffect(
     () => () => {
@@ -370,14 +586,44 @@ export function useEditorViewModel(services: AppServices) {
     return nextSelectedId ? [nextSelectedId] : [];
   }
 
-  function selectElement(elementId: string) {
+  function selectElement(elementId: string, options?: { additive?: boolean }) {
     if (processingElementIds.includes(elementId)) return;
     setBackgroundSelectionMode(false);
     setBackgroundSelectionNotice(undefined);
     clearBackgroundPreview();
     clearBackgroundPreparation();
     clearBackgroundSelectionPoints();
-    setSelectedElementIds([elementId]);
+    setSelectedElementIds((currentSelection) => {
+      if (!options?.additive) return [elementId];
+      if (currentSelection.includes(elementId)) {
+        return currentSelection.filter((id) => id !== elementId);
+      }
+      return [...currentSelection, elementId];
+    });
+  }
+
+  function selectAllElementsOnActivePage() {
+    const page = project.pages.find((item) => item.id === activePageId);
+    if (!page) return;
+    const selectableElementIds = page.elementIds.filter((elementId) => {
+      const element = project.elements[elementId];
+      return element && element.visible !== false && !processingElementIds.includes(elementId);
+    });
+    setBackgroundSelectionMode(false);
+    setBackgroundSelectionNotice(undefined);
+    clearBackgroundPreview();
+    clearBackgroundPreparation();
+    clearBackgroundSelectionPoints();
+    setSelectedElementIds(selectableElementIds);
+  }
+
+  function clearSelection() {
+    setBackgroundSelectionMode(false);
+    setBackgroundSelectionNotice(undefined);
+    clearBackgroundPreview();
+    clearBackgroundPreparation();
+    clearBackgroundSelectionPoints();
+    setSelectedElementIds([]);
   }
 
   function setProjectName(name: string) {
@@ -422,6 +668,7 @@ export function useEditorViewModel(services: AppServices) {
       const normalizedProject = normalizeProjectDocument(importedProject);
       setProject(normalizedProject);
       setActivePageId(normalizedProject.pages[0]?.id ?? '');
+      setPageLanguageCodes({});
       const nextSelectedId = normalizedProject.pages[0]?.elementIds.at(-1);
       setSelectedElementIds(nextSelectedId ? [nextSelectedId] : []);
       setHistory({ past: [], future: [] });
@@ -472,6 +719,10 @@ export function useEditorViewModel(services: AppServices) {
     });
   }
 
+  function updateElementFrames(patches: Record<string, ElementFramePatch>) {
+    commitProject((currentProject) => new UpdateElementFramesCommand(patches).execute(currentProject));
+  }
+
   function updateTextContent(elementId: string, text: string) {
     commitProject((currentProject) => {
       const nextProject = new UpdateTextContentCommand(elementId, text).execute(currentProject);
@@ -483,6 +734,181 @@ export function useEditorViewModel(services: AppServices) {
     });
   }
 
+  function updateElementStyle(elementId: string, patch: ElementStylePatch) {
+    commitProject((currentProject) => {
+      const nextProject = new UpdateElementStyleCommand(elementId, patch).execute(currentProject);
+      const element = nextProject.elements[elementId];
+      if (!element || element.type !== 'text') return nextProject;
+      const minimumHeight = getMinimumTextHeight(element.text, element.fontSize);
+      if (element.height >= minimumHeight) return nextProject;
+      return new UpdateElementFrameCommand(elementId, { height: minimumHeight }).execute(nextProject);
+    });
+  }
+
+  function updatePageBackground(background: PageBackground) {
+    commitProject((currentProject) =>
+      new UpdatePageBackgroundCommand(activePageId, background).execute(currentProject),
+    );
+  }
+
+  function getTranslatableTextElementIds(scope: TranslationScope, sourceProject = project) {
+    const getVisibleUnlockedTextId = (elementId: string) => {
+      const element = sourceProject.elements[elementId];
+      if (!element || element.type !== 'text' || element.locked || element.visible === false) return undefined;
+      return element.id;
+    };
+
+    if (scope === 'selection') {
+      return selectedElementIds.map(getVisibleUnlockedTextId).filter((id): id is string => Boolean(id));
+    }
+
+    const pages =
+      scope === 'slide'
+        ? sourceProject.pages.filter((page) => page.id === activePageId)
+        : sourceProject.pages;
+
+    return pages.flatMap((page) =>
+      page.elementIds.map(getVisibleUnlockedTextId).filter((id): id is string => Boolean(id)),
+    );
+  }
+
+  async function translateTextScope(
+    scope: TranslationScope,
+    targetLanguage = 'pt',
+    options?: { sourceLanguage?: string },
+  ) {
+    const elementIds = getTranslatableTextElementIds(scope);
+    if (elementIds.length === 0) return [];
+
+    const translatedEntries = await Promise.all(
+      elementIds.map(async (elementId) => {
+        const element = project.elements[elementId];
+        if (!element || element.type !== 'text') return undefined;
+        const translatedText = await services.translatorService.translate(
+          element.text,
+          targetLanguage,
+          options?.sourceLanguage ? { sourceLanguage: options.sourceLanguage } : undefined,
+        );
+        const page = project.pages.find((item) => item.elementIds.includes(elementId));
+        return [elementId, fitTranslatedTextToOriginalFrame(element, translatedText, page)] as const;
+      }),
+    );
+    const translations = Object.fromEntries(
+      translatedEntries.filter((entry): entry is readonly [string, TranslationPatch] =>
+        Boolean(entry),
+      ),
+    );
+
+    commitProject((currentProject) => new TranslateTextElementsCommand(translations).execute(currentProject));
+    return Array.from(
+      new Set(
+        elementIds
+          .map((elementId) => project.pages.find((page) => page.elementIds.includes(elementId))?.id)
+          .filter((pageId): pageId is string => Boolean(pageId)),
+      ),
+    );
+  }
+
+  function getTranslationSampleText() {
+    const activePage = project.pages.find((page) => page.id === activePageId) ?? project.pages[0];
+    const activePageText = activePage?.elementIds
+      .map((elementId) => project.elements[elementId])
+      .find((element) => element?.type === 'text' && element.visible !== false && !element.locked);
+    if (activePageText?.type === 'text') return activePageText.text;
+
+    const firstText = Object.values(project.elements).find(
+      (element) => element.type === 'text' && element.visible !== false && !element.locked,
+    );
+    return firstText?.type === 'text' ? firstText.text : '';
+  }
+
+  async function setTranslationTargetLanguage(languageCode: string) {
+    const nextLanguage = TRANSLATION_LANGUAGE_OPTIONS.some((option) => option.code === languageCode)
+      ? languageCode
+      : '';
+    setTranslationTargetLanguageState(nextLanguage);
+    setTranslationTargetAttention(false);
+    setTranslationNotice(undefined);
+    if (typeof window !== 'undefined') {
+      if (nextLanguage) {
+        window.localStorage.setItem(TRANSLATION_TARGET_LANGUAGE_KEY, nextLanguage);
+      } else {
+        window.localStorage.removeItem(TRANSLATION_TARGET_LANGUAGE_KEY);
+      }
+    }
+
+    if (!nextLanguage) {
+      setTranslationPreparation({ progress: 0, status: 'idle' });
+      return;
+    }
+
+    const sampleText = getTranslationSampleText();
+    if (!sampleText) {
+      setTranslationPreparation({ progress: 100, status: 'ready' });
+      return;
+    }
+
+    setTranslationPreparation({ progress: 4, status: 'downloading' });
+    try {
+      const sourceLanguage = normalizeLanguageCode(await services.translatorService.detectLanguage(sampleText));
+      setTranslationPreparation({ progress: 8, sourceLanguage, status: 'downloading' });
+      await services.translatorService.prepareTranslation(sourceLanguage, nextLanguage, {
+        onProgress: (progress) => {
+          setTranslationPreparation({
+            progress: Math.max(8, Math.min(100, Math.round(progress))),
+            sourceLanguage,
+            status: progress >= 100 ? 'ready' : 'downloading',
+          });
+        },
+      });
+      setTranslationPreparation({ progress: 100, sourceLanguage, status: 'ready' });
+    } catch (error) {
+      setTranslationPreparation({ progress: 0, status: 'failed' });
+      setTranslationNotice(error instanceof Error ? error.message : 'Translation language could not be prepared.');
+    }
+  }
+
+  async function requestTranslation(scope: TranslationScope) {
+    if (isTranslating) return;
+
+    if (!translationTargetLanguage) {
+      setActiveTab('ai-tools');
+      setTranslationTargetAttention(true);
+      setTranslationNotice('Choose a target language in AI Tools before translating.');
+      return;
+    }
+
+    if (translationPreparation.status === 'downloading') {
+      setActiveTab('ai-tools');
+      setTranslationTargetAttention(true);
+      setTranslationNotice('Wait for the translation language pair to finish downloading.');
+      return;
+    }
+
+    setTranslationNotice(undefined);
+    setIsTranslating(true);
+    try {
+      const translatedPageIds = await translateTextScope(
+        scope,
+        translationTargetLanguage,
+        translationPreparation.sourceLanguage
+          ? { sourceLanguage: translationPreparation.sourceLanguage }
+          : undefined,
+      );
+      if (translatedPageIds.length > 0) {
+        const normalizedTargetLanguage = normalizeLanguageCode(translationTargetLanguage);
+        setPageLanguageCodes((current) => ({
+          ...current,
+          ...Object.fromEntries(translatedPageIds.map((pageId) => [pageId, normalizedTargetLanguage])),
+        }));
+      }
+    } catch (error) {
+      setTranslationNotice(error instanceof Error ? error.message : 'Translation could not be completed.');
+    } finally {
+      setIsTranslating(false);
+    }
+  }
+
   function setElementVisibility(elementId: string, visible: boolean) {
     commitProject((currentProject) =>
       new SetElementVisibilityCommand(elementId, visible).execute(currentProject),
@@ -491,6 +917,51 @@ export function useEditorViewModel(services: AppServices) {
 
   function setElementLock(elementId: string, locked: boolean) {
     commitProject((currentProject) => new SetElementLockCommand(elementId, locked).execute(currentProject));
+  }
+
+  function getSelectedElementsForClipboard() {
+    const page = project.pages.find((item) => item.id === activePageId);
+    if (!page) return [];
+    return page.elementIds
+      .filter((elementId) => selectedElementIds.includes(elementId))
+      .map((elementId) => project.elements[elementId])
+      .filter((element): element is DesignElement => Boolean(element));
+  }
+
+  function copySelectedElements() {
+    const selectedElements = getSelectedElementsForClipboard();
+    if (selectedElements.length === 0) return;
+    const copiedAssets: ProjectDocument['assets'] = {};
+    for (const element of selectedElements) {
+      if (element.type !== 'image') continue;
+      const asset = project.assets[element.assetId];
+      if (asset) copiedAssets[element.assetId] = asset;
+    }
+    setElementClipboard({
+      assets: copiedAssets,
+      elements: selectedElements.map((element) => ({ ...element })),
+    });
+  }
+
+  function pasteCopiedElements() {
+    if (elementClipboard.elements.length === 0) return;
+    const pastedElements = elementClipboard.elements.map((element) => ({
+      ...element,
+      id: createId(`${element.id}-copy`),
+      x: element.x + PASTED_ELEMENT_OFFSET,
+      y: element.y + PASTED_ELEMENT_OFFSET,
+      locked: false,
+    }));
+
+    commitProject(
+      (currentProject) =>
+        new AddElementsCommand(activePageId, pastedElements, elementClipboard.assets).execute(currentProject),
+      { selectedElementIds: pastedElements.map((element) => element.id) },
+    );
+    setElementClipboard({
+      assets: elementClipboard.assets,
+      elements: pastedElements.map((element) => ({ ...element })),
+    });
   }
 
   function deleteElement(elementId: string) {
@@ -506,15 +977,33 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function deleteSelectedElement() {
-    const elementId = selectedElementIds[0];
-    if (!elementId) return;
-    if (processingElementIds.includes(elementId)) return;
+    const deletableElementIds = selectedElementIds.filter((elementId) => !processingElementIds.includes(elementId));
+    if (deletableElementIds.length === 0) return;
     setBackgroundSelectionMode(false);
     setBackgroundSelectionNotice(undefined);
     clearBackgroundPreview();
     clearBackgroundPreparation();
-    clearBackgroundSelectionPoints(elementId);
-    deleteElement(elementId);
+    deletableElementIds.forEach((elementId) => {
+      clearBackgroundSelectionPoints(elementId);
+    });
+    commitProject((currentProject) => {
+      const nextProject = deletableElementIds.reduce(
+        (nextProjectState, elementId) =>
+          new DeleteElementCommand(activePageId, elementId).execute(nextProjectState),
+        currentProject,
+      );
+      const nextPage = nextProject.pages.find((page) => page.id === activePageId);
+      const nextSelectedId = nextPage?.elementIds.at(-1);
+      setSelectedElementIds(nextSelectedId ? [nextSelectedId] : []);
+      return nextProject;
+    });
+  }
+
+  function cutSelectedElements() {
+    const selectedElements = getSelectedElementsForClipboard();
+    if (selectedElements.length === 0) return;
+    copySelectedElements();
+    deleteSelectedElement();
   }
 
   function duplicateSelectedElement() {
@@ -526,6 +1015,42 @@ export function useEditorViewModel(services: AppServices) {
       (currentProject) =>
         new DuplicateElementCommand(activePageId, elementId, nextElementId).execute(currentProject),
       { selectedElementIds: [nextElementId] },
+    );
+  }
+
+  function insertTextElement() {
+    const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
+    if (!page) return;
+    const selectedElement = project.elements[selectedElementIds[0] ?? ''];
+    const width = 420;
+    const height = 96;
+    const elementId = createId('text');
+    const nextElement: DesignElement = {
+      id: elementId,
+      type: 'text',
+      text: 'New text',
+      x: selectedElement
+        ? Math.min(page.width - width, selectedElement.x + PASTED_ELEMENT_OFFSET)
+        : (page.width - width) / 2,
+      y: selectedElement
+        ? Math.min(page.height - height, selectedElement.y + PASTED_ELEMENT_OFFSET)
+        : (page.height - height) / 2,
+      width,
+      height,
+      rotation: 0,
+      locked: false,
+      visible: true,
+      opacity: 1,
+      fontFamily: 'Open Sans',
+      fontSize: 48,
+      fontWeight: 700,
+      fill: '#FFFFFF',
+      align: 'center',
+    };
+
+    commitProject(
+      (currentProject) => new AddElementsCommand(activePageId, [nextElement]).execute(currentProject),
+      { selectedElementIds: [elementId] },
     );
   }
 
@@ -901,14 +1426,31 @@ export function useEditorViewModel(services: AppServices) {
     canRedo: history.future.length > 0,
     selection,
     activeTab,
+    activeSlideLanguage,
     setActiveTab,
     modelStates,
     setProjectName,
     setPersistence,
     importProject,
+    translationLanguageOptions: TRANSLATION_LANGUAGE_OPTIONS,
+    translationTargetLanguage,
+    translationTargetAttention,
+    translationPreparation,
+    isTranslating,
+    translationNotice,
+    setTranslationTargetLanguage,
+    canTranslateSelection: !isTranslating && getTranslatableTextElementIds('selection').length > 0,
+    canTranslateCurrentSlide: !isTranslating && getTranslatableTextElementIds('slide').length > 0,
+    canTranslateDeck: !isTranslating && getTranslatableTextElementIds('deck').length > 0,
+    canPasteElements: elementClipboard.elements.length > 0,
+    translateSelectedText: () => requestTranslation('selection'),
+    translateCurrentSlide: () => requestTranslation('slide'),
+    translateDeck: () => requestTranslation('deck'),
     downloadRequiredModels,
     downloadModel,
     selectElement,
+    selectAllElementsOnActivePage,
+    clearSelection,
     selectPage,
     addPage,
     undo,
@@ -923,9 +1465,16 @@ export function useEditorViewModel(services: AppServices) {
     pickBackgroundSubject,
     deleteSelectedElement,
     duplicateSelectedElement,
+    copySelectedElements,
+    cutSelectedElements,
+    pasteCopiedElements,
+    insertTextElement,
     alignSelectedElement,
     setSelectedElementZOrder,
     updateElementFrame,
+    updateElementFrames,
+    updateElementStyle,
+    updatePageBackground,
     updateTextContent,
     setElementVisibility,
     setElementLock,

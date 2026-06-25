@@ -1,5 +1,11 @@
 import type { LocalSetupState, SetupCapabilityState } from '../../services/interfaces';
 
+const statusLabels: Record<SetupCapabilityState['status'], string> = {
+  ready: 'Ready',
+  unavailable: 'Unavailable',
+  'needs-setup': 'Needs setup',
+};
+
 interface FirstRunSetupScreenProps {
   setupState: LocalSetupState;
   onRefresh: () => void;
@@ -11,7 +17,9 @@ function CapabilityRow({ capability }: { capability: SetupCapabilityState }) {
     <article className="setup-capability-row">
       <div className="setup-capability-heading">
         <strong>{capability.label}</strong>
-        <span className={`setup-status setup-status-${capability.status}`}>{capability.status}</span>
+        <span className={`setup-status setup-status-${capability.status}`}>
+          {statusLabels[capability.status]}
+        </span>
       </div>
       <p>{capability.detail}</p>
     </article>

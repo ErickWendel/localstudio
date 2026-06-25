@@ -2,6 +2,7 @@ interface ToolbarAction {
   label: string;
   icon: string;
   active?: boolean;
+  disabled?: boolean;
   onClick?: (() => void) | undefined;
   tone?: 'default' | 'ai' | 'danger';
 }
@@ -12,8 +13,12 @@ interface FloatingSelectionToolbarProps {
   onBackgroundSelectionToggle?: (() => void) | undefined;
   onDelete?: (() => void) | undefined;
   onDuplicate?: (() => void) | undefined;
+  onInsertImage?: (() => void) | undefined;
+  onInsertText?: (() => void) | undefined;
   onSendBackward?: (() => void) | undefined;
+  onTranslateSelectedText?: (() => void) | undefined;
   backgroundSelectionActive?: boolean;
+  canTranslateSelection?: boolean;
   disabled?: boolean;
 }
 
@@ -23,11 +28,19 @@ export function FloatingSelectionToolbar({
   onBringForward,
   onDelete,
   onDuplicate,
+  onInsertImage,
+  onInsertText,
   onSendBackward,
+  onTranslateSelectedText,
   backgroundSelectionActive = false,
+  canTranslateSelection = false,
   disabled = false,
 }: FloatingSelectionToolbarProps) {
   const groups: ToolbarAction[][] = [
+    [
+      { label: 'Insert Text', icon: 'title', onClick: onInsertText },
+      { label: 'Insert Image', icon: 'add_photo_alternate', onClick: onInsertImage },
+    ],
     [{ label: 'Align Center', icon: 'align_horizontal_center', onClick: onAlignCenter }],
     [
       { label: 'Bring Forward', icon: 'flip_to_front', onClick: onBringForward },
@@ -45,7 +58,13 @@ export function FloatingSelectionToolbar({
         onClick: onBackgroundSelectionToggle,
         tone: 'ai',
       },
-      { label: 'Translate This Design', icon: 'translate', tone: 'ai' },
+      {
+        label: 'Translate Selected Text',
+        icon: 'translate',
+        onClick: onTranslateSelectedText,
+        tone: 'ai',
+        disabled: !canTranslateSelection,
+      },
     ],
     [{ label: 'Delete', icon: 'delete', onClick: onDelete, tone: 'danger' }],
   ];
@@ -63,7 +82,7 @@ export function FloatingSelectionToolbar({
               key={action.label}
               title={action.label}
               aria-label={action.label}
-              disabled={disabled}
+              disabled={disabled || action.disabled}
               type="button"
               onClick={action.onClick}
             >

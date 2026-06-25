@@ -12,6 +12,46 @@
 
 ---
 
+## Current Status
+
+- Tasks 1-3 are implemented on `main`: file-backed asset persistence, project hydration/storage hardening, and first-run setup readiness checks.
+- Tasks 4-6 are implemented on `main`: `ChromeTranslatorService`, `TranslateTextElementsCommand`, selected-text translation, current-slide translation, `Edit > Translate Deck`, AI Tools target-language selection, translation pair preparation progress, translator caching, busy guards, basic error notices, detector fallback normalization, and first-pass translated text fitting.
+- Latest local non-e2e checks passed after the translation compatibility work: `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build`.
+
+## Remaining Work / Spec Gap Checklist
+
+Translation:
+
+- [ ] Add manual translated-text overflow controls, such as fit text, expand box, accept wrapping, or reset layout.
+- [ ] Add richer translation recovery UX for failed Chrome pair downloads, unsupported source/target pairs, denied model downloads, and offline cases.
+- [ ] Verify Chrome Translator behavior on target Chrome builds/devices, especially `available`, `readily`, `downloadable`, `after-download`, `downloading`, and detector aliases like `gl`.
+- [ ] Add Playwright coverage for target language selection, pair download progress, selected-text translation, current-slide translation, full-deck translation, repeated-click guard, and reverse translation.
+- [ ] Decide whether translated decks should record per-page/per-element source language metadata instead of relying only on the current prepared pair.
+
+Core editor:
+
+- [x] Build real Design-tab property controls for selected text/image/shape/page settings.
+- [x] Make the page background editable from the Design tab instead of only showing a static layer row.
+- [ ] Add multi-select and multi-element alignment/distribution.
+- [ ] Add richer layer operations and property editing coverage in Playwright.
+
+Storage:
+
+- [ ] Store generated previews/masks/cache artifacts in `cache/` when they become durable project data.
+- [ ] Add stale asset cleanup for deleted/replaced generated assets.
+- [ ] Improve save/import error recovery and user-facing permission guidance.
+
+Export:
+
+- [ ] Polish current-page PNG export UX from the real Konva stage.
+- [ ] Add all-page PDF export. JPEG remains deferred unless explicitly reintroduced.
+
+AI roadmap:
+
+- [ ] Wire Chrome Built-in AI prompt-to-palette provider.
+- [ ] Build Smart Grab on the shared Segment Anything WebGPU provider.
+- [ ] Build Magic Eraser on the shared Segment Anything WebGPU provider.
+
 ## References
 
 - Spec: `docs/superpowers/specs/2026-06-24-canva-web-ai-clone-mvp-design.md`
