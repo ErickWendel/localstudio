@@ -65,15 +65,17 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     if (!this.directoryHandle) return null;
     await this.ensureReadWritePermission(this.directoryHandle);
 
+    let file: File;
     try {
       const fileHandle = await this.directoryHandle.getFileHandle(PROJECT_FILE_NAME);
-      const file = await fileHandle.getFile();
-      const project = JSON.parse(await file.text()) as ProjectDocument;
-      return this.hydrateProjectAssets(project);
+      file = await fileHandle.getFile();
     } catch (error) {
       if (error instanceof DOMException && error.name === 'NotFoundError') return null;
       throw error;
     }
+
+    const project = JSON.parse(await file.text()) as ProjectDocument;
+    return this.hydrateProjectAssets(project);
   }
 
   async saveProject(project: ProjectDocument): Promise<void> {
@@ -90,6 +92,16 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     };
 
     for (const [assetId, asset] of Object.entries(project.assets)) {
+      if (asset.storage === 'file' && asset.fileName) {
+        if (isDataUrl(asset.objectUrl)) {
+          await this.writeBlobFile(assetsDirectory, asset.fileName, dataUrlToBlob(asset.objectUrl));
+        }
+        const assetForDisk = { ...asset };
+        delete assetForDisk.objectUrl;
+        projectForDisk.assets[assetId] = assetForDisk;
+        continue;
+      }
+
       if (!isDataUrl(asset.objectUrl)) continue;
       const fileName = asset.fileName ?? `${assetId}.${getAssetFileExtension(asset.mimeType)}`;
       await this.writeBlobFile(assetsDirectory, fileName, dataUrlToBlob(asset.objectUrl));

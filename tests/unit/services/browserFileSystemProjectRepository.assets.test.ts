@@ -130,4 +130,73 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
 
     expect(loaded?.assets['asset-hero']?.objectUrl).toMatch(/^blob:/);
   });
+
+  it('keeps hydrated file-backed object URLs out of project.json when saved again', async () => {
+    const directory = new MockDirectoryHandle();
+    const assetsDirectory = new MockDirectoryHandle();
+    directory.directories.set('assets', assetsDirectory);
+    const assetFile = new Blob(['hello'], { type: 'image/png' });
+    assetsDirectory.files.set('asset-hero.png', assetFile);
+    directory.files.set(
+      'project.json',
+      JSON.stringify({
+        ...createSampleProject(),
+        assets: {
+          'asset-hero': {
+            id: 'asset-hero',
+            type: 'image',
+            name: 'Hero',
+            mimeType: 'image/png',
+            storage: 'file',
+            fileName: 'asset-hero.png',
+          },
+        },
+      }),
+    );
+    const repository = new BrowserFileSystemProjectRepository({
+      pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
+    });
+
+    const loaded = await repository.importProject();
+    if (!loaded) throw new Error('Expected project to load');
+    await repository.saveProject(loaded);
+
+    expect(assetsDirectory.files.get('asset-hero.png')).toBe(assetFile);
+    const savedProject = JSON.parse(directory.files.get('project.json') as string) as ProjectDocument;
+    const savedAsset = savedProject.assets['asset-hero'];
+    if (!savedAsset) throw new Error('Expected asset-hero to be saved in project.json');
+    expect(savedAsset).toMatchObject({
+      id: 'asset-hero',
+      fileName: 'asset-hero.png',
+      storage: 'file',
+    });
+    expect(savedAsset.objectUrl).toBeUndefined();
+  });
+
+  it('rejects when project.json references a missing file-backed asset', async () => {
+    const directory = new MockDirectoryHandle();
+    directory.files.set(
+      'project.json',
+      JSON.stringify({
+        ...createSampleProject(),
+        assets: {
+          'asset-hero': {
+            id: 'asset-hero',
+            type: 'image',
+            name: 'Hero',
+            mimeType: 'image/png',
+            storage: 'file',
+            fileName: 'missing.png',
+          },
+        },
+      }),
+    );
+    const repository = new BrowserFileSystemProjectRepository({
+      pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
+    });
+
+    await expect(repository.importProject()).rejects.toMatchObject({ name: 'NotFoundError' });
+  });
 });
