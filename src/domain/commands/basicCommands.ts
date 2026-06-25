@@ -8,6 +8,11 @@ import type {
 } from '../model';
 import type { EditorCommand } from './types';
 
+export {
+  AddGeneratedSlideElementCommand,
+  PrepareGeneratedSlideCommand,
+} from './applyGeneratedSlideCommand';
+
 export type AlignMode = 'horizontal-center' | 'vertical-center' | 'page-center';
 export type ZOrderMode = 'front' | 'back' | 'forward' | 'backward';
 export type ElementFramePatch = Partial<Pick<BaseElement, 'height' | 'rotation' | 'width' | 'x' | 'y'>>;

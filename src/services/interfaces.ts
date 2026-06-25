@@ -1,4 +1,9 @@
 import type { Asset, ProjectDocument } from '../domain/model';
+import type {
+  GeneratedSlideElement,
+  GeneratedSlideTask,
+  GeneratedSlideTasksDocument,
+} from '../domain/generatedSlide';
 
 export type ModelStatus = 'unavailable' | 'needs-download' | 'downloading' | 'ready' | 'failed';
 
@@ -64,6 +69,19 @@ export type PromptApiAvailability = 'unavailable' | 'downloadable' | 'downloadin
 export interface PromptService {
   checkAvailability(): Promise<PromptApiAvailability>;
   preparePromptApi(options?: { onProgress?: (progress: number) => void }): Promise<void>;
+  generateSlideTasksFromPrompt(
+    prompt: string,
+    options?: { targetLanguageHint?: string },
+  ): Promise<GeneratedSlideTasksDocument>;
+  generateSlideElementFromTask(
+    task: Exclude<GeneratedSlideTask, { type: 'set-background' }>,
+    context: {
+      userPrompt: string;
+      allTasks: GeneratedSlideTask[];
+      page: GeneratedSlideTasksDocument['page'];
+      existingElements: GeneratedSlideElement[];
+    },
+  ): Promise<GeneratedSlideElement>;
 }
 
 export interface PaletteService {

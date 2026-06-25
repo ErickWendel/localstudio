@@ -1,6 +1,11 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createAppServices } from '../../../../src/app/composition';
+import type {
+  GeneratedSlideElement,
+  GeneratedSlideTask,
+  GeneratedSlideTasksDocument,
+} from '../../../../src/domain/generatedSlide';
 import type { PromptApiAvailability, PromptService, TranslatorService } from '../../../../src/services/interfaces';
 import { InMemoryModelSetupService } from '../../../../src/services/modelSetupService';
 import { EditorShell } from '../../../../src/ui/editor/EditorShell';
@@ -40,6 +45,43 @@ class TestPromptService implements PromptService {
     this.availability = 'ready';
     return Promise.resolve();
   });
+
+  generateSlideTasksFromPrompt = vi.fn((): Promise<GeneratedSlideTasksDocument> => {
+    this.availability = 'ready';
+    return Promise.resolve({
+      language: 'en',
+      page: {
+        name: 'Generated Web AI Slide',
+        width: 1920,
+        height: 1080,
+        background: { type: 'color', color: '#050D10' },
+      },
+      tasks: [
+        { type: 'set-background', color: '#050D10' },
+        { type: 'add-title', id: 'title', text: 'Why Web AI Matters', placementHint: 'right side' },
+      ],
+    });
+  });
+
+  generateSlideElementFromTask = vi.fn(
+    (task: Exclude<GeneratedSlideTask, { type: 'set-background' }>): Promise<GeneratedSlideElement> =>
+      Promise.resolve({
+        type: 'text',
+        id: task.id,
+        text: 'text' in task ? task.text : 'Why Web AI Matters',
+        x: 960,
+        y: 280,
+        width: 760,
+        height: 160,
+        rotation: 0,
+        opacity: 1,
+        fontFamily: 'Orbitron',
+        fontSize: 76,
+        fontWeight: 800,
+        fill: '#37FD76',
+        align: 'center',
+      }),
+  );
 }
 
 describe('mocked AI flows', () => {
@@ -194,6 +236,44 @@ describe('mocked AI flows', () => {
     expect(screen.getAllByRole('article')[0]).toHaveAccessibleName('Prompt API');
     expect(screen.getByText('Prompt to slides using Chrome Built-in AI.')).toBeInTheDocument();
     expect(screen.getAllByText('Ready').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('generates a slide progressively from the default prompt bar mode', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const promptService = new TestPromptService('ready');
+    services.promptService = promptService;
+    render(<EditorShell services={services} />);
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'A slide with the title Why Web AI Matters and a subtitle about private AI running in the browser',
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Submit prompt' }));
+
+    await waitFor(() => {
+      expect(promptService.generateSlideTasksFromPrompt).toHaveBeenCalledWith(
+        'A slide with the title Why Web AI Matters and a subtitle about private AI running in the browser',
+        expect.any(Object),
+      );
+      expect(promptService.generateSlideElementFromTask).toHaveBeenCalled();
+    });
+    expect(screen.getByRole('button', { name: 'Undo' })).not.toBeDisabled();
+  });
+
+  it('shows a tooltip when image generation is requested outside Create image mode', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const promptService = new TestPromptService('ready');
+    services.promptService = promptService;
+    render(<EditorShell services={services} />);
+
+    await user.type(screen.getByRole('textbox', { name: 'Slide structure prompt' }), 'generate an image of a frozen tree');
+    await user.click(screen.getByRole('button', { name: 'Submit prompt' }));
+
+    expect(promptService.generateSlideTasksFromPrompt).not.toHaveBeenCalled();
+    expect(screen.getByText('Use Create image from the + menu to generate images.')).toBeInTheDocument();
   });
 
   it('configures the default translation target from AI Tools', async () => {

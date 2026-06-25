@@ -275,7 +275,11 @@ export function EditorShell({ services }: EditorShellProps) {
             }}
           />
           <PromptBar
+            generationNotice={vm.promptGenerationNotice}
+            generationStatus={vm.promptGenerationStatus}
+            isGeneratingSlide={vm.isGeneratingSlide}
             onCreateImagePromptIntent={() => vm.ensurePromptApiReadyForPrompt()}
+            onSlidePromptSubmit={(prompt) => vm.generateSlideFromPrompt(prompt)}
           />
         </section>
         <RightPanel

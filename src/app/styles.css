@@ -1041,6 +1041,19 @@ button {
   transform: translateY(-1px);
 }
 
+.prompt-generation-status,
+.prompt-generation-notice {
+  justify-self: center;
+  max-width: min(720px, 100%);
+  border: 1px solid rgba(55, 253, 118, 0.34);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.86);
+  color: var(--ew-green);
+  padding: 7px 12px;
+  font-size: 12px;
+  box-shadow: 0 0 18px rgba(55, 253, 118, 0.14);
+}
+
 .prompt-bar {
   display: flex;
   align-items: center;

@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AppServices } from '../../app/composition';
 import {
+  AddGeneratedSlideElementCommand,
   AddElementsCommand,
   AddImageElementCommand,
   AlignElementCommand,
   DeleteElementCommand,
   DuplicateElementCommand,
+  PrepareGeneratedSlideCommand,
   ReorderElementCommand,
   SetElementLockCommand,
   SetElementVisibilityCommand,
@@ -21,11 +23,13 @@ import {
   type ElementStylePatch,
   type ZOrderMode,
 } from '../../domain/commands/basicCommands';
+import type { GeneratedSlideElement } from '../../domain/generatedSlide';
 import { fitImageWithinPage } from '../../domain/imageSizing';
 import type { DesignElement, Page, PageBackground, ProjectDocument, SelectionState } from '../../domain/model';
 import { SAMPLE_HERO_IMAGE_SIZE, SAMPLE_HERO_IMAGE_URL } from '../../domain/sampleProject';
 import type { ModelState, PromptApiAvailability } from '../../services/interfaces';
 import { IMAGE_EDITING_MODEL_ID } from '../../services/modelSetupService';
+import { looksLikeImageGenerationRequest } from '../../services/prompts/slideTaskPrompt';
 
 export type RightPanelTab = 'layout' | 'design' | 'ai-tools';
 
@@ -74,6 +78,7 @@ const PERSISTENCE_PREFERENCE_KEY = 'ew-canvas-ai.persistence-enabled';
 const TRANSLATION_TARGET_LANGUAGE_KEY = 'localstudio.ai.translation-target-language';
 const IMAGE_EDITING_MODEL_REQUIRED_MESSAGE = 'You must download the image editing tools first.';
 const PROMPT_API_REQUIRED_MESSAGE = 'Prompt API must be prepared before using prompt-to-slides.';
+const IMAGE_PROMPT_MODE_REQUIRED_MESSAGE = 'Use Create image from the + menu to generate images.';
 const BACKGROUND_PREVIEW_DEBOUNCE_MS = 120;
 const DEFAULT_SLIDE_LANGUAGE_CODE = 'pt';
 const PASTED_ELEMENT_OFFSET = 32;
@@ -400,6 +405,9 @@ export function useEditorViewModel(services: AppServices) {
   });
   const [promptApiAttention, setPromptApiAttention] = useState(false);
   const [promptApiNotice, setPromptApiNotice] = useState<string | undefined>();
+  const [promptGenerationNotice, setPromptGenerationNotice] = useState<string | undefined>();
+  const [promptGenerationStatus, setPromptGenerationStatus] = useState<string | undefined>();
+  const [isGeneratingSlide, setIsGeneratingSlide] = useState(false);
   const [pageLanguageCodes, setPageLanguageCodes] = useState<Record<string, string>>({});
   const [elementClipboard, setElementClipboard] = useState<ElementClipboardState>({
     assets: {},
@@ -650,6 +658,64 @@ export function useEditorViewModel(services: AppServices) {
     setPromptApiAttention(true);
     setPromptApiNotice(PROMPT_API_REQUIRED_MESSAGE);
     return false;
+  }
+
+  async function generateSlideFromPrompt(prompt: string) {
+    const trimmedPrompt = prompt.trim();
+    if (!trimmedPrompt || isGeneratingSlide) return;
+
+    if (looksLikeImageGenerationRequest(trimmedPrompt)) {
+      setPromptGenerationStatus(undefined);
+      setPromptGenerationNotice(IMAGE_PROMPT_MODE_REQUIRED_MESSAGE);
+      return;
+    }
+
+    const isReady = await ensurePromptApiReadyForPrompt();
+    if (!isReady) return;
+
+    setPromptGenerationNotice(undefined);
+    setIsGeneratingSlide(true);
+    try {
+      setPromptGenerationStatus('Planning slide...');
+      const generatedTasks = await services.promptService.generateSlideTasksFromPrompt(trimmedPrompt, {
+        targetLanguageHint: 'same as user prompt',
+      });
+      const pageId = activePageId;
+
+      commitProject(
+        (currentProject) => new PrepareGeneratedSlideCommand(pageId, generatedTasks.page).execute(currentProject),
+        { activePageId: pageId, selectedElementIds: [] },
+      );
+
+      const generatedElements: GeneratedSlideElement[] = [];
+      for (const task of generatedTasks.tasks) {
+        if (task.type === 'set-background') continue;
+
+        setPromptGenerationStatus(`Adding ${task.type.replace('add-', '').replace('-', ' ')}...`);
+        const element = await services.promptService.generateSlideElementFromTask(task, {
+          userPrompt: trimmedPrompt,
+          allTasks: generatedTasks.tasks,
+          page: generatedTasks.page,
+          existingElements: generatedElements,
+        });
+        generatedElements.push(element);
+        const selectedElementId = `generated-${pageId}-${element.id.replace(/[^a-z0-9-_]/gi, '-').toLowerCase()}`;
+        commitProject(
+          (currentProject) => new AddGeneratedSlideElementCommand(pageId, element).execute(currentProject),
+          { activePageId: pageId, selectedElementIds: [selectedElementId] },
+        );
+      }
+
+      setPageLanguageCodes((current) => ({
+        ...current,
+        [pageId]: normalizeLanguageCode(generatedTasks.language),
+      }));
+    } catch (error) {
+      setPromptGenerationNotice(error instanceof Error ? error.message : 'Prompt API could not generate the slide.');
+    } finally {
+      setPromptGenerationStatus(undefined);
+      setIsGeneratingSlide(false);
+    }
   }
 
   function commitProject(
@@ -1541,8 +1607,12 @@ export function useEditorViewModel(services: AppServices) {
     promptPreparation,
     promptApiAttention,
     promptApiNotice,
+    promptGenerationNotice,
+    promptGenerationStatus,
+    isGeneratingSlide,
     preparePromptApi,
     ensurePromptApiReadyForPrompt,
+    generateSlideFromPrompt,
     setTranslationTargetLanguage,
     canTranslateSelection: !isTranslating && getTranslatableTextElementIds('selection').length > 0,
     canTranslateCurrentSlide: !isTranslating && getTranslatableTextElementIds('slide').length > 0,

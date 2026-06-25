@@ -3,7 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 import { IconButton } from '../components/IconButton';
 
 interface PromptBarProps {
+  generationNotice?: string | undefined;
+  generationStatus?: string | undefined;
+  isGeneratingSlide?: boolean;
   onCreateImagePromptIntent?: () => Promise<boolean>;
+  onSlidePromptSubmit?: (prompt: string) => Promise<void>;
 }
 
 const slidePromptExamples = [
@@ -22,7 +26,13 @@ const imagePromptExamples = [
   'A cyberpunk classroom with holographic slide canvases and black-and-green lighting',
 ];
 
-export function PromptBar({ onCreateImagePromptIntent }: PromptBarProps) {
+export function PromptBar({
+  generationNotice,
+  generationStatus,
+  isGeneratingSlide,
+  onCreateImagePromptIntent,
+  onSlidePromptSubmit,
+}: PromptBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [mode, setMode] = useState<'create-image' | null>(null);
@@ -44,6 +54,16 @@ export function PromptBar({ onCreateImagePromptIntent }: PromptBarProps) {
     return onCreateImagePromptIntent?.() ?? true;
   }
 
+  async function submitPrompt() {
+    const trimmedValue = value.trim();
+    if (!trimmedValue || isGeneratingSlide) return;
+    if (mode === 'create-image') {
+      await guardPromptIntent();
+      return;
+    }
+    await onSlidePromptSubmit?.(trimmedValue);
+  }
+
   return (
     <div className="prompt-stack">
       <div className="prompt-examples" aria-label={mode === 'create-image' ? 'Image prompt examples' : 'Slide prompt examples'}>
@@ -62,12 +82,18 @@ export function PromptBar({ onCreateImagePromptIntent }: PromptBarProps) {
           </button>
         ))}
       </div>
+      {generationStatus ? <div className="prompt-generation-status">{generationStatus}</div> : null}
+      {generationNotice ? (
+        <div className="prompt-generation-notice" role="tooltip">
+          {generationNotice}
+        </div>
+      ) : null}
       <form
         className="prompt-bar"
         aria-label="Slide structure prompt"
         onSubmit={(event) => {
           event.preventDefault();
-          void guardPromptIntent();
+          void submitPrompt();
         }}
       >
         <div className="prompt-action-shell">
@@ -127,7 +153,12 @@ export function PromptBar({ onCreateImagePromptIntent }: PromptBarProps) {
         <IconButton label="Record voice prompt">
           <Mic size={16} />
         </IconButton>
-        <IconButton label="Submit prompt">
+        <IconButton
+          label={isGeneratingSlide ? 'Generating slide' : 'Submit prompt'}
+          onClick={() => {
+            void submitPrompt();
+          }}
+        >
           <SendHorizontal size={16} />
         </IconButton>
       </form>

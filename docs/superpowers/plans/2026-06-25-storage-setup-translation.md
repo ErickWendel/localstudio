@@ -18,6 +18,7 @@
 - Tasks 4-6 are implemented on `main`: `ChromeTranslatorService`, `TranslateTextElementsCommand`, selected-text translation, current-slide translation, `Edit > Translate Deck`, AI Tools target-language selection, translation pair preparation progress, translator caching, busy guards, basic error notices, detector fallback normalization, and first-pass translated text fitting.
 - The latest editor ergonomics slice is implemented on `main`: inserted text now follows the seeded LocalStudio.ai template title style, moving elements shows a dotted neon center crosshair, and copy/cut/paste uses browser clipboard events plus a LocalStudio marker so the latest clipboard source wins between editor objects and external images.
 - The Prompt API setup slice is implemented on `main`: the prompt bar has a `+` action menu with `Create image` chip mode, clearing the chip restores the slide-structure prompt, and AI Tools shows Prompt API first under Local Chrome AI with prompt-to-slides copy, startup readiness detection, preparation progress, and hidden prepare action when Chrome already reports readiness.
+- The first Prompt API prompt-to-slides slice is implemented on `main`: default prompt-bar submissions generate active-page slide content through structured JSON task planning, per-element structured JSON layout, local placeholder imagery, remote `https://` image URLs, immutable generated-slide commands, and progressive canvas updates.
 - Latest local non-e2e checks passed after the Prompt API prompt-bar/setup work: `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build`.
 
 ## Remaining Work / Spec Gap Checklist
@@ -57,7 +58,9 @@ AI roadmap:
 - [x] Add prompt bar `+` action menu with `Create image` chip mode and default slide-structure fallback when the chip is cleared.
 - [x] Wire direct Chrome Prompt API readiness/preparation through a `ChromePromptService`.
 - [x] Move Prompt API to the first Local Chrome AI card with prompt-to-slides copy, preparation progress, and hidden prepare action when ready on startup.
-- [ ] Build actual Prompt API prompt-to-slides generation from the prepared Chrome Prompt API provider.
+- [x] Build actual Prompt API prompt-to-slides generation from the prepared Chrome Prompt API provider for the active page.
+- [ ] Expand Prompt API prompt-to-slides generation to multi-slide deck creation.
+- [ ] Add schema repair/retry handling when Chrome Prompt API returns invalid structured output.
 - [ ] Add the future `Create image` provider/action behind the prompt bar chip.
 - [ ] Fold palette generation into the Chrome Prompt API prompt-to-slides/design-generation flow instead of exposing a standalone Text-to-Palette AI tool.
 - [ ] Build Smart Grab on the shared Segment Anything WebGPU provider.

@@ -1,4 +1,15 @@
+import {
+  GENERATED_SLIDE_ELEMENT_RESPONSE_SCHEMA,
+  GENERATED_SLIDE_TASKS_RESPONSE_SCHEMA,
+  parseGeneratedSlideElementJson,
+  parseGeneratedSlideTasksJson,
+  type GeneratedSlideElement,
+  type GeneratedSlideTask,
+  type GeneratedSlideTasksDocument,
+} from '../domain/generatedSlide';
 import type { PromptApiAvailability, PromptService } from './interfaces';
+import { buildSlideElementPrompt } from './prompts/slideElementPrompt';
+import { buildSlideTaskPrompt, extractImageUrls } from './prompts/slideTaskPrompt';
 
 type ChromePromptAvailability =
   | 'available'
@@ -9,6 +20,7 @@ type ChromePromptAvailability =
 
 interface ChromePromptSession {
   destroy?: () => void;
+  prompt?: (input: string, options?: { responseConstraint?: unknown }) => Promise<string>;
 }
 
 interface ChromeLanguageModelApi {
@@ -60,5 +72,57 @@ export class ChromePromptService implements PromptService {
     session.destroy?.();
     this.ready = true;
     options?.onProgress?.(100);
+  }
+
+  async generateSlideTasksFromPrompt(
+    prompt: string,
+    options: { targetLanguageHint?: string } = {},
+  ): Promise<GeneratedSlideTasksDocument> {
+    const response = await this.promptWithStructuredOutput(
+      buildSlideTaskPrompt({
+        userPrompt: prompt,
+        targetLanguageHint: options.targetLanguageHint ?? 'same as user prompt',
+        imageUrls: extractImageUrls(prompt),
+      }),
+      GENERATED_SLIDE_TASKS_RESPONSE_SCHEMA,
+    );
+    this.ready = true;
+    return parseGeneratedSlideTasksJson(response);
+  }
+
+  async generateSlideElementFromTask(
+    task: Exclude<GeneratedSlideTask, { type: 'set-background' }>,
+    context: {
+      userPrompt: string;
+      allTasks: GeneratedSlideTask[];
+      page: GeneratedSlideTasksDocument['page'];
+      existingElements: GeneratedSlideElement[];
+    },
+  ): Promise<GeneratedSlideElement> {
+    const response = await this.promptWithStructuredOutput(
+      buildSlideElementPrompt({
+        userPrompt: context.userPrompt,
+        task,
+        allTasks: context.allTasks,
+        page: context.page,
+        existingElements: context.existingElements,
+      }),
+      GENERATED_SLIDE_ELEMENT_RESPONSE_SCHEMA,
+    );
+    this.ready = true;
+    return parseGeneratedSlideElementJson(response);
+  }
+
+  private async promptWithStructuredOutput(prompt: string, responseConstraint: unknown) {
+    const languageModel = getLanguageModelApi();
+    if (!languageModel?.create) throw new Error('Chrome Prompt API is unavailable.');
+
+    const session = await languageModel.create();
+    try {
+      if (!session.prompt) throw new Error('Chrome Prompt API session cannot generate text.');
+      return await session.prompt(prompt, { responseConstraint });
+    } finally {
+      session.destroy?.();
+    }
   }
 }
