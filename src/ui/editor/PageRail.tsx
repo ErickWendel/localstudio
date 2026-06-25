@@ -4,10 +4,12 @@ import type { ProjectDocument } from '../../domain/model';
 interface PageRailProps {
   project: ProjectDocument;
   activePageId: string;
+  onAddPage?: () => void;
   onImportImage?: (file: File) => void;
+  onSelectPage?: (pageId: string) => void;
 }
 
-export function PageRail({ project, activePageId, onImportImage }: PageRailProps) {
+export function PageRail({ project, activePageId, onAddPage, onImportImage, onSelectPage }: PageRailProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
@@ -23,6 +25,9 @@ export function PageRail({ project, activePageId, onImportImage }: PageRailProps
               type="button"
               aria-label={page.name}
               title={page.name}
+              onClick={() => {
+                onSelectPage?.(page.id);
+              }}
             >
               {page.id === activePageId ? <span className="slide-preview slide-preview-active" /> : null}
               {page.id !== activePageId ? (
@@ -32,12 +37,20 @@ export function PageRail({ project, activePageId, onImportImage }: PageRailProps
             <span className="slide-number">{index + 1}</span>
           </div>
         ))}
+        <div className="slide-item slide-item-add">
+          <button
+            className="slide-thumb slide-thumb-add"
+            type="button"
+            aria-label="Add slide"
+            title="Add slide"
+            onClick={onAddPage}
+          >
+            <span className="material-symbols-outlined">add</span>
+          </button>
+          <span className="slide-number">+</span>
+        </div>
       </div>
       <div className="rail-actions">
-        <button className="rail-action-button" title="Add Page" type="button" aria-label="Add Page">
-          <span className="material-symbols-outlined">note_add</span>
-          <span>Add</span>
-        </button>
         <button
           className="rail-action-button"
           title="Import Assets"

@@ -11,11 +11,16 @@ import {
   type ElementFramePatch,
 } from '../../domain/commands/basicCommands';
 import { fitImageWithinPage } from '../../domain/imageSizing';
-import type { ProjectDocument, SelectionState } from '../../domain/model';
+import type { Page, ProjectDocument, SelectionState } from '../../domain/model';
 import { SAMPLE_HERO_IMAGE_SIZE, SAMPLE_HERO_IMAGE_URL } from '../../domain/sampleProject';
 import type { ModelState } from '../../services/interfaces';
 
 export type RightPanelTab = 'layout' | 'design' | 'ai-tools';
+
+interface EditorHistory {
+  past: ProjectDocument[];
+  future: ProjectDocument[];
+}
 
 function normalizeProjectDocument(project: ProjectDocument): ProjectDocument {
   const shouldRestoreHeroImage = Boolean(project.assets['asset-hero']) && !project.elements['image-hero'];
@@ -73,8 +78,7 @@ function normalizeProjectDocument(project: ProjectDocument): ProjectDocument {
                 ...page,
                 elementIds: (() => {
                   const nextElementIds = page.elementIds.filter((id) => id !== 'image-hero');
-                  const backgroundIndex = nextElementIds.indexOf('shape-bg');
-                  nextElementIds.splice(backgroundIndex >= 0 ? backgroundIndex + 1 : nextElementIds.length, 0, 'image-hero');
+                  nextElementIds.splice(0, 0, 'image-hero');
                   return nextElementIds;
                 })(),
               }
@@ -122,14 +126,17 @@ function createId(prefix: string) {
 }
 
 export function useEditorViewModel(services: AppServices) {
-  const [project, setProject] = useState<ProjectDocument>(
-    normalizeProjectDocument(services.initialProject),
-  );
+  const initialProject = useMemo(() => normalizeProjectDocument(services.initialProject), [
+    services.initialProject,
+  ]);
+  const [project, setProject] = useState<ProjectDocument>(initialProject);
   const [activeTab, setActiveTab] = useState<RightPanelTab>('layout');
   const [modelStates, setModelStates] = useState<ModelState[]>([]);
   const [hasLoadedProject, setHasLoadedProject] = useState(false);
-  const activePageId = project.pages[0]?.id ?? '';
+  const [activePageId, setActivePageId] = useState(initialProject.pages[0]?.id ?? '');
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>(['image-hero']);
+  const [history, setHistory] = useState<EditorHistory>({ past: [], future: [] });
+  const [zoomPercent, setZoomPercent] = useState(100);
   const selection = useMemo<SelectionState>(() => ({ pageId: activePageId, elementIds: selectedElementIds }), [
     activePageId,
     selectedElementIds,
@@ -144,7 +151,12 @@ export function useEditorViewModel(services: AppServices) {
 
     void services.projectRepository.loadProject().then((savedProject) => {
       if (!isMounted) return;
-      if (savedProject) setProject(normalizeProjectDocument(savedProject));
+      if (savedProject) {
+        const normalizedProject = normalizeProjectDocument(savedProject);
+        setProject(normalizedProject);
+        setActivePageId(normalizedProject.pages[0]?.id ?? '');
+        setSelectedElementIds(['image-hero'].filter((id) => Boolean(normalizedProject.elements[id])));
+      }
       setHasLoadedProject(true);
     });
 
@@ -163,30 +175,65 @@ export function useEditorViewModel(services: AppServices) {
     setModelStates(next);
   }
 
+  function commitProject(
+    updater: (currentProject: ProjectDocument) => ProjectDocument,
+    options?: { activePageId?: string; selectedElementIds?: string[] },
+  ) {
+    setProject((currentProject) => {
+      const nextProject = updater(currentProject);
+      if (nextProject === currentProject) return currentProject;
+
+      setHistory((currentHistory) => ({
+        past: [...currentHistory.past, currentProject].slice(-50),
+        future: [],
+      }));
+
+      if (options?.activePageId !== undefined) setActivePageId(options.activePageId);
+      if (options?.selectedElementIds !== undefined) setSelectedElementIds(options.selectedElementIds);
+      return nextProject;
+    });
+  }
+
+  function getSelectionForProject(nextProject: ProjectDocument, pageId: string, currentSelection: string[]) {
+    const page = nextProject.pages.find((item) => item.id === pageId) ?? nextProject.pages[0];
+    const retainedSelection = currentSelection.filter((id) => page?.elementIds.includes(id));
+    if (retainedSelection.length > 0) return retainedSelection;
+    const nextSelectedId = page?.elementIds.at(-1);
+    return nextSelectedId ? [nextSelectedId] : [];
+  }
+
   function selectElement(elementId: string) {
     setSelectedElementIds([elementId]);
   }
 
+  function selectPage(pageId: string) {
+    const page = project.pages.find((item) => item.id === pageId);
+    if (!page) return;
+    setActivePageId(page.id);
+    const nextSelectedId = page.elementIds.at(-1);
+    setSelectedElementIds(nextSelectedId ? [nextSelectedId] : []);
+  }
+
   function updateElementFrame(elementId: string, patch: ElementFramePatch) {
-    setProject((currentProject) => new UpdateElementFrameCommand(elementId, patch).execute(currentProject));
+    commitProject((currentProject) => new UpdateElementFrameCommand(elementId, patch).execute(currentProject));
   }
 
   function updateTextContent(elementId: string, text: string) {
-    setProject((currentProject) => new UpdateTextContentCommand(elementId, text).execute(currentProject));
+    commitProject((currentProject) => new UpdateTextContentCommand(elementId, text).execute(currentProject));
   }
 
   function setElementVisibility(elementId: string, visible: boolean) {
-    setProject((currentProject) =>
+    commitProject((currentProject) =>
       new SetElementVisibilityCommand(elementId, visible).execute(currentProject),
     );
   }
 
   function setElementLock(elementId: string, locked: boolean) {
-    setProject((currentProject) => new SetElementLockCommand(elementId, locked).execute(currentProject));
+    commitProject((currentProject) => new SetElementLockCommand(elementId, locked).execute(currentProject));
   }
 
   function deleteElement(elementId: string) {
-    setProject((currentProject) => {
+    commitProject((currentProject) => {
       const nextProject = new DeleteElementCommand(activePageId, elementId).execute(currentProject);
       const nextPage = nextProject.pages.find((page) => page.id === activePageId);
       if (selectedElementIds.includes(elementId)) {
@@ -198,7 +245,7 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function reorderElement(elementId: string, targetElementId: string) {
-    setProject((currentProject) => {
+    commitProject((currentProject) => {
       const page = currentProject.pages.find((item) => item.id === activePageId);
       if (!page) return currentProject;
 
@@ -210,6 +257,73 @@ export function useEditorViewModel(services: AppServices) {
       const targetPageIndex = nextPageOrder.indexOf(elementId);
       return new ReorderElementCommand(activePageId, elementId, targetPageIndex).execute(currentProject);
     });
+  }
+
+  function addPage() {
+    const sourcePage = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
+    if (!sourcePage) return;
+    const pageId = createId('page');
+    const nextPage: Page = {
+      id: pageId,
+      name: `Slide ${project.pages.length + 1}`,
+      width: sourcePage.width,
+      height: sourcePage.height,
+      background: sourcePage.background,
+      elementIds: [],
+    };
+
+    commitProject(
+      (currentProject) => ({
+        ...currentProject,
+        pages: [...currentProject.pages, nextPage],
+        updatedAt: new Date().toISOString(),
+      }),
+      { activePageId: pageId, selectedElementIds: [] },
+    );
+  }
+
+  function undo() {
+    const previousProject = history.past.at(-1);
+    if (!previousProject) return;
+
+    setHistory((currentHistory) => ({
+      past: currentHistory.past.slice(0, -1),
+      future: [project, ...currentHistory.future],
+    }));
+    setProject(previousProject);
+    const nextActivePageId = previousProject.pages.some((page) => page.id === activePageId)
+      ? activePageId
+      : previousProject.pages[0]?.id ?? '';
+    setActivePageId(nextActivePageId);
+    setSelectedElementIds(getSelectionForProject(previousProject, nextActivePageId, selectedElementIds));
+  }
+
+  function redo() {
+    const nextProject = history.future[0];
+    if (!nextProject) return;
+
+    setHistory((currentHistory) => ({
+      past: [...currentHistory.past, project],
+      future: currentHistory.future.slice(1),
+    }));
+    setProject(nextProject);
+    const nextActivePageId = nextProject.pages.some((page) => page.id === activePageId)
+      ? activePageId
+      : nextProject.pages[0]?.id ?? '';
+    setActivePageId(nextActivePageId);
+    setSelectedElementIds(getSelectionForProject(nextProject, nextActivePageId, selectedElementIds));
+  }
+
+  function zoomIn() {
+    setZoomPercent((current) => Math.min(200, current + 10));
+  }
+
+  function zoomOut() {
+    setZoomPercent((current) => Math.max(50, current - 10));
+  }
+
+  function resetZoom() {
+    setZoomPercent(100);
   }
 
   async function importImageFile(file: File) {
@@ -227,7 +341,8 @@ export function useEditorViewModel(services: AppServices) {
       pageHeight: page.height,
     });
 
-    setProject((currentProject) =>
+    commitProject(
+      (currentProject) =>
       new AddImageElementCommand(activePageId, {
         asset: {
           id: assetId,
@@ -250,19 +365,29 @@ export function useEditorViewModel(services: AppServices) {
           opacity: 1,
         },
       }).execute(currentProject),
+      { selectedElementIds: [elementId] },
     );
-    setSelectedElementIds([elementId]);
   }
 
   return {
     project,
     activePageId,
+    zoomPercent,
+    canUndo: history.past.length > 0,
+    canRedo: history.future.length > 0,
     selection,
     activeTab,
     setActiveTab,
     modelStates,
     downloadRequiredModels,
     selectElement,
+    selectPage,
+    addPage,
+    undo,
+    redo,
+    zoomIn,
+    zoomOut,
+    resetZoom,
     updateElementFrame,
     updateTextContent,
     setElementVisibility,

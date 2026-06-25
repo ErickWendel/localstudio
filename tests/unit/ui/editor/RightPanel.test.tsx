@@ -53,7 +53,7 @@ describe('RightPanel', () => {
     );
 
     expect(screen.getByRole('tab', { name: 'Layout' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByText('5 layers on current page')).toBeInTheDocument();
+    expect(screen.getByText('4 layers on current page')).toBeInTheDocument();
     expect(screen.getByText('Selected Image')).toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: 'Design' }));
     rerender(
@@ -137,7 +137,7 @@ describe('RightPanel', () => {
     expect(onDeleteElement).toHaveBeenCalledWith('image-hero');
 
     const titleRow = screen.getByRole('button', { name: 'Title' });
-    const backgroundRow = screen.getByRole('button', { name: 'Background Shape' });
+    const subtitleRow = screen.getByRole('button', { name: 'Subtitle' });
     const dataTransfer = {
       dropEffect: '',
       effectAllowed: '',
@@ -145,8 +145,8 @@ describe('RightPanel', () => {
       setData: vi.fn(),
     };
     fireEvent.dragStart(titleRow, { dataTransfer });
-    fireEvent.drop(backgroundRow, { dataTransfer });
+    fireEvent.drop(subtitleRow, { dataTransfer });
 
-    expect(onReorderElement).toHaveBeenCalledWith('text-title', 'shape-bg');
+    expect(onReorderElement).toHaveBeenCalledWith('text-title', 'text-subtitle');
   });
 });

@@ -4,8 +4,16 @@ import type { ProjectDocument } from '../../domain/model';
 interface TopToolbarProps {
   project: ProjectDocument;
   language: string;
+  canRedo?: boolean;
+  canUndo?: boolean;
+  zoomPercent?: number;
   onExport?: () => void;
+  onRedo?: () => void;
+  onResetZoom?: () => void;
   onSelectLayers?: () => void;
+  onUndo?: () => void;
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
 }
 
 type HeaderMenu = 'File' | 'Edit' | 'View' | 'Help';
@@ -13,12 +21,25 @@ type HeaderMenu = 'File' | 'Edit' | 'View' | 'Help';
 interface HeaderMenuAction {
   label: string;
   disabled?: boolean;
-  onSelect?: () => void;
+  onSelect?: (() => void) | undefined;
 }
 
 const menuLabels: HeaderMenu[] = ['File', 'Edit', 'View', 'Help'];
 
-export function TopToolbar({ project, language, onExport, onSelectLayers }: TopToolbarProps) {
+export function TopToolbar({
+  project,
+  language,
+  canRedo = false,
+  canUndo = false,
+  zoomPercent = 100,
+  onExport,
+  onRedo,
+  onResetZoom,
+  onSelectLayers,
+  onUndo,
+  onZoomIn,
+  onZoomOut,
+}: TopToolbarProps) {
   const [openMenu, setOpenMenu] = useState<HeaderMenu | null>(null);
 
   function triggerExport() {
@@ -41,15 +62,15 @@ export function TopToolbar({ project, language, onExport, onSelectLayers }: TopT
       { label: 'Export', onSelect: triggerExport },
     ],
     Edit: [
-      { label: 'Undo', disabled: true },
-      { label: 'Redo', disabled: true },
+      { label: 'Undo', disabled: !canUndo, onSelect: onUndo },
+      { label: 'Redo', disabled: !canRedo, onSelect: onRedo },
       { label: 'Duplicate', disabled: true },
       { label: 'Delete', disabled: true },
     ],
     View: [
-      { label: 'Zoom Out', disabled: true },
-      { label: '100%', disabled: true },
-      { label: 'Zoom In', disabled: true },
+      { label: 'Zoom Out', onSelect: onZoomOut },
+      { label: '100%', onSelect: onResetZoom },
+      { label: 'Zoom In', onSelect: onZoomIn },
       onSelectLayers
         ? { label: 'Toggle Layers Panel', onSelect: onSelectLayers }
         : { label: 'Toggle Layers Panel', disabled: true },
@@ -118,12 +139,26 @@ export function TopToolbar({ project, language, onExport, onSelectLayers }: TopT
       </div>
       <div className="toolbar-right">
         <div className="toolbar-icon-group" aria-label="Editing actions">
-          <button className="stitch-icon-button" title="Undo" type="button" aria-label="Undo">
+          <button
+            className="stitch-icon-button"
+            disabled={!canUndo}
+            title="Undo"
+            type="button"
+            aria-label="Undo"
+            onClick={onUndo}
+          >
             <span className="material-symbols-outlined" aria-hidden="true">
               undo
             </span>
           </button>
-          <button className="stitch-icon-button" title="Redo" type="button" aria-label="Redo">
+          <button
+            className="stitch-icon-button"
+            disabled={!canRedo}
+            title="Redo"
+            type="button"
+            aria-label="Redo"
+            onClick={onRedo}
+          >
             <span className="material-symbols-outlined" aria-hidden="true">
               redo
             </span>
@@ -131,13 +166,29 @@ export function TopToolbar({ project, language, onExport, onSelectLayers }: TopT
         </div>
         <div className="toolbar-divider" />
         <div className="zoom-group" aria-label="Zoom controls">
-          <button className="stitch-icon-button" title="Zoom Out" type="button" aria-label="Zoom Out">
+          <button
+            className="stitch-icon-button"
+            disabled={zoomPercent <= 50}
+            title="Zoom Out"
+            type="button"
+            aria-label="Zoom Out"
+            onClick={onZoomOut}
+          >
             <span className="material-symbols-outlined" aria-hidden="true">
               remove
             </span>
           </button>
-          <span className="zoom-value">100%</span>
-          <button className="stitch-icon-button" title="Zoom In" type="button" aria-label="Zoom In">
+          <button className="zoom-value" type="button" aria-label="Reset zoom" onClick={onResetZoom}>
+            {zoomPercent}%
+          </button>
+          <button
+            className="stitch-icon-button"
+            disabled={zoomPercent >= 200}
+            title="Zoom In"
+            type="button"
+            aria-label="Zoom In"
+            onClick={onZoomIn}
+          >
             <span className="material-symbols-outlined" aria-hidden="true">
               zoom_in
             </span>

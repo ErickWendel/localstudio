@@ -10,6 +10,6 @@ describe('IndexedDbProjectRepository', () => {
     const loaded = await repository.loadProject();
 
     expect(loaded?.id).toBe(project.id);
-    expect(loaded?.pages).toHaveLength(3);
+    expect(loaded?.pages).toHaveLength(1);
   });
 });

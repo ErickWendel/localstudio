@@ -9,6 +9,7 @@ interface CanvasWorkspaceProps {
   project: ProjectDocument;
   activePageId: string;
   selection: SelectionState;
+  zoomPercent?: number;
   onSelectElement?: (elementId: string) => void;
   onUpdateElementFrame?: (elementId: string, patch: ElementFramePatch) => void;
   onUpdateTextContent?: (elementId: string, text: string) => void;
@@ -63,6 +64,7 @@ export function CanvasWorkspace({
   project,
   activePageId,
   selection,
+  zoomPercent = 100,
   onSelectElement,
   onUpdateElementFrame,
   onUpdateTextContent,
@@ -86,6 +88,10 @@ export function CanvasWorkspace({
   const stageHeight = stageSize.height;
   const scaleX = page ? stageWidth / page.width : 1;
   const scaleY = page ? stageHeight / page.height : 1;
+  const pageBackground =
+    page?.background.type === 'color'
+      ? page.background.color
+      : page?.background.colorFallback ?? '#050D10';
 
   useEffect(() => {
     const selectedNode = nodeRefs.current[selection.elementIds[0] ?? ''];
@@ -212,8 +218,11 @@ export function CanvasWorkspace({
         className="canvas-frame neon-border"
         aria-label="Slide canvas"
         data-selected-elements={selection.elementIds.join(',')}
+        style={{
+          transform: `scale(${zoomPercent / 100})`,
+        }}
       >
-        <div className="canvas-artboard" ref={artboardRef}>
+        <div className="canvas-artboard" ref={artboardRef} style={{ background: pageBackground }}>
           <Stage height={stageHeight} width={stageWidth}>
             <Layer>
               {visibleElements.map((element) => {

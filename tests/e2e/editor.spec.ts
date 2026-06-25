@@ -13,7 +13,7 @@ test('renders the editor shell and tabs', async ({ page }) => {
   await expect(page.getByText('16:9 Presentation')).toBeVisible();
 
   await page.getByRole('tab', { name: 'Layout' }).click();
-  await expect(page.getByText('5 layers on current page')).toBeVisible();
+  await expect(page.getByText('4 layers on current page')).toBeVisible();
 
   await page.getByRole('tab', { name: 'AI Tools' }).click();
   await expect(page.getByRole('button', { name: 'Download Required Models' })).toBeVisible();

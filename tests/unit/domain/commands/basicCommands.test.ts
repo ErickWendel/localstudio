@@ -89,18 +89,16 @@ describe('editor commands', () => {
 
   it('reorders an element within the page z-order immutably', () => {
     const project = createSampleProject();
-    const command = new ReorderElementCommand('page-1', 'shape-bg', 3);
+    const command = new ReorderElementCommand('page-1', 'image-hero', 2);
     const next = command.execute(project);
 
     expect(next).not.toBe(project);
     expect(next.pages[0]?.elementIds).toEqual([
-      'image-hero',
       'text-subtitle',
       'text-title',
-      'shape-bg',
+      'image-hero',
     ]);
     expect(project.pages[0]?.elementIds).toEqual([
-      'shape-bg',
       'image-hero',
       'text-subtitle',
       'text-title',

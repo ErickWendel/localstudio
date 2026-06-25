@@ -15,6 +15,7 @@ const canvasContext = {
   setTransform: () => undefined,
   beginPath: () => undefined,
   closePath: () => undefined,
+  clip: () => undefined,
   moveTo: () => undefined,
   lineTo: () => undefined,
   quadraticCurveTo: () => undefined,
@@ -54,3 +55,16 @@ class ResizeObserverMock implements ResizeObserver {
 }
 
 globalThis.ResizeObserver = ResizeObserverMock;
+
+class ImageMock extends EventTarget {
+  naturalWidth = 100;
+  naturalHeight = 50;
+
+  set src(_value: string) {
+    queueMicrotask(() => {
+      this.dispatchEvent(new Event('load'));
+    });
+  }
+}
+
+globalThis.Image = ImageMock as unknown as typeof Image;

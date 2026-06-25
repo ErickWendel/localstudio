@@ -265,6 +265,12 @@ button {
     transform 140ms ease;
 }
 
+.stitch-icon-button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .stitch-icon-button:active,
 .floating-toolbar-button:active,
 .icon-button:active,
@@ -283,12 +289,19 @@ button {
 
 .zoom-value {
   min-width: 36px;
+  border: 0;
+  background: transparent;
   color: var(--ew-muted);
+  cursor: pointer;
   text-align: center;
   font-family: 'Orbitron', sans-serif;
   font-size: 11px;
   font-weight: 600;
   line-height: 16px;
+}
+
+.zoom-value:hover {
+  color: var(--ew-green);
 }
 
 .language-chip {
@@ -449,6 +462,11 @@ button {
   transform: translateY(-1px);
 }
 
+.slide-thumb-add {
+  border-style: dashed;
+  color: var(--ew-green);
+}
+
 .slide-number,
 .rail-action-button span:last-child {
   font-family: 'Orbitron', sans-serif;
@@ -550,6 +568,8 @@ button {
   background: #ffffff;
   padding: 16px;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.52);
+  transform-origin: center;
+  transition: transform 160ms ease;
 }
 
 .canvas-artboard {
@@ -558,9 +578,7 @@ button {
   height: 100%;
   overflow: hidden;
   border-radius: 2px;
-  background:
-    radial-gradient(circle at 50% 45%, rgba(55, 253, 118, 0.16), transparent 38%),
-    #050d10;
+  background: #050d10;
 }
 
 .canvas-text-editor {

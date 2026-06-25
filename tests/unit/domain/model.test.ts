@@ -6,9 +6,12 @@ describe('project model', () => {
     const firstPage = project.pages[0];
 
     expect(project.name).toBe('Untitled AI Deck');
+    expect(project.pages).toHaveLength(1);
     expect(firstPage?.width).toBe(1920);
     expect(firstPage?.height).toBe(1080);
-    expect(firstPage?.elementIds.length).toBeGreaterThan(2);
+    expect(firstPage?.elementIds).toEqual(['image-hero', 'text-subtitle', 'text-title']);
+    expect(project.elements['shape-bg']).toBeUndefined();
+    expect(firstPage?.background).toEqual({ type: 'color', color: '#050D10' });
   });
 
   it('keeps z-order as page elementIds', () => {

@@ -18,23 +18,48 @@ export function EditorShell({ services }: EditorShellProps) {
       <TopToolbar
         project={vm.project}
         language="PT-BR"
+        canRedo={vm.canRedo}
+        canUndo={vm.canUndo}
+        zoomPercent={vm.zoomPercent}
+        onRedo={vm.redo}
+        onResetZoom={vm.resetZoom}
         onSelectLayers={() => {
           vm.setActiveTab('layout');
         }}
+        onUndo={vm.undo}
+        onZoomIn={vm.zoomIn}
+        onZoomOut={vm.zoomOut}
       />
       <div className="editor-grid">
         <PageRail
           project={vm.project}
           activePageId={vm.activePageId}
+          onAddPage={vm.addPage}
           onImportImage={(file) => {
             void vm.importImageFile(file);
           }}
+          onSelectPage={vm.selectPage}
         />
-        <section className="workspace-column" aria-label="Canvas workspace">
+        <section
+          className="workspace-column"
+          aria-label="Canvas workspace"
+          onPaste={(event) => {
+            const imageFile =
+              Array.from(event.clipboardData.files).find((file) => file.type.startsWith('image/')) ??
+              Array.from(event.clipboardData.items)
+                .find((item) => item.kind === 'file' && item.type.startsWith('image/'))
+                ?.getAsFile();
+
+            if (!imageFile) return;
+            event.preventDefault();
+            void vm.importImageFile(imageFile);
+          }}
+        >
           <CanvasWorkspace
             project={vm.project}
             activePageId={vm.activePageId}
             selection={vm.selection}
+            zoomPercent={vm.zoomPercent}
             onSelectElement={vm.selectElement}
             onUpdateElementFrame={vm.updateElementFrame}
             onUpdateTextContent={vm.updateTextContent}

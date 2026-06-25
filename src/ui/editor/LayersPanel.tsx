@@ -18,10 +18,11 @@ function isDesignElement(element: DesignElement | undefined): element is DesignE
   return Boolean(element);
 }
 
-function getLayerLabel(element: DesignElement) {
+function getLayerLabel(element: DesignElement, project: ProjectDocument) {
   if (element.id === 'text-title') return 'Title';
   if (element.id === 'text-subtitle') return 'Subtitle';
-  if (element.type === 'image') return 'Selected Image';
+  if (element.id === 'image-hero') return 'Selected Image';
+  if (element.type === 'image') return project.assets[element.assetId]?.name ?? 'Imported Image';
   if (element.type === 'shape') return 'Background Shape';
   return element.id;
 }
@@ -51,7 +52,7 @@ export function LayersPanel({
       .filter(isDesignElement)
       .map((element) => ({
         id: element.id,
-        name: getLayerLabel(element),
+        name: getLayerLabel(element, project),
         icon: getLayerIcon(element),
         selected: selection.elementIds.includes(element.id),
         type: element.type,
