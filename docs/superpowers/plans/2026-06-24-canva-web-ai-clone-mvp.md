@@ -12,6 +12,8 @@
 
 **Updated persistence direction:** LocalStudio.ai now uses browser-mediated disk storage with the File System Access API when supported. The current scaffold writes `project.json`, writes `config/localstudio.json`, and creates `assets/`, `config/`, and `cache/` in the selected project folder. Future storage-hardening work should move document-embedded data URLs into files under `assets/` and use `cache/` for generated previews/masks. AI model weights remain in Chrome/Transformers.js provider-managed browser caches.
 
+**Follow-up execution plan:** The next implementation slice for storage hardening, first-run setup, and Chrome Built-in AI translation lives in `docs/superpowers/plans/2026-06-25-storage-setup-translation.md`. Use that plan for the next pass; this original MVP plan is historical/completed.
+
 ---
 
 ## References
