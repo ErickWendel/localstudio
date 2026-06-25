@@ -152,14 +152,22 @@ async function preloadBonsaiModelFiles(modelId: string, options?: { onProgress?:
   const cache = await caches.open(BONSAI_MODEL_CACHE_NAME);
   const totalBytes =
     manifest.total_bytes ?? manifest.files.reduce((total, file) => total + Math.max(0, file.size), 0);
+  const progressTotalBytes = Math.max(1, totalBytes);
   let loadedBytes = 0;
+  let lastProgress = -1;
+  const reportProgress = (progress: number) => {
+    const boundedProgress = Math.max(0, Math.min(100, progress));
+    if (boundedProgress <= lastProgress) return;
+    lastProgress = boundedProgress;
+    options?.onProgress?.(boundedProgress);
+  };
 
   for (const file of manifest.files) {
     const url = modelFileUrl(modelId, file.remote_path);
     const cachedResponse = await cache.match(url);
     if (cachedResponse) {
       loadedBytes += file.size;
-      options?.onProgress?.((loadedBytes / totalBytes) * 100);
+      reportProgress((loadedBytes / progressTotalBytes) * 100);
       continue;
     }
 
@@ -167,12 +175,59 @@ async function preloadBonsaiModelFiles(modelId: string, options?: { onProgress?:
     if (!response.ok) {
       throw new Error(`Bonsai model file download failed for ${file.remote_path}: ${response.status} ${response.statusText}`);
     }
-    await cache.put(url, response.clone());
+    await cacheResponseWithProgress({
+      cache,
+      expectedFileSize: file.size,
+      onProgress: (downloadedFileBytes) => {
+        reportProgress(((loadedBytes + downloadedFileBytes) / progressTotalBytes) * 100);
+      },
+      response,
+      url,
+    });
     loadedBytes += file.size;
-    options?.onProgress?.((loadedBytes / totalBytes) * 100);
+    reportProgress((loadedBytes / progressTotalBytes) * 100);
   }
 
-  options?.onProgress?.(100);
+  reportProgress(100);
+}
+
+async function cacheResponseWithProgress({
+  cache,
+  expectedFileSize,
+  onProgress,
+  response,
+  url,
+}: {
+  cache: Cache;
+  expectedFileSize: number;
+  onProgress: (downloadedFileBytes: number) => void;
+  response: Response;
+  url: string;
+}) {
+  if (!response.body || typeof TransformStream === 'undefined') {
+    await cache.put(url, response.clone());
+    onProgress(expectedFileSize);
+    return;
+  }
+
+  let downloadedBytes = 0;
+  const countingStream = response.body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        downloadedBytes += chunk.byteLength;
+        onProgress(Math.min(expectedFileSize, downloadedBytes));
+        controller.enqueue(chunk);
+      },
+    }),
+  );
+  const countedResponse = new Response(countingStream, {
+    headers: response.headers,
+    status: response.status,
+    statusText: response.statusText,
+  });
+
+  await cache.put(url, countedResponse);
+  onProgress(expectedFileSize);
 }
 
 export class BrowserImageGenerationService implements ImageGenerationService {
