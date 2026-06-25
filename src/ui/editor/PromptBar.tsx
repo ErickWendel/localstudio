@@ -1,6 +1,7 @@
 import { ImagePlus, Mic, Plus, SendHorizontal } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { IconButton } from '../components/IconButton';
+import type { CreateImagePromptOptions } from './imagePromptOptions';
 
 interface PromptBarProps {
   createImageNotice?: string | undefined;
@@ -9,8 +10,9 @@ interface PromptBarProps {
   generationStatus?: string | undefined;
   isGeneratingImage?: boolean;
   isGeneratingSlide?: boolean;
+  createImageOptions: CreateImagePromptOptions;
   onCreateImagePromptIntent?: () => boolean | Promise<boolean>;
-  onCreateImageSubmit?: (prompt: string) => Promise<void>;
+  onCreateImageSubmit?: (prompt: string, options: CreateImagePromptOptions) => Promise<void>;
   onSlidePromptSubmit?: (prompt: string) => Promise<void>;
 }
 
@@ -37,6 +39,7 @@ export function PromptBar({
   generationStatus,
   isGeneratingImage = false,
   isGeneratingSlide,
+  createImageOptions,
   onCreateImagePromptIntent,
   onCreateImageSubmit,
   onSlidePromptSubmit,
@@ -68,9 +71,11 @@ export function PromptBar({
     if (mode === 'create-image') {
       const canCreateImage = await guardPromptIntent();
       if (!canCreateImage) return;
-      await onCreateImageSubmit?.(trimmedValue);
+      setValue('');
+      await onCreateImageSubmit?.(trimmedValue, createImageOptions);
       return;
     }
+    setValue('');
     await onSlidePromptSubmit?.(trimmedValue);
   }
 

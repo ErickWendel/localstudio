@@ -34,6 +34,7 @@ import {
 } from '../../services/imageGenerationModels';
 import { IMAGE_EDITING_MODEL_ID } from '../../services/modelSetupService';
 import { looksLikeImageGenerationRequest } from '../../services/prompts/slideTaskPrompt';
+import { defaultCreateImagePromptOptions, type CreateImagePromptOptions } from './imagePromptOptions';
 
 export type RightPanelTab = 'layout' | 'design' | 'ai-tools';
 
@@ -415,6 +416,7 @@ export function useEditorViewModel(services: AppServices) {
   const [isGeneratingSlide, setIsGeneratingSlide] = useState(false);
   const [createImageNotice, setCreateImageNotice] = useState<string | undefined>();
   const [createImageStatus, setCreateImageStatus] = useState<string | undefined>();
+  const [createImageOptions, setCreateImageOptions] = useState<CreateImagePromptOptions>(defaultCreateImagePromptOptions);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [aiToolsAttentionModelId, setAiToolsAttentionModelId] = useState<string | undefined>();
   const [pageLanguageCodes, setPageLanguageCodes] = useState<Record<string, string>>({});
@@ -760,7 +762,7 @@ export function useEditorViewModel(services: AppServices) {
     }
   }
 
-  async function generateImageFromPrompt(prompt: string) {
+  async function generateImageFromPrompt(prompt: string, options?: CreateImagePromptOptions) {
     const trimmedPrompt = prompt.trim();
     if (!trimmedPrompt || isGeneratingImage) return;
 
@@ -774,15 +776,22 @@ export function useEditorViewModel(services: AppServices) {
     setCreateImageStatus('Generating image...');
     setIsGeneratingImage(true);
     try {
+      const generationOptions = {
+        ...(options?.height !== undefined ? { height: options.height } : {}),
+        ...(options?.seed !== undefined ? { seed: options.seed } : {}),
+        ...(options?.steps !== undefined ? { steps: options.steps } : {}),
+        ...(options?.width !== undefined ? { width: options.width } : {}),
+      };
       const asset = await services.imageGenerationService.generateImage(trimmedPrompt, {
+        ...generationOptions,
         onProgress: (state) => {
           setCreateImageStatus(`${state.label} ${state.progress}%`);
         },
       });
       const elementId = createId('image-generated');
       const fittedImage = fitImageWithinPage({
-        imageWidth: DEFAULT_IMAGE_GENERATION_SIZE,
-        imageHeight: DEFAULT_IMAGE_GENERATION_SIZE,
+        imageWidth: options?.width ?? DEFAULT_IMAGE_GENERATION_SIZE,
+        imageHeight: options?.height ?? DEFAULT_IMAGE_GENERATION_SIZE,
         pageWidth: page.width,
         pageHeight: page.height,
       });
@@ -1708,6 +1717,7 @@ export function useEditorViewModel(services: AppServices) {
     promptGenerationStatus,
     createImageNotice,
     createImageStatus,
+    createImageOptions,
     isGeneratingImage,
     isGeneratingSlide,
     aiToolsAttentionModelId,
@@ -1716,6 +1726,7 @@ export function useEditorViewModel(services: AppServices) {
     ensureImageGenerationReadyForPrompt,
     generateSlideFromPrompt,
     generateImageFromPrompt,
+    setCreateImageOptions,
     setTranslationTargetLanguage,
     canTranslateSelection: !isTranslating && getTranslatableTextElementIds('selection').length > 0,
     canTranslateCurrentSlide: !isTranslating && getTranslatableTextElementIds('slide').length > 0,

@@ -5,7 +5,7 @@ import {
   IMAGE_GENERATION_TRANSFORMERS_MODEL_ID,
   TRANSFORMERS_CACHE_KEY,
 } from './imageGenerationModels';
-import { BrowserBonsaiImageRuntime } from './browserImageGenerationService';
+import { BrowserBonsaiImageRuntime } from './bonsaiImageRuntime';
 
 export const IMAGE_EDITING_MODEL_ID = 'image-editing-models';
 export const IMAGE_EDITING_TRANSFORMERS_MODEL_ID = 'Xenova/slimsam-77-uniform';

@@ -1,8 +1,5 @@
-import {
-  BrowserBonsaiImageRuntime,
-  BrowserImageGenerationService,
-  type BonsaiImageRuntime,
-} from '../../../src/services/browserImageGenerationService';
+import { BrowserBonsaiImageRuntime, type BonsaiImageRuntime } from '../../../src/services/bonsaiImageRuntime';
+import { BrowserImageGenerationService } from '../../../src/services/browserImageGenerationService';
 import {
   DEFAULT_IMAGE_GENERATION_SIZE,
   DEFAULT_IMAGE_GENERATION_STEPS,
@@ -99,7 +96,51 @@ describe('BrowserBonsaiImageRuntime', () => {
       'prism-ml/bonsai-image-ternary-4B-mlx-2bit',
       expect.objectContaining({ cacheName: 'test-cache' }),
     );
-    expect(progress).toEqual([1, 27, 55, 97, 100]);
+    expect(progress).toEqual([3, 27, 55, 97, 100]);
+  });
+
+  it('keeps model preload progress moving before byte totals are available', async () => {
+    vi.useFakeTimers();
+    type TestPipeline = {
+      generate(options: {
+        callback_on_step_end?: (_pipeline: unknown, step: number) => void;
+        guidance_scale: 1;
+        height: number;
+        num_inference_steps: number;
+        prompt: string;
+        seed?: number;
+        width: number;
+      }): Promise<Blob>;
+    };
+    const pipeline: TestPipeline = {
+      generate: vi.fn(() => Promise.resolve(new Blob(['image'], { type: 'image/png' }))),
+    };
+    let resolvePipeline: ((pipeline: TestPipeline) => void) | undefined;
+    const fromPretrained = vi.fn((_modelId: string, options?: { onProgress?: (progress: unknown) => void }) => {
+      options?.onProgress?.({ phase: 'init' });
+      options?.onProgress?.({ component: 'text_encoder', phase: 'open' });
+      return new Promise<typeof pipeline>((resolve) => {
+        resolvePipeline = resolve;
+      });
+    });
+    const progress: number[] = [];
+    const preloadPromise = new BrowserBonsaiImageRuntime({
+      importRuntime: () =>
+        Promise.resolve({
+          BonsaiImagePipeline: {
+            from_pretrained: fromPretrained,
+          },
+        }),
+    }).preload('prism-ml/bonsai-image-ternary-4B-mlx-2bit', {
+      onProgress: (value) => progress.push(Math.round(value)),
+    });
+
+    await vi.advanceTimersByTimeAsync(3_000);
+    resolvePipeline?.(pipeline);
+    await preloadPromise;
+    vi.useRealTimers();
+
+    expect(progress).toEqual([3, 12, 14, 16, 100]);
   });
 
   it('generates with the Bonsai demo runtime after loading it once', async () => {

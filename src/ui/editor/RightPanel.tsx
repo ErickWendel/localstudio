@@ -5,6 +5,7 @@ import type { ModelState } from '../../services/interfaces';
 import { SegmentedTabs, type SegmentedTab } from '../components/SegmentedTabs';
 import { AiToolsPanel } from './AiToolsPanel';
 import { DesignPanel } from './DesignPanel';
+import type { CreateImagePromptOptions } from './imagePromptOptions';
 import { LayersPanel } from './LayersPanel';
 import type { RightPanelTab } from './useEditorViewModel';
 
@@ -13,6 +14,7 @@ interface RightPanelProps {
   onTabChange: (tab: RightPanelTab) => void;
   modelStates: ModelState[];
   attentionModelId?: string | undefined;
+  createImageOptions?: CreateImagePromptOptions;
   translationLanguageOptions?: Array<{ code: string; flag: string; label: string }>;
   translationPreparation?: { progress: number; sourceLanguage?: string; status: 'idle' | 'downloading' | 'ready' | 'failed' };
   translationTargetAttention?: boolean;
@@ -21,6 +23,7 @@ interface RightPanelProps {
   promptApiNotice?: string | undefined;
   promptPreparation?: { availability: string; progress: number; status: 'idle' | 'downloading' | 'ready' | 'failed' };
   onDownloadModel?: (id: string) => Promise<void>;
+  onCreateImageOptionsChange?: (options: CreateImagePromptOptions) => void;
   onPreparePromptApi?: () => Promise<void>;
   onTranslationTargetLanguageChange?: (languageCode: string) => void;
   project: ProjectDocument;
@@ -46,6 +49,7 @@ export function RightPanel({
   onTabChange,
   modelStates,
   attentionModelId,
+  createImageOptions,
   translationLanguageOptions,
   translationPreparation,
   translationTargetAttention,
@@ -54,6 +58,7 @@ export function RightPanel({
   promptApiNotice,
   promptPreparation,
   onDownloadModel,
+  onCreateImageOptionsChange,
   onPreparePromptApi,
   onTranslationTargetLanguageChange,
   project,
@@ -83,8 +88,10 @@ export function RightPanel({
             promptApiNotice={promptApiNotice}
             promptPreparation={promptPreparation}
             onDownloadModel={onDownloadModel}
+            onCreateImageOptionsChange={onCreateImageOptionsChange}
             onPreparePromptApi={onPreparePromptApi}
             onTranslationTargetLanguageChange={onTranslationTargetLanguageChange}
+            {...(createImageOptions ? { createImageOptions } : {})}
           />
         ) : null}
         {activeTab === 'layout' ? (

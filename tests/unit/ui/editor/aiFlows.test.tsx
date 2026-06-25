@@ -6,8 +6,10 @@ import type {
   GeneratedSlideTask,
   GeneratedSlideTasksDocument,
 } from '../../../../src/domain/generatedSlide';
+import type { Asset } from '../../../../src/domain/model';
 import type {
   ImageGenerationService,
+  ImageGenerationOptions,
   PromptApiAvailability,
   PromptService,
   TranslatorService,
@@ -104,7 +106,7 @@ class SlowImageGenerationService implements ImageGenerationService {
             objectUrl:
               'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lMFeWAAAAABJRU5ErkJggg==',
           });
-        }, 40);
+        }, 250);
       }),
   );
 }
@@ -261,7 +263,47 @@ describe('mocked AI flows', () => {
     await user.click(screen.getByRole('button', { name: 'Submit prompt' }));
 
     expect(await screen.findByText('A neon bonsai browser.png')).toBeInTheDocument();
+    expect(screen.getByLabelText('Create image prompt')).toHaveValue('');
     expect(screen.getByRole('button', { name: 'Undo' })).not.toBeDisabled();
+  });
+
+  it('passes selected create image options to the generator', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const generateImage = vi.fn((_prompt: string, options?: ImageGenerationOptions): Promise<Asset> => {
+      options?.onProgress?.({ label: 'Generating image 1/4', progress: 25 });
+      return Promise.resolve({
+        id: 'asset-generated-wide',
+        type: 'image',
+        name: 'wide.png',
+        mimeType: 'image/png',
+        objectUrl:
+          'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lMFeWAAAAABJRU5ErkJggg==',
+      });
+    });
+    services.modelSetupService = new InMemoryModelSetupService();
+    services.imageGenerationService = { generateImage };
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await user.click(screen.getByRole('button', { name: 'Download Image Generation Models' }));
+    await user.click(screen.getByRole('button', { name: '16:9' }));
+    await user.click(screen.getByRole('tab', { name: 'Layout' }));
+    await user.click(screen.getByRole('button', { name: 'Prompt actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Create image' }));
+    await user.type(screen.getByLabelText('Create image prompt'), 'A wide generated image');
+    await user.click(screen.getByRole('button', { name: 'Submit prompt' }));
+
+    await waitFor(() => {
+      expect(generateImage).toHaveBeenCalledWith(
+        'A wide generated image',
+        expect.objectContaining({
+          height: 432,
+          steps: 4,
+          width: 768,
+        }),
+      );
+    });
   });
 
   it('blocks duplicate create image submissions while generation is running', async () => {
@@ -279,6 +321,7 @@ describe('mocked AI flows', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Create image' }));
     await user.type(screen.getByLabelText('Create image prompt'), 'A slow generated image');
     await user.click(screen.getByRole('button', { name: 'Submit prompt' }));
+    expect(screen.getByLabelText('Create image prompt')).toHaveValue('');
     await user.click(screen.getByRole('button', { name: 'Generating image' }));
 
     expect(await screen.findByText('Generating image 1/4 25%')).toBeInTheDocument();
@@ -324,6 +367,7 @@ describe('mocked AI flows', () => {
       );
       expect(promptService.generateSlideElementFromTask).toHaveBeenCalled();
     });
+    expect(screen.getByRole('textbox', { name: 'Slide structure prompt' })).toHaveValue('');
     expect(screen.getByRole('button', { name: 'Undo' })).not.toBeDisabled();
   });
 

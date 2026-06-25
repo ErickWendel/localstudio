@@ -277,12 +277,13 @@ export function EditorShell({ services }: EditorShellProps) {
           <PromptBar
             createImageNotice={vm.createImageNotice}
             createImageStatus={vm.createImageStatus}
+            createImageOptions={vm.createImageOptions}
             generationNotice={vm.promptGenerationNotice}
             generationStatus={vm.promptGenerationStatus}
             isGeneratingImage={vm.isGeneratingImage}
             isGeneratingSlide={vm.isGeneratingSlide}
             onCreateImagePromptIntent={() => vm.ensureImageGenerationReadyForPrompt()}
-            onCreateImageSubmit={(prompt) => vm.generateImageFromPrompt(prompt)}
+            onCreateImageSubmit={(prompt, options) => vm.generateImageFromPrompt(prompt, options)}
             onSlidePromptSubmit={(prompt) => vm.generateSlideFromPrompt(prompt)}
           />
         </section>
@@ -301,6 +302,7 @@ export function EditorShell({ services }: EditorShellProps) {
           onUpdatePageBackground={vm.updatePageBackground}
           modelStates={vm.modelStates}
           attentionModelId={vm.aiToolsAttentionModelId ?? (vm.backgroundSelectionNotice ? IMAGE_EDITING_MODEL_ID : undefined)}
+          createImageOptions={vm.createImageOptions}
           translationLanguageOptions={vm.translationLanguageOptions}
           translationPreparation={vm.translationPreparation}
           translationTargetAttention={vm.translationTargetAttention}
@@ -309,6 +311,7 @@ export function EditorShell({ services }: EditorShellProps) {
           promptApiNotice={vm.promptApiNotice}
           promptPreparation={vm.promptPreparation}
           onDownloadModel={vm.downloadModel}
+          onCreateImageOptionsChange={vm.setCreateImageOptions}
           onPreparePromptApi={vm.preparePromptApi}
           onTranslationTargetLanguageChange={(languageCode) => {
             void vm.setTranslationTargetLanguage(languageCode);

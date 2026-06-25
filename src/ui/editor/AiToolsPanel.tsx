@@ -1,12 +1,16 @@
 import { Download, ImagePlus, Languages, ScanSearch } from 'lucide-react';
+import { IMAGE_GENERATION_MODEL_ID } from '../../services/imageGenerationModels';
 import type { ModelState } from '../../services/interfaces';
 import { IconButton } from '../components/IconButton';
 import { PanelSection } from '../components/PanelSection';
 import { StatusPill } from '../components/StatusPill';
+import type { CreateImagePromptOptions } from './imagePromptOptions';
+import { defaultCreateImagePromptOptions, getImageSizeLabel, imageSizePresets } from './imagePromptOptions';
 
 interface AiToolsPanelProps {
   modelStates: ModelState[];
   attentionModelId?: string | undefined;
+  createImageOptions?: CreateImagePromptOptions;
   translationLanguageOptions?: Array<{ code: string; flag: string; label: string }> | undefined;
   translationPreparation?: { progress: number; sourceLanguage?: string; status: 'idle' | 'downloading' | 'ready' | 'failed' } | undefined;
   translationTargetAttention?: boolean | undefined;
@@ -15,6 +19,7 @@ interface AiToolsPanelProps {
   promptApiNotice?: string | undefined;
   promptPreparation?: { availability: string; progress: number; status: 'idle' | 'downloading' | 'ready' | 'failed' } | undefined;
   onDownloadModel?: ((id: string) => Promise<void>) | undefined;
+  onCreateImageOptionsChange?: ((options: CreateImagePromptOptions) => void) | undefined;
   onPreparePromptApi?: (() => Promise<void>) | undefined;
   onTranslationTargetLanguageChange?: ((languageCode: string) => void) | undefined;
 }
@@ -45,9 +50,23 @@ function formatStatus(status: ModelState['status']) {
     .join(' ');
 }
 
+function ToolHelp({ id, text }: { id: string; text: string }) {
+  return (
+    <span className="translation-target-help">
+      <span aria-describedby={id} className="material-symbols-outlined" tabIndex={0}>
+        info
+      </span>
+      <span id={id} className="translation-target-tooltip" role="tooltip">
+        {text}
+      </span>
+    </span>
+  );
+}
+
 export function AiToolsPanel({
   modelStates,
   attentionModelId,
+  createImageOptions = defaultCreateImagePromptOptions,
   translationLanguageOptions = [],
   translationPreparation = { progress: 0, status: 'idle' },
   translationTargetAttention = false,
@@ -56,9 +75,17 @@ export function AiToolsPanel({
   promptApiNotice,
   promptPreparation = { availability: 'unavailable', progress: 0, status: 'idle' },
   onDownloadModel,
+  onCreateImageOptionsChange,
   onPreparePromptApi,
   onTranslationTargetLanguageChange,
 }: AiToolsPanelProps) {
+  function updateCreateImageOptions(patch: Partial<CreateImagePromptOptions>) {
+    onCreateImageOptionsChange?.({
+      ...createImageOptions,
+      ...patch,
+    });
+  }
+
   return (
     <div className="panel-stack">
       <PanelSection title="Local Chrome AI">
@@ -86,18 +113,10 @@ export function AiToolsPanel({
                   <label className="translation-target-control">
                     <span className="translation-target-label">
                       Translate to:
-                      <span className="translation-target-help">
-                        <span
-                          aria-describedby="translation-target-tooltip"
-                          className="material-symbols-outlined"
-                          tabIndex={0}
-                        >
-                          info
-                        </span>
-                        <span id="translation-target-tooltip" className="translation-target-tooltip" role="tooltip">
-                          Choose the language that will be used for all translations in this deck.
-                        </span>
-                      </span>
+                      <ToolHelp
+                        id="translation-target-tooltip"
+                        text="Choose the language that will be used for all translations in this deck."
+                      />
                     </span>
                     <select
                       aria-label="Translate to"
@@ -239,6 +258,78 @@ export function AiToolsPanel({
                 </div>
                 {model.status === 'failed' && model.error ? (
                   <span className="translation-source-note">{model.error}</span>
+                ) : null}
+                {model.id === IMAGE_GENERATION_MODEL_ID ? (
+                  <div className="image-generation-settings" aria-label="Image generation settings">
+                    <div className="image-generation-setting">
+                      <span className="translation-target-label">Size</span>
+                      <div className="image-size-presets" role="group" aria-label="Image size">
+                        {imageSizePresets.map((preset) => (
+                          <button
+                            key={preset.label}
+                            aria-pressed={getImageSizeLabel(createImageOptions) === preset.label}
+                            className="image-size-preset"
+                            type="button"
+                            onClick={() => {
+                              updateCreateImageOptions({ width: preset.width, height: preset.height });
+                            }}
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <label className="image-generation-setting image-generation-range">
+                      <span className="translation-target-label">
+                        Steps
+                        <ToolHelp
+                          id="image-steps-tooltip"
+                          text="Steps control how many generation passes the model runs. Lower is faster; higher can add detail but takes longer. Use 4 for quick drafts."
+                        />
+                      </span>
+                      <input
+                        type="range"
+                        min={1}
+                        max={8}
+                        step={1}
+                        value={createImageOptions.steps}
+                        onChange={(event) => {
+                          updateCreateImageOptions({ steps: Number(event.target.value) });
+                        }}
+                      />
+                      <strong>{createImageOptions.steps}</strong>
+                    </label>
+                    <label className="image-generation-setting">
+                      <span className="translation-target-label">
+                        Seed
+                        <ToolHelp
+                          id="image-seed-tooltip"
+                          text="Seed controls randomness. Leave it random for new variations, or reuse the same number to recreate a similar image from the same prompt and options."
+                        />
+                      </span>
+                      <input
+                        aria-label="Image seed"
+                        className="image-generation-seed-input"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        placeholder="random"
+                        type="text"
+                        value={createImageOptions.seed?.toString() ?? ''}
+                        onChange={(event) => {
+                          const nextValue = event.target.value.replace(/\D/g, '').slice(0, 10);
+                          if (!nextValue) {
+                            onCreateImageOptionsChange?.({
+                              width: createImageOptions.width,
+                              height: createImageOptions.height,
+                              steps: createImageOptions.steps,
+                            });
+                            return;
+                          }
+                          updateCreateImageOptions({ seed: Number.parseInt(nextValue, 10) });
+                        }}
+                      />
+                    </label>
+                  </div>
                 ) : null}
               </article>
             );

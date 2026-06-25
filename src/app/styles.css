@@ -1041,6 +1041,38 @@ button {
   transform: translateY(-1px);
 }
 
+.image-size-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.image-size-preset {
+  min-width: 52px;
+  min-height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.32);
+  color: rgba(255, 255, 255, 0.68);
+  cursor: pointer;
+  font-size: 12px;
+  transition:
+    border-color 140ms ease,
+    color 140ms ease,
+    background 140ms ease,
+    transform 140ms ease;
+}
+
+.image-size-preset:hover,
+.image-size-preset:focus-visible,
+.image-size-preset[aria-pressed='true'] {
+  border-color: rgba(55, 253, 118, 0.62);
+  background: rgba(55, 253, 118, 0.12);
+  color: var(--ew-green);
+  outline: 0;
+  transform: translateY(-1px);
+}
+
 .prompt-generation-status,
 .prompt-generation-notice {
   justify-self: center;
@@ -1437,6 +1469,61 @@ button {
 .translation-source-note {
   color: var(--ew-dim);
   font-size: 10px;
+}
+
+.image-generation-settings {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 2px;
+  padding-top: 10px;
+}
+
+.image-generation-setting {
+  display: grid;
+  gap: 7px;
+  color: var(--ew-muted);
+  font-size: 11px;
+}
+
+.image-generation-range {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.image-generation-range .translation-target-label {
+  grid-column: 1 / 3;
+}
+
+.image-generation-range input {
+  width: 100%;
+  accent-color: var(--ew-green);
+}
+
+.image-generation-range strong {
+  min-width: 22px;
+  color: var(--ew-text);
+  font-size: 12px;
+  text-align: right;
+}
+
+.image-generation-seed-input {
+  width: 100%;
+  border: 1px solid rgba(55, 253, 118, 0.28);
+  border-radius: 4px;
+  background: #050d10;
+  color: var(--ew-text);
+  font: inherit;
+  outline: 0;
+  padding: 8px 9px;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.image-generation-seed-input:focus {
+  border-color: var(--ew-green);
+  box-shadow: 0 0 0 2px rgba(55, 253, 118, 0.14);
 }
 
 .model-row-meta {
