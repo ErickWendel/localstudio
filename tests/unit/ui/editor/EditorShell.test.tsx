@@ -168,6 +168,23 @@ describe('EditorShell', () => {
     expect(window.location.search).toBe('?project=Untitled+AI+Deck');
   });
 
+  it('autosaves project changes after persistence is enabled', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const repository = new SavingProjectRepository();
+    services.projectRepository = repository;
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    expect(repository.savedProjects.at(-1)?.name).toBe('Untitled AI Deck');
+
+    await user.click(screen.getByRole('button', { name: 'Edit project name Untitled AI Deck' }));
+    await user.clear(screen.getByRole('textbox', { name: 'Project name' }));
+    await user.type(screen.getByRole('textbox', { name: 'Project name' }), 'Autosaved Deck{Enter}');
+
+    expect(repository.savedProjects.at(-1)?.name).toBe('Autosaved Deck');
+  });
+
   it('keeps persistence disabled when the project folder cannot be saved', async () => {
     const user = userEvent.setup();
     const services = createAppServices();

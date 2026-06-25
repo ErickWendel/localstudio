@@ -18,7 +18,7 @@ The initial AI feature set is balanced:
 
 Chrome Built-in AI is the primary provider for language/design tasks. Hugging Face / Transformers.js browser models are used only when required for vision capabilities Chrome does not currently provide.
 
-## Implementation Status at 2026-06-24 Wrap-Up
+## Implementation Status at 2026-06-25 Update
 
 The current `main` branch contains a working browser-only editor shell aligned with the approved Stitch/EW Academy direction. The implementation is still an MVP scaffold, but the core local editor loop is now usable enough for iteration.
 
@@ -29,32 +29,36 @@ Ready now:
 - Local document model for projects, pages, assets, and layered text/image/shape elements.
 - Immutable command classes for alignment, z-order, frame transforms, text updates, layer reorder, visibility, locking, deletion, and adding imported image elements.
 - File System Access API project persistence scaffold. When supported, clicking the persistence icon or `File > Save Local` asks for a project folder, writes `project.json`, writes `config/localstudio.json`, and creates `assets/`, `config/`, and `cache/` folders. `File > Import Project` opens an existing project folder by reading its `project.json`.
+- Autosave is active after persistence is enabled. Document mutations write the updated project back to the active project folder, while startup restore skips the hydration save so it does not overwrite the last good project.
+- LocalStudio.ai remembers File System Access directory handles in browser structured storage. It keeps both a global recent project handle and project-name keyed handles, so restarted tabs with `?project=<name>` reopen their own project context instead of whichever project was opened most recently.
+- `File > New Project` opens a blank project in a new tab via `?newProject=1`, consumes that query once, and removes stale project context so refreshes do not recreate blank projects.
 - Canvas element selection, drag, resize, rotate, text double-click editing, and locked-element transform prevention.
 - Layout panel selection sync: clicking a layer selects the matching canvas element.
 - Layout panel layer controls: drag/drop layer order, hide/show, lock/unlock, and delete.
 - Left rail local image import from disk. Imported images are inserted as topmost layers and selected immediately.
 - Image elements render actual image assets. The seeded selected image uses the provided remote image URL and preserves its natural `516 x 387` dimensions instead of scaling up. Imported images preserve natural size and only scale down when larger than the page.
-- AI Tools panel includes mocked local model readiness/download states and local Chrome AI tool cards.
+- AI Tools panel includes local model readiness/download states and local Chrome AI tool cards. The image editing model is consolidated as a shared segmentation dependency for background removal, Smart Grab, and Magic Eraser.
+- Click-guided background removal is wired through the shared Segment Anything WebGPU-style image editing provider. The flow blocks until the model is ready, prepares the selected image, previews the selected subject in blue, supports right-click positive refinement points, applies removal on left click, and tightens the selected image bounds after extraction.
 - Export service shell and mocked AI provider seams exist for later real provider work.
 - Unit/component tests are under `tests/unit`; browser specs are under `tests/e2e`.
-- Latest verified local checks: `npm run lint`, `npm run typecheck`, and `npm run test` pass.
+- Latest verified local checks: `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build` pass.
 
 Known limitations in the current implementation:
 
 - Real Chrome Built-in AI providers are not wired yet.
-- The first real Transformers.js / Hugging Face vision provider is wired for click-guided background removal through Segment Anything WebGPU.
+- The first real Transformers.js / Hugging Face vision provider is wired for click-guided background removal through Segment Anything WebGPU, but it still needs broader browser/device verification and production hardening.
 - Translation, palette generation, Smart Grab, and Magic Eraser are still mocked or incomplete workflows.
-- Export is still a service shell; production-quality canvas-to-PNG/PDF output needs implementation and browser verification.
+- Export supports the current-page PNG path, but production-quality browser verification and export UX polish remain. PDF export is still missing.
 - Layer drag/drop works through the app UI and tested callbacks, but should receive more Playwright coverage after interaction stabilizes.
 - Page background is displayed as a static layer row and is not yet a fully editable/selectable element.
-- Undo/redo, duplicate, richer alignment commands, multi-select, and real property editing remain incomplete.
+- Undo/redo, duplicate, delete shortcuts, zoom controls, basic alignment, and z-order actions are implemented. Multi-select, richer multi-element alignment, and real property editing remain incomplete.
 - Local image assets are still stored as data URLs inside `project.json`; moving original/imported/generated image blobs into `assets/` is the next storage-hardening step.
 
 Next implementation priorities:
 
-1. Finish non-AI editor fundamentals: undo/redo command history, duplicate, full layer z-order buttons, alignment controls, and editable property fields.
+1. Finish remaining non-AI editor fundamentals: real Design-tab property fields, page background editability, multi-select, and multi-element alignment.
 2. Harden File System Access project storage: move original/imported/generated image blobs into `assets/`, keep metadata in `project.json`, and keep generated previews/masks in `cache/`.
-3. Complete export: current page PNG/JPEG and all-page PDF from the actual Konva stage at configured page dimensions.
+3. Complete export: polish current-page PNG export and add all-page PDF from the actual Konva stage at configured page dimensions. JPEG is deferred unless explicitly reintroduced.
 4. Add Playwright coverage for layer reorder, hide/show, lock/unlock, delete, local image import, filesystem save, and text editing.
 5. Build first-run AI setup UX with actual browser capability checks and provider readiness state.
 6. Wire real Chrome Built-in AI translation and prompt-to-palette providers.
@@ -64,7 +68,7 @@ Next implementation priorities:
 
 - Provide a usable layered slide/image editor that runs entirely in the browser.
 - Support local project persistence through browser-mediated disk storage with the File System Access API.
-- Support PNG/JPEG export per page and PDF export for a deck.
+- Support PNG export for the current page first, then PDF export for a deck. JPEG is deferred unless explicitly reintroduced.
 - Provide an explicit first-run AI setup flow for required local model dependencies.
 - Keep the codebase maintainable through strict typing, command-driven state updates, dependency injection, class-based services, linting, hooks, and automated tests.
 - Require layout approval from Google Stitch designs before coding the production UI.
@@ -96,7 +100,7 @@ Users can:
 - Trigger context-aware AI actions from the selected element toolbar, including remove background for selected image layers and translate design for text/page content.
 - Use a prompt input below the main canvas to request slide structure, text organization, or current-content layout changes through the browser Prompt API in a later implementation phase.
 - The prompt input includes text submit and microphone controls so users can type or dictate prompts.
-- Export the current page as PNG/JPEG.
+- Export the current page as PNG.
 - Export all pages as a PDF deck.
 
 The MVP should feel like an editor first, not an AI demo. AI tools operate on selected elements and the existing layered document model.
@@ -376,16 +380,16 @@ Project folder/package contents:
 
 Browser storage remains allowed only for lightweight app state:
 
-- Recent project handles or reopen metadata. Because File System Access handles cannot be serialized into `localStorage`, the app stores a lightweight `localStorage` marker and stores the actual last project directory handle in browser-managed structured storage.
+- Recent project handles or reopen metadata. Because File System Access handles cannot be serialized into `localStorage`, the app stores a lightweight `localStorage` marker and stores actual directory handles in browser-managed structured storage. Handles are stored for the global recent project and by project name so independent tabs can reopen their own context.
 - User preferences that are not project-specific.
 - Provider/model readiness metadata.
 - Permission and setup timestamps.
 
 AI model weights and provider runtime caches are not copied into project folders. Chrome Built-in AI and Transformers.js continue using browser/provider-managed caching for models.
 
-The app should autosave document changes to the active project folder after the user grants access. Failed persistence must not corrupt the active in-memory document or the last good on-disk project state. Writes should use an atomic or staged strategy where practical, such as writing a temporary file and replacing the target after successful serialization.
+The app should autosave document changes to the active project folder after the user grants access. Failed persistence must not corrupt the active in-memory document or the last good on-disk project state. Writes should use an atomic or staged strategy where practical, such as writing a temporary file and replacing the target after successful serialization. Current implementation verifies autosave after persistence is enabled by saving updated project metadata after an edit.
 
-The persistence status icon is the primary save-to-disk entry point. When users click it while persistence is disabled, LocalStudio.ai requests a project folder and enables autosave only after the initial write succeeds. The File menu exposes the same save action as `Save Local` and exposes `Import Project` for selecting an existing project folder whose `project.json` should replace the current in-memory project. After a project folder is saved or imported, LocalStudio.ai remembers it locally and attempts to reopen its `project.json` on page restart.
+The persistence status icon is the primary save-to-disk entry point. When users click it while persistence is disabled, LocalStudio.ai requests a project folder and enables autosave only after the initial write succeeds. The File menu exposes the same save action as `Save Local` and exposes `Import Project` for selecting an existing project folder whose `project.json` should replace the current in-memory project. After a project folder is saved or imported, LocalStudio.ai remembers it locally and writes `?project=<project name>` into the current tab URL. On page restart, that tab first attempts to reopen the named project handle. If no project name is present, it can fall back to the global recent project handle. `File > New Project` opens a blank tab through `?newProject=1`, consumes the command once, and removes stale project query context.
 
 If the File System Access API is unavailable or the user denies folder/file permissions, the MVP should show a blocking unsupported-browser or permission-required state instead of silently falling back to large IndexedDB project storage. Future non-Chrome fallbacks may use import/export project packages, but that is outside the MVP.
 
@@ -393,10 +397,10 @@ If the File System Access API is unavailable or the user denies folder/file perm
 
 MVP exports:
 
-- PNG/JPEG for the current page.
+- PNG for the current page.
 - PDF for all pages in project order.
 
-PNG/JPEG export renders from the canvas stage at the page's configured dimensions.
+PNG export renders from the canvas stage at the page's configured dimensions.
 
 PDF export renders each page to an image and assembles those images into a browser-generated PDF. Export is local-only and downloads through the browser.
 
@@ -451,7 +455,7 @@ Unit tests:
 - Palette JSON validation.
 - Image mask application and transparent asset generation.
 - Service interface behavior with mocked providers.
-- Persistence repository behavior with File System Access API mocks, including project folder creation/opening, staged writes, permission-denied states, and lightweight browser metadata storage.
+- Persistence repository behavior with File System Access API mocks, including project folder creation/opening, autosave after edits, project-name keyed tab restore, staged writes, permission-denied states, and lightweight browser metadata storage.
 - Export orchestration with renderer mocks.
 
 Playwright tests:
@@ -466,7 +470,7 @@ Playwright tests:
 - Remove background with mocked provider.
 - Smart Grab with mocked provider.
 - Magic Eraser mask preview and apply flow with mocked provider.
-- Export PNG/JPEG and PDF flows.
+- Export PNG and PDF flows.
 
 AI provider tests should use mocks for normal application flow. Direct provider smoke tests may be added separately, but they should not make the main test suite depend on large model downloads.
 
