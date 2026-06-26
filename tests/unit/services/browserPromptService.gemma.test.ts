@@ -141,7 +141,7 @@ describe('GemmaPromptProvider structured JSON generation', () => {
       setItem: vi.fn(),
     } as unknown as Storage;
     const service = new BrowserPromptService(modelSetupService, undefined, storage, runtime);
-    const allTasks: GeneratedSlideTask[] = [
+    const allTasks: Array<Exclude<GeneratedSlideTask, { type: 'set-background' }>> = [
       {
         type: 'add-placeholder-image',
         id: 'placeholder',

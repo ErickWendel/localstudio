@@ -79,4 +79,43 @@ describe('slide task prompt', () => {
     expect(prompt).toContain('x 48, y 195, width 980, height 735');
     expect(prompt).toContain('x 1180, y 410, width 600');
   });
+
+  it('defines fallback layout and palette decisions when the user omits them', () => {
+    const prompt = buildSlideTaskPrompt({
+      userPrompt: 'Title at the top and bullet points in the body about why Web AI is useful.',
+      targetLanguageHint: 'same as user prompt',
+      imageUrls: [],
+    });
+
+    expect(prompt).toContain('If the user does not specify colors');
+    expect(prompt).toContain('If the user does not specify placement');
+    expect(prompt).toContain('template-matched palette');
+    expect(prompt).toContain('title band + body content');
+    expect(prompt).toContain('image grid');
+    expect(prompt).toContain('full-bleed or large image');
+  });
+
+  it('gives explicit recipes for compact prompt examples', () => {
+    const prompt = buildSlideTaskPrompt({
+      userPrompt: 'Image grid with 3 placeholder images and short Web AI captions.',
+      targetLanguageHint: 'same as user prompt',
+      imageUrls: [],
+    });
+
+    expect(prompt).toContain('For "image grid"');
+    expect(prompt).toContain('three add-placeholder-image tasks');
+    expect(prompt).toContain('grid image 1 left');
+    expect(prompt).toContain('Image grid items must be add-placeholder-image tasks by default');
+    expect(prompt).toContain('do not use add-shape cards for image slots');
+    expect(prompt).toContain('caption below grid image 1');
+    expect(prompt).toContain('caption below grid image 2');
+    expect(prompt).toContain('caption below grid image 3');
+    expect(prompt).toContain('For top title + body bullet slides');
+    expect(prompt).toContain('For title + subtitle slides with explicit colors');
+    expect(prompt).toContain('set-background using the requested background color');
+    expect(prompt).toContain('Do not create separate add-body-text tasks for each bullet');
+    expect(prompt).toContain('For left image + bullet slides');
+    expect(prompt).toContain('right text block bullets');
+    expect(prompt).toContain('For URL image slides');
+  });
 });

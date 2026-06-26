@@ -1,4 +1,4 @@
-import { ImagePlus, Mic, Plus, SendHorizontal, X } from 'lucide-react';
+import { ImagePlus, Mic, Plus, SendHorizontal, Square, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { IconButton } from '../components/IconButton';
 import type { CreateImagePromptOptions } from './imagePromptOptions';
@@ -14,14 +14,15 @@ interface PromptBarProps {
   onCreateImagePromptIntent?: () => boolean | Promise<boolean>;
   onCreateImageSubmit?: (prompt: string, options: CreateImagePromptOptions) => Promise<void>;
   onSlidePromptSubmit?: (prompt: string) => Promise<void>;
+  onStopGeneration?: () => void;
 }
 
 const slidePromptExamples = [
   'Slide with the placeholder image expanded large on the left, the neon green title “AI Design Revolution” on the right, and the subtitle “Browser-native creative” below it.',
-  'Image grid with 3 placeholder images and short Web AI captions.',
-  'Title at the top and bullet points in the body about why Web AI is useful.',
-  'Slide using https://img-c.udemycdn.com/course/480x270/5625134_794c.jpg as the main image, with a short Web AI title.',
-  'Dark slide with cyan title, purple accent shapes, and white text about browser AI.',
+  'Three-image grid about Web AI, with matching captions.',
+  'Top title and three body bullets about why Web AI is useful.',
+  'Slide using https://img-c.udemycdn.com/course/480x270/5625134_794c.jpg as the main image, with a short title and caption.',
+  'Slide with a deep purple background, gold title "Web AI Advantage", and white subtitle "Fast local intelligence".',
 ];
 
 const imagePromptExamples = [
@@ -43,12 +44,14 @@ export function PromptBar({
   onCreateImagePromptIntent,
   onCreateImageSubmit,
   onSlidePromptSubmit,
+  onStopGeneration,
 }: PromptBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [mode, setMode] = useState<'create-image' | null>('create-image');
   const [value, setValue] = useState('');
   const examples = mode === 'create-image' ? imagePromptExamples : slidePromptExamples;
+  const isProcessing = isGeneratingSlide || isGeneratingImage;
 
   function activateCreateImageMode() {
     setMode('create-image');
@@ -63,7 +66,7 @@ export function PromptBar({
 
   async function submitPrompt() {
     const trimmedValue = value.trim();
-    if (!trimmedValue || isGeneratingSlide || isGeneratingImage) return;
+    if (!trimmedValue || isProcessing) return;
     if (mode === 'create-image') {
       const canCreateImage = await guardPromptIntent();
       if (!canCreateImage) return;
@@ -82,6 +85,7 @@ export function PromptBar({
           <button
             key={example}
             className="prompt-example-chip"
+            disabled={isProcessing}
             type="button"
             onClick={() => {
               setValue(example);
@@ -122,6 +126,7 @@ export function PromptBar({
             aria-expanded={menuOpen}
             aria-label="Prompt actions"
             className="prompt-action-button"
+            disabled={isProcessing}
             type="button"
             onClick={() => {
               setMenuOpen((current) => !current);
@@ -148,6 +153,7 @@ export function PromptBar({
           <button
             aria-label="Remove Create image mode"
             className="prompt-mode-token"
+            disabled={isProcessing}
             type="button"
             onClick={() => {
               setMode(null);
@@ -164,6 +170,7 @@ export function PromptBar({
           type="text"
           placeholder={mode === 'create-image' ? '' : 'Describe slide structure or organize current content...'}
           aria-label={mode === 'create-image' ? 'Create image prompt' : 'Slide structure prompt'}
+          disabled={isProcessing}
           value={value}
           onFocus={() => {
             void guardPromptIntent();
@@ -180,18 +187,29 @@ export function PromptBar({
             void guardPromptIntent();
           }}
         />
-        <IconButton label="Record voice prompt">
+        <IconButton disabled={isProcessing} label="Record voice prompt">
           <Mic size={16} />
         </IconButton>
-        <IconButton
-          disabled={isGeneratingSlide || isGeneratingImage}
-          label={isGeneratingImage ? 'Generating image' : isGeneratingSlide ? 'Generating slide' : 'Submit prompt'}
-          onClick={() => {
-            void submitPrompt();
-          }}
-        >
-          <SendHorizontal size={16} />
-        </IconButton>
+        {isProcessing ? (
+          <IconButton
+            label="Stop generation"
+            tone="danger"
+            onClick={() => {
+              onStopGeneration?.();
+            }}
+          >
+            <Square size={16} />
+          </IconButton>
+        ) : (
+          <IconButton
+            label="Submit prompt"
+            onClick={() => {
+              void submitPrompt();
+            }}
+          >
+            <SendHorizontal size={16} />
+          </IconButton>
+        )}
       </form>
     </div>
   );

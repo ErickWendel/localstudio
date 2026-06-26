@@ -355,6 +355,7 @@ export function EditorShell({ services }: EditorShellProps) {
             onCreateImagePromptIntent={() => vm.ensureImageGenerationReadyForPrompt()}
             onCreateImageSubmit={(prompt, options) => vm.generateImageFromPrompt(prompt, options)}
             onSlidePromptSubmit={(prompt) => vm.generateSlideFromPrompt(prompt)}
+            onStopGeneration={vm.stopPromptGeneration}
           /> : null}
         </section>
         {vm.pagesPanelOpen ? (

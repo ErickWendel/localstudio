@@ -266,14 +266,27 @@ class TranslationModelSetupService extends InMemoryModelSetupService implements 
   }
 }
 
+class DeferredImageGenerationService implements ImageGenerationService {
+  resolve!: (asset: Asset) => void;
+
+  generateImage = vi.fn(
+    (_prompt: string, options?: Parameters<ImageGenerationService['generateImage']>[1]) =>
+      new Promise<Awaited<ReturnType<ImageGenerationService['generateImage']>>>((resolve) => {
+        this.resolve = resolve;
+        options?.onProgress?.({ label: 'Generating image 1/4', progress: 25 });
+      }),
+  );
+}
+
 describe('mocked AI flows', () => {
   const leftHeroSlideExample =
     'Slide with the placeholder image expanded large on the left, the neon green title “AI Design Revolution” on the right, and the subtitle “Browser-native creative” below it.';
-  const gridSlideExample = 'Image grid with 3 placeholder images and short Web AI captions.';
-  const bulletsSlideExample = 'Title at the top and bullet points in the body about why Web AI is useful.';
+  const gridSlideExample = 'Three-image grid about Web AI, with matching captions.';
+  const bulletsSlideExample = 'Top title and three body bullets about why Web AI is useful.';
   const urlImageSlideExample =
-    'Slide using https://img-c.udemycdn.com/course/480x270/5625134_794c.jpg as the main image, with a short Web AI title.';
-  const colorsSlideExample = 'Dark slide with cyan title, purple accent shapes, and white text about browser AI.';
+    'Slide using https://img-c.udemycdn.com/course/480x270/5625134_794c.jpg as the main image, with a short title and caption.';
+  const colorsSlideExample =
+    'Slide with a deep purple background, gold title "Web AI Advantage", and white subtitle "Fast local intelligence".';
 
   it('downloads required models from AI Tools panel', async () => {
     const user = userEvent.setup();
@@ -544,7 +557,7 @@ describe('mocked AI flows', () => {
     });
   });
 
-  it('blocks duplicate create image submissions while generation is running', async () => {
+  it('shows a stop action instead of allowing duplicate create image submissions', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
     const imageGenerationService = new SlowImageGenerationService();
@@ -558,11 +571,44 @@ describe('mocked AI flows', () => {
     await user.type(screen.getByLabelText('Create image prompt'), 'A slow generated image');
     await user.click(screen.getByRole('button', { name: 'Submit prompt' }));
     expect(screen.getByLabelText('Create image prompt')).toHaveValue('');
-    await user.click(screen.getByRole('button', { name: 'Generating image' }));
 
+    expect(screen.getByLabelText('Create image prompt')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Stop generation' })).toBeInTheDocument();
     expect(await screen.findByText('Generating image 1/4 25%')).toBeInTheDocument();
     await waitFor(() => {
       expect(imageGenerationService.generateImage).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('disables the prompt input while generating and stops late image results', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const imageGenerationService = new DeferredImageGenerationService();
+    services.modelSetupService = new InMemoryModelSetupService();
+    services.imageGenerationService = imageGenerationService;
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await user.click(screen.getByRole('button', { name: 'Download Image Generation Models' }));
+    await user.click(screen.getByRole('tab', { name: 'Layout' }));
+    await user.type(screen.getByLabelText('Create image prompt'), 'A slow generated image');
+    await user.click(screen.getByRole('button', { name: 'Submit prompt' }));
+
+    expect(screen.getByLabelText('Create image prompt')).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Stop generation' }));
+    expect(screen.getByLabelText('Create image prompt')).not.toBeDisabled();
+
+    imageGenerationService.resolve({
+      id: 'asset-cancelled-generated',
+      type: 'image',
+      name: 'cancelled.png',
+      mimeType: 'image/png',
+      objectUrl:
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lMFeWAAAAABJRU5ErkJggg==',
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText('cancelled.png')).not.toBeInTheDocument();
     });
   });
 
