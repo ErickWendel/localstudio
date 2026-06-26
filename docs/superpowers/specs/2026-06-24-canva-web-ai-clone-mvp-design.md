@@ -59,7 +59,7 @@ Ready now:
 - Moving canvas elements now shows a neon dotted crosshair through the dragged element center to help judge distance and alignment against the slide while dragging.
 - Editor object copy/cut/paste is wired through browser clipboard events with a LocalStudio-specific clipboard marker. This lets the app prefer the latest copied LocalStudio objects when the clipboard is marked, while still allowing newer external image clipboard pastes to import images instead of being blocked by stale in-memory editor objects.
 - Export service shell and mocked AI provider seams exist for later real provider work.
-- Unit/component tests are under `tests/unit`; browser specs are under `tests/e2e`.
+- Unit/component tests are under `tests/unit`; Playwright/e2e coverage has been removed from the active MVP toolchain to keep iteration focused on lint, typecheck, unit tests, and build verification.
 - Latest verified local checks: `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build` pass.
 
 Known limitations in the current implementation:

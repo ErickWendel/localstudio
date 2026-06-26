@@ -16,7 +16,6 @@ Browser-only Canva-style slides and image editor MVP.
 - `npm run lint` runs ESLint.
 - `npm run typecheck` runs TypeScript strict checks.
 - `npm run test` runs unit tests.
-- `npm run e2e` runs Playwright browser tests.
 - `npm run build` creates a production build.
 
 ## Design Source
