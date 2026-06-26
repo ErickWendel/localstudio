@@ -20,7 +20,47 @@ describe('CanvasWorkspace', () => {
     expect(container.querySelector('canvas')).toBeInTheDocument();
     expect(screen.getByLabelText('BG Remover')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Flip' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Crop' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Crop' })).toBeEnabled();
+  });
+
+  it('toggles crop mode for selected images', async () => {
+    const user = userEvent.setup();
+    const project = createSampleProject();
+
+    render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Crop' }));
+
+    expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Crop left' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Crop bottom right' })).toBeInTheDocument();
+  });
+
+  it('exits crop mode when the user clicks the canvas background', async () => {
+    const user = userEvent.setup();
+    const project = createSampleProject();
+    const { container } = render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Crop' }));
+    expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+
+    fireEvent.mouseDown(container.querySelector('canvas')!);
+
+    expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Crop left' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Crop' })).toBeInTheDocument();
   });
 
   it('does not render document text outside the Konva canvas', () => {

@@ -17,6 +17,7 @@ export {
 export type AlignMode = 'horizontal-center' | 'vertical-center' | 'page-center';
 export type ZOrderMode = 'front' | 'back' | 'forward' | 'backward';
 export type ElementFramePatch = Partial<Pick<BaseElement, 'height' | 'rotation' | 'width' | 'x' | 'y'>>;
+export type ImageCropPatch = ElementFramePatch & { crop: NonNullable<ImageElement['crop']> };
 export type ElementStylePatch = Partial<{
   align: 'left' | 'center' | 'right';
   fill: string;
@@ -594,6 +595,34 @@ export class ToggleImageFlipCommand implements EditorCommand {
         [this.elementId]: {
           ...element,
           flipX: !element.flipX,
+        },
+      },
+      updatedAt: new Date().toISOString(),
+    };
+  }
+}
+
+export class UpdateImageCropCommand implements EditorCommand {
+  readonly description = 'Crop image';
+
+  constructor(
+    private readonly elementId: string,
+    private readonly patch: ImageCropPatch,
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    const element = project.elements[this.elementId];
+    if (!element || element.type !== 'image' || element.locked) return project;
+
+    return {
+      ...project,
+      elements: {
+        ...project.elements,
+        [this.elementId]: {
+          ...element,
+          ...this.patch,
+          width: this.patch.width === undefined ? element.width : Math.max(1, this.patch.width),
+          height: this.patch.height === undefined ? element.height : Math.max(1, this.patch.height),
         },
       },
       updatedAt: new Date().toISOString(),

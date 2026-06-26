@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import type Konva from 'konva';
 import { Circle, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transformer } from 'react-konva';
-import type { ElementFramePatch } from '../../domain/commands/basicCommands';
-import type { DesignElement, ProjectDocument, SelectionState } from '../../domain/model';
+import type { ElementFramePatch, ImageCropPatch } from '../../domain/commands/basicCommands';
+import type { CropRect, DesignElement, ImageElement, ProjectDocument, SelectionState } from '../../domain/model';
 import { getNormalizedElementPoint } from './backgroundSelection';
 import { FloatingSelectionToolbar } from './FloatingSelectionToolbar';
+import { calculateImageCropPatch, type ImageCropHandle } from './imageCrop';
 
 const TEXT_FRAME_PADDING = 6;
 
@@ -42,6 +43,7 @@ interface CanvasWorkspaceProps {
   onSelectElement?: (elementId: string, options?: { additive?: boolean }) => void;
   onSendSelectedElementBackward?: () => void;
   onTranslateSelectedText?: () => void;
+  onUpdateImageCrop?: (elementId: string, patch: ImageCropPatch) => void;
   onUpdateElementFrame?: (elementId: string, patch: ElementFramePatch) => void;
   onUpdateElementFrames?: (patches: Record<string, ElementFramePatch>) => void;
   onUpdateTextContent?: (elementId: string, text: string) => void;
@@ -129,6 +131,7 @@ export function CanvasWorkspace({
   onSelectElement,
   onSendSelectedElementBackward,
   onTranslateSelectedText,
+  onUpdateImageCrop,
   onUpdateElementFrame,
   onUpdateElementFrames,
   onUpdateTextContent,
@@ -144,15 +147,32 @@ export function CanvasWorkspace({
   const [processingBlinkOn, setProcessingBlinkOn] = useState(false);
   const [backgroundPreviewPoint, setBackgroundPreviewPoint] = useState<{ x: number; y: number } | null>(null);
   const [dragGuide, setDragGuide] = useState<{ x: number; y: number } | null>(null);
+  const [cropModeElementId, setCropModeElementId] = useState<string | null>(null);
+  const [cropDraft, setCropDraft] = useState<
+    | {
+        elementId: string;
+        crop: CropRect;
+        frame: ImageCropPatch;
+      }
+    | undefined
+  >();
   const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
-  const visibleElements =
+  const sourceVisibleElements =
     page?.elementIds
       .map((id) => project.elements[id])
       .filter(isDesignElement)
       .filter((element) => element.visible !== false) ?? [];
+  const getDraftedElement = (element: DesignElement | undefined): DesignElement | undefined => {
+    if (!element || element.type !== 'image' || cropDraft?.elementId !== element.id) return element;
+    return { ...element, ...cropDraft.frame, crop: cropDraft.crop };
+  };
+  const visibleElements = sourceVisibleElements
+    .map((element) => getDraftedElement(element))
+    .filter(isDesignElement);
   const hasSelection = selection.elementIds.length > 0;
   const showEditorOverlays = !presentationMode;
-  const selectedElement = project.elements[selection.elementIds[0] ?? ''];
+  const selectedElement = getDraftedElement(project.elements[selection.elementIds[0] ?? '']);
+  const isCropModeActive = selectedElement?.type === 'image' && cropModeElementId === selectedElement.id;
   const backgroundSelectionTargetId =
     backgroundSelectionMode && selectedElement?.type === 'image' ? selectedElement.id : undefined;
   const activeBackgroundPreparation =
@@ -328,6 +348,54 @@ export function CanvasWorkspace({
     });
   }
 
+  function toggleCropMode() {
+    if (selectedElement?.type !== 'image') return;
+    setCropDraft(undefined);
+    setCropModeElementId((current) => (current === selectedElement.id ? null : selectedElement.id));
+  }
+
+  function finishCropMode() {
+    setCropDraft(undefined);
+    setCropModeElementId(null);
+  }
+
+  function beginCropDrag(element: ImageElement, handle: ImageCropHandle, event: ReactPointerEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    const start = { x: event.clientX, y: event.clientY };
+    let latestPatch: ReturnType<typeof calculateImageCropPatch> | undefined;
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      latestPatch = calculateImageCropPatch(element, handle, {
+        x: (moveEvent.clientX - start.x) / scaleX,
+        y: (moveEvent.clientY - start.y) / scaleY,
+      });
+      setCropDraft({
+        elementId: element.id,
+        crop: latestPatch.crop,
+        frame: {
+          ...latestPatch.frame,
+          crop: latestPatch.crop,
+        },
+      });
+    };
+
+    const handlePointerUp = () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      if (latestPatch) {
+        onUpdateImageCrop?.(element.id, {
+          ...latestPatch.frame,
+          crop: latestPatch.crop,
+        });
+      }
+      setCropDraft(undefined);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp, { once: true });
+  }
+
   function startTextEditing(element: DesignElement) {
     if (element.type !== 'text') return;
     onSelectElement?.(element.id);
@@ -462,7 +530,14 @@ export function CanvasWorkspace({
 
   function handleStagePointerDown(event: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     if (backgroundSelectionMode || editingTextId) return;
-    if (event.target !== event.target.getStage()) return;
+    if (event.target !== event.target.getStage()) {
+      if (isCropModeActive) finishCropMode();
+      return;
+    }
+    if (isCropModeActive) {
+      finishCropMode();
+      return;
+    }
     onClearSelection?.();
   }
 
@@ -472,6 +547,11 @@ export function CanvasWorkspace({
         className="canvas-frame neon-border"
         aria-label="Slide canvas"
         ref={slideFrameRef}
+        onPointerDown={(event) => {
+          if (!isCropModeActive) return;
+          if (event.target !== event.currentTarget) return;
+          finishCropMode();
+        }}
         {...(backgroundSelectionTargetId
           ? { 'data-background-selection-target': backgroundSelectionTargetId }
           : {})}
@@ -630,7 +710,7 @@ export function CanvasWorkspace({
                   ) : null}
                 </>
               ) : null}
-              {showEditorOverlays && !backgroundSelectionMode && !processingSelectedImageId ? (
+              {showEditorOverlays && !backgroundSelectionMode && !processingSelectedImageId && !isCropModeActive ? (
                 <Transformer
                   ref={transformerRef}
                   anchorFill="#37FD76"
@@ -659,6 +739,13 @@ export function CanvasWorkspace({
               ) : null}
             </Layer>
           </Stage>
+          {showEditorOverlays && selectedElement?.type === 'image' && isCropModeActive ? (
+            <CropFrameOverlay
+              element={selectedElement}
+              scale={{ x: scaleX, y: scaleY }}
+              onHandlePointerDown={beginCropDrag}
+            />
+          ) : null}
           {showEditorOverlays ? visibleElements.map((element) => {
             if (element.type !== 'text' || editingTextId !== element.id) return null;
 
@@ -719,10 +806,12 @@ export function CanvasWorkspace({
             onDelete={onDeleteSelectedElement}
             onDuplicate={onDuplicateSelectedElement}
             onFlipImage={onFlipSelectedImage}
+            onCropImage={toggleCropMode}
             onBackgroundSelectionToggle={onBackgroundSelectionToggle}
             onSendBackward={onSendSelectedElementBackward}
             onTranslateSelectedText={onTranslateSelectedText}
             backgroundSelectionActive={backgroundSelectionMode}
+            cropActive={isCropModeActive}
             canTranslateSelection={canTranslateSelection}
             disabled={Boolean(processingSelectedImageId) || isTranslating}
           />
@@ -817,6 +906,14 @@ interface CanvasImageElementProps {
 
 function CanvasImageElement({ assetUrl, commonProps, element }: CanvasImageElementProps) {
   const image = useCanvasImage(assetUrl);
+  const crop = element.crop && image
+    ? {
+        x: element.crop.x * image.naturalWidth,
+        y: element.crop.y * image.naturalHeight,
+        width: element.crop.width * image.naturalWidth,
+        height: element.crop.height * image.naturalHeight,
+      }
+    : undefined;
   const imageProps = element.flipX
     ? {
         ...commonProps,
@@ -837,5 +934,54 @@ function CanvasImageElement({ assetUrl, commonProps, element }: CanvasImageEleme
     );
   }
 
-  return <KonvaImage {...imageProps} image={image} cornerRadius={6} />;
+  return <KonvaImage {...imageProps} image={image} {...(crop ? { crop } : {})} cornerRadius={6} />;
+}
+
+interface CropFrameOverlayProps {
+  element: ImageElement;
+  scale: { x: number; y: number };
+  onHandlePointerDown: (
+    element: ImageElement,
+    handle: ImageCropHandle,
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) => void;
+}
+
+const cropHandles: Array<{ handle: ImageCropHandle; label: string }> = [
+  { handle: 'top-left', label: 'Crop top left' },
+  { handle: 'top', label: 'Crop top' },
+  { handle: 'top-right', label: 'Crop top right' },
+  { handle: 'right', label: 'Crop right' },
+  { handle: 'bottom-right', label: 'Crop bottom right' },
+  { handle: 'bottom', label: 'Crop bottom' },
+  { handle: 'bottom-left', label: 'Crop bottom left' },
+  { handle: 'left', label: 'Crop left' },
+];
+
+function CropFrameOverlay({ element, scale, onHandlePointerDown }: CropFrameOverlayProps) {
+  return (
+    <div
+      className="image-crop-frame"
+      style={{
+        height: `${element.height * scale.y}px`,
+        left: `${element.x * scale.x}px`,
+        top: `${element.y * scale.y}px`,
+        transform: `rotate(${element.rotation}deg)`,
+        width: `${element.width * scale.x}px`,
+      }}
+    >
+      <div className="image-crop-grid" aria-hidden="true" />
+      {cropHandles.map(({ handle, label }) => (
+        <button
+          key={handle}
+          aria-label={label}
+          className={`image-crop-handle image-crop-handle-${handle}`}
+          type="button"
+          onPointerDown={(event) => {
+            onHandlePointerDown(element, handle, event);
+          }}
+        />
+      ))}
+    </div>
+  );
 }

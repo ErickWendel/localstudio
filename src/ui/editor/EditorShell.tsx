@@ -305,6 +305,7 @@ export function EditorShell({ services }: EditorShellProps) {
             onTranslateSelectedText={() => {
               void vm.translateSelectedText();
             }}
+            onUpdateImageCrop={vm.updateImageCrop}
             onUpdateElementFrame={vm.updateElementFrame}
             onUpdateElementFrames={vm.updateElementFrames}
             onUpdateElementStyle={vm.updateElementStyle}
