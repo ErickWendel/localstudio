@@ -278,6 +278,7 @@ export function EditorShell({ services }: EditorShellProps) {
             onClearSelection={vm.clearSelection}
             onDeleteSelectedElement={vm.deleteSelectedElement}
             onDuplicateSelectedElement={vm.duplicateSelectedElement}
+            onFlipSelectedImage={vm.flipSelectedImage}
             onInsertImage={() => {
               toolbarImageInputRef.current?.click();
             }}

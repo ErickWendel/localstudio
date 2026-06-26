@@ -36,6 +36,7 @@ interface CanvasWorkspaceProps {
   onClearSelection?: () => void;
   onDeleteSelectedElement?: () => void;
   onDuplicateSelectedElement?: () => void;
+  onFlipSelectedImage?: () => void;
   onInsertImage?: () => void;
   onInsertText?: () => void;
   onSelectElement?: (elementId: string, options?: { additive?: boolean }) => void;
@@ -122,6 +123,7 @@ export function CanvasWorkspace({
   onClearSelection,
   onDeleteSelectedElement,
   onDuplicateSelectedElement,
+  onFlipSelectedImage,
   onInsertImage,
   onInsertText,
   onSelectElement,
@@ -262,7 +264,10 @@ export function CanvasWorkspace({
     setDragGuide(null);
     const element = project.elements[elementId];
     if (!element) return;
-    const nextX = toDocumentX(event.target.x());
+    const nextX =
+      element.type === 'image' && element.flipX
+        ? toDocumentX(event.target.x()) - element.width
+        : toDocumentX(event.target.x());
     const nextY = toDocumentY(event.target.y());
     const deltaX = nextX - element.x;
     const deltaY = nextY - element.y;
@@ -303,16 +308,21 @@ export function CanvasWorkspace({
 
   function handleTransformEnd(elementId: string, event: Konva.KonvaEventObject<Event>) {
     const node = event.target;
-    const scaleX = node.scaleX();
+    const element = project.elements[elementId];
+    const scaleX = Math.abs(node.scaleX());
     const scaleY = node.scaleY();
+    const nextWidth = toDocumentX(Math.max(8, node.width() * scaleX));
 
     node.scaleX(1);
     node.scaleY(1);
 
     onUpdateElementFrame?.(elementId, {
-      x: toDocumentX(node.x()),
+      x:
+        element?.type === 'image' && element.flipX
+          ? toDocumentX(node.x()) - nextWidth
+          : toDocumentX(node.x()),
       y: toDocumentY(node.y()),
-      width: toDocumentX(Math.max(8, node.width() * scaleX)),
+      width: nextWidth,
       height: toDocumentY(Math.max(8, node.height() * scaleY)),
       rotation: node.rotation(),
     });
@@ -544,6 +554,7 @@ export function CanvasWorkspace({
                       key={element.id}
                       assetUrl={asset?.objectUrl}
                       commonProps={commonProps}
+                      element={element}
                     />
                   );
                 }
@@ -690,14 +701,24 @@ export function CanvasWorkspace({
           }) : null}
           <span className="canvas-fallback-label">Selected Image</span>
         </div>
+        {showEditorOverlays && !backgroundSelectionMode && !processingSelectedImageId ? (
+          <div className="canvas-quick-actions" aria-label="Canvas insert actions">
+            <button type="button" aria-label="Insert Text" title="Insert Text" onClick={onInsertText}>
+              <span className="material-symbols-outlined">title</span>
+            </button>
+            <button type="button" aria-label="Insert Image" title="Insert Image" onClick={onInsertImage}>
+              <span className="material-symbols-outlined">add_photo_alternate</span>
+            </button>
+          </div>
+        ) : null}
         {showEditorOverlays && hasSelection && selectedElement?.type !== 'text' ? (
           <FloatingSelectionToolbar
+            elementType={selectedElement?.type === 'image' ? 'image' : 'shape'}
             onAlignCenter={onAlignSelectedElement}
             onBringForward={onBringSelectedElementForward}
             onDelete={onDeleteSelectedElement}
             onDuplicate={onDuplicateSelectedElement}
-            onInsertImage={onInsertImage}
-            onInsertText={onInsertText}
+            onFlipImage={onFlipSelectedImage}
             onBackgroundSelectionToggle={onBackgroundSelectionToggle}
             onSendBackward={onSendSelectedElementBackward}
             onTranslateSelectedText={onTranslateSelectedText}
@@ -791,15 +812,23 @@ function getBackgroundSelectionMessage({
 interface CanvasImageElementProps {
   assetUrl: string | undefined;
   commonProps: CommonElementProps;
+  element: Extract<DesignElement, { type: 'image' }>;
 }
 
-function CanvasImageElement({ assetUrl, commonProps }: CanvasImageElementProps) {
+function CanvasImageElement({ assetUrl, commonProps, element }: CanvasImageElementProps) {
   const image = useCanvasImage(assetUrl);
+  const imageProps = element.flipX
+    ? {
+        ...commonProps,
+        scaleX: -1,
+        x: commonProps.x + commonProps.width,
+      }
+    : commonProps;
 
   if (!image) {
     return (
       <Rect
-        {...commonProps}
+        {...imageProps}
         fill="#101B1D"
         stroke="#37FD76"
         strokeWidth={1}
@@ -808,5 +837,5 @@ function CanvasImageElement({ assetUrl, commonProps }: CanvasImageElementProps) 
     );
   }
 
-  return <KonvaImage {...commonProps} image={image} cornerRadius={6} />;
+  return <KonvaImage {...imageProps} image={image} cornerRadius={6} />;
 }

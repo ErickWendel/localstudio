@@ -16,7 +16,7 @@ The initial AI feature set is balanced:
 - Smart Grab for object-aware image editing.
 - Magic Eraser with user-guided browser segmentation.
 
-Chrome Built-in AI is the primary provider for language/design tasks. Hugging Face / Transformers.js browser models are used only when required for vision capabilities Chrome does not currently provide.
+Chrome Built-in AI remains the preferred provider for language/design tasks when available. The provider architecture must also support browser-local WebGPU Hugging Face models for non-Chrome compatibility and for users who explicitly choose an alternate local model. Vision capabilities continue to use Hugging Face / Transformers.js browser models where Chrome does not currently provide equivalent APIs.
 
 ## Implementation Status at 2026-06-25 Update
 
@@ -40,15 +40,17 @@ Ready now:
 - Text panel adds LocalStudio.ai-styled title, subtitle, and body text presets. Title presets use the Orbitron green heading style; subtitle/body presets use Open Sans readable white text. The old disabled Magic Write placeholder is removed.
 - Pages panel shows deck/page navigation on the right side with page thumbnails, add/select/reorder/duplicate/hide/delete/rename/translate controls, while the center workspace renders pages vertically and activates the closest page while scrolling.
 - Left rail local image import from disk. Imported images are inserted as topmost layers and selected immediately.
+- Canvas-level quick actions for Add Text and Add Image sit on the left of the slide frame because they create new objects rather than editing the current selection.
 - Image elements render actual image assets. The seeded selected image uses the provided remote image URL and preserves its natural `516 x 387` dimensions instead of scaling up. Imported images preserve natural size and only scale down when larger than the page.
-- AI Tools panel includes local model readiness/download states and local Chrome AI tool cards. The image editing model is consolidated as a shared segmentation dependency for background removal, Smart Grab, and Magic Eraser.
+- Selecting an image shows a LocalStudio.ai-styled image editing toolbar inspired by Canva, with `BG Remover`, `Flip`, and a disabled `Crop` placeholder for the future crop interaction. `Flip` persists as an undoable image element property.
+- AI Tools panel currently includes local model readiness/download states and local Chrome AI tool cards. The next provider-architecture pass will replace Chrome-specific AI Tools grouping with provider-neutral configuration and one unified downloadable model list.
 - Click-guided background removal is wired through the shared Segment Anything WebGPU-style image editing provider. The flow blocks until the model is ready, prepares the selected image, previews the selected subject in blue, supports right-click positive refinement points, applies removal on left click, and tightens the selected image bounds after extraction.
 - Chrome Built-in AI translation is wired behind `TranslatorService` for selected text, current slide, and full deck scopes. The visible entry points are the selected-text floating toolbar action, the slide translate icon above the canvas, and `Edit > Translate Deck`. The first translation attempt redirects to AI Tools until the user chooses a default target language in `Translate Design > Translate to`.
 - The AI Tools translation card uses a hard-coded Chrome Translator-supported target-language list sorted by language name, with flags shown at the end of each option. Changing the target language prepares the detected source/target pair, shows download progress, and reuses the prepared translator for subsequent text/slide/deck translation.
 - The prompt bar now has a `+` action menu with a `Create image` chip mode, while the default input returns to slide-structure/content-organization prompting when the chip is cleared. Typing into or submitting the gated image mode checks Bonsai image-generation model readiness first and redirects to AI Tools when preparation is required. Accepted prompt submissions clear the prompt input immediately while generation continues.
 - Create image mode now uses a browser-local Bonsai Image WebGPU provider seam behind AI Tools model preparation. If the image generation model is not ready, the prompt redirects to AI Tools and highlights the `Image Generation Models` row. Once ready, generated PNG assets are inserted into the current slide as normal selected image layers. Image generation settings live in the AI Tools `Image Generation Models` card, including common size presets, generation steps, optional seed, and hover/focus help text.
 - The Bonsai runtime adapter is isolated in `src/services/bonsaiImageRuntime.ts`. The vendored WebGPU runtime now lives under `src/vendor` so Vite treats it as a lazy source module instead of importing a static `public/` asset, and the adapter includes model-download progress mapping plus a conservative progress estimate for long runtime setup phases before byte totals are available. The adapter also tears down upstream demo DOM/WebGL side effects after import so the Hugging Face demo scene does not render inside LocalStudio.ai.
-- Chrome Prompt API readiness and preparation are wired behind `ChromePromptService`. The Prompt API card appears first in the Local Chrome AI section, uses prompt-to-slides copy, shows preparation/download progress, and hides the prepare action when Chrome reports the API is ready at startup.
+- Chrome Prompt API readiness and preparation are wired behind `ChromePromptService`. The next provider-architecture pass will generalize this into an LLM provider selection flow with Chrome Built-in Prompt API and Gemma 4 WebGPU options.
 - Prompt API slide generation is wired from the main prompt bar for the active page. The app asks Chrome Prompt API for a strict structured JSON task list, applies the page/background immediately, asks for one Konva-ready element at a time with structured JSON output, validates/clamps every payload, and commits each generated element through immutable document commands for progressive on-canvas feedback.
 - Prompt-to-slides supports local placeholder imagery through a bundled asset and supports user-provided `https://` image URLs as remote image assets. Requests that look like image generation are blocked outside `Create image` mode with guidance to use the `+` menu.
 - Translated text now gets a first-pass fit treatment: single-line source text has accidental translated whitespace collapsed, the text box expands around its original center first, and height grows if needed before any future manual overflow flow is introduced.
@@ -75,16 +77,17 @@ Known limitations in the current implementation:
 
 Next implementation priorities:
 
-1. Finish translation UX hardening: manual overflow controls, richer recovery guidance, browser language availability verification on target Chrome builds, and Playwright coverage.
-2. Finish remaining non-AI editor fundamentals: richer multi-element alignment/distribution, deeper Design-tab property coverage, page thumbnail fidelity, and more canvas interaction polish.
-3. Harden remaining storage edges: generated preview/mask cache files, stale asset cleanup, and stronger save/import error recovery.
-4. Complete export: polish current-page PNG export and add all-page PDF from the actual Konva stage at configured page dimensions. JPEG is deferred unless explicitly reintroduced.
-5. Add Playwright coverage for layer reorder, hide/show, lock/unlock, delete, local image import, filesystem save, text editing, translation flows, and first-run setup.
-6. Expand Prompt API prompt-to-slides generation to multi-slide deck creation.
-7. Add Prompt API schema repair/retry UX for invalid structured output.
-8. Fold palette generation into the prepared Chrome Prompt API design-generation flow.
-9. Harden the Bonsai `Create image` provider/action with production browser verification, cancellation, generation history, model selection, and deeper error recovery.
-10. Build Smart Grab and Magic Eraser on top of the shared Segment Anything WebGPU image editing provider.
+1. Add provider architecture for LLM and translation so Chrome Built-in APIs and browser-local WebGPU Hugging Face models can be selected interchangeably. The implementation plan is `docs/superpowers/plans/2026-06-26-ai-provider-architecture.md`.
+2. Finish translation UX hardening: manual overflow controls, richer recovery guidance, browser language availability verification on target Chrome builds, and Playwright coverage.
+3. Finish remaining non-AI editor fundamentals: richer multi-element alignment/distribution, deeper Design-tab property coverage, page thumbnail fidelity, and more canvas interaction polish.
+4. Harden remaining storage edges: generated preview/mask cache files, stale asset cleanup, and stronger save/import error recovery.
+5. Complete export: polish current-page PNG export and add all-page PDF from the actual Konva stage at configured page dimensions. JPEG is deferred unless explicitly reintroduced.
+6. Add Playwright coverage for layer reorder, hide/show, lock/unlock, delete, local image import, filesystem save, text editing, translation flows, and first-run setup.
+7. Expand Prompt API prompt-to-slides generation to multi-slide deck creation.
+8. Add Prompt API schema repair/retry UX for invalid structured output.
+9. Fold palette generation into the prepared LLM design-generation flow.
+10. Harden the Bonsai `Create image` provider/action with production browser verification, cancellation, generation history, model selection, and deeper error recovery.
+11. Build Smart Grab and Magic Eraser on top of the shared Segment Anything WebGPU image editing provider.
 
 ## Goals
 
@@ -102,7 +105,7 @@ Next implementation priorities:
 - Editable JSON import/export as a user-facing MVP feature.
 - The MVP does not include Image Upscaler or CLIP semantic asset search.
 - The MVP does not include content-aware inpainting/fill for Magic Eraser.
-- The MVP does not include Non-Chrome AI provider fallbacks.
+- The MVP should support non-Chrome local AI provider options for language/design tasks through browser-local WebGPU models when compatible.
 - CI containers or production deployment automation.
 
 ## Product Experience
@@ -375,8 +378,8 @@ Purpose:
 
 The setup flow checks:
 
-- Chrome Built-in AI availability for translation and Prompt API design-generation flows, including palette generation.
-- Chrome Built-in AI language detection and translation readiness before enabling selected-text, slide, or deck translation actions.
+- Provider-aware LLM availability for prompt-to-slides and design-generation flows, including Chrome Built-in Prompt API and Gemma 4 WebGPU.
+- Provider-aware translation availability for selected-text, slide, and deck translation flows, including Chrome Built-in Translator/Language Detector and TranslateGemma WebGPU.
 - Required Transformers.js image segmentation model availability for background removal, Smart Grab, and Magic Eraser.
 - WebGPU/WebAssembly support needed by selected browser models.
 - File System Access API availability and permission state for project data, assets, app config, and app-generated cache artifacts.
@@ -385,7 +388,7 @@ The setup flow checks:
 First-run setup scope for the next implementation pass:
 
 - Storage readiness is checked first because project persistence, asset files, and generated cache files are prerequisites for reliable local editing.
-- Chrome Built-in AI readiness is checked next for language detection and translation. If Chrome reports translation unavailable or needs setup, translation controls remain disabled and the AI Tools panel explains the missing capability.
+- AI provider readiness is checked next. Chrome Built-in APIs are enabled only when the browser APIs exist and report usable availability. WebGPU Hugging Face providers are enabled only when WebGPU and the runtime are compatible. If Chrome is unavailable, compatible Gemma/TranslateGemma providers become the default local path.
 - Transformers.js image editing readiness remains available through the AI Tools panel. The image editing model can be downloaded on demand unless a future flow requires it at startup.
 - The setup screen must not copy AI model weights into the project folder. It only coordinates browser/provider-managed readiness and local project folder readiness.
 
@@ -402,6 +405,7 @@ Caching policy:
 - The AI Tools panel lists one shared `Image Editing Models` dependency with the subtitle `Segmentation model for image editing.` This single Segment Anything model powers Background Remover, Smart Grab, and Magic Eraser.
 - Each required model dependency shows independent readiness/progress state so future parallel downloads can be tracked separately.
 - Optional/deferred models remain visible as downloadable capabilities inside the AI Tools panel.
+- AI Tools should be provider-neutral: configuration appears first, then one unified downloadable model list. Remove the old `Local Chrome AI` and `Cached Browser Models` grouping copy when the provider architecture lands.
 
 Model and capability rows expose states:
 
@@ -525,16 +529,16 @@ AI provider tests should use mocks for normal application flow. Direct provider 
 
 ## Browser Target
 
-The MVP targets Chrome with Built-in AI support.
+The MVP prefers Chrome with Built-in AI support, but language/design AI should be provider-based so compatible non-Chrome browsers can use browser-local WebGPU Hugging Face models where available.
 
-Non-Chrome browsers and alternative AI providers are roadmap items. The architecture should allow future fallbacks, but the MVP does not implement them.
+Chrome Built-in APIs should be disabled with a clear reason when unavailable. Gemma/TranslateGemma WebGPU providers should become the default local path when Chrome APIs are unavailable and WebGPU is compatible.
 
 ## Roadmap After MVP
 
 - Magic Eraser content-aware inpainting/fill upgrade.
 - Image Upscaler / Super Resolution.
 - CLIP semantic search for assets.
-- Non-Chrome AI provider fallbacks.
+- Broader non-Chrome AI provider hardening beyond Gemma/TranslateGemma WebGPU.
 - Better offline model management.
 - Editable JSON import/export.
 - Template library.

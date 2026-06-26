@@ -18,7 +18,9 @@ describe('CanvasWorkspace', () => {
     expect(screen.getByLabelText('Slide canvas')).toBeInTheDocument();
     expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-drag-guide', 'idle');
     expect(container.querySelector('canvas')).toBeInTheDocument();
-    expect(screen.getByLabelText('Remove Background')).toBeInTheDocument();
+    expect(screen.getByLabelText('BG Remover')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Flip' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Crop' })).toBeDisabled();
   });
 
   it('does not render document text outside the Konva canvas', () => {
@@ -72,7 +74,7 @@ describe('CanvasWorkspace', () => {
     expect(screen.getByLabelText('Slide canvas')).not.toHaveClass('canvas-frame-bg-selection');
     expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-background-selection-target', 'image-hero');
 
-    await user.click(screen.getByRole('button', { name: 'Cancel Background Selection' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel BG Remover' }));
   });
 
   it('shows selected image processing feedback while background removal runs', () => {
@@ -88,8 +90,8 @@ describe('CanvasWorkspace', () => {
     );
 
     expect(screen.getByText('Removing background...')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Cancel Background Selection' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Remove Background' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Cancel BG Remover' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'BG Remover' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
   });
 

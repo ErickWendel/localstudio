@@ -3,18 +3,19 @@ interface ToolbarAction {
   icon: string;
   active?: boolean;
   disabled?: boolean;
+  display?: 'icon' | 'label';
   onClick?: (() => void) | undefined;
   tone?: 'default' | 'ai' | 'danger';
 }
 
 interface FloatingSelectionToolbarProps {
+  elementType?: 'image' | 'shape' | undefined;
   onAlignCenter?: (() => void) | undefined;
   onBringForward?: (() => void) | undefined;
   onBackgroundSelectionToggle?: (() => void) | undefined;
+  onFlipImage?: (() => void) | undefined;
   onDelete?: (() => void) | undefined;
   onDuplicate?: (() => void) | undefined;
-  onInsertImage?: (() => void) | undefined;
-  onInsertText?: (() => void) | undefined;
   onSendBackward?: (() => void) | undefined;
   onTranslateSelectedText?: (() => void) | undefined;
   backgroundSelectionActive?: boolean;
@@ -23,24 +24,44 @@ interface FloatingSelectionToolbarProps {
 }
 
 export function FloatingSelectionToolbar({
+  elementType,
   onAlignCenter,
   onBackgroundSelectionToggle,
   onBringForward,
+  onFlipImage,
   onDelete,
   onDuplicate,
-  onInsertImage,
-  onInsertText,
   onSendBackward,
   onTranslateSelectedText,
   backgroundSelectionActive = false,
   canTranslateSelection = false,
   disabled = false,
 }: FloatingSelectionToolbarProps) {
-  const groups: ToolbarAction[][] = [
+  const imageGroups: ToolbarAction[][] = [
     [
-      { label: 'Insert Text', icon: 'title', onClick: onInsertText },
-      { label: 'Insert Image', icon: 'add_photo_alternate', onClick: onInsertImage },
+      {
+        label: backgroundSelectionActive ? 'Cancel BG Remover' : 'BG Remover',
+        icon: backgroundSelectionActive ? 'ads_click' : 'auto_fix_high',
+        active: backgroundSelectionActive,
+        display: 'label',
+        onClick: onBackgroundSelectionToggle,
+        tone: 'ai',
+      },
+      { label: 'Flip', icon: 'flip', display: 'label', onClick: onFlipImage },
+      { label: 'Crop', icon: 'crop', display: 'label', disabled: true },
     ],
+    [
+      { label: 'Align Center', icon: 'align_horizontal_center', onClick: onAlignCenter },
+      { label: 'Send Backward', icon: 'flip_to_back', onClick: onSendBackward },
+      { label: 'Bring Forward', icon: 'flip_to_front', onClick: onBringForward },
+    ],
+    [
+      { label: 'Duplicate', icon: 'content_copy', onClick: onDuplicate },
+      { label: 'Delete', icon: 'delete', onClick: onDelete, tone: 'danger' },
+    ],
+  ];
+
+  const objectGroups: ToolbarAction[][] = [
     [{ label: 'Align Center', icon: 'align_horizontal_center', onClick: onAlignCenter }],
     [
       { label: 'Bring Forward', icon: 'flip_to_front', onClick: onBringForward },
@@ -52,13 +73,6 @@ export function FloatingSelectionToolbar({
     ],
     [
       {
-        label: backgroundSelectionActive ? 'Cancel Background Selection' : 'Remove Background',
-        icon: backgroundSelectionActive ? 'ads_click' : 'no_photography',
-        active: backgroundSelectionActive,
-        onClick: onBackgroundSelectionToggle,
-        tone: 'ai',
-      },
-      {
         label: 'Translate Selected Text',
         icon: 'translate',
         onClick: onTranslateSelectedText,
@@ -68,6 +82,8 @@ export function FloatingSelectionToolbar({
     ],
     [{ label: 'Delete', icon: 'delete', onClick: onDelete, tone: 'danger' }],
   ];
+
+  const groups = elementType === 'image' ? imageGroups : objectGroups;
 
   return (
     <div className="floating-toolbar" aria-label="Selected element actions">
@@ -87,6 +103,7 @@ export function FloatingSelectionToolbar({
               onClick={action.onClick}
             >
               <span className="material-symbols-outlined">{action.icon}</span>
+              {action.display === 'label' ? <span className="floating-toolbar-label">{action.label}</span> : null}
             </button>
           ))}
         </div>

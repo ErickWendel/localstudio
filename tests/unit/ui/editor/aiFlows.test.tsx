@@ -134,7 +134,7 @@ describe('mocked AI flows', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Layout' }));
     await user.click(screen.getByRole('button', { name: 'Selected Image' }));
-    expect(screen.getByLabelText('Remove Background')).toBeInTheDocument();
+    expect(screen.getByLabelText('BG Remover')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Title' }));
     expect(screen.getByLabelText('Translate Selected Text')).toBeInTheDocument();

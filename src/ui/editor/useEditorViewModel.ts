@@ -17,6 +17,7 @@ import {
   SetElementVisibilityCommand,
   SetPageVisibilityCommand,
   SetZOrderCommand,
+  ToggleImageFlipCommand,
   TranslateTextElementsCommand,
   UpdateElementFramesCommand,
   UpdateElementStyleCommand,
@@ -1426,6 +1427,12 @@ export function useEditorViewModel(services: AppServices) {
     commitProject((currentProject) => new SetZOrderCommand(activePageId, elementId, mode).execute(currentProject));
   }
 
+  function flipSelectedImage() {
+    const elementId = selectedElementIds[0];
+    if (!elementId || selectedElementIds.length !== 1) return;
+    commitProject((currentProject) => new ToggleImageFlipCommand(elementId).execute(currentProject));
+  }
+
   function reorderElement(elementId: string, targetElementId: string) {
     commitProject((currentProject) => {
       const page = currentProject.pages.find((item) => item.id === activePageId);
@@ -1923,6 +1930,7 @@ export function useEditorViewModel(services: AppServices) {
     insertTextElement,
     alignSelectedElement,
     setSelectedElementZOrder,
+    flipSelectedImage,
     updateElementFrame,
     updateElementFrames,
     updateElementStyle,

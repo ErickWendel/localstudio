@@ -869,13 +869,13 @@ describe('EditorShell', () => {
     render(<EditorShell services={createAppServices()} />);
     await selectImageLayer(user);
 
-    await user.click(screen.getByRole('button', { name: 'Remove Background' }));
+    await user.click(screen.getByRole('button', { name: 'BG Remover' }));
 
     expect(screen.getByText('You must download the image editing tools first.')).toBeInTheDocument();
     expect(
       screen.queryByText('Right click adds areas to keep. Left click applies the background removal.'),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Remove Background' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'BG Remover' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'AI Tools' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('button', { name: 'Download Image Editing Models' })).toHaveClass(
       'icon-button-attention',
@@ -896,19 +896,19 @@ describe('EditorShell', () => {
     render(<EditorShell services={services} />);
     await selectImageLayer(user);
 
-    await user.click(screen.getByRole('button', { name: 'Remove Background' }));
+    await user.click(screen.getByRole('button', { name: 'BG Remover' }));
 
     expect(
       await screen.findByText('Right click adds areas to keep. Left click applies the background removal.'),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Cancel Background Selection' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel BG Remover' })).toBeInTheDocument();
 
     await user.keyboard('{Escape}');
 
     expect(
       screen.queryByText('Right click adds areas to keep. Left click applies the background removal.'),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Remove Background' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'BG Remover' })).toBeInTheDocument();
   });
 
   it('exports the current slide as a PNG file', async () => {

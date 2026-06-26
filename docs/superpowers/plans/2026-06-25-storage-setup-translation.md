@@ -22,6 +22,7 @@
 - The Bonsai Image WebGPU create-image slice is implemented on `main`: create-image mode now gates on `Image Generation Models`, redirects to AI Tools when the model is not ready, downloads the optional model row independently, configures size/steps/seed in AI Tools, generates PNG assets through an isolated image-generation service seam, and inserts the result into the active slide as a selected image layer.
 - The Bonsai runtime is now isolated in `src/services/bonsaiImageRuntime.ts`, with the vendored runtime moved under `src/vendor` for Vite lazy-module loading, progress handling hardened for long model setup phases before byte-level progress is emitted, and upstream demo DOM/WebGL side effects removed after runtime import.
 - The Canva-style layout slice is implemented on `main`: tools live in a click-toggle left rail, pages/deck navigation moved to the right panel, the center workspace renders scrollable pages, the prompt bar is docked and always visible, fullscreen targets the active slide as a presentation view, and a Text tab inserts LocalStudio.ai title/subtitle/body presets.
+- The next AI architecture slice is planned in `docs/superpowers/plans/2026-06-26-ai-provider-architecture.md`: Prompt API and Translate API will become provider-based so Chrome Built-in AI and browser-local WebGPU Hugging Face models can be selected interchangeably.
 - Latest local non-e2e checks passed after the Bonsai AI Tools configuration work: `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build`.
 
 ## Remaining Work / Spec Gap Checklist
@@ -58,6 +59,7 @@ Export:
 
 AI roadmap:
 
+- [ ] Refactor Prompt API and Translate API into provider-based services with selectable Chrome Built-in and WebGPU Hugging Face providers. See `docs/superpowers/plans/2026-06-26-ai-provider-architecture.md`.
 - [x] Add prompt bar `+` action menu with `Create image` chip mode and default slide-structure fallback when the chip is cleared.
 - [x] Wire direct Chrome Prompt API readiness/preparation through a `ChromePromptService`.
 - [x] Move Prompt API to the first Local Chrome AI card with prompt-to-slides copy, preparation progress, and hidden prepare action when ready on startup.

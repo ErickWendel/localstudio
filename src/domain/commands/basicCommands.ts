@@ -578,6 +578,29 @@ export class UpdateElementStyleCommand implements EditorCommand {
   }
 }
 
+export class ToggleImageFlipCommand implements EditorCommand {
+  readonly description = 'Flip image';
+
+  constructor(private readonly elementId: string) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    const element = project.elements[this.elementId];
+    if (!element || element.type !== 'image' || element.locked) return project;
+
+    return {
+      ...project,
+      elements: {
+        ...project.elements,
+        [this.elementId]: {
+          ...element,
+          flipX: !element.flipX,
+        },
+      },
+      updatedAt: new Date().toISOString(),
+    };
+  }
+}
+
 export class UpdatePageBackgroundCommand implements EditorCommand {
   readonly description = 'Update page background';
 

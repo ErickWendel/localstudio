@@ -13,6 +13,7 @@ import {
   SetZOrderCommand,
   SetElementLockCommand,
   SetElementVisibilityCommand,
+  ToggleImageFlipCommand,
   UpdateElementFrameCommand,
   UpdateElementFramesCommand,
   UpdateElementStyleCommand,
@@ -76,6 +77,16 @@ describe('editor commands', () => {
     expect(next.elements['image-hero']).toBeUndefined();
     expect(next.assets['asset-hero']).toBeUndefined();
     expect(next.pages[0]?.elementIds).not.toContain('image-hero');
+  });
+
+  it('toggles image horizontal flip immutably', () => {
+    const project = createSampleProject();
+    const flipped = new ToggleImageFlipCommand('image-hero').execute(project);
+    const unflipped = new ToggleImageFlipCommand('image-hero').execute(flipped);
+
+    expect(flipped.elements['image-hero']).toMatchObject({ type: 'image', flipX: true });
+    expect(unflipped.elements['image-hero']).toMatchObject({ type: 'image', flipX: false });
+    expect(project.elements['image-hero']).not.toHaveProperty('flipX');
   });
 
   it('keeps an image asset when deleting an element if the page background still uses it', () => {

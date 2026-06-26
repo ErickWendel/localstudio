@@ -63,6 +63,7 @@ export interface ImageElement extends BaseElement {
   type: 'image';
   assetId: string;
   crop?: CropRect;
+  flipX?: boolean;
 }
 
 export interface ShapeElement extends BaseElement {
