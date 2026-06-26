@@ -13,6 +13,7 @@ import {
   RenamePageCommand,
   ReorderPageCommand,
   ReorderElementCommand,
+  ReplaceImageAssetCommand,
   SetElementLockCommand,
   SetElementVisibilityCommand,
   SetPageVisibilityCommand,
@@ -33,7 +34,7 @@ import {
 } from '../../domain/commands/basicCommands';
 import type { GeneratedSlideElement } from '../../domain/generatedSlide';
 import { fitImageWithinPage } from '../../domain/imageSizing';
-import type { DesignElement, Page, PageBackground, ProjectDocument, SelectionState } from '../../domain/model';
+import type { DesignElement, ImageElement, Page, PageBackground, ProjectDocument, SelectionState } from '../../domain/model';
 import { SAMPLE_HERO_IMAGE_SIZE, SAMPLE_HERO_IMAGE_URL } from '../../domain/sampleProject';
 import type { AiProviderState, ModelState, PromptApiAvailability, VersionHistoryEntry } from '../../services/interfaces';
 import {
@@ -99,6 +100,7 @@ const IMAGE_EDITING_MODEL_REQUIRED_MESSAGE = 'You must download the image editin
 const PROMPT_API_REQUIRED_MESSAGE = 'LLM model must be prepared before using prompt-to-slides.';
 const IMAGE_GENERATION_MODEL_REQUIRED_MESSAGE = 'Download image generation models before creating images.';
 const IMAGE_PROMPT_MODE_REQUIRED_MESSAGE = 'Use Create image from the + menu to generate images.';
+const IMAGE_GENERATION_DIMENSION_MULTIPLE = 16;
 const BACKGROUND_PREVIEW_DEBOUNCE_MS = 120;
 const DEFAULT_SLIDE_LANGUAGE_CODE = 'pt';
 const PASTED_ELEMENT_OFFSET = 32;
@@ -175,6 +177,13 @@ function getLanguageOption(languageCode: string | undefined) {
   return (
     TRANSLATION_LANGUAGE_OPTIONS.find((option) => option.code === code) ??
     TRANSLATION_LANGUAGE_OPTIONS.find((option) => option.code === DEFAULT_SLIDE_LANGUAGE_CODE)!
+  );
+}
+
+function normalizeImageGenerationDimension(value: number) {
+  return Math.max(
+    IMAGE_GENERATION_DIMENSION_MULTIPLE,
+    Math.round(value / IMAGE_GENERATION_DIMENSION_MULTIPLE) * IMAGE_GENERATION_DIMENSION_MULTIPLE,
   );
 }
 
@@ -472,6 +481,11 @@ export function useEditorViewModel(services: AppServices) {
     activePageId,
     selectedElementIds,
   ]);
+  const selectedImageElement = useMemo<ImageElement | undefined>(() => {
+    if (selectedElementIds.length !== 1) return undefined;
+    const element = project.elements[selectedElementIds[0] ?? ''];
+    return element?.type === 'image' ? element : undefined;
+  }, [project.elements, selectedElementIds]);
   const activeSlideLanguage = useMemo(() => {
     const option = getLanguageOption(pageLanguageCodes[activePageId]);
     return {
@@ -1027,6 +1041,7 @@ export function useEditorViewModel(services: AppServices) {
   async function generateImageFromPrompt(prompt: string, options?: CreateImagePromptOptions) {
     const trimmedPrompt = prompt.trim();
     if (!trimmedPrompt || isGeneratingImage || isGeneratingSlide) return;
+    const imageToReplace = selectedImageElement;
     const runId = promptGenerationRunIdRef.current + 1;
     promptGenerationRunIdRef.current = runId;
     const isCurrentRun = () => promptGenerationRunIdRef.current === runId;
@@ -1038,14 +1053,18 @@ export function useEditorViewModel(services: AppServices) {
     if (!page) return;
 
     setCreateImageNotice(undefined);
-    setCreateImageStatus('Generating image...');
+    setCreateImageStatus(imageToReplace ? 'Generating replacement...' : 'Generating image...');
     setIsGeneratingImage(true);
     try {
       const generationOptions = {
-        ...(options?.height !== undefined ? { height: options.height } : {}),
+        height: normalizeImageGenerationDimension(
+          imageToReplace?.height ?? options?.height ?? DEFAULT_IMAGE_GENERATION_SIZE,
+        ),
         ...(options?.seed !== undefined ? { seed: options.seed } : {}),
         ...(options?.steps !== undefined ? { steps: options.steps } : {}),
-        ...(options?.width !== undefined ? { width: options.width } : {}),
+        width: normalizeImageGenerationDimension(
+          imageToReplace?.width ?? options?.width ?? DEFAULT_IMAGE_GENERATION_SIZE,
+        ),
       };
       const asset = await services.imageGenerationService.generateImage(trimmedPrompt, {
         ...generationOptions,
@@ -1055,10 +1074,18 @@ export function useEditorViewModel(services: AppServices) {
         },
       });
       if (!isCurrentRun()) return;
+      if (imageToReplace) {
+        commitProject(
+          (currentProject) => new ReplaceImageAssetCommand(imageToReplace.id, asset).execute(currentProject),
+          { selectedElementIds: [imageToReplace.id] },
+        );
+        return;
+      }
+
       const elementId = createId('image-generated');
       const fittedImage = fitImageWithinPage({
-        imageWidth: options?.width ?? DEFAULT_IMAGE_GENERATION_SIZE,
-        imageHeight: options?.height ?? DEFAULT_IMAGE_GENERATION_SIZE,
+        imageWidth: generationOptions.width,
+        imageHeight: generationOptions.height,
         pageWidth: page.width,
         pageHeight: page.height,
       });
@@ -2245,6 +2272,7 @@ export function useEditorViewModel(services: AppServices) {
     createImageNotice,
     createImageStatus,
     createImageOptions,
+    selectedImagePromptElementId: selectedImageElement?.id,
     isGeneratingImage,
     isGeneratingSlide,
     aiToolsAttentionModelId,

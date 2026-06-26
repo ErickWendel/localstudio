@@ -10,6 +10,7 @@ interface PromptBarProps {
   generationStatus?: string | undefined;
   isGeneratingImage?: boolean;
   isGeneratingSlide?: boolean;
+  selectedImageElementId?: string | undefined;
   createImageOptions: CreateImagePromptOptions;
   onCreateImagePromptIntent?: () => boolean | Promise<boolean>;
   onCreateImageSubmit?: (prompt: string, options: CreateImagePromptOptions) => Promise<void>;
@@ -40,6 +41,7 @@ export function PromptBar({
   generationStatus,
   isGeneratingImage = false,
   isGeneratingSlide,
+  selectedImageElementId,
   createImageOptions,
   onCreateImagePromptIntent,
   onCreateImageSubmit,
@@ -51,7 +53,8 @@ export function PromptBar({
   const [mode, setMode] = useState<'create-image' | null>('create-image');
   const [localSubmissionActive, setLocalSubmissionActive] = useState(false);
   const [value, setValue] = useState('');
-  const examples = mode === 'create-image' ? imagePromptExamples : slidePromptExamples;
+  const activeMode = selectedImageElementId ? 'create-image' : mode;
+  const examples = activeMode === 'create-image' ? imagePromptExamples : slidePromptExamples;
   const isProcessing = isGeneratingSlide || isGeneratingImage || localSubmissionActive;
 
   function activateCreateImageMode() {
@@ -61,7 +64,7 @@ export function PromptBar({
   }
 
   async function guardPromptIntent() {
-    if (mode !== 'create-image') return true;
+    if (activeMode !== 'create-image') return true;
     return onCreateImagePromptIntent?.() ?? true;
   }
 
@@ -69,7 +72,7 @@ export function PromptBar({
     const trimmedValue = value.trim();
     if (!trimmedValue || isProcessing) return;
     setLocalSubmissionActive(true);
-    if (mode === 'create-image') {
+    if (activeMode === 'create-image') {
       try {
         const canCreateImage = await guardPromptIntent();
         if (!canCreateImage) return;
@@ -90,7 +93,7 @@ export function PromptBar({
 
   return (
     <div className="prompt-stack">
-      <div className="prompt-examples" aria-label={mode === 'create-image' ? 'Image prompt examples' : 'Slide prompt examples'}>
+      <div className="prompt-examples" aria-label={activeMode === 'create-image' ? 'Image prompt examples' : 'Slide prompt examples'}>
         {examples.map((example) => (
           <button
             key={example}
@@ -107,18 +110,18 @@ export function PromptBar({
           </button>
         ))}
       </div>
-      {mode === 'create-image' && createImageStatus ? (
+      {activeMode === 'create-image' && createImageStatus ? (
         <div className="prompt-generation-status">{createImageStatus}</div>
       ) : null}
-      {mode !== 'create-image' && generationStatus ? (
+      {activeMode !== 'create-image' && generationStatus ? (
         <div className="prompt-generation-status">{generationStatus}</div>
       ) : null}
-      {mode === 'create-image' && createImageNotice ? (
+      {activeMode === 'create-image' && createImageNotice ? (
         <div className="prompt-generation-notice" role="tooltip">
           {createImageNotice}
         </div>
       ) : null}
-      {mode !== 'create-image' && generationNotice ? (
+      {activeMode !== 'create-image' && generationNotice ? (
         <div className="prompt-generation-notice" role="tooltip">
           {generationNotice}
         </div>
@@ -160,11 +163,11 @@ export function PromptBar({
             </div>
           ) : null}
         </div>
-        {mode === 'create-image' ? (
+        {activeMode === 'create-image' ? (
           <button
             aria-label="Remove Create image mode"
             className="prompt-mode-token"
-            disabled={isProcessing}
+            disabled={isProcessing || Boolean(selectedImageElementId)}
             type="button"
             onClick={() => {
               setMode(null);
@@ -179,8 +182,8 @@ export function PromptBar({
         <input
           ref={inputRef}
           type="text"
-          placeholder={mode === 'create-image' ? '' : 'Describe slide structure or organize current content...'}
-          aria-label={mode === 'create-image' ? 'Create image prompt' : 'Slide structure prompt'}
+          placeholder={activeMode === 'create-image' ? '' : 'Describe slide structure or organize current content...'}
+          aria-label={activeMode === 'create-image' ? 'Create image prompt' : 'Slide structure prompt'}
           disabled={isProcessing}
           value={value}
           onFocus={() => {
@@ -188,7 +191,7 @@ export function PromptBar({
           }}
           onChange={(event) => {
             const nextValue = event.target.value;
-            if (mode === 'create-image' && value.length > 0 && nextValue.length === 0) {
+            if (activeMode === 'create-image' && !selectedImageElementId && value.length > 0 && nextValue.length === 0) {
               setMode(null);
               setValue('');
               return;

@@ -415,6 +415,36 @@ export class AddImageElementCommand implements EditorCommand {
   }
 }
 
+export class ReplaceImageAssetCommand implements EditorCommand {
+  readonly description = 'Replace image asset';
+
+  constructor(
+    private readonly elementId: string,
+    private readonly asset: Asset,
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    const element = project.elements[this.elementId];
+    if (!element || element.type !== 'image' || element.locked) return project;
+
+    return removeUnreferencedAssets({
+      ...project,
+      assets: {
+        ...project.assets,
+        [this.asset.id]: this.asset,
+      },
+      elements: {
+        ...project.elements,
+        [this.elementId]: {
+          ...element,
+          assetId: this.asset.id,
+        },
+      },
+      updatedAt: new Date().toISOString(),
+    });
+  }
+}
+
 export class AddElementsCommand implements EditorCommand {
   readonly description = 'Add elements';
 
