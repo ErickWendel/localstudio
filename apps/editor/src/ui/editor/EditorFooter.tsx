@@ -25,14 +25,7 @@ export function EditorFooter({
 }: EditorFooterProps) {
   return (
     <footer className="editor-footer" aria-label="Editor footer controls">
-      <div className="editor-footer-left">
-        <span className="footer-note">
-          <span className="material-symbols-outlined" aria-hidden="true">
-            edit_note
-          </span>
-          Notes
-        </span>
-      </div>
+      <div className="editor-footer-left" />
       <div className="editor-footer-right">
         <div className="footer-zoom-controls" aria-label="Zoom controls">
           <button

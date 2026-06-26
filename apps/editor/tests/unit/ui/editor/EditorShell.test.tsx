@@ -1,8 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
-import { createAppServices } from '../../../../src/app/composition';
+import { createAppServices as createRealAppServices } from '../../../../src/app/composition';
 import type { Asset, ProjectDocument } from '../../../../src/domain/model';
+import { createSampleProject } from '../../../../src/domain/sampleProject';
 import type {
   BackgroundRemovalService,
   ProjectRepository,
@@ -10,6 +11,13 @@ import type {
 } from '../../../../src/services/interfaces';
 import { InMemoryModelSetupService } from '../../../../src/services/modelSetupService';
 import { EditorShell } from '../../../../src/ui/editor/EditorShell';
+
+function createAppServices(options: Parameters<typeof createRealAppServices>[0] = {}) {
+  return createRealAppServices({
+    initialProject: createSampleProject(),
+    ...options,
+  });
+}
 
 class InstantBackgroundRemovalService implements BackgroundRemovalService {
   prepareBackgroundRemoval(

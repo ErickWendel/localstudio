@@ -1,4 +1,4 @@
-import { createSampleProject } from '../domain/sampleProject';
+import { createBlankProject } from '../domain/sampleProject';
 import type { ProjectDocument } from '../domain/model';
 import type {
   BackgroundRemovalService,
@@ -65,7 +65,7 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     languageDetectionRuntime,
   );
   return {
-    initialProject: options.initialProject ?? createSampleProject(),
+    initialProject: options.initialProject ?? createBlankProject(),
     skipStoredProjectLoad: options.skipStoredProjectLoad ?? false,
     ...(options.storedProjectName ? { storedProjectName: options.storedProjectName } : {}),
     projectRepository: createProjectRepository(),

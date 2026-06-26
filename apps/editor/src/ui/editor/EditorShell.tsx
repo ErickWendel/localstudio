@@ -269,7 +269,7 @@ export function EditorShell({ services }: EditorShellProps) {
           }}
         />
         <section
-          className="workspace-column"
+          className={leftPanelOpen ? 'workspace-column workspace-column-left-panel-open' : 'workspace-column'}
           aria-label="Canvas workspace"
           ref={workspaceRef}
         >

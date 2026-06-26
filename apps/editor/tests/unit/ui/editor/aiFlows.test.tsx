@@ -1,12 +1,13 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { createAppServices } from '../../../../src/app/composition';
+import { createAppServices as createRealAppServices } from '../../../../src/app/composition';
 import type {
   GeneratedSlideElement,
   GeneratedSlideTask,
   GeneratedSlideTasksDocument,
 } from '../../../../src/domain/generatedSlide';
 import type { Asset } from '../../../../src/domain/model';
+import { createSampleProject } from '../../../../src/domain/sampleProject';
 import type {
   AiProviderState,
   ImageGenerationService,
@@ -21,6 +22,16 @@ import { GEMMA_LLM_MODEL_ID, TRANSLATEGEMMA_MODEL_ID } from '../../../../src/ser
 import { MockImageGenerationService } from '../../../../src/services/inMemoryAiServices';
 import { InMemoryModelSetupService } from '../../../../src/services/modelSetupService';
 import { EditorShell } from '../../../../src/ui/editor/EditorShell';
+
+const createImageExample =
+  'Create an icy Bonsai tree in a rainy forest with snowy mountains in the background, photo realistic';
+
+function createAppServices(options: Parameters<typeof createRealAppServices>[0] = {}) {
+  return createRealAppServices({
+    initialProject: createSampleProject(),
+    ...options,
+  });
+}
 
 class PreparingTranslatorService implements TranslatorService {
   prepareTranslation = vi.fn(
@@ -463,7 +474,7 @@ describe('mocked AI flows', () => {
     expect(screen.getByLabelText('Create image prompt')).toBeInTheDocument();
     expect(
       screen.getByRole('button', {
-        name: 'An icy Bonsai tree, in a rainy forest with snowy mountains in the background, photo realistic',
+        name: createImageExample,
       }),
     ).toBeInTheDocument();
   });
@@ -476,13 +487,11 @@ describe('mocked AI flows', () => {
 
     await user.click(
       screen.getByRole('button', {
-        name: 'An icy Bonsai tree, in a rainy forest with snowy mountains in the background, photo realistic',
+        name: createImageExample,
       }),
     );
 
-    expect(screen.getByLabelText('Create image prompt')).toHaveValue(
-      'An icy Bonsai tree, in a rainy forest with snowy mountains in the background, photo realistic',
-    );
+    expect(screen.getByLabelText('Create image prompt')).toHaveValue(createImageExample);
 
     await user.clear(screen.getByLabelText('Create image prompt'));
     await user.click(
@@ -710,7 +719,7 @@ describe('mocked AI flows', () => {
     await user.click(screen.getByRole('tab', { name: 'Layout' }));
     await user.type(screen.getByLabelText('Create image prompt'), 'A slow generated image');
     await user.click(screen.getByRole('button', { name: 'Submit prompt' }));
-    expect(screen.getByLabelText('Create image prompt')).toHaveValue('');
+    expect(screen.getByLabelText('Create image prompt')).toHaveValue('A slow generated image');
 
     expect(screen.getByLabelText('Create image prompt')).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Stop generation' })).toBeInTheDocument();

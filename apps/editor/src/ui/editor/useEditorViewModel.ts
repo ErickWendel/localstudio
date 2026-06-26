@@ -408,7 +408,7 @@ export function useEditorViewModel(services: AppServices) {
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   const [history, setHistory] = useState<EditorHistory>({ past: [], future: [] });
   const [zoomPercent, setZoomPercent] = useState(100);
-  const [pagesPanelOpen, setPagesPanelOpen] = useState(true);
+  const [pagesPanelOpen, setPagesPanelOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [backgroundSelectionMode, setBackgroundSelectionMode] = useState(false);
   const [backgroundSelectionNotice, setBackgroundSelectionNotice] = useState<string | undefined>();

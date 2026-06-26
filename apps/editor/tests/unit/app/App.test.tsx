@@ -71,7 +71,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Continue to editor' }));
 
     expect(window.localStorage.getItem(SETUP_COMPLETE_KEY)).toBe('true');
-    expect(await screen.findByText('Untitled AI Deck')).toBeInTheDocument();
+    expect(await screen.findByText('Untitled Project')).toBeInTheDocument();
   });
 
   it('revalidates completed setup and shows setup when capabilities are unavailable', async () => {
@@ -81,7 +81,7 @@ describe('App', () => {
     render(<App />);
 
     expect(await screen.findByText('LocalStudio.ai runs locally in this browser.')).toBeInTheDocument();
-    expect(screen.queryByText('Untitled AI Deck')).not.toBeInTheDocument();
+    expect(screen.queryByText('Untitled Project')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Continue to editor' })).toBeDisabled();
   });
 });

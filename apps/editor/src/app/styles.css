@@ -896,6 +896,11 @@ button {
   width: 100%;
 }
 
+.workspace-column-left-panel-open .canvas-workspace {
+  box-sizing: border-box;
+  padding-left: 54px;
+}
+
 .scrolling-canvas-workspace {
   position: relative;
   z-index: 1;

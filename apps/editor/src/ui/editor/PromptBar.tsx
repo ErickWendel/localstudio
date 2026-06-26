@@ -26,11 +26,11 @@ const slidePromptExamples = [
 ];
 
 const imagePromptExamples = [
-  'An icy Bonsai tree, in a rainy forest with snowy mountains in the background, photo realistic',
-  'A neon green browser-native design studio floating inside a dark futuristic workspace',
-  'A cinematic close-up of a laptop editing slides with glowing green UI reflections',
-  'A realistic product hero image for a local-first AI creative editor, dark background',
-  'A cyberpunk classroom with holographic slide canvases and black-and-green lighting',
+  'Create an icy Bonsai tree in a rainy forest with snowy mountains in the background, photo realistic',
+  'Create a neon green browser-native design studio floating inside a dark futuristic workspace',
+  'Create a cinematic close-up of a laptop editing slides with glowing green UI reflections',
+  'Create a realistic product hero image for a local-first AI creative editor on a dark background',
+  'Create a cyberpunk classroom with holographic slide canvases and black-and-green lighting',
 ];
 
 export function PromptBar({
@@ -49,9 +49,10 @@ export function PromptBar({
   const inputRef = useRef<HTMLInputElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [mode, setMode] = useState<'create-image' | null>('create-image');
+  const [localSubmissionActive, setLocalSubmissionActive] = useState(false);
   const [value, setValue] = useState('');
   const examples = mode === 'create-image' ? imagePromptExamples : slidePromptExamples;
-  const isProcessing = isGeneratingSlide || isGeneratingImage;
+  const isProcessing = isGeneratingSlide || isGeneratingImage || localSubmissionActive;
 
   function activateCreateImageMode() {
     setMode('create-image');
@@ -70,12 +71,22 @@ export function PromptBar({
     if (mode === 'create-image') {
       const canCreateImage = await guardPromptIntent();
       if (!canCreateImage) return;
-      setValue('');
-      await onCreateImageSubmit?.(trimmedValue, createImageOptions);
+      setLocalSubmissionActive(true);
+      try {
+        await onCreateImageSubmit?.(trimmedValue, createImageOptions);
+        setValue('');
+      } finally {
+        setLocalSubmissionActive(false);
+      }
       return;
     }
-    setValue('');
-    await onSlidePromptSubmit?.(trimmedValue);
+    setLocalSubmissionActive(true);
+    try {
+      await onSlidePromptSubmit?.(trimmedValue);
+      setValue('');
+    } finally {
+      setLocalSubmissionActive(false);
+    }
   }
 
   return (
@@ -195,6 +206,8 @@ export function PromptBar({
             label="Stop generation"
             tone="danger"
             onClick={() => {
+              setLocalSubmissionActive(false);
+              setValue('');
               onStopGeneration?.();
             }}
           >
