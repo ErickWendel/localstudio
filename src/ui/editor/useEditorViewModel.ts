@@ -33,7 +33,7 @@ import type { GeneratedSlideElement } from '../../domain/generatedSlide';
 import { fitImageWithinPage } from '../../domain/imageSizing';
 import type { DesignElement, Page, PageBackground, ProjectDocument, SelectionState } from '../../domain/model';
 import { SAMPLE_HERO_IMAGE_SIZE, SAMPLE_HERO_IMAGE_URL } from '../../domain/sampleProject';
-import type { AiProviderState, ModelState, PromptApiAvailability } from '../../services/interfaces';
+import type { AiProviderState, ModelState, PromptApiAvailability, VersionHistoryEntry } from '../../services/interfaces';
 import { GEMMA_LLM_MODEL_ID, TRANSLATEGEMMA_MODEL_ID } from '../../services/aiModelIds';
 import {
   DEFAULT_IMAGE_GENERATION_SIZE,
@@ -439,6 +439,13 @@ export function useEditorViewModel(services: AppServices) {
   });
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationNotice, setTranslationNotice] = useState<string | undefined>();
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
+  const [versionHistoryEntries, setVersionHistoryEntries] = useState<VersionHistoryEntry[]>([]);
+  const [selectedVersionId, setSelectedVersionId] = useState<string | undefined>();
+  const [previewProject, setPreviewProject] = useState<ProjectDocument | undefined>();
+  const [highlightVersionChanges, setHighlightVersionChanges] = useState(true);
+  const [lastEditedAt, setLastEditedAt] = useState<string | undefined>(initialProject.updatedAt);
+  const [saveAnimationKey, setSaveAnimationKey] = useState(0);
   const [, setBackgroundSelectionPoints] = useState<Record<string, BackgroundSelectionPoint[]>>(
     {},
   );
@@ -448,6 +455,7 @@ export function useEditorViewModel(services: AppServices) {
   const backgroundPreparationSequenceRef = useRef(0);
   const languageDetectionSequenceRef = useRef(0);
   const skipNextProjectSaveRef = useRef(shouldRestoreStoredProject);
+  const lastVersionProjectRef = useRef<ProjectDocument>(initialProject);
   const selection = useMemo<SelectionState>(() => ({ pageId: activePageId, elementIds: selectedElementIds }), [
     activePageId,
     selectedElementIds,
@@ -521,6 +529,11 @@ export function useEditorViewModel(services: AppServices) {
           setActivePageId(normalizedProject.pages[0]?.id ?? '');
           setPageLanguageCodes({});
           setSelectedElementIds([]);
+          lastVersionProjectRef.current = normalizedProject;
+          setLastEditedAt(normalizedProject.updatedAt);
+          if (services.projectRepository.getVersionHistory) {
+            void services.projectRepository.getVersionHistory().then(setVersionHistoryEntries).catch(() => undefined);
+          }
           writeProjectNameToUrl(normalizedProject.name);
         }
         setHasLoadedProject(true);
@@ -547,6 +560,17 @@ export function useEditorViewModel(services: AppServices) {
     }
     void services.projectRepository
       .saveProject(project)
+      .then(async () => {
+        setLastEditedAt(project.updatedAt);
+        setSaveAnimationKey((current) => current + 1);
+        if (!services.projectRepository.saveVersion) return;
+        const entry = await services.projectRepository.saveVersion(project, {
+          previousProject: lastVersionProjectRef.current,
+        });
+        lastVersionProjectRef.current = project;
+        setLastEditedAt(entry.createdAt);
+        setVersionHistoryEntries((current) => [entry, ...current.filter((item) => item.id !== entry.id)]);
+      })
       .then(() => {
         writeProjectNameToUrl(project.name);
       })
@@ -946,6 +970,7 @@ export function useEditorViewModel(services: AppServices) {
     updater: (currentProject: ProjectDocument) => ProjectDocument,
     options?: { activePageId?: string; selectedElementIds?: string[] },
   ) {
+    if (versionHistoryOpen || previewProject) return;
     setProject((currentProject) => {
       const nextProject = updater(currentProject);
       if (nextProject === currentProject) return currentProject;
@@ -1030,6 +1055,10 @@ export function useEditorViewModel(services: AppServices) {
 
     try {
       await services.projectRepository.saveProject(project);
+      lastVersionProjectRef.current = project;
+      setLastEditedAt(project.updatedAt);
+      setSaveAnimationKey((current) => current + 1);
+      skipNextProjectSaveRef.current = true;
       setPersistenceEnabled(true);
       writeProjectNameToUrl(project.name);
       if (typeof window !== 'undefined') {
@@ -1060,7 +1089,13 @@ export function useEditorViewModel(services: AppServices) {
       clearBackgroundPreview();
       clearBackgroundPreparation();
       clearBackgroundSelectionPoints();
+      skipNextProjectSaveRef.current = true;
       setPersistenceEnabled(true);
+      lastVersionProjectRef.current = normalizedProject;
+      setLastEditedAt(normalizedProject.updatedAt);
+      if (services.projectRepository.getVersionHistory) {
+        void services.projectRepository.getVersionHistory().then(setVersionHistoryEntries).catch(() => undefined);
+      }
       writeProjectNameToUrl(normalizedProject.name);
       if (typeof window !== 'undefined') {
         window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'true');
@@ -1071,6 +1106,64 @@ export function useEditorViewModel(services: AppServices) {
         window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'false');
       }
     }
+  }
+
+  async function openVersionHistory() {
+    if (!services.projectRepository.getVersionHistory) return;
+    setVersionHistoryOpen(true);
+    setSelectedVersionId(undefined);
+    setPreviewProject(undefined);
+    const entries = await services.projectRepository.getVersionHistory();
+    setVersionHistoryEntries(entries);
+  }
+
+  function closeVersionHistory() {
+    setVersionHistoryOpen(false);
+    setSelectedVersionId(undefined);
+    setPreviewProject(undefined);
+    setSelectedElementIds([]);
+    setActivePageId(project.pages[0]?.id ?? '');
+  }
+
+  async function selectVersion(versionId: string, entryOverride?: VersionHistoryEntry) {
+    if (!services.projectRepository.loadVersion) return;
+    const entry = entryOverride ?? versionHistoryEntries.find((item) => item.id === versionId);
+    const versionProject = await services.projectRepository.loadVersion(versionId);
+    if (!versionProject) return;
+    const normalizedVersionProject = normalizeProjectDocument(versionProject);
+    setSelectedVersionId(versionId);
+    setPreviewProject(normalizedVersionProject);
+    const nextPageId = entry?.firstChangedPageId ?? normalizedVersionProject.pages[0]?.id ?? '';
+    setActivePageId(nextPageId);
+    setSelectedElementIds(entry?.firstChangedElementId ? [entry.firstChangedElementId] : []);
+  }
+
+  async function restoreVersion(versionId: string) {
+    if (!services.projectRepository.loadVersion) return;
+    const restoredProject = await services.projectRepository.loadVersion(versionId);
+    if (!restoredProject) return;
+    const normalizedProject = normalizeProjectDocument({
+      ...restoredProject,
+      updatedAt: new Date().toISOString(),
+    });
+    await services.projectRepository.saveProject(normalizedProject);
+    setSaveAnimationKey((current) => current + 1);
+    if (services.projectRepository.saveVersion) {
+      const entry = await services.projectRepository.saveVersion(normalizedProject, {
+        previousProject: project,
+        force: true,
+      });
+      setVersionHistoryEntries((current) => [entry, ...current.filter((item) => item.id !== entry.id)]);
+      setLastEditedAt(entry.createdAt);
+    }
+    lastVersionProjectRef.current = normalizedProject;
+    setProject(normalizedProject);
+    setHistory({ past: [], future: [] });
+    setPreviewProject(undefined);
+    setSelectedVersionId(undefined);
+    setVersionHistoryOpen(false);
+    setActivePageId(normalizedProject.pages[0]?.id ?? '');
+    setSelectedElementIds([]);
   }
 
   function selectPage(pageId: string) {
@@ -1941,12 +2034,19 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   return {
-    project,
+    project: previewProject ?? project,
     activePageId,
     zoomPercent,
     pagesPanelOpen,
     isFullscreen,
     persistenceEnabled,
+    versionHistoryOpen,
+    versionHistoryEntries,
+    selectedVersionId,
+    highlightVersionChanges,
+    lastEditedAt,
+    saveAnimationKey,
+    isVersionPreview: Boolean(previewProject),
     backgroundSelectionMode,
     backgroundSelectionNotice,
     processingElementIds,
@@ -1962,6 +2062,11 @@ export function useEditorViewModel(services: AppServices) {
     setProjectName,
     setPersistence,
     importProject,
+    openVersionHistory,
+    closeVersionHistory,
+    selectVersion,
+    restoreVersion,
+    setHighlightVersionChanges,
     translationLanguageOptions: TRANSLATION_LANGUAGE_OPTIONS,
     translationTargetLanguage,
     promptProviderStates,

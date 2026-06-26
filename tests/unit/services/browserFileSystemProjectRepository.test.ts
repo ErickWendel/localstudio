@@ -180,4 +180,44 @@ describe('BrowserFileSystemProjectRepository', () => {
     expect(loaded?.id).toBe('alpha');
     expect(loaded?.name).toBe('Alpha Deck');
   });
+
+  it('saves and loads full project version snapshots with first-change metadata', async () => {
+    const directory = new MockDirectoryHandle();
+    const repository = new BrowserFileSystemProjectRepository({
+      pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
+    });
+    const previousProject = createSampleProject();
+    const nextProject = {
+      ...previousProject,
+      elements: {
+        ...previousProject.elements,
+        'text-title': {
+          ...previousProject.elements['text-title']!,
+          text: 'Versioned title',
+        },
+      },
+    };
+
+    await repository.saveProject(previousProject);
+    const entry = await repository.saveVersion(nextProject, { previousProject });
+
+    expect(entry).toMatchObject({
+      authorName: 'Local user',
+      firstChangedPageId: 'page-1',
+      firstChangedElementId: 'text-title',
+      projectName: previousProject.name,
+    });
+    expect(entry.changeCount).toBeGreaterThan(0);
+    const historyDirectory = directory.directories.get('history')!;
+    const versionsDirectory = historyDirectory.directories.get('versions')!;
+    expect(JSON.parse(historyDirectory.files.get('manifest.json')!)).toMatchObject({
+      latestVersionId: entry.id,
+      versions: [expect.objectContaining({ id: entry.id })],
+    });
+    expect(versionsDirectory.files.has(entry.fileName)).toBe(true);
+
+    const loadedVersion = await repository.loadVersion(entry.id);
+    expect(loadedVersion?.elements['text-title']).toMatchObject({ text: 'Versioned title' });
+  });
 });

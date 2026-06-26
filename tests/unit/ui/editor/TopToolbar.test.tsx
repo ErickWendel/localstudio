@@ -67,6 +67,27 @@ describe('TopToolbar', () => {
     expect(onPersistenceToggle).toHaveBeenCalledWith(true);
   });
 
+  it('opens version history from the toolbar when persistence is enabled', async () => {
+    const user = userEvent.setup();
+    const onOpenVersionHistory = vi.fn();
+
+    render(
+      <TopToolbar
+        project={createSampleProject()}
+        language="PT-BR"
+        persistenceEnabled
+        lastEditedAt="2026-06-26T15:04:00.000Z"
+        onOpenVersionHistory={onOpenVersionHistory}
+      />,
+    );
+
+    const historyButton = screen.getByRole('button', { name: 'Version history' });
+    expect(historyButton).toHaveAttribute('title', expect.stringContaining('Last edited'));
+    await user.click(historyButton);
+
+    expect(onOpenVersionHistory).toHaveBeenCalledTimes(1);
+  });
+
   it('edits the project name inline', async () => {
     const user = userEvent.setup();
     const onProjectNameChange = vi.fn();

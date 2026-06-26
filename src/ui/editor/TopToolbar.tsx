@@ -10,21 +10,24 @@ interface TopToolbarProps {
   canUndo?: boolean;
   hasSelection?: boolean;
   persistenceEnabled?: boolean;
+  lastEditedAt?: string | undefined;
+  saveAnimationKey?: number;
   canTranslateDeck?: boolean;
-  onDelete?: () => void;
-  onDuplicate?: () => void;
-  onExport?: () => void;
-  onImportProject?: () => void;
-  onNewProject?: () => void;
-  onPersistenceToggle?: (enabled: boolean) => void;
-  onProjectNameChange?: (name: string) => void;
-  onRedo?: () => void;
-  onResetZoom?: () => void;
-  onSelectLayers?: () => void;
-  onTranslateDeck?: () => void;
-  onUndo?: () => void;
-  onZoomIn?: () => void;
-  onZoomOut?: () => void;
+  onDelete?: (() => void) | undefined;
+  onDuplicate?: (() => void) | undefined;
+  onExport?: (() => void) | undefined;
+  onImportProject?: (() => void) | undefined;
+  onOpenVersionHistory?: (() => void) | undefined;
+  onNewProject?: (() => void) | undefined;
+  onPersistenceToggle?: ((enabled: boolean) => void) | undefined;
+  onProjectNameChange?: ((name: string) => void) | undefined;
+  onRedo?: (() => void) | undefined;
+  onResetZoom?: (() => void) | undefined;
+  onSelectLayers?: (() => void) | undefined;
+  onTranslateDeck?: (() => void) | undefined;
+  onUndo?: (() => void) | undefined;
+  onZoomIn?: (() => void) | undefined;
+  onZoomOut?: (() => void) | undefined;
 }
 
 type HeaderMenu = 'File' | 'Edit' | 'View' | 'Help';
@@ -46,11 +49,14 @@ export function TopToolbar({
   canUndo = false,
   hasSelection = false,
   persistenceEnabled = false,
+  lastEditedAt,
+  saveAnimationKey = 0,
   canTranslateDeck = false,
   onDelete,
   onDuplicate,
   onExport,
   onImportProject,
+  onOpenVersionHistory,
   onNewProject,
   onPersistenceToggle,
   onProjectNameChange,
@@ -128,6 +134,13 @@ export function TopToolbar({
     action.onSelect?.();
     closeMenu();
   }
+
+  const lastEditedLabel = lastEditedAt
+    ? `Last edited ${new Intl.DateTimeFormat(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }).format(new Date(lastEditedAt))}`
+    : 'No saved versions yet';
 
   return (
     <header className="top-toolbar">
@@ -224,6 +237,18 @@ export function TopToolbar({
           >
             <span className="material-symbols-outlined" aria-hidden="true">
               {persistenceEnabled ? 'cloud_done' : 'cloud_off'}
+            </span>
+          </button>
+          <button
+            className="stitch-icon-button history-save-applied"
+            disabled={!persistenceEnabled || !onOpenVersionHistory}
+            title={lastEditedLabel}
+            type="button"
+            aria-label="Version history"
+            onClick={onOpenVersionHistory}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true" key={saveAnimationKey}>
+              history
             </span>
           </button>
           <button

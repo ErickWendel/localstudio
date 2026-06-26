@@ -15,6 +15,7 @@ interface CanvasWorkspaceProps {
   slideFrameRef?: RefObject<HTMLDivElement | null>;
   stageRef?: RefObject<Konva.Stage | null>;
   presentationMode?: boolean;
+  readOnly?: boolean;
   zoomPercent?: number;
   backgroundSelectionMode?: boolean;
   backgroundSelectionNotice?: string | undefined;
@@ -26,25 +27,25 @@ interface CanvasWorkspaceProps {
   canTranslateSelection?: boolean;
   isTranslating?: boolean;
   translationNotice?: string | undefined;
-  onAlignSelectedElement?: () => void;
-  onBringSelectedElementForward?: () => void;
-  onBackgroundPreviewPoint?: (elementId: string, point: { x: number; y: number }) => void;
-  onBackgroundRefinePoint?: (elementId: string, point: { x: number; y: number }) => void;
-  onBackgroundSelectionToggle?: () => void;
-  onBackgroundSubjectPick?: (elementId: string, point: { x: number; y: number }) => void;
-  onCancelBackgroundSelection?: () => void;
-  onClearSelection?: () => void;
-  onDeleteSelectedElement?: () => void;
-  onDuplicateSelectedElement?: () => void;
-  onFlipSelectedImage?: () => void;
-  onInsertImage?: () => void;
-  onInsertText?: () => void;
-  onSelectElement?: (elementId: string, options?: { additive?: boolean }) => void;
-  onSendSelectedElementBackward?: () => void;
-  onTranslateSelectedText?: () => void;
-  onUpdateElementFrame?: (elementId: string, patch: ElementFramePatch) => void;
-  onUpdateElementFrames?: (patches: Record<string, ElementFramePatch>) => void;
-  onUpdateTextContent?: (elementId: string, text: string) => void;
+  onAlignSelectedElement?: (() => void) | undefined;
+  onBringSelectedElementForward?: (() => void) | undefined;
+  onBackgroundPreviewPoint?: ((elementId: string, point: { x: number; y: number }) => void) | undefined;
+  onBackgroundRefinePoint?: ((elementId: string, point: { x: number; y: number }) => void) | undefined;
+  onBackgroundSelectionToggle?: (() => void) | undefined;
+  onBackgroundSubjectPick?: ((elementId: string, point: { x: number; y: number }) => void) | undefined;
+  onCancelBackgroundSelection?: (() => void) | undefined;
+  onClearSelection?: (() => void) | undefined;
+  onDeleteSelectedElement?: (() => void) | undefined;
+  onDuplicateSelectedElement?: (() => void) | undefined;
+  onFlipSelectedImage?: (() => void) | undefined;
+  onInsertImage?: (() => void) | undefined;
+  onInsertText?: (() => void) | undefined;
+  onSelectElement?: ((elementId: string, options?: { additive?: boolean }) => void) | undefined;
+  onSendSelectedElementBackward?: (() => void) | undefined;
+  onTranslateSelectedText?: (() => void) | undefined;
+  onUpdateElementFrame?: ((elementId: string, patch: ElementFramePatch) => void) | undefined;
+  onUpdateElementFrames?: ((patches: Record<string, ElementFramePatch>) => void) | undefined;
+  onUpdateTextContent?: ((elementId: string, text: string) => void) | undefined;
 }
 
 interface CommonElementProps {
@@ -104,6 +105,7 @@ export function CanvasWorkspace({
   slideFrameRef,
   stageRef,
   presentationMode = false,
+  readOnly = false,
   zoomPercent = 100,
   backgroundSelectionMode = false,
   backgroundSelectionNotice,
@@ -151,7 +153,7 @@ export function CanvasWorkspace({
       .filter(isDesignElement)
       .filter((element) => element.visible !== false) ?? [];
   const hasSelection = selection.elementIds.length > 0;
-  const showEditorOverlays = !presentationMode;
+  const showEditorOverlays = !presentationMode && !readOnly;
   const selectedElement = project.elements[selection.elementIds[0] ?? ''];
   const backgroundSelectionTargetId =
     backgroundSelectionMode && selectedElement?.type === 'image' ? selectedElement.id : undefined;
@@ -329,6 +331,7 @@ export function CanvasWorkspace({
   }
 
   function startTextEditing(element: DesignElement) {
+    if (readOnly) return;
     if (element.type !== 'text') return;
     onSelectElement?.(element.id);
     setEditingTextId(element.id);
@@ -387,7 +390,7 @@ export function CanvasWorkspace({
     const isProcessing = processingElementIds.includes(element.id);
 
     return {
-      draggable: !element.locked && !backgroundSelectionMode && !isProcessing,
+      draggable: !readOnly && !element.locked && !backgroundSelectionMode && !isProcessing,
       height: element.height * scaleY,
       opacity: isProcessing && activeProcessingBlink ? 0.38 : element.opacity,
       ref: (node: Konva.Node | null) => {
@@ -415,9 +418,11 @@ export function CanvasWorkspace({
         pickBackgroundSubject(element, event);
       },
       onDblClick: () => {
+        if (readOnly) return;
         startTextEditing(element);
       },
       onDblTap: () => {
+        if (readOnly) return;
         startTextEditing(element);
       },
       onDragEnd: (event: Konva.KonvaEventObject<DragEvent>) => {
