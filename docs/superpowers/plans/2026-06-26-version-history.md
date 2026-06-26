@@ -1,6 +1,6 @@
 # Version History Implementation Plan
 
-> **For agentic workers:** Keep this plan updated with checkbox progress. Implement in small slices, keep the feature file-backed, and skip Playwright/e2e unless the user explicitly asks for it.
+> **For agentic workers:** Keep this plan updated with checkbox progress. Implement in small slices, keep the feature file-backed, and use the active lint/typecheck/unit/build toolchain unless browser e2e is explicitly reintroduced in a future plan.
 
 **Goal:** Add a Google Slides-style local version history to LocalStudio.ai. The header gets a history/time icon near the persistence icon, hover shows the last edited date-time, click opens version history, selecting a version previews it at the first detected change, and restoring a version writes it back as the current project.
 
