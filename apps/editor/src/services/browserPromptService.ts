@@ -172,7 +172,7 @@ export class GemmaPromptProvider implements PromptProvider {
   ): Promise<void> {
     const reportProgress = createMonotonicProgressReporter(options?.onProgress, { initial: 4, min: 4, max: 100 });
     await modelSetupService.downloadModel(GEMMA_LLM_MODEL_ID, {
-      onProgress: (progress) => reportProgress(mapProgressToRange(progress, 4, 99)),
+      onProgress: (progress) => reportProgress(progress >= 99 ? 99 : mapProgressToRange(progress, 4, 99)),
     });
     reportProgress(100);
   }

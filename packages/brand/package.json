@@ -1,0 +1,13 @@
+{
+  "name": "@localstudio/brand",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/tokens.ts",
+    "./brand.css": "./src/brand.css"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit --pretty false"
+  }
+}

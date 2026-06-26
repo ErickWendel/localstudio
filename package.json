@@ -3,15 +3,25 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "npm run typecheck && vite build",
-    "preview": "vite preview",
+    "dev": "npm run dev --workspace @localstudio/landing",
+    "dev:landing": "npm run dev --workspace @localstudio/landing",
+    "dev:editor": "npm run dev --workspace @localstudio/editor",
+    "build": "npm run build --workspace @localstudio/landing && npm run build --workspace @localstudio/editor",
+    "build:landing": "npm run build --workspace @localstudio/landing",
+    "build:editor": "npm run build --workspace @localstudio/editor",
+    "preview": "npm run preview --workspace @localstudio/landing",
+    "preview:landing": "npm run preview --workspace @localstudio/landing",
+    "preview:editor": "npm run preview --workspace @localstudio/editor",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "typecheck": "tsc -p tsconfig.json --noEmit --pretty false",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "typecheck": "npm run typecheck --workspace @localstudio/brand && npm run typecheck --workspace @localstudio/landing && npm run typecheck --workspace @localstudio/editor",
+    "test": "npm run test --workspace @localstudio/landing && npm run test --workspace @localstudio/editor",
+    "test:watch": "npm run test:watch --workspace @localstudio/editor",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -22,15 +32,6 @@
     "*.{css,md,json}": [
       "prettier --write"
     ]
-  },
-  "dependencies": {
-    "@huggingface/transformers": "^4.2.0",
-    "jspdf": "^4.2.1",
-    "konva": "^10.3.0",
-    "lucide-react": "^1.21.0",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "react-konva": "^19.2.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

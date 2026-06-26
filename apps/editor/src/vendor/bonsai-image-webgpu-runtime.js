@@ -4077,10 +4077,10 @@ ${e}<|im_end|>
 #endif`,aomap_fragment:`#ifdef USE_AOMAP
 	float ambientOcclusion = ( texture2D( aoMap, vAoMapUv ).r - 1.0 ) * aoMapIntensity + 1.0;
 	reflectedLight.indirectDiffuse *= ambientOcclusion;
-	#if defined( USE_CLEARCOAT ) 
+	#if defined( USE_CLEARCOAT )
 		clearcoatSpecularIndirect *= ambientOcclusion;
 	#endif
-	#if defined( USE_SHEEN ) 
+	#if defined( USE_SHEEN )
 		sheenSpecularIndirect *= ambientOcclusion;
 	#endif
 	#if defined( USE_ENVMAP ) && defined( STANDARD )
@@ -4564,7 +4564,7 @@ vec4 sRGBTransferOETF( in vec4 value ) {
 		#define ENV_WORLDPOS
 	#endif
 	#ifdef ENV_WORLDPOS
-		
+
 		varying vec3 vWorldPosition;
 	#else
 		varying vec3 vReflect;
@@ -5208,17 +5208,17 @@ void RE_Direct_Physical( const in IncidentLight directLight, const in vec3 geome
 		clearcoatSpecularDirect += ccIrradiance * BRDF_GGX_Clearcoat( directLight.direction, geometryViewDir, geometryClearcoatNormal, material );
 	#endif
 	#ifdef USE_SHEEN
- 
- 		sheenSpecularDirect += irradiance * BRDF_Sheen( directLight.direction, geometryViewDir, geometryNormal, material.sheenColor, material.sheenRoughness );
- 
- 		float sheenAlbedoV = IBLSheenBRDF( geometryNormal, geometryViewDir, material.sheenRoughness );
- 		float sheenAlbedoL = IBLSheenBRDF( geometryNormal, directLight.direction, material.sheenRoughness );
- 
- 		float sheenEnergyComp = 1.0 - max3( material.sheenColor ) * max( sheenAlbedoV, sheenAlbedoL );
- 
- 		irradiance *= sheenEnergyComp;
- 
- 	#endif
+
+		sheenSpecularDirect += irradiance * BRDF_Sheen( directLight.direction, geometryViewDir, geometryNormal, material.sheenColor, material.sheenRoughness );
+
+		float sheenAlbedoV = IBLSheenBRDF( geometryNormal, geometryViewDir, material.sheenRoughness );
+		float sheenAlbedoL = IBLSheenBRDF( geometryNormal, directLight.direction, material.sheenRoughness );
+
+		float sheenEnergyComp = 1.0 - max3( material.sheenColor ) * max( sheenAlbedoV, sheenAlbedoL );
+
+		irradiance *= sheenEnergyComp;
+
+	#endif
 	reflectedLight.directSpecular += irradiance * BRDF_GGX_Multiscatter( directLight.direction, geometryViewDir, geometryNormal, material );
 	reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseContribution );
 }
@@ -5237,7 +5237,7 @@ void RE_IndirectSpecular_Physical( const in vec3 radiance, const in vec3 irradia
 	#endif
 	#ifdef USE_SHEEN
 		sheenSpecularIndirect += irradiance * material.sheenColor * IBLSheenBRDF( geometryNormal, geometryViewDir, material.sheenRoughness ) * RECIPROCAL_PI;
- 	#endif
+	#endif
 	vec3 singleScatteringDielectric = vec3( 0.0 );
 	vec3 multiScatteringDielectric = vec3( 0.0 );
 	vec3 singleScatteringMetallic = vec3( 0.0 );
@@ -5745,7 +5745,7 @@ float viewZToOrthographicDepth( const in float viewZ, const in float near, const
 }
 float orthographicDepthToViewZ( const in float depth, const in float near, const in float far ) {
 	#ifdef USE_REVERSED_DEPTH_BUFFER
-	
+
 		return depth * ( far - near ) - far;
 	#else
 		return depth * ( near - far ) - near;
@@ -5755,7 +5755,7 @@ float viewZToPerspectiveDepth( const in float viewZ, const in float near, const 
 	return ( ( near + viewZ ) * far ) / ( ( far - near ) * viewZ );
 }
 float perspectiveDepthToViewZ( const in float depth, const in float near, const in float far ) {
-	
+
 	#ifdef USE_REVERSED_DEPTH_BUFFER
 		return ( near * far ) / ( ( near - far ) * depth - near );
 	#else
@@ -5894,7 +5894,7 @@ gl_Position = projectionMatrix * mvPosition;`,dithering_fragment:`#ifdef DITHERI
 				#else
 					float hard_shadow = step( shadowCoord.z, mean );
 				#endif
-				
+
 				if ( hard_shadow == 1.0 ) {
 					shadow = 1.0;
 				} else {
@@ -7438,10 +7438,10 @@ void main() {
 	#include <transmission_fragment>
 	vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;
 	#ifdef USE_SHEEN
- 
+
 		outgoingLight = outgoingLight + sheenSpecularDirect + sheenSpecularIndirect;
- 
- 	#endif
+
+	#endif
 	#ifdef USE_CLEARCOAT
 		float dotNVcc = saturate( dot( geometryClearcoatNormal, geometryViewDir ) );
 		vec3 Fcc = F_Schlick( material.clearcoatF0, material.clearcoatF90, dotNVcc );

@@ -1,22 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300..800&family=Orbitron:wght@400..900&display=swap');
+@import '@localstudio/brand/brand.css';
 @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
 
 :root {
-  color-scheme: dark;
-  --ew-bg: #0c160d;
-  --ew-black: #000000;
-  --ew-panel: #0c160d;
-  --ew-panel-low: #151e15;
-  --ew-raised: #323c31;
-  --ew-border: #40493f;
-  --ew-green: #37fd76;
-  --ew-green-fixed: #69ff89;
-  --ew-green-hover: #00ff22;
-  --ew-text: #ffffff;
-  --ew-muted: #c1c9bd;
-  --ew-dim: #8a9388;
-  --ew-on-primary: #002108;
-  font-family: 'Open Sans', Helvetica, sans-serif;
+  font-family: var(--ls-font-body);
   background: var(--ew-bg);
 }
 

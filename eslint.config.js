@@ -11,6 +11,8 @@ export default tseslint.config(
       '.worktrees/**',
       'node_modules',
       'docs/design/stitch/**/*.html',
+      'apps/*/dist',
+      'packages/*/dist',
       '**/*.js',
       '**/*.d.ts',
       '**/*.cjs',
@@ -21,7 +23,7 @@ export default tseslint.config(
   {
     languageOptions: {
       parserOptions: {
-        project: ['./tsconfig.json', './tsconfig.node.json'],
+        projectService: true,
         tsconfigRootDir: import.meta.dirname,
       },
     },
