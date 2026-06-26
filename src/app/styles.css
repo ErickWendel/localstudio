@@ -458,6 +458,27 @@ button {
   color: var(--ew-green);
 }
 
+.history-save-applied .material-symbols-outlined {
+  animation: history-save-rotate 520ms ease-out;
+}
+
+@keyframes history-save-rotate {
+  0% {
+    filter: drop-shadow(0 0 0 rgb(36 255 112 / 0));
+    transform: rotate(0deg) scale(1);
+  }
+
+  45% {
+    filter: drop-shadow(0 0 10px rgb(36 255 112 / 0.72));
+    transform: rotate(180deg) scale(1.12);
+  }
+
+  100% {
+    filter: drop-shadow(0 0 0 rgb(36 255 112 / 0));
+    transform: rotate(360deg) scale(1);
+  }
+}
+
 .stitch-icon-button:active,
 .floating-toolbar-button:active,
 .icon-button:active,
@@ -1360,6 +1381,114 @@ button {
     0 0 28px rgba(55, 253, 118, 0.1);
   pointer-events: auto;
   backdrop-filter: blur(12px);
+}
+
+.version-history-panel {
+  position: fixed;
+  top: 50px;
+  right: 0;
+  bottom: 42px;
+  z-index: 30;
+  width: min(360px, 92vw);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-left: 1px solid var(--ew-border);
+  background: rgba(13, 28, 16, 0.98);
+  box-shadow: -24px 0 48px rgba(0, 0, 0, 0.34);
+  padding: 18px;
+}
+
+.version-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.version-history-header h2 {
+  margin: 0;
+  color: var(--ew-text);
+  font-size: 18px;
+}
+
+.version-history-filter {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--ew-border);
+  border-radius: 4px;
+  background: #050d10;
+  color: var(--ew-text);
+  padding: 0 10px;
+}
+
+.version-history-restore {
+  justify-content: center;
+}
+
+.version-history-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.version-history-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.32);
+  color: var(--ew-text);
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.version-history-entry:hover,
+.version-history-entry-active {
+  border-color: rgba(55, 253, 118, 0.75);
+  background: rgba(55, 253, 118, 0.08);
+  box-shadow: 0 0 22px rgba(55, 253, 118, 0.12);
+}
+
+.version-history-entry strong {
+  font-size: 14px;
+}
+
+.version-history-entry span {
+  color: var(--ew-muted);
+  font-size: 12px;
+}
+
+.version-history-current {
+  color: var(--ew-green) !important;
+  font-weight: 800;
+}
+
+.version-history-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.version-history-author span {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--ew-green);
+}
+
+.version-history-highlight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ew-text);
+  font-size: 13px;
 }
 
 .text-toolbar-font,

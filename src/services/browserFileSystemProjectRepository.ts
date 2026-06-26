@@ -1,5 +1,10 @@
 import type { Asset, ProjectDocument } from '../domain/model';
-import type { ProjectRepository } from './interfaces';
+import type {
+  ProjectRepository,
+  VersionHistoryEntry,
+  VersionHistoryManifest,
+  VersionSnapshotMetadata,
+} from './interfaces';
 
 interface FileSystemProjectRepositoryOptions {
   pickDirectory?: () => Promise<FileSystemDirectoryHandle>;
@@ -23,6 +28,8 @@ type WindowWithDirectoryPicker = Window &
 
 const PROJECT_FILE_NAME = 'project.json';
 const PROJECT_CONFIG_FILE_NAME = 'localstudio.json';
+const VERSION_HISTORY_FILE_NAME = 'manifest.json';
+const VERSION_HISTORY_LIMIT = 100;
 
 function getAssetFileExtension(mimeType: string) {
   if (mimeType === 'image/jpeg') return 'jpg';
@@ -67,6 +74,137 @@ function getReferencedAssets(project: ProjectDocument) {
   return Object.fromEntries(
     Object.entries(project.assets).filter(([assetId]) => referencedAssetIds.has(assetId)),
   );
+}
+
+function createVersionId(date = new Date()) {
+  return date.toISOString().replace(/[:.]/g, '-');
+}
+
+function cloneProjectForHistory(project: ProjectDocument): ProjectDocument {
+  return {
+    ...project,
+    assets: Object.fromEntries(
+      Object.entries(project.assets).map(([assetId, asset]) => {
+        const assetForDisk = { ...asset };
+        delete assetForDisk.objectUrl;
+        return [assetId, assetForDisk];
+      }),
+    ),
+  };
+}
+
+async function createFileBackedProjectSnapshot(
+  project: ProjectDocument,
+  assetsDirectory: FileSystemDirectoryHandle,
+): Promise<ProjectDocument> {
+  const referencedAssets = getReferencedAssets(project);
+  const projectForDisk: ProjectDocument = {
+    ...project,
+    assets: { ...referencedAssets },
+  };
+
+  for (const [assetId, asset] of Object.entries(referencedAssets)) {
+    if (asset.storage === 'file' && asset.fileName) {
+      const assetForDisk = { ...asset };
+      delete assetForDisk.objectUrl;
+      projectForDisk.assets[assetId] = assetForDisk;
+      continue;
+    }
+
+    if (!isDataUrl(asset.objectUrl) && !isBlobUrl(asset.objectUrl)) continue;
+    const fileName = asset.fileName ?? `${assetId}.${getAssetFileExtension(asset.mimeType)}`;
+    await writeBlobFileToDirectory(assetsDirectory, fileName, await objectUrlToBlob(asset.objectUrl));
+    const assetForDisk = { ...asset };
+    delete assetForDisk.objectUrl;
+    projectForDisk.assets[assetId] = {
+      ...assetForDisk,
+      fileName,
+      storage: 'file',
+    };
+  }
+
+  return projectForDisk;
+}
+
+async function writeBlobFileToDirectory(
+  directoryHandle: FileSystemDirectoryHandle,
+  fileName: string,
+  value: Blob,
+) {
+  const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
+  const writable = await fileHandle.createWritable();
+  await writable.write(value);
+  await writable.close();
+}
+
+function getChangedElementKeys(previousProject: ProjectDocument, nextProject: ProjectDocument) {
+  const changedElementIds = new Set<string>();
+  const elementIds = new Set([...Object.keys(previousProject.elements), ...Object.keys(nextProject.elements)]);
+  for (const elementId of elementIds) {
+    if (JSON.stringify(previousProject.elements[elementId]) !== JSON.stringify(nextProject.elements[elementId])) {
+      changedElementIds.add(elementId);
+    }
+  }
+  return changedElementIds;
+}
+
+function createChangeSummary(project: ProjectDocument, previousProject?: ProjectDocument) {
+  if (!previousProject) {
+    const firstPage = project.pages[0];
+    return {
+      changeCount: 1,
+      summary: 'Initial saved version',
+      ...(firstPage ? { firstChangedPageId: firstPage.id } : {}),
+    };
+  }
+
+  let changeCount = 0;
+  let firstChangedPageId: string | undefined;
+  let firstChangedElementId: string | undefined;
+  const changedElementIds = getChangedElementKeys(previousProject, project);
+
+  for (const elementId of changedElementIds) {
+    changeCount += 1;
+    const page =
+      project.pages.find((item) => item.elementIds.includes(elementId)) ??
+      previousProject.pages.find((item) => item.elementIds.includes(elementId));
+    firstChangedPageId ??= page?.id;
+    firstChangedElementId ??= elementId;
+  }
+
+  const pageIds = new Set([...previousProject.pages.map((page) => page.id), ...project.pages.map((page) => page.id)]);
+  for (const pageId of pageIds) {
+    const previousPage = previousProject.pages.find((page) => page.id === pageId);
+    const nextPage = project.pages.find((page) => page.id === pageId);
+    if (JSON.stringify(previousPage) !== JSON.stringify(nextPage)) {
+      changeCount += 1;
+      firstChangedPageId ??= nextPage?.id ?? previousPage?.id;
+      const pageElementIds = [...(nextPage?.elementIds ?? []), ...(previousPage?.elementIds ?? [])];
+      firstChangedElementId ??= pageElementIds.find((elementId) => changedElementIds.has(elementId));
+    }
+  }
+
+  for (const assetId of new Set([...Object.keys(previousProject.assets), ...Object.keys(project.assets)])) {
+    if (JSON.stringify(previousProject.assets[assetId]) !== JSON.stringify(project.assets[assetId])) {
+      changeCount += 1;
+    }
+  }
+
+  if (project.name !== previousProject.name) changeCount += 1;
+  if (changeCount === 0) {
+    return {
+      changeCount: 0,
+      summary: 'No visible changes',
+      ...(project.pages[0] ? { firstChangedPageId: project.pages[0].id } : {}),
+    };
+  }
+
+  return {
+    changeCount,
+    summary: `${changeCount} ${changeCount === 1 ? 'edit' : 'edits'}`,
+    ...(firstChangedPageId ? { firstChangedPageId } : {}),
+    ...(firstChangedElementId ? { firstChangedElementId } : {}),
+  };
 }
 
 export class BrowserFileSystemProjectRepository implements ProjectRepository {
@@ -114,35 +252,11 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
       directoryHandle.getDirectoryHandle('config', { create: true }),
     ]);
 
-    const referencedAssets = getReferencedAssets(project);
     const staleAssets = Object.entries(project.assets)
-      .filter(([assetId]) => !(assetId in referencedAssets))
+      .filter(([assetId]) => !collectReferencedAssetIds(project).has(assetId))
       .map(([, asset]) => asset);
 
-    const projectForDisk: ProjectDocument = {
-      ...project,
-      assets: { ...referencedAssets },
-    };
-
-    for (const [assetId, asset] of Object.entries(referencedAssets)) {
-      if (asset.storage === 'file' && asset.fileName) {
-        const assetForDisk = { ...asset };
-        delete assetForDisk.objectUrl;
-        projectForDisk.assets[assetId] = assetForDisk;
-        continue;
-      }
-
-      if (!isDataUrl(asset.objectUrl) && !isBlobUrl(asset.objectUrl)) continue;
-      const fileName = asset.fileName ?? `${assetId}.${getAssetFileExtension(asset.mimeType)}`;
-      await this.writeBlobFile(assetsDirectory, fileName, await objectUrlToBlob(asset.objectUrl));
-      const assetForDisk = { ...asset };
-      delete assetForDisk.objectUrl;
-      projectForDisk.assets[assetId] = {
-        ...assetForDisk,
-        fileName,
-        storage: 'file',
-      };
-    }
+    const projectForDisk = await createFileBackedProjectSnapshot(project, assetsDirectory);
 
     await this.removeStaleAssetFiles(assetsDirectory, staleAssets);
     await this.writeJsonFile(directoryHandle, PROJECT_FILE_NAME, projectForDisk);
@@ -153,6 +267,60 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
       schemaVersion: 1,
       savedAt: new Date().toISOString(),
     });
+  }
+
+  async getVersionHistory(): Promise<VersionHistoryEntry[]> {
+    const directoryHandle = await this.ensureProjectDirectory();
+    const manifest = await this.readVersionHistoryManifest(directoryHandle);
+    return manifest.versions;
+  }
+
+  async saveVersion(project: ProjectDocument, metadata: VersionSnapshotMetadata): Promise<VersionHistoryEntry> {
+    const directoryHandle = await this.ensureProjectDirectory(project.name);
+    const assetsDirectory = await directoryHandle.getDirectoryHandle('assets', { create: true });
+    const historyDirectory = await directoryHandle.getDirectoryHandle('history', { create: true });
+    const versionsDirectory = await historyDirectory.getDirectoryHandle('versions', { create: true });
+    const manifest = await this.readVersionHistoryManifest(directoryHandle, project.id);
+    const createdAt = new Date().toISOString();
+    const id = createVersionId(new Date(createdAt));
+    const fileName = `${id}.json`;
+    const changeSummary = createChangeSummary(project, metadata.previousProject);
+    const entry: VersionHistoryEntry = {
+      id,
+      createdAt,
+      authorName: 'Local user',
+      projectName: project.name,
+      summary: changeSummary.summary,
+      changeCount: changeSummary.changeCount,
+      fileName,
+      ...(changeSummary.firstChangedPageId ? { firstChangedPageId: changeSummary.firstChangedPageId } : {}),
+      ...(changeSummary.firstChangedElementId ? { firstChangedElementId: changeSummary.firstChangedElementId } : {}),
+    };
+
+    const projectForHistory = await createFileBackedProjectSnapshot(project, assetsDirectory);
+    await this.writeJsonFile(versionsDirectory, fileName, cloneProjectForHistory(projectForHistory));
+    const nextVersions = [entry, ...manifest.versions.filter((version) => version.id !== entry.id)];
+    const retainedVersions = nextVersions.slice(0, VERSION_HISTORY_LIMIT);
+    await this.removePrunedVersionFiles(versionsDirectory, nextVersions.slice(VERSION_HISTORY_LIMIT));
+    await this.writeJsonFile(historyDirectory, VERSION_HISTORY_FILE_NAME, {
+      schemaVersion: 1,
+      projectId: project.id,
+      latestVersionId: entry.id,
+      versions: retainedVersions,
+    } satisfies VersionHistoryManifest);
+    return entry;
+  }
+
+  async loadVersion(versionId: string): Promise<ProjectDocument | null> {
+    const directoryHandle = await this.ensureProjectDirectory();
+    const manifest = await this.readVersionHistoryManifest(directoryHandle);
+    const entry = manifest.versions.find((version) => version.id === versionId);
+    if (!entry) return null;
+    const historyDirectory = await directoryHandle.getDirectoryHandle('history');
+    const versionsDirectory = await historyDirectory.getDirectoryHandle('versions');
+    const fileHandle = await versionsDirectory.getFileHandle(entry.fileName);
+    const file = await fileHandle.getFile();
+    return this.hydrateProjectAssets(JSON.parse(await file.text()) as ProjectDocument);
   }
 
   private async ensureProjectDirectory(projectName?: string): Promise<FileSystemDirectoryHandle> {
@@ -196,13 +364,6 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     await writable.close();
   }
 
-  private async writeBlobFile(directoryHandle: FileSystemDirectoryHandle, fileName: string, value: Blob) {
-    const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
-    const writable = await fileHandle.createWritable();
-    await writable.write(value);
-    await writable.close();
-  }
-
   private async removeStaleAssetFiles(directoryHandle: FileSystemDirectoryHandle, staleAssets: Asset[]) {
     await Promise.all(
       staleAssets.map(async (asset) => {
@@ -210,6 +371,26 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
         await directoryHandle.removeEntry(asset.fileName).catch(() => undefined);
       }),
     );
+  }
+
+  private async removePrunedVersionFiles(directoryHandle: FileSystemDirectoryHandle, entries: VersionHistoryEntry[]) {
+    if (!directoryHandle.removeEntry) return;
+    await Promise.all(entries.map((entry) => directoryHandle.removeEntry(entry.fileName).catch(() => undefined)));
+  }
+
+  private async readVersionHistoryManifest(
+    directoryHandle: FileSystemDirectoryHandle,
+    projectId = 'unknown-project',
+  ): Promise<VersionHistoryManifest> {
+    const historyDirectory = await directoryHandle.getDirectoryHandle('history', { create: true });
+    try {
+      const fileHandle = await historyDirectory.getFileHandle(VERSION_HISTORY_FILE_NAME);
+      const file = await fileHandle.getFile();
+      return JSON.parse(await file.text()) as VersionHistoryManifest;
+    } catch (error) {
+      if (error instanceof DOMException && error.name !== 'NotFoundError') throw error;
+      return { schemaVersion: 1, projectId, versions: [] };
+    }
   }
 
   private async hydrateProjectAssets(project: ProjectDocument): Promise<ProjectDocument> {

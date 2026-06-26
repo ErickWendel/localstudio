@@ -5,15 +5,15 @@ interface PagesPanelProps {
   activePageId: string;
   canTranslate?: boolean;
   project: ProjectDocument;
-  onAddPage?: () => void;
-  onClose?: () => void;
-  onDeletePage?: (pageId: string) => void;
-  onDuplicatePage?: (pageId: string) => void;
-  onRenamePage?: (pageId: string, name: string) => void;
-  onReorderPage?: (pageId: string, targetIndex: number) => void;
-  onSelectPage?: (pageId: string) => void;
-  onSetPageVisibility?: (pageId: string, visible: boolean) => void;
-  onTranslatePage?: (pageId: string) => void;
+  onAddPage?: (() => void) | undefined;
+  onClose?: (() => void) | undefined;
+  onDeletePage?: ((pageId: string) => void) | undefined;
+  onDuplicatePage?: ((pageId: string) => void) | undefined;
+  onRenamePage?: ((pageId: string, name: string) => void) | undefined;
+  onReorderPage?: ((pageId: string, targetIndex: number) => void) | undefined;
+  onSelectPage?: ((pageId: string) => void) | undefined;
+  onSetPageVisibility?: ((pageId: string, visible: boolean) => void) | undefined;
+  onTranslatePage?: ((pageId: string) => void) | undefined;
 }
 
 export function PagesPanel({

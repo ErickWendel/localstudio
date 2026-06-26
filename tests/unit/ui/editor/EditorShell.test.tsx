@@ -365,11 +365,8 @@ describe('EditorShell', () => {
     await user.click(screen.getByRole('button', { name: 'File' }));
     await user.click(screen.getByRole('menuitem', { name: 'Import Project' }));
 
-    await waitFor(() => {
-      expect(repository.savedProjects.at(-1)?.assets['asset-hero']?.objectUrl).toBe(
-        'blob:hydrated-hero',
-      );
-    });
+    await screen.findByRole('button', { name: 'Edit project name Imported Hydrated Project' });
+    expect(repository.savedProjects).toHaveLength(0);
   });
 
   it('opens a blank project in a new tab from the File menu', async () => {

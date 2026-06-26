@@ -8,15 +8,15 @@ type CanvasWorkspaceProps = ComponentProps<typeof CanvasWorkspace>;
 interface ScrollingCanvasWorkspaceProps extends CanvasWorkspaceProps {
   canTranslateCurrentSlide?: boolean;
   children?: ReactNode;
-  onAddPage?: () => void;
-  onActivePageFromScroll?: (pageId: string) => void;
-  onDeletePage?: (pageId: string) => void;
-  onDuplicatePage?: (pageId: string) => void;
-  onRenamePage?: (pageId: string, name: string) => void;
-  onReorderPage?: (pageId: string, targetIndex: number) => void;
-  onSetPageVisibility?: (pageId: string, visible: boolean) => void;
-  onTranslatePage?: (pageId: string) => void;
-  onUpdateElementStyle?: (elementId: string, patch: ElementStylePatch) => void;
+  onAddPage?: (() => void) | undefined;
+  onActivePageFromScroll?: ((pageId: string) => void) | undefined;
+  onDeletePage?: ((pageId: string) => void) | undefined;
+  onDuplicatePage?: ((pageId: string) => void) | undefined;
+  onRenamePage?: ((pageId: string, name: string) => void) | undefined;
+  onReorderPage?: ((pageId: string, targetIndex: number) => void) | undefined;
+  onSetPageVisibility?: ((pageId: string, visible: boolean) => void) | undefined;
+  onTranslatePage?: ((pageId: string) => void) | undefined;
+  onUpdateElementStyle?: ((elementId: string, patch: ElementStylePatch) => void) | undefined;
 }
 
 export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanvasWorkspaceProps>(function ScrollingCanvasWorkspace(

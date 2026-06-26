@@ -27,26 +27,26 @@ interface LeftToolPanelProps {
   promptApiAttention?: boolean;
   promptApiNotice?: string | undefined;
   promptPreparation?: { availability: string; progress: number; status: 'idle' | 'downloading' | 'ready' | 'failed' };
-  onDownloadModel?: (id: string) => Promise<void>;
-  onRemoveModel?: (id: string) => Promise<void>;
-  onCreateImageOptionsChange?: (options: CreateImagePromptOptions) => void;
-  onImportImage?: (file: File) => void;
-  onInsertText?: (preset: TextPreset) => void;
-  onPreparePromptApi?: () => Promise<void>;
-  onPrepareTranslationProvider?: () => Promise<void>;
-  onPromptProviderChange?: (providerId: string) => void;
-  onTranslationTargetLanguageChange?: (languageCode: string) => void;
-  onTranslationProviderChange?: (providerId: string) => void;
+  onDownloadModel?: ((id: string) => Promise<void>) | undefined;
+  onRemoveModel?: ((id: string) => Promise<void>) | undefined;
+  onCreateImageOptionsChange?: ((options: CreateImagePromptOptions) => void) | undefined;
+  onImportImage?: ((file: File) => void) | undefined;
+  onInsertText?: ((preset: TextPreset) => void) | undefined;
+  onPreparePromptApi?: (() => Promise<void>) | undefined;
+  onPrepareTranslationProvider?: (() => Promise<void>) | undefined;
+  onPromptProviderChange?: ((providerId: string) => void) | undefined;
+  onTranslationTargetLanguageChange?: ((languageCode: string) => void) | undefined;
+  onTranslationProviderChange?: ((providerId: string) => void) | undefined;
   project: ProjectDocument;
   activePageId: string;
   selection: SelectionState;
-  onSelectElement?: (elementId: string, options?: { additive?: boolean }) => void;
-  onSetElementVisibility?: (elementId: string, visible: boolean) => void;
-  onSetElementLock?: (elementId: string, locked: boolean) => void;
-  onDeleteElement?: (elementId: string) => void;
-  onReorderElement?: (elementId: string, targetElementId: string) => void;
-  onUpdateElementStyle?: (elementId: string, patch: ElementStylePatch) => void;
-  onUpdatePageBackground?: (background: PageBackground) => void;
+  onSelectElement?: ((elementId: string, options?: { additive?: boolean }) => void) | undefined;
+  onSetElementVisibility?: ((elementId: string, visible: boolean) => void) | undefined;
+  onSetElementLock?: ((elementId: string, locked: boolean) => void) | undefined;
+  onDeleteElement?: ((elementId: string) => void) | undefined;
+  onReorderElement?: ((elementId: string, targetElementId: string) => void) | undefined;
+  onUpdateElementStyle?: ((elementId: string, patch: ElementStylePatch) => void) | undefined;
+  onUpdatePageBackground?: ((background: PageBackground) => void) | undefined;
 }
 
 const menuItems: Array<{ id: RightPanelTab; label: string; icon: typeof Layers3 }> = [

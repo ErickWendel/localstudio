@@ -38,6 +38,33 @@ export interface ProjectRepository {
   importProject?(): Promise<ProjectDocument | null>;
   loadProject(options?: { projectName?: string }): Promise<ProjectDocument | null>;
   saveProject(project: ProjectDocument): Promise<void>;
+  getVersionHistory?(): Promise<VersionHistoryEntry[]>;
+  saveVersion?(project: ProjectDocument, metadata: VersionSnapshotMetadata): Promise<VersionHistoryEntry>;
+  loadVersion?(versionId: string): Promise<ProjectDocument | null>;
+}
+
+export interface VersionHistoryEntry {
+  id: string;
+  createdAt: string;
+  authorName: string;
+  projectName: string;
+  summary: string;
+  firstChangedPageId?: string;
+  firstChangedElementId?: string;
+  changeCount: number;
+  fileName: string;
+}
+
+export interface VersionHistoryManifest {
+  schemaVersion: 1;
+  projectId: string;
+  latestVersionId?: string;
+  versions: VersionHistoryEntry[];
+}
+
+export interface VersionSnapshotMetadata {
+  previousProject?: ProjectDocument | undefined;
+  force?: boolean | undefined;
 }
 
 export interface ExportService {
