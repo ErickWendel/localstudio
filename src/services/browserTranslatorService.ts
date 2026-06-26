@@ -199,7 +199,7 @@ class TranslateGemmaProvider implements TranslationProvider {
   ): Promise<void> {
     const reportProgress = createMonotonicProgressReporter(options?.onProgress, { initial: 4, min: 4, max: 100 });
     await modelSetupService.downloadModel(TRANSLATEGEMMA_MODEL_ID, {
-      onProgress: (progress) => reportProgress(mapProgressToRange(progress, 4, 92)),
+      onProgress: (progress) => reportProgress(progress),
     });
     await this.runtimeClient.preload(TRANSLATEGEMMA_TRANSFORMERS_MODEL_ID, {
       onProgress: (progress) => reportProgress(mapProgressToRange(progress, 4, 99)),

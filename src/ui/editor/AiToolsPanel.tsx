@@ -8,6 +8,7 @@ import type { CreateImagePromptOptions } from './imagePromptOptions';
 import { defaultCreateImagePromptOptions, getImageSizeLabel, imageSizePresets } from './imagePromptOptions';
 
 interface AiToolsPanelProps {
+  activeSlideLanguage?: { code: string; displayCode: string; flag: string; label: string } | undefined;
   modelStates: ModelState[];
   attentionModelId?: string | undefined;
   createImageOptions?: CreateImagePromptOptions;
@@ -59,6 +60,12 @@ function getPreparationLabel(status: 'idle' | 'downloading' | 'ready' | 'failed'
   return 'Pending';
 }
 
+function getProgressText(status: 'idle' | 'downloading' | 'ready' | 'failed', progress: number) {
+  if (status === 'ready') return undefined;
+  if (status === 'downloading' && progress >= 98) return 'Finalizing...';
+  return `${progress}%`;
+}
+
 function getPreparationTone(status: 'idle' | 'downloading' | 'ready' | 'failed') {
   if (status === 'ready') return 'success';
   if (status === 'downloading') return 'warning';
@@ -79,6 +86,7 @@ function ToolHelp({ id, text }: { id: string; text: string }) {
 }
 
 export function AiToolsPanel({
+  activeSlideLanguage,
   modelStates,
   attentionModelId,
   createImageOptions = defaultCreateImagePromptOptions,
@@ -141,8 +149,11 @@ export function AiToolsPanel({
   const selectedTranslationProvider = translationProviders.find((provider) => provider.selected) ?? translationProviders[0];
   const promptStatus = getPreparationStatus(selectedPromptProvider, promptPreparation.status);
   const promptProgress = promptStatus === 'ready' ? 100 : promptPreparation.progress;
+  const promptProgressText = getProgressText(promptStatus, promptProgress);
   const translationProviderStatus = getPreparationStatus(selectedTranslationProvider, translationPreparation.status);
   const translationProviderProgress = translationProviderStatus === 'ready' ? 100 : translationPreparation.progress;
+  const translationProviderProgressText = getProgressText(translationProviderStatus, translationProviderProgress);
+  const displayedSourceLanguage = activeSlideLanguage?.code ?? translationPreparation.sourceLanguage;
   const selectedPromptNeedsDownload =
     selectedPromptProvider?.readiness === 'needs-download' || selectedPromptProvider?.readiness === 'failed';
   const selectedTranslationNeedsDownload =
@@ -222,7 +233,7 @@ export function AiToolsPanel({
                     label={getPreparationLabel(promptStatus)}
                     tone={getPreparationTone(promptStatus)}
                   />
-                  {promptStatus === 'ready' ? null : <span>{promptProgress}%</span>}
+                  {promptProgressText ? <span>{promptProgressText}</span> : null}
                 </div>
                 {promptStatus === 'ready' ? null : (
                   <>
@@ -327,16 +338,16 @@ export function AiToolsPanel({
                       label={getPreparationLabel(translationProviderStatus)}
                       tone={getPreparationTone(translationProviderStatus)}
                     />
-                    {translationProviderStatus === 'ready' ? null : <span>{translationProviderProgress}%</span>}
+                  {translationProviderProgressText ? <span>{translationProviderProgressText}</span> : null}
                   </div>
                   {translationProviderStatus === 'ready' ? null : (
                     <div className="model-progress">
                       <span style={{ width: `${translationProviderProgress}%` }} />
                     </div>
                   )}
-                  {translationPreparation.sourceLanguage ? (
+                  {displayedSourceLanguage ? (
                     <span className="translation-source-note">
-                      Pair: {translationPreparation.sourceLanguage} → {translationTargetLanguage}
+                      Pair: {displayedSourceLanguage} → {translationTargetLanguage}
                     </span>
                   ) : null}
                 </div>

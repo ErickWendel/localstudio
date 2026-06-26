@@ -19,7 +19,11 @@ import {
 import { createMonotonicProgressReporter, mapProgressToRange } from './progress';
 import { buildSlideElementPrompt } from './prompts/slideElementPrompt';
 import { buildSlideTaskPrompt, extractImageUrls } from './prompts/slideTaskPrompt';
-import { TransformersTextGenerationRuntime, type TextGenerationRuntime } from './webGpuTextGenerationRuntime';
+import {
+  TransformersTextGenerationRuntime,
+  type TextGenerationInput,
+  type TextGenerationRuntime,
+} from './webGpuTextGenerationRuntime';
 
 export const CHROME_PROMPT_PROVIDER_ID = 'chrome-prompt-api';
 export const GEMMA_PROMPT_PROVIDER_ID = 'gemma-4-webgpu';
@@ -84,7 +88,67 @@ class ChromePromptProvider implements PromptProvider {
   }
 }
 
-class GemmaPromptProvider implements PromptProvider {
+const GEMMA_JSON_SYSTEM_PROMPT = [
+  'You are LocalStudio.ai structured JSON mode.',
+  'Return exactly one JSON value matching the requested schema.',
+  'Do not use markdown, comments, prose, code fences, or explanations.',
+  'The response must start with "{" and end with "}".',
+].join('\n');
+
+interface GemmaStructuredJsonOptions<T> {
+  prompt: string;
+  responseSchema: unknown;
+  parse: (value: string) => T;
+}
+
+export function createGemmaStructuredJsonMessages(prompt: string, responseSchema: unknown): TextGenerationInput {
+  return [
+    {
+      role: 'user',
+      content: [
+        GEMMA_JSON_SYSTEM_PROMPT,
+        '',
+        'JSON Schema:',
+        JSON.stringify(responseSchema),
+        '',
+        'Task:',
+        prompt,
+      ].join('\n'),
+    },
+  ];
+}
+
+function createGemmaJsonRepairMessages(options: {
+  prompt: string;
+  responseSchema: unknown;
+  invalidResponse: string;
+  errorMessage: string;
+}): TextGenerationInput {
+  return [
+    {
+      role: 'user',
+      content: [
+        GEMMA_JSON_SYSTEM_PROMPT,
+        '',
+        'The previous response was invalid for this schema.',
+        `Validation error: ${options.errorMessage}`,
+        '',
+        'JSON Schema:',
+        JSON.stringify(options.responseSchema),
+        '',
+        'Original task:',
+        options.prompt,
+        '',
+        'Invalid response to repair:',
+        options.invalidResponse,
+        '',
+        'Return only corrected JSON.',
+      ].join('\n'),
+    },
+  ];
+}
+
+export class GemmaPromptProvider implements PromptProvider {
   id = GEMMA_PROMPT_PROVIDER_ID;
   label = 'Gemma 4 WebGPU';
   description = 'Browser-local Gemma LLM for prompt-to-slides.';
@@ -107,7 +171,7 @@ class GemmaPromptProvider implements PromptProvider {
   ): Promise<void> {
     const reportProgress = createMonotonicProgressReporter(options?.onProgress, { initial: 4, min: 4, max: 100 });
     await modelSetupService.downloadModel(GEMMA_LLM_MODEL_ID, {
-      onProgress: (progress) => reportProgress(mapProgressToRange(progress, 4, 92)),
+      onProgress: (progress) => reportProgress(progress),
     });
     await this.runtimeClient.preload(GEMMA_LLM_TRANSFORMERS_MODEL_ID, {
       onProgress: (progress) => reportProgress(mapProgressToRange(progress, 4, 99)),
@@ -119,15 +183,15 @@ class GemmaPromptProvider implements PromptProvider {
     prompt: string,
     options: { targetLanguageHint?: string } = {},
   ): Promise<GeneratedSlideTasksDocument> {
-    const response = await this.generateStrictJson(
-      buildSlideTaskPrompt({
+    return this.generateStructuredJson({
+      prompt: buildSlideTaskPrompt({
         userPrompt: prompt,
         targetLanguageHint: options.targetLanguageHint ?? 'same as user prompt',
         imageUrls: extractImageUrls(prompt),
       }),
-      GENERATED_SLIDE_TASKS_RESPONSE_SCHEMA,
-    );
-    return parseGeneratedSlideTasksJson(response);
+      responseSchema: GENERATED_SLIDE_TASKS_RESPONSE_SCHEMA,
+      parse: parseGeneratedSlideTasksJson,
+    });
   }
 
   async generateSlideElementFromTask(
@@ -139,29 +203,41 @@ class GemmaPromptProvider implements PromptProvider {
       existingElements: GeneratedSlideElement[];
     },
   ): Promise<GeneratedSlideElement> {
-    const response = await this.generateStrictJson(
-      buildSlideElementPrompt({
+    return this.generateStructuredJson({
+      prompt: buildSlideElementPrompt({
         userPrompt: context.userPrompt,
         task,
         allTasks: context.allTasks,
         page: context.page,
         existingElements: context.existingElements,
       }),
-      GENERATED_SLIDE_ELEMENT_RESPONSE_SCHEMA,
-    );
-    return parseGeneratedSlideElementJson(response);
+      responseSchema: GENERATED_SLIDE_ELEMENT_RESPONSE_SCHEMA,
+      parse: parseGeneratedSlideElementJson,
+    });
   }
 
-  private generateStrictJson(prompt: string, responseSchema: unknown) {
-    return this.runtimeClient.generate(
+  private async generateStructuredJson<T>(options: GemmaStructuredJsonOptions<T>) {
+    const response = await this.runtimeClient.generate(
       GEMMA_LLM_TRANSFORMERS_MODEL_ID,
-      [
-        prompt,
-        '',
-        'Return only valid JSON matching this JSON Schema.',
-        JSON.stringify(responseSchema),
-      ].join('\n'),
+      createGemmaStructuredJsonMessages(options.prompt, options.responseSchema),
+      { max_new_tokens: 3072 },
     );
+
+    try {
+      return options.parse(response);
+    } catch (error) {
+      const repairedResponse = await this.runtimeClient.generate(
+        GEMMA_LLM_TRANSFORMERS_MODEL_ID,
+        createGemmaJsonRepairMessages({
+          prompt: options.prompt,
+          responseSchema: options.responseSchema,
+          invalidResponse: response,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        }),
+        { max_new_tokens: 3072 },
+      );
+      return options.parse(repairedResponse);
+    }
   }
 }
 
@@ -221,8 +297,8 @@ export class BrowserPromptService implements PromptService {
                 : availability === 'unavailable'
                   ? 'unavailable'
                   : availability === 'downloading'
-                    ? 'downloading'
-                    : 'needs-download'
+                  ? 'downloading'
+                  : 'needs-download'
               : getModelReadiness(modelStates, provider.modelId),
           selected: false,
         } satisfies AiProviderState;

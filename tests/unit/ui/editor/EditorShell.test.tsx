@@ -699,6 +699,7 @@ describe('EditorShell', () => {
     await user.click(screen.getAllByRole('button', { name: 'Translate Slide 1' })[0]!);
 
     expect(await screen.findByRole('button', { name: 'Current slide language Portuguese' })).toBeInTheDocument();
+    expect(screen.getByText('Pair: pt → pt')).toBeInTheDocument();
   });
 
   it('ignores repeated translate clicks while a translation is running', async () => {

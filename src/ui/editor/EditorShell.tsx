@@ -217,6 +217,7 @@ export function EditorShell({ services }: EditorShellProps) {
       <div className={vm.pagesPanelOpen ? 'editor-grid' : 'editor-grid editor-grid-pages-collapsed'}>
         <LeftToolPanel
           activeTab={vm.activeTab}
+          activeSlideLanguage={vm.activeSlideLanguage}
           onTabChange={vm.setActiveTab}
           open={leftPanelOpen}
           onOpenChange={setLeftPanelOpen}

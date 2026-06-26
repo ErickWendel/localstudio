@@ -773,6 +773,14 @@ export function useEditorViewModel(services: AppServices) {
       }
       setPromptApiNotice('Prompt API ready');
     } catch (error) {
+      const selectedProvider = promptProviderStates.find((provider) => provider.selected);
+      if (selectedProvider?.modelId) {
+        await services.modelSetupService.removeModel?.(selectedProvider.modelId);
+        setModelStates(await services.modelSetupService.getModelStates());
+        if (services.promptService.getProviderStates) {
+          setPromptProviderStates(await services.promptService.getProviderStates());
+        }
+      }
       setPromptPreparation({ availability: 'unavailable', progress: 0, status: 'failed' });
       setPromptApiAttention(true);
       setPromptApiNotice(error instanceof Error ? error.message : 'Chrome Prompt API could not be prepared.');
@@ -784,6 +792,14 @@ export function useEditorViewModel(services: AppServices) {
     const nextProviders = await services.promptService.setSelectedProvider(providerId);
     setPromptProviderStates(nextProviders);
     await refreshPromptApiAvailability();
+    const selectedProvider = nextProviders.find((provider) => provider.selected);
+    if (
+      selectedProvider?.modelId &&
+      selectedProvider.compatibility !== 'incompatible' &&
+      selectedProvider.readiness !== 'ready'
+    ) {
+      await preparePromptApi();
+    }
   }
 
   async function setTranslationProvider(providerId: string) {
@@ -795,10 +811,18 @@ export function useEditorViewModel(services: AppServices) {
       progress: current.status === 'ready' ? 0 : current.progress,
       status: current.status === 'ready' ? 'idle' : current.status,
     }));
+    const selectedProvider = nextProviders.find((provider) => provider.selected);
+    if (
+      selectedProvider?.modelId &&
+      selectedProvider.compatibility !== 'incompatible' &&
+      selectedProvider.readiness !== 'ready'
+    ) {
+      await prepareSelectedTranslationProvider(selectedProvider);
+    }
   }
 
-  async function prepareSelectedTranslationProvider() {
-    const selectedProvider = translationProviderStates.find((provider) => provider.selected);
+  async function prepareSelectedTranslationProvider(providerState?: AiProviderState) {
+    const selectedProvider = providerState ?? translationProviderStates.find((provider) => provider.selected);
     if (selectedProvider?.modelId && selectedProvider.readiness !== 'ready') {
       setTranslationPreparation({ progress: 4, status: 'downloading' });
       try {
@@ -816,6 +840,13 @@ export function useEditorViewModel(services: AppServices) {
           setTranslationProviderStates(await services.translatorService.getProviderStates());
         }
       } catch (error) {
+        if (selectedProvider?.modelId) {
+          await services.modelSetupService.removeModel?.(selectedProvider.modelId);
+          setModelStates(await services.modelSetupService.getModelStates());
+          if (services.translatorService.getProviderStates) {
+            setTranslationProviderStates(await services.translatorService.getProviderStates());
+          }
+        }
         setTranslationPreparation({ progress: 0, status: 'failed' });
         setTranslationNotice(error instanceof Error ? error.message : 'Translation model could not be prepared.');
       }

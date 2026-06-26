@@ -1,4 +1,5 @@
 import { TRANSFORMERS_CACHE_KEY } from './imageGenerationModels';
+import { createTransformersProgressCallback } from './progress';
 
 export interface TextGenerationRuntime {
   preload(modelId: string, options?: { onProgress?: (progress: number) => void }): Promise<void>;
@@ -80,12 +81,7 @@ export class TransformersTextGenerationRuntime implements TextGenerationRuntime 
       return (await pipeline('text-generation', modelId, {
         dtype: 'q4',
         device: 'webgpu',
-        progress_callback: (progress) => {
-          const progressValue = 'progress' in progress ? progress.progress : undefined;
-          if (typeof progressValue === 'number') {
-            options?.onProgress?.(progressValue);
-          }
-        },
+        progress_callback: createTransformersProgressCallback(options?.onProgress),
       })) as unknown as TextGenerationPipeline;
     });
     this.pipelines.set(modelId, pipelinePromise);

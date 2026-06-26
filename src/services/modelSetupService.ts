@@ -14,7 +14,7 @@ import {
   TRANSFORMERS_CACHE_KEY,
 } from './imageGenerationModels';
 import { BrowserBonsaiImageRuntime } from './bonsaiImageRuntime';
-import { createMonotonicProgressReporter } from './progress';
+import { createMonotonicProgressReporter, createTransformersProgressCallback } from './progress';
 
 export const IMAGE_EDITING_MODEL_ID = 'image-editing-models';
 export const IMAGE_EDITING_TRANSFORMERS_MODEL_ID = 'Xenova/slimsam-77-uniform';
@@ -128,12 +128,7 @@ export class TransformersTextGenerationModelLoader implements TextGenerationMode
     await pipeline('text-generation', modelId, {
       dtype: 'q4',
       device: 'webgpu',
-      progress_callback: (progress) => {
-        const progressValue = 'progress' in progress ? progress.progress : undefined;
-        if (typeof progressValue === 'number') {
-          options?.onProgress?.(progressValue);
-        }
-      },
+      progress_callback: createTransformersProgressCallback(options?.onProgress),
     });
   }
 }

@@ -12,6 +12,7 @@ import type { RightPanelTab, TextPreset } from './useEditorViewModel';
 
 interface LeftToolPanelProps {
   activeTab: RightPanelTab;
+  activeSlideLanguage?: { code: string; displayCode: string; flag: string; label: string } | undefined;
   onTabChange: (tab: RightPanelTab) => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -59,6 +60,7 @@ const menuItems: Array<{ id: RightPanelTab; label: string; icon: typeof Layers3 
 
 export function LeftToolPanel({
   activeTab,
+  activeSlideLanguage,
   onTabChange,
   open = false,
   onOpenChange,
@@ -156,6 +158,7 @@ export function LeftToolPanel({
         ) : null}
         {panelOpen && activeTab === 'ai-tools' ? (
           <AiToolsPanel
+            activeSlideLanguage={activeSlideLanguage}
             modelStates={modelStates}
             attentionModelId={attentionModelId}
             translationLanguageOptions={translationLanguageOptions}
