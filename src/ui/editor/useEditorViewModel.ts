@@ -702,15 +702,27 @@ export function useEditorViewModel(services: AppServices) {
   async function removeModel(id: string) {
     if (!services.modelSetupService.removeModel) return;
 
+    const selectedPromptProviderId = promptProviderStates.find((provider) => provider.modelId === id && provider.selected)?.id;
+    const selectedTranslationProviderId = translationProviderStates.find(
+      (provider) => provider.modelId === id && provider.selected,
+    )?.id;
     const next = await services.modelSetupService.removeModel(id);
     setModelStates((currentStates) =>
       currentStates.map((state) => (state.id === id ? next : state)),
     );
     if (services.promptService.getProviderStates) {
-      setPromptProviderStates(await services.promptService.getProviderStates());
+      const nextPromptProviders =
+        selectedPromptProviderId && services.promptService.setSelectedProvider
+          ? await services.promptService.setSelectedProvider(selectedPromptProviderId)
+          : await services.promptService.getProviderStates();
+      setPromptProviderStates(nextPromptProviders);
     }
     if (services.translatorService.getProviderStates) {
-      setTranslationProviderStates(await services.translatorService.getProviderStates());
+      const nextTranslationProviders =
+        selectedTranslationProviderId && services.translatorService.setSelectedProvider
+          ? await services.translatorService.setSelectedProvider(selectedTranslationProviderId)
+          : await services.translatorService.getProviderStates();
+      setTranslationProviderStates(nextTranslationProviders);
     }
     if (id === GEMMA_LLM_MODEL_ID) {
       setPromptPreparation({ availability: 'downloadable', progress: 0, status: 'idle' });

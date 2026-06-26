@@ -2,12 +2,14 @@ import { vi } from 'vitest';
 import { GEMMA_LLM_MODEL_ID, TRANSLATEGEMMA_MODEL_ID } from '../../../src/services/aiModelIds';
 import {
   BrowserModelSetupService,
+  BrowserTransformersModelCache,
   InMemoryModelSetupService,
   type ImageEditingModelLoader,
   type ImageGenerationModelLoader,
+  type ModelCacheStorage,
   type TextGenerationModelLoader,
 } from '../../../src/services/modelSetupService';
-import { IMAGE_GENERATION_MODEL_ID } from '../../../src/services/imageGenerationModels';
+import { IMAGE_GENERATION_MODEL_ID, TRANSFORMERS_CACHE_KEY } from '../../../src/services/imageGenerationModels';
 
 describe('InMemoryModelSetupService', () => {
   it('downloads required models in parallel and exposes progress', async () => {
@@ -175,7 +177,22 @@ describe('BrowserModelSetupService', () => {
   it('removes cached model readiness metadata and marks the model downloadable again', async () => {
     const loadImageEditingModel = vi.fn().mockResolvedValue(undefined);
     const storage = createStorage({ 'localstudio.ai.model.translategemma-webgpu.ready': 'true' });
-    const service = new BrowserModelSetupService({ loadImageEditingModel }, storage);
+    const removeTextGenerationModel = vi.fn().mockResolvedValue(undefined);
+    const deleteModelArtifacts = vi.fn().mockResolvedValue(undefined);
+    const textGenerationLoader: TextGenerationModelLoader = {
+      loadTextGenerationModel: vi.fn().mockResolvedValue(undefined),
+      removeTextGenerationModel,
+    };
+    const modelCacheStorage: ModelCacheStorage = {
+      deleteModelArtifacts,
+    };
+    const service = new BrowserModelSetupService(
+      { loadImageEditingModel },
+      storage,
+      undefined,
+      textGenerationLoader,
+      modelCacheStorage,
+    );
 
     const state = await service.removeModel(TRANSLATEGEMMA_MODEL_ID);
 
@@ -185,5 +202,37 @@ describe('BrowserModelSetupService', () => {
       progress: 0,
     });
     expect(storage.getItem('localstudio.ai.model.translategemma-webgpu.ready')).toBe('false');
+    expect(removeTextGenerationModel).toHaveBeenCalledWith('onnx-community/translategemma-text-4b-it-ONNX');
+    expect(deleteModelArtifacts).toHaveBeenCalledWith('onnx-community/translategemma-text-4b-it-ONNX');
+  });
+
+  it('removes matching Transformers.js cache entries for a model id', async () => {
+    const deletedRequests: string[] = [];
+    const cache = {
+      keys: vi.fn(() =>
+        Promise.resolve([
+          new Request('https://huggingface.co/onnx-community/gemma-4-E2B-it-ONNX/resolve/main/config.json'),
+          new Request('https://huggingface.co/onnx-community/gemma-4-E2B-it-ONNX/resolve/main/onnx/model_q4.onnx'),
+          new Request('https://huggingface.co/onnx-community/translategemma-text-4b-it-ONNX/resolve/main/config.json'),
+        ]),
+      ),
+      delete: vi.fn((request: Request) => {
+        deletedRequests.push(request.url);
+        return Promise.resolve(true);
+      }),
+    };
+    vi.stubGlobal('caches', {
+      open: vi.fn((cacheName: string) => {
+        expect(cacheName).toBe(TRANSFORMERS_CACHE_KEY);
+        return Promise.resolve(cache);
+      }),
+    });
+
+    await new BrowserTransformersModelCache().deleteModelArtifacts('onnx-community/gemma-4-E2B-it-ONNX');
+
+    expect(deletedRequests).toEqual([
+      'https://huggingface.co/onnx-community/gemma-4-E2B-it-ONNX/resolve/main/config.json',
+      'https://huggingface.co/onnx-community/gemma-4-E2B-it-ONNX/resolve/main/onnx/model_q4.onnx',
+    ]);
   });
 });

@@ -148,6 +148,10 @@ class PromptProviderSelectionService extends TestPromptService {
     return this.selectedProviderId;
   }
 
+  markGemmaNeedsDownload() {
+    this.availability = 'downloadable';
+  }
+
   setSelectedProvider(providerId: string) {
     this.selectedProviderId = providerId;
     return this.getProviderStates();
@@ -155,6 +159,10 @@ class PromptProviderSelectionService extends TestPromptService {
 }
 
 class PromptModelSetupService extends InMemoryModelSetupService implements ModelSetupService {
+  constructor(private readonly onGemmaRemoved?: () => void) {
+    super();
+  }
+
   private gemmaState: ModelState = {
     id: GEMMA_LLM_MODEL_ID,
     label: 'Gemma 4 WebGPU LLM',
@@ -174,6 +182,13 @@ class PromptModelSetupService extends InMemoryModelSetupService implements Model
     options?.onProgress?.(40);
     options?.onProgress?.(100);
     this.gemmaState = { ...this.gemmaState, status: 'ready', progress: 100 };
+    return { ...this.gemmaState };
+  }
+
+  override async removeModel(id: string): Promise<ModelState> {
+    if (id !== GEMMA_LLM_MODEL_ID) return super.removeModel(id);
+    this.onGemmaRemoved?.();
+    this.gemmaState = { ...this.gemmaState, status: 'needs-download', progress: 0 };
     return { ...this.gemmaState };
   }
 }
@@ -227,9 +242,27 @@ class TranslationProviderSelectionService extends PreparingTranslatorService {
     return this.selectedProviderId;
   }
 
+  markTranslateGemmaNeedsDownload() {
+    this.translateGemmaReady = false;
+  }
+
   setSelectedProvider(providerId: string) {
     this.selectedProviderId = providerId;
     return this.getProviderStates();
+  }
+}
+
+class TranslationModelSetupService extends InMemoryModelSetupService implements ModelSetupService {
+  constructor(private readonly onTranslateGemmaRemoved?: () => void) {
+    super();
+  }
+
+  override async removeModel(id: string): Promise<ModelState> {
+    const next = await super.removeModel(id);
+    if (id === TRANSLATEGEMMA_MODEL_ID) {
+      this.onTranslateGemmaRemoved?.();
+    }
+    return next;
   }
 }
 
@@ -361,7 +394,7 @@ describe('mocked AI flows', () => {
     const services = createAppServices();
     const promptService = new PromptProviderSelectionService('downloadable');
     services.promptService = promptService;
-    services.modelSetupService = new PromptModelSetupService();
+    services.modelSetupService = new PromptModelSetupService(() => promptService.markGemmaNeedsDownload());
     render(<EditorShell services={services} />);
 
     await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
@@ -374,11 +407,33 @@ describe('mocked AI flows', () => {
     expect(within(llmCard).getByText('Ready')).toBeInTheDocument();
   });
 
+  it('keeps Gemma selected after removing its cached model', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const promptService = new PromptProviderSelectionService('downloadable');
+    services.promptService = promptService;
+    services.modelSetupService = new PromptModelSetupService(() => promptService.markGemmaNeedsDownload());
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await user.selectOptions(screen.getAllByLabelText('LLM Model')[1]!, 'gemma-4-webgpu');
+    await waitFor(() => {
+      expect(promptService.preparePromptApi).toHaveBeenCalled();
+    });
+    await user.click(screen.getByRole('button', { name: 'Remove LLM Model' }));
+
+    expect(screen.getAllByLabelText('LLM Model')[1]).toHaveValue('gemma-4-webgpu');
+    expect(screen.getByRole('button', { name: 'Download LLM Model' })).toBeInTheDocument();
+  });
+
   it('prepares TranslateGemma automatically when selected as the translation model', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
     const translatorService = new TranslationProviderSelectionService();
     services.translatorService = translatorService;
+    services.modelSetupService = new TranslationModelSetupService(() =>
+      translatorService.markTranslateGemmaNeedsDownload(),
+    );
     render(<EditorShell services={services} />);
 
     await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
@@ -389,6 +444,27 @@ describe('mocked AI flows', () => {
     });
     const translationCard = screen.getByRole('article', { name: 'Translate Design' });
     expect(within(translationCard).getByRole('button', { name: 'Remove Translation Model' })).toBeInTheDocument();
+  });
+
+  it('keeps TranslateGemma selected after removing its cached model', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const translatorService = new TranslationProviderSelectionService();
+    services.translatorService = translatorService;
+    services.modelSetupService = new TranslationModelSetupService(() =>
+      translatorService.markTranslateGemmaNeedsDownload(),
+    );
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await user.selectOptions(screen.getByLabelText('Translation Model'), 'translategemma-webgpu');
+    await waitFor(() => {
+      expect(translatorService.prepareTranslation).toHaveBeenCalled();
+    });
+    await user.click(screen.getByRole('button', { name: 'Remove Translation Model' }));
+
+    expect(screen.getByLabelText('Translation Model')).toHaveValue('translategemma-webgpu');
+    expect(screen.getByRole('button', { name: 'Download Translation Model' })).toBeInTheDocument();
   });
 
   it('generates an image from create image mode and inserts it into the active slide', async () => {
