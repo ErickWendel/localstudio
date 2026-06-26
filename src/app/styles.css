@@ -1267,6 +1267,103 @@ button {
   font-size: 20px;
 }
 
+.image-crop-frame {
+  position: absolute;
+  z-index: 9;
+  border: 2px solid var(--ew-green);
+  box-shadow:
+    0 0 0 9999px rgba(0, 0, 0, 0.34),
+    0 0 18px rgba(55, 253, 118, 0.2);
+  pointer-events: none;
+  transform-origin: center;
+}
+
+.image-crop-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, transparent calc(33.333% - 0.5px), rgba(255, 255, 255, 0.42) calc(33.333% - 0.5px), rgba(255, 255, 255, 0.42) calc(33.333% + 0.5px), transparent calc(33.333% + 0.5px)),
+    linear-gradient(to right, transparent calc(66.666% - 0.5px), rgba(255, 255, 255, 0.42) calc(66.666% - 0.5px), rgba(255, 255, 255, 0.42) calc(66.666% + 0.5px), transparent calc(66.666% + 0.5px)),
+    linear-gradient(to bottom, transparent calc(33.333% - 0.5px), rgba(255, 255, 255, 0.42) calc(33.333% - 0.5px), rgba(255, 255, 255, 0.42) calc(33.333% + 0.5px), transparent calc(33.333% + 0.5px)),
+    linear-gradient(to bottom, transparent calc(66.666% - 0.5px), rgba(255, 255, 255, 0.42) calc(66.666% - 0.5px), rgba(255, 255, 255, 0.42) calc(66.666% + 0.5px), transparent calc(66.666% + 0.5px));
+  opacity: 0.55;
+}
+
+.image-crop-handle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #050d10;
+  border-radius: 50%;
+  background: var(--ew-green);
+  box-shadow: 0 0 12px rgba(55, 253, 118, 0.42);
+  pointer-events: auto;
+}
+
+.image-crop-handle-top-left,
+.image-crop-handle-bottom-right {
+  cursor: nwse-resize;
+}
+
+.image-crop-handle-top-right,
+.image-crop-handle-bottom-left {
+  cursor: nesw-resize;
+}
+
+.image-crop-handle-top,
+.image-crop-handle-bottom {
+  cursor: ns-resize;
+}
+
+.image-crop-handle-left,
+.image-crop-handle-right {
+  cursor: ew-resize;
+}
+
+.image-crop-handle-top-left {
+  left: -8px;
+  top: -8px;
+}
+
+.image-crop-handle-top {
+  left: 50%;
+  top: -8px;
+  transform: translateX(-50%);
+}
+
+.image-crop-handle-top-right {
+  right: -8px;
+  top: -8px;
+}
+
+.image-crop-handle-right {
+  right: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.image-crop-handle-bottom-right {
+  bottom: -8px;
+  right: -8px;
+}
+
+.image-crop-handle-bottom {
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.image-crop-handle-bottom-left {
+  bottom: -8px;
+  left: -8px;
+}
+
+.image-crop-handle-left {
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
 .text-selection-toolbar {
   position: relative;
   display: inline-flex;

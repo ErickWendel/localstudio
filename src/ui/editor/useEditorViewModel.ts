@@ -18,6 +18,7 @@ import {
   SetPageVisibilityCommand,
   SetZOrderCommand,
   ToggleImageFlipCommand,
+  UpdateImageCropCommand,
   TranslateTextElementsCommand,
   UpdateElementFramesCommand,
   UpdateElementStyleCommand,
@@ -26,6 +27,7 @@ import {
   UpdateTextContentCommand,
   type AlignMode,
   type ElementFramePatch,
+  type ImageCropPatch,
   type ElementStylePatch,
   type ZOrderMode,
 } from '../../domain/commands/basicCommands';
@@ -1623,6 +1625,10 @@ export function useEditorViewModel(services: AppServices) {
     commitProject((currentProject) => new ToggleImageFlipCommand(elementId).execute(currentProject));
   }
 
+  function updateImageCrop(elementId: string, patch: ImageCropPatch) {
+    commitProject((currentProject) => new UpdateImageCropCommand(elementId, patch).execute(currentProject));
+  }
+
   function reorderElement(elementId: string, targetElementId: string) {
     commitProject((currentProject) => {
       const page = currentProject.pages.find((item) => item.id === activePageId);
@@ -2139,6 +2145,7 @@ export function useEditorViewModel(services: AppServices) {
     alignSelectedElement,
     setSelectedElementZOrder,
     flipSelectedImage,
+    updateImageCrop,
     updateElementFrame,
     updateElementFrames,
     updateElementStyle,

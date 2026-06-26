@@ -317,6 +317,7 @@ export function EditorShell({ services }: EditorShellProps) {
             onTranslateSelectedText={isHistoryReadOnly ? undefined : () => {
               void vm.translateSelectedText();
             }}
+            onUpdateImageCrop={isHistoryReadOnly ? undefined : vm.updateImageCrop}
             onUpdateElementFrame={isHistoryReadOnly ? undefined : vm.updateElementFrame}
             onUpdateElementFrames={isHistoryReadOnly ? undefined : vm.updateElementFrames}
             onUpdateElementStyle={isHistoryReadOnly ? undefined : vm.updateElementStyle}

@@ -14,6 +14,7 @@ import {
   SetElementLockCommand,
   SetElementVisibilityCommand,
   ToggleImageFlipCommand,
+  UpdateImageCropCommand,
   UpdateElementFrameCommand,
   UpdateElementFramesCommand,
   UpdateElementStyleCommand,
@@ -87,6 +88,23 @@ describe('editor commands', () => {
     expect(flipped.elements['image-hero']).toMatchObject({ type: 'image', flipX: true });
     expect(unflipped.elements['image-hero']).toMatchObject({ type: 'image', flipX: false });
     expect(project.elements['image-hero']).not.toHaveProperty('flipX');
+  });
+
+  it('updates image crop and frame immutably', () => {
+    const project = createSampleProject();
+    const next = new UpdateImageCropCommand('image-hero', {
+      x: 75,
+      width: 880,
+      crop: { x: 0.1, y: 0, width: 0.9, height: 1 },
+    }).execute(project);
+
+    expect(next.elements['image-hero']).toMatchObject({
+      type: 'image',
+      x: 75,
+      width: 880,
+      crop: { x: 0.1, y: 0, width: 0.9, height: 1 },
+    });
+    expect(project.elements['image-hero']).not.toHaveProperty('crop');
   });
 
   it('keeps an image asset when deleting an element if the page background still uses it', () => {
