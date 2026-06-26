@@ -69,4 +69,41 @@ describe('slide element prompt', () => {
     expect(prompt).toContain('right column x 1320-1740');
     expect(prompt).toContain('column headings 42-58px');
   });
+
+  it('includes fallback regions for image grids, body bullets, and large URL images', () => {
+    const prompt = buildSlideElementPrompt({
+      userPrompt: 'Image grid with 3 placeholder images and short Web AI captions.',
+      task: {
+        type: 'add-placeholder-image',
+        id: 'grid-1',
+        description: 'First Web AI image',
+        placementHint: 'grid image 1 left',
+      },
+      allTasks: [
+        {
+          type: 'add-placeholder-image',
+          id: 'grid-1',
+          description: 'First Web AI image',
+          placementHint: 'grid image 1 left',
+        },
+      ],
+      page: {
+        name: 'Generated slide',
+        width: 1920,
+        height: 1080,
+        background: { type: 'color', color: '#050D10' },
+      },
+      existingElements: [],
+    });
+
+    expect(prompt).toContain('image grid layouts');
+    expect(prompt).toContain('centered title + subtitle layouts');
+    expect(prompt).toContain('title x 240');
+    expect(prompt).toContain('grid image 1 x 120');
+    expect(prompt).toContain('body bullet layouts');
+    expect(prompt).toContain('bullets x 360');
+    expect(prompt).toContain('left image + bullet layouts');
+    expect(prompt).toContain('bullets x 1100');
+    expect(prompt).toContain('large URL/main image layouts');
+  });
 });

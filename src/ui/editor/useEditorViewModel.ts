@@ -435,6 +435,7 @@ export function useEditorViewModel(services: AppServices) {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [aiToolsAttentionModelId, setAiToolsAttentionModelId] = useState<string | undefined>();
   const [pageLanguageCodes, setPageLanguageCodes] = useState<Record<string, string>>({});
+  const promptGenerationRunIdRef = useRef(0);
   const [elementClipboard, setElementClipboard] = useState<ElementClipboardState>({
     assets: {},
     elements: [],
@@ -893,7 +894,10 @@ export function useEditorViewModel(services: AppServices) {
 
   async function generateSlideFromPrompt(prompt: string) {
     const trimmedPrompt = prompt.trim();
-    if (!trimmedPrompt || isGeneratingSlide) return;
+    if (!trimmedPrompt || isGeneratingSlide || isGeneratingImage) return;
+    const runId = promptGenerationRunIdRef.current + 1;
+    promptGenerationRunIdRef.current = runId;
+    const isCurrentRun = () => promptGenerationRunIdRef.current === runId;
 
     if (looksLikeImageGenerationRequest(trimmedPrompt)) {
       setPromptGenerationStatus(undefined);
@@ -911,6 +915,7 @@ export function useEditorViewModel(services: AppServices) {
       const generatedTasks = await services.promptService.generateSlideTasksFromPrompt(trimmedPrompt, {
         targetLanguageHint: 'same as user prompt',
       });
+      if (!isCurrentRun()) return;
       const pageId = activePageId;
 
       commitProject(
@@ -929,6 +934,7 @@ export function useEditorViewModel(services: AppServices) {
           page: generatedTasks.page,
           existingElements: generatedElements,
         });
+        if (!isCurrentRun()) return;
         generatedElements.push(element);
         const selectedElementId = `generated-${pageId}-${element.id.replace(/[^a-z0-9-_]/gi, '-').toLowerCase()}`;
         commitProject(
@@ -942,16 +948,22 @@ export function useEditorViewModel(services: AppServices) {
         [pageId]: normalizeLanguageCode(generatedTasks.language),
       }));
     } catch (error) {
+      if (!isCurrentRun()) return;
       setPromptGenerationNotice(error instanceof Error ? error.message : 'Prompt API could not generate the slide.');
     } finally {
-      setPromptGenerationStatus(undefined);
-      setIsGeneratingSlide(false);
+      if (isCurrentRun()) {
+        setPromptGenerationStatus(undefined);
+        setIsGeneratingSlide(false);
+      }
     }
   }
 
   async function generateImageFromPrompt(prompt: string, options?: CreateImagePromptOptions) {
     const trimmedPrompt = prompt.trim();
-    if (!trimmedPrompt || isGeneratingImage) return;
+    if (!trimmedPrompt || isGeneratingImage || isGeneratingSlide) return;
+    const runId = promptGenerationRunIdRef.current + 1;
+    promptGenerationRunIdRef.current = runId;
+    const isCurrentRun = () => promptGenerationRunIdRef.current === runId;
 
     const isReady = ensureImageGenerationReadyForPrompt();
     if (!isReady) return;
@@ -972,9 +984,11 @@ export function useEditorViewModel(services: AppServices) {
       const asset = await services.imageGenerationService.generateImage(trimmedPrompt, {
         ...generationOptions,
         onProgress: (state) => {
+          if (!isCurrentRun()) return;
           setCreateImageStatus(`${state.label} ${state.progress}%`);
         },
       });
+      if (!isCurrentRun()) return;
       const elementId = createId('image-generated');
       const fittedImage = fitImageWithinPage({
         imageWidth: options?.width ?? DEFAULT_IMAGE_GENERATION_SIZE,
@@ -1004,9 +1018,26 @@ export function useEditorViewModel(services: AppServices) {
         { selectedElementIds: [elementId] },
       );
     } catch (error) {
+      if (!isCurrentRun()) return;
       setCreateImageNotice(error instanceof Error ? error.message : 'Image generation failed.');
     } finally {
+      if (isCurrentRun()) {
+        setCreateImageStatus(undefined);
+        setIsGeneratingImage(false);
+      }
+    }
+  }
+
+  function stopPromptGeneration() {
+    promptGenerationRunIdRef.current += 1;
+    if (isGeneratingSlide) {
+      setPromptGenerationStatus(undefined);
+      setPromptGenerationNotice('Slide generation stopped.');
+      setIsGeneratingSlide(false);
+    }
+    if (isGeneratingImage) {
       setCreateImageStatus(undefined);
+      setCreateImageNotice('Image generation stopped.');
       setIsGeneratingImage(false);
     }
   }
@@ -2141,6 +2172,7 @@ export function useEditorViewModel(services: AppServices) {
     ensureImageGenerationReadyForPrompt,
     generateSlideFromPrompt,
     generateImageFromPrompt,
+    stopPromptGeneration,
     setCreateImageOptions,
     setPromptProvider,
     setTranslationProvider,

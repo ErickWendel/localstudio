@@ -2029,10 +2029,45 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
   color: #7eb6ff;
+  padding: 4px 6px;
   white-space: nowrap;
   font-size: 13px;
   font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.prompt-mode-token:hover,
+.prompt-mode-token:focus-visible {
+  border-color: rgba(55, 253, 118, 0.28);
+  background: #000;
+  color: var(--ew-green);
+  transform: translateY(-1px);
+}
+
+.prompt-mode-token-close {
+  width: 0;
+  opacity: 0;
+  transform: scale(0.75);
+  transition:
+    width 140ms ease,
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.prompt-mode-token:hover .prompt-mode-token-close,
+.prompt-mode-token:focus-visible .prompt-mode-token-close {
+  width: 13px;
+  opacity: 1;
+  transform: scale(1);
 }
 
 .right-panel {

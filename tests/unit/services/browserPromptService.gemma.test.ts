@@ -1,9 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { GeneratedSlideTask } from '../../../src/domain/generatedSlide';
 import { GEMMA_LLM_TRANSFORMERS_MODEL_ID } from '../../../src/services/aiModelIds';
 import {
+  BrowserPromptService,
   createGemmaStructuredJsonMessages,
   GemmaPromptProvider,
+  GEMMA_PROMPT_PROVIDER_ID,
 } from '../../../src/services/browserPromptService';
+import type { ModelSetupService } from '../../../src/services/interfaces';
 import type {
   TextGenerationInput,
   TextGenerationOptions,
@@ -110,5 +114,67 @@ describe('GemmaPromptProvider structured JSON generation', () => {
 
     expect(progress).toContain(99);
     expect(progress.at(-1)).toBe(100);
+  });
+
+  it('normalizes left-image hero layout geometry after Gemma output', async () => {
+    const modelSetupService: ModelSetupService = {
+      getModelStates: vi.fn().mockResolvedValue([]),
+      downloadRequiredModels: vi.fn().mockResolvedValue([]),
+      downloadModel: vi.fn(),
+    };
+    const runtime: TextGenerationRuntime = {
+      preload: vi.fn(),
+      generate: vi.fn().mockResolvedValue(JSON.stringify({
+        type: 'image',
+        id: 'placeholder',
+        assetRole: 'placeholder',
+        x: 20,
+        y: 20,
+        width: 200,
+        height: 120,
+        rotation: 0,
+        opacity: 1,
+      })),
+    };
+    const storage = {
+      getItem: vi.fn().mockReturnValue(GEMMA_PROMPT_PROVIDER_ID),
+      setItem: vi.fn(),
+    } as unknown as Storage;
+    const service = new BrowserPromptService(modelSetupService, undefined, storage, runtime);
+    const allTasks: Array<Exclude<GeneratedSlideTask, { type: 'set-background' }>> = [
+      {
+        type: 'add-placeholder-image',
+        id: 'placeholder',
+        description: 'Hero placeholder image',
+        placementHint: 'hero placeholder image in the left media block',
+      },
+      {
+        type: 'add-title',
+        id: 'title',
+        text: 'AI Design Revolution',
+        placementHint: 'right text block, centered',
+      },
+    ];
+
+    const element = await service.generateSlideElementFromTask(allTasks[0]!, {
+      userPrompt: 'Create a LocalStudio.ai hero slide',
+      allTasks,
+      page: {
+        name: 'Generated slide',
+        width: 1920,
+        height: 1080,
+        background: { type: 'color', color: '#050D10' },
+      },
+      existingElements: [],
+    });
+
+    expect(element).toMatchObject({
+      type: 'image',
+      assetRole: 'placeholder',
+      x: 48,
+      y: 195,
+      width: 980,
+      height: 735,
+    });
   });
 });
