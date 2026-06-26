@@ -363,6 +363,7 @@ export function EditorShell({ services }: EditorShellProps) {
             generationStatus={vm.promptGenerationStatus}
             isGeneratingImage={vm.isGeneratingImage}
             isGeneratingSlide={vm.isGeneratingSlide}
+            selectedImageElementId={vm.selectedImagePromptElementId}
             onCreateImagePromptIntent={() => vm.ensureImageGenerationReadyForPrompt()}
             onCreateImageSubmit={(prompt, options) => vm.generateImageFromPrompt(prompt, options)}
             onSlidePromptSubmit={(prompt) => vm.generateSlideFromPrompt(prompt)}

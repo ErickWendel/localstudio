@@ -9,6 +9,7 @@ import {
   RenamePageCommand,
   ReorderPageCommand,
   ReorderElementCommand,
+  ReplaceImageAssetCommand,
   SetPageVisibilityCommand,
   SetZOrderCommand,
   SetElementLockCommand,
@@ -78,6 +79,34 @@ describe('editor commands', () => {
     expect(next.elements['image-hero']).toBeUndefined();
     expect(next.assets['asset-hero']).toBeUndefined();
     expect(next.pages[0]?.elementIds).not.toContain('image-hero');
+  });
+
+  it('replaces an image asset while preserving its frame and z-order', () => {
+    const project = createSampleProject();
+    const command = new ReplaceImageAssetCommand('image-hero', {
+      id: 'asset-generated-replacement',
+      type: 'image',
+      name: 'replacement.png',
+      mimeType: 'image/png',
+      objectUrl: 'blob:replacement',
+    });
+    const next = command.execute(project);
+
+    expect(next).not.toBe(project);
+    expect(next.elements['image-hero']).toMatchObject({
+      id: 'image-hero',
+      type: 'image',
+      assetId: 'asset-generated-replacement',
+      x: 55,
+      y: 200,
+      width: 980,
+      height: 735,
+      rotation: 0,
+    });
+    expect(next.pages[0]?.elementIds).toEqual(project.pages[0]?.elementIds);
+    expect(next.assets['asset-generated-replacement']).toBeDefined();
+    expect(next.assets['asset-hero']).toBeUndefined();
+    expect(project.elements['image-hero']).toMatchObject({ type: 'image', assetId: 'asset-hero' });
   });
 
   it('toggles image horizontal flip immutably', () => {

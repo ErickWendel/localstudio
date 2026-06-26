@@ -706,6 +706,45 @@ describe('mocked AI flows', () => {
     });
   });
 
+  it('replaces the selected image using the selected image frame as generation size', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const generateImage = vi.fn((_prompt: string, options?: ImageGenerationOptions): Promise<Asset> => {
+      options?.onProgress?.({ label: 'Generating replacement 1/4', progress: 25 });
+      return Promise.resolve({
+        id: 'asset-generated-replacement',
+        type: 'image',
+        name: 'replacement.png',
+        mimeType: 'image/png',
+        objectUrl:
+          'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lMFeWAAAAABJRU5ErkJggg==',
+      });
+    });
+    services.modelSetupService = new InMemoryModelSetupService();
+    services.imageGenerationService = { generateImage };
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await user.click(screen.getByRole('button', { name: 'Download Image Generation Models' }));
+    await user.click(screen.getByRole('button', { name: '16:9' }));
+    await user.click(screen.getByRole('tab', { name: 'Layout' }));
+    await user.click(screen.getByRole('button', { name: 'Selected Image' }));
+    await user.type(screen.getByLabelText('Create image prompt'), 'Replace with a neon studio');
+    await user.click(screen.getByRole('button', { name: 'Submit prompt' }));
+
+    await waitFor(() => {
+      expect(generateImage).toHaveBeenCalledWith(
+        'Replace with a neon studio',
+        expect.objectContaining({
+          height: 736,
+          width: 976,
+        }),
+      );
+    });
+    expect(screen.getByRole('button', { name: 'Selected Image' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Undo' })).not.toBeDisabled();
+  });
+
   it('shows a stop action instead of allowing duplicate create image submissions', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
