@@ -78,4 +78,19 @@ describe('AiToolsPanel', () => {
     expect(screen.queryByRole('button', { name: 'Download LLM Model' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Download Translation Model' })).not.toBeInTheDocument();
   });
+
+  it('shows finalizing copy instead of a stuck high percentage during model preparation', () => {
+    render(
+      <AiToolsPanel
+        modelStates={[]}
+        promptProviderStates={[gemmaProvider]}
+        promptPreparation={{ availability: 'downloading', progress: 99, status: 'downloading' }}
+      />,
+    );
+
+    const llmCard = screen.getByRole('article', { name: 'LLM Model' });
+
+    expect(within(llmCard).getByText('Finalizing...')).toBeInTheDocument();
+    expect(within(llmCard).queryByText('99%')).not.toBeInTheDocument();
+  });
 });

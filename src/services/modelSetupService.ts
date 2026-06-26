@@ -14,7 +14,7 @@ import {
   TRANSFORMERS_CACHE_KEY,
 } from './imageGenerationModels';
 import { BrowserBonsaiImageRuntime } from './bonsaiImageRuntime';
-import { createMonotonicProgressReporter } from './progress';
+import { createMonotonicProgressReporter, createTransformersProgressCallback } from './progress';
 
 export const IMAGE_EDITING_MODEL_ID = 'image-editing-models';
 export const IMAGE_EDITING_TRANSFORMERS_MODEL_ID = 'Xenova/slimsam-77-uniform';
@@ -37,6 +37,11 @@ export interface ImageGenerationModelLoader {
 
 export interface TextGenerationModelLoader {
   loadTextGenerationModel(modelId: string, options?: { onProgress?: (progress: number) => void }): Promise<void>;
+  removeTextGenerationModel?(modelId: string): Promise<void>;
+}
+
+export interface ModelCacheStorage {
+  deleteModelArtifacts(modelId: string): Promise<void>;
 }
 
 const initialStates: ModelState[] = [
@@ -128,13 +133,32 @@ export class TransformersTextGenerationModelLoader implements TextGenerationMode
     await pipeline('text-generation', modelId, {
       dtype: 'q4',
       device: 'webgpu',
-      progress_callback: (progress) => {
-        const progressValue = 'progress' in progress ? progress.progress : undefined;
-        if (typeof progressValue === 'number') {
-          options?.onProgress?.(progressValue);
-        }
-      },
+      progress_callback: createTransformersProgressCallback(options?.onProgress),
     });
+  }
+
+  async removeTextGenerationModel(): Promise<void> {
+    // Plain loader instances do not retain an in-memory pipeline. The shared runtime
+    // used by the app implements this hook to dispose WebGPU sessions.
+  }
+}
+
+export class BrowserTransformersModelCache implements ModelCacheStorage {
+  async deleteModelArtifacts(modelId: string): Promise<void> {
+    if (typeof caches === 'undefined') return;
+
+    const normalizedModelId = modelId.toLowerCase();
+    const encodedModelId = encodeURIComponent(modelId).toLowerCase();
+    const cache = await caches.open(TRANSFORMERS_CACHE_KEY);
+    const requests = await cache.keys();
+    await Promise.all(
+      requests
+        .filter((request) => {
+          const url = request.url.toLowerCase();
+          return url.includes(normalizedModelId) || url.includes(encodedModelId);
+        })
+        .map((request) => cache.delete(request)),
+    );
   }
 }
 
@@ -146,6 +170,7 @@ export class BrowserModelSetupService implements ModelSetupService {
     private readonly storage: ModelStorage | undefined = getBrowserStorage(),
     private readonly imageGenerationModelLoader: ImageGenerationModelLoader = new TransformersImageGenerationModelLoader(),
     private readonly textGenerationModelLoader: TextGenerationModelLoader = new TransformersTextGenerationModelLoader(),
+    private readonly modelCacheStorage: ModelCacheStorage = new BrowserTransformersModelCache(),
   ) {
     const imageEditingModelReady = storage?.getItem(IMAGE_EDITING_READY_KEY) === 'true';
     const imageGenerationModelReady = storage?.getItem(IMAGE_GENERATION_READY_KEY) === 'true';
@@ -224,7 +249,7 @@ export class BrowserModelSetupService implements ModelSetupService {
     }
   }
 
-  removeModel(id: string): Promise<ModelState> {
+  async removeModel(id: string): Promise<ModelState> {
     const current = this.states.find((state) => state.id === id);
     if (!current) throw new Error(`Unknown model: ${id}`);
 
@@ -234,7 +259,22 @@ export class BrowserModelSetupService implements ModelSetupService {
       this.storage?.setItem(readyKey, 'false');
     }
 
-    return Promise.resolve(this.setModelState(id, { status: 'needs-download', progress: 0, error: undefined }));
+    if (id === GEMMA_LLM_MODEL_ID) {
+      await this.textGenerationModelLoader.removeTextGenerationModel?.(GEMMA_LLM_TRANSFORMERS_MODEL_ID);
+      await this.modelCacheStorage.deleteModelArtifacts(GEMMA_LLM_TRANSFORMERS_MODEL_ID);
+    }
+    if (id === TRANSLATEGEMMA_MODEL_ID) {
+      await this.textGenerationModelLoader.removeTextGenerationModel?.(TRANSLATEGEMMA_TRANSFORMERS_MODEL_ID);
+      await this.modelCacheStorage.deleteModelArtifacts(TRANSLATEGEMMA_TRANSFORMERS_MODEL_ID);
+    }
+    if (id === IMAGE_EDITING_MODEL_ID) {
+      await this.modelCacheStorage.deleteModelArtifacts(IMAGE_EDITING_TRANSFORMERS_MODEL_ID);
+    }
+    if (id === IMAGE_GENERATION_MODEL_ID) {
+      await this.modelCacheStorage.deleteModelArtifacts(IMAGE_GENERATION_TRANSFORMERS_MODEL_ID);
+    }
+
+    return this.setModelState(id, { status: 'needs-download', progress: 0, error: undefined });
   }
 
   private setModelState(id: string, patch: Partial<ModelState>) {

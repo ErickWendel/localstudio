@@ -8,12 +8,16 @@ import type {
 } from '../../../../src/domain/generatedSlide';
 import type { Asset } from '../../../../src/domain/model';
 import type {
+  AiProviderState,
   ImageGenerationService,
   ImageGenerationOptions,
+  ModelSetupService,
+  ModelState,
   PromptApiAvailability,
   PromptService,
   TranslatorService,
 } from '../../../../src/services/interfaces';
+import { GEMMA_LLM_MODEL_ID, TRANSLATEGEMMA_MODEL_ID } from '../../../../src/services/aiModelIds';
 import { MockImageGenerationService } from '../../../../src/services/inMemoryAiServices';
 import { InMemoryModelSetupService } from '../../../../src/services/modelSetupService';
 import { EditorShell } from '../../../../src/ui/editor/EditorShell';
@@ -43,7 +47,7 @@ class PreparingTranslatorService implements TranslatorService {
 }
 
 class TestPromptService implements PromptService {
-  constructor(private availability: PromptApiAvailability = 'unavailable') {}
+  constructor(protected availability: PromptApiAvailability = 'unavailable') {}
 
   checkAvailability = vi.fn(() => Promise.resolve(this.availability));
 
@@ -109,6 +113,157 @@ class SlowImageGenerationService implements ImageGenerationService {
         }, 250);
       }),
   );
+}
+
+class PromptProviderSelectionService extends TestPromptService {
+  private selectedProviderId = 'chrome-prompt-api';
+
+  getProviderStates = vi.fn((): Promise<AiProviderState[]> =>
+    Promise.resolve([
+      {
+        id: 'chrome-prompt-api',
+        label: 'Chrome Built-in Prompt API',
+        description: 'Prompt to slides using Chrome Built-in AI.',
+        capability: 'prompt',
+        runtime: 'chrome-built-in',
+        compatibility: 'compatible',
+        readiness: 'ready',
+        selected: this.selectedProviderId === 'chrome-prompt-api',
+      },
+      {
+        id: 'gemma-4-webgpu',
+        label: 'Gemma 4 WebGPU',
+        description: 'Browser-local Gemma LLM for prompt-to-slides.',
+        capability: 'prompt',
+        runtime: 'webgpu-huggingface',
+        compatibility: 'compatible',
+        modelId: GEMMA_LLM_MODEL_ID,
+        readiness: this.availability === 'ready' ? 'ready' : 'needs-download',
+        selected: this.selectedProviderId === 'gemma-4-webgpu',
+      },
+    ]),
+  );
+
+  getSelectedProviderId() {
+    return this.selectedProviderId;
+  }
+
+  markGemmaNeedsDownload() {
+    this.availability = 'downloadable';
+  }
+
+  setSelectedProvider(providerId: string) {
+    this.selectedProviderId = providerId;
+    return this.getProviderStates();
+  }
+}
+
+class PromptModelSetupService extends InMemoryModelSetupService implements ModelSetupService {
+  constructor(private readonly onGemmaRemoved?: () => void) {
+    super();
+  }
+
+  private gemmaState: ModelState = {
+    id: GEMMA_LLM_MODEL_ID,
+    label: 'Gemma 4 WebGPU LLM',
+    provider: 'transformers',
+    status: 'needs-download',
+    progress: 0,
+    required: false,
+  };
+
+  override async getModelStates(): Promise<ModelState[]> {
+    const states = await super.getModelStates();
+    return [...states.filter((state) => state.id !== GEMMA_LLM_MODEL_ID), { ...this.gemmaState }];
+  }
+
+  override async downloadModel(id: string, options?: { onProgress?: (progress: number) => void }): Promise<ModelState> {
+    if (id !== GEMMA_LLM_MODEL_ID) return super.downloadModel(id, options);
+    options?.onProgress?.(40);
+    options?.onProgress?.(100);
+    this.gemmaState = { ...this.gemmaState, status: 'ready', progress: 100 };
+    return { ...this.gemmaState };
+  }
+
+  override async removeModel(id: string): Promise<ModelState> {
+    if (id !== GEMMA_LLM_MODEL_ID) return super.removeModel(id);
+    this.onGemmaRemoved?.();
+    this.gemmaState = { ...this.gemmaState, status: 'needs-download', progress: 0 };
+    return { ...this.gemmaState };
+  }
+}
+
+class TranslationProviderSelectionService extends PreparingTranslatorService {
+  private selectedProviderId = 'chrome-translator-api';
+  private translateGemmaReady = false;
+
+  override prepareTranslation = vi.fn(
+    (
+      sourceLanguage: string,
+      targetLanguage: string,
+      options?: { onProgress?: (progress: number) => void },
+    ) => {
+      void sourceLanguage;
+      void targetLanguage;
+      options?.onProgress?.(45);
+      options?.onProgress?.(100);
+      this.translateGemmaReady = true;
+      return Promise.resolve();
+    },
+  );
+
+  getProviderStates = vi.fn((): Promise<AiProviderState[]> =>
+    Promise.resolve([
+      {
+        id: 'chrome-translator-api',
+        label: 'Chrome Built-in Translator',
+        description: 'Translate visible text using Chrome Built-in AI.',
+        capability: 'translation',
+        runtime: 'chrome-built-in',
+        compatibility: 'compatible',
+        readiness: 'ready',
+        selected: this.selectedProviderId === 'chrome-translator-api',
+      },
+      {
+        id: 'translategemma-webgpu',
+        label: 'TranslateGemma WebGPU',
+        description: 'Browser-local translation model.',
+        capability: 'translation',
+        runtime: 'webgpu-huggingface',
+        compatibility: 'compatible',
+        modelId: TRANSLATEGEMMA_MODEL_ID,
+        readiness: this.translateGemmaReady ? 'ready' : 'needs-download',
+        selected: this.selectedProviderId === 'translategemma-webgpu',
+      },
+    ]),
+  );
+
+  getSelectedProviderId() {
+    return this.selectedProviderId;
+  }
+
+  markTranslateGemmaNeedsDownload() {
+    this.translateGemmaReady = false;
+  }
+
+  setSelectedProvider(providerId: string) {
+    this.selectedProviderId = providerId;
+    return this.getProviderStates();
+  }
+}
+
+class TranslationModelSetupService extends InMemoryModelSetupService implements ModelSetupService {
+  constructor(private readonly onTranslateGemmaRemoved?: () => void) {
+    super();
+  }
+
+  override async removeModel(id: string): Promise<ModelState> {
+    const next = await super.removeModel(id);
+    if (id === TRANSLATEGEMMA_MODEL_ID) {
+      this.onTranslateGemmaRemoved?.();
+    }
+    return next;
+  }
 }
 
 describe('mocked AI flows', () => {
@@ -232,6 +387,84 @@ describe('mocked AI flows', () => {
 
     expect(screen.getByRole('tab', { name: 'Layout' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByLabelText('Create image prompt')).toHaveValue('neon cover');
+  });
+
+  it('prepares Gemma automatically when selected as the LLM model', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const promptService = new PromptProviderSelectionService('downloadable');
+    services.promptService = promptService;
+    services.modelSetupService = new PromptModelSetupService(() => promptService.markGemmaNeedsDownload());
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await user.selectOptions(screen.getAllByLabelText('LLM Model')[1]!, 'gemma-4-webgpu');
+
+    await waitFor(() => {
+      expect(promptService.preparePromptApi).toHaveBeenCalled();
+    });
+    const llmCard = screen.getByRole('article', { name: 'LLM Model' });
+    expect(within(llmCard).getByText('Ready')).toBeInTheDocument();
+  });
+
+  it('keeps Gemma selected after removing its cached model', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const promptService = new PromptProviderSelectionService('downloadable');
+    services.promptService = promptService;
+    services.modelSetupService = new PromptModelSetupService(() => promptService.markGemmaNeedsDownload());
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await user.selectOptions(screen.getAllByLabelText('LLM Model')[1]!, 'gemma-4-webgpu');
+    await waitFor(() => {
+      expect(promptService.preparePromptApi).toHaveBeenCalled();
+    });
+    await user.click(screen.getByRole('button', { name: 'Remove LLM Model' }));
+
+    expect(screen.getAllByLabelText('LLM Model')[1]).toHaveValue('gemma-4-webgpu');
+    expect(screen.getByRole('button', { name: 'Download LLM Model' })).toBeInTheDocument();
+  });
+
+  it('prepares TranslateGemma automatically when selected as the translation model', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const translatorService = new TranslationProviderSelectionService();
+    services.translatorService = translatorService;
+    services.modelSetupService = new TranslationModelSetupService(() =>
+      translatorService.markTranslateGemmaNeedsDownload(),
+    );
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await user.selectOptions(screen.getByLabelText('Translation Model'), 'translategemma-webgpu');
+
+    await waitFor(() => {
+      expect(translatorService.prepareTranslation).toHaveBeenCalled();
+    });
+    const translationCard = screen.getByRole('article', { name: 'Translate Design' });
+    expect(within(translationCard).getByRole('button', { name: 'Remove Translation Model' })).toBeInTheDocument();
+  });
+
+  it('keeps TranslateGemma selected after removing its cached model', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const translatorService = new TranslationProviderSelectionService();
+    services.translatorService = translatorService;
+    services.modelSetupService = new TranslationModelSetupService(() =>
+      translatorService.markTranslateGemmaNeedsDownload(),
+    );
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await user.selectOptions(screen.getByLabelText('Translation Model'), 'translategemma-webgpu');
+    await waitFor(() => {
+      expect(translatorService.prepareTranslation).toHaveBeenCalled();
+    });
+    await user.click(screen.getByRole('button', { name: 'Remove Translation Model' }));
+
+    expect(screen.getByLabelText('Translation Model')).toHaveValue('translategemma-webgpu');
+    expect(screen.getByRole('button', { name: 'Download Translation Model' })).toBeInTheDocument();
   });
 
   it('generates an image from create image mode and inserts it into the active slide', async () => {

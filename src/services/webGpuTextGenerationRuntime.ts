@@ -1,14 +1,18 @@
 import { TRANSFORMERS_CACHE_KEY } from './imageGenerationModels';
+import { createTransformersProgressCallback } from './progress';
 
 export interface TextGenerationRuntime {
   preload(modelId: string, options?: { onProgress?: (progress: number) => void }): Promise<void>;
   generate(modelId: string, prompt: TextGenerationInput, options?: TextGenerationOptions): Promise<string>;
+  removeTextGenerationModel?(modelId: string): Promise<void>;
 }
 
 export type TextGenerationInput = string | Array<{ role: string; content: unknown }>;
 export type TextGenerationOptions = Record<string, unknown>;
 
-type TextGenerationPipeline = (prompt: unknown, options?: TextGenerationOptions) => Promise<unknown>;
+type TextGenerationPipeline = ((prompt: unknown, options?: TextGenerationOptions) => Promise<unknown>) & {
+  dispose?: () => Promise<void> | void;
+};
 
 function extractTextFromGeneratedValue(value: unknown): string | undefined {
   if (typeof value === 'string') return value;
@@ -54,6 +58,13 @@ export class TransformersTextGenerationRuntime implements TextGenerationRuntime 
     await this.loadPipeline(modelId, options);
   }
 
+  async removeTextGenerationModel(modelId: string): Promise<void> {
+    const pipelinePromise = this.pipelines.get(modelId);
+    this.pipelines.delete(modelId);
+    const pipeline = await pipelinePromise?.catch(() => undefined);
+    await pipeline?.dispose?.();
+  }
+
   async generate(modelId: string, prompt: TextGenerationInput, options?: TextGenerationOptions): Promise<string> {
     const textGeneration = await this.loadPipeline(modelId);
     const generationOptions: TextGenerationOptions = {
@@ -80,12 +91,7 @@ export class TransformersTextGenerationRuntime implements TextGenerationRuntime 
       return (await pipeline('text-generation', modelId, {
         dtype: 'q4',
         device: 'webgpu',
-        progress_callback: (progress) => {
-          const progressValue = 'progress' in progress ? progress.progress : undefined;
-          if (typeof progressValue === 'number') {
-            options?.onProgress?.(progressValue);
-          }
-        },
+        progress_callback: createTransformersProgressCallback(options?.onProgress),
       })) as unknown as TextGenerationPipeline;
     });
     this.pipelines.set(modelId, pipelinePromise);
