@@ -67,6 +67,32 @@ describe('TopToolbar', () => {
     expect(onPersistenceToggle).toHaveBeenCalledWith(true);
   });
 
+  it('marks persistence as unavailable when the browser cannot save local folders', async () => {
+    const user = userEvent.setup();
+    const onPersistenceToggle = vi.fn();
+
+    render(
+      <TopToolbar
+        project={createSampleProject()}
+        language="PT-BR"
+        persistenceAvailable={false}
+        onPersistenceToggle={onPersistenceToggle}
+      />,
+    );
+
+    const persistenceButton = screen.getByRole('button', { name: 'Persistence unavailable' });
+    expect(persistenceButton).toBeDisabled();
+    expect(persistenceButton).toHaveAttribute(
+      'title',
+      'Local project persistence is not available in this browser. Use a browser with File System Access support.',
+    );
+    expect(persistenceButton).toHaveTextContent('×');
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    expect(screen.getByRole('menuitem', { name: 'Save Local' })).toBeDisabled();
+    expect(onPersistenceToggle).not.toHaveBeenCalled();
+  });
+
   it('opens version history from the toolbar when persistence is enabled', async () => {
     const user = userEvent.setup();
     const onOpenVersionHistory = vi.fn();

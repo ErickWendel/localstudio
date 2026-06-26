@@ -21,7 +21,9 @@ describe('createAppServices', () => {
       value: () => Promise.resolve({}),
     });
 
-    expect(createAppServices().projectRepository).toBeInstanceOf(BrowserFileSystemProjectRepository);
+    const services = createAppServices();
+    expect(services.persistenceAvailable).toBe(true);
+    expect(services.projectRepository).toBeInstanceOf(BrowserFileSystemProjectRepository);
   });
 
   it('uses disabled persistence when the File System Access API is unavailable', () => {
@@ -30,7 +32,9 @@ describe('createAppServices', () => {
       value: undefined,
     });
 
-    expect(createAppServices().projectRepository).toBeInstanceOf(DisabledProjectRepository);
+    const services = createAppServices();
+    expect(services.persistenceAvailable).toBe(false);
+    expect(services.projectRepository).toBeInstanceOf(DisabledProjectRepository);
   });
 
   it('wires the browser image generation service', () => {

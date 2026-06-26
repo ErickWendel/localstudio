@@ -2,11 +2,9 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '../../../src/App';
-import { SETUP_COMPLETE_KEY } from '../../../src/services/localSetupService';
 
 describe('App', () => {
   beforeEach(() => {
-    window.localStorage.setItem(SETUP_COMPLETE_KEY, 'true');
     vi.stubGlobal('showDirectoryPicker', vi.fn());
     vi.stubGlobal('Translator', {
       availability: vi.fn().mockResolvedValue('available'),
@@ -56,8 +54,7 @@ describe('App', () => {
     expect(window.location.search).toBe('');
   });
 
-  it('shows first-run setup before entering the editor', async () => {
-    const user = userEvent.setup();
+  it('opens the editor without requiring first-run setup', async () => {
     window.localStorage.clear();
     vi.stubGlobal('showDirectoryPicker', vi.fn());
     vi.stubGlobal('Translator', {
@@ -66,22 +63,17 @@ describe('App', () => {
 
     render(<App />);
 
-    expect(await screen.findByText('LocalStudio.ai runs locally in this browser.')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Continue to editor' }));
-
-    expect(window.localStorage.getItem(SETUP_COMPLETE_KEY)).toBe('true');
     expect(await screen.findByText('Untitled Project')).toBeInTheDocument();
+    expect(screen.queryByText('LocalStudio.ai runs locally in this browser.')).not.toBeInTheDocument();
   });
 
-  it('revalidates completed setup and shows setup when capabilities are unavailable', async () => {
+  it('opens the editor even when browser capabilities are unavailable', async () => {
     vi.stubGlobal('showDirectoryPicker', undefined);
     vi.stubGlobal('Translator', undefined);
 
     render(<App />);
 
-    expect(await screen.findByText('LocalStudio.ai runs locally in this browser.')).toBeInTheDocument();
-    expect(screen.queryByText('Untitled Project')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Continue to editor' })).toBeDisabled();
+    expect(await screen.findByText('Untitled Project')).toBeInTheDocument();
+    expect(screen.queryByText('LocalStudio.ai runs locally in this browser.')).not.toBeInTheDocument();
   });
 });

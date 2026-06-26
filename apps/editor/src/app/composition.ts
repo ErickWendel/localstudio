@@ -34,6 +34,7 @@ export interface AppServices {
   initialProject: ProjectDocument;
   skipStoredProjectLoad: boolean;
   storedProjectName?: string;
+  persistenceAvailable: boolean;
   projectRepository: ProjectRepository;
   exportService: ExportService;
   localSetupService: LocalSetupService;
@@ -56,6 +57,7 @@ interface CreateAppServicesOptions {
 export function createAppServices(options: CreateAppServicesOptions = {}): AppServices {
   const textGenerationRuntime = new TransformersTextGenerationRuntime();
   const languageDetectionRuntime = new TransformersLanguageDetectionRuntime();
+  const persistenceAvailable = isFileSystemAccessAvailable();
   const modelSetupService = new BrowserModelSetupService(
     undefined,
     undefined,
@@ -68,7 +70,8 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     initialProject: options.initialProject ?? createBlankProject(),
     skipStoredProjectLoad: options.skipStoredProjectLoad ?? false,
     ...(options.storedProjectName ? { storedProjectName: options.storedProjectName } : {}),
-    projectRepository: createProjectRepository(),
+    persistenceAvailable,
+    projectRepository: createProjectRepository(persistenceAvailable),
     exportService: new BrowserExportService(),
     localSetupService: new BrowserLocalSetupService(),
     modelSetupService,
@@ -88,11 +91,15 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
   };
 }
 
-function createProjectRepository(): ProjectRepository {
-  if (
+function isFileSystemAccessAvailable() {
+  return (
     typeof window !== 'undefined' &&
     typeof (window as Window & { showDirectoryPicker?: unknown }).showDirectoryPicker === 'function'
-  ) {
+  );
+}
+
+function createProjectRepository(persistenceAvailable: boolean): ProjectRepository {
+  if (persistenceAvailable) {
     return new BrowserFileSystemProjectRepository();
   }
   return new DisabledProjectRepository();

@@ -414,6 +414,7 @@ button {
 }
 
 .stitch-icon-button {
+  position: relative;
   width: 32px;
   height: 32px;
   display: inline-flex;
@@ -442,6 +443,27 @@ button {
 
 .persistence-on {
   color: var(--ew-green);
+}
+
+.persistence-unavailable {
+  color: #ffb4ab;
+}
+
+.persistence-unavailable-x {
+  position: absolute;
+  right: 4px;
+  bottom: 3px;
+  width: 12px;
+  height: 12px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(255, 180, 171, 0.82);
+  border-radius: 999px;
+  background: #050d10;
+  color: #ffb4ab;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
 }
 
 .history-save-applied .material-symbols-outlined {
@@ -1934,6 +1956,14 @@ button {
     box-shadow 140ms ease;
 }
 
+.prompt-bar-processing {
+  border-color: rgba(55, 253, 118, 0.38);
+  opacity: 0.72;
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.5),
+    0 0 22px rgba(55, 253, 118, 0.12);
+}
+
 .prompt-bar:focus-within {
   border-color: rgba(55, 253, 118, 0.65);
   box-shadow:
@@ -1949,6 +1979,12 @@ button {
   background: transparent;
   color: var(--ew-text);
   font-size: 13px;
+}
+
+.prompt-bar input:disabled {
+  color: rgba(236, 255, 233, 0.72);
+  opacity: 1;
+  -webkit-text-fill-color: rgba(236, 255, 233, 0.72);
 }
 
 .prompt-bar input::placeholder {

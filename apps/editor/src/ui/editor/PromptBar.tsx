@@ -68,11 +68,11 @@ export function PromptBar({
   async function submitPrompt() {
     const trimmedValue = value.trim();
     if (!trimmedValue || isProcessing) return;
+    setLocalSubmissionActive(true);
     if (mode === 'create-image') {
-      const canCreateImage = await guardPromptIntent();
-      if (!canCreateImage) return;
-      setLocalSubmissionActive(true);
       try {
+        const canCreateImage = await guardPromptIntent();
+        if (!canCreateImage) return;
         await onCreateImageSubmit?.(trimmedValue, createImageOptions);
         setValue('');
       } finally {
@@ -80,7 +80,6 @@ export function PromptBar({
       }
       return;
     }
-    setLocalSubmissionActive(true);
     try {
       await onSlidePromptSubmit?.(trimmedValue);
       setValue('');
@@ -125,7 +124,8 @@ export function PromptBar({
         </div>
       ) : null}
       <form
-        className="prompt-bar"
+        className={isProcessing ? 'prompt-bar prompt-bar-processing' : 'prompt-bar'}
+        aria-busy={isProcessing}
         aria-label="Slide structure prompt"
         onSubmit={(event) => {
           event.preventDefault();

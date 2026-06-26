@@ -18,13 +18,22 @@ interface EditorShellProps {
 const EDITOR_OBJECT_CLIPBOARD_TYPE = 'application/x-localstudio-editor-elements';
 const EDITOR_OBJECT_CLIPBOARD_MARKER = '1';
 
-function isEditablePasteTarget(target: EventTarget | null) {
+function isEditableElement(target: EventTarget | null) {
   return (
     target instanceof HTMLInputElement ||
     target instanceof HTMLTextAreaElement ||
     target instanceof HTMLSelectElement ||
     (target instanceof HTMLElement && target.isContentEditable)
   );
+}
+
+function isEditableInteractionTarget(target: EventTarget | null) {
+  return isEditableElement(target) || isEditableElement(document.activeElement);
+}
+
+function hasBrowserTextSelection() {
+  const selection = window.getSelection();
+  return Boolean(selection && selection.toString().length > 0);
 }
 
 function getClipboardImageFile(clipboardData: DataTransfer | null) {
@@ -99,7 +108,7 @@ export function EditorShell({ services }: EditorShellProps) {
       }
 
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'a') {
-        if (isEditablePasteTarget(event.target)) return;
+        if (isEditableInteractionTarget(event.target)) return;
         event.preventDefault();
         vm.selectAllElementsOnActivePage();
         return;
@@ -113,12 +122,7 @@ export function EditorShell({ services }: EditorShellProps) {
 
       if (event.key !== 'Delete' && event.key !== 'Backspace') return;
       const target = event.target;
-      if (
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target instanceof HTMLSelectElement ||
-        (target instanceof HTMLElement && target.isContentEditable)
-      ) {
+      if (isEditableInteractionTarget(target)) {
         return;
       }
 
@@ -136,7 +140,7 @@ export function EditorShell({ services }: EditorShellProps) {
   useEffect(() => {
     function handleCopy(event: ClipboardEvent) {
       if (isHistoryReadOnly) return;
-      if (isEditablePasteTarget(event.target) || !hasSelection) return;
+      if (isEditableInteractionTarget(event.target) || hasBrowserTextSelection() || !hasSelection) return;
       event.preventDefault();
       vm.copySelectedElements();
       writeEditorObjectClipboardMarker(event.clipboardData);
@@ -144,7 +148,7 @@ export function EditorShell({ services }: EditorShellProps) {
 
     function handleCut(event: ClipboardEvent) {
       if (isHistoryReadOnly) return;
-      if (isEditablePasteTarget(event.target) || !hasSelection) return;
+      if (isEditableInteractionTarget(event.target) || hasBrowserTextSelection() || !hasSelection) return;
       event.preventDefault();
       vm.cutSelectedElements();
       writeEditorObjectClipboardMarker(event.clipboardData);
@@ -152,7 +156,7 @@ export function EditorShell({ services }: EditorShellProps) {
 
     function handlePaste(event: ClipboardEvent) {
       if (isHistoryReadOnly) return;
-      if (isEditablePasteTarget(event.target)) return;
+      if (isEditableInteractionTarget(event.target)) return;
       event.preventDefault();
       if (hasEditorObjectClipboardMarker(event.clipboardData) && vm.pasteCopiedElements()) return;
       const imageFile = getClipboardImageFile(event.clipboardData);
@@ -187,6 +191,7 @@ export function EditorShell({ services }: EditorShellProps) {
         lastEditedAt={vm.lastEditedAt}
         saveAnimationKey={vm.saveAnimationKey}
         canTranslateDeck={vm.canTranslateDeck}
+        persistenceAvailable={services.persistenceAvailable}
         onDelete={isHistoryReadOnly ? undefined : vm.deleteSelectedElement}
         onDuplicate={isHistoryReadOnly ? undefined : vm.duplicateSelectedElement}
         onExport={exportCurrentPageAsPng}

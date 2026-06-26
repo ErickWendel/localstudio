@@ -10,6 +10,7 @@ interface TopToolbarProps {
   canUndo?: boolean;
   hasSelection?: boolean;
   persistenceEnabled?: boolean;
+  persistenceAvailable?: boolean;
   lastEditedAt?: string | undefined;
   saveAnimationKey?: number;
   canTranslateDeck?: boolean;
@@ -49,6 +50,7 @@ export function TopToolbar({
   canUndo = false,
   hasSelection = false,
   persistenceEnabled = false,
+  persistenceAvailable = true,
   lastEditedAt,
   saveAnimationKey = 0,
   canTranslateDeck = false,
@@ -105,7 +107,11 @@ export function TopToolbar({
     File: [
       { label: 'New Project', disabled: !onNewProject, onSelect: onNewProject },
       { label: 'Import Project', disabled: !onImportProject, onSelect: onImportProject },
-      { label: 'Save Local', onSelect: () => onPersistenceToggle?.(true) },
+      {
+        label: 'Save Local',
+        disabled: !persistenceAvailable,
+        onSelect: () => onPersistenceToggle?.(true),
+      },
       { label: 'Export', onSelect: triggerExport },
     ],
     Edit: [
@@ -141,6 +147,16 @@ export function TopToolbar({
         timeStyle: 'short',
       }).format(new Date(lastEditedAt))}`
     : 'No saved versions yet';
+  const persistenceLabel = !persistenceAvailable
+    ? 'Persistence unavailable'
+    : persistenceEnabled
+      ? 'Persistence enabled'
+      : 'Persistence disabled';
+  const persistenceTitle = !persistenceAvailable
+    ? 'Local project persistence is not available in this browser. Use a browser with File System Access support.'
+    : persistenceEnabled
+      ? 'Persistence enabled'
+      : 'Persistence disabled';
 
   return (
     <header className="top-toolbar">
@@ -227,17 +243,30 @@ export function TopToolbar({
       <div className="toolbar-right">
         <div className="toolbar-icon-group" aria-label="Editing actions">
           <button
-            className={persistenceEnabled ? 'stitch-icon-button persistence-on' : 'stitch-icon-button persistence-off'}
-            title={persistenceEnabled ? 'Persistence enabled' : 'Persistence disabled'}
+            className={
+              !persistenceAvailable
+                ? 'stitch-icon-button persistence-off persistence-unavailable'
+                : persistenceEnabled
+                  ? 'stitch-icon-button persistence-on'
+                  : 'stitch-icon-button persistence-off'
+            }
+            disabled={!persistenceAvailable}
+            title={persistenceTitle}
             type="button"
-            aria-label={persistenceEnabled ? 'Persistence enabled' : 'Persistence disabled'}
+            aria-label={persistenceLabel}
             onClick={() => {
+              if (!persistenceAvailable) return;
               onPersistenceToggle?.(!persistenceEnabled);
             }}
           >
             <span className="material-symbols-outlined" aria-hidden="true">
               {persistenceEnabled ? 'cloud_done' : 'cloud_off'}
             </span>
+            {!persistenceAvailable ? (
+              <span className="persistence-unavailable-x" aria-hidden="true">
+                ×
+              </span>
+            ) : null}
           </button>
           <button
             className="stitch-icon-button history-save-applied"

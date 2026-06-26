@@ -13,6 +13,7 @@ import { InMemoryModelSetupService } from '../../../../src/services/modelSetupSe
 import { EditorShell } from '../../../../src/ui/editor/EditorShell';
 
 function createAppServices(options: Parameters<typeof createRealAppServices>[0] = {}) {
+  vi.stubGlobal('showDirectoryPicker', vi.fn());
   return createRealAppServices({
     initialProject: createSampleProject(),
     ...options,
@@ -283,7 +284,9 @@ describe('EditorShell', () => {
 
   it('toggles persistence from disabled to enabled', async () => {
     const user = userEvent.setup();
-    render(<EditorShell services={createAppServices()} />);
+    const services = createAppServices();
+    services.projectRepository = new SavingProjectRepository();
+    render(<EditorShell services={services} />);
 
     await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
 
@@ -394,11 +397,15 @@ describe('EditorShell', () => {
 
   it('restores enabled persistence after remounting', async () => {
     const user = userEvent.setup();
-    const { unmount } = render(<EditorShell services={createAppServices()} />);
+    const firstServices = createAppServices();
+    firstServices.projectRepository = new SavingProjectRepository();
+    const { unmount } = render(<EditorShell services={firstServices} />);
 
     await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
     unmount();
-    render(<EditorShell services={createAppServices()} />);
+    const secondServices = createAppServices();
+    secondServices.projectRepository = new SavingProjectRepository();
+    render(<EditorShell services={secondServices} />);
 
     expect(await screen.findByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
   });
@@ -521,6 +528,32 @@ describe('EditorShell', () => {
         y: (original?.y ?? 0) + 32,
       });
     });
+  });
+
+  it('does not overwrite copied text when an editable field is active with a selected object', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+    await selectImageLayer(user);
+    const clipboardData = createClipboardData();
+    const textArea = document.createElement('textarea');
+    textArea.value = 'Copied text from editor';
+    document.body.append(textArea);
+    textArea.focus();
+    textArea.select();
+
+    fireEvent.copy(window, {
+      clipboardData,
+    });
+
+    expect(clipboardData.setData).not.toHaveBeenCalledWith(
+      'text/plain',
+      'LocalStudio.ai editor elements',
+    );
+    expect(clipboardData.setData).not.toHaveBeenCalledWith(
+      'application/x-localstudio-editor-elements',
+      '1',
+    );
+    textArea.remove();
   });
 
   it('prefers the latest editor object copy over stale image clipboard data', async () => {
