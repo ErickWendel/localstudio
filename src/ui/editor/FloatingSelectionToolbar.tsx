@@ -13,12 +13,14 @@ interface FloatingSelectionToolbarProps {
   onAlignCenter?: (() => void) | undefined;
   onBringForward?: (() => void) | undefined;
   onBackgroundSelectionToggle?: (() => void) | undefined;
+  onCropImage?: (() => void) | undefined;
   onFlipImage?: (() => void) | undefined;
   onDelete?: (() => void) | undefined;
   onDuplicate?: (() => void) | undefined;
   onSendBackward?: (() => void) | undefined;
   onTranslateSelectedText?: (() => void) | undefined;
   backgroundSelectionActive?: boolean;
+  cropActive?: boolean;
   canTranslateSelection?: boolean;
   disabled?: boolean;
 }
@@ -28,12 +30,14 @@ export function FloatingSelectionToolbar({
   onAlignCenter,
   onBackgroundSelectionToggle,
   onBringForward,
+  onCropImage,
   onFlipImage,
   onDelete,
   onDuplicate,
   onSendBackward,
   onTranslateSelectedText,
   backgroundSelectionActive = false,
+  cropActive = false,
   canTranslateSelection = false,
   disabled = false,
 }: FloatingSelectionToolbarProps) {
@@ -48,7 +52,14 @@ export function FloatingSelectionToolbar({
         tone: 'ai',
       },
       { label: 'Flip', icon: 'flip', display: 'label', onClick: onFlipImage },
-      { label: 'Crop', icon: 'crop', display: 'label', disabled: true },
+      {
+        label: cropActive ? 'Done' : 'Crop',
+        icon: cropActive ? 'check' : 'crop',
+        active: cropActive,
+        disabled: !onCropImage,
+        display: 'label',
+        onClick: onCropImage,
+      },
     ],
     [
       { label: 'Align Center', icon: 'align_horizontal_center', onClick: onAlignCenter },
