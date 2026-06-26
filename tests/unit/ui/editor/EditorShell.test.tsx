@@ -81,9 +81,9 @@ class RecordingTranslatorService implements TranslatorService {
     Promise.resolve(`${targetLanguage}:${text}`),
   );
 
-  detectLanguage(): Promise<string> {
+  detectLanguage = vi.fn(() => {
     return Promise.resolve('en');
-  }
+  });
 }
 
 class ImportingProjectRepository implements ProjectRepository {
@@ -692,6 +692,10 @@ describe('EditorShell', () => {
     render(<EditorShell services={services} />);
 
     expect(await screen.findByRole('button', { name: 'Current slide language English' })).toBeInTheDocument();
+    expect((services.translatorService as RecordingTranslatorService).detectLanguage).toHaveBeenCalledWith(
+      expect.any(String),
+      { allowModelPreparation: false },
+    );
 
     await openLeftTab(user, 'AI Tools');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');

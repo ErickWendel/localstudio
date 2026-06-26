@@ -6,7 +6,7 @@ import type {
 } from '../domain/generatedSlide';
 
 export type ModelStatus = 'unavailable' | 'needs-download' | 'downloading' | 'ready' | 'failed';
-export type AiCapability = 'prompt' | 'translation' | 'image-generation' | 'image-editing';
+export type AiCapability = 'prompt' | 'translation' | 'language-detection' | 'image-generation' | 'image-editing';
 export type AiProviderRuntime = 'chrome-built-in' | 'webgpu-huggingface';
 export type AiProviderCompatibility = 'compatible' | 'incompatible' | 'unknown';
 
@@ -25,7 +25,7 @@ export interface AiProviderState {
   id: string;
   label: string;
   description: string;
-  capability: Extract<AiCapability, 'prompt' | 'translation'>;
+  capability: Extract<AiCapability, 'prompt' | 'translation' | 'language-detection'>;
   runtime: AiProviderRuntime;
   compatibility: AiProviderCompatibility;
   disabledReason?: string | undefined;
@@ -103,7 +103,13 @@ export interface TranslatorService {
   getProviderStates?(): Promise<AiProviderState[]>;
   getSelectedProviderId?(): string;
   setSelectedProvider?(providerId: string): Promise<AiProviderState[]>;
-  detectLanguage(text: string): Promise<string>;
+  getLanguageDetectionProviderStates?(): Promise<AiProviderState[]>;
+  setLanguageDetectionProvider?(providerId: string): Promise<AiProviderState[]>;
+  prepareLanguageDetection?(options?: { onProgress?: (progress: number) => void }): Promise<void>;
+  detectLanguage(
+    text: string,
+    options?: { allowModelPreparation?: boolean; onProgress?: (progress: number) => void },
+  ): Promise<string>;
   prepareTranslation(
     sourceLanguage: string,
     targetLanguage: string,

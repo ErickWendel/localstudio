@@ -27,6 +27,7 @@ import { BrowserFileSystemProjectRepository } from '../services/browserFileSyste
 import { DisabledProjectRepository } from '../services/disabledProjectRepository';
 import { BrowserLocalSetupService } from '../services/localSetupService';
 import { BrowserModelSetupService } from '../services/modelSetupService';
+import { TransformersLanguageDetectionRuntime } from '../services/webGpuLanguageDetectionRuntime';
 import { TransformersTextGenerationRuntime } from '../services/webGpuTextGenerationRuntime';
 
 export interface AppServices {
@@ -54,11 +55,14 @@ interface CreateAppServicesOptions {
 
 export function createAppServices(options: CreateAppServicesOptions = {}): AppServices {
   const textGenerationRuntime = new TransformersTextGenerationRuntime();
+  const languageDetectionRuntime = new TransformersLanguageDetectionRuntime();
   const modelSetupService = new BrowserModelSetupService(
     undefined,
     undefined,
     undefined,
     textGenerationRuntime,
+    undefined,
+    languageDetectionRuntime,
   );
   return {
     initialProject: options.initialProject ?? createSampleProject(),
@@ -68,7 +72,13 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     exportService: new BrowserExportService(),
     localSetupService: new BrowserLocalSetupService(),
     modelSetupService,
-    translatorService: new BrowserTranslatorService(modelSetupService, undefined, undefined, textGenerationRuntime),
+    translatorService: new BrowserTranslatorService(
+      modelSetupService,
+      undefined,
+      undefined,
+      textGenerationRuntime,
+      languageDetectionRuntime,
+    ),
     promptService: new BrowserPromptService(modelSetupService, undefined, undefined, textGenerationRuntime),
     imageGenerationService: new BrowserImageGenerationService(),
     paletteService: new MockPaletteService(),

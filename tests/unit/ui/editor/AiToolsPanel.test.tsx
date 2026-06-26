@@ -1,10 +1,15 @@
 import { render, screen, within } from '@testing-library/react';
+import {
+  GEMMA_LLM_DISPLAY_NAME,
+  LANGUAGE_DETECTION_DISPLAY_NAME,
+  TRANSLATEGEMMA_DISPLAY_NAME,
+} from '../../../../src/services/aiModelIds';
 import type { AiProviderState } from '../../../../src/services/interfaces';
 import { AiToolsPanel } from '../../../../src/ui/editor/AiToolsPanel';
 
 const gemmaProvider: AiProviderState = {
   id: 'gemma-4-webgpu',
-  label: 'Gemma 4 WebGPU',
+  label: GEMMA_LLM_DISPLAY_NAME,
   description: 'Browser-local Gemma LLM for prompt-to-slides.',
   capability: 'prompt',
   runtime: 'webgpu-huggingface',
@@ -16,12 +21,24 @@ const gemmaProvider: AiProviderState = {
 
 const translateGemmaProvider: AiProviderState = {
   id: 'translategemma-webgpu',
-  label: 'TranslateGemma WebGPU',
+  label: TRANSLATEGEMMA_DISPLAY_NAME,
   description: 'Browser-local WebGPU translation model.',
   capability: 'translation',
   runtime: 'webgpu-huggingface',
   compatibility: 'compatible',
   modelId: 'translategemma-webgpu',
+  readiness: 'needs-download',
+  selected: true,
+};
+
+const languageDetectionProvider: AiProviderState = {
+  id: 'language-detection-webgpu',
+  label: LANGUAGE_DETECTION_DISPLAY_NAME,
+  description: 'Browser-local XLM-RoBERTa language detection fallback.',
+  capability: 'language-detection',
+  runtime: 'webgpu-huggingface',
+  compatibility: 'compatible',
+  modelId: 'language-detection-webgpu',
   readiness: 'needs-download',
   selected: true,
 };
@@ -57,8 +74,26 @@ describe('AiToolsPanel', () => {
     const translationCard = screen.getByRole('article', { name: 'Translate Design' });
 
     expect(within(translationCard).queryByText('Ready')).not.toBeInTheDocument();
-    expect(within(translationCard).getByText('Pending')).toBeInTheDocument();
+    expect(within(translationCard).getAllByText('Pending').length).toBeGreaterThanOrEqual(1);
+    expect(within(translationCard).queryByText('100%')).not.toBeInTheDocument();
     expect(within(translationCard).getByRole('button', { name: 'Download Translation Model' })).toBeInTheDocument();
+  });
+
+  it('shows translation model download progress even before a target language is selected', () => {
+    render(
+      <AiToolsPanel
+        modelStates={[]}
+        translationProviderStates={[translateGemmaProvider]}
+        translationLanguageOptions={[{ code: 'pt', flag: '🇧🇷', label: 'Portuguese' }]}
+        translationPreparation={{ progress: 64, status: 'downloading' }}
+      />,
+    );
+
+    const translationCard = screen.getByRole('article', { name: 'Translate Design' });
+
+    expect(within(translationCard).getByLabelText('Translation Model')).toBeDisabled();
+    expect(within(translationCard).getByLabelText('Translation model preparation')).toHaveTextContent('Downloading');
+    expect(within(translationCard).getByText('64%')).toBeInTheDocument();
   });
 
   it('shows remove actions for cached external providers', () => {
@@ -92,5 +127,23 @@ describe('AiToolsPanel', () => {
 
     expect(within(llmCard).getByText('Finalizing...')).toBeInTheDocument();
     expect(within(llmCard).queryByText('99%')).not.toBeInTheDocument();
+  });
+
+  it('shows the same configurable model controls for language detection', () => {
+    render(
+      <AiToolsPanel
+        modelStates={[]}
+        languageDetectionProviderStates={[languageDetectionProvider]}
+        languageDetectionPreparation={{ progress: 0, status: 'idle' }}
+      />,
+    );
+
+    const detectionCard = screen.getByRole('article', { name: 'Language Detection' });
+
+    expect(within(detectionCard).getByLabelText('Language Detection Model')).toHaveValue(
+      'language-detection-webgpu',
+    );
+    expect(within(detectionCard).getByText('Pending')).toBeInTheDocument();
+    expect(within(detectionCard).getByRole('button', { name: 'Download Language Detection Model' })).toBeInTheDocument();
   });
 });

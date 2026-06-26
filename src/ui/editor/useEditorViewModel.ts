@@ -36,7 +36,11 @@ import { fitImageWithinPage } from '../../domain/imageSizing';
 import type { DesignElement, Page, PageBackground, ProjectDocument, SelectionState } from '../../domain/model';
 import { SAMPLE_HERO_IMAGE_SIZE, SAMPLE_HERO_IMAGE_URL } from '../../domain/sampleProject';
 import type { AiProviderState, ModelState, PromptApiAvailability, VersionHistoryEntry } from '../../services/interfaces';
-import { GEMMA_LLM_MODEL_ID, TRANSLATEGEMMA_MODEL_ID } from '../../services/aiModelIds';
+import {
+  GEMMA_LLM_MODEL_ID,
+  LANGUAGE_DETECTION_MODEL_ID,
+  TRANSLATEGEMMA_MODEL_ID,
+} from '../../services/aiModelIds';
 import {
   DEFAULT_IMAGE_GENERATION_SIZE,
   IMAGE_GENERATION_MODEL_ID,
@@ -414,10 +418,15 @@ export function useEditorViewModel(services: AppServices) {
   const [translationTargetLanguage, setTranslationTargetLanguageState] = useState(readTranslationTargetLanguage);
   const [promptProviderStates, setPromptProviderStates] = useState<AiProviderState[]>([]);
   const [translationProviderStates, setTranslationProviderStates] = useState<AiProviderState[]>([]);
+  const [languageDetectionProviderStates, setLanguageDetectionProviderStates] = useState<AiProviderState[]>([]);
   const [translationTargetAttention, setTranslationTargetAttention] = useState(false);
   const [translationPreparation, setTranslationPreparation] = useState<TranslationPreparationState>({
     progress: 0,
     status: readTranslationTargetLanguage() ? 'ready' : 'idle',
+  });
+  const [languageDetectionPreparation, setLanguageDetectionPreparation] = useState<TranslationPreparationState>({
+    progress: 0,
+    status: 'idle',
   });
   const [promptPreparation, setPromptPreparation] = useState<PromptPreparationState>({
     availability: 'unavailable',
@@ -482,6 +491,9 @@ export function useEditorViewModel(services: AppServices) {
       }
       if (services.translatorService.getProviderStates) {
         setTranslationProviderStates(await services.translatorService.getProviderStates());
+      }
+      if (services.translatorService.getLanguageDetectionProviderStates) {
+        setLanguageDetectionProviderStates(await services.translatorService.getLanguageDetectionProviderStates());
       }
     }
 
@@ -594,7 +606,7 @@ export function useEditorViewModel(services: AppServices) {
     languageDetectionSequenceRef.current = sequence;
 
     void services.translatorService
-      .detectLanguage(sampleText)
+      .detectLanguage(sampleText, { allowModelPreparation: false })
       .then((languageCode) => {
         if (languageDetectionSequenceRef.current !== sequence) return;
         setPageLanguageCodes((current) => ({
@@ -658,6 +670,9 @@ export function useEditorViewModel(services: AppServices) {
     if (services.translatorService.getProviderStates) {
       setTranslationProviderStates(await services.translatorService.getProviderStates());
     }
+    if (services.translatorService.getLanguageDetectionProviderStates) {
+      setLanguageDetectionProviderStates(await services.translatorService.getLanguageDetectionProviderStates());
+    }
     if (next.some((state) => state.id === IMAGE_EDITING_MODEL_ID && state.status === 'ready')) {
       setBackgroundSelectionNotice(undefined);
     }
@@ -690,6 +705,9 @@ export function useEditorViewModel(services: AppServices) {
     }
     if (services.translatorService.getProviderStates) {
       setTranslationProviderStates(await services.translatorService.getProviderStates());
+    }
+    if (services.translatorService.getLanguageDetectionProviderStates) {
+      setLanguageDetectionProviderStates(await services.translatorService.getLanguageDetectionProviderStates());
     }
     if (id === IMAGE_EDITING_MODEL_ID && next.status === 'ready') {
       setBackgroundSelectionNotice(undefined);
@@ -730,6 +748,9 @@ export function useEditorViewModel(services: AppServices) {
     }
     if (id === TRANSLATEGEMMA_MODEL_ID) {
       setTranslationPreparation({ progress: 0, status: 'idle' });
+    }
+    if (id === LANGUAGE_DETECTION_MODEL_ID) {
+      setLanguageDetectionPreparation({ progress: 0, status: 'idle' });
     }
   }
 
@@ -804,7 +825,6 @@ export function useEditorViewModel(services: AppServices) {
     if (!services.promptService.setSelectedProvider) return;
     const nextProviders = await services.promptService.setSelectedProvider(providerId);
     setPromptProviderStates(nextProviders);
-    await refreshPromptApiAvailability();
     const selectedProvider = nextProviders.find((provider) => provider.selected);
     if (
       selectedProvider?.modelId &&
@@ -812,7 +832,9 @@ export function useEditorViewModel(services: AppServices) {
       selectedProvider.readiness !== 'ready'
     ) {
       await preparePromptApi();
+      return;
     }
+    await refreshPromptApiAvailability();
   }
 
   async function setTranslationProvider(providerId: string) {
@@ -831,6 +853,50 @@ export function useEditorViewModel(services: AppServices) {
       selectedProvider.readiness !== 'ready'
     ) {
       await prepareSelectedTranslationProvider(selectedProvider);
+    }
+  }
+
+  async function setLanguageDetectionProvider(providerId: string) {
+    if (!services.translatorService.setLanguageDetectionProvider) return;
+    const nextProviders = await services.translatorService.setLanguageDetectionProvider(providerId);
+    setLanguageDetectionProviderStates(nextProviders);
+    setLanguageDetectionPreparation((current) => ({
+      ...current,
+      progress: current.status === 'ready' ? 0 : current.progress,
+      status: current.status === 'ready' ? 'idle' : current.status,
+    }));
+    const selectedProvider = nextProviders.find((provider) => provider.selected);
+    if (
+      selectedProvider?.modelId &&
+      selectedProvider.compatibility !== 'incompatible' &&
+      selectedProvider.readiness !== 'ready'
+    ) {
+      await prepareSelectedLanguageDetectionProvider(selectedProvider);
+    }
+  }
+
+  async function prepareSelectedLanguageDetectionProvider(providerState?: AiProviderState) {
+    const selectedProvider = providerState ?? languageDetectionProviderStates.find((provider) => provider.selected);
+    if (!selectedProvider?.modelId || selectedProvider.readiness === 'ready') return;
+
+    setLanguageDetectionPreparation({ progress: 4, status: 'downloading' });
+    try {
+      await services.translatorService.prepareLanguageDetection?.({
+        onProgress: (progress) => {
+          setLanguageDetectionPreparation((current) => ({
+            progress: Math.max(current.progress, 4, Math.min(100, Math.round(progress))),
+            status: progress >= 100 ? 'ready' : 'downloading',
+          }));
+        },
+      });
+      setLanguageDetectionPreparation({ progress: 100, status: 'ready' });
+      setModelStates(await services.modelSetupService.getModelStates());
+      if (services.translatorService.getLanguageDetectionProviderStates) {
+        setLanguageDetectionProviderStates(await services.translatorService.getLanguageDetectionProviderStates());
+      }
+    } catch (error) {
+      setLanguageDetectionPreparation({ progress: 0, status: 'failed' });
+      setTranslationNotice(error instanceof Error ? error.message : 'Language detection model could not be prepared.');
     }
   }
 
@@ -1410,17 +1476,31 @@ export function useEditorViewModel(services: AppServices) {
 
     setTranslationPreparation({ progress: 4, status: 'downloading' });
     try {
-      const sourceLanguage = normalizeLanguageCode(await services.translatorService.detectLanguage(sampleText));
-      setTranslationPreparation({ progress: 8, sourceLanguage, status: 'downloading' });
-      await services.translatorService.prepareTranslation(sourceLanguage, nextLanguage, {
-        onProgress: (progress) => {
-          setTranslationPreparation((current) => ({
-            progress: Math.max(current.progress, 8, Math.min(100, Math.round(progress))),
-            sourceLanguage,
-            status: progress >= 100 ? 'ready' : 'downloading',
-          }));
-        },
-      });
+      const sourceLanguage = normalizeLanguageCode(
+        await services.translatorService.detectLanguage(sampleText, {
+          onProgress: (progress) => {
+            setTranslationPreparation((current) => ({
+              progress: Math.max(current.progress, 4, Math.min(45, Math.round(progress * 0.45))),
+              status: 'downloading',
+            }));
+          },
+        }),
+      );
+      const selectedTranslationProvider = translationProviderStates.find((provider) => provider.selected);
+      const shouldPrepareLanguagePair =
+        !selectedTranslationProvider?.modelId || selectedTranslationProvider.runtime === 'chrome-built-in';
+      if (shouldPrepareLanguagePair) {
+        setTranslationPreparation({ progress: 8, sourceLanguage, status: 'downloading' });
+        await services.translatorService.prepareTranslation(sourceLanguage, nextLanguage, {
+          onProgress: (progress) => {
+            setTranslationPreparation((current) => ({
+              progress: Math.max(current.progress, 8, Math.min(100, Math.round(progress))),
+              sourceLanguage,
+              status: progress >= 100 ? 'ready' : 'downloading',
+            }));
+          },
+        });
+      }
       setTranslationPreparation({ progress: 100, sourceLanguage, status: 'ready' });
     } catch (error) {
       setTranslationPreparation({ progress: 0, status: 'failed' });
@@ -2151,8 +2231,10 @@ export function useEditorViewModel(services: AppServices) {
     translationTargetLanguage,
     promptProviderStates,
     translationProviderStates,
+    languageDetectionProviderStates,
     translationTargetAttention,
     translationPreparation,
+    languageDetectionPreparation,
     isTranslating,
     translationNotice,
     promptPreparation,
@@ -2168,6 +2250,7 @@ export function useEditorViewModel(services: AppServices) {
     aiToolsAttentionModelId,
     preparePromptApi,
     prepareSelectedTranslationProvider,
+    prepareSelectedLanguageDetectionProvider,
     ensurePromptApiReadyForPrompt,
     ensureImageGenerationReadyForPrompt,
     generateSlideFromPrompt,
@@ -2176,6 +2259,7 @@ export function useEditorViewModel(services: AppServices) {
     setCreateImageOptions,
     setPromptProvider,
     setTranslationProvider,
+    setLanguageDetectionProvider,
     setTranslationTargetLanguage,
     canTranslateSelection: !isTranslating && getTranslatableTextElementIds('selection').length > 0,
     canTranslateCurrentSlide: !isTranslating && getTranslatableTextElementIds('slide').length > 0,

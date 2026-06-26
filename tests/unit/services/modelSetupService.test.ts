@@ -1,11 +1,20 @@
 import { vi } from 'vitest';
-import { GEMMA_LLM_MODEL_ID, TRANSLATEGEMMA_MODEL_ID } from '../../../src/services/aiModelIds';
+import {
+  GEMMA_LLM_DISPLAY_NAME,
+  GEMMA_LLM_MODEL_ID,
+  GEMMA_LLM_TRANSFORMERS_MODEL_ID,
+  LANGUAGE_DETECTION_DISPLAY_NAME,
+  LANGUAGE_DETECTION_MODEL_ID,
+  TRANSLATEGEMMA_DISPLAY_NAME,
+  TRANSLATEGEMMA_MODEL_ID,
+} from '../../../src/services/aiModelIds';
 import {
   BrowserModelSetupService,
   BrowserTransformersModelCache,
   InMemoryModelSetupService,
   type ImageEditingModelLoader,
   type ImageGenerationModelLoader,
+  type LanguageDetectionModelLoader,
   type ModelCacheStorage,
   type TextGenerationModelLoader,
 } from '../../../src/services/modelSetupService';
@@ -18,14 +27,19 @@ describe('InMemoryModelSetupService', () => {
 
     const states = await service.getModelStates();
     expect(states.filter((state) => state.required).every((state) => state.status === 'ready')).toBe(true);
-    expect(states).toHaveLength(4);
+    expect(states).toHaveLength(5);
     expect(states.find((state) => state.id === GEMMA_LLM_MODEL_ID)).toMatchObject({
-      label: 'Gemma 4 WebGPU LLM',
+      label: GEMMA_LLM_DISPLAY_NAME,
       required: false,
       status: 'needs-download',
     });
     expect(states.find((state) => state.id === TRANSLATEGEMMA_MODEL_ID)).toMatchObject({
-      label: 'TranslateGemma WebGPU',
+      label: TRANSLATEGEMMA_DISPLAY_NAME,
+      required: false,
+      status: 'needs-download',
+    });
+    expect(states.find((state) => state.id === LANGUAGE_DETECTION_MODEL_ID)).toMatchObject({
+      label: LANGUAGE_DETECTION_DISPLAY_NAME,
       required: false,
       status: 'needs-download',
     });
@@ -37,7 +51,7 @@ describe('InMemoryModelSetupService', () => {
     expect(states.find((state) => state.id === IMAGE_GENERATION_MODEL_ID)).toMatchObject({
       id: IMAGE_GENERATION_MODEL_ID,
       label: 'Image Generation Models',
-      description: 'Bonsai Image WebGPU text-to-image model.',
+      description: 'Text-to-image model for generated slide assets.',
       status: 'needs-download',
       required: false,
     });
@@ -130,6 +144,61 @@ describe('BrowserModelSetupService', () => {
 
     expect(state).toMatchObject({ id: GEMMA_LLM_MODEL_ID, status: 'ready', progress: 100 });
     expect(progress).toEqual([10, 18, 18, 55, 100]);
+  });
+
+  it('releases text generation pipelines after warming the browser cache', async () => {
+    const loadImageEditingModel = vi.fn().mockResolvedValue(undefined);
+    const loadImageGenerationModel = vi.fn().mockResolvedValue(undefined);
+    const loadTextGenerationModel = vi.fn().mockResolvedValue(undefined);
+    const releaseTextGenerationModel = vi.fn().mockResolvedValue(undefined);
+    const textGenerationLoader: TextGenerationModelLoader & {
+      releaseTextGenerationModel: (modelId: string) => Promise<void>;
+    } = {
+      loadTextGenerationModel,
+      releaseTextGenerationModel,
+    };
+    const service = new BrowserModelSetupService(
+      { loadImageEditingModel },
+      createStorage(),
+      { loadImageGenerationModel },
+      textGenerationLoader,
+    );
+
+    await service.downloadModel(GEMMA_LLM_MODEL_ID);
+
+    expect(loadTextGenerationModel).toHaveBeenCalledWith(GEMMA_LLM_TRANSFORMERS_MODEL_ID, expect.any(Object));
+    expect(releaseTextGenerationModel).toHaveBeenCalledWith(GEMMA_LLM_TRANSFORMERS_MODEL_ID);
+  });
+
+  it('downloads the language detection model independently', async () => {
+    const loadImageEditingModel = vi.fn().mockResolvedValue(undefined);
+    const loadImageGenerationModel = vi.fn().mockResolvedValue(undefined);
+    const loadTextGenerationModel = vi.fn().mockResolvedValue(undefined);
+    const loadLanguageDetectionModel = vi.fn((_, options?: { onProgress?: (progress: number) => void }) => {
+      options?.onProgress?.(42);
+      return Promise.resolve();
+    });
+    const languageDetectionLoader: LanguageDetectionModelLoader = {
+      loadLanguageDetectionModel,
+    };
+    const service = new BrowserModelSetupService(
+      { loadImageEditingModel },
+      createStorage(),
+      { loadImageGenerationModel },
+      { loadTextGenerationModel },
+      undefined,
+      languageDetectionLoader,
+    );
+
+    const progress: number[] = [];
+    const state = await service.downloadModel(LANGUAGE_DETECTION_MODEL_ID, {
+      onProgress: (value) => progress.push(value),
+    });
+
+    expect(state).toMatchObject({ id: LANGUAGE_DETECTION_MODEL_ID, status: 'ready', progress: 100 });
+    expect(progress).toEqual([42, 100]);
+    expect(loadLanguageDetectionModel).toHaveBeenCalledTimes(1);
+    expect(loadTextGenerationModel).not.toHaveBeenCalled();
   });
 
   it('restores ready state from browser cache metadata', async () => {
@@ -234,5 +303,20 @@ describe('BrowserModelSetupService', () => {
       'https://huggingface.co/onnx-community/gemma-4-E2B-it-ONNX/resolve/main/config.json',
       'https://huggingface.co/onnx-community/gemma-4-E2B-it-ONNX/resolve/main/onnx/model_q4.onnx',
     ]);
+  });
+
+  it('restores language detection ready state from browser cache metadata', async () => {
+    const service = new BrowserModelSetupService(
+      { loadImageEditingModel: vi.fn().mockResolvedValue(undefined) },
+      createStorage({ 'localstudio.ai.model.language-detection-webgpu.ready': 'true' }),
+    );
+
+    const states = await service.getModelStates();
+
+    expect(states.find((state) => state.id === LANGUAGE_DETECTION_MODEL_ID)).toMatchObject({
+      id: LANGUAGE_DETECTION_MODEL_ID,
+      status: 'ready',
+      progress: 100,
+    });
   });
 });

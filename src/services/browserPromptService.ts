@@ -7,7 +7,7 @@ import {
   type GeneratedSlideTask,
   type GeneratedSlideTasksDocument,
 } from '../domain/generatedSlide';
-import { GEMMA_LLM_MODEL_ID, GEMMA_LLM_TRANSFORMERS_MODEL_ID } from './aiModelIds';
+import { GEMMA_LLM_DISPLAY_NAME, GEMMA_LLM_MODEL_ID, GEMMA_LLM_TRANSFORMERS_MODEL_ID } from './aiModelIds';
 import { ChromePromptService } from './chromePromptService';
 import type { AiProviderState, ModelSetupService, PromptApiAvailability, PromptService } from './interfaces';
 import {
@@ -151,7 +151,7 @@ function createGemmaJsonRepairMessages(options: {
 
 export class GemmaPromptProvider implements PromptProvider {
   id = GEMMA_PROMPT_PROVIDER_ID;
-  label = 'Gemma 4 WebGPU';
+  label = GEMMA_LLM_DISPLAY_NAME;
   description = 'Browser-local Gemma LLM for prompt-to-slides.';
   runtime = 'webgpu-huggingface' as const;
   modelId = GEMMA_LLM_MODEL_ID;
@@ -172,9 +172,6 @@ export class GemmaPromptProvider implements PromptProvider {
   ): Promise<void> {
     const reportProgress = createMonotonicProgressReporter(options?.onProgress, { initial: 4, min: 4, max: 100 });
     await modelSetupService.downloadModel(GEMMA_LLM_MODEL_ID, {
-      onProgress: (progress) => reportProgress(progress),
-    });
-    await this.runtimeClient.preload(GEMMA_LLM_TRANSFORMERS_MODEL_ID, {
       onProgress: (progress) => reportProgress(mapProgressToRange(progress, 4, 99)),
     });
     reportProgress(100);

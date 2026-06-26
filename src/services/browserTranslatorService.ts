@@ -1,5 +1,16 @@
-import { TRANSLATEGEMMA_MODEL_ID, TRANSLATEGEMMA_TRANSFORMERS_MODEL_ID } from './aiModelIds';
-import { ChromeTranslatorService } from './chromeTranslatorService';
+import {
+  LANGUAGE_DETECTION_MODEL_ID,
+  LANGUAGE_DETECTION_DISPLAY_NAME,
+  LANGUAGE_DETECTION_TRANSFORMERS_MODEL_ID,
+  TRANSLATEGEMMA_DISPLAY_NAME,
+  TRANSLATEGEMMA_MODEL_ID,
+  TRANSLATEGEMMA_TRANSFORMERS_MODEL_ID,
+} from './aiModelIds';
+import {
+  ChromeTranslatorService,
+  hasChromeLanguageDetector,
+  normalizeDetectedLanguageCode,
+} from './chromeTranslatorService';
 import type { AiProviderState, ModelSetupService, TranslatorService } from './interfaces';
 import {
   getBrowserProviderStorage,
@@ -8,11 +19,18 @@ import {
   selectDefaultProvider,
 } from './providerSelection';
 import { createMonotonicProgressReporter, mapProgressToRange } from './progress';
+import {
+  TransformersLanguageDetectionRuntime,
+  type LanguageDetectionRuntime,
+} from './webGpuLanguageDetectionRuntime';
 import { TransformersTextGenerationRuntime, type TextGenerationRuntime } from './webGpuTextGenerationRuntime';
 
 export const CHROME_TRANSLATION_PROVIDER_ID = 'chrome-translator-api';
 export const TRANSLATEGEMMA_PROVIDER_ID = 'translategemma-webgpu';
 export const TRANSLATION_PROVIDER_STORAGE_KEY = 'localstudio.ai.translation-provider';
+export const CHROME_LANGUAGE_DETECTION_PROVIDER_ID = 'chrome-language-detector-api';
+export const WEBGPU_LANGUAGE_DETECTION_PROVIDER_ID = 'language-detection-webgpu';
+export const LANGUAGE_DETECTION_PROVIDER_STORAGE_KEY = 'localstudio.ai.language-detection-provider';
 
 interface TranslationProvider {
   id: string;
@@ -29,6 +47,17 @@ interface TranslationProvider {
   ): Promise<void>;
   translate(text: string, targetLanguage: string, options?: { sourceLanguage?: string }): Promise<string>;
   detectLanguage?(text: string): Promise<string>;
+}
+
+interface LanguageDetectionProvider {
+  id: string;
+  label: string;
+  description: string;
+  runtime: AiProviderState['runtime'];
+  modelId?: string | undefined;
+  checkCompatibility(): { compatible: boolean; disabledReason?: string | undefined };
+  prepare(modelSetupService: ModelSetupService, options?: { onProgress?: (progress: number) => void }): Promise<void>;
+  detectLanguage(text: string): Promise<string>;
 }
 
 type ChromeTranslatorApi = {
@@ -178,7 +207,7 @@ class ChromeTranslationProvider implements TranslationProvider {
 
 class TranslateGemmaProvider implements TranslationProvider {
   id = TRANSLATEGEMMA_PROVIDER_ID;
-  label = 'TranslateGemma WebGPU';
+  label = TRANSLATEGEMMA_DISPLAY_NAME;
   description = 'Browser-local WebGPU translation model.';
   runtime = 'webgpu-huggingface' as const;
   modelId = TRANSLATEGEMMA_MODEL_ID;
@@ -199,9 +228,6 @@ class TranslateGemmaProvider implements TranslationProvider {
   ): Promise<void> {
     const reportProgress = createMonotonicProgressReporter(options?.onProgress, { initial: 4, min: 4, max: 100 });
     await modelSetupService.downloadModel(TRANSLATEGEMMA_MODEL_ID, {
-      onProgress: (progress) => reportProgress(progress),
-    });
-    await this.runtimeClient.preload(TRANSLATEGEMMA_TRANSFORMERS_MODEL_ID, {
       onProgress: (progress) => reportProgress(mapProgressToRange(progress, 4, 99)),
     });
     reportProgress(100);
@@ -219,19 +245,82 @@ class TranslateGemmaProvider implements TranslationProvider {
   }
 }
 
+class ChromeLanguageDetectionProvider implements LanguageDetectionProvider {
+  id = CHROME_LANGUAGE_DETECTION_PROVIDER_ID;
+  label = 'Chrome Built-in Language Detector';
+  description = 'Detect slide text language using Chrome Built-in AI.';
+  runtime = 'chrome-built-in' as const;
+
+  constructor(private readonly chromeTranslatorService = new ChromeTranslatorService()) {}
+
+  checkCompatibility() {
+    return hasChromeLanguageDetector()
+      ? { compatible: true }
+      : { compatible: false, disabledReason: 'Chrome Built-in LanguageDetector is unavailable in this browser.' };
+  }
+
+  prepare(_modelSetupService: ModelSetupService, options?: { onProgress?: (progress: number) => void }) {
+    options?.onProgress?.(100);
+    return Promise.resolve();
+  }
+
+  detectLanguage(text: string) {
+    return this.chromeTranslatorService.detectLanguage(text);
+  }
+}
+
+class WebGpuLanguageDetectionProvider implements LanguageDetectionProvider {
+  id = WEBGPU_LANGUAGE_DETECTION_PROVIDER_ID;
+  label = LANGUAGE_DETECTION_DISPLAY_NAME;
+  description = 'Browser-local XLM-RoBERTa language detection fallback.';
+  runtime = 'webgpu-huggingface' as const;
+  modelId = LANGUAGE_DETECTION_MODEL_ID;
+
+  constructor(private readonly runtimeClient: LanguageDetectionRuntime = new TransformersLanguageDetectionRuntime()) {}
+
+  checkCompatibility() {
+    return isWebGpuCompatible()
+      ? { compatible: true }
+      : { compatible: false, disabledReason: 'WebGPU is required for external language detection.' };
+  }
+
+  async prepare(modelSetupService: ModelSetupService, options?: { onProgress?: (progress: number) => void }) {
+    const reportProgress = createMonotonicProgressReporter(options?.onProgress, { initial: 4, min: 4, max: 100 });
+    await modelSetupService.downloadModel(LANGUAGE_DETECTION_MODEL_ID, {
+      onProgress: (progress) => reportProgress(mapProgressToRange(progress, 4, 99)),
+    });
+    reportProgress(100);
+  }
+
+  async detectLanguage(text: string) {
+    const result = await this.runtimeClient.detectLanguage(LANGUAGE_DETECTION_TRANSFORMERS_MODEL_ID, text);
+    return normalizeDetectedLanguageCode(result.language);
+  }
+}
+
 export class BrowserTranslatorService implements TranslatorService {
   private selectedProviderId: string | undefined;
+  private selectedLanguageDetectionProviderId: string | undefined;
   private forceSelectedProvider = false;
+  private forceSelectedLanguageDetectionProvider = false;
   private readonly providers: TranslationProvider[];
+  private readonly languageDetectionProviders: LanguageDetectionProvider[];
 
   constructor(
     private readonly modelSetupService: ModelSetupService,
     providers?: TranslationProvider[],
     private readonly storage = getBrowserProviderStorage(),
     textGenerationRuntime: TextGenerationRuntime = new TransformersTextGenerationRuntime(),
+    private readonly languageDetectionRuntime: LanguageDetectionRuntime = new TransformersLanguageDetectionRuntime(),
   ) {
     this.providers = providers ?? [new ChromeTranslationProvider(), new TranslateGemmaProvider(textGenerationRuntime)];
+    this.languageDetectionProviders = [
+      new ChromeLanguageDetectionProvider(),
+      new WebGpuLanguageDetectionProvider(languageDetectionRuntime),
+    ];
     this.selectedProviderId = storage?.getItem(TRANSLATION_PROVIDER_STORAGE_KEY) ?? undefined;
+    this.selectedLanguageDetectionProviderId =
+      storage?.getItem(LANGUAGE_DETECTION_PROVIDER_STORAGE_KEY) ?? undefined;
   }
 
   getSelectedProviderId() {
@@ -245,6 +334,44 @@ export class BrowserTranslatorService implements TranslatorService {
     this.forceSelectedProvider = true;
     this.storage?.setItem(TRANSLATION_PROVIDER_STORAGE_KEY, provider.id);
     return this.getProviderStates();
+  }
+
+  async getLanguageDetectionProviderStates(): Promise<AiProviderState[]> {
+    const modelStates = await this.modelSetupService.getModelStates();
+    const states = this.languageDetectionProviders.map((provider) => {
+      const compatibility = provider.checkCompatibility();
+      return {
+        id: provider.id,
+        label: provider.label,
+        description: provider.description,
+        capability: 'language-detection' as const,
+        runtime: provider.runtime,
+        compatibility: compatibility.compatible ? 'compatible' as const : 'incompatible' as const,
+        disabledReason: compatibility.disabledReason,
+        modelId: provider.modelId,
+        readiness:
+          provider.runtime === 'chrome-built-in'
+            ? compatibility.compatible
+              ? 'ready' as const
+              : 'unavailable' as const
+            : getModelReadiness(modelStates, provider.modelId),
+        selected: false,
+      } satisfies AiProviderState;
+    });
+    const selected = selectDefaultProvider(states, this.selectedLanguageDetectionProviderId, {
+      forcePreferred: this.forceSelectedLanguageDetectionProvider,
+    });
+    this.selectedLanguageDetectionProviderId = selected?.id;
+    return states.map((state) => ({ ...state, selected: state.id === selected?.id }));
+  }
+
+  async setLanguageDetectionProvider(providerId: string) {
+    const provider = this.languageDetectionProviders.find((item) => item.id === providerId);
+    if (!provider) throw new Error(`Unknown language detection provider: ${providerId}`);
+    this.selectedLanguageDetectionProviderId = provider.id;
+    this.forceSelectedLanguageDetectionProvider = true;
+    this.storage?.setItem(LANGUAGE_DETECTION_PROVIDER_STORAGE_KEY, provider.id);
+    return this.getLanguageDetectionProviderStates();
   }
 
   async getProviderStates(): Promise<AiProviderState[]> {
@@ -278,10 +405,24 @@ export class BrowserTranslatorService implements TranslatorService {
     return states.map((state) => ({ ...state, selected: state.id === selected?.id }));
   }
 
-  async detectLanguage(text: string): Promise<string> {
-    const provider = this.getSelectedProvider();
-    if (provider.detectLanguage) return provider.detectLanguage(text);
-    return navigator.language || 'en';
+  async prepareLanguageDetection(options?: { onProgress?: (progress: number) => void }) {
+    await this.getSelectedLanguageDetectionProvider().prepare(this.modelSetupService, options);
+  }
+
+  async detectLanguage(
+    text: string,
+    options?: { allowModelPreparation?: boolean; onProgress?: (progress: number) => void },
+  ): Promise<string> {
+    const provider = this.getSelectedLanguageDetectionProvider();
+    if (options?.allowModelPreparation === false && provider.runtime !== 'chrome-built-in') {
+      return normalizeDetectedLanguageCode(navigator.language || 'en');
+    }
+    try {
+      await provider.prepare(this.modelSetupService, options);
+      return normalizeDetectedLanguageCode(await provider.detectLanguage(text));
+    } catch {
+      return normalizeDetectedLanguageCode(navigator.language || 'en');
+    }
   }
 
   async prepareTranslation(
@@ -301,6 +442,23 @@ export class BrowserTranslatorService implements TranslatorService {
       this.providers.find((provider) => provider.id === this.selectedProviderId) ??
       this.providers.find((provider) => provider.id === CHROME_TRANSLATION_PROVIDER_ID) ??
       this.providers[0]!
+    );
+  }
+
+  private getSelectedLanguageDetectionProvider() {
+    const selectedProvider = this.languageDetectionProviders.find(
+      (provider) => provider.id === this.selectedLanguageDetectionProviderId,
+    );
+    if (selectedProvider) return selectedProvider;
+
+    return (
+      this.languageDetectionProviders.find(
+        (provider) => provider.id === CHROME_LANGUAGE_DETECTION_PROVIDER_ID && provider.checkCompatibility().compatible,
+      ) ??
+      this.languageDetectionProviders.find(
+        (provider) => provider.id === WEBGPU_LANGUAGE_DETECTION_PROVIDER_ID && provider.checkCompatibility().compatible,
+      ) ??
+      this.languageDetectionProviders[0]!
     );
   }
 }

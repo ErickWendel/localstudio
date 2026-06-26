@@ -77,3 +77,20 @@ export function createTransformersProgressCallback(
     }
   };
 }
+export function createEstimatedProgressTicker(
+  onProgress: (progress: number) => void,
+  options: { intervalMs?: number; max: number; start: number; step?: number },
+) {
+  let latest = options.start;
+  const intervalMs = options.intervalMs ?? 1_500;
+  const step = options.step ?? 1;
+  const timer = setInterval(() => {
+    if (latest >= options.max) return;
+    latest = Math.min(options.max, latest + step);
+    onProgress(latest);
+  }, intervalMs);
+
+  return () => {
+    clearInterval(timer);
+  };
+}

@@ -59,14 +59,23 @@ function getTranslationKey(sourceLanguage: string, targetLanguage: string) {
   return `${sourceLanguage}:${targetLanguage}`;
 }
 
+export function hasChromeLanguageDetector() {
+  return typeof window !== 'undefined' && Boolean((window as ChromeAiWindow).LanguageDetector?.create);
+}
+
+export function normalizeDetectedLanguageCode(language: string) {
+  return normalizeLanguageCode(language);
+}
+
 export class ChromeTranslatorService implements TranslatorService {
   private readonly translators = new Map<string, Promise<ChromeTranslationInstance>>();
 
   async detectLanguage(text: string): Promise<string> {
-    const languageDetector = (window as ChromeAiWindow).LanguageDetector;
-    if (!languageDetector?.create) return navigator.language || 'en';
+    if (!hasChromeLanguageDetector()) return navigator.language || 'en';
+    const createLanguageDetector = (window as ChromeAiWindow).LanguageDetector?.create;
+    if (!createLanguageDetector) return navigator.language || 'en';
 
-    const detector = await languageDetector.create();
+    const detector = await createLanguageDetector();
     const results = await detector.detect(text);
     return normalizeLanguageCode(results[0]?.detectedLanguage ?? navigator.language ?? 'en');
   }
