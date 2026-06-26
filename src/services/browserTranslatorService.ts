@@ -40,9 +40,89 @@ type TranslationWindow = Window &
     Translator?: ChromeTranslatorApi;
   };
 
+const TRANSLATEGEMMA_LANGUAGE_CODES = new Set([
+  'ar',
+  'bg',
+  'cs',
+  'da',
+  'de',
+  'el',
+  'en',
+  'es',
+  'fr',
+  'he',
+  'hi',
+  'hr',
+  'hu',
+  'id',
+  'it',
+  'ja',
+  'ko',
+  'nl',
+  'pl',
+  'pt_BR',
+  'ro',
+  'ru',
+  'sk',
+  'sl',
+  'sv',
+  'sw',
+  'th',
+  'tr',
+  'uk',
+  'vi',
+  'zh',
+]);
+
+const TRANSLATEGEMMA_LANGUAGE_ALIASES: Record<string, string> = {
+  he: 'he',
+  iw: 'he',
+  pt: 'pt_BR',
+  'pt-BR': 'pt_BR',
+  'pt_BR': 'pt_BR',
+  zh: 'zh',
+  'zh-CN': 'zh',
+  'zh-Hant': 'zh',
+  'zh-TW': 'zh',
+};
+
 function getChromeTranslatorApi() {
   if (typeof window === 'undefined') return undefined;
   return (window as TranslationWindow).Translator;
+}
+
+export function toTranslateGemmaLanguageCode(languageCode: string | undefined, fallback = 'en') {
+  const requestedCode = languageCode?.trim() || fallback;
+  const baseCode = requestedCode.split('-')[0] ?? requestedCode;
+  const translateGemmaCode =
+    TRANSLATEGEMMA_LANGUAGE_ALIASES[requestedCode] ??
+    TRANSLATEGEMMA_LANGUAGE_ALIASES[baseCode] ??
+    requestedCode;
+
+  if (TRANSLATEGEMMA_LANGUAGE_CODES.has(translateGemmaCode)) return translateGemmaCode;
+  if (TRANSLATEGEMMA_LANGUAGE_CODES.has(baseCode)) return baseCode;
+
+  throw new Error(`TranslateGemma does not support ${requestedCode}.`);
+}
+
+export function createTranslateGemmaMessages(options: {
+  sourceLanguage?: string | undefined;
+  targetLanguage: string;
+  text: string;
+}) {
+  return [
+    {
+      role: 'user',
+      content: [
+        {
+          type: 'text',
+          source_lang_code: toTranslateGemmaLanguageCode(options.sourceLanguage),
+          target_lang_code: toTranslateGemmaLanguageCode(options.targetLanguage),
+          text: options.text,
+        },
+      ],
+    },
+  ];
 }
 
 class ChromeTranslationProvider implements TranslationProvider {
@@ -128,13 +208,14 @@ class TranslateGemmaProvider implements TranslationProvider {
   }
 
   async translate(text: string, targetLanguage: string, options?: { sourceLanguage?: string }): Promise<string> {
-    const prompt = [
-      `Translate the following text from ${options?.sourceLanguage ?? 'auto'} to ${targetLanguage}.`,
-      'Return only the translated text, with no explanation.',
-      '',
+    const messages = createTranslateGemmaMessages({
+      sourceLanguage: options?.sourceLanguage,
+      targetLanguage,
       text,
-    ].join('\n');
-    return this.runtimeClient.generate(TRANSLATEGEMMA_TRANSFORMERS_MODEL_ID, prompt);
+    });
+    return this.runtimeClient.generate(TRANSLATEGEMMA_TRANSFORMERS_MODEL_ID, messages, {
+      max_new_tokens: Math.max(64, Math.min(1024, Math.ceil(text.length * 2.5))),
+    });
   }
 }
 

@@ -2,21 +2,44 @@ import { TRANSFORMERS_CACHE_KEY } from './imageGenerationModels';
 
 export interface TextGenerationRuntime {
   preload(modelId: string, options?: { onProgress?: (progress: number) => void }): Promise<void>;
-  generate(modelId: string, prompt: string): Promise<string>;
+  generate(modelId: string, prompt: TextGenerationInput, options?: TextGenerationOptions): Promise<string>;
 }
 
-type TextGenerationPipeline = (prompt: string, options?: Record<string, unknown>) => Promise<unknown>;
+export type TextGenerationInput = string | Array<{ role: string; content: unknown }>;
+export type TextGenerationOptions = Record<string, unknown>;
 
-function extractGeneratedText(result: unknown) {
+type TextGenerationPipeline = (prompt: unknown, options?: TextGenerationOptions) => Promise<unknown>;
+
+function extractTextFromGeneratedValue(value: unknown): string | undefined {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) {
+    const values = value as unknown[];
+    const lastMessage = values.at(-1);
+    if (lastMessage && typeof lastMessage === 'object') {
+      const content = (lastMessage as { content?: unknown }).content;
+      if (typeof content === 'string') return content;
+      const generatedText = (lastMessage as { generated_text?: unknown }).generated_text;
+      const nestedText = extractTextFromGeneratedValue(generatedText);
+      if (nestedText) return nestedText;
+    }
+
+    const firstMessage = values[0];
+    if (firstMessage && typeof firstMessage === 'object') {
+      const generatedText = (firstMessage as { generated_text?: unknown }).generated_text;
+      const nestedText = extractTextFromGeneratedValue(generatedText);
+      if (nestedText) return nestedText;
+    }
+  }
+  if (value && typeof value === 'object' && 'generated_text' in value) {
+    return extractTextFromGeneratedValue((value as { generated_text?: unknown }).generated_text);
+  }
+  return undefined;
+}
+
+export function extractGeneratedText(result: unknown) {
   if (typeof result === 'string') return result;
-  if (Array.isArray(result)) {
-    const first = result[0] as { generated_text?: unknown } | undefined;
-    if (typeof first?.generated_text === 'string') return first.generated_text;
-  }
-  if (result && typeof result === 'object' && 'generated_text' in result) {
-    const generatedText = (result as { generated_text?: unknown }).generated_text;
-    if (typeof generatedText === 'string') return generatedText;
-  }
+  const generatedText = extractTextFromGeneratedValue(result);
+  if (generatedText) return generatedText;
   throw new Error('WebGPU text generation did not return text.');
 }
 
@@ -31,12 +54,18 @@ export class TransformersTextGenerationRuntime implements TextGenerationRuntime 
     await this.loadPipeline(modelId, options);
   }
 
-  async generate(modelId: string, prompt: string): Promise<string> {
+  async generate(modelId: string, prompt: TextGenerationInput, options?: TextGenerationOptions): Promise<string> {
     const textGeneration = await this.loadPipeline(modelId);
-    const result = await textGeneration(prompt, {
+    const generationOptions: TextGenerationOptions = {
       do_sample: false,
       max_new_tokens: 2048,
-      return_full_text: false,
+      ...options,
+    };
+    if (typeof prompt === 'string' && !('return_full_text' in generationOptions)) {
+      generationOptions.return_full_text = false;
+    }
+    const result = await textGeneration(prompt, {
+      ...generationOptions,
     });
     return extractGeneratedText(result);
   }
@@ -48,7 +77,7 @@ export class TransformersTextGenerationRuntime implements TextGenerationRuntime 
     const pipelinePromise = import('@huggingface/transformers').then(async ({ env, pipeline }) => {
       env.useBrowserCache = true;
       env.cacheKey = TRANSFORMERS_CACHE_KEY;
-      return await pipeline('text-generation', modelId, {
+      return (await pipeline('text-generation', modelId, {
         dtype: 'q4',
         device: 'webgpu',
         progress_callback: (progress) => {
@@ -57,7 +86,7 @@ export class TransformersTextGenerationRuntime implements TextGenerationRuntime 
             options?.onProgress?.(progressValue);
           }
         },
-      });
+      })) as unknown as TextGenerationPipeline;
     });
     this.pipelines.set(modelId, pipelinePromise);
     return pipelinePromise;

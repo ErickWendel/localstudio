@@ -1042,6 +1042,11 @@ button {
   pointer-events: auto;
 }
 
+.background-selection-hint-translation {
+  top: 56px;
+  z-index: 13;
+}
+
 .background-selection-hint .material-symbols-outlined {
   color: var(--ew-green);
   font-size: 18px;

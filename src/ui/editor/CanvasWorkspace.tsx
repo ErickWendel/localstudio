@@ -569,7 +569,12 @@ export function CanvasWorkspace({
         <div className="canvas-artboard" ref={artboardRef} style={{ background: pageBackground }}>
           {showEditorOverlays &&
           (backgroundSelectionMode || backgroundSelectionNotice || processingSelectedImageId || isTranslating || translationNotice) ? (
-            <div className="background-selection-hint" role="status">
+            <div
+              className={`background-selection-hint ${
+                isTranslating || translationNotice ? 'background-selection-hint-translation' : ''
+              }`}
+              role="status"
+            >
               <span className="material-symbols-outlined" aria-hidden="true">
                 {isTranslating || translationNotice
                   ? 'translate'
