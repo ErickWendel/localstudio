@@ -1,0 +1,37 @@
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300..800&family=Orbitron:wght@400..900&display=swap');
+
+:root {
+  color-scheme: dark;
+  --ls-bg: #0c160d;
+  --ls-black: #000000;
+  --ls-panel: #101b12;
+  --ls-panel-low: #151e15;
+  --ls-raised: #323c31;
+  --ls-border: #40493f;
+  --ls-green: #37fd76;
+  --ls-green-fixed: #69ff89;
+  --ls-green-hover: #00ff22;
+  --ls-cyan: #36d7ff;
+  --ls-yellow: #f2ff5e;
+  --ls-text: #ffffff;
+  --ls-muted: #c1c9bd;
+  --ls-dim: #8a9388;
+  --ls-danger: #ff6b6b;
+  --ls-on-primary: #002108;
+  --ls-font-display: 'Orbitron', Helvetica, sans-serif;
+  --ls-font-body: 'Open Sans', Helvetica, sans-serif;
+
+  --ew-bg: var(--ls-bg);
+  --ew-black: var(--ls-black);
+  --ew-panel: var(--ls-panel);
+  --ew-panel-low: var(--ls-panel-low);
+  --ew-raised: var(--ls-raised);
+  --ew-border: var(--ls-border);
+  --ew-green: var(--ls-green);
+  --ew-green-fixed: var(--ls-green-fixed);
+  --ew-green-hover: var(--ls-green-hover);
+  --ew-text: var(--ls-text);
+  --ew-muted: var(--ls-muted);
+  --ew-dim: var(--ls-dim);
+  --ew-on-primary: var(--ls-on-primary);
+}
