@@ -18,6 +18,7 @@ import {
 } from './providerSelection';
 import { createMonotonicProgressReporter, mapProgressToRange } from './progress';
 import { buildSlideElementPrompt } from './prompts/slideElementPrompt';
+import { applySlideElementLayoutPreset } from './prompts/slideLayoutPresets';
 import { buildSlideTaskPrompt, extractImageUrls } from './prompts/slideTaskPrompt';
 import {
   TransformersTextGenerationRuntime,
@@ -203,7 +204,7 @@ export class GemmaPromptProvider implements PromptProvider {
       existingElements: GeneratedSlideElement[];
     },
   ): Promise<GeneratedSlideElement> {
-    return this.generateStructuredJson({
+    const element = await this.generateStructuredJson({
       prompt: buildSlideElementPrompt({
         userPrompt: context.userPrompt,
         task,
@@ -213,6 +214,12 @@ export class GemmaPromptProvider implements PromptProvider {
       }),
       responseSchema: GENERATED_SLIDE_ELEMENT_RESPONSE_SCHEMA,
       parse: parseGeneratedSlideElementJson,
+    });
+
+    return applySlideElementLayoutPreset(element, {
+      task,
+      allTasks: context.allTasks,
+      page: context.page,
     });
   }
 

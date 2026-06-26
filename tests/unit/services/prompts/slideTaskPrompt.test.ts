@@ -63,4 +63,20 @@ describe('slide task prompt', () => {
     expect(prompt).toContain('add-shape with shape "ellipse"');
     expect(prompt).toContain('do not create tiny centered text clusters');
   });
+
+  it('includes a concrete left-image hero recipe for placeholder image slides', () => {
+    const prompt = buildSlideTaskPrompt({
+      userPrompt:
+        'Create a 16:9 dark LocalStudio.ai slide with the placeholder image expanded large on the left, the neon green title “AI Design Revolution” on the right, and the subtitle “Browser-native creative” below it.',
+      targetLanguageHint: 'same as user prompt',
+      imageUrls: [],
+    });
+
+    expect(prompt).toContain('For "left image and right title"');
+    expect(prompt).toContain('left media block');
+    expect(prompt).toContain('right text block');
+    expect(prompt).toContain('hero placeholder image');
+    expect(prompt).toContain('x 48, y 195, width 980, height 735');
+    expect(prompt).toContain('x 1180, y 410, width 600');
+  });
 });

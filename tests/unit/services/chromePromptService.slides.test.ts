@@ -88,4 +88,67 @@ describe('ChromePromptService slide generation', () => {
     const elementPromptOptions = prompt.mock.calls[0]?.[1] as { responseConstraint?: { oneOf?: unknown } };
     expect(Array.isArray(elementPromptOptions.responseConstraint?.oneOf)).toBe(true);
   });
+
+  it('normalizes left-image hero layout geometry after Prompt API output', async () => {
+    const prompt = vi.fn().mockResolvedValue(JSON.stringify({
+      type: 'text',
+      id: 'title',
+      text: 'AI Design Revolution',
+      x: 12,
+      y: 12,
+      width: 120,
+      height: 60,
+      rotation: 0,
+      opacity: 1,
+      fontFamily: 'Open Sans',
+      fontSize: 32,
+      fontWeight: 400,
+      fill: '#FFFFFF',
+      align: 'left',
+    }));
+    Object.defineProperty(window, 'LanguageModel', {
+      configurable: true,
+      value: {
+        availability: vi.fn().mockResolvedValue('available'),
+        create: vi.fn().mockResolvedValue({ prompt, destroy: vi.fn() }),
+      },
+    });
+
+    const service = new ChromePromptService();
+    const allTasks = [
+      {
+        type: 'add-placeholder-image',
+        id: 'placeholder',
+        description: 'Hero placeholder image',
+        placementHint: 'hero placeholder image in the left media block',
+      },
+      {
+        type: 'add-title',
+        id: 'title',
+        text: 'AI Design Revolution',
+        placementHint: 'right text block, centered',
+      },
+    ] as const;
+    const element = await service.generateSlideElementFromTask(allTasks[1], {
+      userPrompt: 'Create a 16:9 dark LocalStudio.ai slide with the placeholder image expanded large on the left',
+      allTasks: [...allTasks],
+      page: {
+        name: 'Generated slide',
+        width: 1920,
+        height: 1080,
+        background: { type: 'color', color: '#050D10' },
+      },
+      existingElements: [],
+    });
+
+    expect(element).toMatchObject({
+      x: 1180,
+      y: 410,
+      width: 600,
+      height: 190,
+      fontFamily: 'Orbitron',
+      fontSize: 90,
+      fill: '#37FD76',
+    });
+  });
 });

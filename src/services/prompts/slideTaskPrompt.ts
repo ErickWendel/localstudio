@@ -73,6 +73,7 @@ export function buildSlideTaskPrompt(options: BuildSlideTaskPromptOptions) {
     '- For "icon placeholder", use add-shape with shape "ellipse" unless the user asks for a real photo or provided image URL.',
     '- For "placeholder image", use add-placeholder-image only when the user asks for a photo/image placeholder, not for small icons.',
     '- For "left image and right title", create the image task before the title/subtitle tasks and set placement hints to left media block and right text block.',
+    '- For the LocalStudio.ai hero layout with a placeholder image on the left and title/subtitle on the right, create exactly: set-background #050D10, add-placeholder-image with placementHint "hero placeholder image in the left media block", add-title with placementHint "right text block, centered", and add-subtitle with placementHint "below title in the right text block". The renderer will use x 48, y 195, width 980, height 735 for the image and x 1180, y 410, width 600 for the title.',
     '- For bullet slides, create a large title task and one add-bullets task with 3-5 concise bullet items.',
     '',
     'Images:',

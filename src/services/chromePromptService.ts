@@ -9,6 +9,7 @@ import {
 } from '../domain/generatedSlide';
 import type { PromptApiAvailability, PromptService } from './interfaces';
 import { buildSlideElementPrompt } from './prompts/slideElementPrompt';
+import { applySlideElementLayoutPreset } from './prompts/slideLayoutPresets';
 import { buildSlideTaskPrompt, extractImageUrls } from './prompts/slideTaskPrompt';
 
 type ChromePromptAvailability =
@@ -110,7 +111,11 @@ export class ChromePromptService implements PromptService {
       GENERATED_SLIDE_ELEMENT_RESPONSE_SCHEMA,
     );
     this.ready = true;
-    return parseGeneratedSlideElementJson(response);
+    return applySlideElementLayoutPreset(parseGeneratedSlideElementJson(response), {
+      task,
+      allTasks: context.allTasks,
+      page: context.page,
+    });
   }
 
   private async promptWithStructuredOutput(prompt: string, responseConstraint: unknown) {

@@ -267,6 +267,14 @@ class TranslationModelSetupService extends InMemoryModelSetupService implements 
 }
 
 describe('mocked AI flows', () => {
+  const leftHeroSlideExample =
+    'Slide with the placeholder image expanded large on the left, the neon green title “AI Design Revolution” on the right, and the subtitle “Browser-native creative” below it.';
+  const gridSlideExample = 'Image grid with 3 placeholder images and short Web AI captions.';
+  const bulletsSlideExample = 'Title at the top and bullet points in the body about why Web AI is useful.';
+  const urlImageSlideExample =
+    'Slide using https://img-c.udemycdn.com/course/480x270/5625134_794c.jpg as the main image, with a short Web AI title.';
+  const colorsSlideExample = 'Dark slide with cyan title, purple accent shapes, and white text about browser AI.';
+
   it('downloads required models from AI Tools panel', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
@@ -326,13 +334,15 @@ describe('mocked AI flows', () => {
     await user.clear(screen.getByLabelText('Create image prompt'));
     await user.click(
       screen.getByRole('button', {
-        name: 'A slide with a placeholder image on the left, the title Local AI Is Faster in the middle, and subtext below',
+        name: leftHeroSlideExample,
       }),
     );
 
-    expect(screen.getByRole('textbox', { name: 'Slide structure prompt' })).toHaveValue(
-      'A slide with a placeholder image on the left, the title Local AI Is Faster in the middle, and subtext below',
-    );
+    expect(screen.getByRole('textbox', { name: 'Slide structure prompt' })).toHaveValue(leftHeroSlideExample);
+    expect(screen.getByRole('button', { name: gridSlideExample })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: bulletsSlideExample })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: urlImageSlideExample })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: colorsSlideExample })).toBeInTheDocument();
   });
 
   it('clears create image mode when the prompt text is deleted', async () => {
@@ -352,6 +362,18 @@ describe('mocked AI flows', () => {
     expect(
       screen.getByPlaceholderText('Describe slide structure or organize current content...'),
     ).toBeInTheDocument();
+  });
+
+  it('clears create image mode when the mode token is clicked', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    services.promptService = new TestPromptService('ready');
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'Remove Create image mode' }));
+
+    expect(screen.queryByRole('button', { name: 'Remove Create image mode' })).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Slide structure prompt' })).toHaveValue('');
   });
 
   it('redirects create image prompt typing to AI Tools when image generation models are not ready', async () => {
@@ -571,14 +593,14 @@ describe('mocked AI flows', () => {
     await user.clear(screen.getByLabelText('Create image prompt'));
     await user.click(
       screen.getByRole('button', {
-        name: 'A slide with the title Why Web AI Matters and a subtitle about private AI running in the browser',
+        name: bulletsSlideExample,
       }),
     );
     await user.click(screen.getByRole('button', { name: 'Submit prompt' }));
 
     await waitFor(() => {
       expect(promptService.generateSlideTasksFromPrompt).toHaveBeenCalledWith(
-        'A slide with the title Why Web AI Matters and a subtitle about private AI running in the browser',
+        bulletsSlideExample,
         expect.any(Object),
       );
       expect(promptService.generateSlideElementFromTask).toHaveBeenCalled();

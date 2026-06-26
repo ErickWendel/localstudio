@@ -1,4 +1,4 @@
-import { ImagePlus, Mic, Plus, SendHorizontal } from 'lucide-react';
+import { ImagePlus, Mic, Plus, SendHorizontal, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { IconButton } from '../components/IconButton';
 import type { CreateImagePromptOptions } from './imagePromptOptions';
@@ -17,11 +17,11 @@ interface PromptBarProps {
 }
 
 const slidePromptExamples = [
-  'A slide with the title Why Web AI Matters and a subtitle about private AI running in the browser',
-  'A slide with a placeholder image on the left, the title Local AI Is Faster in the middle, and subtext below',
-  'A slide with a large centered title Web AI Benefits, two bullet points about privacy and offline use, and a footer note',
-  'A slide with three columns about Web AI: Privacy, Speed, and No Backend, each with an icon placeholder and one sentence',
-  'A slide with a black background, green title Run AI Directly In The Browser, short subtitle, and a call-to-action button',
+  'Slide with the placeholder image expanded large on the left, the neon green title “AI Design Revolution” on the right, and the subtitle “Browser-native creative” below it.',
+  'Image grid with 3 placeholder images and short Web AI captions.',
+  'Title at the top and bullet points in the body about why Web AI is useful.',
+  'Slide using https://img-c.udemycdn.com/course/480x270/5625134_794c.jpg as the main image, with a short Web AI title.',
+  'Dark slide with cyan title, purple accent shapes, and white text about browser AI.',
 ];
 
 const imagePromptExamples = [
@@ -145,10 +145,19 @@ export function PromptBar({
           ) : null}
         </div>
         {mode === 'create-image' ? (
-          <span className="prompt-mode-token">
+          <button
+            aria-label="Remove Create image mode"
+            className="prompt-mode-token"
+            type="button"
+            onClick={() => {
+              setMode(null);
+              inputRef.current?.focus();
+            }}
+          >
             <ImagePlus size={15} />
-            Create image
-          </span>
+            <span>Create image</span>
+            <X className="prompt-mode-token-close" size={13} />
+          </button>
         ) : null}
         <input
           ref={inputRef}

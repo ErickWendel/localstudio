@@ -20,6 +20,7 @@ export function buildSlideElementPrompt(options: BuildSlideElementPromptOptions)
     'Use most of the canvas. Never return tiny centered elements for a full-slide layout.',
     'For three-column layouts, use these regions unless the task says otherwise: left column x 180-600, center column x 720-1140, right column x 1320-1740, with columns starting around y 360 and occupying 260-520px height.',
     'For column card/background tasks, return a large rect around that column. For icon placeholder tasks, return an ellipse near the top of that column.',
+    'For left media block + right text block hero layouts, use these exact regions: image x 48, y 195, width 980, height 735; title x 1180, y 410, width 600, height 190; subtitle x 1210, y 640, width 560, height 70.',
     '',
     `Original user prompt: ${options.userPrompt}`,
     `Page: ${JSON.stringify(options.page)}`,
