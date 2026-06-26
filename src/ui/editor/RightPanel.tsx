@@ -1,7 +1,7 @@
 import { Brush, Layers3, Sparkles } from 'lucide-react';
 import type { PageBackground, ProjectDocument, SelectionState } from '../../domain/model';
 import type { ElementStylePatch } from '../../domain/commands/basicCommands';
-import type { ModelState } from '../../services/interfaces';
+import type { AiProviderState, ModelState } from '../../services/interfaces';
 import { SegmentedTabs, type SegmentedTab } from '../components/SegmentedTabs';
 import { AiToolsPanel } from './AiToolsPanel';
 import { DesignPanel } from './DesignPanel';
@@ -17,6 +17,8 @@ interface RightPanelProps {
   modelStates: ModelState[];
   attentionModelId?: string | undefined;
   createImageOptions?: CreateImagePromptOptions;
+  promptProviderStates?: AiProviderState[];
+  translationProviderStates?: AiProviderState[];
   translationLanguageOptions?: Array<{ code: string; flag: string; label: string }>;
   translationPreparation?: { progress: number; sourceLanguage?: string; status: 'idle' | 'downloading' | 'ready' | 'failed' };
   translationTargetAttention?: boolean;
@@ -25,9 +27,13 @@ interface RightPanelProps {
   promptApiNotice?: string | undefined;
   promptPreparation?: { availability: string; progress: number; status: 'idle' | 'downloading' | 'ready' | 'failed' };
   onDownloadModel?: (id: string) => Promise<void>;
+  onRemoveModel?: (id: string) => Promise<void>;
   onCreateImageOptionsChange?: (options: CreateImagePromptOptions) => void;
   onPreparePromptApi?: () => Promise<void>;
+  onPrepareTranslationProvider?: () => Promise<void>;
+  onPromptProviderChange?: (providerId: string) => void;
   onTranslationTargetLanguageChange?: (languageCode: string) => void;
+  onTranslationProviderChange?: (providerId: string) => void;
   project: ProjectDocument;
   activePageId: string;
   selection: SelectionState;
@@ -52,6 +58,8 @@ export function RightPanel({
   modelStates,
   attentionModelId,
   createImageOptions,
+  promptProviderStates,
+  translationProviderStates,
   translationLanguageOptions,
   translationPreparation,
   translationTargetAttention,
@@ -60,9 +68,13 @@ export function RightPanel({
   promptApiNotice,
   promptPreparation,
   onDownloadModel,
+  onRemoveModel,
   onCreateImageOptionsChange,
   onPreparePromptApi,
+  onPrepareTranslationProvider,
+  onPromptProviderChange,
   onTranslationTargetLanguageChange,
+  onTranslationProviderChange,
   project,
   activePageId,
   selection,
@@ -82,6 +94,8 @@ export function RightPanel({
           <AiToolsPanel
             modelStates={modelStates}
             attentionModelId={attentionModelId}
+            promptProviderStates={promptProviderStates}
+            translationProviderStates={translationProviderStates}
             translationLanguageOptions={translationLanguageOptions}
             translationPreparation={translationPreparation}
             translationTargetAttention={translationTargetAttention}
@@ -90,9 +104,13 @@ export function RightPanel({
             promptApiNotice={promptApiNotice}
             promptPreparation={promptPreparation}
             onDownloadModel={onDownloadModel}
+            onRemoveModel={onRemoveModel}
             onCreateImageOptionsChange={onCreateImageOptionsChange}
             onPreparePromptApi={onPreparePromptApi}
+            onPrepareTranslationProvider={onPrepareTranslationProvider}
+            onPromptProviderChange={onPromptProviderChange}
             onTranslationTargetLanguageChange={onTranslationTargetLanguageChange}
+            onTranslationProviderChange={onTranslationProviderChange}
             {...(createImageOptions ? { createImageOptions } : {})}
           />
         ) : null}

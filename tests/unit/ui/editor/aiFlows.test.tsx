@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createAppServices } from '../../../../src/app/composition';
 import type {
@@ -311,7 +311,7 @@ describe('mocked AI flows', () => {
     });
   });
 
-  it('shows ready Prompt API first without a prepare action when available on startup', async () => {
+  it('shows ready LLM configuration without a prepare action when available on startup', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
     services.promptService = new TestPromptService('ready');
@@ -320,10 +320,10 @@ describe('mocked AI flows', () => {
     await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
 
     await waitFor(() => {
-      expect(screen.queryByRole('button', { name: 'Prepare Prompt API' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Prepare LLM Model' })).not.toBeInTheDocument();
     });
-    expect(screen.getAllByRole('article')[0]).toHaveAccessibleName('Prompt API');
-    expect(screen.getByText('Prompt to slides using Chrome Built-in AI.')).toBeInTheDocument();
+    expect(screen.getAllByRole('article')[0]).toHaveAccessibleName('LLM Model');
+    expect(screen.getByText('Choose the local model used for prompt-to-slides.')).toBeInTheDocument();
     expect(screen.getAllByText('Ready').length).toBeGreaterThanOrEqual(1);
   });
 
@@ -383,7 +383,7 @@ describe('mocked AI flows', () => {
     expect(screen.getByLabelText('Translate to')).toHaveValue('es');
     expect(translator.prepareTranslation).toHaveBeenCalledWith('en', 'es', expect.any(Object));
     expect(await screen.findByText('Ready')).toBeInTheDocument();
-    expect(screen.getAllByText('100%').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByLabelText('Translation language preparation').querySelector('.model-progress')).toBeNull();
     expect(screen.getByText('Pair: en → es')).toBeInTheDocument();
     expect(window.localStorage.getItem('localstudio.ai.translation-target-language')).toBe('es');
     expect(
@@ -397,7 +397,7 @@ describe('mocked AI flows', () => {
 
     await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
 
-    const options = screen.getAllByRole<HTMLOptionElement>('option');
+    const options = within(screen.getByLabelText('Translate to')).getAllByRole<HTMLOptionElement>('option');
     expect(options).toHaveLength(40);
     expect(options.map((option) => option.value)).toEqual([
       '',

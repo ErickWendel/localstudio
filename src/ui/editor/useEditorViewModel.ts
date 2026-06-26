@@ -33,7 +33,8 @@ import type { GeneratedSlideElement } from '../../domain/generatedSlide';
 import { fitImageWithinPage } from '../../domain/imageSizing';
 import type { DesignElement, Page, PageBackground, ProjectDocument, SelectionState } from '../../domain/model';
 import { SAMPLE_HERO_IMAGE_SIZE, SAMPLE_HERO_IMAGE_URL } from '../../domain/sampleProject';
-import type { ModelState, PromptApiAvailability } from '../../services/interfaces';
+import type { AiProviderState, ModelState, PromptApiAvailability } from '../../services/interfaces';
+import { GEMMA_LLM_MODEL_ID, TRANSLATEGEMMA_MODEL_ID } from '../../services/aiModelIds';
 import {
   DEFAULT_IMAGE_GENERATION_SIZE,
   IMAGE_GENERATION_MODEL_ID,
@@ -89,7 +90,7 @@ interface ElementClipboardState {
 const PERSISTENCE_PREFERENCE_KEY = 'ew-canvas-ai.persistence-enabled';
 const TRANSLATION_TARGET_LANGUAGE_KEY = 'localstudio.ai.translation-target-language';
 const IMAGE_EDITING_MODEL_REQUIRED_MESSAGE = 'You must download the image editing tools first.';
-const PROMPT_API_REQUIRED_MESSAGE = 'Prompt API must be prepared before using prompt-to-slides.';
+const PROMPT_API_REQUIRED_MESSAGE = 'LLM model must be prepared before using prompt-to-slides.';
 const IMAGE_GENERATION_MODEL_REQUIRED_MESSAGE = 'Download image generation models before creating images.';
 const IMAGE_PROMPT_MODE_REQUIRED_MESSAGE = 'Use Create image from the + menu to generate images.';
 const BACKGROUND_PREVIEW_DEBOUNCE_MS = 120;
@@ -409,6 +410,8 @@ export function useEditorViewModel(services: AppServices) {
   const [backgroundPreview, setBackgroundPreview] = useState<BackgroundPreviewState | undefined>();
   const [backgroundPreparation, setBackgroundPreparation] = useState<BackgroundPreparationState | undefined>();
   const [translationTargetLanguage, setTranslationTargetLanguageState] = useState(readTranslationTargetLanguage);
+  const [promptProviderStates, setPromptProviderStates] = useState<AiProviderState[]>([]);
+  const [translationProviderStates, setTranslationProviderStates] = useState<AiProviderState[]>([]);
   const [translationTargetAttention, setTranslationTargetAttention] = useState(false);
   const [translationPreparation, setTranslationPreparation] = useState<TranslationPreparationState>({
     progress: 0,
@@ -460,8 +463,19 @@ export function useEditorViewModel(services: AppServices) {
   }, [activePageId, pageLanguageCodes]);
 
   useEffect(() => {
-    void services.modelSetupService.getModelStates().then(setModelStates);
-  }, [services.modelSetupService]);
+    async function refreshAiReadiness() {
+      const nextModelStates = await services.modelSetupService.getModelStates();
+      setModelStates(nextModelStates);
+      if (services.promptService.getProviderStates) {
+        setPromptProviderStates(await services.promptService.getProviderStates());
+      }
+      if (services.translatorService.getProviderStates) {
+        setTranslationProviderStates(await services.translatorService.getProviderStates());
+      }
+    }
+
+    void refreshAiReadiness();
+  }, [services.modelSetupService, services.promptService, services.translatorService]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
@@ -611,6 +625,12 @@ export function useEditorViewModel(services: AppServices) {
     );
     const next = await services.modelSetupService.downloadRequiredModels();
     setModelStates(next);
+    if (services.promptService.getProviderStates) {
+      setPromptProviderStates(await services.promptService.getProviderStates());
+    }
+    if (services.translatorService.getProviderStates) {
+      setTranslationProviderStates(await services.translatorService.getProviderStates());
+    }
     if (next.some((state) => state.id === IMAGE_EDITING_MODEL_ID && state.status === 'ready')) {
       setBackgroundSelectionNotice(undefined);
     }
@@ -638,12 +658,39 @@ export function useEditorViewModel(services: AppServices) {
     setModelStates((currentStates) =>
       currentStates.map((state) => (state.id === id ? next : state)),
     );
+    if (services.promptService.getProviderStates) {
+      setPromptProviderStates(await services.promptService.getProviderStates());
+    }
+    if (services.translatorService.getProviderStates) {
+      setTranslationProviderStates(await services.translatorService.getProviderStates());
+    }
     if (id === IMAGE_EDITING_MODEL_ID && next.status === 'ready') {
       setBackgroundSelectionNotice(undefined);
     }
     if (id === IMAGE_GENERATION_MODEL_ID && next.status === 'ready') {
       setCreateImageNotice(undefined);
       setAiToolsAttentionModelId(undefined);
+    }
+  }
+
+  async function removeModel(id: string) {
+    if (!services.modelSetupService.removeModel) return;
+
+    const next = await services.modelSetupService.removeModel(id);
+    setModelStates((currentStates) =>
+      currentStates.map((state) => (state.id === id ? next : state)),
+    );
+    if (services.promptService.getProviderStates) {
+      setPromptProviderStates(await services.promptService.getProviderStates());
+    }
+    if (services.translatorService.getProviderStates) {
+      setTranslationProviderStates(await services.translatorService.getProviderStates());
+    }
+    if (id === GEMMA_LLM_MODEL_ID) {
+      setPromptPreparation({ availability: 'downloadable', progress: 0, status: 'idle' });
+    }
+    if (id === TRANSLATEGEMMA_MODEL_ID) {
+      setTranslationPreparation({ progress: 0, status: 'idle' });
     }
   }
 
@@ -668,8 +715,8 @@ export function useEditorViewModel(services: AppServices) {
     const availability = await services.promptService.checkAvailability();
     setPromptPreparation((current) => ({
       availability,
-      progress: availability === 'ready' ? 100 : current.progress,
-      status: availability === 'ready' ? 'ready' : current.status === 'ready' ? 'ready' : current.status,
+      progress: availability === 'ready' ? 100 : current.status === 'downloading' ? current.progress : 0,
+      status: availability === 'ready' ? 'ready' : current.status === 'downloading' ? 'downloading' : 'idle',
     }));
     return availability;
   }
@@ -688,17 +735,67 @@ export function useEditorViewModel(services: AppServices) {
           setPromptPreparation((current) => ({
             ...current,
             availability: progress >= 100 ? 'ready' : current.availability,
-            progress: Math.max(4, Math.min(100, Math.round(progress))),
+            progress: Math.max(current.progress, 4, Math.min(100, Math.round(progress))),
             status: progress >= 100 ? 'ready' : 'downloading',
           }));
         },
       });
       setPromptPreparation({ availability: 'ready', progress: 100, status: 'ready' });
+      setModelStates(await services.modelSetupService.getModelStates());
+      if (services.promptService.getProviderStates) {
+        setPromptProviderStates(await services.promptService.getProviderStates());
+      }
       setPromptApiNotice('Prompt API ready');
     } catch (error) {
       setPromptPreparation({ availability: 'unavailable', progress: 0, status: 'failed' });
       setPromptApiAttention(true);
       setPromptApiNotice(error instanceof Error ? error.message : 'Chrome Prompt API could not be prepared.');
+    }
+  }
+
+  async function setPromptProvider(providerId: string) {
+    if (!services.promptService.setSelectedProvider) return;
+    const nextProviders = await services.promptService.setSelectedProvider(providerId);
+    setPromptProviderStates(nextProviders);
+    await refreshPromptApiAvailability();
+  }
+
+  async function setTranslationProvider(providerId: string) {
+    if (!services.translatorService.setSelectedProvider) return;
+    const nextProviders = await services.translatorService.setSelectedProvider(providerId);
+    setTranslationProviderStates(nextProviders);
+    setTranslationPreparation((current) => ({
+      ...current,
+      progress: current.status === 'ready' ? 0 : current.progress,
+      status: current.status === 'ready' ? 'idle' : current.status,
+    }));
+  }
+
+  async function prepareSelectedTranslationProvider() {
+    const selectedProvider = translationProviderStates.find((provider) => provider.selected);
+    if (selectedProvider?.modelId && selectedProvider.readiness !== 'ready') {
+      setTranslationPreparation({ progress: 4, status: 'downloading' });
+      try {
+        await services.translatorService.prepareTranslation('en', translationTargetLanguage || 'en', {
+          onProgress: (progress) => {
+            setTranslationPreparation((current) => ({
+              progress: Math.max(current.progress, 4, Math.min(100, Math.round(progress))),
+              status: progress >= 100 ? 'ready' : 'downloading',
+            }));
+          },
+        });
+        setTranslationPreparation({ progress: 100, status: 'ready' });
+        setModelStates(await services.modelSetupService.getModelStates());
+        if (services.translatorService.getProviderStates) {
+          setTranslationProviderStates(await services.translatorService.getProviderStates());
+        }
+      } catch (error) {
+        setTranslationPreparation({ progress: 0, status: 'failed' });
+        setTranslationNotice(error instanceof Error ? error.message : 'Translation model could not be prepared.');
+      }
+    }
+    if (translationTargetLanguage) {
+      await setTranslationTargetLanguage(translationTargetLanguage);
     }
   }
 
@@ -1148,11 +1245,11 @@ export function useEditorViewModel(services: AppServices) {
       setTranslationPreparation({ progress: 8, sourceLanguage, status: 'downloading' });
       await services.translatorService.prepareTranslation(sourceLanguage, nextLanguage, {
         onProgress: (progress) => {
-          setTranslationPreparation({
-            progress: Math.max(8, Math.min(100, Math.round(progress))),
+          setTranslationPreparation((current) => ({
+            progress: Math.max(current.progress, 8, Math.min(100, Math.round(progress))),
             sourceLanguage,
             status: progress >= 100 ? 'ready' : 'downloading',
-          });
+          }));
         },
       });
       setTranslationPreparation({ progress: 100, sourceLanguage, status: 'ready' });
@@ -1867,6 +1964,8 @@ export function useEditorViewModel(services: AppServices) {
     importProject,
     translationLanguageOptions: TRANSLATION_LANGUAGE_OPTIONS,
     translationTargetLanguage,
+    promptProviderStates,
+    translationProviderStates,
     translationTargetAttention,
     translationPreparation,
     isTranslating,
@@ -1883,11 +1982,14 @@ export function useEditorViewModel(services: AppServices) {
     isGeneratingSlide,
     aiToolsAttentionModelId,
     preparePromptApi,
+    prepareSelectedTranslationProvider,
     ensurePromptApiReadyForPrompt,
     ensureImageGenerationReadyForPrompt,
     generateSlideFromPrompt,
     generateImageFromPrompt,
     setCreateImageOptions,
+    setPromptProvider,
+    setTranslationProvider,
     setTranslationTargetLanguage,
     canTranslateSelection: !isTranslating && getTranslatableTextElementIds('selection').length > 0,
     canTranslateCurrentSlide: !isTranslating && getTranslatableTextElementIds('slide').length > 0,
@@ -1899,6 +2001,7 @@ export function useEditorViewModel(services: AppServices) {
     translateDeck: () => requestTranslation('deck'),
     downloadRequiredModels,
     downloadModel,
+    removeModel,
     selectElement,
     selectAllElementsOnActivePage,
     clearSelection,

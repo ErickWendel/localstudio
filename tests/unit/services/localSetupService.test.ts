@@ -4,10 +4,14 @@ import { BrowserLocalSetupService, SETUP_COMPLETE_KEY } from '../../../src/servi
 describe('BrowserLocalSetupService', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    Object.defineProperty(navigator, 'gpu', {
+      configurable: true,
+      value: undefined,
+    });
     window.localStorage.clear();
   });
 
-  it('reports filesystem and chrome translation readiness', async () => {
+  it('reports filesystem and Chrome local AI readiness', async () => {
     vi.stubGlobal('showDirectoryPicker', vi.fn());
     vi.stubGlobal('Translator', {
       availability: vi.fn().mockResolvedValue('available'),
@@ -18,6 +22,8 @@ describe('BrowserLocalSetupService', () => {
 
     expect(state.fileSystem.status).toBe('ready');
     expect(state.chromeTranslation.status).toBe('ready');
+    expect(state.chromeTranslation.label).toBe('Local AI Providers');
+    expect(state.chromeTranslation.detail).toBe('Chrome Built-in AI is ready.');
   });
 
   it('reports missing browser capabilities as unavailable', async () => {
@@ -29,22 +35,27 @@ describe('BrowserLocalSetupService', () => {
 
     expect(state.fileSystem.status).toBe('unavailable');
     expect(state.chromeTranslation.status).toBe('unavailable');
+    expect(state.chromeTranslation.detail).toBe('No compatible local AI provider was found in this browser.');
   });
 
-  it('reports downloadable chrome translation as unavailable for this setup pass', async () => {
+  it('uses WebGPU provider compatibility when Chrome AI needs setup', async () => {
     vi.stubGlobal('showDirectoryPicker', vi.fn());
     vi.stubGlobal('Translator', {
       availability: vi.fn().mockResolvedValue('downloadable'),
+    });
+    Object.defineProperty(navigator, 'gpu', {
+      configurable: true,
+      value: {},
     });
     const service = new BrowserLocalSetupService();
 
     const state = await service.checkReadiness();
 
-    expect(state.chromeTranslation.status).toBe('unavailable');
-    expect(state.chromeTranslation.detail).toBe('Chrome translation is not ready in this browser session.');
+    expect(state.chromeTranslation.status).toBe('ready');
+    expect(state.chromeTranslation.detail).toBe('Chrome AI needs setup, but WebGPU local models are available.');
   });
 
-  it('reports downloading chrome translation as unavailable for this setup pass', async () => {
+  it('reports downloading Chrome AI as unavailable when no WebGPU fallback exists', async () => {
     vi.stubGlobal('showDirectoryPicker', vi.fn());
     vi.stubGlobal('Translator', {
       availability: vi.fn().mockResolvedValue('downloading'),
@@ -54,7 +65,7 @@ describe('BrowserLocalSetupService', () => {
     const state = await service.checkReadiness();
 
     expect(state.chromeTranslation.status).toBe('unavailable');
-    expect(state.chromeTranslation.detail).toBe('Chrome translation is not ready in this browser session.');
+    expect(state.chromeTranslation.detail).toBe('Chrome AI needs setup and no WebGPU fallback is available.');
   });
 
   it('stores setup completion in localStorage', () => {

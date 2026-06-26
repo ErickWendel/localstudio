@@ -18,7 +18,7 @@ export class BrowserLocalSetupService implements LocalSetupService {
   async checkReadiness(): Promise<LocalSetupState> {
     return {
       fileSystem: this.checkFileSystem(),
-      chromeTranslation: await this.checkChromeTranslation(),
+      chromeTranslation: await this.checkLocalAiProviders(),
     };
   }
 
@@ -47,41 +47,71 @@ export class BrowserLocalSetupService implements LocalSetupService {
     };
   }
 
-  private async checkChromeTranslation(): Promise<SetupCapabilityState> {
+  private async checkLocalAiProviders(): Promise<SetupCapabilityState> {
     const browserWindow = window as SetupWindow;
     const translator = browserWindow.Translator;
+    const hasWebGpu = typeof navigator !== 'undefined' && Boolean((navigator as Navigator & { gpu?: unknown }).gpu);
     if (!translator?.availability) {
+      if (hasWebGpu) {
+        return {
+          label: 'Local AI Providers',
+          status: 'ready',
+          detail: 'WebGPU local AI models can be configured in AI Tools.',
+        };
+      }
       return {
-        label: 'Chrome Translation',
+        label: 'Local AI Providers',
         status: 'unavailable',
-        detail: 'Chrome Built-in AI translation is not available.',
+        detail: 'No compatible local AI provider was found in this browser.',
       };
     }
 
     try {
       const result = await translator.availability({ sourceLanguage: 'en', targetLanguage: 'pt' });
       if (result === 'available') {
-        return { label: 'Chrome Translation', status: 'ready', detail: 'Translation is ready.' };
+        return { label: 'Local AI Providers', status: 'ready', detail: 'Chrome Built-in AI is ready.' };
       }
       if (result === 'downloadable' || result === 'downloading') {
+        if (hasWebGpu) {
+          return {
+            label: 'Local AI Providers',
+            status: 'ready',
+            detail: 'Chrome AI needs setup, but WebGPU local models are available.',
+          };
+        }
         return {
-          label: 'Chrome Translation',
+          label: 'Local AI Providers',
           status: 'unavailable',
-          detail: 'Chrome translation is not ready in this browser session.',
+          detail: 'Chrome AI needs setup and no WebGPU fallback is available.',
         };
       }
     } catch {
+      if (hasWebGpu) {
+        return {
+          label: 'Local AI Providers',
+          status: 'ready',
+          detail: 'Chrome AI readiness could not be checked, but WebGPU local models are available.',
+        };
+      }
       return {
-        label: 'Chrome Translation',
+        label: 'Local AI Providers',
         status: 'unavailable',
-        detail: 'Translation readiness could not be checked.',
+        detail: 'Local AI readiness could not be checked.',
+      };
+    }
+
+    if (hasWebGpu) {
+      return {
+        label: 'Local AI Providers',
+        status: 'ready',
+        detail: 'WebGPU local AI models can be configured in AI Tools.',
       };
     }
 
     return {
-      label: 'Chrome Translation',
+      label: 'Local AI Providers',
       status: 'unavailable',
-      detail: 'Translation is unavailable in this browser.',
+      detail: 'No compatible local AI provider was found in this browser.',
     };
   }
 }

@@ -66,6 +66,12 @@ describe('RightPanel', () => {
       />,
     );
     expect(screen.queryByText('Download Required Models')).not.toBeInTheDocument();
+    expect(screen.queryByText('Local Chrome AI')).not.toBeInTheDocument();
+    expect(screen.queryByText('Cached Browser Models')).not.toBeInTheDocument();
+    expect(screen.queryByText('Configuration')).not.toBeInTheDocument();
+    expect(screen.queryByText('Models')).not.toBeInTheDocument();
+    expect(screen.getAllByLabelText('LLM Model').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByLabelText('Translation Model').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Image Editing Models')).toBeInTheDocument();
     expect(screen.getByText('Segmentation model for image editing.')).toBeInTheDocument();
     expect(screen.queryByText('Background Remover')).not.toBeInTheDocument();
@@ -149,10 +155,7 @@ describe('RightPanel', () => {
     );
 
     expect(screen.getByRole('article', { name: 'Image Editing Models' })).not.toHaveClass('model-row-attention');
-    expect(screen.getByRole('button', { name: 'Download Image Editing Models' })).not.toHaveClass(
-      'icon-button-attention',
-    );
-    expect(screen.getByRole('button', { name: 'Download Image Editing Models' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Download Image Editing Models' })).not.toBeInTheDocument();
   });
 
   it('exposes layer controls for visibility, lock, delete, and drag order', async () => {

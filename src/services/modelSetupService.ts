@@ -1,11 +1,20 @@
 import type { ModelSetupService, ModelState } from './interfaces';
 import {
+  GEMMA_LLM_MODEL_ID,
+  GEMMA_LLM_READY_KEY,
+  GEMMA_LLM_TRANSFORMERS_MODEL_ID,
+  TRANSLATEGEMMA_MODEL_ID,
+  TRANSLATEGEMMA_READY_KEY,
+  TRANSLATEGEMMA_TRANSFORMERS_MODEL_ID,
+} from './aiModelIds';
+import {
   IMAGE_GENERATION_MODEL_ID,
   IMAGE_GENERATION_READY_KEY,
   IMAGE_GENERATION_TRANSFORMERS_MODEL_ID,
   TRANSFORMERS_CACHE_KEY,
 } from './imageGenerationModels';
 import { BrowserBonsaiImageRuntime } from './bonsaiImageRuntime';
+import { createMonotonicProgressReporter } from './progress';
 
 export const IMAGE_EDITING_MODEL_ID = 'image-editing-models';
 export const IMAGE_EDITING_TRANSFORMERS_MODEL_ID = 'Xenova/slimsam-77-uniform';
@@ -15,6 +24,7 @@ const IMAGE_EDITING_READY_KEY = 'ew-canvas-ai.model.image-editing-models.ready';
 interface ModelStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
+  removeItem?(key: string): void;
 }
 
 export interface ImageEditingModelLoader {
@@ -25,7 +35,29 @@ export interface ImageGenerationModelLoader {
   loadImageGenerationModel(options?: { onProgress?: (progress: number) => void }): Promise<void>;
 }
 
+export interface TextGenerationModelLoader {
+  loadTextGenerationModel(modelId: string, options?: { onProgress?: (progress: number) => void }): Promise<void>;
+}
+
 const initialStates: ModelState[] = [
+  {
+    id: GEMMA_LLM_MODEL_ID,
+    label: 'Gemma 4 WebGPU LLM',
+    description: 'Browser-local LLM model for prompt-to-slides.',
+    provider: 'transformers',
+    status: 'needs-download',
+    progress: 0,
+    required: false,
+  },
+  {
+    id: TRANSLATEGEMMA_MODEL_ID,
+    label: 'TranslateGemma WebGPU',
+    description: 'Browser-local translation model.',
+    provider: 'transformers',
+    status: 'needs-download',
+    progress: 0,
+    required: false,
+  },
   {
     id: IMAGE_EDITING_MODEL_ID,
     label: 'Image Editing Models',
@@ -55,6 +87,14 @@ function getBrowserStorage(): ModelStorage | undefined {
   return window.localStorage;
 }
 
+function getReadyKey(id: string) {
+  if (id === IMAGE_EDITING_MODEL_ID) return IMAGE_EDITING_READY_KEY;
+  if (id === IMAGE_GENERATION_MODEL_ID) return IMAGE_GENERATION_READY_KEY;
+  if (id === GEMMA_LLM_MODEL_ID) return GEMMA_LLM_READY_KEY;
+  if (id === TRANSLATEGEMMA_MODEL_ID) return TRANSLATEGEMMA_READY_KEY;
+  return undefined;
+}
+
 export class TransformersImageEditingModelLoader implements ImageEditingModelLoader {
   async loadImageEditingModel(): Promise<void> {
     const { AutoProcessor, SamModel, env } = await import('@huggingface/transformers');
@@ -78,6 +118,26 @@ export class TransformersImageGenerationModelLoader implements ImageGenerationMo
   }
 }
 
+export class TransformersTextGenerationModelLoader implements TextGenerationModelLoader {
+  async loadTextGenerationModel(modelId: string, options?: { onProgress?: (progress: number) => void }): Promise<void> {
+    const { pipeline, env } = await import('@huggingface/transformers');
+
+    env.useBrowserCache = true;
+    env.cacheKey = TRANSFORMERS_CACHE_KEY;
+
+    await pipeline('text-generation', modelId, {
+      dtype: 'q4',
+      device: 'webgpu',
+      progress_callback: (progress) => {
+        const progressValue = 'progress' in progress ? progress.progress : undefined;
+        if (typeof progressValue === 'number') {
+          options?.onProgress?.(progressValue);
+        }
+      },
+    });
+  }
+}
+
 export class BrowserModelSetupService implements ModelSetupService {
   private states: ModelState[];
 
@@ -85,11 +145,18 @@ export class BrowserModelSetupService implements ModelSetupService {
     private readonly imageEditingModelLoader: ImageEditingModelLoader = new TransformersImageEditingModelLoader(),
     private readonly storage: ModelStorage | undefined = getBrowserStorage(),
     private readonly imageGenerationModelLoader: ImageGenerationModelLoader = new TransformersImageGenerationModelLoader(),
+    private readonly textGenerationModelLoader: TextGenerationModelLoader = new TransformersTextGenerationModelLoader(),
   ) {
     const imageEditingModelReady = storage?.getItem(IMAGE_EDITING_READY_KEY) === 'true';
     const imageGenerationModelReady = storage?.getItem(IMAGE_GENERATION_READY_KEY) === 'true';
+    const gemmaLlmReady = storage?.getItem(GEMMA_LLM_READY_KEY) === 'true';
+    const translateGemmaReady = storage?.getItem(TRANSLATEGEMMA_READY_KEY) === 'true';
     this.states = initialStates.map((state) =>
-      state.id === IMAGE_EDITING_MODEL_ID && imageEditingModelReady
+      state.id === GEMMA_LLM_MODEL_ID && gemmaLlmReady
+        ? { ...state, status: 'ready', progress: 100 }
+        : state.id === TRANSLATEGEMMA_MODEL_ID && translateGemmaReady
+          ? { ...state, status: 'ready', progress: 100 }
+        : state.id === IMAGE_EDITING_MODEL_ID && imageEditingModelReady
         ? { ...state, status: 'ready', progress: 100 }
         : state.id === IMAGE_GENERATION_MODEL_ID && imageGenerationModelReady
           ? { ...state, status: 'ready', progress: 100 }
@@ -114,6 +181,13 @@ export class BrowserModelSetupService implements ModelSetupService {
     if (current.status === 'ready') return { ...current };
 
     this.setModelState(id, { status: 'downloading', progress: 10, error: undefined });
+    const reportProgress = createMonotonicProgressReporter(
+      (progress) => {
+        this.setModelState(id, { status: 'downloading', progress, error: undefined });
+        options?.onProgress?.(progress);
+      },
+      { initial: 10, min: 10, max: 99 },
+    );
 
     try {
       if (id === IMAGE_EDITING_MODEL_ID) {
@@ -122,22 +196,45 @@ export class BrowserModelSetupService implements ModelSetupService {
       }
       if (id === IMAGE_GENERATION_MODEL_ID) {
         await this.imageGenerationModelLoader.loadImageGenerationModel({
-          onProgress: (progress) => {
-            const boundedProgress = Math.max(10, Math.min(99, Math.round(progress)));
-            this.setModelState(id, { status: 'downloading', progress: boundedProgress, error: undefined });
-            options?.onProgress?.(boundedProgress);
-          },
+          onProgress: reportProgress,
         });
         this.storage?.setItem(IMAGE_GENERATION_READY_KEY, 'true');
+      }
+      if (id === GEMMA_LLM_MODEL_ID) {
+        await this.textGenerationModelLoader.loadTextGenerationModel(GEMMA_LLM_TRANSFORMERS_MODEL_ID, {
+          onProgress: reportProgress,
+        });
+        this.storage?.setItem(GEMMA_LLM_READY_KEY, 'true');
+      }
+      if (id === TRANSLATEGEMMA_MODEL_ID) {
+        await this.textGenerationModelLoader.loadTextGenerationModel(TRANSLATEGEMMA_TRANSFORMERS_MODEL_ID, {
+          onProgress: reportProgress,
+        });
+        this.storage?.setItem(TRANSLATEGEMMA_READY_KEY, 'true');
       }
       options?.onProgress?.(100);
       return this.setModelState(id, { status: 'ready', progress: 100, error: undefined });
     } catch (error) {
       if (id === IMAGE_EDITING_MODEL_ID) this.storage?.setItem(IMAGE_EDITING_READY_KEY, 'false');
       if (id === IMAGE_GENERATION_MODEL_ID) this.storage?.setItem(IMAGE_GENERATION_READY_KEY, 'false');
+      if (id === GEMMA_LLM_MODEL_ID) this.storage?.setItem(GEMMA_LLM_READY_KEY, 'false');
+      if (id === TRANSLATEGEMMA_MODEL_ID) this.storage?.setItem(TRANSLATEGEMMA_READY_KEY, 'false');
       const message = error instanceof Error ? error.message : 'Model download failed.';
       return this.setModelState(id, { status: 'failed', progress: 0, error: message });
     }
+  }
+
+  removeModel(id: string): Promise<ModelState> {
+    const current = this.states.find((state) => state.id === id);
+    if (!current) throw new Error(`Unknown model: ${id}`);
+
+    const readyKey = getReadyKey(id);
+    if (readyKey) {
+      this.storage?.removeItem?.(readyKey);
+      this.storage?.setItem(readyKey, 'false');
+    }
+
+    return Promise.resolve(this.setModelState(id, { status: 'needs-download', progress: 0, error: undefined }));
   }
 
   private setModelState(id: string, patch: Partial<ModelState>) {
@@ -167,6 +264,16 @@ export class InMemoryModelSetupService implements ModelSetupService {
     options?.onProgress?.(100);
     this.states = this.states.map((state) =>
       state.id === id ? { ...state, status: 'ready', progress: 100, error: undefined } : state,
+    );
+    return Promise.resolve({ ...this.states.find((state) => state.id === id)! });
+  }
+
+  removeModel(id: string): Promise<ModelState> {
+    const current = this.states.find((state) => state.id === id);
+    if (!current) throw new Error(`Unknown model: ${id}`);
+
+    this.states = this.states.map((state) =>
+      state.id === id ? { ...state, status: 'needs-download', progress: 0, error: undefined } : state,
     );
     return Promise.resolve({ ...this.states.find((state) => state.id === id)! });
   }

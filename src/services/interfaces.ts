@@ -6,6 +6,9 @@ import type {
 } from '../domain/generatedSlide';
 
 export type ModelStatus = 'unavailable' | 'needs-download' | 'downloading' | 'ready' | 'failed';
+export type AiCapability = 'prompt' | 'translation' | 'image-generation' | 'image-editing';
+export type AiProviderRuntime = 'chrome-built-in' | 'webgpu-huggingface';
+export type AiProviderCompatibility = 'compatible' | 'incompatible' | 'unknown';
 
 export interface ModelState {
   id: string;
@@ -16,6 +19,19 @@ export interface ModelState {
   status: ModelStatus;
   progress: number;
   required: boolean;
+}
+
+export interface AiProviderState {
+  id: string;
+  label: string;
+  description: string;
+  capability: Extract<AiCapability, 'prompt' | 'translation'>;
+  runtime: AiProviderRuntime;
+  compatibility: AiProviderCompatibility;
+  disabledReason?: string | undefined;
+  modelId?: string | undefined;
+  readiness: ModelStatus;
+  selected: boolean;
 }
 
 export interface ProjectRepository {
@@ -34,6 +50,7 @@ export interface ModelSetupService {
   getModelStates(): Promise<ModelState[]>;
   downloadRequiredModels(): Promise<ModelState[]>;
   downloadModel(id: string, options?: { onProgress?: (progress: number) => void }): Promise<ModelState>;
+  removeModel?(id: string): Promise<ModelState>;
 }
 
 export type SetupCapabilityStatus = 'unavailable' | 'needs-setup' | 'ready';
@@ -56,6 +73,9 @@ export interface LocalSetupService {
 }
 
 export interface TranslatorService {
+  getProviderStates?(): Promise<AiProviderState[]>;
+  getSelectedProviderId?(): string;
+  setSelectedProvider?(providerId: string): Promise<AiProviderState[]>;
   detectLanguage(text: string): Promise<string>;
   prepareTranslation(
     sourceLanguage: string,
@@ -68,6 +88,9 @@ export interface TranslatorService {
 export type PromptApiAvailability = 'unavailable' | 'downloadable' | 'downloading' | 'ready';
 
 export interface PromptService {
+  getProviderStates?(): Promise<AiProviderState[]>;
+  getSelectedProviderId?(): string;
+  setSelectedProvider?(providerId: string): Promise<AiProviderState[]>;
   checkAvailability(): Promise<PromptApiAvailability>;
   preparePromptApi(options?: { onProgress?: (progress: number) => void }): Promise<void>;
   generateSlideTasksFromPrompt(

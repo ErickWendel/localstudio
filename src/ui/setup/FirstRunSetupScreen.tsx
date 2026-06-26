@@ -38,7 +38,7 @@ export function FirstRunSetupScreen({ setupState, onRefresh, onContinue }: First
           LocalStudio.ai runs locally in this browser.
         </h1>
         <p className="setup-copy">
-          Confirm this browser can save project folders and use Chrome translation before opening the
+          Confirm this browser can save project folders and run local AI providers before opening the
           editor.
         </p>
         <div className="setup-capability-list">

@@ -7,6 +7,8 @@ export default tseslint.config(
   {
     ignores: [
       'dist',
+      '.worktrees',
+      '.worktrees/**',
       'node_modules',
       'docs/design/stitch/**/*.html',
       '**/*.js',

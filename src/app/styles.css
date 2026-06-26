@@ -647,7 +647,9 @@ button {
 
 .left-tool-content {
   min-height: 0;
-  overflow: auto;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 18px;
 }
 
@@ -1650,11 +1652,13 @@ button {
 .image-size-presets {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
 }
 
 .image-size-preset {
-  min-width: 52px;
+  flex: 1 1 48px;
+  min-width: 0;
   min-height: 30px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 999px;
@@ -1993,11 +1997,13 @@ button {
 .panel-stack {
   display: grid;
   gap: 16px;
+  min-width: 0;
 }
 
 .panel-section {
   display: grid;
   gap: 10px;
+  min-width: 0;
 }
 
 .panel-section-title {
@@ -2013,6 +2019,7 @@ button {
 .layer-list {
   display: grid;
   gap: 10px;
+  min-width: 0;
 }
 
 .tool-card,
@@ -2030,6 +2037,7 @@ button {
 .model-row {
   display: grid;
   gap: 8px;
+  min-width: 0;
   padding: 12px;
   transition:
     border-color 140ms ease,
@@ -2075,6 +2083,7 @@ button {
 .tool-card-heading,
 .model-row-main {
   gap: 8px;
+  min-width: 0;
   color: var(--ew-text);
   font-size: 12px;
 }
@@ -2101,6 +2110,15 @@ button {
   margin-left: auto;
 }
 
+.tool-card-heading .status-pill + .icon-button {
+  margin-left: 0;
+}
+
+.tool-card-heading .icon-button {
+  width: 26px;
+  height: 26px;
+}
+
 .tool-card p,
 .compact-tool p {
   margin: 0;
@@ -2112,8 +2130,16 @@ button {
 .translation-target-control {
   display: grid;
   gap: 6px;
+  min-width: 0;
   color: var(--ew-muted);
   font-size: 11px;
+}
+
+.provider-action-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  min-height: 32px;
 }
 
 .translation-target-label {
@@ -2183,6 +2209,7 @@ button {
 
 .translation-target-control select {
   width: 100%;
+  min-width: 0;
   border: 1px solid rgba(55, 253, 118, 0.32);
   border-radius: 4px;
   background: #050d10;
@@ -2205,6 +2232,7 @@ button {
 .translation-preparation {
   display: grid;
   gap: 6px;
+  min-width: 0;
 }
 
 .translation-preparation-meta {
@@ -2223,6 +2251,7 @@ button {
 .image-generation-settings {
   display: grid;
   gap: 10px;
+  min-width: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   margin-top: 2px;
   padding-top: 10px;
@@ -2231,6 +2260,7 @@ button {
 .image-generation-setting {
   display: grid;
   gap: 7px;
+  min-width: 0;
   color: var(--ew-muted);
   font-size: 11px;
 }
@@ -2238,6 +2268,7 @@ button {
 .image-generation-range {
   grid-template-columns: 1fr auto;
   align-items: center;
+  min-width: 0;
 }
 
 .image-generation-range .translation-target-label {
@@ -2246,6 +2277,7 @@ button {
 
 .image-generation-range input {
   width: 100%;
+  min-width: 0;
   accent-color: var(--ew-green);
 }
 
@@ -2258,6 +2290,7 @@ button {
 
 .image-generation-seed-input {
   width: 100%;
+  min-width: 0;
   border: 1px solid rgba(55, 253, 118, 0.28);
   border-radius: 4px;
   background: #050d10;
@@ -2533,6 +2566,18 @@ button {
   color: var(--ew-green);
   border-color: var(--ew-green);
   animation: model-download-pulse 1.2s ease-in-out infinite;
+}
+
+.icon-button-danger {
+  color: #ffb4ab;
+  border-color: rgba(255, 180, 171, 0.34);
+}
+
+.icon-button-danger:hover,
+.icon-button-danger:focus-visible {
+  color: #ffdad6;
+  border-color: #ffb4ab;
+  background: rgba(255, 180, 171, 0.1);
 }
 
 @keyframes model-download-pulse {

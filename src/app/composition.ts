@@ -18,8 +18,8 @@ import {
   MockPaletteService,
   MockSmartGrabService,
 } from '../services/inMemoryAiServices';
-import { ChromeTranslatorService } from '../services/chromeTranslatorService';
-import { ChromePromptService } from '../services/chromePromptService';
+import { BrowserTranslatorService } from '../services/browserTranslatorService';
+import { BrowserPromptService } from '../services/browserPromptService';
 import { BrowserExportService } from '../services/exportService';
 import { BrowserBackgroundRemovalService } from '../services/browserBackgroundRemovalService';
 import { BrowserImageGenerationService } from '../services/browserImageGenerationService';
@@ -27,6 +27,7 @@ import { BrowserFileSystemProjectRepository } from '../services/browserFileSyste
 import { DisabledProjectRepository } from '../services/disabledProjectRepository';
 import { BrowserLocalSetupService } from '../services/localSetupService';
 import { BrowserModelSetupService } from '../services/modelSetupService';
+import { TransformersTextGenerationRuntime } from '../services/webGpuTextGenerationRuntime';
 
 export interface AppServices {
   initialProject: ProjectDocument;
@@ -52,6 +53,13 @@ interface CreateAppServicesOptions {
 }
 
 export function createAppServices(options: CreateAppServicesOptions = {}): AppServices {
+  const textGenerationRuntime = new TransformersTextGenerationRuntime();
+  const modelSetupService = new BrowserModelSetupService(
+    undefined,
+    undefined,
+    undefined,
+    textGenerationRuntime,
+  );
   return {
     initialProject: options.initialProject ?? createSampleProject(),
     skipStoredProjectLoad: options.skipStoredProjectLoad ?? false,
@@ -59,9 +67,9 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     projectRepository: createProjectRepository(),
     exportService: new BrowserExportService(),
     localSetupService: new BrowserLocalSetupService(),
-    modelSetupService: new BrowserModelSetupService(),
-    translatorService: new ChromeTranslatorService(),
-    promptService: new ChromePromptService(),
+    modelSetupService,
+    translatorService: new BrowserTranslatorService(modelSetupService, undefined, undefined, textGenerationRuntime),
+    promptService: new BrowserPromptService(modelSetupService, undefined, undefined, textGenerationRuntime),
     imageGenerationService: new BrowserImageGenerationService(),
     paletteService: new MockPaletteService(),
     backgroundRemovalService: new BrowserBackgroundRemovalService(),

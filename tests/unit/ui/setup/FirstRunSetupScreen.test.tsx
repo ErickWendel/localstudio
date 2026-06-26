@@ -6,7 +6,7 @@ import { FirstRunSetupScreen } from '../../../../src/ui/setup/FirstRunSetupScree
 
 const readyState: LocalSetupState = {
   fileSystem: { label: 'Project Files', status: 'ready', detail: 'Ready' },
-  chromeTranslation: { label: 'Chrome Translation', status: 'ready', detail: 'Ready' },
+  chromeTranslation: { label: 'Local AI Providers', status: 'ready', detail: 'Ready' },
 };
 
 describe('FirstRunSetupScreen', () => {
@@ -27,9 +27,9 @@ describe('FirstRunSetupScreen', () => {
         setupState={{
           ...readyState,
           chromeTranslation: {
-            label: 'Chrome Translation',
+            label: 'Local AI Providers',
             status: 'needs-setup',
-            detail: 'Chrome must download translation support.',
+            detail: 'Choose a compatible local AI provider.',
           },
         }}
         onRefresh={vi.fn()}
@@ -38,7 +38,7 @@ describe('FirstRunSetupScreen', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Continue to editor' })).toBeDisabled();
-    expect(screen.getByText('Chrome must download translation support.')).toBeInTheDocument();
+    expect(screen.getByText('Choose a compatible local AI provider.')).toBeInTheDocument();
   });
 
   it('checks capabilities again on request', async () => {

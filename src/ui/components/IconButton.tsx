@@ -6,6 +6,7 @@ interface IconButtonProps {
   active?: boolean;
   attention?: boolean;
   disabled?: boolean;
+  tone?: 'default' | 'danger';
   onClick?: () => void;
 }
 
@@ -15,12 +16,14 @@ export function IconButton({
   active = false,
   attention = false,
   disabled = false,
+  tone = 'default',
   onClick,
 }: IconButtonProps) {
   const className = [
     'icon-button',
     active ? 'icon-button-active' : '',
     attention ? 'icon-button-attention' : '',
+    tone === 'danger' ? 'icon-button-danger' : '',
   ]
     .filter(Boolean)
     .join(' ');

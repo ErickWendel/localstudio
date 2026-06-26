@@ -2,7 +2,7 @@ import { Brush, ImagePlus, Layers3, Sparkles, Type } from 'lucide-react';
 import { useRef } from 'react';
 import type { PageBackground, ProjectDocument, SelectionState } from '../../domain/model';
 import type { ElementStylePatch } from '../../domain/commands/basicCommands';
-import type { ModelState } from '../../services/interfaces';
+import type { AiProviderState, ModelState } from '../../services/interfaces';
 import { AiToolsPanel } from './AiToolsPanel';
 import { DesignPanel } from './DesignPanel';
 import type { CreateImagePromptOptions } from './imagePromptOptions';
@@ -18,6 +18,8 @@ interface LeftToolPanelProps {
   modelStates: ModelState[];
   attentionModelId?: string | undefined;
   createImageOptions?: CreateImagePromptOptions;
+  promptProviderStates?: AiProviderState[];
+  translationProviderStates?: AiProviderState[];
   translationLanguageOptions?: Array<{ code: string; flag: string; label: string }>;
   translationPreparation?: { progress: number; sourceLanguage?: string; status: 'idle' | 'downloading' | 'ready' | 'failed' };
   translationTargetAttention?: boolean;
@@ -26,11 +28,15 @@ interface LeftToolPanelProps {
   promptApiNotice?: string | undefined;
   promptPreparation?: { availability: string; progress: number; status: 'idle' | 'downloading' | 'ready' | 'failed' };
   onDownloadModel?: (id: string) => Promise<void>;
+  onRemoveModel?: (id: string) => Promise<void>;
   onCreateImageOptionsChange?: (options: CreateImagePromptOptions) => void;
   onImportImage?: (file: File) => void;
   onInsertText?: (preset: TextPreset) => void;
   onPreparePromptApi?: () => Promise<void>;
+  onPrepareTranslationProvider?: () => Promise<void>;
+  onPromptProviderChange?: (providerId: string) => void;
   onTranslationTargetLanguageChange?: (languageCode: string) => void;
+  onTranslationProviderChange?: (providerId: string) => void;
   project: ProjectDocument;
   activePageId: string;
   selection: SelectionState;
@@ -59,6 +65,8 @@ export function LeftToolPanel({
   modelStates,
   attentionModelId,
   createImageOptions,
+  promptProviderStates,
+  translationProviderStates,
   translationLanguageOptions,
   translationPreparation,
   translationTargetAttention,
@@ -67,11 +75,15 @@ export function LeftToolPanel({
   promptApiNotice,
   promptPreparation,
   onDownloadModel,
+  onRemoveModel,
   onCreateImageOptionsChange,
   onImportImage,
   onInsertText,
   onPreparePromptApi,
+  onPrepareTranslationProvider,
+  onPromptProviderChange,
   onTranslationTargetLanguageChange,
+  onTranslationProviderChange,
   project,
   activePageId,
   selection,
@@ -147,6 +159,8 @@ export function LeftToolPanel({
             modelStates={modelStates}
             attentionModelId={attentionModelId}
             translationLanguageOptions={translationLanguageOptions}
+            promptProviderStates={promptProviderStates}
+            translationProviderStates={translationProviderStates}
             translationPreparation={translationPreparation}
             translationTargetAttention={translationTargetAttention}
             translationTargetLanguage={translationTargetLanguage}
@@ -154,9 +168,13 @@ export function LeftToolPanel({
             promptApiNotice={promptApiNotice}
             promptPreparation={promptPreparation}
             onDownloadModel={onDownloadModel}
+            onRemoveModel={onRemoveModel}
             onCreateImageOptionsChange={onCreateImageOptionsChange}
             onPreparePromptApi={onPreparePromptApi}
+            onPrepareTranslationProvider={onPrepareTranslationProvider}
+            onPromptProviderChange={onPromptProviderChange}
             onTranslationTargetLanguageChange={onTranslationTargetLanguageChange}
+            onTranslationProviderChange={onTranslationProviderChange}
             {...(createImageOptions ? { createImageOptions } : {})}
           />
         ) : null}

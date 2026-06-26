@@ -227,6 +227,8 @@ export function EditorShell({ services }: EditorShellProps) {
           attentionModelId={vm.aiToolsAttentionModelId ?? (vm.backgroundSelectionNotice ? IMAGE_EDITING_MODEL_ID : undefined)}
           createImageOptions={vm.createImageOptions}
           translationLanguageOptions={vm.translationLanguageOptions}
+          promptProviderStates={vm.promptProviderStates}
+          translationProviderStates={vm.translationProviderStates}
           translationPreparation={vm.translationPreparation}
           translationTargetAttention={vm.translationTargetAttention}
           translationTargetLanguage={vm.translationTargetLanguage}
@@ -234,10 +236,18 @@ export function EditorShell({ services }: EditorShellProps) {
           promptApiNotice={vm.promptApiNotice}
           promptPreparation={vm.promptPreparation}
           onDownloadModel={vm.downloadModel}
+          onRemoveModel={vm.removeModel}
           onCreateImageOptionsChange={vm.setCreateImageOptions}
           onPreparePromptApi={vm.preparePromptApi}
+          onPrepareTranslationProvider={vm.prepareSelectedTranslationProvider}
+          onPromptProviderChange={(providerId) => {
+            void vm.setPromptProvider(providerId);
+          }}
           onTranslationTargetLanguageChange={(languageCode) => {
             void vm.setTranslationTargetLanguage(languageCode);
+          }}
+          onTranslationProviderChange={(providerId) => {
+            void vm.setTranslationProvider(providerId);
           }}
         />
         <section
