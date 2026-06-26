@@ -6,7 +6,9 @@
 
 **Architecture:** React + Vite renders the approved EW Academy/Stitch UI shell, while domain state lives in immutable TypeScript models updated through command classes. Application services are class-based and injected through a composition root so UI, persistence, export, and AI providers remain testable and replaceable.
 
-**Tech Stack:** React, Vite, TypeScript strict mode, Konva/React Konva, browser File System Access API for project files, lightweight browser storage for preferences/readiness metadata, jsPDF, lucide-react, Vitest, Testing Library, Playwright, ESLint, Prettier, Husky.
+**Tech Stack:** React, Vite, TypeScript strict mode, Konva/React Konva, browser File System Access API for project files, lightweight browser storage for preferences/readiness metadata, jsPDF, lucide-react, Vitest, Testing Library, ESLint, Prettier, Husky.
+
+**Current testing direction:** Playwright/e2e has been removed from the active MVP toolchain. Keep verification focused on `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build` unless e2e coverage is explicitly reintroduced in a future plan.
 
 **Updated product name:** The MVP product name is `LocalStudio.ai`. Use this in browser titles, headers, README copy, tests, and user-facing docs. Keep `EW Academy` references only for visual identity, color, and typography direction.
 
@@ -67,8 +69,6 @@ src/ui/components/SegmentedTabs.tsx
 src/ui/components/StatusPill.tsx
 src/test/testUtils.tsx
 src/test/fakeServices.ts
-tests/e2e/editor.spec.ts
-playwright.config.ts
 ```
 
 Responsibilities:
@@ -76,7 +76,7 @@ Responsibilities:
 - `src/domain`: pure document model and commands. No React, DOM, IndexedDB, Konva, or AI provider imports.
 - `src/services`: class-based app services and provider interfaces.
 - `src/ui`: React presentation and orchestration using injected services.
-- `tests/e2e`: browser behavior through Playwright with mocked services.
+- `tests/unit`: unit and component behavior through Vitest and Testing Library.
 
 ---
 
@@ -90,7 +90,6 @@ Responsibilities:
 - Create: `tsconfig.node.json`
 - Create: `eslint.config.js`
 - Create: `prettier.config.cjs`
-- Create: `playwright.config.ts`
 - Create: `src/main.tsx`
 - Create: `src/App.tsx`
 - Create: `src/app/styles.css`
@@ -1916,13 +1915,13 @@ Completed implementation commits on `feat/ew-canvas-ai-mvp`:
 - [x] **Header menu interactions:** File, Edit, View, and Help open Stitch-styled dropdown menus. Actions backed by local state/services are wired; future actions render disabled.
 - [x] **Hover/focus animation polish:** strengthened hover, active, and focus-visible states for the toolbar, rail, right-panel tabs, prompt bar, model rows, and selection toolbar without changing the Stitch visual language.
 - [x] **Konva editability:** element selection, drag, resize, and rotate are enabled with Konva `Transformer`; changes persist through immutable document state updates while preserving `page.elementIds` z-order.
-- [x] **Test organization:** unit/component tests moved from `src` to `tests/unit`, shared setup moved to `tests/setup`, and Playwright specs remain in `tests/e2e`.
+- [x] **Test organization:** unit/component tests moved from `src` to `tests/unit`, shared setup moved to `tests/setup`, and Playwright/e2e was removed from the active MVP toolchain in favor of lint/typecheck/unit/build checks.
 - [x] **Main branch integration:** merged `feat/ew-canvas-ai-mvp` into `main`.
 
 Cleanup verification note:
 
 - `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build` passed on the cleanup branch before the user requested skipping test iteration.
-- `npm run e2e` was intentionally deferred for faster iteration after Playwright exposed stale/browser-flow failures during this cleanup pass.
+- Playwright/e2e was later removed from the active MVP toolchain after stale/browser-flow failures made it a drag on iteration speed.
 
 ---
 

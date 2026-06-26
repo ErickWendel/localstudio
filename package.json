@@ -12,7 +12,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit --pretty false",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "playwright test",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -35,7 +34,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.61.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
@@ -49,7 +47,6 @@
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
     "lint-staged": "^16.4.0",
-    "playwright": "^1.61.1",
     "prettier": "^3.8.4",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.62.0",
