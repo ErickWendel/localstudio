@@ -1,8 +1,14 @@
 import type { ModelSetupService, ModelState } from './interfaces';
 import {
+  GEMMA_LLM_DISPLAY_NAME,
   GEMMA_LLM_MODEL_ID,
   GEMMA_LLM_READY_KEY,
   GEMMA_LLM_TRANSFORMERS_MODEL_ID,
+  LANGUAGE_DETECTION_DISPLAY_NAME,
+  LANGUAGE_DETECTION_MODEL_ID,
+  LANGUAGE_DETECTION_READY_KEY,
+  LANGUAGE_DETECTION_TRANSFORMERS_MODEL_ID,
+  TRANSLATEGEMMA_DISPLAY_NAME,
   TRANSLATEGEMMA_MODEL_ID,
   TRANSLATEGEMMA_READY_KEY,
   TRANSLATEGEMMA_TRANSFORMERS_MODEL_ID,
@@ -18,6 +24,7 @@ import { createMonotonicProgressReporter, createTransformersProgressCallback } f
 
 export const IMAGE_EDITING_MODEL_ID = 'image-editing-models';
 export const IMAGE_EDITING_TRANSFORMERS_MODEL_ID = 'Xenova/slimsam-77-uniform';
+export const IMAGE_EDITING_DISPLAY_NAME = 'SlimSAM 77M';
 
 const IMAGE_EDITING_READY_KEY = 'ew-canvas-ai.model.image-editing-models.ready';
 
@@ -38,6 +45,11 @@ export interface ImageGenerationModelLoader {
 export interface TextGenerationModelLoader {
   loadTextGenerationModel(modelId: string, options?: { onProgress?: (progress: number) => void }): Promise<void>;
   removeTextGenerationModel?(modelId: string): Promise<void>;
+  releaseTextGenerationModel?(modelId: string): Promise<void> | void;
+}
+
+export interface LanguageDetectionModelLoader {
+  loadLanguageDetectionModel(modelId: string, options?: { onProgress?: (progress: number) => void }): Promise<void>;
 }
 
 export interface ModelCacheStorage {
@@ -47,7 +59,7 @@ export interface ModelCacheStorage {
 const initialStates: ModelState[] = [
   {
     id: GEMMA_LLM_MODEL_ID,
-    label: 'Gemma 4 WebGPU LLM',
+    label: GEMMA_LLM_DISPLAY_NAME,
     description: 'Browser-local LLM model for prompt-to-slides.',
     provider: 'transformers',
     status: 'needs-download',
@@ -56,8 +68,17 @@ const initialStates: ModelState[] = [
   },
   {
     id: TRANSLATEGEMMA_MODEL_ID,
-    label: 'TranslateGemma WebGPU',
+    label: TRANSLATEGEMMA_DISPLAY_NAME,
     description: 'Browser-local translation model.',
+    provider: 'transformers',
+    status: 'needs-download',
+    progress: 0,
+    required: false,
+  },
+  {
+    id: LANGUAGE_DETECTION_MODEL_ID,
+    label: LANGUAGE_DETECTION_DISPLAY_NAME,
+    description: 'Browser-local fallback detector for slide text language.',
     provider: 'transformers',
     status: 'needs-download',
     progress: 0,
@@ -75,7 +96,7 @@ const initialStates: ModelState[] = [
   {
     id: IMAGE_GENERATION_MODEL_ID,
     label: 'Image Generation Models',
-    description: 'Bonsai Image WebGPU text-to-image model.',
+    description: 'Text-to-image model for generated slide assets.',
     provider: 'transformers',
     status: 'needs-download',
     progress: 0,
@@ -97,6 +118,7 @@ function getReadyKey(id: string) {
   if (id === IMAGE_GENERATION_MODEL_ID) return IMAGE_GENERATION_READY_KEY;
   if (id === GEMMA_LLM_MODEL_ID) return GEMMA_LLM_READY_KEY;
   if (id === TRANSLATEGEMMA_MODEL_ID) return TRANSLATEGEMMA_READY_KEY;
+  if (id === LANGUAGE_DETECTION_MODEL_ID) return LANGUAGE_DETECTION_READY_KEY;
   return undefined;
 }
 
@@ -130,16 +152,30 @@ export class TransformersTextGenerationModelLoader implements TextGenerationMode
     env.useBrowserCache = true;
     env.cacheKey = TRANSFORMERS_CACHE_KEY;
 
-    await pipeline('text-generation', modelId, {
+    const textGeneration = await pipeline('text-generation', modelId, {
       dtype: 'q4',
       device: 'webgpu',
       progress_callback: createTransformersProgressCallback(options?.onProgress),
     });
+    await (textGeneration as { dispose?: () => Promise<void> | void }).dispose?.();
   }
+}
 
-  async removeTextGenerationModel(): Promise<void> {
-    // Plain loader instances do not retain an in-memory pipeline. The shared runtime
-    // used by the app implements this hook to dispose WebGPU sessions.
+export class TransformersLanguageDetectionModelLoader implements LanguageDetectionModelLoader {
+  async loadLanguageDetectionModel(
+    modelId: string,
+    options?: { onProgress?: (progress: number) => void },
+  ): Promise<void> {
+    const { pipeline, env } = await import('@huggingface/transformers');
+
+    env.useBrowserCache = true;
+    env.cacheKey = TRANSFORMERS_CACHE_KEY;
+
+    const detector = await pipeline('text-classification', modelId, {
+      device: 'webgpu',
+      progress_callback: createTransformersProgressCallback(options?.onProgress),
+    });
+    await (detector as { dispose?: () => Promise<void> | void }).dispose?.();
   }
 }
 
@@ -171,15 +207,19 @@ export class BrowserModelSetupService implements ModelSetupService {
     private readonly imageGenerationModelLoader: ImageGenerationModelLoader = new TransformersImageGenerationModelLoader(),
     private readonly textGenerationModelLoader: TextGenerationModelLoader = new TransformersTextGenerationModelLoader(),
     private readonly modelCacheStorage: ModelCacheStorage = new BrowserTransformersModelCache(),
+    private readonly languageDetectionModelLoader: LanguageDetectionModelLoader = new TransformersLanguageDetectionModelLoader(),
   ) {
     const imageEditingModelReady = storage?.getItem(IMAGE_EDITING_READY_KEY) === 'true';
     const imageGenerationModelReady = storage?.getItem(IMAGE_GENERATION_READY_KEY) === 'true';
     const gemmaLlmReady = storage?.getItem(GEMMA_LLM_READY_KEY) === 'true';
     const translateGemmaReady = storage?.getItem(TRANSLATEGEMMA_READY_KEY) === 'true';
+    const languageDetectionReady = storage?.getItem(LANGUAGE_DETECTION_READY_KEY) === 'true';
     this.states = initialStates.map((state) =>
       state.id === GEMMA_LLM_MODEL_ID && gemmaLlmReady
         ? { ...state, status: 'ready', progress: 100 }
         : state.id === TRANSLATEGEMMA_MODEL_ID && translateGemmaReady
+          ? { ...state, status: 'ready', progress: 100 }
+        : state.id === LANGUAGE_DETECTION_MODEL_ID && languageDetectionReady
           ? { ...state, status: 'ready', progress: 100 }
         : state.id === IMAGE_EDITING_MODEL_ID && imageEditingModelReady
         ? { ...state, status: 'ready', progress: 100 }
@@ -229,13 +269,21 @@ export class BrowserModelSetupService implements ModelSetupService {
         await this.textGenerationModelLoader.loadTextGenerationModel(GEMMA_LLM_TRANSFORMERS_MODEL_ID, {
           onProgress: reportProgress,
         });
+        await this.textGenerationModelLoader.releaseTextGenerationModel?.(GEMMA_LLM_TRANSFORMERS_MODEL_ID);
         this.storage?.setItem(GEMMA_LLM_READY_KEY, 'true');
       }
       if (id === TRANSLATEGEMMA_MODEL_ID) {
         await this.textGenerationModelLoader.loadTextGenerationModel(TRANSLATEGEMMA_TRANSFORMERS_MODEL_ID, {
           onProgress: reportProgress,
         });
+        await this.textGenerationModelLoader.releaseTextGenerationModel?.(TRANSLATEGEMMA_TRANSFORMERS_MODEL_ID);
         this.storage?.setItem(TRANSLATEGEMMA_READY_KEY, 'true');
+      }
+      if (id === LANGUAGE_DETECTION_MODEL_ID) {
+        await this.languageDetectionModelLoader.loadLanguageDetectionModel(LANGUAGE_DETECTION_TRANSFORMERS_MODEL_ID, {
+          onProgress: reportProgress,
+        });
+        this.storage?.setItem(LANGUAGE_DETECTION_READY_KEY, 'true');
       }
       options?.onProgress?.(100);
       return this.setModelState(id, { status: 'ready', progress: 100, error: undefined });
@@ -244,6 +292,7 @@ export class BrowserModelSetupService implements ModelSetupService {
       if (id === IMAGE_GENERATION_MODEL_ID) this.storage?.setItem(IMAGE_GENERATION_READY_KEY, 'false');
       if (id === GEMMA_LLM_MODEL_ID) this.storage?.setItem(GEMMA_LLM_READY_KEY, 'false');
       if (id === TRANSLATEGEMMA_MODEL_ID) this.storage?.setItem(TRANSLATEGEMMA_READY_KEY, 'false');
+      if (id === LANGUAGE_DETECTION_MODEL_ID) this.storage?.setItem(LANGUAGE_DETECTION_READY_KEY, 'false');
       const message = error instanceof Error ? error.message : 'Model download failed.';
       return this.setModelState(id, { status: 'failed', progress: 0, error: message });
     }

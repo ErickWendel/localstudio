@@ -21,7 +21,9 @@ interface LeftToolPanelProps {
   createImageOptions?: CreateImagePromptOptions;
   promptProviderStates?: AiProviderState[];
   translationProviderStates?: AiProviderState[];
+  languageDetectionProviderStates?: AiProviderState[];
   translationLanguageOptions?: Array<{ code: string; flag: string; label: string }>;
+  languageDetectionPreparation?: { progress: number; sourceLanguage?: string; status: 'idle' | 'downloading' | 'ready' | 'failed' };
   translationPreparation?: { progress: number; sourceLanguage?: string; status: 'idle' | 'downloading' | 'ready' | 'failed' };
   translationTargetAttention?: boolean;
   translationTargetLanguage?: string;
@@ -34,8 +36,10 @@ interface LeftToolPanelProps {
   onImportImage?: ((file: File) => void) | undefined;
   onInsertText?: ((preset: TextPreset) => void) | undefined;
   onPreparePromptApi?: (() => Promise<void>) | undefined;
+  onPrepareLanguageDetectionProvider?: (() => Promise<void>) | undefined;
   onPrepareTranslationProvider?: (() => Promise<void>) | undefined;
   onPromptProviderChange?: ((providerId: string) => void) | undefined;
+  onLanguageDetectionProviderChange?: ((providerId: string) => void) | undefined;
   onTranslationTargetLanguageChange?: ((languageCode: string) => void) | undefined;
   onTranslationProviderChange?: ((providerId: string) => void) | undefined;
   project: ProjectDocument;
@@ -69,7 +73,9 @@ export function LeftToolPanel({
   createImageOptions,
   promptProviderStates,
   translationProviderStates,
+  languageDetectionProviderStates,
   translationLanguageOptions,
+  languageDetectionPreparation,
   translationPreparation,
   translationTargetAttention,
   translationTargetLanguage,
@@ -82,8 +88,10 @@ export function LeftToolPanel({
   onImportImage,
   onInsertText,
   onPreparePromptApi,
+  onPrepareLanguageDetectionProvider,
   onPrepareTranslationProvider,
   onPromptProviderChange,
+  onLanguageDetectionProviderChange,
   onTranslationTargetLanguageChange,
   onTranslationProviderChange,
   project,
@@ -164,6 +172,8 @@ export function LeftToolPanel({
             translationLanguageOptions={translationLanguageOptions}
             promptProviderStates={promptProviderStates}
             translationProviderStates={translationProviderStates}
+            languageDetectionProviderStates={languageDetectionProviderStates}
+            languageDetectionPreparation={languageDetectionPreparation}
             translationPreparation={translationPreparation}
             translationTargetAttention={translationTargetAttention}
             translationTargetLanguage={translationTargetLanguage}
@@ -174,8 +184,10 @@ export function LeftToolPanel({
             onRemoveModel={onRemoveModel}
             onCreateImageOptionsChange={onCreateImageOptionsChange}
             onPreparePromptApi={onPreparePromptApi}
+            onPrepareLanguageDetectionProvider={onPrepareLanguageDetectionProvider}
             onPrepareTranslationProvider={onPrepareTranslationProvider}
             onPromptProviderChange={onPromptProviderChange}
+            onLanguageDetectionProviderChange={onLanguageDetectionProviderChange}
             onTranslationTargetLanguageChange={onTranslationTargetLanguageChange}
             onTranslationProviderChange={onTranslationProviderChange}
             {...(createImageOptions ? { createImageOptions } : {})}

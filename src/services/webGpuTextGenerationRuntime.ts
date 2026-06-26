@@ -54,6 +54,13 @@ export class TransformersTextGenerationRuntime implements TextGenerationRuntime 
     return this.preload(modelId, options);
   }
 
+  async releaseTextGenerationModel(modelId: string): Promise<void> {
+    const pipelinePromise = this.pipelines.get(modelId);
+    this.pipelines.delete(modelId);
+    const pipeline = await pipelinePromise;
+    await pipeline?.dispose?.();
+  }
+
   async preload(modelId: string, options?: { onProgress?: (progress: number) => void }): Promise<void> {
     await this.loadPipeline(modelId, options);
   }

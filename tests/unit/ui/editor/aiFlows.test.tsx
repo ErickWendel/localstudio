@@ -46,6 +46,146 @@ class PreparingTranslatorService implements TranslatorService {
   }
 }
 
+class ConfigurableTranslatorService extends PreparingTranslatorService {
+  private selectedProviderId = 'chrome-translator-api';
+  private translateGemmaReady: boolean;
+
+  constructor(options: { translateGemmaReady?: boolean } = {}) {
+    super();
+    this.translateGemmaReady = options.translateGemmaReady ?? false;
+  }
+
+  getProviderStates = vi.fn((): Promise<AiProviderState[]> => Promise.resolve(this.createProviderStates()));
+
+  setSelectedProvider = vi.fn((providerId: string): Promise<AiProviderState[]> => {
+    this.selectedProviderId = providerId;
+    return Promise.resolve(this.createProviderStates());
+  });
+
+  override prepareTranslation = vi.fn(
+    (
+      sourceLanguage: string,
+      targetLanguage: string,
+      options?: { onProgress?: (progress: number) => void },
+    ) => {
+      void sourceLanguage;
+      void targetLanguage;
+      options?.onProgress?.(91);
+      options?.onProgress?.(100);
+      this.translateGemmaReady = true;
+      return Promise.resolve();
+    },
+  );
+
+  private createProviderStates(): AiProviderState[] {
+    return [
+      {
+        id: 'chrome-translator-api',
+        label: 'Chrome Built-in Translator',
+        description: 'Uses Chrome built-in local translation support.',
+        capability: 'translation',
+        runtime: 'chrome-built-in',
+        compatibility: 'compatible',
+        readiness: 'ready',
+        selected: this.selectedProviderId === 'chrome-translator-api',
+      },
+      {
+        id: 'translategemma-webgpu',
+        label: 'TranslateGemma 4B',
+        description: 'Browser-local WebGPU translation model.',
+        capability: 'translation',
+        runtime: 'webgpu-huggingface',
+        compatibility: 'compatible',
+        modelId: 'translategemma-webgpu',
+        readiness: this.translateGemmaReady ? 'ready' : 'needs-download',
+        selected: this.selectedProviderId === 'translategemma-webgpu',
+      },
+    ];
+  }
+}
+
+class ConfigurablePromptService implements PromptService {
+  private selectedProviderId = 'chrome-prompt-api';
+  private availability: PromptApiAvailability = 'downloadable';
+  private gemmaReady = false;
+
+  checkAvailability = vi.fn(() => Promise.resolve(this.gemmaReady ? 'ready' : this.availability));
+
+  getProviderStates = vi.fn((): Promise<AiProviderState[]> => Promise.resolve(this.createProviderStates()));
+
+  setSelectedProvider = vi.fn((providerId: string): Promise<AiProviderState[]> => {
+    this.selectedProviderId = providerId;
+    return Promise.resolve(this.createProviderStates());
+  });
+
+  preparePromptApi = vi.fn((options?: { onProgress?: (progress: number) => void }) => {
+    options?.onProgress?.(91);
+    options?.onProgress?.(100);
+    this.gemmaReady = true;
+    this.availability = 'ready';
+    return Promise.resolve();
+  });
+
+  generateSlideTasksFromPrompt = vi.fn((): Promise<GeneratedSlideTasksDocument> =>
+    Promise.resolve({
+      language: 'en',
+      page: {
+        name: 'Generated Web AI Slide',
+        width: 1920,
+        height: 1080,
+        background: { type: 'color', color: '#050D10' },
+      },
+      tasks: [{ type: 'add-title', id: 'title', text: 'Why Web AI Matters', placementHint: 'center' }],
+    }),
+  );
+
+  generateSlideElementFromTask = vi.fn(
+    (task: Exclude<GeneratedSlideTask, { type: 'set-background' }>): Promise<GeneratedSlideElement> =>
+      Promise.resolve({
+        type: 'text',
+        id: task.id,
+        text: 'text' in task ? task.text : 'Why Web AI Matters',
+        x: 720,
+        y: 280,
+        width: 800,
+        height: 180,
+        rotation: 0,
+        opacity: 1,
+        fontFamily: 'Orbitron',
+        fontSize: 76,
+        fontWeight: 800,
+        fill: '#37FD76',
+        align: 'center',
+      }),
+  );
+
+  private createProviderStates(): AiProviderState[] {
+    return [
+      {
+        id: 'chrome-prompt-api',
+        label: 'Chrome Built-in Prompt API',
+        description: 'Prompt to slides using Chrome Built-in AI.',
+        capability: 'prompt',
+        runtime: 'chrome-built-in',
+        compatibility: 'compatible',
+        readiness: 'ready',
+        selected: this.selectedProviderId === 'chrome-prompt-api',
+      },
+      {
+        id: 'gemma-4-webgpu',
+        label: 'Gemma 4 E2B',
+        description: 'Browser-local Gemma LLM for prompt-to-slides.',
+        capability: 'prompt',
+        runtime: 'webgpu-huggingface',
+        compatibility: 'compatible',
+        modelId: 'gemma-4-webgpu-llm',
+        readiness: this.gemmaReady ? 'ready' : 'needs-download',
+        selected: this.selectedProviderId === 'gemma-4-webgpu',
+      },
+    ];
+  }
+}
+
 class TestPromptService implements PromptService {
   constructor(protected availability: PromptApiAvailability = 'unavailable') {}
 
@@ -683,13 +823,70 @@ describe('mocked AI flows', () => {
 
     expect(screen.getByLabelText('Translate to')).toHaveValue('es');
     expect(translator.prepareTranslation).toHaveBeenCalledWith('en', 'es', expect.any(Object));
-    expect(await screen.findByText('Ready')).toBeInTheDocument();
+    expect((await screen.findAllByText('Ready')).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByLabelText('Translation language preparation').querySelector('.model-progress')).toBeNull();
     expect(screen.getByText('Pair: en → es')).toBeInTheDocument();
     expect(window.localStorage.getItem('localstudio.ai.translation-target-language')).toBe('es');
     expect(
       screen.getByText('Choose the language that will be used for all translations in this deck.'),
     ).toBeInTheDocument();
+  });
+
+  it('prepares an uncached translation model when selected from the dropdown', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const translator = new ConfigurableTranslatorService();
+    services.translatorService = translator;
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await user.selectOptions(screen.getByLabelText('Translation Model'), 'translategemma-webgpu');
+
+    await waitFor(() => {
+      expect(translator.prepareTranslation).toHaveBeenCalledWith('en', 'en', expect.any(Object));
+    });
+    expect(screen.getByLabelText('Translation Model')).toHaveValue('translategemma-webgpu');
+    await waitFor(() => {
+      expect(screen.getByLabelText('Translation model preparation')).toHaveTextContent('Ready');
+    });
+  });
+
+  it('does not reprepare a cached external translation model when the target language changes', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const translator = new ConfigurableTranslatorService({ translateGemmaReady: true });
+    services.translatorService = translator;
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await user.selectOptions(screen.getByLabelText('Translation Model'), 'translategemma-webgpu');
+    await waitFor(() => {
+      expect(screen.getByLabelText('Translation Model')).toHaveValue('translategemma-webgpu');
+    });
+    translator.prepareTranslation.mockClear();
+
+    await user.selectOptions(screen.getByLabelText('Translate to'), 'es');
+
+    expect(screen.getByLabelText('Translate to')).toHaveValue('es');
+    expect(translator.prepareTranslation).not.toHaveBeenCalled();
+    expect(await screen.findByText('Pair: en → es')).toBeInTheDocument();
+  });
+
+  it('prepares an uncached LLM model when selected from the dropdown', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const promptService = new ConfigurablePromptService();
+    services.promptService = promptService;
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'LLM Model' }), 'gemma-4-webgpu');
+
+    await waitFor(() => {
+      expect(promptService.preparePromptApi).toHaveBeenCalledWith(expect.any(Object));
+    });
+    expect(screen.getByRole('combobox', { name: 'LLM Model' })).toHaveValue('gemma-4-webgpu');
+    expect(screen.getByLabelText('LLM preparation')).toHaveTextContent('Ready');
   });
 
   it('lists Chrome-supported translation target languages', async () => {

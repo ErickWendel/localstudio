@@ -241,6 +241,8 @@ export function EditorShell({ services }: EditorShellProps) {
           translationLanguageOptions={vm.translationLanguageOptions}
           promptProviderStates={vm.promptProviderStates}
           translationProviderStates={vm.translationProviderStates}
+          languageDetectionProviderStates={vm.languageDetectionProviderStates}
+          languageDetectionPreparation={vm.languageDetectionPreparation}
           translationPreparation={vm.translationPreparation}
           translationTargetAttention={vm.translationTargetAttention}
           translationTargetLanguage={vm.translationTargetLanguage}
@@ -251,9 +253,13 @@ export function EditorShell({ services }: EditorShellProps) {
           onRemoveModel={vm.removeModel}
           onCreateImageOptionsChange={vm.setCreateImageOptions}
           onPreparePromptApi={vm.preparePromptApi}
+          onPrepareLanguageDetectionProvider={vm.prepareSelectedLanguageDetectionProvider}
           onPrepareTranslationProvider={vm.prepareSelectedTranslationProvider}
           onPromptProviderChange={(providerId) => {
             void vm.setPromptProvider(providerId);
+          }}
+          onLanguageDetectionProviderChange={(providerId) => {
+            void vm.setLanguageDetectionProvider(providerId);
           }}
           onTranslationTargetLanguageChange={(languageCode) => {
             void vm.setTranslationTargetLanguage(languageCode);

@@ -1,7 +1,12 @@
 import { Download, ImagePlus, Languages, ScanSearch, X } from 'lucide-react';
-import { GEMMA_LLM_MODEL_ID, TRANSLATEGEMMA_MODEL_ID } from '../../services/aiModelIds';
-import { IMAGE_GENERATION_MODEL_ID } from '../../services/imageGenerationModels';
+import {
+  GEMMA_LLM_MODEL_ID,
+  LANGUAGE_DETECTION_MODEL_ID,
+  TRANSLATEGEMMA_MODEL_ID,
+} from '../../services/aiModelIds';
+import { IMAGE_GENERATION_DISPLAY_NAME, IMAGE_GENERATION_MODEL_ID } from '../../services/imageGenerationModels';
 import type { AiProviderState, ModelState } from '../../services/interfaces';
+import { IMAGE_EDITING_DISPLAY_NAME, IMAGE_EDITING_MODEL_ID } from '../../services/modelSetupService';
 import { IconButton } from '../components/IconButton';
 import { StatusPill } from '../components/StatusPill';
 import type { CreateImagePromptOptions } from './imagePromptOptions';
@@ -14,7 +19,9 @@ interface AiToolsPanelProps {
   createImageOptions?: CreateImagePromptOptions;
   promptProviderStates?: AiProviderState[] | undefined;
   translationProviderStates?: AiProviderState[] | undefined;
+  languageDetectionProviderStates?: AiProviderState[] | undefined;
   translationLanguageOptions?: Array<{ code: string; flag: string; label: string }> | undefined;
+  languageDetectionPreparation?: { progress: number; sourceLanguage?: string; status: 'idle' | 'downloading' | 'ready' | 'failed' } | undefined;
   translationPreparation?: { progress: number; sourceLanguage?: string; status: 'idle' | 'downloading' | 'ready' | 'failed' } | undefined;
   translationTargetAttention?: boolean | undefined;
   translationTargetLanguage?: string | undefined;
@@ -25,8 +32,10 @@ interface AiToolsPanelProps {
   onRemoveModel?: ((id: string) => Promise<void>) | undefined;
   onCreateImageOptionsChange?: ((options: CreateImagePromptOptions) => void) | undefined;
   onPreparePromptApi?: (() => Promise<void>) | undefined;
+  onPrepareLanguageDetectionProvider?: (() => Promise<void>) | undefined;
   onPrepareTranslationProvider?: (() => Promise<void>) | undefined;
   onPromptProviderChange?: ((providerId: string) => void) | undefined;
+  onLanguageDetectionProviderChange?: ((providerId: string) => void) | undefined;
   onTranslationTargetLanguageChange?: ((languageCode: string) => void) | undefined;
   onTranslationProviderChange?: ((providerId: string) => void) | undefined;
 }
@@ -62,6 +71,7 @@ function getPreparationLabel(status: 'idle' | 'downloading' | 'ready' | 'failed'
 
 function getProgressText(status: 'idle' | 'downloading' | 'ready' | 'failed', progress: number) {
   if (status === 'ready') return undefined;
+  if (status === 'idle') return undefined;
   if (status === 'downloading' && progress >= 98) return 'Finalizing...';
   return `${progress}%`;
 }
@@ -70,6 +80,12 @@ function getPreparationTone(status: 'idle' | 'downloading' | 'ready' | 'failed')
   if (status === 'ready') return 'success';
   if (status === 'downloading') return 'warning';
   return 'neutral';
+}
+
+function getFixedModelDisplayName(modelId: string, fallback: string) {
+  if (modelId === IMAGE_EDITING_MODEL_ID) return IMAGE_EDITING_DISPLAY_NAME;
+  if (modelId === IMAGE_GENERATION_MODEL_ID) return IMAGE_GENERATION_DISPLAY_NAME;
+  return fallback;
 }
 
 function ToolHelp({ id, text }: { id: string; text: string }) {
@@ -92,7 +108,9 @@ export function AiToolsPanel({
   createImageOptions = defaultCreateImagePromptOptions,
   promptProviderStates = [],
   translationProviderStates = [],
+  languageDetectionProviderStates = [],
   translationLanguageOptions = [],
+  languageDetectionPreparation = { progress: 0, status: 'idle' },
   translationPreparation = { progress: 0, status: 'idle' },
   translationTargetAttention = false,
   translationTargetLanguage = '',
@@ -103,8 +121,10 @@ export function AiToolsPanel({
   onRemoveModel,
   onCreateImageOptionsChange,
   onPreparePromptApi,
+  onPrepareLanguageDetectionProvider,
   onPrepareTranslationProvider,
   onPromptProviderChange,
+  onLanguageDetectionProviderChange,
   onTranslationTargetLanguageChange,
   onTranslationProviderChange,
 }: AiToolsPanelProps) {
@@ -145,11 +165,34 @@ export function AiToolsPanel({
             selected: true,
           },
         ];
+  const languageDetectionProviders =
+    languageDetectionProviderStates.length > 0
+      ? languageDetectionProviderStates
+      : [
+          {
+            id: 'chrome-language-detector-api',
+            label: 'Chrome Built-in Language Detector',
+            description: 'Detect slide language using Chrome Built-in AI.',
+            capability: 'language-detection' as const,
+            runtime: 'chrome-built-in' as const,
+            compatibility: 'compatible' as const,
+            readiness: 'ready' as const,
+            selected: true,
+          },
+        ];
   const selectedPromptProvider = promptProviders.find((provider) => provider.selected) ?? promptProviders[0];
   const selectedTranslationProvider = translationProviders.find((provider) => provider.selected) ?? translationProviders[0];
+  const selectedLanguageDetectionProvider =
+    languageDetectionProviders.find((provider) => provider.selected) ?? languageDetectionProviders[0];
   const promptStatus = getPreparationStatus(selectedPromptProvider, promptPreparation.status);
   const promptProgress = promptStatus === 'ready' ? 100 : promptPreparation.progress;
   const promptProgressText = getProgressText(promptStatus, promptProgress);
+  const languageDetectionStatus = getPreparationStatus(
+    selectedLanguageDetectionProvider,
+    languageDetectionPreparation.status,
+  );
+  const languageDetectionProgress =
+    languageDetectionStatus === 'ready' ? 100 : languageDetectionPreparation.progress;
   const translationProviderStatus = getPreparationStatus(selectedTranslationProvider, translationPreparation.status);
   const translationProviderProgress = translationProviderStatus === 'ready' ? 100 : translationPreparation.progress;
   const translationProviderProgressText = getProgressText(translationProviderStatus, translationProviderProgress);
@@ -158,11 +201,19 @@ export function AiToolsPanel({
     selectedPromptProvider?.readiness === 'needs-download' || selectedPromptProvider?.readiness === 'failed';
   const selectedTranslationNeedsDownload =
     selectedTranslationProvider?.readiness === 'needs-download' || selectedTranslationProvider?.readiness === 'failed';
+  const selectedLanguageDetectionNeedsDownload =
+    selectedLanguageDetectionProvider?.readiness === 'needs-download' ||
+    selectedLanguageDetectionProvider?.readiness === 'failed';
   const selectedPromptCanRemove = selectedPromptProvider?.modelId && selectedPromptProvider.readiness === 'ready';
+  const selectedLanguageDetectionCanRemove =
+    selectedLanguageDetectionProvider?.modelId && selectedLanguageDetectionProvider.readiness === 'ready';
   const selectedTranslationCanRemove =
     selectedTranslationProvider?.modelId && selectedTranslationProvider.readiness === 'ready';
   const visibleModelStates = modelStates.filter(
-    (model) => model.id !== GEMMA_LLM_MODEL_ID && model.id !== TRANSLATEGEMMA_MODEL_ID,
+    (model) =>
+      model.id !== GEMMA_LLM_MODEL_ID &&
+      model.id !== TRANSLATEGEMMA_MODEL_ID &&
+      model.id !== LANGUAGE_DETECTION_MODEL_ID,
   );
 
   return (
@@ -235,7 +286,7 @@ export function AiToolsPanel({
                   />
                   {promptProgressText ? <span>{promptProgressText}</span> : null}
                 </div>
-                {promptStatus === 'ready' ? null : (
+                {promptStatus === 'downloading' ? (
                   <>
                     <div className="model-progress">
                       <span style={{ width: `${promptProgress}%` }} />
@@ -244,7 +295,80 @@ export function AiToolsPanel({
                       {promptApiNotice ?? `Availability: ${promptPreparation.availability}`}
                     </span>
                   </>
-                )}
+                ) : null}
+              </div>
+            </div>
+          </article>
+
+          <article className="tool-card" aria-label="Language Detection">
+            <div className="tool-card-heading">
+              <ScanSearch size={18} />
+              <strong>Language Detection</strong>
+              <StatusPill
+                label={selectedLanguageDetectionProvider?.runtime === 'chrome-built-in' ? 'CHROME' : 'EXTERNAL'}
+                tone={selectedLanguageDetectionProvider?.compatibility === 'compatible' ? 'success' : 'neutral'}
+              />
+              {languageDetectionStatus === 'downloading' ? null : selectedLanguageDetectionNeedsDownload ? (
+                <IconButton
+                  label="Download Language Detection Model"
+                  attention
+                  disabled={selectedLanguageDetectionProvider?.compatibility === 'incompatible'}
+                  onClick={() => {
+                    void onPrepareLanguageDetectionProvider?.();
+                  }}
+                >
+                  <Download size={14} />
+                </IconButton>
+              ) : selectedLanguageDetectionCanRemove ? (
+                <IconButton
+                  label="Remove Language Detection Model"
+                  tone="danger"
+                  onClick={() => {
+                    void onRemoveModel?.(selectedLanguageDetectionProvider.modelId!);
+                  }}
+                >
+                  <X size={14} />
+                </IconButton>
+              ) : null}
+            </div>
+            <p>Choose how LocalStudio.ai detects source text language before translation.</p>
+            <label className="translation-target-control">
+              <span className="translation-target-label">Detection Model</span>
+              <select
+                aria-label="Language Detection Model"
+                disabled={languageDetectionPreparation.status === 'downloading'}
+                value={selectedLanguageDetectionProvider?.id ?? ''}
+                onChange={(event) => onLanguageDetectionProviderChange?.(event.target.value)}
+              >
+                {languageDetectionProviders.map((provider) => (
+                  <option
+                    key={provider.id}
+                    value={provider.id}
+                    disabled={provider.compatibility === 'incompatible'}
+                  >
+                    {provider.label}
+                    {provider.compatibility === 'incompatible' ? ' - unavailable' : ''}
+                  </option>
+                ))}
+              </select>
+              {selectedLanguageDetectionProvider?.disabledReason ? (
+                <span className="translation-source-note">{selectedLanguageDetectionProvider.disabledReason}</span>
+              ) : null}
+            </label>
+            <div className="translation-target-control">
+              <div className="translation-preparation" aria-label="Language detection preparation">
+                <div className="translation-preparation-meta">
+                  <StatusPill
+                    label={getPreparationLabel(languageDetectionStatus)}
+                    tone={getPreparationTone(languageDetectionStatus)}
+                  />
+                  {languageDetectionStatus === 'downloading' ? <span>{languageDetectionProgress}%</span> : null}
+                </div>
+                {languageDetectionStatus === 'downloading' ? (
+                  <div className="model-progress">
+                    <span style={{ width: `${languageDetectionProgress}%` }} />
+                  </div>
+                ) : null}
               </div>
             </div>
           </article>
@@ -307,6 +431,24 @@ export function AiToolsPanel({
                 <span className="translation-source-note">{selectedTranslationProvider.disabledReason}</span>
               ) : null}
             </label>
+            {selectedTranslationProvider?.modelId ? (
+              <div className="translation-target-control">
+                <div className="translation-preparation" aria-label="Translation model preparation">
+                  <div className="translation-preparation-meta">
+                    <StatusPill
+                      label={getPreparationLabel(translationProviderStatus)}
+                      tone={getPreparationTone(translationProviderStatus)}
+                    />
+                    {translationProviderStatus === 'downloading' ? <span>{translationProviderProgress}%</span> : null}
+                  </div>
+                  {translationProviderStatus === 'downloading' ? (
+                    <div className="model-progress">
+                      <span style={{ width: `${translationProviderProgress}%` }} />
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
             <label className="translation-target-control">
               <span className="translation-target-label">
                 Translate to:
@@ -338,13 +480,13 @@ export function AiToolsPanel({
                       label={getPreparationLabel(translationProviderStatus)}
                       tone={getPreparationTone(translationProviderStatus)}
                     />
-                  {translationProviderProgressText ? <span>{translationProviderProgressText}</span> : null}
+                    {translationProviderProgressText ? <span>{translationProviderProgressText}</span> : null}
                   </div>
-                  {translationProviderStatus === 'ready' ? null : (
+                  {translationProviderStatus === 'downloading' ? (
                     <div className="model-progress">
                       <span style={{ width: `${translationProviderProgress}%` }} />
                     </div>
-                  )}
+                  ) : null}
                   {displayedSourceLanguage ? (
                     <span className="translation-source-note">
                       Pair: {displayedSourceLanguage} → {translationTargetLanguage}
@@ -392,6 +534,12 @@ export function AiToolsPanel({
                     </IconButton>
                   )}
                 </div>
+                <label className="translation-target-control model-row-selector">
+                  <span className="translation-target-label">Model</span>
+                  <select aria-label={`${model.label} model`} value={model.id} onChange={() => undefined}>
+                    <option value={model.id}>{getFixedModelDisplayName(model.id, model.label)}</option>
+                  </select>
+                </label>
                 <div className="model-row-meta">
                   <StatusPill label={formatStatus(model.status)} tone={statusTone(model.status)} />
                   {model.status === 'ready' ? null : <span>{model.progress}%</span>}
