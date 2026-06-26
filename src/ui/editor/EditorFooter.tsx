@@ -68,7 +68,7 @@ export function EditorFooter({
           onClick={onTogglePagesPanel}
         >
           <span className="material-symbols-outlined" aria-hidden="true">
-            view_carousel
+            view_sidebar
           </span>
           Pages
         </button>

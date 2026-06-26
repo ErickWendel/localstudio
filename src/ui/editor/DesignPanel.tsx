@@ -6,10 +6,9 @@ import type {
   SelectionState,
 } from '../../domain/model';
 import { PanelSection } from '../components/PanelSection';
+import { TEXT_FONT_FAMILIES, TEXT_FONT_WEIGHTS } from './textStyleOptions';
 
 const palette = ['#37FD76', '#050D10', '#FFFFFF', '#91999D', '#00779A'];
-const fontFamilies = ['Orbitron', 'Open Sans', 'Inter', 'Arial'];
-const fontWeights = [400, 600, 700, 800, 900];
 
 interface DesignPanelProps {
   project: ProjectDocument;
@@ -136,7 +135,7 @@ export function DesignPanel({
                 updateSelectedStyle({ fontFamily: event.target.value });
               }}
             >
-              {fontFamilies.map((fontFamily) => (
+              {TEXT_FONT_FAMILIES.map((fontFamily) => (
                 <option key={fontFamily} value={fontFamily}>
                   {fontFamily}
                 </option>
@@ -164,7 +163,7 @@ export function DesignPanel({
                 updateSelectedStyle({ fontWeight: Number(event.target.value) });
               }}
             >
-              {fontWeights.map((fontWeight) => (
+              {TEXT_FONT_WEIGHTS.map((fontWeight) => (
                 <option key={fontWeight} value={fontWeight}>
                   {fontWeight}
                 </option>

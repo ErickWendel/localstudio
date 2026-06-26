@@ -128,29 +128,23 @@ describe('mocked AI flows', () => {
     expect(screen.getByText('Image Generation Models')).toBeInTheDocument();
   });
 
-  it('exposes selected-object AI shortcuts', () => {
-    render(<EditorShell services={createAppServices()} />);
-
-    expect(screen.getByLabelText('Remove Background')).toBeInTheDocument();
-    expect(screen.getByLabelText('Translate Selected Text')).toBeInTheDocument();
-  });
-
-  it('selects create image mode from the prompt plus menu', async () => {
+  it('exposes selected-object AI shortcuts', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
 
-    expect(screen.queryByText('Create image')).not.toBeInTheDocument();
-    expect(
-      screen.getByRole('button', {
-        name: 'A slide with the title Why Web AI Matters and a subtitle about private AI running in the browser',
-      }),
-    ).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Layout' }));
+    await user.click(screen.getByRole('button', { name: 'Selected Image' }));
+    expect(screen.getByLabelText('Remove Background')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Prompt actions' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Create image' }));
+    await user.click(screen.getByRole('button', { name: 'Title' }));
+    expect(screen.getByLabelText('Translate Selected Text')).toBeInTheDocument();
+  });
+
+  it('starts in create image mode from the prompt bar', () => {
+    render(<EditorShell services={createAppServices()} />);
 
     expect(screen.getByText('Create image')).toBeInTheDocument();
-    expect(screen.getByLabelText('Create image prompt')).toHaveFocus();
+    expect(screen.getByLabelText('Create image prompt')).toBeInTheDocument();
     expect(
       screen.getByRole('button', {
         name: 'An icy Bonsai tree, in a rainy forest with snowy mountains in the background, photo realistic',
@@ -166,24 +160,23 @@ describe('mocked AI flows', () => {
 
     await user.click(
       screen.getByRole('button', {
-        name: 'A slide with a placeholder image on the left, the title Local AI Is Faster in the middle, and subtext below',
-      }),
-    );
-
-    expect(screen.getByRole('textbox', { name: 'Slide structure prompt' })).toHaveValue(
-      'A slide with a placeholder image on the left, the title Local AI Is Faster in the middle, and subtext below',
-    );
-
-    await user.click(screen.getByRole('button', { name: 'Prompt actions' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Create image' }));
-    await user.click(
-      screen.getByRole('button', {
         name: 'An icy Bonsai tree, in a rainy forest with snowy mountains in the background, photo realistic',
       }),
     );
 
     expect(screen.getByLabelText('Create image prompt')).toHaveValue(
       'An icy Bonsai tree, in a rainy forest with snowy mountains in the background, photo realistic',
+    );
+
+    await user.clear(screen.getByLabelText('Create image prompt'));
+    await user.click(
+      screen.getByRole('button', {
+        name: 'A slide with a placeholder image on the left, the title Local AI Is Faster in the middle, and subtext below',
+      }),
+    );
+
+    expect(screen.getByRole('textbox', { name: 'Slide structure prompt' })).toHaveValue(
+      'A slide with a placeholder image on the left, the title Local AI Is Faster in the middle, and subtext below',
     );
   });
 
@@ -193,8 +186,6 @@ describe('mocked AI flows', () => {
     services.promptService = new TestPromptService('ready');
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'Prompt actions' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Create image' }));
     await user.type(screen.getByLabelText('Create image prompt'), 'hero image');
 
     await user.clear(screen.getByLabelText('Create image prompt'));
@@ -214,8 +205,6 @@ describe('mocked AI flows', () => {
     services.modelSetupService = new InMemoryModelSetupService();
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'Prompt actions' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Create image' }));
     await user.type(screen.getByLabelText('Create image prompt'), 'cyberpunk course cover');
 
     await waitFor(() => {
@@ -239,8 +228,6 @@ describe('mocked AI flows', () => {
     });
 
     await user.click(screen.getByRole('tab', { name: 'Layout' }));
-    await user.click(screen.getByRole('button', { name: 'Prompt actions' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Create image' }));
     await user.type(screen.getByLabelText('Create image prompt'), 'neon cover');
 
     expect(screen.getByRole('tab', { name: 'Layout' })).toHaveAttribute('aria-selected', 'true');
@@ -257,8 +244,6 @@ describe('mocked AI flows', () => {
     await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
     await user.click(screen.getByRole('button', { name: 'Download Image Generation Models' }));
     await user.click(screen.getByRole('tab', { name: 'Layout' }));
-    await user.click(screen.getByRole('button', { name: 'Prompt actions' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Create image' }));
     await user.type(screen.getByLabelText('Create image prompt'), 'A neon bonsai browser');
     await user.click(screen.getByRole('button', { name: 'Submit prompt' }));
 
@@ -289,8 +274,6 @@ describe('mocked AI flows', () => {
     await user.click(screen.getByRole('button', { name: 'Download Image Generation Models' }));
     await user.click(screen.getByRole('button', { name: '16:9' }));
     await user.click(screen.getByRole('tab', { name: 'Layout' }));
-    await user.click(screen.getByRole('button', { name: 'Prompt actions' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Create image' }));
     await user.type(screen.getByLabelText('Create image prompt'), 'A wide generated image');
     await user.click(screen.getByRole('button', { name: 'Submit prompt' }));
 
@@ -317,8 +300,6 @@ describe('mocked AI flows', () => {
     await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
     await user.click(screen.getByRole('button', { name: 'Download Image Generation Models' }));
     await user.click(screen.getByRole('tab', { name: 'Layout' }));
-    await user.click(screen.getByRole('button', { name: 'Prompt actions' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Create image' }));
     await user.type(screen.getByLabelText('Create image prompt'), 'A slow generated image');
     await user.click(screen.getByRole('button', { name: 'Submit prompt' }));
     expect(screen.getByLabelText('Create image prompt')).toHaveValue('');
@@ -353,6 +334,8 @@ describe('mocked AI flows', () => {
     services.promptService = promptService;
     render(<EditorShell services={services} />);
 
+    await user.type(screen.getByLabelText('Create image prompt'), 'switch mode');
+    await user.clear(screen.getByLabelText('Create image prompt'));
     await user.click(
       screen.getByRole('button', {
         name: 'A slide with the title Why Web AI Matters and a subtitle about private AI running in the browser',
@@ -378,6 +361,8 @@ describe('mocked AI flows', () => {
     services.promptService = promptService;
     render(<EditorShell services={services} />);
 
+    await user.type(screen.getByLabelText('Create image prompt'), 'switch mode');
+    await user.clear(screen.getByLabelText('Create image prompt'));
     await user.type(screen.getByRole('textbox', { name: 'Slide structure prompt' }), 'generate an image of a frozen tree');
     await user.click(screen.getByRole('button', { name: 'Submit prompt' }));
 

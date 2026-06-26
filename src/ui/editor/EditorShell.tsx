@@ -288,9 +288,6 @@ export function EditorShell({ services }: EditorShellProps) {
             onSendSelectedElementBackward={() => {
               vm.setSelectedElementZOrder('backward');
             }}
-            onTranslateCurrentSlide={() => {
-              void vm.translateCurrentSlide();
-            }}
             onTranslatePage={(pageId) => {
               void vm.translatePage(pageId);
             }}
@@ -299,6 +296,7 @@ export function EditorShell({ services }: EditorShellProps) {
             }}
             onUpdateElementFrame={vm.updateElementFrame}
             onUpdateElementFrames={vm.updateElementFrames}
+            onUpdateElementStyle={vm.updateElementStyle}
             onUpdateTextContent={vm.updateTextContent}
             onActivePageFromScroll={vm.activateScrolledPage}
             onAddPage={vm.addPage}
@@ -336,10 +334,11 @@ export function EditorShell({ services }: EditorShellProps) {
         </section>
         {vm.pagesPanelOpen ? (
           <PagesPanel
-          project={vm.project}
-          activePageId={vm.activePageId}
+            project={vm.project}
+            activePageId={vm.activePageId}
             canTranslate={vm.canTranslateDeck}
             onAddPage={vm.addPage}
+            onClose={vm.togglePagesPanel}
             onDeletePage={vm.deletePage}
             onDuplicatePage={vm.duplicatePage}
             onRenamePage={vm.renamePage}

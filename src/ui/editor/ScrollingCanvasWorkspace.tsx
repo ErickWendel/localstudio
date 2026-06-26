@@ -1,9 +1,12 @@
 import { forwardRef, type ComponentProps, type ReactNode, useImperativeHandle, useRef } from 'react';
+import type { ElementStylePatch } from '../../domain/commands/basicCommands';
 import { CanvasWorkspace } from './CanvasWorkspace';
+import { TextSelectionToolbar } from './TextSelectionToolbar';
 
 type CanvasWorkspaceProps = ComponentProps<typeof CanvasWorkspace>;
 
 interface ScrollingCanvasWorkspaceProps extends CanvasWorkspaceProps {
+  canTranslateCurrentSlide?: boolean;
   children?: ReactNode;
   onAddPage?: () => void;
   onActivePageFromScroll?: (pageId: string) => void;
@@ -13,6 +16,7 @@ interface ScrollingCanvasWorkspaceProps extends CanvasWorkspaceProps {
   onReorderPage?: (pageId: string, targetIndex: number) => void;
   onSetPageVisibility?: (pageId: string, visible: boolean) => void;
   onTranslatePage?: (pageId: string) => void;
+  onUpdateElementStyle?: (elementId: string, patch: ElementStylePatch) => void;
 }
 
 export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanvasWorkspaceProps>(function ScrollingCanvasWorkspace(
@@ -28,6 +32,7 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
     onReorderPage,
     onSetPageVisibility,
     onTranslatePage,
+    onUpdateElementStyle,
     project,
     ...canvasProps
   },
@@ -35,6 +40,14 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
 ) {
   const pageRefs = useRef(new Map<string, HTMLElement>());
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const selectedElement = project.elements[canvasProps.selection.elementIds[0] ?? ''];
+  const showTextToolbar =
+    !canvasProps.presentationMode &&
+    selectedElement?.type === 'text' &&
+    canvasProps.selection.elementIds.length === 1;
+  const textToolbarDisabled =
+    Boolean(canvasProps.isTranslating) ||
+    Boolean(selectedElement?.type === 'text' && canvasProps.processingElementIds?.includes(selectedElement.id));
   useImperativeHandle(ref, () => scrollerRef.current as HTMLDivElement, []);
 
   function updateActivePageFromScroll() {
@@ -58,6 +71,17 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
       ref={scrollerRef}
       onScroll={updateActivePageFromScroll}
     >
+      {showTextToolbar && selectedElement?.type === 'text' ? (
+        <div className="scrolling-text-toolbar-shell" data-testid="sticky-text-selection-toolbar">
+          <TextSelectionToolbar
+            element={selectedElement}
+            canTranslateSelection={Boolean(canvasProps.canTranslateSelection)}
+            disabled={textToolbarDisabled}
+            {...(canvasProps.onTranslateSelectedText ? { onTranslateSelectedText: canvasProps.onTranslateSelectedText } : {})}
+            {...(onUpdateElementStyle ? { onUpdateElementStyle } : {})}
+          />
+        </div>
+      ) : null}
       {project.pages.map((page, index) => {
         const isActive = page.id === activePageId;
         const visible = page.visible ?? true;
@@ -95,7 +119,6 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
               <CanvasWorkspace
                 {...canvasProps}
                 activePageId={activePageId}
-                canTranslateCurrentSlide={Boolean(canTranslateCurrentSlide)}
                 project={project}
               />
             ) : (

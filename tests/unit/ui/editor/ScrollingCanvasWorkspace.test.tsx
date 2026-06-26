@@ -51,4 +51,31 @@ describe('ScrollingCanvasWorkspace', () => {
     await user.click(screen.getAllByRole('button', { name: 'Add page' })[0]!);
     expect(handlers.onAddPage).toHaveBeenCalledTimes(1);
   });
+
+  it('keeps text editing controls in the sticky slide toolbar and wires translation', async () => {
+    const user = userEvent.setup();
+    const onTranslateSelectedText = vi.fn();
+    const onUpdateElementStyle = vi.fn();
+
+    render(
+      <ScrollingCanvasWorkspace
+        activePageId="page-1"
+        project={createSampleProject()}
+        selection={{ pageId: 'page-1', elementIds: ['text-subtitle'] }}
+        canTranslateSelection
+        onTranslateSelectedText={onTranslateSelectedText}
+        onUpdateElementStyle={onUpdateElementStyle}
+      />,
+    );
+
+    expect(screen.getByTestId('sticky-text-selection-toolbar')).toContainElement(
+      screen.getByRole('toolbar', { name: 'Text editing controls' }),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Translate Selected Text' }));
+    expect(onTranslateSelectedText).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('button', { name: 'Align text left' }));
+    expect(onUpdateElementStyle).toHaveBeenCalledWith('text-subtitle', { align: 'left' });
+  });
 });

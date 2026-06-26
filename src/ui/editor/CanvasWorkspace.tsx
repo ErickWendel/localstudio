@@ -23,7 +23,6 @@ interface CanvasWorkspaceProps {
   backgroundPreparation?:
     | { elementId: string; progress: number; status: 'preparing' | 'ready' | 'failed' }
     | undefined;
-  canTranslateCurrentSlide?: boolean;
   canTranslateSelection?: boolean;
   isTranslating?: boolean;
   translationNotice?: string | undefined;
@@ -41,7 +40,6 @@ interface CanvasWorkspaceProps {
   onInsertText?: () => void;
   onSelectElement?: (elementId: string, options?: { additive?: boolean }) => void;
   onSendSelectedElementBackward?: () => void;
-  onTranslateCurrentSlide?: () => void;
   onTranslateSelectedText?: () => void;
   onUpdateElementFrame?: (elementId: string, patch: ElementFramePatch) => void;
   onUpdateElementFrames?: (patches: Record<string, ElementFramePatch>) => void;
@@ -111,7 +109,6 @@ export function CanvasWorkspace({
   processingElementIds = [],
   backgroundPreview,
   backgroundPreparation,
-  canTranslateCurrentSlide = false,
   canTranslateSelection = false,
   isTranslating = false,
   translationNotice,
@@ -129,7 +126,6 @@ export function CanvasWorkspace({
   onInsertText,
   onSelectElement,
   onSendSelectedElementBackward,
-  onTranslateCurrentSlide,
   onTranslateSelectedText,
   onUpdateElementFrame,
   onUpdateElementFrames,
@@ -475,20 +471,6 @@ export function CanvasWorkspace({
           transform: `scale(${zoomPercent / 100})`,
         }}
       >
-        {showEditorOverlays ? (
-          <button
-            aria-label="Translate Current Slide"
-            className="slide-translate-button"
-            disabled={!canTranslateCurrentSlide}
-            title="Translate Current Slide"
-            type="button"
-            onClick={onTranslateCurrentSlide}
-          >
-            <span className="material-symbols-outlined" aria-hidden="true">
-              translate
-            </span>
-          </button>
-        ) : null}
         <div className="canvas-artboard" ref={artboardRef} style={{ background: pageBackground }}>
           {showEditorOverlays &&
           (backgroundSelectionMode || backgroundSelectionNotice || processingSelectedImageId || isTranslating || translationNotice) ? (
@@ -708,7 +690,7 @@ export function CanvasWorkspace({
           }) : null}
           <span className="canvas-fallback-label">Selected Image</span>
         </div>
-        {showEditorOverlays && hasSelection ? (
+        {showEditorOverlays && hasSelection && selectedElement?.type !== 'text' ? (
           <FloatingSelectionToolbar
             onAlignCenter={onAlignSelectedElement}
             onBringForward={onBringSelectedElementForward}

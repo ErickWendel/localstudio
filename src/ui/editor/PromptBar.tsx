@@ -1,5 +1,5 @@
 import { ImagePlus, Mic, Plus, SendHorizontal } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { IconButton } from '../components/IconButton';
 import type { CreateImagePromptOptions } from './imagePromptOptions';
 
@@ -46,18 +46,14 @@ export function PromptBar({
 }: PromptBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [mode, setMode] = useState<'create-image' | null>(null);
+  const [mode, setMode] = useState<'create-image' | null>('create-image');
   const [value, setValue] = useState('');
   const examples = mode === 'create-image' ? imagePromptExamples : slidePromptExamples;
-
-  useEffect(() => {
-    if (mode !== 'create-image') return;
-    inputRef.current?.focus();
-  }, [mode]);
 
   function activateCreateImageMode() {
     setMode('create-image');
     setMenuOpen(false);
+    inputRef.current?.focus();
   }
 
   async function guardPromptIntent() {

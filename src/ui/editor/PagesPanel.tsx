@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type DragEvent } from 'react';
 import type { DesignElement, Page, ProjectDocument } from '../../domain/model';
 
 interface PagesPanelProps {
@@ -6,6 +6,7 @@ interface PagesPanelProps {
   canTranslate?: boolean;
   project: ProjectDocument;
   onAddPage?: () => void;
+  onClose?: () => void;
   onDeletePage?: (pageId: string) => void;
   onDuplicatePage?: (pageId: string) => void;
   onRenamePage?: (pageId: string, name: string) => void;
@@ -20,6 +21,7 @@ export function PagesPanel({
   canTranslate = false,
   project,
   onAddPage,
+  onClose,
   onDeletePage,
   onDuplicatePage,
   onRenamePage,
@@ -49,6 +51,20 @@ export function PagesPanel({
     setEditingPageId(undefined);
   }
 
+  function handleDragStart(event: DragEvent<HTMLElement>, pageId: string) {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('application/x-localstudio-page-id', pageId);
+  }
+
+  function handleDrop(event: DragEvent<HTMLElement>, targetIndex: number) {
+    event.preventDefault();
+    const pageId = event.dataTransfer.getData('application/x-localstudio-page-id');
+    if (!pageId) return;
+    const currentIndex = project.pages.findIndex((page) => page.id === pageId);
+    if (currentIndex === -1 || currentIndex === targetIndex) return;
+    onReorderPage?.(pageId, targetIndex);
+  }
+
   return (
     <aside className="pages-panel" aria-label="Pages">
       <div className="pages-panel-header">
@@ -56,11 +72,18 @@ export function PagesPanel({
           <h2 className="panel-heading">Pages</h2>
           <p className="panel-muted">{project.pages.length} pages</p>
         </div>
-        <button className="icon-button" type="button" aria-label="Add page" title="Add page" onClick={onAddPage}>
-          <span className="material-symbols-outlined" aria-hidden="true">
-            add
-          </span>
-        </button>
+        <div className="pages-panel-header-actions">
+          <button className="icon-button" type="button" aria-label="Add page" title="Add page" onClick={onAddPage}>
+            <span className="material-symbols-outlined" aria-hidden="true">
+              add
+            </span>
+          </button>
+          <button className="icon-button" type="button" aria-label="Close pages panel" title="Close pages panel" onClick={onClose}>
+            <span className="material-symbols-outlined" aria-hidden="true">
+              close
+            </span>
+          </button>
+        </div>
       </div>
       <div className="pages-list">
         {project.pages.map((page, index) => {
@@ -70,8 +93,22 @@ export function PagesPanel({
             <article
               aria-label={`Page ${index + 1}: ${page.name}`}
               className={isActive ? 'page-card page-card-active' : 'page-card'}
+              draggable
               key={page.id}
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+              }}
+              onDragStart={(event) => {
+                handleDragStart(event, page.id);
+              }}
+              onDrop={(event) => {
+                handleDrop(event, index);
+              }}
             >
+              <span className="page-card-number" aria-hidden="true">
+                {index + 1}
+              </span>
               <button
                 className="page-card-preview"
                 type="button"
@@ -83,7 +120,6 @@ export function PagesPanel({
                 <MiniPagePreview page={page} project={project} visible={visible} />
               </button>
               <div className="page-card-body">
-                <span className="page-card-index">Page {index + 1}</span>
                 {editingPageId === page.id ? (
                   <input
                     ref={inputRef}

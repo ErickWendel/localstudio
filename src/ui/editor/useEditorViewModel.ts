@@ -397,7 +397,7 @@ export function useEditorViewModel(services: AppServices) {
   const [hasLoadedProject, setHasLoadedProject] = useState(!shouldRestoreStoredProject);
   const [persistenceEnabled, setPersistenceEnabled] = useState(shouldRestoreStoredProject);
   const [activePageId, setActivePageId] = useState(initialProject.pages[0]?.id ?? '');
-  const [selectedElementIds, setSelectedElementIds] = useState<string[]>(['image-hero']);
+  const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   const [history, setHistory] = useState<EditorHistory>({ past: [], future: [] });
   const [zoomPercent, setZoomPercent] = useState(100);
   const [pagesPanelOpen, setPagesPanelOpen] = useState(true);
@@ -505,7 +505,7 @@ export function useEditorViewModel(services: AppServices) {
           setProject(normalizedProject);
           setActivePageId(normalizedProject.pages[0]?.id ?? '');
           setPageLanguageCodes({});
-          setSelectedElementIds(['image-hero'].filter((id) => Boolean(normalizedProject.elements[id])));
+          setSelectedElementIds([]);
           writeProjectNameToUrl(normalizedProject.name);
         }
         setHasLoadedProject(true);

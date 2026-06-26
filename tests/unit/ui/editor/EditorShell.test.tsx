@@ -177,6 +177,11 @@ async function selectTitleLayer(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Title' }));
 }
 
+async function selectImageLayer(user: ReturnType<typeof userEvent.setup>) {
+  await openLeftTab(user, 'Layout');
+  await user.click(screen.getByRole('button', { name: 'Selected Image' }));
+}
+
 describe('EditorShell', () => {
   it('renders the approved editor shell landmarks', async () => {
     render(<EditorShell services={createAppServices()} />);
@@ -186,10 +191,19 @@ describe('EditorShell', () => {
     expect(screen.getByText('PT')).toBeInTheDocument();
     expect(await screen.findByText('EN')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Prompt actions' })).toBeInTheDocument();
-    expect(
-      screen.getByPlaceholderText('Describe slide structure or organize current content...'),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Create image prompt')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Layout' })).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-selected-elements', '');
+  });
+
+  it('does not select any element on startup', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-selected-elements', '');
+
+    await openLeftTab(user, 'Layout');
+    expect(screen.getByRole('button', { name: 'Selected Image' })).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('switches to the layout panel from the header view menu', async () => {
@@ -205,7 +219,7 @@ describe('EditorShell', () => {
   it('undoes and redoes editor mutations from the toolbar', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
-    await openLeftTab(user, 'Layout');
+    await selectImageLayer(user);
 
     await user.click(screen.getByRole('button', { name: 'Delete' }));
     expect(screen.queryByRole('button', { name: 'Selected Image' })).not.toBeInTheDocument();
@@ -220,7 +234,7 @@ describe('EditorShell', () => {
   it('undoes and redoes editor mutations with keyboard shortcuts', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
-    await openLeftTab(user, 'Layout');
+    await selectImageLayer(user);
 
     await user.click(screen.getByRole('button', { name: 'Delete' }));
     expect(screen.queryByRole('button', { name: 'Selected Image' })).not.toBeInTheDocument();
@@ -474,7 +488,7 @@ describe('EditorShell', () => {
     const repository = new SavingProjectRepository();
     services.projectRepository = repository;
     render(<EditorShell services={services} />);
-    await openLeftTab(user, 'Layout');
+    await selectImageLayer(user);
 
     fireEvent.copy(window, {
       clipboardData: createClipboardData(),
@@ -553,7 +567,7 @@ describe('EditorShell', () => {
   it('cuts selected objects into the editor clipboard', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
-    await openLeftTab(user, 'Layout');
+    await selectImageLayer(user);
 
     fireEvent.cut(window, {
       clipboardData: createClipboardData(),
@@ -577,6 +591,7 @@ describe('EditorShell', () => {
     services.projectRepository = repository;
     render(<EditorShell services={services} />);
     await openLeftTab(user, 'Layout');
+    await selectImageLayer(user);
 
     await user.click(screen.getByRole('button', { name: 'Insert Text' }));
     await waitFor(() => {
@@ -608,6 +623,7 @@ describe('EditorShell', () => {
     });
 
     const image = new File(['image-bytes'], 'toolbar-image.png', { type: 'image/png' });
+    await selectImageLayer(user);
     await user.click(screen.getByRole('button', { name: 'Insert Image' }));
     await user.upload(screen.getByLabelText('Insert image file'), image);
 
@@ -620,7 +636,7 @@ describe('EditorShell', () => {
   it('deletes the selected layer with Delete and Backspace keystrokes', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
-    await openLeftTab(user, 'Layout');
+    await selectImageLayer(user);
 
     await user.keyboard('{Delete}');
     expect(screen.queryByRole('button', { name: 'Selected Image' })).not.toBeInTheDocument();
@@ -635,7 +651,7 @@ describe('EditorShell', () => {
   it('duplicates, centers, and changes z-order from the floating toolbar', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
-    await openLeftTab(user, 'Layout');
+    await selectImageLayer(user);
 
     await user.click(screen.getByRole('button', { name: 'Duplicate' }));
     expect(screen.getByRole('button', { name: 'Selected Image copy' })).toHaveAttribute(
@@ -683,7 +699,7 @@ describe('EditorShell', () => {
     await openLeftTab(user, 'AI Tools');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
     expect(await screen.findByText('Pair: en → pt')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Translate Current Slide' }));
+    await user.click(screen.getAllByRole('button', { name: 'Translate Slide 1' })[0]!);
 
     expect(await screen.findByRole('button', { name: 'Current slide language Portuguese' })).toBeInTheDocument();
   });
@@ -788,7 +804,7 @@ describe('EditorShell', () => {
 
     await openLeftTab(user, 'AI Tools');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
-    await user.click(screen.getByRole('button', { name: 'Translate Current Slide' }));
+    await user.click(screen.getAllByRole('button', { name: 'Translate Slide 1' })[0]!);
 
     await waitFor(() => {
       expect(translator.translate).toHaveBeenCalledWith('AI Design Revolution', 'pt', {
@@ -851,6 +867,7 @@ describe('EditorShell', () => {
   it('blocks background subject selection until image editing models are downloaded', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
+    await selectImageLayer(user);
 
     await user.click(screen.getByRole('button', { name: 'Remove Background' }));
 
@@ -877,6 +894,7 @@ describe('EditorShell', () => {
     await services.modelSetupService.downloadModel('image-editing-models');
 
     render(<EditorShell services={services} />);
+    await selectImageLayer(user);
 
     await user.click(screen.getByRole('button', { name: 'Remove Background' }));
 

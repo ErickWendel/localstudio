@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { createSampleProject } from '../../../../src/domain/sampleProject';
@@ -16,6 +16,7 @@ describe('PagesPanel', () => {
     });
     const handlers = {
       onAddPage: vi.fn(),
+      onClose: vi.fn(),
       onDeletePage: vi.fn(),
       onDuplicatePage: vi.fn(),
       onRenamePage: vi.fn(),
@@ -30,6 +31,9 @@ describe('PagesPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Add page' }));
     expect(handlers.onAddPage).toHaveBeenCalledTimes(1);
 
+    await user.click(screen.getByRole('button', { name: 'Close pages panel' }));
+    expect(handlers.onClose).toHaveBeenCalledTimes(1);
+
     await user.click(screen.getByRole('button', { name: 'Select Slide 1' }));
     expect(handlers.onSelectPage).toHaveBeenCalledWith('page-1');
 
@@ -43,6 +47,18 @@ describe('PagesPanel', () => {
     expect(handlers.onTranslatePage).toHaveBeenCalledWith('page-1');
 
     await user.click(screen.getByRole('button', { name: 'Move Slide 1 down' }));
+    expect(handlers.onReorderPage).toHaveBeenCalledWith('page-1', 1);
+
+    const dataTransfer = {
+      dropEffect: '',
+      effectAllowed: '',
+      getData: vi.fn(() => 'page-1'),
+      setData: vi.fn(),
+    };
+    fireEvent.dragStart(screen.getByRole('article', { name: 'Page 1: Slide 1' }), { dataTransfer });
+    fireEvent.dragOver(screen.getByRole('article', { name: 'Page 2: Second Slide' }), { dataTransfer });
+    fireEvent.drop(screen.getByRole('article', { name: 'Page 2: Second Slide' }), { dataTransfer });
+    expect(dataTransfer.setData).toHaveBeenCalledWith('application/x-localstudio-page-id', 'page-1');
     expect(handlers.onReorderPage).toHaveBeenCalledWith('page-1', 1);
 
     await user.click(screen.getByRole('button', { name: 'Delete Slide 1' }));
