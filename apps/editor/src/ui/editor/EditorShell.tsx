@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import type Konva from 'konva';
 import type { AppServices } from '../../app/composition';
+import { EditorAutomationController, type EditorAutomationDelegate } from '../../services/editorAutomationController';
 import { IMAGE_EDITING_MODEL_ID } from '../../services/modelSetupService';
+import {
+  WebMcpToolAdapter,
+  type WebMcpDemoWindow,
+  type WebMcpModelContext,
+} from '../../services/webMcpToolAdapter';
 import { EditorFooter } from './EditorFooter';
 import { LeftToolPanel } from './LeftToolPanel';
 import { PagesPanel } from './PagesPanel';
@@ -65,8 +71,19 @@ function writeEditorObjectClipboardMarker(clipboardData: DataTransfer | null) {
   clipboardData.setData('text/plain', 'LocalStudio.ai editor elements');
 }
 
+function isWebMcpEnabled() {
+  if (typeof window === 'undefined') return false;
+  return new URL(window.location.href).searchParams.get('webmcp') === '1';
+}
+
+function getWebMcpModelContext() {
+  if (typeof document === 'undefined') return undefined;
+  return (document as Document & { modelContext?: WebMcpModelContext }).modelContext;
+}
+
 export function EditorShell({ services }: EditorShellProps) {
   const vm = useEditorViewModel(services);
+  const automationDelegateRef = useRef(vm.automation);
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
   const stageRef = useRef<Konva.Stage>(null);
   const workspaceRef = useRef<HTMLElement>(null);
@@ -138,6 +155,10 @@ export function EditorShell({ services }: EditorShellProps) {
   }, [hasSelection, isHistoryReadOnly, vm]);
 
   useEffect(() => {
+    automationDelegateRef.current = vm.automation;
+  }, [vm.automation]);
+
+  useEffect(() => {
     function handleCopy(event: ClipboardEvent) {
       if (isHistoryReadOnly) return;
       if (isEditableInteractionTarget(event.target) || hasBrowserTextSelection() || !hasSelection) return;
@@ -176,6 +197,27 @@ export function EditorShell({ services }: EditorShellProps) {
       window.removeEventListener('paste', handlePaste);
     };
   }, [hasSelection, isHistoryReadOnly, vm]);
+
+  useEffect(() => {
+    if (!isWebMcpEnabled()) return undefined;
+    const delegate: EditorAutomationDelegate = {
+      createProject: (input) => automationDelegateRef.current.createProject(input),
+      generateSlides: (input) => automationDelegateRef.current.generateSlides(input),
+      generateImage: (input) => automationDelegateRef.current.generateImage(input),
+      translateText: (input) => automationDelegateRef.current.translateText(input),
+      getState: () => automationDelegateRef.current.getState(),
+    };
+    const adapter = new WebMcpToolAdapter(new EditorAutomationController(delegate));
+    const demoWindow = window as WebMcpDemoWindow;
+    const modelContext = getWebMcpModelContext();
+    demoWindow.localStudioWebMcpTools = adapter.createTools();
+    const unregister = modelContext ? adapter.register(modelContext) : undefined;
+
+    return () => {
+      unregister?.();
+      delete demoWindow.localStudioWebMcpTools;
+    };
+  }, []);
 
   return (
     <div className="app-shell">

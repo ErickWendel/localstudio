@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '../../../src/App';
+import { TRANSLATION_LANGUAGE_OPTIONS } from '../../../src/ui/editor/translationLanguages';
 
 describe('App', () => {
   beforeEach(() => {
@@ -14,6 +15,10 @@ describe('App', () => {
   afterEach(() => {
     window.history.replaceState({}, '', '/');
     window.localStorage.clear();
+    Object.defineProperty(document, 'modelContext', {
+      configurable: true,
+      value: undefined,
+    });
     vi.unstubAllGlobals();
   });
 
@@ -75,5 +80,104 @@ describe('App', () => {
 
     expect(await screen.findByText('Untitled Project')).toBeInTheDocument();
     expect(screen.queryByText('LocalStudio.ai runs locally in this browser.')).not.toBeInTheDocument();
+  });
+
+  it('renders the WebMCP showcase page at /webmcp', () => {
+    window.history.replaceState({}, '', '/webmcp');
+
+    render(<App />);
+
+    expect(screen.getByRole('heading', { name: 'WebMCP showcase' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Discover tools' })).toBeInTheDocument();
+    expect(screen.getByTitle('LocalStudio editor WebMCP demo')).toHaveAttribute(
+      'src',
+      '/editor/?webmcp=1&newProject=1',
+    );
+  });
+
+  it('renders the WebMCP showcase page under the editor base path', () => {
+    window.history.replaceState({}, '', '/editor/webmcp');
+
+    render(<App />);
+
+    expect(screen.getByRole('heading', { name: 'WebMCP showcase' })).toBeInTheDocument();
+  });
+
+  it('opens editable command input for a WebMCP workflow step', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, '', '/webmcp');
+
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: 'Create project' }));
+
+    expect(screen.getByLabelText('Create project command input')).toHaveValue('WebMCP Demo Deck');
+    expect(screen.getByRole('button', { name: 'Send Create project' })).toBeInTheDocument();
+  });
+
+  it('shows the AI tools translation options for the WebMCP translate step', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, '', '/webmcp');
+
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: 'Translate deck' }));
+
+    const languageSelect = screen.getByLabelText('Translate deck command input');
+    const options = within(languageSelect).getAllByRole<HTMLOptionElement>('option');
+    expect(options).toHaveLength(TRANSLATION_LANGUAGE_OPTIONS.length);
+    expect(options.map((option) => option.value)).toEqual(
+      TRANSLATION_LANGUAGE_OPTIONS.map((language) => language.code),
+    );
+    expect(screen.getByRole('option', { name: 'Hebrew (iw) 🇮🇱' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Chinese (Traditional) (zh-Hant) 🇹🇼' })).toBeInTheDocument();
+  });
+
+  it('runs the WebMCP snapshot step without showing a command input', async () => {
+    const user = userEvent.setup();
+    const executeSnapshot = vi.fn().mockResolvedValue({ project: { name: 'Demo' } });
+    window.history.replaceState({}, '', '/webmcp');
+    Object.defineProperty(document, 'modelContext', {
+      configurable: true,
+      value: {
+        getTools: vi.fn().mockResolvedValue([
+          { name: 'get_project_snapshot', description: 'Read snapshot', execute: executeSnapshot },
+        ]),
+      },
+    });
+
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: 'Discover tools' }));
+    await user.click(screen.getByRole('button', { name: 'Read snapshot' }));
+
+    await waitFor(() => {
+      expect(executeSnapshot).toHaveBeenCalledWith({});
+    });
+    expect(screen.queryByLabelText('Read snapshot command input')).not.toBeInTheDocument();
+    expect(screen.getByText('Read snapshot completed.')).toBeInTheDocument();
+  });
+
+  it('focuses the matching workflow step when a discovered tool is selected', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, '', '/webmcp');
+    Object.defineProperty(document, 'modelContext', {
+      configurable: true,
+      value: {
+        getTools: vi.fn().mockResolvedValue([
+          { name: 'create_project', description: 'Create project', execute: vi.fn() },
+          { name: 'generate_slides', description: 'Generate slides', execute: vi.fn() },
+        ]),
+      },
+    });
+
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: 'Discover tools' }));
+    await user.click(await screen.findByRole('button', { name: 'generate_slides' }));
+
+    const stepButton = screen.getByRole('button', { name: 'Generate slide' });
+    expect(stepButton).toHaveFocus();
+    expect(stepButton).toHaveClass('webmcp-step-button-focused');
   });
 });

@@ -1,0 +1,47 @@
+export interface TranslationLanguageOption {
+  code: string;
+  flag: string;
+  label: string;
+}
+
+export const TRANSLATION_LANGUAGE_OPTIONS: TranslationLanguageOption[] = [
+  { code: 'ar', flag: '🇸🇦', label: 'Arabic' },
+  { code: 'bn', flag: '🇧🇩', label: 'Bengali' },
+  { code: 'bg', flag: '🇧🇬', label: 'Bulgarian' },
+  { code: 'zh', flag: '🇨🇳', label: 'Chinese' },
+  { code: 'zh-Hant', flag: '🇹🇼', label: 'Chinese (Traditional)' },
+  { code: 'hr', flag: '🇭🇷', label: 'Croatian' },
+  { code: 'cs', flag: '🇨🇿', label: 'Czech' },
+  { code: 'da', flag: '🇩🇰', label: 'Danish' },
+  { code: 'nl', flag: '🇳🇱', label: 'Dutch' },
+  { code: 'en', flag: '🇺🇸', label: 'English' },
+  { code: 'fi', flag: '🇫🇮', label: 'Finnish' },
+  { code: 'fr', flag: '🇫🇷', label: 'French' },
+  { code: 'de', flag: '🇩🇪', label: 'German' },
+  { code: 'el', flag: '🇬🇷', label: 'Greek' },
+  { code: 'iw', flag: '🇮🇱', label: 'Hebrew' },
+  { code: 'hi', flag: '🇮🇳', label: 'Hindi' },
+  { code: 'hu', flag: '🇭🇺', label: 'Hungarian' },
+  { code: 'id', flag: '🇮🇩', label: 'Indonesian' },
+  { code: 'it', flag: '🇮🇹', label: 'Italian' },
+  { code: 'ja', flag: '🇯🇵', label: 'Japanese' },
+  { code: 'kn', flag: '🇮🇳', label: 'Kannada' },
+  { code: 'ko', flag: '🇰🇷', label: 'Korean' },
+  { code: 'lt', flag: '🇱🇹', label: 'Lithuanian' },
+  { code: 'mr', flag: '🇮🇳', label: 'Marathi' },
+  { code: 'no', flag: '🇳🇴', label: 'Norwegian' },
+  { code: 'pl', flag: '🇵🇱', label: 'Polish' },
+  { code: 'pt', flag: '🇧🇷', label: 'Portuguese' },
+  { code: 'ro', flag: '🇷🇴', label: 'Romanian' },
+  { code: 'ru', flag: '🇷🇺', label: 'Russian' },
+  { code: 'sk', flag: '🇸🇰', label: 'Slovak' },
+  { code: 'sl', flag: '🇸🇮', label: 'Slovenian' },
+  { code: 'es', flag: '🇪🇸', label: 'Spanish' },
+  { code: 'sv', flag: '🇸🇪', label: 'Swedish' },
+  { code: 'ta', flag: '🇮🇳', label: 'Tamil' },
+  { code: 'te', flag: '🇮🇳', label: 'Telugu' },
+  { code: 'th', flag: '🇹🇭', label: 'Thai' },
+  { code: 'tr', flag: '🇹🇷', label: 'Turkish' },
+  { code: 'uk', flag: '🇺🇦', label: 'Ukrainian' },
+  { code: 'vi', flag: '🇻🇳', label: 'Vietnamese' },
+];
