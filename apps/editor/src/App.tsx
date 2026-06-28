@@ -2,8 +2,17 @@ import { useMemo } from 'react';
 import { createAppServices } from './app/composition';
 import { createBlankProject } from './domain/sampleProject';
 import { EditorShell } from './ui/editor/EditorShell';
+import { WebMcpShowcasePage } from './ui/webmcp/WebMcpShowcasePage';
 
 export function App() {
+  if (window.location.pathname === '/webmcp' || window.location.pathname === '/editor/webmcp') {
+    return <WebMcpShowcasePage />;
+  }
+
+  return <EditorApp />;
+}
+
+function EditorApp() {
   const services = useMemo(() => {
     const url = new URL(window.location.href);
     const shouldStartBlankProject = url.searchParams.get('newProject') === '1';

@@ -35,7 +35,8 @@ import {
 import type { GeneratedSlideElement } from '../../domain/generatedSlide';
 import { fitImageWithinPage } from '../../domain/imageSizing';
 import type { DesignElement, ImageElement, Page, PageBackground, ProjectDocument, SelectionState } from '../../domain/model';
-import { SAMPLE_HERO_IMAGE_SIZE, SAMPLE_HERO_IMAGE_URL } from '../../domain/sampleProject';
+import { createBlankProject, SAMPLE_HERO_IMAGE_SIZE, SAMPLE_HERO_IMAGE_URL } from '../../domain/sampleProject';
+import type { EditorAutomationDelegate } from '../../services/editorAutomationController';
 import type { AiProviderState, ModelState, PromptApiAvailability, VersionHistoryEntry } from '../../services/interfaces';
 import {
   GEMMA_LLM_MODEL_ID,
@@ -49,6 +50,7 @@ import {
 import { IMAGE_EDITING_MODEL_ID } from '../../services/modelSetupService';
 import { looksLikeImageGenerationRequest } from '../../services/prompts/slideTaskPrompt';
 import { defaultCreateImagePromptOptions, type CreateImagePromptOptions } from './imagePromptOptions';
+import { TRANSLATION_LANGUAGE_OPTIONS } from './translationLanguages';
 
 export type RightPanelTab = 'layout' | 'text' | 'design' | 'ai-tools' | 'assets';
 export type TextPreset = 'title' | 'subtitle' | 'body';
@@ -104,48 +106,6 @@ const IMAGE_GENERATION_DIMENSION_MULTIPLE = 16;
 const BACKGROUND_PREVIEW_DEBOUNCE_MS = 120;
 const DEFAULT_SLIDE_LANGUAGE_CODE = 'pt';
 const PASTED_ELEMENT_OFFSET = 32;
-export const TRANSLATION_LANGUAGE_OPTIONS = [
-  { code: 'ar', flag: '🇸🇦', label: 'Arabic' },
-  { code: 'bn', flag: '🇧🇩', label: 'Bengali' },
-  { code: 'bg', flag: '🇧🇬', label: 'Bulgarian' },
-  { code: 'zh', flag: '🇨🇳', label: 'Chinese' },
-  { code: 'zh-Hant', flag: '🇹🇼', label: 'Chinese (Traditional)' },
-  { code: 'hr', flag: '🇭🇷', label: 'Croatian' },
-  { code: 'cs', flag: '🇨🇿', label: 'Czech' },
-  { code: 'da', flag: '🇩🇰', label: 'Danish' },
-  { code: 'nl', flag: '🇳🇱', label: 'Dutch' },
-  { code: 'en', flag: '🇺🇸', label: 'English' },
-  { code: 'fi', flag: '🇫🇮', label: 'Finnish' },
-  { code: 'fr', flag: '🇫🇷', label: 'French' },
-  { code: 'de', flag: '🇩🇪', label: 'German' },
-  { code: 'el', flag: '🇬🇷', label: 'Greek' },
-  { code: 'iw', flag: '🇮🇱', label: 'Hebrew' },
-  { code: 'hi', flag: '🇮🇳', label: 'Hindi' },
-  { code: 'hu', flag: '🇭🇺', label: 'Hungarian' },
-  { code: 'id', flag: '🇮🇩', label: 'Indonesian' },
-  { code: 'it', flag: '🇮🇹', label: 'Italian' },
-  { code: 'ja', flag: '🇯🇵', label: 'Japanese' },
-  { code: 'kn', flag: '🇮🇳', label: 'Kannada' },
-  { code: 'ko', flag: '🇰🇷', label: 'Korean' },
-  { code: 'lt', flag: '🇱🇹', label: 'Lithuanian' },
-  { code: 'mr', flag: '🇮🇳', label: 'Marathi' },
-  { code: 'no', flag: '🇳🇴', label: 'Norwegian' },
-  { code: 'pl', flag: '🇵🇱', label: 'Polish' },
-  { code: 'pt', flag: '🇧🇷', label: 'Portuguese' },
-  { code: 'ro', flag: '🇷🇴', label: 'Romanian' },
-  { code: 'ru', flag: '🇷🇺', label: 'Russian' },
-  { code: 'sk', flag: '🇸🇰', label: 'Slovak' },
-  { code: 'sl', flag: '🇸🇮', label: 'Slovenian' },
-  { code: 'es', flag: '🇪🇸', label: 'Spanish' },
-  { code: 'sv', flag: '🇸🇪', label: 'Swedish' },
-  { code: 'ta', flag: '🇮🇳', label: 'Tamil' },
-  { code: 'te', flag: '🇮🇳', label: 'Telugu' },
-  { code: 'th', flag: '🇹🇭', label: 'Thai' },
-  { code: 'tr', flag: '🇹🇷', label: 'Turkish' },
-  { code: 'uk', flag: '🇺🇦', label: 'Ukrainian' },
-  { code: 'vi', flag: '🇻🇳', label: 'Vietnamese' },
-];
-
 function normalizeLanguageCode(languageCode: string | undefined) {
   const normalized = languageCode?.trim();
   if (!normalized) return DEFAULT_SLIDE_LANGUAGE_CODE;
@@ -409,12 +369,15 @@ export function useEditorViewModel(services: AppServices) {
     [services.skipStoredProjectLoad],
   );
   const [project, setProject] = useState<ProjectDocument>(initialProject);
+  const projectRef = useRef(project);
   const [activeTab, setActiveTab] = useState<RightPanelTab>('layout');
   const [modelStates, setModelStates] = useState<ModelState[]>([]);
   const [hasLoadedProject, setHasLoadedProject] = useState(!shouldRestoreStoredProject);
   const [persistenceEnabled, setPersistenceEnabled] = useState(shouldRestoreStoredProject);
   const [activePageId, setActivePageId] = useState(initialProject.pages[0]?.id ?? '');
+  const activePageIdRef = useRef(activePageId);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
+  const selectedElementIdsRef = useRef(selectedElementIds);
   const [history, setHistory] = useState<EditorHistory>({ past: [], future: [] });
   const [zoomPercent, setZoomPercent] = useState(100);
   const [pagesPanelOpen, setPagesPanelOpen] = useState(false);
@@ -470,6 +433,9 @@ export function useEditorViewModel(services: AppServices) {
   const [, setBackgroundSelectionPoints] = useState<Record<string, BackgroundSelectionPoint[]>>(
     {},
   );
+  projectRef.current = project;
+  activePageIdRef.current = activePageId;
+  selectedElementIdsRef.current = selectedElementIds;
   const backgroundSelectionPointsRef = useRef<Record<string, BackgroundSelectionPoint[]>>({});
   const backgroundPreviewTimeoutRef = useRef<number | undefined>(undefined);
   const backgroundPreviewSequenceRef = useRef(0);
@@ -664,6 +630,29 @@ export function useEditorViewModel(services: AppServices) {
     void removed;
     backgroundSelectionPointsRef.current = remainingPoints;
     setBackgroundSelectionPoints(remainingPoints);
+  }
+
+  function replaceProjectForAutomation(nextProject: ProjectDocument) {
+    const nextActivePageId = nextProject.pages[0]?.id ?? '';
+    projectRef.current = nextProject;
+    activePageIdRef.current = nextActivePageId;
+    selectedElementIdsRef.current = [];
+    setProject(nextProject);
+    setActivePageId(nextActivePageId);
+    setSelectedElementIds([]);
+    setHistory({ past: [], future: [] });
+    setPageLanguageCodes({});
+    setBackgroundSelectionMode(false);
+    setBackgroundSelectionNotice(undefined);
+    clearBackgroundPreview();
+    clearBackgroundPreparation();
+    clearBackgroundSelectionPoints();
+    setPreviewProject(undefined);
+    setSelectedVersionId(undefined);
+    setVersionHistoryOpen(false);
+    skipNextProjectSaveRef.current = true;
+    lastVersionProjectRef.current = nextProject;
+    setLastEditedAt(nextProject.updatedAt);
   }
 
   function isBackgroundPreparationReady(elementId: string) {
@@ -1143,14 +1132,21 @@ export function useEditorViewModel(services: AppServices) {
     setProject((currentProject) => {
       const nextProject = updater(currentProject);
       if (nextProject === currentProject) return currentProject;
+      projectRef.current = nextProject;
 
       setHistory((currentHistory) => ({
         past: [...currentHistory.past, currentProject].slice(-50),
         future: [],
       }));
 
-      if (options?.activePageId !== undefined) setActivePageId(options.activePageId);
-      if (options?.selectedElementIds !== undefined) setSelectedElementIds(options.selectedElementIds);
+      if (options?.activePageId !== undefined) {
+        activePageIdRef.current = options.activePageId;
+        setActivePageId(options.activePageId);
+      }
+      if (options?.selectedElementIds !== undefined) {
+        selectedElementIdsRef.current = options.selectedElementIds;
+        setSelectedElementIds(options.selectedElementIds);
+      }
       return nextProject;
     });
   }
@@ -1582,6 +1578,75 @@ export function useEditorViewModel(services: AppServices) {
       setIsTranslating(false);
     }
   }
+
+  function createProjectForAutomation(input: { name?: string }) {
+    const blankProject = createBlankProject();
+    const nextProject = normalizeProjectDocument({
+      ...blankProject,
+      name: input.name?.trim() || blankProject.name,
+      updatedAt: new Date().toISOString(),
+    });
+    replaceProjectForAutomation(nextProject);
+    return Promise.resolve(nextProject);
+  }
+
+  async function generateSlidesForAutomation(input: { prompt: string }) {
+    await generateSlideFromPrompt(input.prompt);
+    return projectRef.current;
+  }
+
+  async function generateImageForAutomation(input: { height?: number; prompt: string; seed?: number; steps?: number; width?: number }) {
+    const options =
+      input.height !== undefined ||
+      input.seed !== undefined ||
+      input.steps !== undefined ||
+      input.width !== undefined
+        ? {
+            ...createImageOptions,
+            ...(input.height !== undefined ? { height: input.height } : {}),
+            ...(input.seed !== undefined ? { seed: input.seed } : {}),
+            ...(input.steps !== undefined ? { steps: input.steps } : {}),
+            ...(input.width !== undefined ? { width: input.width } : {}),
+          }
+        : undefined;
+    await generateImageFromPrompt(input.prompt, options);
+    return projectRef.current;
+  }
+
+  async function translateTextForAutomation(input: { pageId?: string; scope: TranslationScope; targetLanguage: string }) {
+    await setTranslationTargetLanguage(input.targetLanguage);
+    const translationOptions = input.pageId ? { pageId: input.pageId } : undefined;
+    const translatedPageIds = await translateTextScope(input.scope, input.targetLanguage, translationOptions);
+    if (translatedPageIds.length > 0) {
+      const normalizedTargetLanguage = normalizeLanguageCode(input.targetLanguage);
+      setPageLanguageCodes((current) => ({
+        ...current,
+        ...Object.fromEntries(translatedPageIds.map((pageId) => [pageId, normalizedTargetLanguage])),
+      }));
+    }
+    return {
+      project: projectRef.current,
+      translatedPageIds,
+    };
+  }
+
+  function getAutomationState() {
+    return {
+      project: projectRef.current,
+      selection: {
+        pageId: activePageIdRef.current,
+        elementIds: selectedElementIdsRef.current,
+      },
+    };
+  }
+
+  const automation: EditorAutomationDelegate = {
+    createProject: createProjectForAutomation,
+    generateSlides: generateSlidesForAutomation,
+    generateImage: generateImageForAutomation,
+    translateText: translateTextForAutomation,
+    getState: getAutomationState,
+  };
 
   function setElementVisibility(elementId: string, visible: boolean) {
     commitProject((currentProject) =>
@@ -2222,6 +2287,7 @@ export function useEditorViewModel(services: AppServices) {
 
   return {
     project: previewProject ?? project,
+    automation,
     activePageId,
     zoomPercent,
     pagesPanelOpen,

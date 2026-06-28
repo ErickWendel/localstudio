@@ -9,6 +9,7 @@ import type {
   ProjectRepository,
   TranslatorService,
 } from '../../../../src/services/interfaces';
+import type { WebMcpDemoWindow, WebMcpTool } from '../../../../src/services/webMcpToolAdapter';
 import { InMemoryModelSetupService } from '../../../../src/services/modelSetupService';
 import { EditorShell } from '../../../../src/ui/editor/EditorShell';
 
@@ -192,6 +193,55 @@ async function selectImageLayer(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('EditorShell', () => {
+  afterEach(() => {
+    window.history.pushState({}, '', '/editor/');
+    Object.defineProperty(document, 'modelContext', {
+      configurable: true,
+      value: undefined,
+    });
+    delete (window as WebMcpDemoWindow).localStudioWebMcpTools;
+  });
+
+  it('registers WebMCP tools when explicitly enabled', async () => {
+    const registerTools = vi.fn<(tools: WebMcpTool[]) => void>();
+    window.history.pushState({}, '', '/editor/?webmcp=1');
+    Object.defineProperty(document, 'modelContext', {
+      configurable: true,
+      value: { registerTools },
+    });
+
+    render(<EditorShell services={createAppServices()} />);
+
+    await waitFor(() => {
+      expect(registerTools).toHaveBeenCalled();
+    });
+    const tools = registerTools.mock.calls[0]?.[0] ?? [];
+    expect(tools.map((tool) => tool.name)).toEqual([
+      'create_project',
+      'generate_slides',
+      'generate_image',
+      'translate_text',
+      'get_project_snapshot',
+    ]);
+  });
+
+  it('exposes same-origin demo tools when WebMCP runtime is unavailable', async () => {
+    window.history.pushState({}, '', '/editor/?webmcp=1');
+
+    render(<EditorShell services={createAppServices()} />);
+
+    await waitFor(() => {
+      expect((window as WebMcpDemoWindow).localStudioWebMcpTools).toHaveLength(5);
+    });
+    expect((window as WebMcpDemoWindow).localStudioWebMcpTools?.map((tool) => tool.name)).toEqual([
+      'create_project',
+      'generate_slides',
+      'generate_image',
+      'translate_text',
+      'get_project_snapshot',
+    ]);
+  });
+
   it('renders the approved editor shell landmarks', async () => {
     render(<EditorShell services={createAppServices()} />);
 
