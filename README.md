@@ -1,7 +1,7 @@
 # LocalStudio.ai
 
-[![CI](https://github.com/ErickWendel/canva-webai-clone/actions/workflows/ci.yml/badge.svg)](https://github.com/ErickWendel/canva-webai-clone/actions/workflows/ci.yml)
-[![Pages](https://github.com/ErickWendel/canva-webai-clone/actions/workflows/pages.yml/badge.svg)](https://github.com/ErickWendel/canva-webai-clone/actions/workflows/pages.yml)
+[![CI](https://github.com/ErickWendel/localstudio/actions/workflows/ci.yml/badge.svg)](https://github.com/ErickWendel/localstudio/actions/workflows/ci.yml)
+[![Pages](https://github.com/ErickWendel/localstudio/actions/workflows/pages.yml/badge.svg)](https://github.com/ErickWendel/localstudio/actions/workflows/pages.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Node 26](https://img.shields.io/badge/Node-26-5FA04E?logo=nodedotjs&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=111)
@@ -10,7 +10,7 @@
 
 Browser-only Canva-style slides and image editing, powered by local Web AI.
 
-[Live demo](https://erickwendel.github.io/canva-webai-clone/) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md)
+[Live demo](https://erickwendel.github.io/localstudio/) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md)
 
 ![LocalStudio.ai Web AI demo](apps/landing/public/powered-webau.gif)
 
