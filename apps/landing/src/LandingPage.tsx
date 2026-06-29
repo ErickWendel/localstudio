@@ -17,6 +17,20 @@ type WorkflowStepId = 'prompt' | 'image' | 'translate' | 'edit' | 'local';
 
 const githubUrl = 'https://github.com/ErickWendel/semana-javascript-expert07';
 const githubApiUrl = 'https://api.github.com/repos/ErickWendel/semana-javascript-expert07';
+const workflowDemoGifs: Partial<Record<WorkflowStepId, { src: string; alt: string }>> = {
+  prompt: {
+    src: '/prompt-to-slide.gif',
+    alt: 'Prompt-to-slide workflow generating an editable presentation in LocalStudio',
+  },
+  image: {
+    src: '/prompt-to-image.gif',
+    alt: 'Prompt-to-image workflow generating an image and continuing the slide in LocalStudio',
+  },
+  translate: {
+    src: '/translate.gif',
+    alt: 'Translate workflow updating slide text in LocalStudio',
+  },
+};
 
 const workflowSteps: Array<{
   id: WorkflowStepId;
@@ -33,8 +47,8 @@ const workflowSteps: Array<{
   {
     id: 'image',
     icon: ImagePlus,
-    title: 'Generate images',
-    copy: 'Create an image asset and keep composing the same slide.',
+    title: 'Prompt-to-image',
+    copy: 'A prompt becomes an image asset while you keep composing the same slide.',
   },
   {
     id: 'translate',
@@ -72,10 +86,10 @@ const featureShowcases: Array<{
   },
   {
     id: 'image',
-    eyebrow: 'Generate images',
+    eyebrow: 'Prompt-to-image',
     title: 'Create image assets without leaving the deck.',
-    copy: 'Image generation is part of the same prompt surface, so a generated asset lands back on the canvas as a normal editable layer.',
-    bullets: ['Image mode inside the prompt bar', 'Size, steps, and seed controls', 'Generated assets saved locally'],
+    copy: 'Prompt-to-image is part of the same prompt surface, so a generated asset lands back on the canvas as a normal editable layer.',
+    bullets: ['Image prompts inside the prompt bar', 'Size, steps, and seed controls', 'Generated assets saved locally'],
   },
   {
     id: 'translate',
@@ -219,6 +233,8 @@ function FeatureMedia({ feature }: { feature: WorkflowStepId }) {
 }
 
 function WorkflowPreview({ activeStep }: { activeStep: WorkflowStepId }) {
+  const demoGif = workflowDemoGifs[activeStep];
+
   return (
     <div className="workflow-preview" data-demo={activeStep} aria-label="LocalStudio workflow preview">
       <div className="preview-topbar">
@@ -243,6 +259,7 @@ function WorkflowPreview({ activeStep }: { activeStep: WorkflowStepId }) {
             <span>Translate</span>
           </div>
           <div className="preview-slide">
+            {demoGif ? <img className="workflow-demo-gif" src={demoGif.src} alt={demoGif.alt} /> : null}
             <div className="slide-grid" />
             <div className="generated-shape shape-a" />
             <div className="generated-shape shape-b" />

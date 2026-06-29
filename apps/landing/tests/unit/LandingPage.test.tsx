@@ -34,7 +34,11 @@ describe('LandingPage', () => {
     render(<LandingPage />);
 
     expect(screen.getByRole('tab', { name: /Prompt-to-slide/i })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /Generate images/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Prompt-to-image/i })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /Prompt-to-slide workflow/i })).toHaveAttribute(
+      'src',
+      '/prompt-to-slide.gif',
+    );
     expect(screen.queryByText('Chrome Prompt API')).not.toBeInTheDocument();
     expect(screen.queryByText('Bonsai Image WebGPU')).not.toBeInTheDocument();
   });
@@ -43,11 +47,21 @@ describe('LandingPage', () => {
     const user = userEvent.setup();
     render(<LandingPage />);
 
-    const imageTab = screen.getByRole('tab', { name: /Generate images/i });
+    const imageTab = screen.getByRole('tab', { name: /Prompt-to-image/i });
     await user.click(imageTab);
 
     expect(imageTab).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByText(/Create an image asset/i)).toBeInTheDocument();
+    expect(screen.getByText(/A prompt becomes an image asset/i)).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /Prompt-to-image workflow/i })).toHaveAttribute(
+      'src',
+      '/prompt-to-image.gif',
+    );
+
+    const translateTab = screen.getByRole('tab', { name: /Translate/i });
+    await user.click(translateTab);
+
+    expect(translateTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('img', { name: /Translate workflow/i })).toHaveAttribute('src', '/translate.gif');
   });
 
   it('promotes the GitHub repository with a custom star button and feature showcase sections', async () => {
