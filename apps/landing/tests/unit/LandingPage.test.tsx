@@ -118,7 +118,7 @@ describe('LandingPage', () => {
 
     expect(screen.getByRole('link', { name: /Star LocalStudio.dev on GitHub/i })).toHaveAttribute(
       'href',
-      'https://github.com/ErickWendel/semana-javascript-expert07',
+      'https://github.com/ErickWendel/localstudio',
     );
     expect(screen.getByRole('link', { name: /Star LocalStudio.dev on GitHub/i })).toHaveClass('github-star-button');
     await waitFor(() => expect(screen.getByText('194,166')).toBeInTheDocument());
@@ -175,7 +175,7 @@ describe('LandingPage', () => {
     );
     expect(screen.getByRole('link', { name: /Star the repo/i })).toHaveAttribute(
       'href',
-      'https://github.com/ErickWendel/semana-javascript-expert07',
+      'https://github.com/ErickWendel/localstudio',
     );
   });
 });

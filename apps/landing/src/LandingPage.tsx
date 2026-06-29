@@ -20,8 +20,8 @@ type WorkflowStepId = 'prompt' | 'image' | 'translate' | 'edit' | 'local' | 'web
 type FeatureShowcaseId = Exclude<WorkflowStepId, 'webai'>;
 type FeatureMediaStyle = CSSProperties & { '--feature-media-ratio'?: string };
 
-const githubUrl = 'https://github.com/ErickWendel/semana-javascript-expert07';
-const githubApiUrl = 'https://api.github.com/repos/ErickWendel/semana-javascript-expert07';
+const githubUrl = 'https://github.com/ErickWendel/localstudio';
+const githubApiUrl = 'https://api.github.com/repos/ErickWendel/localstudio';
 const chromeBuiltInAiUrl =
   'https://developer.chrome.com/docs/ai/built-in?utm_source=localstudio.dev&utm_medium=referral&utm_campaign=localstudio_thanks';
 const huggingFaceWebMlUrl =
