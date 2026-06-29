@@ -11,7 +11,7 @@
     "dev": "npm run dev --workspace @localstudio/landing",
     "dev:landing": "npm run dev --workspace @localstudio/landing",
     "dev:editor": "npm run dev --workspace @localstudio/editor",
-    "build": "npm run build --workspace @localstudio/landing && npm run build --workspace @localstudio/editor",
+    "build": "npm run build --workspace @localstudio/landing && npm run build --workspace @localstudio/editor && node scripts/prepare-pages-artifacts.mjs",
     "build:landing": "npm run build --workspace @localstudio/landing",
     "build:editor": "npm run build --workspace @localstudio/editor",
     "preview": "npm run preview --workspace @localstudio/landing",

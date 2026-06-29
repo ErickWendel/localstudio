@@ -10,7 +10,7 @@
 
 Browser-only Canva-style slides and image editing, powered by local Web AI.
 
-[Live demo](https://localstudio.dev/) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md)
+[Live demo](https://localstudio.dev/) · [WebMCP showcase](https://localstudio.dev/webmcp/) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md)
 
 ## What It Does
 
@@ -51,6 +51,12 @@ Save project files to disk and restore from local version history.
 Browser-native AI capabilities keep the workflow fast, private, and local-first.
 
 ![Web AI setup](apps/landing/public/powered-webau.gif)
+
+### WebMCP showcase
+
+Expose the editor as a browser agent surface, discover local tools, and run a guided same-origin automation demo.
+
+[Open the WebMCP showcase](https://localstudio.dev/webmcp/)
 
 ## Quick Start
 

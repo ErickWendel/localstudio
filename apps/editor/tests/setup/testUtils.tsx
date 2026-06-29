@@ -1,6 +1,45 @@
 import '@testing-library/jest-dom/vitest';
 import { beforeEach } from 'vitest';
 
+function createMemoryStorage(): Storage {
+  const entries = new Map<string, string>();
+
+  return {
+    get length() {
+      return entries.size;
+    },
+    clear() {
+      entries.clear();
+    },
+    getItem(key: string) {
+      return entries.get(key) ?? null;
+    },
+    key(index: number) {
+      return Array.from(entries.keys())[index] ?? null;
+    },
+    removeItem(key: string) {
+      entries.delete(key);
+    },
+    setItem(key: string, value: string) {
+      entries.set(key, String(value));
+    },
+  };
+}
+
+function ensureLocalStorage() {
+  try {
+    window.localStorage.setItem('__localstudio_test__', '1');
+    window.localStorage.removeItem('__localstudio_test__');
+  } catch {
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      value: createMemoryStorage(),
+    });
+  }
+}
+
+ensureLocalStorage();
+
 beforeEach(() => {
   window.localStorage.clear();
 });

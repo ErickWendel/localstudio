@@ -14,6 +14,7 @@ export default tseslint.config(
       'apps/*/dist',
       'packages/*/dist',
       '**/*.js',
+      '**/*.mjs',
       '**/*.d.ts',
       '**/*.cjs',
     ],
