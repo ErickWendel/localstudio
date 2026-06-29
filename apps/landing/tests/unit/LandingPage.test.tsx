@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LandingPage } from '../../src/LandingPage';
@@ -35,9 +35,9 @@ describe('LandingPage', () => {
 
     expect(screen.getByRole('tab', { name: /Prompt-to-slide/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Prompt-to-image/i })).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: /Prompt-to-slide workflow/i })).toHaveAttribute(
+    expect(screen.getByLabelText(/Prompt-to-slide workflow/i).querySelector('source')).toHaveAttribute(
       'src',
-      '/prompt-to-slide.gif',
+      '/prompt-to-slide.mp4',
     );
     expect(screen.queryByText('Chrome Prompt API')).not.toBeInTheDocument();
     expect(screen.queryByText('Bonsai Image WebGPU')).not.toBeInTheDocument();
@@ -52,16 +52,48 @@ describe('LandingPage', () => {
 
     expect(imageTab).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText(/A prompt becomes an image asset/i)).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: /Prompt-to-image workflow/i })).toHaveAttribute(
+    expect(screen.getByLabelText(/Prompt-to-image workflow/i).querySelector('source')).toHaveAttribute(
       'src',
-      '/prompt-to-image.gif',
+      '/prompt-to-image.mp4',
     );
 
     const translateTab = screen.getByRole('tab', { name: /Translate/i });
     await user.click(translateTab);
 
     expect(translateTab).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('img', { name: /Translate workflow/i })).toHaveAttribute('src', '/translate.gif');
+    expect(screen.getByLabelText(/Translate workflow/i).querySelector('source')).toHaveAttribute('src', '/translate.mp4');
+
+    const editTab = screen.getByRole('tab', { name: /Edit images/i });
+    await user.click(editTab);
+
+    expect(editTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByLabelText(/Edit images workflow/i).querySelector('source')).toHaveAttribute(
+      'src',
+      '/edit-images.mp4',
+    );
+
+    const localTab = screen.getByRole('tab', { name: /Work locally/i });
+    await user.click(localTab);
+
+    expect(localTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByLabelText(/Work locally workflow/i).querySelector('source')).toHaveAttribute(
+      'src',
+      '/fs-history.mp4',
+    );
+  });
+
+  it('automatically advances workflow demos when the active video finishes', () => {
+    render(<LandingPage />);
+
+    expect(screen.getByRole('tab', { name: /Prompt-to-slide/i })).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.ended(screen.getByLabelText(/Prompt-to-slide workflow/i));
+
+    expect(screen.getByRole('tab', { name: /Prompt-to-image/i })).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.ended(screen.getByLabelText(/Prompt-to-image workflow/i));
+
+    expect(screen.getByRole('tab', { name: /Translate/i })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('promotes the GitHub repository with a custom star button and feature showcase sections', async () => {
@@ -75,6 +107,26 @@ describe('LandingPage', () => {
     await waitFor(() => expect(screen.getByText('194,166')).toBeInTheDocument());
     expect(document.getElementById('github-buttons-script')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Every AI action returns to the editor/i })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /prompt-to-slide editor/i })).toHaveAttribute(
+      'src',
+      '/prompt-to-slide-showcase.png',
+    );
+    expect(screen.getByRole('img', { name: /generated AI chip image/i })).toHaveAttribute(
+      'src',
+      '/prompt-to-image-showcase.png',
+    );
+    expect(screen.getByRole('img', { name: /translated into Portuguese/i })).toHaveAttribute(
+      'src',
+      '/translate-showcase.png',
+    );
+    expect(screen.getByRole('img', { name: /background removal segmentation/i })).toHaveAttribute(
+      'src',
+      '/edit-images-showcase.png',
+    );
+    expect(screen.getByRole('img', { name: /project history panel/i })).toHaveAttribute(
+      'src',
+      '/project-history-showcase.png',
+    );
     expect(screen.getByText(/Project files, assets, and history stay in a folder/i)).toBeInTheDocument();
   });
 });

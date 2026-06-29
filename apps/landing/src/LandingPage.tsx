@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { type CSSProperties, useEffect, useState } from 'react';
 import {
   ArrowRight,
   Bot,
@@ -14,21 +14,35 @@ import {
 } from 'lucide-react';
 
 type WorkflowStepId = 'prompt' | 'image' | 'translate' | 'edit' | 'local';
+type FeatureMediaStyle = CSSProperties & { '--feature-media-ratio'?: string };
 
 const githubUrl = 'https://github.com/ErickWendel/semana-javascript-expert07';
 const githubApiUrl = 'https://api.github.com/repos/ErickWendel/semana-javascript-expert07';
-const workflowDemoGifs: Partial<Record<WorkflowStepId, { src: string; alt: string }>> = {
+const workflowDemoVideos: Record<WorkflowStepId, { src: string; fallbackSrc: string; label: string }> = {
   prompt: {
-    src: '/prompt-to-slide.gif',
-    alt: 'Prompt-to-slide workflow generating an editable presentation in LocalStudio',
+    src: '/prompt-to-slide.mp4',
+    fallbackSrc: '/prompt-to-slide.gif',
+    label: 'Prompt-to-slide workflow generating an editable presentation in LocalStudio',
   },
   image: {
-    src: '/prompt-to-image.gif',
-    alt: 'Prompt-to-image workflow generating an image and continuing the slide in LocalStudio',
+    src: '/prompt-to-image.mp4',
+    fallbackSrc: '/prompt-to-image.gif',
+    label: 'Prompt-to-image workflow generating an image and continuing the slide in LocalStudio',
   },
   translate: {
-    src: '/translate.gif',
-    alt: 'Translate workflow updating slide text in LocalStudio',
+    src: '/translate.mp4',
+    fallbackSrc: '/translate.gif',
+    label: 'Translate workflow updating slide text in LocalStudio',
+  },
+  edit: {
+    src: '/edit-images.mp4',
+    fallbackSrc: '/edit-images.gif',
+    label: 'Edit images workflow removing backgrounds and adjusting image layers in LocalStudio',
+  },
+  local: {
+    src: '/fs-history.mp4',
+    fallbackSrc: '/fs-history.gif',
+    label: 'Work locally workflow saving with the File System Access API and browsing project history in LocalStudio',
   },
 };
 
@@ -69,6 +83,34 @@ const workflowSteps: Array<{
     copy: 'Save project files to disk and restore from local version history.',
   },
 ];
+
+const featureMediaImages: Partial<Record<WorkflowStepId, { src: string; alt: string; aspectRatio: string }>> = {
+  prompt: {
+    src: '/prompt-to-slide-showcase.png',
+    alt: 'LocalStudio prompt-to-slide editor with an AI Design Revolution slide',
+    aspectRatio: '2982 / 2390',
+  },
+  image: {
+    src: '/prompt-to-image-showcase.png',
+    alt: 'LocalStudio prompt-to-image editor with a generated AI chip image on a slide',
+    aspectRatio: '2970 / 2398',
+  },
+  translate: {
+    src: '/translate-showcase.png',
+    alt: 'LocalStudio translate editor showing the AI Design Revolution slide translated into Portuguese',
+    aspectRatio: '2980 / 2396',
+  },
+  edit: {
+    src: '/edit-images-showcase.png',
+    alt: 'LocalStudio edit images workflow showing background removal segmentation on an image layer',
+    aspectRatio: '2982 / 2396',
+  },
+  local: {
+    src: '/project-history-showcase.png',
+    alt: 'LocalStudio project history panel showing saved local versions',
+    aspectRatio: '4110 / 2402',
+  },
+};
 
 const featureShowcases: Array<{
   id: WorkflowStepId;
@@ -211,13 +253,25 @@ function GitHubStarButton() {
 }
 
 function FeatureMedia({ feature }: { feature: WorkflowStepId }) {
+  const mediaImage = featureMediaImages[feature];
+  const mediaImageStyle: FeatureMediaStyle | undefined = mediaImage
+    ? { '--feature-media-ratio': mediaImage.aspectRatio }
+    : undefined;
+
   return (
-    <div className="feature-media" data-feature={feature} aria-label={`${feature} feature preview`}>
-      <div className="feature-media-toolbar">
-        <span>LocalStudio.ai</span>
-        <strong>{feature}</strong>
-      </div>
-      <div className="feature-media-canvas">
+    <div
+      className={mediaImage ? 'feature-media with-image' : 'feature-media'}
+      data-feature={feature}
+      aria-label={`${feature} feature preview`}
+    >
+      {mediaImage ? null : (
+        <div className="feature-media-toolbar">
+          <span>LocalStudio.ai</span>
+          <strong>{feature}</strong>
+        </div>
+      )}
+      <div className="feature-media-canvas" style={mediaImageStyle}>
+        {mediaImage ? <img className="feature-media-image" src={mediaImage.src} alt={mediaImage.alt} /> : null}
         <span className="media-page page-one" />
         <span className="media-page page-two" />
         <span className="media-object object-one" />
@@ -232,8 +286,8 @@ function FeatureMedia({ feature }: { feature: WorkflowStepId }) {
   );
 }
 
-function WorkflowPreview({ activeStep }: { activeStep: WorkflowStepId }) {
-  const demoGif = workflowDemoGifs[activeStep];
+function WorkflowPreview({ activeStep, onDemoEnded }: { activeStep: WorkflowStepId; onDemoEnded: () => void }) {
+  const demoVideo = workflowDemoVideos[activeStep];
 
   return (
     <div className="workflow-preview" data-demo={activeStep} aria-label="LocalStudio workflow preview">
@@ -259,7 +313,19 @@ function WorkflowPreview({ activeStep }: { activeStep: WorkflowStepId }) {
             <span>Translate</span>
           </div>
           <div className="preview-slide">
-            {demoGif ? <img className="workflow-demo-gif" src={demoGif.src} alt={demoGif.alt} /> : null}
+            <video
+              key={demoVideo.src}
+              className="workflow-demo-video"
+              aria-label={demoVideo.label}
+              autoPlay
+              muted
+              playsInline
+              preload="auto"
+              onEnded={onDemoEnded}
+            >
+              <source src={demoVideo.src} type="video/mp4" />
+              <a href={demoVideo.fallbackSrc}>View the workflow demo</a>
+            </video>
             <div className="slide-grid" />
             <div className="generated-shape shape-a" />
             <div className="generated-shape shape-b" />
@@ -338,6 +404,21 @@ export function LandingPage() {
   const [activeWorkflowStep, setActiveWorkflowStep] = useState<WorkflowStepId>('prompt');
   const activeWorkflow = workflowSteps.find((step) => step.id === activeWorkflowStep) ?? workflowSteps[0]!;
 
+  const advanceWorkflowStep = () => {
+    const reduceMotion =
+      typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (reduceMotion) {
+      return;
+    }
+
+    setActiveWorkflowStep((currentStep) => {
+      const currentIndex = workflowSteps.findIndex((step) => step.id === currentStep);
+      const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % workflowSteps.length;
+      return workflowSteps[nextIndex]!.id;
+    });
+  };
+
   return (
     <main className="landing-shell">
       <MotionBackdrop />
@@ -350,7 +431,6 @@ export function LandingPage() {
           <a href="#demo">Demo</a>
           <a href="#web-ai">Web AI</a>
           <a href="#features">Features</a>
-          <a href="#architecture">Architecture</a>
         </nav>
         <div className="header-actions">
           <GitHubStarButton />
@@ -409,7 +489,7 @@ export function LandingPage() {
               </button>
             ))}
           </div>
-          <WorkflowPreview activeStep={activeWorkflowStep} />
+          <WorkflowPreview activeStep={activeWorkflowStep} onDemoEnded={advanceWorkflowStep} />
         </div>
       </section>
 
@@ -505,25 +585,6 @@ export function LandingPage() {
             <li key={item}>{item}</li>
           ))}
         </ul>
-      </section>
-
-      <section id="architecture" className="architecture-section" aria-labelledby="architecture-title">
-        <p className="eyebrow">Architecture</p>
-        <h2 id="architecture-title">Two projects, one repo, clean dependency boundaries.</h2>
-        <div className="architecture-grid">
-          <div>
-            <h3>Landing</h3>
-            <p>Lightweight marketing app at `/`, using shared brand tokens and no editor model deps.</p>
-          </div>
-          <div>
-            <h3>Editor</h3>
-            <p>Heavy browser editor at `/editor/`, where Konva, Transformers.js, and WebGPU runtimes live.</p>
-          </div>
-          <div>
-            <h3>Brand package</h3>
-            <p>Shared LocalStudio.ai colors, fonts, and tokens so both surfaces keep the same identity.</p>
-          </div>
-        </div>
       </section>
 
       <section className="closing-section" aria-labelledby="closing-title">
