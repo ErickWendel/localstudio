@@ -941,11 +941,11 @@ button {
 .editor-grid {
   min-height: 0;
   display: grid;
-  grid-template-columns: max-content minmax(640px, 1fr) 300px;
+  grid-template-columns: max-content minmax(0, 1fr) minmax(260px, 300px);
 }
 
 .editor-grid-pages-collapsed {
-  grid-template-columns: max-content minmax(640px, 1fr);
+  grid-template-columns: max-content minmax(0, 1fr);
 }
 
 .left-tool-panel {
@@ -1159,8 +1159,8 @@ button {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   overflow: hidden;
-  gap: 14px;
-  padding: 14px 18px 16px;
+  gap: 12px;
+  padding: 14px 18px 18px;
   background: #050d10;
   box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.28);
 }
@@ -1267,8 +1267,9 @@ button {
   flex-direction: column;
   align-items: center;
   gap: 20px;
+  overflow-x: hidden;
   overflow-y: auto;
-  padding: 12px 0 18px;
+  padding: 12px 0 10px;
   scroll-snap-type: y proximity;
 }
 
@@ -1968,7 +1969,9 @@ button {
 .prompt-stack {
   position: relative;
   z-index: 1;
-  width: min(860px, 82%);
+  box-sizing: border-box;
+  width: min(860px, 100%);
+  min-width: 0;
   margin-inline: auto;
   align-self: center;
   justify-self: center;
@@ -2193,10 +2196,13 @@ button {
   flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .prompt-example-chip {
   max-width: min(100%, 280px);
+  min-width: 0;
   min-height: 30px;
   border: 1px solid rgba(55, 253, 118, 0.2);
   border-radius: 999px;
@@ -2275,14 +2281,18 @@ button {
 }
 
 .prompt-bar {
-  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  height: 48px;
+  min-height: 48px;
   border: 1px solid var(--ew-border);
-  border-radius: 999px;
+  border-radius: 24px;
   background: var(--ew-panel-low);
-  padding: 0 8px 0 16px;
+  padding: 8px 8px 8px 16px;
   color: var(--ew-green);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
   transition:
@@ -2305,23 +2315,44 @@ button {
     0 0 20px rgba(55, 253, 118, 0.16);
 }
 
-.prompt-bar input {
+.prompt-input-cluster {
   min-width: 0;
-  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.prompt-bar textarea {
+  min-width: 0;
+  flex: 1 1 220px;
+  width: 100%;
+  max-height: 112px;
   border: 0;
   outline: 0;
   background: transparent;
   color: var(--ew-text);
   font-size: 13px;
+  line-height: 1.35;
+  overflow-y: auto;
+  resize: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
-.prompt-bar input:disabled {
+.prompt-submit-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.prompt-bar textarea:disabled {
   color: rgba(236, 255, 233, 0.72);
   opacity: 1;
   -webkit-text-fill-color: rgba(236, 255, 233, 0.72);
 }
 
-.prompt-bar input::placeholder {
+.prompt-bar textarea::placeholder {
   color: rgba(145, 153, 157, 0.74);
 }
 
@@ -2387,6 +2418,8 @@ button {
 }
 
 .prompt-mode-token {
+  flex: 0 1 auto;
+  max-width: min(178px, 42%);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -2404,6 +2437,12 @@ button {
     border-color 140ms ease,
     color 140ms ease,
     transform 140ms ease;
+}
+
+.prompt-mode-token span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .prompt-mode-token:hover,
@@ -2429,6 +2468,46 @@ button {
   width: 13px;
   opacity: 1;
   transform: scale(1);
+}
+
+@media (max-width: 760px) {
+  .workspace-column {
+    padding-inline: 10px;
+  }
+
+  .prompt-stack {
+    width: 100%;
+  }
+
+  .prompt-examples {
+    justify-content: flex-start;
+  }
+
+  .prompt-bar {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    border-radius: 18px;
+    padding: 8px;
+  }
+
+  .prompt-input-cluster {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .prompt-input-cluster textarea {
+    flex-basis: 100%;
+  }
+
+  .prompt-submit-actions {
+    justify-self: end;
+  }
+
+  .prompt-mode-token {
+    max-width: 100%;
+  }
 }
 
 .right-panel {

@@ -5,6 +5,15 @@ import { defaultCreateImagePromptOptions } from '../../../../src/ui/editor/image
 import { PromptBar } from '../../../../src/ui/editor/PromptBar';
 
 describe('PromptBar', () => {
+  it('uses a multiline prompt field so long image prompts can wrap', () => {
+    render(<PromptBar createImageOptions={defaultCreateImagePromptOptions} />);
+
+    const promptField = screen.getByLabelText('Create image prompt');
+
+    expect(promptField.tagName).toBe('TEXTAREA');
+    expect(promptField).not.toHaveStyle({ height: '0px' });
+  });
+
   it('shows the stop action immediately while create image readiness is still checking', async () => {
     const user = userEvent.setup();
     let resolveReadiness: ((ready: boolean) => void) | undefined;
