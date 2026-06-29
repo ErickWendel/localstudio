@@ -1554,6 +1554,79 @@ h3 {
   margin: 0;
 }
 
+.landing-footer {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto auto;
+  gap: clamp(22px, 4vw, 52px);
+  align-items: center;
+  padding: 32px clamp(18px, 5vw, 72px) 40px;
+  border-top: 1px solid rgba(105, 255, 137, 0.18);
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.footer-brand {
+  margin-bottom: 10px;
+}
+
+.landing-footer p {
+  max-width: 460px;
+  margin: 0;
+  color: var(--ls-muted);
+  line-height: 1.55;
+}
+
+.footer-socials {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.footer-socials a,
+.footer-star-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(105, 255, 137, 0.24);
+  border-radius: 999px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.46);
+  color: var(--ls-muted);
+  font-size: 14px;
+  font-weight: 900;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    color 150ms ease,
+    transform 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.footer-socials a:hover,
+.footer-socials a:focus-visible,
+.footer-star-cta:hover,
+.footer-star-cta:focus-visible {
+  transform: translateY(-2px);
+  border-color: rgba(55, 253, 118, 0.78);
+  color: var(--ls-green-fixed);
+}
+
+.footer-star-cta {
+  border-color: rgba(55, 253, 118, 0.52);
+  background: var(--ls-green-fixed);
+  color: #041006;
+  box-shadow: 0 14px 34px rgba(55, 253, 118, 0.2);
+}
+
+.footer-star-cta:hover,
+.footer-star-cta:focus-visible {
+  background: var(--ls-cyan);
+  color: #031014;
+  box-shadow: 0 16px 42px rgba(54, 215, 255, 0.2);
+}
+
 @keyframes grid-drift {
   from {
     transform: translate3d(-10px, -8px, 0);
@@ -1808,8 +1881,17 @@ h3 {
   }
 
   .landing-nav {
-    gap: 14px;
+    gap: 12px;
     font-size: 12px;
+  }
+
+  .landing-footer {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .footer-socials {
+    justify-content: flex-start;
   }
 
   .showcase-row.reverse .showcase-copy {
@@ -1906,6 +1988,20 @@ h3 {
 
   .requirements-grid {
     grid-template-columns: 1fr;
+  }
+
+  .landing-footer {
+    padding-bottom: 32px;
+  }
+
+  .footer-socials,
+  .footer-star-cta {
+    width: 100%;
+  }
+
+  .footer-socials a,
+  .footer-star-cta {
+    justify-content: center;
   }
 }
 

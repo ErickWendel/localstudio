@@ -13,6 +13,7 @@ import {
   Layers3,
   Lock,
   Sparkles,
+  Star,
 } from 'lucide-react';
 
 type WorkflowStepId = 'prompt' | 'image' | 'translate' | 'edit' | 'local' | 'webai';
@@ -20,8 +21,25 @@ type FeatureMediaStyle = CSSProperties & { '--feature-media-ratio'?: string };
 
 const githubUrl = 'https://github.com/ErickWendel/semana-javascript-expert07';
 const githubApiUrl = 'https://api.github.com/repos/ErickWendel/semana-javascript-expert07';
-const chromeBuiltInAiUrl = 'https://developer.chrome.com/docs/ai/built-in';
-const huggingFaceWebMlUrl = 'https://huggingface.co/webml-community';
+const chromeBuiltInAiUrl =
+  'https://developer.chrome.com/docs/ai/built-in?utm_source=localstudio.ai&utm_medium=referral&utm_campaign=localstudio_thanks';
+const huggingFaceWebMlUrl =
+  'https://huggingface.co/webml-community?utm_source=localstudio.ai&utm_medium=referral&utm_campaign=localstudio_thanks';
+
+const socialLinks = [
+  {
+    label: 'YouTube',
+    href: 'https://www.youtube.com/@ErickWendelAcademy',
+  },
+  {
+    label: 'GitHub',
+    href: 'https://github.com/erickWendel',
+  },
+  {
+    label: 'LinkedIn',
+    href: 'https://www.linkedin.com/in/erickwendel/',
+  },
+];
 const workflowDemoVideos: Record<WorkflowStepId, { src: string; fallbackSrc: string; label: string }> = {
   prompt: {
     src: '/prompt-to-slide.mp4',
@@ -284,6 +302,16 @@ function GitHubStarButton() {
   );
 }
 
+function FooterStarCta() {
+  return (
+    <a className="footer-star-cta" href={githubUrl} target="_blank" rel="noreferrer">
+      <Star size={18} aria-hidden="true" />
+      Star the repo
+      <ArrowRight size={16} aria-hidden="true" />
+    </a>
+  );
+}
+
 function FeatureMedia({ feature }: { feature: WorkflowStepId }) {
   const mediaImage = featureMediaImages[feature];
   const mediaImageStyle: FeatureMediaStyle | undefined = mediaImage
@@ -460,10 +488,10 @@ export function LandingPage() {
           <span className="beta-flag">Beta</span>
         </a>
         <nav className="landing-nav" aria-label="Landing sections">
-          <a href="#top">Home</a>
-          <a href="#demo">Demo</a>
+          <a href="#top">Workflow</a>
+          <a href="#showcase">Showcase</a>
           <a href="#web-ai">Web AI</a>
-          <a href="#features">Features</a>
+          <a href="#features">Editor</a>
           <a href="#requirements">Requirements</a>
           <a href="#thanks">Thanks</a>
         </nav>
@@ -524,7 +552,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section className="showcase-section" aria-labelledby="showcase-title">
+      <section id="showcase" className="showcase-section" aria-labelledby="showcase-title">
         <div className="section-heading">
           <p className="eyebrow">Feature showcase</p>
           <h2 id="showcase-title">Every AI action returns to the editor.</h2>
@@ -666,6 +694,25 @@ export function LandingPage() {
           <ArrowRight size={18} aria-hidden="true" />
         </a>
       </section>
+
+      <footer className="landing-footer" aria-label="LocalStudio footer">
+        <div>
+          <a className="brand-mark footer-brand" href="#top" aria-label="LocalStudio.ai beta home">
+            LocalStudio.ai
+            <span className="beta-flag">Beta</span>
+          </a>
+          <p>Built by Erick Wendel for browser-native AI workflows.</p>
+        </div>
+        <nav className="footer-socials" aria-label="Erick Wendel social links">
+          {socialLinks.map(({ label, href }) => (
+            <a key={label} href={href} target="_blank" rel="noreferrer">
+              {label}
+              <ExternalLink size={14} aria-hidden="true" />
+            </a>
+          ))}
+        </nav>
+        <FooterStarCta />
+      </footer>
     </main>
   );
 }

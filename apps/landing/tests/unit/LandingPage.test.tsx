@@ -27,7 +27,9 @@ describe('LandingPage', () => {
     expect(screen.getByRole('heading', { name: /Design slides with local AI/i })).toBeInTheDocument();
     expect(screen.getByText(/one continuous slide workflow/i)).toBeInTheDocument();
     expect(screen.getAllByText('Beta').length).toBeGreaterThan(0);
-    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '#top');
+    expect(screen.getByRole('link', { name: 'Workflow' })).toHaveAttribute('href', '#top');
+    expect(screen.getByRole('link', { name: 'Showcase' })).toHaveAttribute('href', '#showcase');
+    expect(screen.getByRole('link', { name: 'Editor' })).toHaveAttribute('href', '#features');
     expect(screen.getByRole('link', { name: 'Requirements' })).toHaveAttribute('href', '#requirements');
     expect(screen.getByRole('link', { name: 'Thanks' })).toHaveAttribute('href', '#thanks');
     expect(screen.getByRole('link', { name: /Open editor/i })).toHaveAttribute('href', '/editor/');
@@ -148,11 +150,24 @@ describe('LandingPage', () => {
     expect(screen.getByText(/Chrome Web Team/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Chrome Built-in AI/i })).toHaveAttribute(
       'href',
-      'https://developer.chrome.com/docs/ai/built-in',
+      'https://developer.chrome.com/docs/ai/built-in?utm_source=localstudio.ai&utm_medium=referral&utm_campaign=localstudio_thanks',
     );
     expect(screen.getByRole('link', { name: /Hugging Face WebML community/i })).toHaveAttribute(
       'href',
-      'https://huggingface.co/webml-community',
+      'https://huggingface.co/webml-community?utm_source=localstudio.ai&utm_medium=referral&utm_campaign=localstudio_thanks',
+    );
+    expect(screen.getByRole('link', { name: 'YouTube' })).toHaveAttribute(
+      'href',
+      'https://www.youtube.com/@ErickWendelAcademy',
+    );
+    expect(screen.getByRole('link', { name: 'GitHub' })).toHaveAttribute('href', 'https://github.com/erickWendel');
+    expect(screen.getByRole('link', { name: 'LinkedIn' })).toHaveAttribute(
+      'href',
+      'https://www.linkedin.com/in/erickwendel/',
+    );
+    expect(screen.getByRole('link', { name: /Star the repo/i })).toHaveAttribute(
+      'href',
+      'https://github.com/ErickWendel/semana-javascript-expert07',
     );
   });
 });
