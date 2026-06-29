@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LandingPage } from '../../src/LandingPage';
@@ -113,7 +113,7 @@ describe('LandingPage', () => {
     expect(screen.getByRole('tab', { name: /Translate/i })).toHaveAttribute('aria-selected', 'true');
   });
 
-  it('promotes the GitHub repository with a custom star button and feature showcase sections', async () => {
+  it('promotes the GitHub repository with a custom star button and feature showcase sections', () => {
     render(<LandingPage />);
 
     expect(screen.getByRole('link', { name: /Star LocalStudio.dev on GitHub/i })).toHaveAttribute(
@@ -121,7 +121,7 @@ describe('LandingPage', () => {
       'https://github.com/ErickWendel/localstudio',
     );
     expect(screen.getByRole('link', { name: /Star LocalStudio.dev on GitHub/i })).toHaveClass('github-star-button');
-    await waitFor(() => expect(screen.getByText('194,166')).toBeInTheDocument());
+    expect(screen.getByLabelText('9999 GitHub stars')).toBeInTheDocument();
     expect(document.getElementById('github-buttons-script')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Every AI action returns to the editor/i })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: /prompt-to-slide editor/i })).toHaveAttribute(

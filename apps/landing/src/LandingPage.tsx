@@ -21,7 +21,7 @@ type FeatureShowcaseId = Exclude<WorkflowStepId, 'webai'>;
 type FeatureMediaStyle = CSSProperties & { '--feature-media-ratio'?: string };
 
 const githubUrl = 'https://github.com/ErickWendel/localstudio';
-const githubApiUrl = 'https://api.github.com/repos/ErickWendel/localstudio';
+const githubStarCount = 9999;
 const chromeBuiltInAiUrl =
   'https://developer.chrome.com/docs/ai/built-in?utm_source=localstudio.dev&utm_medium=referral&utm_campaign=localstudio_thanks';
 const huggingFaceWebMlUrl =
@@ -247,8 +247,30 @@ const requirements: Array<{
   },
 ];
 
-function formatStarCount(stars: number) {
-  return new Intl.NumberFormat('en-US').format(stars);
+function useAnimatedStarCount(target: number) {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    const durationMs = 280;
+    let animationFrame = 0;
+    const start = performance.now();
+
+    const tick = (now: number) => {
+      const progress = Math.min((now - start) / durationMs, 1);
+      const easedProgress = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.round(target * easedProgress));
+
+      if (progress < 1) {
+        animationFrame = requestAnimationFrame(tick);
+      }
+    };
+
+    animationFrame = requestAnimationFrame(tick);
+
+    return () => cancelAnimationFrame(animationFrame);
+  }, [target]);
+
+  return count;
 }
 
 function GitHubLogo() {
@@ -263,30 +285,7 @@ function GitHubLogo() {
 }
 
 function GitHubStarButton() {
-  const [stars, setStars] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (typeof fetch !== 'function') {
-      return;
-    }
-
-    const controller = new AbortController();
-
-    fetch(githubApiUrl, { signal: controller.signal })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data: { stargazers_count?: number } | null) => {
-        if (typeof data?.stargazers_count === 'number') {
-          setStars(data.stargazers_count);
-        }
-      })
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === 'AbortError') {
-          return;
-        }
-      });
-
-    return () => controller.abort();
-  }, []);
+  const stars = useAnimatedStarCount(githubStarCount);
 
   return (
     <a
@@ -298,7 +297,9 @@ function GitHubStarButton() {
     >
       <GitHubLogo />
       <span className="github-star-divider" aria-hidden="true" />
-      <span className="github-star-count">{stars === null ? 'Star' : formatStarCount(stars)}</span>
+      <span className="github-star-count" aria-label={`${githubStarCount} GitHub stars`}>
+        {stars}
+      </span>
     </a>
   );
 }

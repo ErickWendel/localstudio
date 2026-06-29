@@ -889,12 +889,19 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
+  gap: 6px;
+  min-width: 70px;
   height: 32px;
   border: 1px solid rgba(236, 255, 233, 0.2);
   border-radius: 4px;
+  padding: 0 9px;
   background: var(--ew-panel);
   color: var(--ew-text);
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  animation: github-toolbar-pulse 2.15s ease-in-out infinite;
   transition:
     border-color 140ms ease,
     box-shadow 140ms ease,
@@ -910,8 +917,31 @@ button {
 }
 
 .github-toolbar-logo {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.github-toolbar-count {
+  min-width: 30px;
+  text-align: right;
+}
+
+@keyframes github-toolbar-pulse {
+  0%,
+  100% {
+    border-color: rgba(236, 255, 233, 0.2);
+    box-shadow: 0 0 0 rgba(55, 253, 118, 0);
+    transform: translateY(0);
+  }
+
+  48% {
+    border-color: rgba(55, 253, 118, 0.78);
+    box-shadow:
+      0 0 0 3px rgba(55, 253, 118, 0.11),
+      0 0 18px rgba(55, 253, 118, 0.24);
+    transform: translateY(-1px);
+  }
 }
 
 .export-button {

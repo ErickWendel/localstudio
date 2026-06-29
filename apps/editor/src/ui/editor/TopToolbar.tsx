@@ -41,6 +41,33 @@ interface HeaderMenuAction {
 
 const menuLabels: HeaderMenu[] = ['File', 'Edit', 'View', 'Help'];
 const githubUrl = 'https://github.com/ErickWendel/localstudio';
+const githubStarCount = 9999;
+
+function useAnimatedStarCount(target: number) {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    const durationMs = 280;
+    let animationFrame = 0;
+    const start = performance.now();
+
+    const tick = (now: number) => {
+      const progress = Math.min((now - start) / durationMs, 1);
+      const easedProgress = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.round(target * easedProgress));
+
+      if (progress < 1) {
+        animationFrame = requestAnimationFrame(tick);
+      }
+    };
+
+    animationFrame = requestAnimationFrame(tick);
+
+    return () => cancelAnimationFrame(animationFrame);
+  }, [target]);
+
+  return count;
+}
 
 function GitHubLogo() {
   return (
@@ -86,6 +113,7 @@ export function TopToolbar({
   const [isEditingProjectName, setIsEditingProjectName] = useState(false);
   const [projectNameDraft, setProjectNameDraft] = useState(project.name);
   const projectNameInputRef = useRef<HTMLInputElement>(null);
+  const stars = useAnimatedStarCount(githubStarCount);
 
   useEffect(() => {
     if (!isEditingProjectName) return;
@@ -332,6 +360,9 @@ export function TopToolbar({
           title="Star LocalStudio.dev on GitHub"
         >
           <GitHubLogo />
+          <span className="github-toolbar-count" aria-label={`${githubStarCount} GitHub stars`}>
+            {stars}
+          </span>
         </a>
         <button className="export-button font-orbitron" type="button" onClick={triggerExport}>
           <span className="material-symbols-outlined" aria-hidden="true">

@@ -310,7 +310,7 @@ a {
   box-shadow: 0 0 0 rgba(55, 253, 118, 0);
   font-size: 13px;
   font-weight: 900;
-  animation: github-star-attention 1.45s ease-out 520ms 1 both;
+  animation: github-star-attention 2.15s ease-in-out infinite;
   transition:
     border-color 150ms ease,
     background 150ms ease,
@@ -342,8 +342,9 @@ a {
 }
 
 .github-star-count {
-  min-width: 37px;
+  min-width: 42px;
   text-align: right;
+  font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 
@@ -1893,18 +1894,20 @@ h3 {
 
 @keyframes github-star-attention {
   0% {
-    border-color: rgba(55, 253, 118, 0.24);
+    border-color: rgba(55, 253, 118, 0.34);
     box-shadow: 0 0 0 rgba(55, 253, 118, 0);
+    transform: translateY(0);
   }
 
-  34% {
+  45% {
     border-color: rgba(55, 253, 118, 0.95);
     box-shadow:
       0 0 0 4px rgba(55, 253, 118, 0.16),
       0 0 28px rgba(55, 253, 118, 0.32);
+    transform: translateY(-1px);
   }
 
-  68% {
+  72% {
     border-color: rgba(54, 215, 255, 0.74);
     box-shadow:
       0 0 0 2px rgba(54, 215, 255, 0.1),
@@ -1914,6 +1917,7 @@ h3 {
   100% {
     border-color: rgba(55, 253, 118, 0.46);
     box-shadow: 0 0 0 rgba(55, 253, 118, 0);
+    transform: translateY(0);
   }
 }
 

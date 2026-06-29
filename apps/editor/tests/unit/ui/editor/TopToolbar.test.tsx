@@ -74,6 +74,7 @@ describe('TopToolbar', () => {
       'href',
       'https://github.com/ErickWendel/localstudio',
     );
+    expect(screen.getByLabelText('9999 GitHub stars')).toBeInTheDocument();
   });
 
   it('marks persistence as unavailable when the browser cannot save local folders', async () => {
