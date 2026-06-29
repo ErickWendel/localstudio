@@ -39,7 +39,8 @@ The README should include:
 - Badges for CI, Pages deploy, MIT license, Node 26, React, Vite, and TypeScript.
 - Live demo link for GitHub Pages.
 - Hero demo using an existing asset from `apps/landing/public`, preferably `powered-webau.gif` or `prompt-to-slide.gif`.
-- Compact feature gallery using existing media for prompt-to-slide, prompt-to-image, translation, image editing, and project history.
+- Functionality gallery that shows all existing GIF demos from `apps/landing/public` to exemplify the product capabilities.
+- Supporting screenshots where useful for static feature previews, using the existing PNG files.
 - Quick start for local development.
 - Browser support notes for experimental Web AI features.
 - Workspace layout.
