@@ -67,7 +67,7 @@ describe('slide task prompt', () => {
   it('includes a concrete left-image hero recipe for placeholder image slides', () => {
     const prompt = buildSlideTaskPrompt({
       userPrompt:
-        'Create a 16:9 dark LocalStudio.ai slide with the placeholder image expanded large on the left, the neon green title “AI Design Revolution” on the right, and the subtitle “Browser-native creative” below it.',
+        'Create a 16:9 dark LocalStudio.dev slide with the placeholder image expanded large on the left, the neon green title “AI Design Revolution” on the right, and the subtitle “Browser-native creative” below it.',
       targetLanguageHint: 'same as user prompt',
       imageUrls: [],
     });

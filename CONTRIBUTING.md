@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping improve LocalStudio.ai.
+Thanks for helping improve LocalStudio.dev.
 
 ## Local Setup
 
@@ -29,7 +29,7 @@ npm run build
 
 ## Browser Notes
 
-LocalStudio.ai uses browser-local AI features. Some paths need Chrome experimental APIs, WebGPU, browser-managed model caches, and permission to write project files through the File System Access API.
+LocalStudio.dev uses browser-local AI features. Some paths need Chrome experimental APIs, WebGPU, browser-managed model caches, and permission to write project files through the File System Access API.
 
 When changing AI flows, document which browser and device you tested. When changing UI, include a screenshot or short recording in the pull request.
 

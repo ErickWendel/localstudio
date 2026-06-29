@@ -5,7 +5,7 @@ Last updated: 2026-06-26
 
 ## Goal
 
-Generate editable LocalStudio.ai slide content from the main prompt bar using a local LLM provider. The LLM returns structured JSON tasks and element payloads, and the editor applies them progressively through immutable document commands.
+Generate editable LocalStudio.dev slide content from the main prompt bar using a local LLM provider. The LLM returns structured JSON tasks and element payloads, and the editor applies them progressively through immutable document commands.
 
 ## Implemented
 

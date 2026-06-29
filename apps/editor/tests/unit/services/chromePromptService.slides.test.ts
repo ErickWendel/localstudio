@@ -130,7 +130,7 @@ describe('ChromePromptService slide generation', () => {
       },
     ] as const;
     const element = await service.generateSlideElementFromTask(allTasks[1], {
-      userPrompt: 'Create a 16:9 dark LocalStudio.ai slide with the placeholder image expanded large on the left',
+      userPrompt: 'Create a 16:9 dark LocalStudio.dev slide with the placeholder image expanded large on the left',
       allTasks: [...allTasks],
       page: {
         name: 'Generated slide',

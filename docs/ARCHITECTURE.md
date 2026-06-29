@@ -1,6 +1,6 @@
 # Architecture
 
-LocalStudio.ai is a browser-only React workspace with a landing app, an editor app, and shared brand tokens.
+LocalStudio.dev is a browser-only React workspace with a landing app, an editor app, and shared brand tokens.
 
 ## Workspace
 
@@ -19,7 +19,7 @@ Projects are saved through the browser File System Access API. The app writes pr
 
 ## Browser AI
 
-LocalStudio.ai uses Chrome built-in AI APIs when available and WebGPU/Hugging Face model paths for local browser execution. Some flows require Chrome experimental features, WebGPU support, and enough local disk space for model caches.
+LocalStudio.dev uses Chrome built-in AI APIs when available and WebGPU/Hugging Face model paths for local browser execution. Some flows require Chrome experimental features, WebGPU support, and enough local disk space for model caches.
 
 ## Build Output
 

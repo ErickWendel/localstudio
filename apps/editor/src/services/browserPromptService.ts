@@ -90,7 +90,7 @@ class ChromePromptProvider implements PromptProvider {
 }
 
 const GEMMA_JSON_SYSTEM_PROMPT = [
-  'You are LocalStudio.ai structured JSON mode.',
+  'You are LocalStudio.dev structured JSON mode.',
   'Return exactly one JSON value matching the requested schema.',
   'Do not use markdown, comments, prose, code fences, or explanations.',
   'The response must start with "{" and end with "}".',

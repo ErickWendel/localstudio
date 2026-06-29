@@ -16,7 +16,7 @@ describe('FirstRunSetupScreen', () => {
 
     render(<FirstRunSetupScreen setupState={readyState} onRefresh={vi.fn()} onContinue={onContinue} />);
 
-    expect(screen.getByText('LocalStudio.ai runs locally in this browser.')).toBeInTheDocument();
+    expect(screen.getByText('LocalStudio.dev runs locally in this browser.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Continue to editor' }));
     expect(onContinue).toHaveBeenCalledTimes(1);
   });

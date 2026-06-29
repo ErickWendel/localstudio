@@ -1,17 +1,17 @@
-# LocalStudio.ai MVP Spec
+# LocalStudio.dev MVP Spec
 
 Date: 2026-06-24
 Last updated: 2026-06-26
 
 ## Summary
 
-LocalStudio.ai is a local-first browser slide and image editor inspired by Canva. Users create a project with multiple pages, place layered text/images/shapes on each page, edit those layers directly on a Konva canvas, and use local/browser AI tools for translation, prompt-to-slide generation, image generation, and image editing.
+LocalStudio.dev is a local-first browser slide and image editor inspired by Canva. Users create a project with multiple pages, place layered text/images/shapes on each page, edit those layers directly on a Konva canvas, and use local/browser AI tools for translation, prompt-to-slide generation, image generation, and image editing.
 
 The MVP has no accounts, backend, cloud sync, collaboration, billing, or server-side AI. Project files live in a user-selected folder through the browser File System Access API. Browser AI model weights stay in provider-managed browser caches.
 
 ## Current Product Shape
 
-The editor uses a Canva-style layout with LocalStudio.ai black/green visual identity:
+The editor uses a Canva-style layout with LocalStudio.dev black/green visual identity:
 
 - Top toolbar: product name, File/Edit/View/Help, editable deck title, persistence/history, undo/redo, language indicator, and export.
 - Left rail: click-toggle menus for Layout, Text, Design, AI Tools, and Assets.
@@ -30,7 +30,7 @@ Core editor:
 - Normalized project/page/asset/element document model.
 - Immutable command-based updates for common editor operations.
 - Konva-backed canvas selection, drag, resize, rotate, text editing, crop mode, flip, lock prevention, z-order, duplicate, delete, undo/redo, select all, shift multi-select, grouped movement, and copy/cut/paste.
-- Text tab presets for LocalStudio.ai title, subtitle, and body styles.
+- Text tab presets for LocalStudio.dev title, subtitle, and body styles.
 - Image import from disk and clipboard, preserving natural size and scaling down only when needed.
 - Image toolbar with BG Remover, Flip, and Crop.
 - Dotted neon movement guides while dragging.

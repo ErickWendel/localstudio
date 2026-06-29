@@ -245,7 +245,7 @@ describe('EditorShell', () => {
   it('renders the approved editor shell landmarks', async () => {
     render(<EditorShell services={createAppServices()} />);
 
-    expect(screen.getByText('LocalStudio.ai')).toBeInTheDocument();
+    expect(screen.getByText('LocalStudio.dev')).toBeInTheDocument();
     expect(screen.getByText('Untitled AI Deck')).toBeInTheDocument();
     expect(screen.getByText('PT')).toBeInTheDocument();
     expect(await screen.findByText('EN')).toBeInTheDocument();
@@ -597,7 +597,7 @@ describe('EditorShell', () => {
 
     expect(clipboardData.setData).not.toHaveBeenCalledWith(
       'text/plain',
-      'LocalStudio.ai editor elements',
+      'LocalStudio.dev editor elements',
     );
     expect(clipboardData.setData).not.toHaveBeenCalledWith(
       'application/x-localstudio-editor-elements',

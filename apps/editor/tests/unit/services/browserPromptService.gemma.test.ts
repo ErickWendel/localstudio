@@ -157,7 +157,7 @@ describe('GemmaPromptProvider structured JSON generation', () => {
     ];
 
     const element = await service.generateSlideElementFromTask(allTasks[0]!, {
-      userPrompt: 'Create a LocalStudio.ai hero slide',
+      userPrompt: 'Create a LocalStudio.dev hero slide',
       allTasks,
       page: {
         name: 'Generated slide',

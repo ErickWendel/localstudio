@@ -161,7 +161,7 @@ export function TopToolbar({
   return (
     <header className="top-toolbar">
       <div className="toolbar-left">
-        <h1 className="toolbar-product-title font-orbitron">LocalStudio.ai</h1>
+        <h1 className="toolbar-product-title font-orbitron">LocalStudio.dev</h1>
         <nav className="toolbar-menu" aria-label="Application menu">
           {menuLabels.map((item) => (
             <div className="toolbar-menu-shell" key={item}>

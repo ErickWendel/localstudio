@@ -68,7 +68,7 @@ function hasEditorObjectClipboardMarker(clipboardData: DataTransfer | null) {
 function writeEditorObjectClipboardMarker(clipboardData: DataTransfer | null) {
   if (!clipboardData) return;
   clipboardData.setData(EDITOR_OBJECT_CLIPBOARD_TYPE, EDITOR_OBJECT_CLIPBOARD_MARKER);
-  clipboardData.setData('text/plain', 'LocalStudio.ai editor elements');
+  clipboardData.setData('text/plain', 'LocalStudio.dev editor elements');
 }
 
 function isWebMcpEnabled() {

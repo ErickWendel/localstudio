@@ -21,7 +21,7 @@ describe('LandingPage', () => {
     vi.unstubAllGlobals();
   });
 
-  it('introduces LocalStudio.ai as a local AI editor workflow', () => {
+  it('introduces LocalStudio.dev as a local AI editor workflow', () => {
     render(<LandingPage />);
 
     expect(screen.getByRole('heading', { name: /Design slides with local AI/i })).toBeInTheDocument();
@@ -114,11 +114,11 @@ describe('LandingPage', () => {
   it('promotes the GitHub repository with a custom star button and feature showcase sections', async () => {
     render(<LandingPage />);
 
-    expect(screen.getByRole('link', { name: /Star LocalStudio.ai on GitHub/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /Star LocalStudio.dev on GitHub/i })).toHaveAttribute(
       'href',
       'https://github.com/ErickWendel/semana-javascript-expert07',
     );
-    expect(screen.getByRole('link', { name: /Star LocalStudio.ai on GitHub/i })).toHaveClass('github-star-button');
+    expect(screen.getByRole('link', { name: /Star LocalStudio.dev on GitHub/i })).toHaveClass('github-star-button');
     await waitFor(() => expect(screen.getByText('194,166')).toBeInTheDocument());
     expect(document.getElementById('github-buttons-script')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Every AI action returns to the editor/i })).toBeInTheDocument();
@@ -150,11 +150,11 @@ describe('LandingPage', () => {
     expect(screen.getByText(/Chrome Web Team/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Chrome Built-in AI/i })).toHaveAttribute(
       'href',
-      'https://developer.chrome.com/docs/ai/built-in?utm_source=localstudio.ai&utm_medium=referral&utm_campaign=localstudio_thanks',
+      'https://developer.chrome.com/docs/ai/built-in?utm_source=localstudio.dev&utm_medium=referral&utm_campaign=localstudio_thanks',
     );
     expect(screen.getByRole('link', { name: /Hugging Face WebML community/i })).toHaveAttribute(
       'href',
-      'https://huggingface.co/webml-community?utm_source=localstudio.ai&utm_medium=referral&utm_campaign=localstudio_thanks',
+      'https://huggingface.co/webml-community?utm_source=localstudio.dev&utm_medium=referral&utm_campaign=localstudio_thanks',
     );
     expect(screen.getByRole('link', { name: 'YouTube' })).toHaveAttribute(
       'href',

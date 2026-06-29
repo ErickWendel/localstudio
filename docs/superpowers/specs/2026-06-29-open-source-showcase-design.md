@@ -4,13 +4,13 @@ Date: 2026-06-29
 
 ## Goal
 
-Prepare LocalStudio.ai for a public open-source launch with a polished repository surface, practical contributor onboarding, reliable GitHub Actions checks, and a GitHub Pages demo path.
+Prepare LocalStudio.dev for a public open-source launch with a polished repository surface, practical contributor onboarding, reliable GitHub Actions checks, and a GitHub Pages demo path.
 
 This is a showcase-ready launch package, not a full maintainer automation suite. It should make the project credible and easy to try without adding governance or release process before the repo has public contributor pressure.
 
 ## Decisions
 
-- Product and public documentation name: LocalStudio.ai.
+- Product and public documentation name: LocalStudio.dev.
 - License: MIT.
 - Demo hosting: GitHub Pages from this repository.
 - Launch level: project showcase.
@@ -31,7 +31,7 @@ Do not add `CODE_OF_CONDUCT.md` or `SECURITY.md` in this launch package.
 
 ## README Design
 
-Rewrite the README as the public entry point for LocalStudio.ai.
+Rewrite the README as the public entry point for LocalStudio.dev.
 
 The README should be intentionally short and high-impact. It should optimize for a "WOW" first impression, then quickly route readers to setup, architecture, and contribution details. Avoid turning the README into full project documentation.
 
@@ -94,7 +94,7 @@ Keep this section short. It should credit the underlying ecosystem and help tech
 - Root npm workspace.
 - `apps/landing`: marketing and public demo entry served at `/`.
 - `apps/editor`: Web AI editor served at `/editor/`.
-- `packages/brand`: shared LocalStudio.ai tokens and CSS.
+- `packages/brand`: shared LocalStudio.dev tokens and CSS.
 - Browser-only AI service boundary in `apps/editor/src/services`.
 - Local-first persistence through the File System Access API.
 - Build output expectation: landing at `/`, editor at `/editor/`.

@@ -22,9 +22,9 @@ type FeatureMediaStyle = CSSProperties & { '--feature-media-ratio'?: string };
 const githubUrl = 'https://github.com/ErickWendel/semana-javascript-expert07';
 const githubApiUrl = 'https://api.github.com/repos/ErickWendel/semana-javascript-expert07';
 const chromeBuiltInAiUrl =
-  'https://developer.chrome.com/docs/ai/built-in?utm_source=localstudio.ai&utm_medium=referral&utm_campaign=localstudio_thanks';
+  'https://developer.chrome.com/docs/ai/built-in?utm_source=localstudio.dev&utm_medium=referral&utm_campaign=localstudio_thanks';
 const huggingFaceWebMlUrl =
-  'https://huggingface.co/webml-community?utm_source=localstudio.ai&utm_medium=referral&utm_campaign=localstudio_thanks';
+  'https://huggingface.co/webml-community?utm_source=localstudio.dev&utm_medium=referral&utm_campaign=localstudio_thanks';
 
 const socialLinks = [
   {
@@ -293,7 +293,7 @@ function GitHubStarButton() {
       href={githubUrl}
       target="_blank"
       rel="noreferrer"
-      aria-label="Star LocalStudio.ai on GitHub"
+      aria-label="Star LocalStudio.dev on GitHub"
     >
       <GitHubLogo />
       <span className="github-star-divider" aria-hidden="true" />
@@ -326,7 +326,7 @@ function FeatureMedia({ feature }: { feature: WorkflowStepId }) {
     >
       {mediaImage ? null : (
         <div className="feature-media-toolbar">
-          <span>LocalStudio.ai</span>
+          <span>LocalStudio.dev</span>
           <strong>{feature}</strong>
         </div>
       )}
@@ -483,8 +483,8 @@ export function LandingPage() {
     <main className="landing-shell">
       <MotionBackdrop />
       <header className="landing-header">
-        <a className="brand-mark" href="#top" aria-label="LocalStudio.ai beta home">
-          LocalStudio.ai
+        <a className="brand-mark" href="#top" aria-label="LocalStudio.dev beta home">
+          LocalStudio.dev
           <span className="beta-flag">Beta</span>
         </a>
         <nav className="landing-nav" aria-label="Landing sections">
@@ -509,7 +509,7 @@ export function LandingPage() {
           <p className="eyebrow">Browser-native Canva-style editor</p>
           <h1 id="hero-title">Design slides with local AI, then keep editing.</h1>
           <p className="hero-subtitle">
-            LocalStudio.ai turns prompt, image generation, translation, background removal, and
+            LocalStudio.dev turns prompt, image generation, translation, background removal, and
             local saving into one continuous slide workflow inside the browser.
           </p>
           <div className="hero-actions">
@@ -585,7 +585,7 @@ export function LandingPage() {
           <p className="eyebrow">Watch the workflow</p>
           <h2 id="demo-title">From prompt to editable slide, still local.</h2>
           <p>
-            LocalStudio.ai keeps the core creation loop in the browser: prompt, edit layers,
+            LocalStudio.dev keeps the core creation loop in the browser: prompt, edit layers,
             translate, segment, generate, and save to disk.
           </p>
         </div>
@@ -690,15 +690,15 @@ export function LandingPage() {
       <section className="closing-section" aria-labelledby="closing-title">
         <h2 id="closing-title">Try the browser-native editor.</h2>
         <a className="primary-action" href="/editor/">
-          Open LocalStudio.ai
+          Open LocalStudio.dev
           <ArrowRight size={18} aria-hidden="true" />
         </a>
       </section>
 
       <footer className="landing-footer" aria-label="LocalStudio footer">
         <div>
-          <a className="brand-mark footer-brand" href="#top" aria-label="LocalStudio.ai beta home">
-            LocalStudio.ai
+          <a className="brand-mark footer-brand" href="#top" aria-label="LocalStudio.dev beta home">
+            LocalStudio.dev
             <span className="beta-flag">Beta</span>
           </a>
           <p>Built by Erick Wendel for browser-native AI workflows.</p>

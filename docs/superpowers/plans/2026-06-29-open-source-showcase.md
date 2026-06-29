@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Convert LocalStudio.ai into a showcase-ready public open-source repository with concise WOW-focused documentation, GitHub Actions, GitHub Pages deployment, MIT licensing, contribution templates, and local verification for landing and editor apps.
+**Goal:** Convert LocalStudio.dev into a showcase-ready public open-source repository with concise WOW-focused documentation, GitHub Actions, GitHub Pages deployment, MIT licensing, contribution templates, and local verification for landing and editor apps.
 
 **Architecture:** Keep the app architecture unchanged. Add repository-level documentation and GitHub metadata, then make the Vite build configurable for GitHub Pages without hard-coding a future repository name. Reuse existing landing media and source-defined model IDs instead of generating new assets.
 
@@ -12,7 +12,7 @@
 
 ## File Structure
 
-- Create `LICENSE`: Standard MIT license for LocalStudio.ai.
+- Create `LICENSE`: Standard MIT license for LocalStudio.dev.
 - Create `CONTRIBUTING.md`: Contributor quick start, scripts, local app verification, PR guidance, and browser AI caveats.
 - Create `docs/ARCHITECTURE.md`: Short contributor-facing architecture reference.
 - Create `.github/workflows/ci.yml`: Pull request and `main` branch quality gate.
@@ -294,7 +294,7 @@ Create `CONTRIBUTING.md`:
 ```md
 # Contributing
 
-Thanks for helping improve LocalStudio.ai.
+Thanks for helping improve LocalStudio.dev.
 
 ## Local Setup
 
@@ -323,7 +323,7 @@ npm run build
 
 ## Browser Notes
 
-LocalStudio.ai uses browser-local AI features. Some paths need Chrome experimental APIs, WebGPU, browser-managed model caches, and permission to write project files through the File System Access API.
+LocalStudio.dev uses browser-local AI features. Some paths need Chrome experimental APIs, WebGPU, browser-managed model caches, and permission to write project files through the File System Access API.
 
 When changing AI flows, document which browser and device you tested. When changing UI, include a screenshot or short recording in the pull request.
 
@@ -385,7 +385,7 @@ Create `.github/ISSUE_TEMPLATE/feature_request.yml`:
 
 ```yaml
 name: Feature request
-description: Suggest a focused improvement for LocalStudio.ai.
+description: Suggest a focused improvement for LocalStudio.dev.
 title: "[Feature]: "
 labels: ["enhancement"]
 body:
@@ -459,7 +459,7 @@ Create `docs/ARCHITECTURE.md`:
 ```md
 # Architecture
 
-LocalStudio.ai is a browser-only React workspace with a landing app, an editor app, and shared brand tokens.
+LocalStudio.dev is a browser-only React workspace with a landing app, an editor app, and shared brand tokens.
 
 ## Workspace
 
@@ -478,7 +478,7 @@ Projects are saved through the browser File System Access API. The app writes pr
 
 ## Browser AI
 
-LocalStudio.ai uses Chrome built-in AI APIs when available and WebGPU/Hugging Face model paths for local browser execution. Some flows require Chrome experimental features, WebGPU support, and enough local disk space for model caches.
+LocalStudio.dev uses Chrome built-in AI APIs when available and WebGPU/Hugging Face model paths for local browser execution. Some flows require Chrome experimental features, WebGPU support, and enough local disk space for model caches.
 
 ## Build Output
 
@@ -504,7 +504,7 @@ git commit -m "Document project architecture"
 Replace `README.md` with:
 
 ```md
-# LocalStudio.ai
+# LocalStudio.dev
 
 [![CI](https://github.com/ErickWendel/localstudio/actions/workflows/ci.yml/badge.svg)](https://github.com/ErickWendel/localstudio/actions/workflows/ci.yml)
 [![Pages](https://github.com/ErickWendel/localstudio/actions/workflows/pages.yml/badge.svg)](https://github.com/ErickWendel/localstudio/actions/workflows/pages.yml)
@@ -518,11 +518,11 @@ Browser-only Canva-style slides and image editing, powered by local Web AI.
 
 [Live demo](https://erickwendel.github.io/localstudio/) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md)
 
-![LocalStudio.ai Web AI demo](apps/landing/public/powered-webau.gif)
+![LocalStudio.dev Web AI demo](apps/landing/public/powered-webau.gif)
 
 ## What It Does
 
-LocalStudio.ai runs in the browser: compose slides, generate layouts, create image assets, translate text, edit images, save project history, and export designs without a backend.
+LocalStudio.dev runs in the browser: compose slides, generate layouts, create image assets, translate text, edit images, save project history, and export designs without a backend.
 
 | Prompt to slide | Prompt to image |
 | --- | --- |
@@ -571,7 +571,7 @@ Some features need Chrome experimental APIs, WebGPU, browser-managed model cache
 
 - `apps/landing`: product page at `/`
 - `apps/editor`: Web AI editor at `/editor/`
-- `packages/brand`: shared LocalStudio.ai tokens and CSS
+- `packages/brand`: shared LocalStudio.dev tokens and CSS
 
 ## Roadmap
 

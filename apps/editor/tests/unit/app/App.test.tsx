@@ -25,7 +25,7 @@ describe('App', () => {
   it('renders the application root', async () => {
     render(<App />);
 
-    expect(await screen.findByText('LocalStudio.ai')).toBeInTheDocument();
+    expect(await screen.findByText('LocalStudio.dev')).toBeInTheDocument();
   });
 
   it('starts with a blank project when requested from a new project tab', async () => {
@@ -69,7 +69,7 @@ describe('App', () => {
     render(<App />);
 
     expect(await screen.findByText('Untitled Project')).toBeInTheDocument();
-    expect(screen.queryByText('LocalStudio.ai runs locally in this browser.')).not.toBeInTheDocument();
+    expect(screen.queryByText('LocalStudio.dev runs locally in this browser.')).not.toBeInTheDocument();
   });
 
   it('opens the editor even when browser capabilities are unavailable', async () => {
@@ -79,7 +79,7 @@ describe('App', () => {
     render(<App />);
 
     expect(await screen.findByText('Untitled Project')).toBeInTheDocument();
-    expect(screen.queryByText('LocalStudio.ai runs locally in this browser.')).not.toBeInTheDocument();
+    expect(screen.queryByText('LocalStudio.dev runs locally in this browser.')).not.toBeInTheDocument();
   });
 
   it('renders the WebMCP showcase page at /webmcp', () => {

@@ -1,9 +1,9 @@
-# LocalStudio.ai Stitch Handoff
+# LocalStudio.dev Stitch Handoff
 
 Date: 2026-06-24
 Last updated: 2026-06-26
 
-This folder contains the original Google Stitch design artifacts for the LocalStudio.ai MVP editor shell. They remain useful for colors, typography, header treatment, button style, spacing mood, and LocalStudio.ai/EW Academy visual language.
+This folder contains the original Google Stitch design artifacts for the LocalStudio.dev MVP editor shell. They remain useful for colors, typography, header treatment, button style, spacing mood, and LocalStudio.dev/EW Academy visual language.
 
 ## Project
 
@@ -21,7 +21,7 @@ This folder contains the original Google Stitch design artifacts for the LocalSt
 
 ## Current Implementation Guidance
 
-- Keep the black/neon-green LocalStudio.ai styling from these screens.
+- Keep the black/neon-green LocalStudio.dev styling from these screens.
 - Use `Orbitron` for brand/tool/button labels and `Open Sans` for dense editor text.
 - Use the header/top toolbar structure from `screens/ai-tools.html` as the visual baseline.
 - Use the export button treatment from `screens/design.html`.

@@ -262,7 +262,7 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     await this.writeJsonFile(directoryHandle, PROJECT_FILE_NAME, projectForDisk);
     const configDirectory = await directoryHandle.getDirectoryHandle('config', { create: true });
     await this.writeJsonFile(configDirectory, PROJECT_CONFIG_FILE_NAME, {
-      app: 'LocalStudio.ai',
+      app: 'LocalStudio.dev',
       projectId: project.id,
       schemaVersion: 1,
       savedAt: new Date().toISOString(),
@@ -345,7 +345,7 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
       const nextPermission = await permissionCapableHandle.requestPermission(permissions);
       if (nextPermission === 'granted') return;
     }
-    throw new Error('LocalStudio.ai needs permission to read and write the selected project folder.');
+    throw new Error('LocalStudio.dev needs permission to read and write the selected project folder.');
   }
 
   private async writeJsonFile(directoryHandle: FileSystemDirectoryHandle, fileName: string, value: unknown) {

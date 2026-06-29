@@ -104,7 +104,7 @@ describe('BrowserFileSystemProjectRepository', () => {
       name: project.name,
     });
     expect(JSON.parse(directory.directories.get('config')!.files.get('localstudio.json')!)).toMatchObject({
-      app: 'LocalStudio.ai',
+      app: 'LocalStudio.dev',
       projectId: project.id,
     });
   });

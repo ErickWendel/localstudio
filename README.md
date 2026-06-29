@@ -1,4 +1,4 @@
-# LocalStudio.ai
+# LocalStudio.dev
 
 [![CI](https://github.com/ErickWendel/localstudio/actions/workflows/ci.yml/badge.svg)](https://github.com/ErickWendel/localstudio/actions/workflows/ci.yml)
 [![Pages](https://github.com/ErickWendel/localstudio/actions/workflows/pages.yml/badge.svg)](https://github.com/ErickWendel/localstudio/actions/workflows/pages.yml)
@@ -12,11 +12,11 @@ Browser-only Canva-style slides and image editing, powered by local Web AI.
 
 [Live demo](https://erickwendel.github.io/localstudio/) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md)
 
-![LocalStudio.ai Web AI demo](apps/landing/public/powered-webau.gif)
+![LocalStudio.dev Web AI demo](apps/landing/public/powered-webau.gif)
 
 ## What It Does
 
-LocalStudio.ai runs in the browser: compose slides, generate layouts, create image assets, translate text, edit images, save project history, and export designs without a backend.
+LocalStudio.dev runs in the browser: compose slides, generate layouts, create image assets, translate text, edit images, save project history, and export designs without a backend.
 
 | Prompt to slide | Prompt to image |
 | --- | --- |
@@ -65,7 +65,7 @@ Some features need Chrome experimental APIs, WebGPU, browser-managed model cache
 
 - `apps/landing`: product page at `/`
 - `apps/editor`: Web AI editor at `/editor/`
-- `packages/brand`: shared LocalStudio.ai tokens and CSS
+- `packages/brand`: shared LocalStudio.dev tokens and CSS
 
 ## Roadmap
 
