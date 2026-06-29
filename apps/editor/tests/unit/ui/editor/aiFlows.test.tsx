@@ -22,9 +22,9 @@ import { GEMMA_LLM_MODEL_ID, TRANSLATEGEMMA_MODEL_ID } from '../../../../src/ser
 import { MockImageGenerationService } from '../../../../src/services/inMemoryAiServices';
 import { InMemoryModelSetupService } from '../../../../src/services/modelSetupService';
 import { EditorShell } from '../../../../src/ui/editor/EditorShell';
+import { imagePromptExamples } from '../../../../src/ui/editor/promptRecipes';
 
-const createImageExample =
-  'Create an icy Bonsai tree in a rainy forest with snowy mountains in the background, photo realistic';
+const createImageExample = imagePromptExamples[0];
 
 function createAppServices(options: Parameters<typeof createRealAppServices>[0] = {}) {
   return createRealAppServices({
