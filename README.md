@@ -10,7 +10,7 @@
 
 Browser-only Canva-style slides and image editing, powered by local Web AI.
 
-[Live demo](https://erickwendel.github.io/localstudio/) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md)
+[Live demo](https://localstudio.dev/) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md)
 
 ![LocalStudio.dev Web AI demo](apps/landing/public/powered-webau.gif)
 
