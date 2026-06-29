@@ -1,23 +1,27 @@
 import { type CSSProperties, useEffect, useState } from 'react';
 import {
   ArrowRight,
+  AppWindow,
   Bot,
   BrainCircuit,
   Eraser,
+  ExternalLink,
   FolderOpen,
+  HardDrive,
   ImagePlus,
   Languages,
   Layers3,
   Lock,
-  MonitorPlay,
   Sparkles,
 } from 'lucide-react';
 
-type WorkflowStepId = 'prompt' | 'image' | 'translate' | 'edit' | 'local';
+type WorkflowStepId = 'prompt' | 'image' | 'translate' | 'edit' | 'local' | 'webai';
 type FeatureMediaStyle = CSSProperties & { '--feature-media-ratio'?: string };
 
 const githubUrl = 'https://github.com/ErickWendel/semana-javascript-expert07';
 const githubApiUrl = 'https://api.github.com/repos/ErickWendel/semana-javascript-expert07';
+const chromeBuiltInAiUrl = 'https://developer.chrome.com/docs/ai/built-in';
+const huggingFaceWebMlUrl = 'https://huggingface.co/webml-community';
 const workflowDemoVideos: Record<WorkflowStepId, { src: string; fallbackSrc: string; label: string }> = {
   prompt: {
     src: '/prompt-to-slide.mp4',
@@ -43,6 +47,11 @@ const workflowDemoVideos: Record<WorkflowStepId, { src: string; fallbackSrc: str
     src: '/fs-history.mp4',
     fallbackSrc: '/fs-history.gif',
     label: 'Work locally workflow saving with the File System Access API and browsing project history in LocalStudio',
+  },
+  webai: {
+    src: '/powered-webau.mp4',
+    fallbackSrc: '/powered-webau.gif',
+    label: 'Powered by Web AI workflow showing browser-native AI capabilities in LocalStudio',
   },
 };
 
@@ -81,6 +90,12 @@ const workflowSteps: Array<{
     icon: FolderOpen,
     title: 'Work locally',
     copy: 'Save project files to disk and restore from local version history.',
+  },
+  {
+    id: 'webai',
+    icon: Sparkles,
+    title: 'Powered by Web AI',
+    copy: 'Browser-native AI capabilities keep the workflow fast, private, and local-first.',
   },
 ];
 
@@ -194,6 +209,23 @@ const editorProof = [
   'Pages, thumbnails, and drag reordering',
   'Text toolbar with translate actions',
   'PNG export and local folder persistence',
+];
+
+const requirements: Array<{
+  icon: typeof BrainCircuit;
+  title: string;
+  copy: string;
+}> = [
+  {
+    icon: AppWindow,
+    title: 'Chrome browser',
+    copy: 'Preferred browser because LocalStudio uses Chrome-first browser AI and file system APIs as they become available.',
+  },
+  {
+    icon: HardDrive,
+    title: '10GB free storage',
+    copy: 'Recommended minimum for downloaded model weights, browser-managed caches, generated assets, and local project history.',
+  },
 ];
 
 function formatStarCount(stars: number) {
@@ -428,9 +460,12 @@ export function LandingPage() {
           <span className="beta-flag">Beta</span>
         </a>
         <nav className="landing-nav" aria-label="Landing sections">
+          <a href="#top">Home</a>
           <a href="#demo">Demo</a>
           <a href="#web-ai">Web AI</a>
           <a href="#features">Features</a>
+          <a href="#requirements">Requirements</a>
+          <a href="#thanks">Thanks</a>
         </nav>
         <div className="header-actions">
           <GitHubStarButton />
@@ -450,10 +485,6 @@ export function LandingPage() {
             local saving into one continuous slide workflow inside the browser.
           </p>
           <div className="hero-actions">
-            <a className="primary-action" href="#workflow">
-              Choose workflow
-              <MonitorPlay size={18} aria-hidden="true" />
-            </a>
             <a className="secondary-action" href="/editor/">
               Launch editor
               <ArrowRight size={18} aria-hidden="true" />
@@ -585,6 +616,47 @@ export function LandingPage() {
             <li key={item}>{item}</li>
           ))}
         </ul>
+      </section>
+
+      <section id="requirements" className="requirements-section" aria-labelledby="requirements-title">
+        <div className="section-heading">
+          <p className="eyebrow">Requirements</p>
+          <h2 id="requirements-title">Built for modern browser AI workflows.</h2>
+          <p>
+            LocalStudio runs in the browser, but the models and local project files still need the
+            right browser surface and enough disk space.
+          </p>
+        </div>
+        <div className="requirements-grid">
+          {requirements.map(({ icon: Icon, title, copy }) => (
+            <article className="requirement-card" key={title}>
+              <Icon size={30} aria-hidden="true" />
+              <h3>{title}</h3>
+              <p>{copy}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section id="thanks" className="thanks-section" aria-labelledby="thanks-title">
+        <div className="section-heading">
+          <p className="eyebrow">Thank you</p>
+          <h2 id="thanks-title">Built on the work of the browser AI community.</h2>
+          <p>
+            Thanks to the Chrome Web Team for pushing built-in AI APIs forward, and to the
+            Hugging Face WebML community for making local browser models easier to discover and run.
+          </p>
+        </div>
+        <div className="thanks-links" aria-label="Browser AI resources">
+          <a href={chromeBuiltInAiUrl} target="_blank" rel="noreferrer">
+            Chrome Built-in AI
+            <ExternalLink size={16} aria-hidden="true" />
+          </a>
+          <a href={huggingFaceWebMlUrl} target="_blank" rel="noreferrer">
+            Hugging Face WebML community
+            <ExternalLink size={16} aria-hidden="true" />
+          </a>
+        </div>
       </section>
 
       <section className="closing-section" aria-labelledby="closing-title">

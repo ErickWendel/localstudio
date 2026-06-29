@@ -27,6 +27,9 @@ describe('LandingPage', () => {
     expect(screen.getByRole('heading', { name: /Design slides with local AI/i })).toBeInTheDocument();
     expect(screen.getByText(/one continuous slide workflow/i)).toBeInTheDocument();
     expect(screen.getAllByText('Beta').length).toBeGreaterThan(0);
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '#top');
+    expect(screen.getByRole('link', { name: 'Requirements' })).toHaveAttribute('href', '#requirements');
+    expect(screen.getByRole('link', { name: 'Thanks' })).toHaveAttribute('href', '#thanks');
     expect(screen.getByRole('link', { name: /Open editor/i })).toHaveAttribute('href', '/editor/');
   });
 
@@ -35,6 +38,7 @@ describe('LandingPage', () => {
 
     expect(screen.getByRole('tab', { name: /Prompt-to-slide/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Prompt-to-image/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Powered by Web AI/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/Prompt-to-slide workflow/i).querySelector('source')).toHaveAttribute(
       'src',
       '/prompt-to-slide.mp4',
@@ -79,6 +83,15 @@ describe('LandingPage', () => {
     expect(screen.getByLabelText(/Work locally workflow/i).querySelector('source')).toHaveAttribute(
       'src',
       '/fs-history.mp4',
+    );
+
+    const webAiTab = screen.getByRole('tab', { name: /Powered by Web AI/i });
+    await user.click(webAiTab);
+
+    expect(webAiTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByLabelText(/Powered by Web AI workflow/i).querySelector('source')).toHaveAttribute(
+      'src',
+      '/powered-webau.mp4',
     );
   });
 
@@ -128,5 +141,18 @@ describe('LandingPage', () => {
       '/project-history-showcase.png',
     );
     expect(screen.getByText(/Project files, assets, and history stay in a folder/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Built for modern browser AI workflows/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Chrome browser' })).toBeInTheDocument();
+    expect(screen.getByText(/10GB free storage/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Built on the work of the browser AI community/i })).toBeInTheDocument();
+    expect(screen.getByText(/Chrome Web Team/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Chrome Built-in AI/i })).toHaveAttribute(
+      'href',
+      'https://developer.chrome.com/docs/ai/built-in',
+    );
+    expect(screen.getByRole('link', { name: /Hugging Face WebML community/i })).toHaveAttribute(
+      'href',
+      'https://huggingface.co/webml-community',
+    );
   });
 });
