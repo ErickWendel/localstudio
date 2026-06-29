@@ -12,23 +12,45 @@ Browser-only Canva-style slides and image editing, powered by local Web AI.
 
 [Live demo](https://localstudio.dev/) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md)
 
-![LocalStudio.dev Web AI demo](apps/landing/public/powered-webau.gif)
-
 ## What It Does
 
 LocalStudio.dev runs in the browser: compose slides, generate layouts, create image assets, translate text, edit images, save project history, and export designs without a backend.
 
-| Prompt to slide | Prompt to image |
-| --- | --- |
-| ![Prompt to slide](apps/landing/public/prompt-to-slide.gif) | ![Prompt to image](apps/landing/public/prompt-to-image.gif) |
+### Prompt-to-slide
 
-| Translate | Edit images |
-| --- | --- |
-| ![Translate](apps/landing/public/translate.gif) | ![Edit images](apps/landing/public/edit-images.gif) |
+A prompt becomes editable slide layers, not a flat generated image.
 
-| Web AI setup | Local project history |
-| --- | --- |
-| ![Web AI setup](apps/landing/public/powered-webau.gif) | ![Local project history](apps/landing/public/fs-history.gif) |
+![Prompt to slide](apps/landing/public/prompt-to-slide.gif)
+
+### Prompt-to-image
+
+A prompt becomes an image asset while you keep composing the same slide.
+
+![Prompt to image](apps/landing/public/prompt-to-image.gif)
+
+### Translate
+
+Translate selected text, one page, or the full deck in place.
+
+![Translate](apps/landing/public/translate.gif)
+
+### Edit images
+
+Remove the background, then flip or expand the image as a normal layer.
+
+![Edit images](apps/landing/public/edit-images.gif)
+
+### Work locally
+
+Save project files to disk and restore from local version history.
+
+![Local project history](apps/landing/public/fs-history.gif)
+
+### Powered by Web AI
+
+Browser-native AI capabilities keep the workflow fast, private, and local-first.
+
+![Web AI setup](apps/landing/public/powered-webau.gif)
 
 ## Quick Start
 
