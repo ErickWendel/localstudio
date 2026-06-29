@@ -29,6 +29,8 @@ describe('LandingPage', () => {
     expect(screen.getAllByText('Beta').length).toBeGreaterThan(0);
     expect(screen.getByRole('link', { name: 'Workflow' })).toHaveAttribute('href', '#top');
     expect(screen.getByRole('link', { name: 'Showcase' })).toHaveAttribute('href', '#showcase');
+    expect(screen.getByRole('link', { name: 'Web AI' })).toHaveAttribute('href', '#web-ai');
+    expect(screen.getByRole('link', { name: 'WebMCP' })).toHaveAttribute('href', '#webmcp');
     expect(screen.getByRole('link', { name: 'Editor' })).toHaveAttribute('href', '#features');
     expect(screen.getByRole('link', { name: 'Requirements' })).toHaveAttribute('href', '#requirements');
     expect(screen.getByRole('link', { name: 'Thanks' })).toHaveAttribute('href', '#thanks');
@@ -144,6 +146,12 @@ describe('LandingPage', () => {
     );
     expect(screen.getByText(/Project files, assets, and history stay in a folder/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Built for modern browser AI workflows/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /A host page can drive the editor/i })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /WebMCP showcase page/i })).toHaveAttribute(
+      'src',
+      '/webmcp-showcase.png',
+    );
+    expect(screen.getByRole('link', { name: /Open WebMCP demo/i })).toHaveAttribute('href', '/webmcp/');
     expect(screen.getByRole('heading', { name: 'Chrome browser' })).toBeInTheDocument();
     expect(screen.getByText(/10GB free storage/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Built on the work of the browser AI community/i })).toBeInTheDocument();

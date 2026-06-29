@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 
 type WorkflowStepId = 'prompt' | 'image' | 'translate' | 'edit' | 'local' | 'webai';
+type FeatureShowcaseId = Exclude<WorkflowStepId, 'webai'>;
 type FeatureMediaStyle = CSSProperties & { '--feature-media-ratio'?: string };
 
 const githubUrl = 'https://github.com/ErickWendel/semana-javascript-expert07';
@@ -117,7 +118,7 @@ const workflowSteps: Array<{
   },
 ];
 
-const featureMediaImages: Partial<Record<WorkflowStepId, { src: string; alt: string; aspectRatio: string }>> = {
+const featureMediaImages: Partial<Record<FeatureShowcaseId, { src: string; alt: string; aspectRatio: string }>> = {
   prompt: {
     src: '/prompt-to-slide-showcase.png',
     alt: 'LocalStudio prompt-to-slide editor with an AI Design Revolution slide',
@@ -146,7 +147,7 @@ const featureMediaImages: Partial<Record<WorkflowStepId, { src: string; alt: str
 };
 
 const featureShowcases: Array<{
-  id: WorkflowStepId;
+  id: FeatureShowcaseId;
   eyebrow: string;
   title: string;
   copy: string;
@@ -312,7 +313,7 @@ function FooterStarCta() {
   );
 }
 
-function FeatureMedia({ feature }: { feature: WorkflowStepId }) {
+function FeatureMedia({ feature }: { feature: FeatureShowcaseId }) {
   const mediaImage = featureMediaImages[feature];
   const mediaImageStyle: FeatureMediaStyle | undefined = mediaImage
     ? { '--feature-media-ratio': mediaImage.aspectRatio }
@@ -491,6 +492,7 @@ export function LandingPage() {
           <a href="#top">Workflow</a>
           <a href="#showcase">Showcase</a>
           <a href="#web-ai">Web AI</a>
+          <a href="#webmcp">WebMCP</a>
           <a href="#features">Editor</a>
           <a href="#requirements">Requirements</a>
           <a href="#thanks">Thanks</a>
@@ -625,6 +627,35 @@ export function LandingPage() {
               <Lock size={16} aria-hidden="true" />
               Browser-managed model cache
             </span>
+          </div>
+        </div>
+      </section>
+
+      <section id="webmcp" className="webmcp-section" aria-labelledby="webmcp-title">
+        <div className="showcase-row">
+          <div className="showcase-copy">
+            <p className="eyebrow">WebMCP showcase</p>
+            <h2 id="webmcp-title">A host page can drive the editor through browser tools.</h2>
+            <p>
+              WebMCP exposes LocalStudio actions as semantic browser tools, so an external page can
+              discover capabilities, create a project, generate assets, translate the deck, and read
+              the resulting project snapshot.
+            </p>
+            <ul>
+              <li>Tool discovery from the editor iframe</li>
+              <li>Prompt, image, translate, and snapshot actions</li>
+              <li>Same local-first editor surface behind every call</li>
+            </ul>
+            <a className="inline-section-link" href="/webmcp/">
+              Open WebMCP demo
+              <ArrowRight size={16} aria-hidden="true" />
+            </a>
+          </div>
+          <div className="webmcp-media">
+            <img
+              src="/webmcp-showcase.png"
+              alt="WebMCP showcase page discovering tools and controlling the LocalStudio editor"
+            />
           </div>
         </div>
       </section>

@@ -200,6 +200,7 @@ a {
 .demo-section,
 .showcase-section,
 .web-ai-section,
+.webmcp-section,
 .features-section,
 .requirements-section,
 .thanks-section,
@@ -1045,6 +1046,7 @@ h3 {
 .showcase-section,
 .demo-section,
 .web-ai-section,
+.webmcp-section,
 .features-section,
 .requirements-section,
 .thanks-section,
@@ -1431,6 +1433,55 @@ h3 {
   background: rgba(0, 0, 0, 0.52);
   color: var(--ls-muted);
   font-weight: 900;
+}
+
+.webmcp-section {
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.42)),
+    rgba(4, 17, 12, 0.36);
+}
+
+.webmcp-media {
+  overflow: hidden;
+  border: 1px solid rgba(105, 255, 137, 0.28);
+  border-radius: 8px;
+  background: #020705;
+  box-shadow: 0 34px 100px rgba(0, 0, 0, 0.38);
+}
+
+.webmcp-media img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.inline-section-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  width: fit-content;
+  min-height: 42px;
+  margin-top: 24px;
+  border: 1px solid rgba(55, 253, 118, 0.46);
+  border-radius: 6px;
+  padding: 0 14px;
+  background: rgba(55, 253, 118, 0.1);
+  color: var(--ls-green-fixed);
+  font-size: 13px;
+  font-weight: 900;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    transform 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.inline-section-link:hover,
+.inline-section-link:focus-visible {
+  border-color: rgba(55, 253, 118, 0.82);
+  background: rgba(55, 253, 118, 0.16);
+  transform: translateY(-2px);
+  box-shadow: 0 0 26px rgba(55, 253, 118, 0.2);
 }
 
 .feature-panel {
@@ -1871,6 +1922,7 @@ h3 {
   .showcase-row,
   .showcase-row.reverse,
   .web-ai-section,
+  .webmcp-section .showcase-row,
   .features-section,
   .thanks-section {
     grid-template-columns: 1fr;
