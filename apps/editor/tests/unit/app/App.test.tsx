@@ -95,8 +95,24 @@ describe('App', () => {
     );
   });
 
+  it('renders the WebMCP showcase page at /webmcp/', () => {
+    window.history.replaceState({}, '', '/webmcp/');
+
+    render(<App />);
+
+    expect(screen.getByRole('heading', { name: 'WebMCP showcase' })).toBeInTheDocument();
+  });
+
   it('renders the WebMCP showcase page under the editor base path', () => {
     window.history.replaceState({}, '', '/editor/webmcp');
+
+    render(<App />);
+
+    expect(screen.getByRole('heading', { name: 'WebMCP showcase' })).toBeInTheDocument();
+  });
+
+  it('renders the WebMCP showcase page under the editor base path with a trailing slash', () => {
+    window.history.replaceState({}, '', '/editor/webmcp/');
 
     render(<App />);
 

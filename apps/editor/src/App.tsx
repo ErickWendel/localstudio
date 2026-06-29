@@ -4,8 +4,14 @@ import { createBlankProject } from './domain/sampleProject';
 import { EditorShell } from './ui/editor/EditorShell';
 import { WebMcpShowcasePage } from './ui/webmcp/WebMcpShowcasePage';
 
+function normalizeRoutePath(pathname: string) {
+  return pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
+}
+
 export function App() {
-  if (window.location.pathname === '/webmcp' || window.location.pathname === '/editor/webmcp') {
+  const pathname = normalizeRoutePath(window.location.pathname);
+
+  if (pathname === '/webmcp' || pathname === '/editor/webmcp') {
     return <WebMcpShowcasePage />;
   }
 
