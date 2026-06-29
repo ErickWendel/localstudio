@@ -827,6 +827,7 @@ button {
 .rail-action-button:active,
 .compact-action:active,
 .download-models-button:active,
+.github-toolbar-link:active,
 .export-button:active {
   transform: translateY(1px);
 }
@@ -882,6 +883,35 @@ button {
   font-family: 'Open Sans', Helvetica, sans-serif;
   font-size: 14px;
   letter-spacing: 0;
+}
+
+.github-toolbar-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(236, 255, 233, 0.2);
+  border-radius: 4px;
+  background: var(--ew-panel);
+  color: var(--ew-text);
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.github-toolbar-link:hover {
+  border-color: rgba(55, 253, 118, 0.58);
+  color: var(--ew-green-fixed);
+  box-shadow: 0 0 12px rgba(55, 253, 118, 0.14);
+  transform: translateY(-1px);
+}
+
+.github-toolbar-logo {
+  width: 18px;
+  height: 18px;
 }
 
 .export-button {
@@ -3302,6 +3332,7 @@ button {
 .toolbar-menu-item:focus-visible,
 .toolbar-dropdown-item:focus-visible,
 .stitch-icon-button:focus-visible,
+.github-toolbar-link:focus-visible,
 .language-chip:focus-visible,
 .export-button:focus-visible,
 .profile-avatar:focus-visible,
