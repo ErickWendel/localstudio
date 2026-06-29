@@ -1,5 +1,5 @@
 import { ImagePlus, Mic, Plus, SendHorizontal, Square, X } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { IconButton } from '../components/IconButton';
 import type { CreateImagePromptOptions } from './imagePromptOptions';
 import { imagePromptExamples, slidePromptExamples } from './promptRecipes';
@@ -33,7 +33,7 @@ export function PromptBar({
   onSlidePromptSubmit,
   onStopGeneration,
 }: PromptBarProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [mode, setMode] = useState<'create-image' | null>('create-image');
   const [localSubmissionActive, setLocalSubmissionActive] = useState(false);
@@ -41,6 +41,14 @@ export function PromptBar({
   const activeMode = selectedImageElementId ? 'create-image' : mode;
   const examples = activeMode === 'create-image' ? imagePromptExamples : slidePromptExamples;
   const isProcessing = isGeneratingSlide || isGeneratingImage || localSubmissionActive;
+
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    input.style.height = '0px';
+    input.style.height = `${Math.min(Math.max(input.scrollHeight, 18), 112)}px`;
+  }, [value]);
 
   function activateCreateImageMode() {
     setMode('create-image');
@@ -148,69 +156,79 @@ export function PromptBar({
             </div>
           ) : null}
         </div>
-        {activeMode === 'create-image' ? (
-          <button
-            aria-label="Remove Create image mode"
-            className="prompt-mode-token"
-            disabled={isProcessing || Boolean(selectedImageElementId)}
-            type="button"
-            onClick={() => {
-              setMode(null);
-              inputRef.current?.focus();
+        <div className="prompt-input-cluster">
+          {activeMode === 'create-image' ? (
+            <button
+              aria-label="Remove Create image mode"
+              className="prompt-mode-token"
+              disabled={isProcessing || Boolean(selectedImageElementId)}
+              type="button"
+              onClick={() => {
+                setMode(null);
+                inputRef.current?.focus();
+              }}
+            >
+              <ImagePlus size={15} />
+              <span>Create image</span>
+              <X className="prompt-mode-token-close" size={13} />
+            </button>
+          ) : null}
+          <textarea
+            ref={inputRef}
+            placeholder={activeMode === 'create-image' ? '' : 'Describe slide structure or organize current content...'}
+            aria-label={activeMode === 'create-image' ? 'Create image prompt' : 'Slide structure prompt'}
+            disabled={isProcessing}
+            rows={1}
+            value={value}
+            onFocus={() => {
+              void guardPromptIntent();
             }}
-          >
-            <ImagePlus size={15} />
-            <span>Create image</span>
-            <X className="prompt-mode-token-close" size={13} />
-          </button>
-        ) : null}
-        <input
-          ref={inputRef}
-          type="text"
-          placeholder={activeMode === 'create-image' ? '' : 'Describe slide structure or organize current content...'}
-          aria-label={activeMode === 'create-image' ? 'Create image prompt' : 'Slide structure prompt'}
-          disabled={isProcessing}
-          value={value}
-          onFocus={() => {
-            void guardPromptIntent();
-          }}
-          onChange={(event) => {
-            const nextValue = event.target.value;
-            if (activeMode === 'create-image' && !selectedImageElementId && value.length > 0 && nextValue.length === 0) {
-              setMode(null);
-              setValue('');
-              return;
-            }
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                void submitPrompt();
+              }
+            }}
+            onChange={(event) => {
+              const nextValue = event.target.value;
+              if (activeMode === 'create-image' && !selectedImageElementId && value.length > 0 && nextValue.length === 0) {
+                setMode(null);
+                setValue('');
+                return;
+              }
 
-            setValue(nextValue);
-            void guardPromptIntent();
-          }}
-        />
-        <IconButton disabled={isProcessing} label="Record voice prompt">
-          <Mic size={16} />
-        </IconButton>
-        {isProcessing ? (
-          <IconButton
-            label="Stop generation"
-            tone="danger"
-            onClick={() => {
-              setLocalSubmissionActive(false);
-              setValue('');
-              onStopGeneration?.();
+              setValue(nextValue);
+              void guardPromptIntent();
             }}
-          >
-            <Square size={16} />
+          />
+        </div>
+        <div className="prompt-submit-actions">
+          <IconButton disabled={isProcessing} label="Record voice prompt">
+            <Mic size={16} />
           </IconButton>
-        ) : (
-          <IconButton
-            label="Submit prompt"
-            onClick={() => {
-              void submitPrompt();
-            }}
-          >
-            <SendHorizontal size={16} />
-          </IconButton>
-        )}
+          {isProcessing ? (
+            <IconButton
+              label="Stop generation"
+              tone="danger"
+              onClick={() => {
+                setLocalSubmissionActive(false);
+                setValue('');
+                onStopGeneration?.();
+              }}
+            >
+              <Square size={16} />
+            </IconButton>
+          ) : (
+            <IconButton
+              label="Submit prompt"
+              onClick={() => {
+                void submitPrompt();
+              }}
+            >
+              <SendHorizontal size={16} />
+            </IconButton>
+          )}
+        </div>
       </form>
     </div>
   );
