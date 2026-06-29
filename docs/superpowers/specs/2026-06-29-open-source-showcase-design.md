@@ -33,6 +33,8 @@ Do not add `CODE_OF_CONDUCT.md` or `SECURITY.md` in this launch package.
 
 Rewrite the README as the public entry point for LocalStudio.ai.
 
+The README should be intentionally short and high-impact. It should optimize for a "WOW" first impression, then quickly route readers to setup, architecture, and contribution details. Avoid turning the README into full project documentation.
+
 The README should include:
 
 - Title and concise product description.
@@ -41,6 +43,7 @@ The README should include:
 - Hero demo using an existing asset from `apps/landing/public`, preferably `powered-webau.gif` or `prompt-to-slide.gif`.
 - Functionality gallery that shows all existing GIF demos from `apps/landing/public` to exemplify the product capabilities.
 - Supporting screenshots where useful for static feature previews, using the existing PNG files.
+- Short linked model/API credits for the Hugging Face models, Hugging Face WebML resources, and Chrome built-in AI APIs used by the app.
 - Quick start for local development.
 - Browser support notes for experimental Web AI features.
 - Workspace layout.
@@ -55,6 +58,34 @@ The README should distinguish between:
 
 - Product capabilities: browser-only Canva-style slides and image editing with Web AI.
 - Contributor workflow: install dependencies, run the apps, run checks, and open PRs.
+
+The functionality gallery should include every existing GIF demo:
+
+- `apps/landing/public/powered-webau.gif`
+- `apps/landing/public/prompt-to-slide.gif`
+- `apps/landing/public/prompt-to-image.gif`
+- `apps/landing/public/translate.gif`
+- `apps/landing/public/edit-images.gif`
+- `apps/landing/public/fs-history.gif`
+
+Keep captions short and benefit-oriented. Longer explanations belong in `docs/ARCHITECTURE.md` or `CONTRIBUTING.md`.
+
+## Model And API Links
+
+The README should include a compact credits/references section linking to the external browser AI pieces currently used by the app:
+
+- Gemma WebGPU model: `https://huggingface.co/onnx-community/gemma-4-E2B-it-ONNX`
+- TranslateGemma WebGPU model: `https://huggingface.co/onnx-community/translategemma-text-4b-it-ONNX`
+- Language detection model: `https://huggingface.co/onnx-community/xlm-roberta-base-language-detection-ONNX`
+- Image editing segmentation model: `https://huggingface.co/Xenova/slimsam-77-uniform`
+- Bonsai image generation model: `https://huggingface.co/prism-ml/bonsai-image-ternary-4B-mlx-2bit`
+- Bonsai WebGPU reference Space: `https://huggingface.co/spaces/webml-community/bonsai-image-webgpu`
+- Hugging Face WebML community: `https://huggingface.co/webml-community`
+- Chrome Prompt API docs: `https://developer.chrome.com/docs/ai/prompt-api`
+- Chrome Translator API docs: `https://developer.chrome.com/docs/ai/translator-api`
+- Chrome Language Detector API docs: `https://developer.chrome.com/docs/ai/language-detection`
+
+Keep this section short. It should credit the underlying ecosystem and help technical readers inspect the local AI stack without interrupting the visual README flow.
 
 ## Architecture Documentation
 
@@ -111,7 +142,14 @@ Before implementation is considered complete, run the same local checks used by 
 - `npm run test`
 - `npm run build`
 
-Also inspect the production build output enough to confirm:
+Also verify the local npm scripts prove both user-facing apps work:
+
+- `npm run dev:landing` starts the landing page locally.
+- `npm run dev:editor` starts the editor locally.
+- `npm run dev` still starts the default landing experience.
+- Local routes load as expected: landing at `/` and editor at `/editor/` when using the production build or preview flow.
+
+Inspect the production build output enough to confirm:
 
 - The landing app is available at the site root.
 - The editor remains available under `/editor/`.
