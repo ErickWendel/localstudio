@@ -140,6 +140,21 @@ describe('TopToolbar', () => {
         project={createSampleProject()}
         language="PT-BR"
         persistenceEnabled
+        mirrorState={{ enabled: false, status: 'disabled' }}
+        onMirrorNow={onMirrorNow}
+        onMirrorToggle={onMirrorToggle}
+      />,
+    );
+    const disabledMirrorButton = screen.getByRole('button', { name: 'Mirror disabled' });
+    expect(disabledMirrorButton).not.toBeDisabled();
+    await user.click(disabledMirrorButton);
+    expect(onMirrorNow).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <TopToolbar
+        project={createSampleProject()}
+        language="PT-BR"
+        persistenceEnabled
         mirrorState={{ enabled: true, status: 'syncing' }}
         onMirrorNow={onMirrorNow}
         onMirrorToggle={onMirrorToggle}
@@ -161,7 +176,7 @@ describe('TopToolbar', () => {
     expect(mirrorButton).toHaveClass('mirror-synced');
     await user.click(mirrorButton);
     expect(onMirrorToggle).toHaveBeenCalledWith(false);
-    expect(onMirrorNow).not.toHaveBeenCalled();
+    expect(onMirrorNow).toHaveBeenCalledTimes(1);
   });
 
   it('labels deck storage state by persistence and mirror activation', () => {

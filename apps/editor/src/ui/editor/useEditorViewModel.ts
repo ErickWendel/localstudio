@@ -467,6 +467,8 @@ export function useEditorViewModel(services: AppServices) {
   const [modelStates, setModelStates] = useState<ModelState[]>([]);
   const [hasLoadedProject, setHasLoadedProject] = useState(!shouldRestoreStoredProject);
   const [persistenceEnabled, setPersistenceEnabled] = useState(shouldRestoreStoredProject);
+  const [hasPersistedLocalProject, setHasPersistedLocalProject] =
+    useState(shouldRestoreStoredProject);
   const [activePageId, setActivePageId] = useState(initialProject.pages[0]?.id ?? '');
   const activePageIdRef = useRef(activePageId);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
@@ -551,6 +553,7 @@ export function useEditorViewModel(services: AppServices) {
   const [mirrorConfig, setMirrorConfig] = useState<MinioMirrorConfig>(
     () => storedMirrorConfig ?? DEFAULT_MINIO_MIRROR_CONFIG,
   );
+  const [hasMirrorConfig, setHasMirrorConfig] = useState(Boolean(storedMirrorConfig));
   const mirrorConfigRef = useRef<MinioMirrorConfig | null>(storedMirrorConfig);
   const mirrorSyncInFlightRef = useRef(false);
   const mirrorSyncQueuedRef = useRef(false);
@@ -561,7 +564,7 @@ export function useEditorViewModel(services: AppServices) {
   projectRef.current = project;
   activePageIdRef.current = activePageId;
   selectedElementIdsRef.current = selectedElementIds;
-  mirrorConfigRef.current = mirrorState.enabled ? mirrorConfig : null;
+  mirrorConfigRef.current = hasMirrorConfig ? mirrorConfig : null;
   queueMirrorSyncRef.current = queueMirrorSync;
   syncMirrorNowRef.current = (projectToSync) => {
     void syncMirrorNow(projectToSync);
@@ -689,6 +692,7 @@ export function useEditorViewModel(services: AppServices) {
               .catch(() => undefined);
           }
           writeProjectNameToUrl(normalizedProject.name);
+          setHasPersistedLocalProject(true);
           if (storedMirrorConfig) syncMirrorNowRef.current(normalizedProject);
         }
         setHasLoadedProject(true);
@@ -716,6 +720,7 @@ export function useEditorViewModel(services: AppServices) {
     void services.projectRepository
       .saveProject(project)
       .then(async () => {
+        setHasPersistedLocalProject(true);
         setLastEditedAt(project.updatedAt);
         setSaveAnimationKey((current) => current + 1);
         if (!services.projectRepository.saveVersion) return;
@@ -1439,11 +1444,42 @@ export function useEditorViewModel(services: AppServices) {
       return;
     }
 
+    if (hasPersistedLocalProject) {
+      void reenablePersistence();
+      return;
+    }
+
     setLocalProjectSetupOpen(true);
+  }
+
+  async function reenablePersistence() {
+    try {
+      const projectToSave = projectRef.current;
+      await services.projectRepository.saveProject(projectToSave);
+      lastVersionProjectRef.current = projectToSave;
+      setHasPersistedLocalProject(true);
+      setLastEditedAt(projectToSave.updatedAt);
+      setSaveAnimationKey((current) => current + 1);
+      skipNextProjectSaveRef.current = true;
+      setPersistenceEnabled(true);
+      setPersistenceAttention(false);
+      setPersistenceNotice(undefined);
+      setLocalProjectSetupOpen(false);
+      writeProjectNameToUrl(projectToSave.name);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'true');
+      }
+    } catch {
+      setPersistenceEnabled(false);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'false');
+      }
+    }
   }
 
   async function persistCurrentProject(projectToSave = projectRef.current) {
     await services.projectRepository.saveProject(projectToSave);
+    setHasPersistedLocalProject(true);
     const previousProject = lastVersionProjectRef.current;
     lastVersionProjectRef.current = projectToSave;
     setLastEditedAt(projectToSave.updatedAt);
@@ -1495,6 +1531,7 @@ export function useEditorViewModel(services: AppServices) {
       setLastEditedAt(nextProject.updatedAt);
       setSaveAnimationKey((current) => current + 1);
       skipNextProjectSaveRef.current = true;
+      setHasPersistedLocalProject(true);
       setPersistenceEnabled(true);
       setPersistenceAttention(false);
       setPersistenceNotice(undefined);
@@ -1529,6 +1566,7 @@ export function useEditorViewModel(services: AppServices) {
       clearBackgroundPreparation();
       clearBackgroundSelectionPoints();
       skipNextProjectSaveRef.current = true;
+      setHasPersistedLocalProject(true);
       setPersistenceEnabled(true);
       lastVersionProjectRef.current = normalizedProject;
       setLastEditedAt(normalizedProject.updatedAt);
@@ -1574,19 +1612,22 @@ export function useEditorViewModel(services: AppServices) {
   function saveMirrorConfig(config: MinioMirrorConfig) {
     services.mirrorService.saveConfig(config);
     setMirrorConfig(config);
+    setHasMirrorConfig(true);
     mirrorConfigRef.current = config;
     setMirrorState({ enabled: true, status: 'idle' });
+    void syncMirrorNow();
   }
 
   function setMirrorEnabled(enabled: boolean) {
     if (enabled) {
       if (!mirrorConfigRef.current) {
         openMirrorSettings();
+        return;
       }
+      setMirrorState({ enabled: true, status: 'idle' });
+      void syncMirrorNow();
       return;
     }
-    services.mirrorService.clearConfig();
-    mirrorConfigRef.current = null;
     setMirrorState({ enabled: false, status: 'disabled' });
   }
 
@@ -1607,7 +1648,7 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function queueMirrorSync() {
-    if (!mirrorConfigRef.current) return;
+    if (!mirrorState.enabled || !mirrorConfigRef.current) return;
     if (typeof window === 'undefined') {
       void syncMirrorNow();
       return;
@@ -1668,6 +1709,9 @@ export function useEditorViewModel(services: AppServices) {
       openMirrorSettings();
       return;
     }
+    if (!mirrorState.enabled) {
+      setMirrorState({ enabled: true, status: 'idle' });
+    }
     void syncMirrorNow();
   }
 
@@ -1723,6 +1767,7 @@ export function useEditorViewModel(services: AppServices) {
       clearBackgroundPreparation();
       clearBackgroundSelectionPoints();
       skipNextProjectSaveRef.current = true;
+      setHasPersistedLocalProject(true);
       setPersistenceEnabled(true);
       lastVersionProjectRef.current = normalizedProject;
       setLastEditedAt(normalizedProject.updatedAt);

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { createAppServices as createRealAppServices } from '../../../../src/app/composition';
@@ -115,13 +115,9 @@ class RecordingMirrorService implements MirrorService<MinioMirrorConfig> {
     return undefined;
   }
 
-  listProjects(): Promise<MirrorProjectSummary[]> {
-    return Promise.resolve([]);
-  }
+  listProjects = vi.fn((): Promise<MirrorProjectSummary[]> => Promise.resolve([]));
 
-  downloadProject(): Promise<MirrorFile[]> {
-    return Promise.resolve([]);
-  }
+  downloadProject = vi.fn((): Promise<MirrorFile[]> => Promise.resolve([]));
 }
 
 class RecordingTranslatorService implements TranslatorService {
@@ -163,6 +159,25 @@ class ImportingProjectRepository implements ProjectRepository {
   saveProject(project: ProjectDocument): Promise<void> {
     this.savedProjects.push(project);
     return Promise.resolve();
+  }
+}
+
+class RemoteMirrorImportingProjectRepository implements ProjectRepository {
+  importedFilePaths: string[] = [];
+
+  loadProject(): Promise<ProjectDocument | null> {
+    return Promise.resolve(null);
+  }
+
+  saveProject(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  async importMirrorFiles(files: MirrorFile[]): Promise<ProjectDocument> {
+    this.importedFilePaths = files.map((file) => file.path);
+    const projectFile = files.find((file) => file.path === 'project.json');
+    if (!projectFile) throw new Error('Missing project.json');
+    return JSON.parse(await projectFile.blob.text()) as ProjectDocument;
   }
 }
 
@@ -458,6 +473,27 @@ describe('EditorShell', () => {
     expect(screen.getByRole('button', { name: 'Edit project name Mirror Debug Deck' })).toBeInTheDocument();
   });
 
+  it('re-enables persistence without opening the folder setup again', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const repository = new SavingProjectRepository();
+    services.projectRepository = repository;
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+    expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Persistence enabled' }));
+    expect(screen.getByRole('button', { name: 'Persistence disabled' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+
+    expect(screen.queryByRole('dialog', { name: 'Save local project' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
+    expect(repository.savedProjects).toHaveLength(2);
+  });
+
   it('writes the persisted project name into the tab URL', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
@@ -528,6 +564,69 @@ describe('EditorShell', () => {
     expect(screen.getByRole('dialog', { name: 'Mirror settings' })).toBeInTheDocument();
   });
 
+  it('syncs the current project after mirror settings are saved', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const repository = new SavingProjectRepository();
+    const mirrorService = new RecordingMirrorService(null);
+    services.projectRepository = repository;
+    services.mirrorService = mirrorService;
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+    await user.click(screen.getByRole('button', { name: 'Mirror settings' }));
+    await user.click(within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('button', {
+      name: 'Mirror settings',
+    }));
+    await user.click(screen.getByRole('button', { name: 'Save settings' }));
+
+    await waitFor(() => {
+      expect(mirrorService.syncProject).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Untitled AI Deck' }),
+        repository,
+        mirrorConfig,
+      );
+    });
+  });
+
+  it('mirrors the renamed project name from the header bar', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const repository = new SavingProjectRepository();
+    const mirrorService = new RecordingMirrorService(null);
+    services.projectRepository = repository;
+    services.mirrorService = mirrorService;
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+    await user.click(screen.getByRole('button', { name: 'Mirror settings' }));
+    await user.click(within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('button', {
+      name: 'Mirror settings',
+    }));
+    await user.click(screen.getByRole('button', { name: 'Save settings' }));
+    await waitFor(() => {
+      expect(mirrorService.syncProject).toHaveBeenCalledTimes(1);
+    });
+    mirrorService.syncProject.mockClear();
+
+    await user.click(screen.getByRole('button', { name: 'Edit project name Untitled AI Deck' }));
+    await user.clear(screen.getByRole('textbox', { name: 'Project name' }));
+    await user.type(screen.getByRole('textbox', { name: 'Project name' }), 'Renamed Mirror Deck{Enter}');
+
+    await waitFor(
+      () => {
+        expect(mirrorService.syncProject).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'Renamed Mirror Deck' }),
+          repository,
+          mirrorConfig,
+        );
+      },
+      { timeout: 2000 },
+    );
+  });
+
   it('disables mirroring when the mirror status icon is clicked', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
@@ -547,8 +646,17 @@ describe('EditorShell', () => {
     const mirrorButton = await screen.findByRole('button', { name: 'Mirror up to date' });
     await user.click(mirrorButton);
 
-    expect(mirrorService.clearConfig).toHaveBeenCalledTimes(1);
+    expect(mirrorService.clearConfig).not.toHaveBeenCalled();
     expect(screen.getByText('Local only')).toBeInTheDocument();
+
+    const disabledMirrorButton = screen.getByRole('button', { name: 'Mirror disabled' });
+    expect(disabledMirrorButton).not.toBeDisabled();
+    await user.click(disabledMirrorButton);
+
+    await waitFor(() => {
+      expect(mirrorService.syncProject).toHaveBeenCalledTimes(2);
+    });
+    expect(await screen.findByRole('button', { name: 'Mirror up to date' })).toBeInTheDocument();
   });
 
   it('imports an existing project from the File menu', async () => {
@@ -569,6 +677,38 @@ describe('EditorShell', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
     expect(window.location.search).toBe('?project=Imported+LocalStudio+Project');
+  });
+
+  it('displays the remote project name after importing a mirrored project', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const repository = new RemoteMirrorImportingProjectRepository();
+    const mirrorService = new RecordingMirrorService(mirrorConfig);
+    services.projectRepository = repository;
+    services.mirrorService = mirrorService;
+    mirrorService.listProjects.mockResolvedValue([
+      { id: 'Remote Mirror Deck', name: 'Remote Mirror Deck', syncedAt: '2026-06-30T10:00:00.000Z' },
+    ]);
+    mirrorService.downloadProject.mockResolvedValue([
+      {
+        path: 'project.json',
+        blob: new Blob(
+          [JSON.stringify({ ...services.initialProject, id: 'remote-project', name: 'Remote Mirror Deck' })],
+          { type: 'application/json' },
+        ),
+      },
+    ]);
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Import Remote' }));
+    await user.click(await screen.findByRole('button', { name: 'Import Remote Mirror Deck' }));
+
+    expect(
+      await screen.findByRole('button', { name: 'Edit project name Remote Mirror Deck' }),
+    ).toBeInTheDocument();
+    expect(repository.importedFilePaths).toContain('project.json');
+    expect(window.location.search).toBe('?project=Remote+Mirror+Deck');
   });
 
   it('preserves hydrated sample hero object URLs during import normalization', async () => {

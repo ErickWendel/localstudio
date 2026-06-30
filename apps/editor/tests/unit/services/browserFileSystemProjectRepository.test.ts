@@ -71,6 +71,12 @@ class MockDirectoryHandle {
   requestPermission(): Promise<PermissionState> {
     return Promise.resolve('granted');
   }
+
+  removeEntry(name: string): Promise<void> {
+    this.files.delete(name);
+    this.directories.delete(name);
+    return Promise.resolve();
+  }
 }
 
 class MemoryRecentProjectHandleStore implements RecentProjectHandleStore {
@@ -153,6 +159,25 @@ describe('BrowserFileSystemProjectRepository', () => {
     });
   });
 
+  it('moves a persisted project into a renamed child folder when the project name changes', async () => {
+    const parentDirectory = new MockDirectoryHandle('Projects');
+    const repository = new BrowserFileSystemProjectRepository({
+      pickDirectory: () => Promise.resolve(parentDirectory as unknown as FileSystemDirectoryHandle),
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
+    });
+    const project = { ...createSampleProject(), name: 'Launch Deck' };
+
+    await repository.saveProject(project, { projectDirectoryName: 'Launch Deck' });
+    await repository.saveProject({ ...project, name: 'Renamed Launch Deck' });
+
+    expect(parentDirectory.directories.has('Launch Deck')).toBe(false);
+    const renamedDirectory = parentDirectory.directories.get('Renamed Launch Deck')!;
+    expect(renamedDirectory).toBeDefined();
+    expect(JSON.parse(await readMockText(renamedDirectory.files.get('project.json')!))).toMatchObject({
+      name: 'Renamed Launch Deck',
+    });
+  });
+
   it('imports an existing project folder without overwriting it first', async () => {
     const directory = new MockDirectoryHandle();
     const project = createSampleProject();
@@ -168,8 +193,8 @@ describe('BrowserFileSystemProjectRepository', () => {
     expect(directory.directories.size).toBe(0);
   });
 
-  it('imports a mirrored remote project into a selected local folder', async () => {
-    const directory = new MockDirectoryHandle('Chosen Folder Name');
+  it('imports a mirrored remote project into a child folder named from the remote project', async () => {
+    const directory = new MockDirectoryHandle('Projects');
     const project = createSampleProject();
     const repository = new BrowserFileSystemProjectRepository({
       pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
@@ -194,11 +219,13 @@ describe('BrowserFileSystemProjectRepository', () => {
       },
     ]);
 
-    expect(importedProject.name).toBe('Chosen Folder Name');
-    expect(JSON.parse(await readMockText(directory.files.get('project.json')!))).toMatchObject({
-      name: 'Chosen Folder Name',
+    expect(importedProject.name).toBe('Remote Mirror');
+    const projectDirectory = directory.directories.get('Remote Mirror')!;
+    expect(projectDirectory).toBeDefined();
+    expect(JSON.parse(await readMockText(projectDirectory.files.get('project.json')!))).toMatchObject({
+      name: 'Remote Mirror',
     });
-    expect(directory.directories.get('config')?.files.has('localstudio.json')).toBe(true);
+    expect(projectDirectory.directories.get('config')?.files.has('localstudio.json')).toBe(true);
   });
 
   it('reopens the last project folder from the recent handle store', async () => {
