@@ -58,10 +58,10 @@ describe('LeftToolPanel', () => {
     expect(screen.queryByText('Image Editing Models')).not.toBeInTheDocument();
   });
 
-  it('imports image files from the Assets menu', async () => {
+  it('imports media files from the Assets menu', async () => {
     const user = userEvent.setup();
-    const onImportImage = vi.fn();
-    const file = new File(['image'], 'asset.png', { type: 'image/png' });
+    const onImportMedia = vi.fn();
+    const file = new File(['video'], 'clip.mp4', { type: 'video/mp4' });
 
     render(
       <LeftToolPanel
@@ -72,14 +72,14 @@ describe('LeftToolPanel', () => {
         activePageId="page-1"
         selection={{ pageId: 'page-1', elementIds: [] }}
         modelStates={modelStates}
-        onImportImage={onImportImage}
+        onImportMedia={onImportMedia}
       />,
     );
 
     await user.click(screen.getByRole('tab', { name: 'Assets' }));
-    await user.upload(screen.getByLabelText('Import image file'), file);
+    await user.upload(screen.getByLabelText('Import media file'), file);
 
-    expect(onImportImage).toHaveBeenCalledWith(file);
+    expect(onImportMedia).toHaveBeenCalledWith(file);
   });
 
   it('adds styled text presets from the Text menu', async () => {

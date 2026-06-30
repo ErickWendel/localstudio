@@ -4,6 +4,7 @@ import {
   AddGeneratedSlideElementCommand,
   AddElementsCommand,
   AddImageElementCommand,
+  AddMediaElementCommand,
   AlignElementCommand,
   DeleteElementCommand,
   DeletePageCommand,
@@ -24,12 +25,14 @@ import {
   UpdateElementFramesCommand,
   UpdateElementStyleCommand,
   UpdateElementFrameCommand,
+  UpdateMediaPlaybackCommand,
   UpdatePageBackgroundCommand,
   UpdateTextContentCommand,
   type AlignMode,
   type ElementFramePatch,
   type ImageCropPatch,
   type ElementStylePatch,
+  type MediaPlaybackPatch,
   type ZOrderMode,
 } from '../../domain/commands/basicCommands';
 import type { GeneratedSlideElement } from '../../domain/generatedSlide';
@@ -268,6 +271,26 @@ function readImageSize(src: string) {
     });
     image.src = src;
   });
+}
+
+function readVideoSize(src: string) {
+  return new Promise<{ width: number; height: number }>((resolve, reject) => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.addEventListener('loadedmetadata', () => {
+      resolve({ width: video.videoWidth || 16, height: video.videoHeight || 9 });
+    });
+    video.addEventListener('error', () => {
+      reject(new Error('Video dimensions could not be read.'));
+    });
+    video.src = src;
+  });
+}
+
+function getMediaAssetType(file: File): 'image' | 'gif' | 'video' {
+  if (file.type === 'image/gif') return 'gif';
+  if (file.type.startsWith('video/')) return 'video';
+  return 'image';
 }
 
 function createId(prefix: string) {
@@ -1672,7 +1695,7 @@ export function useEditorViewModel(services: AppServices) {
     if (selectedElements.length === 0) return;
     const copiedAssets: ProjectDocument['assets'] = {};
     for (const element of selectedElements) {
-      if (element.type !== 'image') continue;
+      if (element.type !== 'image' && element.type !== 'gif' && element.type !== 'video') continue;
       const asset = project.assets[element.assetId];
       if (asset) copiedAssets[element.assetId] = asset;
     }
@@ -2243,19 +2266,86 @@ export function useEditorViewModel(services: AppServices) {
 
   async function importImageFile(file: File) {
     const dataUrl = await readImageFileAsDataUrl(file);
-    const imageSize = await readImageSize(dataUrl);
+    const assetType = getMediaAssetType(file);
+    const mediaSize = assetType === 'video' ? await readVideoSize(dataUrl) : await readImageSize(dataUrl);
     const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
     if (!page) return;
 
     const assetId = createId('asset');
-    const elementId = createId('image');
-    const imageName = file.name.trim() || 'Pasted image';
-    const fittedImage = fitImageWithinPage({
-      imageWidth: imageSize.width,
-      imageHeight: imageSize.height,
+    const elementId = createId(assetType);
+    const mediaName = file.name.trim() || (assetType === 'video' ? 'Pasted video' : assetType === 'gif' ? 'Pasted GIF' : 'Pasted image');
+    const fittedMedia = fitImageWithinPage({
+      imageWidth: mediaSize.width,
+      imageHeight: mediaSize.height,
       pageWidth: page.width,
       pageHeight: page.height,
     });
+
+    if (assetType === 'gif') {
+      commitProject(
+        (currentProject) =>
+          new AddMediaElementCommand(activePageId, {
+            asset: {
+              id: assetId,
+              type: 'gif',
+              name: mediaName,
+              mimeType: file.type || 'image/gif',
+              objectUrl: dataUrl,
+            },
+            element: {
+              id: elementId,
+              type: 'gif',
+              assetId,
+              x: fittedMedia.x,
+              y: fittedMedia.y,
+              width: fittedMedia.width,
+              height: fittedMedia.height,
+              rotation: 0,
+              locked: false,
+              visible: true,
+              opacity: 1,
+              playing: true,
+            },
+          }).execute(currentProject),
+        { selectedElementIds: [elementId] },
+      );
+      return;
+    }
+
+    if (assetType === 'video') {
+      commitProject(
+        (currentProject) =>
+          new AddMediaElementCommand(activePageId, {
+            asset: {
+              id: assetId,
+              type: 'video',
+              name: mediaName,
+              mimeType: file.type || 'video/mp4',
+              objectUrl: dataUrl,
+            },
+            element: {
+              id: elementId,
+              type: 'video',
+              assetId,
+              x: fittedMedia.x,
+              y: fittedMedia.y,
+              width: fittedMedia.width,
+              height: fittedMedia.height,
+              rotation: 0,
+              locked: false,
+              visible: true,
+              opacity: 1,
+              loop: false,
+              controls: true,
+              muted: true,
+              autoplayInPreview: true,
+              trimStartSeconds: 0,
+            },
+          }).execute(currentProject),
+        { selectedElementIds: [elementId] },
+      );
+      return;
+    }
 
     commitProject(
       (currentProject) =>
@@ -2263,7 +2353,7 @@ export function useEditorViewModel(services: AppServices) {
         asset: {
           id: assetId,
           type: 'image',
-          name: imageName,
+          name: mediaName,
           mimeType: file.type || 'image/*',
           objectUrl: dataUrl,
         },
@@ -2271,10 +2361,10 @@ export function useEditorViewModel(services: AppServices) {
           id: elementId,
           type: 'image',
           assetId,
-          x: fittedImage.x,
-          y: fittedImage.y,
-          width: fittedImage.width,
-          height: fittedImage.height,
+          x: fittedMedia.x,
+          y: fittedMedia.y,
+          width: fittedMedia.width,
+          height: fittedMedia.height,
           rotation: 0,
           locked: false,
           visible: true,
@@ -2283,6 +2373,10 @@ export function useEditorViewModel(services: AppServices) {
       }).execute(currentProject),
       { selectedElementIds: [elementId] },
     );
+  }
+
+  function updateMediaPlayback(elementId: string, patch: MediaPlaybackPatch) {
+    commitProject((currentProject) => new UpdateMediaPlaybackCommand(elementId, patch).execute(currentProject));
   }
 
   return {
@@ -2402,6 +2496,7 @@ export function useEditorViewModel(services: AppServices) {
     updateElementFrame,
     updateElementFrames,
     updateElementStyle,
+    updateMediaPlayback,
     updatePageBackground,
     updateTextContent,
     setElementVisibility,
@@ -2409,5 +2504,6 @@ export function useEditorViewModel(services: AppServices) {
     deleteElement,
     reorderElement,
     importImageFile,
+    importMediaFile: importImageFile,
   };
 }

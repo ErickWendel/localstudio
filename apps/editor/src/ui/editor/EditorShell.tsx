@@ -109,6 +109,30 @@ export function EditorShell({ services }: EditorShellProps) {
     window.open(url.toString(), '_blank', 'noopener,noreferrer');
   }
 
+  function isAnimatedMediaFile(file: File) {
+    return file.type === 'image/gif' || file.type.startsWith('video/');
+  }
+
+  function revealMediaSettingsForElement(elementId: string) {
+    const selectedElement = vm.project.elements[elementId];
+    if (selectedElement?.type !== 'gif' && selectedElement?.type !== 'video') return;
+    vm.setActiveTab('design');
+    setLeftPanelOpen(true);
+  }
+
+  function selectElement(elementId: string, options?: { additive?: boolean }) {
+    vm.selectElement(elementId, options);
+    if (!options?.additive) revealMediaSettingsForElement(elementId);
+  }
+
+  function importMediaFile(file: File) {
+    if (isAnimatedMediaFile(file)) {
+      vm.setActiveTab('design');
+      setLeftPanelOpen(true);
+    }
+    void vm.importMediaFile(file);
+  }
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (isHistoryReadOnly) return;
@@ -271,16 +295,18 @@ export function EditorShell({ services }: EditorShellProps) {
           project={vm.project}
           activePageId={vm.activePageId}
           selection={vm.selection}
-          onSelectElement={isHistoryReadOnly ? undefined : vm.selectElement}
+          onSelectElement={isHistoryReadOnly ? undefined : selectElement}
           onSetElementVisibility={isHistoryReadOnly ? undefined : vm.setElementVisibility}
           onSetElementLock={isHistoryReadOnly ? undefined : vm.setElementLock}
           onDeleteElement={isHistoryReadOnly ? undefined : vm.deleteElement}
           onReorderElement={isHistoryReadOnly ? undefined : vm.reorderElement}
           onUpdateElementStyle={isHistoryReadOnly ? undefined : vm.updateElementStyle}
+          onUpdateMediaPlayback={isHistoryReadOnly ? undefined : vm.updateMediaPlayback}
           onUpdatePageBackground={isHistoryReadOnly ? undefined : vm.updatePageBackground}
           onImportImage={isHistoryReadOnly ? undefined : (file) => {
             void vm.importImageFile(file);
           }}
+          onImportMedia={isHistoryReadOnly ? undefined : importMediaFile}
           onInsertText={isHistoryReadOnly ? undefined : vm.insertTextElement}
           modelStates={vm.modelStates}
           attentionModelId={vm.aiToolsAttentionModelId ?? (vm.backgroundSelectionNotice ? IMAGE_EDITING_MODEL_ID : undefined)}
@@ -355,13 +381,13 @@ export function EditorShell({ services }: EditorShellProps) {
             onDeleteSelectedElement={isHistoryReadOnly ? undefined : vm.deleteSelectedElement}
             onDuplicateSelectedElement={isHistoryReadOnly ? undefined : vm.duplicateSelectedElement}
             onFlipSelectedImage={isHistoryReadOnly ? undefined : vm.flipSelectedImage}
-            onInsertImage={isHistoryReadOnly ? undefined : () => {
+            onInsertMedia={isHistoryReadOnly ? undefined : () => {
               toolbarImageInputRef.current?.click();
             }}
             onInsertText={isHistoryReadOnly ? undefined : () => {
               vm.insertTextElement();
             }}
-            onSelectElement={isHistoryReadOnly ? undefined : vm.selectElement}
+            onSelectElement={isHistoryReadOnly ? undefined : selectElement}
             onSendSelectedElementBackward={isHistoryReadOnly ? undefined : () => {
               vm.setSelectedElementZOrder('backward');
             }}
@@ -386,14 +412,14 @@ export function EditorShell({ services }: EditorShellProps) {
           />
           <input
             ref={toolbarImageInputRef}
-            aria-label="Insert image file"
+            aria-label="Insert media file"
             className="visually-hidden-input"
             type="file"
-            accept="image/*"
+            accept="image/*,video/*"
             onChange={(event) => {
               const file = event.target.files?.[0];
               if (!file || isHistoryReadOnly) return;
-              void vm.importImageFile(file);
+              importMediaFile(file);
               event.target.value = '';
             }}
           />

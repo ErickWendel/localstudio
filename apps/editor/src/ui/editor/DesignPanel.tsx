@@ -1,10 +1,12 @@
-import { AlignCenter, CaseSensitive, Image, Square, Type } from 'lucide-react';
+import { AlignCenter, CaseSensitive, Film, Image, Square, Type, Video } from 'lucide-react';
 import type {
   DesignElement,
   PageBackground,
   ProjectDocument,
   SelectionState,
+  VideoElement,
 } from '../../domain/model';
+import type { MediaPlaybackPatch } from '../../domain/commands/basicCommands';
 import { PanelSection } from '../components/PanelSection';
 import { TEXT_FONT_FAMILIES, TEXT_FONT_WEIGHTS } from './textStyleOptions';
 
@@ -27,6 +29,7 @@ interface DesignPanelProps {
       strokeWidth: number;
     }>,
   ) => void;
+  onUpdateMediaPlayback?: (elementId: string, patch: MediaPlaybackPatch) => void;
   onUpdatePageBackground?: (background: PageBackground) => void;
 }
 
@@ -43,6 +46,7 @@ export function DesignPanel({
   activePageId,
   selection,
   onUpdateElementStyle,
+  onUpdateMediaPlayback,
   onUpdatePageBackground,
 }: DesignPanelProps) {
   const page = project.pages.find((item) => item.id === activePageId);
@@ -52,6 +56,12 @@ export function DesignPanel({
   function updateSelectedStyle(patch: Parameters<NonNullable<typeof onUpdateElementStyle>>[1]) {
     if (!selectedElement || selectedElement.locked) return;
     onUpdateElementStyle?.(selectedElement.id, patch);
+  }
+
+  function updateSelectedMediaPlayback(patch: MediaPlaybackPatch) {
+    if (!selectedElement || selectedElement.locked) return;
+    if (selectedElement.type !== 'gif' && selectedElement.type !== 'video') return;
+    onUpdateMediaPlayback?.(selectedElement.id, patch);
   }
 
   function applyColor(color: string) {
@@ -103,6 +113,8 @@ export function DesignPanel({
         <div className="compact-action design-selection-summary">
           {selectedElement?.type === 'text' ? <Type size={16} /> : null}
           {selectedElement?.type === 'image' ? <Image size={16} /> : null}
+          {selectedElement?.type === 'gif' ? <Film size={16} /> : null}
+          {selectedElement?.type === 'video' ? <Video size={16} /> : null}
           {selectedElement?.type === 'shape' ? <Square size={16} /> : null}
           {!selectedElement ? <CaseSensitive size={16} /> : null}
           <span>{selectedElement ? `Selected ${selectedElement.type}` : 'No selected element'}</span>
@@ -202,6 +214,10 @@ export function DesignPanel({
         </PanelSection>
       ) : null}
 
+      {selectedElement?.type === 'video' ? (
+        <VideoPlaybackPanel element={selectedElement} onUpdate={updateSelectedMediaPlayback} />
+      ) : null}
+
       {selectedElement?.type === 'shape' ? (
         <PanelSection title="Shape">
           <label className="design-control">
@@ -241,5 +257,100 @@ export function DesignPanel({
         </PanelSection>
       ) : null}
     </div>
+  );
+}
+
+interface VideoPlaybackPanelProps {
+  element: VideoElement;
+  onUpdate: (patch: MediaPlaybackPatch) => void;
+}
+
+function toTrimSeconds(value: string) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+}
+
+function getTrimSliderMax(element: VideoElement) {
+  return Math.max(60, Math.ceil(element.trimStartSeconds), Math.ceil(element.trimEndSeconds ?? 0));
+}
+
+function VideoPlaybackPanel({ element, onUpdate }: VideoPlaybackPanelProps) {
+  const trimSliderMax = getTrimSliderMax(element);
+
+  return (
+    <PanelSection title="Playback">
+      <label className="design-control">
+        <span>Loop</span>
+        <input
+          aria-label="Loop selected video"
+          type="checkbox"
+          checked={element.loop}
+          onChange={(event) => {
+            onUpdate({ loop: event.target.checked });
+          }}
+        />
+      </label>
+      <label className="design-control">
+        <span>Controls</span>
+        <input
+          aria-label="Show selected video controls"
+          type="checkbox"
+          checked={element.controls}
+          onChange={(event) => {
+            onUpdate({ controls: event.target.checked });
+          }}
+        />
+      </label>
+      <label className="design-control">
+        <span>Muted</span>
+        <input
+          aria-label="Mute selected video"
+          type="checkbox"
+          checked={element.muted}
+          onChange={(event) => {
+            onUpdate({ muted: event.target.checked });
+          }}
+        />
+      </label>
+      <label className="design-control">
+        <span>Preview autoplay</span>
+        <input
+          aria-label="Autoplay selected video in preview"
+          type="checkbox"
+          checked={element.autoplayInPreview}
+          onChange={(event) => {
+            onUpdate({ autoplayInPreview: event.target.checked });
+          }}
+        />
+      </label>
+      <label className="design-control">
+        <span>Trim start {element.trimStartSeconds.toFixed(1)}s</span>
+        <input
+          aria-label="Selected video trim start"
+          max={trimSliderMax}
+          min="0"
+          step="0.1"
+          type="range"
+          value={element.trimStartSeconds}
+          onChange={(event) => {
+            onUpdate({ trimStartSeconds: toTrimSeconds(event.target.value) });
+          }}
+        />
+      </label>
+      <label className="design-control">
+        <span>Trim end {(element.trimEndSeconds ?? 0).toFixed(1)}s</span>
+        <input
+          aria-label="Selected video trim end"
+          max={trimSliderMax}
+          min="0"
+          step="0.1"
+          type="range"
+          value={element.trimEndSeconds ?? 0}
+          onChange={(event) => {
+            onUpdate({ trimEndSeconds: toTrimSeconds(event.target.value) });
+          }}
+        />
+      </label>
+    </PanelSection>
   );
 }

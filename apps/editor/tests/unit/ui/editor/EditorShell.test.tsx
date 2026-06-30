@@ -160,6 +160,37 @@ function createClipboardData(options: { editorObject?: boolean; files?: File[] }
   };
 }
 
+function createProjectWithVideo(): ProjectDocument {
+  const project = createSampleProject();
+  project.assets['asset-video'] = {
+    id: 'asset-video',
+    type: 'video',
+    name: 'Demo clip',
+    mimeType: 'video/mp4',
+    objectUrl: 'blob:video',
+  };
+  project.elements['video-demo'] = {
+    id: 'video-demo',
+    type: 'video',
+    assetId: 'asset-video',
+    x: 120,
+    y: 80,
+    width: 640,
+    height: 360,
+    rotation: 0,
+    locked: false,
+    visible: true,
+    opacity: 1,
+    loop: false,
+    controls: true,
+    muted: true,
+    autoplayInPreview: true,
+    trimStartSeconds: 0,
+  };
+  project.pages[0]?.elementIds.push('video-demo');
+  return project;
+}
+
 function createReadyPrepareTranslationMock() {
   return vi.fn(
     (
@@ -192,6 +223,21 @@ async function selectImageLayer(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Selected Image' }));
 }
 
+function mockVideoMetadataLoad() {
+  const createElement = document.createElement.bind(document);
+  return vi.spyOn(document, 'createElement').mockImplementation((tagName: string, options?: ElementCreationOptions) => {
+    const element = createElement(tagName, options);
+    if (tagName.toLowerCase() === 'video') {
+      Object.defineProperty(element, 'videoWidth', { configurable: true, value: 1280 });
+      Object.defineProperty(element, 'videoHeight', { configurable: true, value: 720 });
+      queueMicrotask(() => {
+        element.dispatchEvent(new Event('loadedmetadata'));
+      });
+    }
+    return element;
+  });
+}
+
 describe('EditorShell', () => {
   afterEach(() => {
     window.history.pushState({}, '', '/editor/');
@@ -200,6 +246,7 @@ describe('EditorShell', () => {
       value: undefined,
     });
     delete (window as WebMcpDemoWindow).localStudioWebMcpTools;
+    vi.restoreAllMocks();
   });
 
   it('registers WebMCP tools when explicitly enabled', async () => {
@@ -672,7 +719,7 @@ describe('EditorShell', () => {
     );
   });
 
-  it('inserts text and images from the floating toolbar', async () => {
+  it('inserts text and media from the floating toolbar', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
     const repository = new SavingProjectRepository();
@@ -712,13 +759,41 @@ describe('EditorShell', () => {
 
     const image = new File(['image-bytes'], 'toolbar-image.png', { type: 'image/png' });
     await selectImageLayer(user);
-    await user.click(screen.getByRole('button', { name: 'Insert Image' }));
-    await user.upload(screen.getByLabelText('Insert image file'), image);
+    await user.click(screen.getByRole('button', { name: 'Insert Media' }));
+    await user.upload(screen.getByLabelText('Insert media file'), image);
 
     expect(await screen.findByRole('button', { name: 'toolbar-image.png' })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
+
+    mockVideoMetadataLoad();
+    const video = new File(['video-bytes'], 'toolbar-video.mp4', { type: 'video/mp4' });
+    await user.click(screen.getByRole('button', { name: 'Insert Media' }));
+    await user.upload(screen.getByLabelText('Insert media file'), video);
+
+    await waitFor(() => {
+      const savedProject = repository.savedProjects.at(-1);
+      const importedVideo = Object.values(savedProject?.elements ?? {}).find(
+        (element) => element.type === 'video',
+      );
+      expect(importedVideo).toMatchObject({ type: 'video' });
+      expect(savedProject?.assets[importedVideo?.assetId ?? '']?.name).toBe('toolbar-video.mp4');
+    });
+    expect(screen.getByRole('tab', { name: 'Design' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByLabelText('Show selected video controls')).toBeChecked();
+  });
+
+  it('opens the media settings panel when a video layer is selected', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices({ initialProject: createProjectWithVideo() })} />);
+
+    await openLeftTab(user, 'Layout');
+    await user.click(screen.getByRole('button', { name: 'Demo clip' }));
+
+    expect(screen.getByRole('tab', { name: 'Design' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('Playback')).toBeInTheDocument();
+    expect(screen.getByLabelText('Show selected video controls')).toBeChecked();
   });
 
   it('deletes the selected layer with Delete and Backspace keystrokes', async () => {

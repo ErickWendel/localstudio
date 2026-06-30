@@ -1,7 +1,7 @@
 import { Brush, ImagePlus, Layers3, Sparkles, Type } from 'lucide-react';
 import { useRef } from 'react';
 import type { PageBackground, ProjectDocument, SelectionState } from '../../domain/model';
-import type { ElementStylePatch } from '../../domain/commands/basicCommands';
+import type { ElementStylePatch, MediaPlaybackPatch } from '../../domain/commands/basicCommands';
 import type { AiProviderState, ModelState } from '../../services/interfaces';
 import { AiToolsPanel } from './AiToolsPanel';
 import { DesignPanel } from './DesignPanel';
@@ -34,6 +34,7 @@ interface LeftToolPanelProps {
   onRemoveModel?: ((id: string) => Promise<void>) | undefined;
   onCreateImageOptionsChange?: ((options: CreateImagePromptOptions) => void) | undefined;
   onImportImage?: ((file: File) => void) | undefined;
+  onImportMedia?: ((file: File) => void) | undefined;
   onInsertText?: ((preset: TextPreset) => void) | undefined;
   onPreparePromptApi?: (() => Promise<void>) | undefined;
   onPrepareLanguageDetectionProvider?: (() => Promise<void>) | undefined;
@@ -51,6 +52,7 @@ interface LeftToolPanelProps {
   onDeleteElement?: ((elementId: string) => void) | undefined;
   onReorderElement?: ((elementId: string, targetElementId: string) => void) | undefined;
   onUpdateElementStyle?: ((elementId: string, patch: ElementStylePatch) => void) | undefined;
+  onUpdateMediaPlayback?: ((elementId: string, patch: MediaPlaybackPatch) => void) | undefined;
   onUpdatePageBackground?: ((background: PageBackground) => void) | undefined;
 }
 
@@ -86,6 +88,7 @@ export function LeftToolPanel({
   onRemoveModel,
   onCreateImageOptionsChange,
   onImportImage,
+  onImportMedia,
   onInsertText,
   onPreparePromptApi,
   onPrepareLanguageDetectionProvider,
@@ -103,6 +106,7 @@ export function LeftToolPanel({
   onDeleteElement,
   onReorderElement,
   onUpdateElementStyle,
+  onUpdateMediaPlayback,
   onUpdatePageBackground,
 }: LeftToolPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -158,6 +162,7 @@ export function LeftToolPanel({
             activePageId={activePageId}
             selection={selection}
             {...(onUpdateElementStyle ? { onUpdateElementStyle } : {})}
+            {...(onUpdateMediaPlayback ? { onUpdateMediaPlayback } : {})}
             {...(onUpdatePageBackground ? { onUpdatePageBackground } : {})}
           />
         ) : null}
@@ -197,7 +202,7 @@ export function LeftToolPanel({
           <section className="panel-stack">
             <div className="panel-section">
               <h2 className="panel-heading">Assets</h2>
-              <p className="panel-muted">Import images from disk into the active page.</p>
+              <p className="panel-muted">Import images, GIFs, or videos from disk into the active page.</p>
             </div>
             <button
               className="compact-action compact-action-full"
@@ -209,18 +214,22 @@ export function LeftToolPanel({
               <span className="material-symbols-outlined" aria-hidden="true">
                 add_photo_alternate
               </span>
-              Import Image
+              Import Media
             </button>
             <input
               ref={fileInputRef}
-              aria-label="Import image file"
+              aria-label="Import media file"
               className="visually-hidden-input"
               type="file"
-              accept="image/*"
+              accept="image/*,video/*"
               onChange={(event) => {
                 const file = event.target.files?.[0];
                 if (!file) return;
-                onImportImage?.(file);
+                if (onImportMedia) {
+                  onImportMedia(file);
+                } else {
+                  onImportImage?.(file);
+                }
                 event.target.value = '';
               }}
             />

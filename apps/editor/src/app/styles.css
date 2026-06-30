@@ -1429,6 +1429,21 @@ button {
   background: #050d10;
 }
 
+.canvas-media-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.canvas-media-element {
+  position: absolute;
+  display: block;
+  border-radius: 6px;
+  object-fit: fill;
+  transform-origin: top left;
+}
+
 .background-selection-hint {
   position: absolute;
   left: 50%;
