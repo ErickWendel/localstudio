@@ -7,11 +7,16 @@ import {
   DeletePageCommand,
   DuplicatePageCommand,
   DuplicateElementCommand,
+  ClearPageTransitionCommand,
   RenamePageCommand,
   ReorderPageCommand,
   ReorderElementCommand,
   RemoveAssetCommand,
+  ReorderElementAnimationBuildCommand,
   ReplaceImageAssetCommand,
+  ClearElementAnimationBuildCommand,
+  SetElementAnimationBuildsCommand,
+  SetPageTransitionCommand,
   SetPageVisibilityCommand,
   SetZOrderCommand,
   SetElementLockCommand,
@@ -66,12 +71,18 @@ describe('editor commands', () => {
   });
 
   it('deletes an element and removes it from z-order', () => {
-    const project = createSampleProject();
+    const project = new SetElementAnimationBuildsCommand(
+      'page-1',
+      ['text-subtitle'],
+      (elementId) => `build-${elementId}`,
+      { effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+    ).execute(createSampleProject());
     const command = new DeleteElementCommand('page-1', 'text-subtitle');
     const next = command.execute(project);
 
     expect(next.elements['text-subtitle']).toBeUndefined();
     expect(next.pages[0]?.elementIds).not.toContain('text-subtitle');
+    expect(next.pages[0]?.animationBuilds).toEqual([]);
   });
 
   it('deletes an image element while keeping its asset in the project library', () => {
@@ -266,6 +277,76 @@ describe('editor commands', () => {
     expect(next).not.toBe(project);
     expect(next.pages[0]?.background).toEqual({ type: 'color', color: '#000000' });
     expect(project.pages[0]?.background).toEqual({ type: 'color', color: '#050D10' });
+  });
+
+  it('sets the active page reveal transition immutably', () => {
+    const project = createSampleProject();
+    const next = new SetPageTransitionCommand('page-1', { effect: 'reveal', delayMs: 250 }).execute(project);
+
+    expect(next).not.toBe(project);
+    expect(next.pages[0]?.transition).toEqual({ effect: 'reveal', delayMs: 250 });
+    expect(project.pages[0]?.transition).toBeUndefined();
+  });
+
+  it('clears the active page transition immutably', () => {
+    const project = createSampleProject();
+    const withTransition = new SetPageTransitionCommand('page-1', { effect: 'reveal', delayMs: 250 }).execute(project);
+    const next = new ClearPageTransitionCommand('page-1').execute(withTransition);
+
+    expect(next).not.toBe(withTransition);
+    expect(next.pages[0]?.transition).toBeUndefined();
+    expect(withTransition.pages[0]?.transition).toEqual({ effect: 'reveal', delayMs: 250 });
+  });
+
+  it('sets reveal animation builds for selected elements in page layer order', () => {
+    const project = createSampleProject();
+    const next = new SetElementAnimationBuildsCommand(
+      'page-1',
+      ['text-title', 'image-hero'],
+      (elementId) => `build-${elementId}`,
+      { effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+    ).execute(project);
+
+    expect(next.pages[0]?.animationBuilds).toEqual([
+      { id: 'build-image-hero', elementId: 'image-hero', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+      { id: 'build-text-title', elementId: 'text-title', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+    ]);
+    expect(project.pages[0]?.animationBuilds).toBeUndefined();
+  });
+
+  it('removes an element animation build without affecting other builds', () => {
+    const project = new SetElementAnimationBuildsCommand(
+      'page-1',
+      ['image-hero', 'text-title'],
+      (elementId) => `build-${elementId}`,
+      { effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+    ).execute(createSampleProject());
+    const next = new ClearElementAnimationBuildCommand('page-1', 'image-hero').execute(project);
+
+    expect(next.pages[0]?.animationBuilds).toEqual([
+      { id: 'build-text-title', elementId: 'text-title', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+    ]);
+  });
+
+  it('reorders element animation builds within the active page', () => {
+    const project = new SetElementAnimationBuildsCommand(
+      'page-1',
+      ['image-hero', 'text-subtitle', 'text-title'],
+      (elementId) => `build-${elementId}`,
+      { effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+    ).execute(createSampleProject());
+    const next = new ReorderElementAnimationBuildCommand('page-1', 'text-title', 0).execute(project);
+
+    expect(next.pages[0]?.animationBuilds?.map((build) => build.elementId)).toEqual([
+      'text-title',
+      'image-hero',
+      'text-subtitle',
+    ]);
+    expect(project.pages[0]?.animationBuilds?.map((build) => build.elementId)).toEqual([
+      'image-hero',
+      'text-subtitle',
+      'text-title',
+    ]);
   });
 
   it('translates multiple unlocked text elements immutably', () => {
@@ -537,7 +618,12 @@ describe('editor commands', () => {
   });
 
   it('duplicates a page with cloned unlocked elements after the source page', () => {
-    const project = createSampleProject();
+    const project = new SetElementAnimationBuildsCommand(
+      'page-1',
+      ['image-hero', 'text-title'],
+      (elementId) => `build-${elementId}`,
+      { effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+    ).execute(createSampleProject());
     const next = new DuplicatePageCommand('page-1', 'page-copy', (elementId) => `${elementId}-page-copy`).execute(project);
 
     expect(next.pages).toHaveLength(2);
@@ -556,6 +642,10 @@ describe('editor commands', () => {
       text: 'AI Design Revolution',
       locked: false,
     });
+    expect(next.pages[1]?.animationBuilds).toEqual([
+      { id: 'build-image-hero-page-copy', elementId: 'image-hero-page-copy', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+      { id: 'build-text-title-page-copy', elementId: 'text-title-page-copy', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+    ]);
     expect(project.pages).toHaveLength(1);
   });
 

@@ -709,6 +709,37 @@ button {
   color: var(--ew-green);
 }
 
+.project-play-button {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  border: 1px solid rgba(55, 253, 118, 0.34);
+  border-radius: 5px;
+  background: rgba(55, 253, 118, 0.1);
+  color: var(--ew-green-fixed);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 16px;
+  white-space: nowrap;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.project-play-button:hover {
+  border-color: rgba(55, 253, 118, 0.58);
+  background: rgba(55, 253, 118, 0.16);
+  box-shadow: 0 0 14px rgba(55, 253, 118, 0.12);
+}
+
+.project-play-button .material-symbols-outlined {
+  font-size: 18px;
+}
+
 .project-title-input {
   width: min(220px, 24vw);
   height: 26px;
@@ -1515,6 +1546,41 @@ button {
   line-height: 1.08;
   resize: none;
   transform-origin: top left;
+}
+
+.animation-build-badges {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  pointer-events: none;
+}
+
+.animation-build-badge {
+  position: absolute;
+  min-width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(204, 232, 255, 0.55);
+  border-radius: 6px;
+  background: linear-gradient(180deg, #9fc0df, #6382a0);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.35),
+    inset 0 1px 2px rgba(255, 255, 255, 0.32);
+}
+
+.animation-build-badge-selected {
+  border-color: rgba(55, 253, 118, 0.9);
+  background: linear-gradient(180deg, #62c840, #4ca936);
+  box-shadow:
+    0 0 0 2px rgba(55, 253, 118, 0.22),
+    0 0 16px rgba(55, 253, 118, 0.28);
 }
 
 .canvas-image-card {
@@ -2793,6 +2859,145 @@ button {
   font-size: 10px;
   font-weight: 900;
   text-transform: uppercase;
+}
+
+.animation-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.animation-choice,
+.animation-build-row {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: #000;
+}
+
+.animation-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 46px;
+  padding: 10px;
+  color: var(--ew-text);
+  cursor: pointer;
+}
+
+.animation-choice .material-symbols-outlined {
+  color: var(--ew-green);
+}
+
+.animation-choice-active {
+  border-color: rgba(55, 253, 118, 0.34);
+  box-shadow: 0 0 18px rgba(55, 253, 118, 0.1);
+}
+
+.animation-build-list {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.animation-build-row {
+  display: grid;
+  gap: 9px;
+  padding: 10px;
+  cursor: grab;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.animation-build-row:active {
+  cursor: grabbing;
+}
+
+.animation-build-row:hover,
+.animation-build-row:focus-within {
+  border-color: rgba(55, 253, 118, 0.3);
+  box-shadow: 0 0 16px rgba(55, 253, 118, 0.08);
+}
+
+.animation-build-title,
+.animation-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.animation-build-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.animation-build-title span,
+.animation-field span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.animation-build-title {
+  color: var(--ew-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.animation-build-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.animation-build-drag-handle {
+  color: var(--ew-muted);
+  cursor: grab;
+  font-size: 18px;
+  line-height: 18px;
+  flex: 0 0 auto;
+}
+
+.animation-build-number {
+  min-width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(204, 232, 255, 0.42);
+  border-radius: 5px;
+  background: linear-gradient(180deg, #9fc0df, #6382a0);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+.animation-field {
+  color: var(--ew-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.animation-field input,
+.animation-field select {
+  width: 136px;
+  min-height: 32px;
+  border: 1px solid var(--ew-border);
+  border-radius: 5px;
+  background: var(--ew-surface);
+  color: var(--ew-text);
+  font: inherit;
+  padding: 0 8px;
 }
 
 .tool-card-list,

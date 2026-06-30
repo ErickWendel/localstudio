@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { vi } from 'vitest';
@@ -144,5 +144,113 @@ describe('LeftToolPanel', () => {
     expect(onInsertText).toHaveBeenNthCalledWith(1, 'title');
     expect(onInsertText).toHaveBeenNthCalledWith(2, 'subtitle');
     expect(onInsertText).toHaveBeenNthCalledWith(3, 'body');
+  });
+
+  it('shows slide transition and all object animations in the Animate menu', async () => {
+    const user = userEvent.setup();
+    const onSetPageTransition = vi.fn();
+    const onClearPageTransition = vi.fn();
+    const onClearElementAnimationBuild = vi.fn();
+    const onReorderElementAnimationBuild = vi.fn();
+    const onPlayAnimationPreview = vi.fn();
+    const onSetElementAnimationBuilds = vi.fn();
+    const project = createSampleProject();
+    project.pages[0] = {
+      ...project.pages[0]!,
+      transition: { effect: 'reveal', delayMs: 0 },
+      animationBuilds: [
+        { id: 'build-image-hero', elementId: 'image-hero', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+        { id: 'build-text-title', elementId: 'text-title', effect: 'reveal', trigger: 'after-transition', delayMs: 0 },
+      ],
+    };
+
+    render(
+      <LeftToolPanel
+        activeTab="animations"
+        open
+        onTabChange={vi.fn()}
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
+        modelStates={modelStates}
+        onClearPageTransition={onClearPageTransition}
+        onClearElementAnimationBuild={onClearElementAnimationBuild}
+        onSetPageTransition={onSetPageTransition}
+        onSetElementAnimationBuilds={onSetElementAnimationBuilds}
+        onReorderElementAnimationBuild={onReorderElementAnimationBuild}
+        onPlayAnimationPreview={onPlayAnimationPreview}
+      />,
+    );
+
+    expect(screen.getByRole('tab', { name: 'Animate' })).toBeInTheDocument();
+    expect(screen.getByText('Slide Transition')).toBeInTheDocument();
+    expect(screen.getByText('Object Animations')).toBeInTheDocument();
+    expect(screen.getByText('Image')).toBeInTheDocument();
+    expect(screen.getByText('AI Design Revolution')).toBeInTheDocument();
+    expect(screen.getByLabelText('Build 1')).toBeInTheDocument();
+    expect(screen.getByLabelText('Build 2')).toBeInTheDocument();
+
+    const dataTransfer = {
+      dropEffect: '',
+      effectAllowed: '',
+      getData: vi.fn(() => 'text-title'),
+      setData: vi.fn(),
+    };
+    fireEvent.dragStart(screen.getByRole('listitem', { name: 'Build 2: AI Design Revolution' }), { dataTransfer });
+    fireEvent.dragOver(screen.getByRole('listitem', { name: 'Build 1: Image' }), { dataTransfer });
+    fireEvent.drop(screen.getByRole('listitem', { name: 'Build 1: Image' }), { dataTransfer });
+
+    expect(dataTransfer.setData).toHaveBeenCalledWith(
+      'application/x-localstudio-animation-build-element-id',
+      'text-title',
+    );
+    expect(onReorderElementAnimationBuild).toHaveBeenCalledWith('text-title', 0);
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Slide transition effect' }), 'reveal');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Slide transition effect' }), 'none');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Effect for Image' }), 'none');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Start for AI Design Revolution' }), 'after-previous');
+    await user.click(screen.getByRole('button', { name: 'Move AI Design Revolution animation up' }));
+    await user.click(screen.getByRole('button', { name: 'Play animation preview' }));
+
+    expect(onSetPageTransition).toHaveBeenCalledWith({ effect: 'reveal', delayMs: 0 });
+    expect(onClearPageTransition).toHaveBeenCalledTimes(1);
+    expect(onClearElementAnimationBuild).toHaveBeenCalledWith('image-hero');
+    expect(onSetElementAnimationBuilds).toHaveBeenCalledWith(
+      ['text-title'],
+      { effect: 'reveal', trigger: 'after-previous', delayMs: 0 },
+    );
+    expect(onReorderElementAnimationBuild).toHaveBeenCalledWith('text-title', 0);
+    expect(onPlayAnimationPreview).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies reveal to selected elements from the whole-slide animation view', async () => {
+    const user = userEvent.setup();
+    const onSetElementAnimationBuilds = vi.fn();
+    const onPlayAnimationPreview = vi.fn();
+
+    render(
+      <LeftToolPanel
+        activeTab="animations"
+        open
+        onTabChange={vi.fn()}
+        project={createSampleProject()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['text-title', 'image-hero'] }}
+        modelStates={modelStates}
+        onSetElementAnimationBuilds={onSetElementAnimationBuilds}
+        onPlayAnimationPreview={onPlayAnimationPreview}
+      />,
+    );
+
+    expect(screen.getByText('Object Animations')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Add animation' }));
+    await user.click(screen.getByRole('button', { name: 'Play animation preview' }));
+
+    expect(onSetElementAnimationBuilds).toHaveBeenCalledWith(
+      ['text-title', 'image-hero'],
+      { effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+    );
+    expect(onPlayAnimationPreview).toHaveBeenCalledTimes(1);
   });
 });

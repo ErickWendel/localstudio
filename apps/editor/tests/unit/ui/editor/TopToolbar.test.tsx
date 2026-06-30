@@ -143,6 +143,23 @@ describe('TopToolbar', () => {
     expect(onProjectNameChange).toHaveBeenCalledWith('Demo Deck');
   });
 
+  it('starts presenter mode from the play button near the project name', async () => {
+    const user = userEvent.setup();
+    const onStartPresenterMode = vi.fn();
+
+    render(
+      <TopToolbar
+        project={createSampleProject()}
+        language="PT-BR"
+        onStartPresenterMode={onStartPresenterMode}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Play presentation' }));
+
+    expect(onStartPresenterMode).toHaveBeenCalledTimes(1);
+  });
+
   it('selects the full project name when entering rename mode', async () => {
     const user = userEvent.setup();
     const project = createSampleProject();

@@ -1,11 +1,9 @@
 interface EditorFooterProps {
   activePageIndex: number;
-  isFullscreen?: boolean;
   pageCount: number;
   pagesPanelOpen?: boolean;
   zoomPercent: number;
   onResetZoom?: () => void;
-  onToggleFullscreen?: () => void;
   onTogglePagesPanel?: () => void;
   onZoomIn?: () => void;
   onZoomOut?: () => void;
@@ -13,12 +11,10 @@ interface EditorFooterProps {
 
 export function EditorFooter({
   activePageIndex,
-  isFullscreen = false,
   pageCount,
   pagesPanelOpen = true,
   zoomPercent,
   onResetZoom,
-  onToggleFullscreen,
   onTogglePagesPanel,
   onZoomIn,
   onZoomOut,
@@ -68,16 +64,6 @@ export function EditorFooter({
         <span className="footer-page-count">
           {activePageIndex + 1} / {pageCount}
         </span>
-        <button
-          className={isFullscreen ? 'footer-toggle footer-toggle-active' : 'footer-toggle'}
-          type="button"
-          aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-          onClick={onToggleFullscreen}
-        >
-          <span className="material-symbols-outlined" aria-hidden="true">
-            {isFullscreen ? 'fullscreen_exit' : 'fullscreen'}
-          </span>
-        </button>
       </div>
     </footer>
   );

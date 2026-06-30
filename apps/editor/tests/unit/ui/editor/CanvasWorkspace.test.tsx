@@ -92,6 +92,7 @@ describe('CanvasWorkspace', () => {
     expect(screen.getByLabelText('BG Remover')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Flip' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Crop' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Animate' })).toBeInTheDocument();
   });
 
   it('toggles crop mode for selected images', async () => {
@@ -163,6 +164,56 @@ describe('CanvasWorkspace', () => {
     fireEvent.mouseDown(canvas!);
 
     expect(onClearSelection).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks active animation preview state and advances click-triggered builds', () => {
+    const onAnimationPreviewAdvance = vi.fn();
+    const { container } = render(
+      <CanvasWorkspace
+        project={createSampleProject()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        animationPreview={{
+          pageId: 'page-1',
+          hiddenElementIds: ['image-hero'],
+          playing: true,
+          waitingForClick: true,
+        }}
+        onAnimationPreviewAdvance={onAnimationPreviewAdvance}
+      />,
+    );
+
+    expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview', 'playing');
+    expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview-waiting', 'true');
+
+    fireEvent.mouseDown(container.querySelector('canvas')!);
+
+    expect(onAnimationPreviewAdvance).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows numbered animation build badges and highlights the selected animated element', () => {
+    const project = createSampleProject();
+    project.pages[0] = {
+      ...project.pages[0]!,
+      animationBuilds: [
+        { id: 'build-image-hero', elementId: 'image-hero', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+        { id: 'build-text-title', elementId: 'text-title', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+      ],
+    };
+
+    render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['text-title'] }}
+      />,
+    );
+
+    expect(screen.getByLabelText('Animation build 1 for Image')).toHaveTextContent('1');
+    expect(screen.getByLabelText('Animation build 2 for AI Design Revolution')).toHaveAttribute(
+      'data-selected',
+      'true',
+    );
   });
 
   it('shows background selection guidance and active cursor treatment', async () => {

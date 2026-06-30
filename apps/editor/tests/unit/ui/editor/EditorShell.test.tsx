@@ -553,6 +553,26 @@ describe('EditorShell', () => {
     expect(screen.getByText('100%')).toBeInTheDocument();
   });
 
+  it('starts animation preview when playing the presentation from the toolbar', async () => {
+    const user = userEvent.setup();
+    const project = createSampleProject();
+    project.pages[0] = {
+      ...project.pages[0]!,
+      transition: { effect: 'reveal', delayMs: 0 },
+      animationBuilds: [
+        { id: 'build-image-hero', elementId: 'image-hero', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+      ],
+    };
+
+    render(<EditorShell services={createAppServices({ initialProject: project })} />);
+
+    await user.click(screen.getByRole('button', { name: 'Play presentation' }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview', 'playing');
+    });
+  });
+
   it('pastes an image from the clipboard as a new selected layer', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);

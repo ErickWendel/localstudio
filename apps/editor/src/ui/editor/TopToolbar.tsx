@@ -25,6 +25,7 @@ interface TopToolbarProps {
   onResetZoom?: (() => void) | undefined;
   onSelectLayers?: (() => void) | undefined;
   onShare?: (() => void) | undefined;
+  onStartPresenterMode?: (() => void) | undefined;
   onTranslateDeck?: (() => void) | undefined;
   onUndo?: (() => void) | undefined;
   onZoomIn?: (() => void) | undefined;
@@ -106,6 +107,7 @@ export function TopToolbar({
   onResetZoom,
   onSelectLayers,
   onShare,
+  onStartPresenterMode,
   onTranslateDeck,
   onUndo,
   onZoomIn,
@@ -279,6 +281,18 @@ export function TopToolbar({
               {project.name}
             </button>
           )}
+          <button
+            className="project-play-button"
+            type="button"
+            aria-label="Play presentation"
+            title="Play presentation"
+            onClick={onStartPresenterMode}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              play_arrow
+            </span>
+            <span>Play</span>
+          </button>
           <span className="local-only-badge">Local only</span>
         </div>
       </div>

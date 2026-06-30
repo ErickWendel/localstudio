@@ -6,6 +6,8 @@ import {
   AddImageElementCommand,
   AddMediaElementCommand,
   AlignElementCommand,
+  ClearElementAnimationBuildCommand,
+  ClearPageTransitionCommand,
   DeleteElementCommand,
   DeletePageCommand,
   DuplicatePageCommand,
@@ -15,9 +17,12 @@ import {
   ReorderPageCommand,
   ReorderElementCommand,
   RemoveAssetCommand,
+  ReorderElementAnimationBuildCommand,
   ReplaceImageAssetCommand,
+  SetElementAnimationBuildsCommand,
   SetElementLockCommand,
   SetElementVisibilityCommand,
+  SetPageTransitionCommand,
   SetPageVisibilityCommand,
   SetZOrderCommand,
   ToggleImageFlipCommand,
@@ -30,6 +35,7 @@ import {
   UpdatePageBackgroundCommand,
   UpdateTextContentCommand,
   type AlignMode,
+  type ElementAnimationPatch,
   type ElementFramePatch,
   type ImageCropPatch,
   type ElementStylePatch,
@@ -38,7 +44,16 @@ import {
 } from '../../domain/commands/basicCommands';
 import type { GeneratedSlideElement } from '../../domain/generatedSlide';
 import { fitImageWithinPage } from '../../domain/imageSizing';
-import type { DesignElement, ImageElement, Page, PageBackground, ProjectDocument, SelectionState } from '../../domain/model';
+import type {
+  DesignElement,
+  ElementAnimationBuild,
+  ImageElement,
+  Page,
+  PageBackground,
+  ProjectDocument,
+  SelectionState,
+  SlideTransition,
+} from '../../domain/model';
 import { createBlankProject, SAMPLE_HERO_IMAGE_SIZE, SAMPLE_HERO_IMAGE_URL } from '../../domain/sampleProject';
 import type { EditorAutomationDelegate } from '../../services/editorAutomationController';
 import type { AiProviderState, ModelState, PromptApiAvailability, VersionHistoryEntry } from '../../services/interfaces';
@@ -56,7 +71,7 @@ import { looksLikeImageGenerationRequest } from '../../services/prompts/slideTas
 import { defaultCreateImagePromptOptions, type CreateImagePromptOptions } from './imagePromptOptions';
 import { TRANSLATION_LANGUAGE_OPTIONS } from './translationLanguages';
 
-export type RightPanelTab = 'layout' | 'text' | 'design' | 'ai-tools' | 'assets';
+export type RightPanelTab = 'layout' | 'text' | 'design' | 'ai-tools' | 'assets' | 'animations';
 export type TextPreset = 'title' | 'subtitle' | 'body';
 
 interface EditorHistory {
@@ -98,6 +113,13 @@ interface PromptPreparationState {
 interface ElementClipboardState {
   assets: ProjectDocument['assets'];
   elements: DesignElement[];
+}
+
+interface AnimationPreviewState {
+  hiddenElementIds: string[];
+  pageId: string;
+  playing: boolean;
+  waitingForClick: boolean;
 }
 
 const PERSISTENCE_PREFERENCE_KEY = 'ew-canvas-ai.persistence-enabled';
@@ -240,7 +262,7 @@ function normalizeProjectDocument(project: ProjectDocument): ProjectDocument {
             : page,
         )
       : project.pages
-    ).map((page) => ({ ...page, visible: page.visible ?? true })),
+    ).map((page) => ({ ...page, animationBuilds: page.animationBuilds ?? [], visible: page.visible ?? true })),
   };
 }
 
@@ -447,6 +469,7 @@ export function useEditorViewModel(services: AppServices) {
   });
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationNotice, setTranslationNotice] = useState<string | undefined>();
+  const [animationPreview, setAnimationPreview] = useState<AnimationPreviewState | undefined>();
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [versionHistoryEntries, setVersionHistoryEntries] = useState<VersionHistoryEntry[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState<string | undefined>();
@@ -462,6 +485,8 @@ export function useEditorViewModel(services: AppServices) {
   selectedElementIdsRef.current = selectedElementIds;
   const backgroundSelectionPointsRef = useRef<Record<string, BackgroundSelectionPoint[]>>({});
   const backgroundPreviewTimeoutRef = useRef<number | undefined>(undefined);
+  const animationPreviewQueueRef = useRef<ElementAnimationBuild[]>([]);
+  const animationPreviewTimeoutsRef = useRef<number[]>([]);
   const backgroundPreviewSequenceRef = useRef(0);
   const backgroundPreparationSequenceRef = useRef(0);
   const languageDetectionSequenceRef = useRef(0);
@@ -512,6 +537,14 @@ export function useEditorViewModel(services: AppServices) {
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      for (const timeoutId of animationPreviewTimeoutsRef.current) {
+        window.clearTimeout(timeoutId);
+      }
     };
   }, []);
 
@@ -1414,6 +1447,122 @@ export function useEditorViewModel(services: AppServices) {
     commitProject((currentProject) =>
       new UpdatePageBackgroundCommand(activePageId, background).execute(currentProject),
     );
+  }
+
+  function setPageTransition(transition: SlideTransition) {
+    commitProject((currentProject) =>
+      new SetPageTransitionCommand(activePageId, transition).execute(currentProject),
+    );
+  }
+
+  function clearPageTransition() {
+    commitProject((currentProject) => new ClearPageTransitionCommand(activePageId).execute(currentProject));
+  }
+
+  function setElementAnimationBuilds(elementIds: string[], patch: ElementAnimationPatch) {
+    commitProject((currentProject) =>
+      new SetElementAnimationBuildsCommand(
+        activePageId,
+        elementIds,
+        (elementId) => createId(`animation-${elementId}`),
+        patch,
+      ).execute(currentProject),
+    );
+  }
+
+  function clearElementAnimationBuild(elementId: string) {
+    commitProject((currentProject) =>
+      new ClearElementAnimationBuildCommand(activePageId, elementId).execute(currentProject),
+    );
+  }
+
+  function reorderElementAnimationBuild(elementId: string, targetIndex: number) {
+    commitProject((currentProject) =>
+      new ReorderElementAnimationBuildCommand(activePageId, elementId, targetIndex).execute(currentProject),
+    );
+  }
+
+  function clearAnimationPreviewTimers() {
+    for (const timeoutId of animationPreviewTimeoutsRef.current) {
+      window.clearTimeout(timeoutId);
+    }
+    animationPreviewTimeoutsRef.current = [];
+  }
+
+  function scheduleAnimationPreview(callback: () => void, delayMs: number) {
+    const timeoutId = window.setTimeout(callback, Math.max(0, delayMs));
+    animationPreviewTimeoutsRef.current.push(timeoutId);
+  }
+
+  function finishAnimationPreview() {
+    animationPreviewQueueRef.current = [];
+    clearAnimationPreviewTimers();
+    setAnimationPreview(undefined);
+  }
+
+  function revealAnimationBuild(build: ElementAnimationBuild) {
+    setAnimationPreview((current) =>
+      current
+        ? {
+            ...current,
+            hiddenElementIds: current.hiddenElementIds.filter((elementId) => elementId !== build.elementId),
+            waitingForClick: false,
+          }
+        : current,
+    );
+  }
+
+  function runNextAnimationBuild() {
+    const nextBuild = animationPreviewQueueRef.current[0];
+    if (!nextBuild) {
+      scheduleAnimationPreview(finishAnimationPreview, 520);
+      return;
+    }
+
+    if (nextBuild.trigger === 'on-click') {
+      setAnimationPreview((current) => (current ? { ...current, waitingForClick: true } : current));
+      return;
+    }
+
+    animationPreviewQueueRef.current = animationPreviewQueueRef.current.slice(1);
+    scheduleAnimationPreview(() => {
+      revealAnimationBuild(nextBuild);
+      runNextAnimationBuild();
+    }, nextBuild.delayMs);
+  }
+
+  function advanceAnimationPreview() {
+    const nextBuild = animationPreviewQueueRef.current[0];
+    if (!nextBuild) {
+      finishAnimationPreview();
+      return;
+    }
+    animationPreviewQueueRef.current = animationPreviewQueueRef.current.slice(1);
+    scheduleAnimationPreview(() => {
+      revealAnimationBuild(nextBuild);
+      runNextAnimationBuild();
+    }, nextBuild.delayMs);
+  }
+
+  function playAnimationPreview() {
+    const page = projectRef.current.pages.find((item) => item.id === activePageIdRef.current);
+    if (!page) return;
+    const builds = (page.animationBuilds ?? []).filter((build) => page.elementIds.includes(build.elementId));
+    clearAnimationPreviewTimers();
+    animationPreviewQueueRef.current = builds;
+    setAnimationPreview({
+      hiddenElementIds: builds.map((build) => build.elementId),
+      pageId: page.id,
+      playing: true,
+      waitingForClick: false,
+    });
+
+    const transitionDelay = page.transition?.delayMs ?? 0;
+    if (builds.length === 0) {
+      scheduleAnimationPreview(finishAnimationPreview, transitionDelay + 520);
+      return;
+    }
+    scheduleAnimationPreview(runNextAnimationBuild, transitionDelay);
   }
 
   function getTranslatableTextElementIds(
@@ -2404,6 +2553,7 @@ export function useEditorViewModel(services: AppServices) {
     processingElementIds,
     backgroundPreview,
     backgroundPreparation,
+    animationPreview,
     canUndo: history.past.length > 0,
     canRedo: history.future.length > 0,
     selection,
@@ -2503,6 +2653,13 @@ export function useEditorViewModel(services: AppServices) {
     updateElementStyle,
     updateMediaPlayback,
     updatePageBackground,
+    clearPageTransition,
+    setPageTransition,
+    setElementAnimationBuilds,
+    clearElementAnimationBuild,
+    reorderElementAnimationBuild,
+    playAnimationPreview,
+    advanceAnimationPreview,
     updateTextContent,
     setElementVisibility,
     setElementLock,

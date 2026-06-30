@@ -319,6 +319,10 @@ export function EditorShell({ services }: EditorShellProps) {
         onShare={() => {
           setSharePanelOpen(true);
         }}
+        onStartPresenterMode={() => {
+          vm.playAnimationPreview();
+          void vm.toggleFullscreen(slideFrameRef.current);
+        }}
         onTranslateDeck={isHistoryReadOnly ? undefined : () => {
           void vm.translateDeck();
         }}
@@ -344,6 +348,12 @@ export function EditorShell({ services }: EditorShellProps) {
           onUpdateElementStyle={isHistoryReadOnly ? undefined : vm.updateElementStyle}
           onUpdateMediaPlayback={isHistoryReadOnly ? undefined : vm.updateMediaPlayback}
           onUpdatePageBackground={isHistoryReadOnly ? undefined : vm.updatePageBackground}
+          onClearPageTransition={isHistoryReadOnly ? undefined : vm.clearPageTransition}
+          onSetPageTransition={isHistoryReadOnly ? undefined : vm.setPageTransition}
+          onSetElementAnimationBuilds={isHistoryReadOnly ? undefined : vm.setElementAnimationBuilds}
+          onClearElementAnimationBuild={isHistoryReadOnly ? undefined : vm.clearElementAnimationBuild}
+          onReorderElementAnimationBuild={isHistoryReadOnly ? undefined : vm.reorderElementAnimationBuild}
+          onPlayAnimationPreview={vm.playAnimationPreview}
           onImportImage={isHistoryReadOnly ? undefined : (file) => {
             void vm.importImageFile(file);
           }}
@@ -401,6 +411,7 @@ export function EditorShell({ services }: EditorShellProps) {
             backgroundSelectionNotice={vm.backgroundSelectionNotice}
             processingElementIds={vm.processingElementIds}
             backgroundPreview={vm.backgroundPreview}
+            animationPreview={vm.animationPreview}
             backgroundPreparation={vm.backgroundPreparation}
             canTranslateCurrentSlide={vm.canTranslateCurrentSlide}
             canTranslateSelection={vm.canTranslateSelection}
@@ -409,6 +420,7 @@ export function EditorShell({ services }: EditorShellProps) {
             onAlignSelectedElement={isHistoryReadOnly ? undefined : () => {
               vm.alignSelectedElement('page-center');
             }}
+            onAnimationPreviewAdvance={vm.advanceAnimationPreview}
             onBackgroundSelectionToggle={isHistoryReadOnly ? undefined : vm.toggleBackgroundSelectionMode}
             onBackgroundSubjectPick={isHistoryReadOnly ? undefined : (elementId, point) => {
               void vm.pickBackgroundSubject(elementId, point);
@@ -428,6 +440,10 @@ export function EditorShell({ services }: EditorShellProps) {
             }}
             onInsertText={isHistoryReadOnly ? undefined : () => {
               vm.insertTextElement();
+            }}
+            onOpenAnimations={isHistoryReadOnly ? undefined : () => {
+              vm.setActiveTab('animations');
+              setLeftPanelOpen(true);
             }}
             onSelectElement={isHistoryReadOnly ? undefined : selectElement}
             onSendSelectedElementBackward={isHistoryReadOnly ? undefined : () => {
@@ -528,14 +544,10 @@ export function EditorShell({ services }: EditorShellProps) {
       ) : null}
       <EditorFooter
         activePageIndex={activePageIndex}
-        isFullscreen={vm.isFullscreen}
         pageCount={vm.project.pages.length}
         pagesPanelOpen={vm.pagesPanelOpen}
         zoomPercent={vm.zoomPercent}
         onResetZoom={vm.resetZoom}
-        onToggleFullscreen={() => {
-          void vm.toggleFullscreen(slideFrameRef.current);
-        }}
         onTogglePagesPanel={vm.togglePagesPanel}
         onZoomIn={vm.zoomIn}
         onZoomOut={vm.zoomOut}
