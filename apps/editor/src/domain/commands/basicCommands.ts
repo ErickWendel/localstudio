@@ -7,6 +7,7 @@ import type {
   PageBackground,
   ProjectDocument,
 } from '../model';
+import { collectReferencedAssetIds } from '../assetUsage';
 import type { EditorCommand } from './types';
 
 export {
@@ -39,23 +40,30 @@ interface TextTranslationPatch {
 
 type TextTranslationValue = string | TextTranslationPatch;
 
-function collectReferencedAssetIds(project: ProjectDocument): Set<string> {
-  const referencedAssetIds = new Set<string>();
-  for (const element of Object.values(project.elements)) {
-    if (element.type === 'image') referencedAssetIds.add(element.assetId);
-  }
-  for (const page of project.pages) {
-    if (page.background.type === 'asset') referencedAssetIds.add(page.background.assetId);
-  }
-  return referencedAssetIds;
-}
-
 function removeUnreferencedAssets(project: ProjectDocument): ProjectDocument {
   const referencedAssetIds = collectReferencedAssetIds(project);
   const assets = Object.fromEntries(
     Object.entries(project.assets).filter(([assetId]) => referencedAssetIds.has(assetId)),
   );
   return { ...project, assets };
+}
+
+export class RemoveAssetCommand implements EditorCommand {
+  readonly description = 'Remove asset';
+
+  constructor(private readonly assetId: string) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    if (!project.assets[this.assetId] || collectReferencedAssetIds(project).has(this.assetId)) return project;
+
+    const { [this.assetId]: removedAsset, ...assets } = project.assets;
+    void removedAsset;
+    return {
+      ...project,
+      assets,
+      updatedAt: new Date().toISOString(),
+    };
+  }
 }
 
 export class AlignElementCommand implements EditorCommand {

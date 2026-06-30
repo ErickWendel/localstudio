@@ -2722,6 +2722,7 @@ button {
 
 .tool-card-list,
 .model-list,
+.asset-list,
 .layer-list {
   display: grid;
   gap: 10px;
@@ -2730,6 +2731,7 @@ button {
 
 .tool-card,
 .model-row,
+.asset-row,
 .layer-row,
 .compact-action,
 .property-row,
@@ -2753,6 +2755,7 @@ button {
 
 .tool-card:hover,
 .model-row:hover,
+.asset-row:hover,
 .layer-row:hover,
 .compact-action:hover,
 .property-row:hover {
@@ -2763,6 +2766,108 @@ button {
 .tool-card:hover,
 .model-row:hover {
   transform: translateY(-1px);
+}
+
+.asset-row {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.asset-thumb {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ew-muted);
+}
+
+.asset-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.asset-row-body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.asset-row-title-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.asset-row-title {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--ew-text);
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asset-status {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 2px 6px;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.asset-status-used {
+  border: 1px solid rgba(55, 253, 118, 0.3);
+  color: var(--ew-green);
+}
+
+.asset-status-unused {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--ew-muted);
+}
+
+.asset-row-meta {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--ew-muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asset-remove-button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ew-text);
+  cursor: pointer;
+}
+
+.asset-remove-button:hover:not(:disabled) {
+  border-color: rgba(255, 91, 91, 0.45);
+  color: #ff8c8c;
+}
+
+.asset-remove-button:disabled {
+  color: rgba(255, 255, 255, 0.26);
+  cursor: not-allowed;
 }
 
 .model-row-attention {

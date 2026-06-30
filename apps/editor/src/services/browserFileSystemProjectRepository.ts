@@ -257,8 +257,14 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
       .map(([, asset]) => asset);
 
     const projectForDisk = await createFileBackedProjectSnapshot(project, assetsDirectory);
+    const retainedAssetFileNames = new Set(
+      Object.values(projectForDisk.assets)
+        .map((asset) => asset.fileName)
+        .filter((fileName): fileName is string => Boolean(fileName)),
+    );
 
     await this.removeStaleAssetFiles(assetsDirectory, staleAssets);
+    await this.removeUnretainedAssetFiles(assetsDirectory, retainedAssetFileNames);
     await this.writeJsonFile(directoryHandle, PROJECT_FILE_NAME, projectForDisk);
     const configDirectory = await directoryHandle.getDirectoryHandle('config', { create: true });
     await this.writeJsonFile(configDirectory, PROJECT_CONFIG_FILE_NAME, {
@@ -371,6 +377,24 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
         await directoryHandle.removeEntry(asset.fileName).catch(() => undefined);
       }),
     );
+  }
+
+  private async removeUnretainedAssetFiles(
+    directoryHandle: FileSystemDirectoryHandle,
+    retainedAssetFileNames: Set<string>,
+  ) {
+    if (!directoryHandle.removeEntry) return;
+    const entries = (directoryHandle as unknown as {
+      entries?: () => AsyncIterable<[string, { kind?: string }]>;
+    }).entries;
+    if (!entries) return;
+
+    const removals: Array<Promise<void>> = [];
+    for await (const [name, handle] of entries.call(directoryHandle)) {
+      if (handle.kind !== 'file' || retainedAssetFileNames.has(name)) continue;
+      removals.push(directoryHandle.removeEntry(name).catch(() => undefined));
+    }
+    await Promise.all(removals);
   }
 
   private async removePrunedVersionFiles(directoryHandle: FileSystemDirectoryHandle, entries: VersionHistoryEntry[]) {

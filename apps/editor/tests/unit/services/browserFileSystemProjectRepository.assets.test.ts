@@ -55,6 +55,11 @@ class MockDirectoryHandle {
     this.directories.delete(name);
     return Promise.resolve();
   }
+  async *entries(): AsyncIterableIterator<[string, { kind: 'file' | 'directory'; name: string }]> {
+    await Promise.resolve();
+    for (const name of this.files.keys()) yield [name, { kind: 'file', name }];
+    for (const name of this.directories.keys()) yield [name, { kind: 'directory', name }];
+  }
   queryPermission(): Promise<PermissionState> {
     return Promise.resolve('granted');
   }
@@ -285,5 +290,20 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
     const savedProject = JSON.parse(directory.files.get('project.json') as string) as ProjectDocument;
     expect(savedProject.assets['asset-stale']).toBeUndefined();
     expect(assetsDirectory.files.has('asset-stale.png')).toBe(false);
+  });
+
+  it('removes asset files that no longer have project metadata on save', async () => {
+    const directory = new MockDirectoryHandle();
+    const assetsDirectory = new MockDirectoryHandle();
+    directory.directories.set('assets', assetsDirectory);
+    assetsDirectory.files.set('asset-removed.png', new Blob(['removed'], { type: 'image/png' }));
+    const repository = new BrowserFileSystemProjectRepository({
+      pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
+    });
+
+    await repository.saveProject(createSampleProject());
+
+    expect(assetsDirectory.files.has('asset-removed.png')).toBe(false);
   });
 });

@@ -322,6 +322,7 @@ export function EditorShell({ services }: EditorShellProps) {
           onImportImage={isHistoryReadOnly ? undefined : (file) => {
             void vm.importImageFile(file);
           }}
+          onRemoveAsset={isHistoryReadOnly ? undefined : vm.removeAsset}
           onInsertText={isHistoryReadOnly ? undefined : vm.insertTextElement}
           modelStates={vm.modelStates}
           attentionModelId={vm.aiToolsAttentionModelId ?? (vm.backgroundSelectionNotice ? IMAGE_EDITING_MODEL_ID : undefined)}

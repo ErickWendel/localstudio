@@ -1,6 +1,7 @@
 import { Brush, ImagePlus, Layers3, Sparkles, Type } from 'lucide-react';
-import { useRef } from 'react';
-import type { PageBackground, ProjectDocument, SelectionState } from '../../domain/model';
+import { useMemo, useRef } from 'react';
+import { collectReferencedAssetIds } from '../../domain/assetUsage';
+import type { Asset, PageBackground, ProjectDocument, SelectionState } from '../../domain/model';
 import type { ElementStylePatch } from '../../domain/commands/basicCommands';
 import type { AiProviderState, ModelState } from '../../services/interfaces';
 import { AiToolsPanel } from './AiToolsPanel';
@@ -34,6 +35,7 @@ interface LeftToolPanelProps {
   onRemoveModel?: ((id: string) => Promise<void>) | undefined;
   onCreateImageOptionsChange?: ((options: CreateImagePromptOptions) => void) | undefined;
   onImportImage?: ((file: File) => void) | undefined;
+  onRemoveAsset?: ((assetId: string) => void) | undefined;
   onInsertText?: ((preset: TextPreset) => void) | undefined;
   onPreparePromptApi?: (() => Promise<void>) | undefined;
   onPrepareLanguageDetectionProvider?: (() => Promise<void>) | undefined;
@@ -86,6 +88,7 @@ export function LeftToolPanel({
   onRemoveModel,
   onCreateImageOptionsChange,
   onImportImage,
+  onRemoveAsset,
   onInsertText,
   onPreparePromptApi,
   onPrepareLanguageDetectionProvider,
@@ -108,6 +111,16 @@ export function LeftToolPanel({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isAttentionOpen = Boolean(attentionModelId || promptApiAttention || translationTargetAttention);
   const panelOpen = open || isAttentionOpen;
+  const assetRows = useMemo(() => {
+    if (!panelOpen || activeTab !== 'assets') return [];
+    const referencedAssetIds = collectReferencedAssetIds(project);
+    return Object.values(project.assets)
+      .map((asset) => ({
+        asset,
+        used: referencedAssetIds.has(asset.id),
+      }))
+      .sort((a, b) => a.asset.name.localeCompare(b.asset.name, undefined, { sensitivity: 'base' }));
+  }, [activeTab, panelOpen, project]);
 
   return (
     <aside className={panelOpen ? 'left-tool-panel left-tool-panel-open' : 'left-tool-panel'} aria-label="Editor tools">
@@ -197,7 +210,7 @@ export function LeftToolPanel({
           <section className="panel-stack">
             <div className="panel-section">
               <h2 className="panel-heading">Assets</h2>
-              <p className="panel-muted">Import images from disk into the active page.</p>
+              <p className="panel-muted">Imported assets in this project.</p>
             </div>
             <button
               className="compact-action compact-action-full"
@@ -224,9 +237,69 @@ export function LeftToolPanel({
                 event.target.value = '';
               }}
             />
+            <div className="asset-list" aria-label="Project assets">
+              {assetRows.length > 0 ? (
+                assetRows.map(({ asset, used }) => (
+                  <AssetRow
+                    asset={asset}
+                    key={asset.id}
+                    used={used}
+                    onRemoveAsset={onRemoveAsset}
+                  />
+                ))
+              ) : (
+                <p className="panel-muted">No assets imported yet.</p>
+              )}
+            </div>
           </section>
         ) : null}
       </div>
     </aside>
+  );
+}
+
+function AssetRow({
+  asset,
+  onRemoveAsset,
+  used,
+}: {
+  asset: Asset;
+  onRemoveAsset: ((assetId: string) => void) | undefined;
+  used: boolean;
+}) {
+  const detail = asset.fileName ?? asset.id;
+  const storageLabel = asset.storage === 'file' ? 'Saved file' : asset.storage === 'remote' ? 'Remote' : 'Inline';
+  return (
+    <div className="asset-row">
+      <div className="asset-thumb" aria-hidden="true">
+        {asset.objectUrl ? <img alt="" src={asset.objectUrl} /> : <span className="material-symbols-outlined">image</span>}
+      </div>
+      <div className="asset-row-body">
+        <div className="asset-row-title-line">
+          <h3 className="asset-row-title">{asset.name}</h3>
+          <span className={used ? 'asset-status asset-status-used' : 'asset-status asset-status-unused'}>
+            {used ? 'Used' : 'Unused'}
+          </span>
+        </div>
+        <p className="asset-row-meta">
+          {asset.mimeType} · {storageLabel}
+        </p>
+        <p className="asset-row-meta">{detail}</p>
+      </div>
+      <button
+        aria-label={`Remove ${asset.name}`}
+        className="asset-remove-button"
+        disabled={used || !onRemoveAsset}
+        title={used ? 'This asset is still used in the project' : 'Remove unused asset'}
+        type="button"
+        onClick={() => {
+          onRemoveAsset?.(asset.id);
+        }}
+      >
+        <span className="material-symbols-outlined" aria-hidden="true">
+          delete
+        </span>
+      </button>
+    </div>
   );
 }

@@ -9,6 +9,7 @@ import {
   RenamePageCommand,
   ReorderPageCommand,
   ReorderElementCommand,
+  RemoveAssetCommand,
   ReplaceImageAssetCommand,
   SetPageVisibilityCommand,
   SetZOrderCommand,
@@ -148,6 +149,30 @@ describe('editor commands', () => {
     });
 
     expect(next.elements['image-hero']).toBeUndefined();
+    expect(next.assets['asset-hero']).toBeDefined();
+  });
+
+  it('removes an unused asset from the project', () => {
+    const project = createSampleProject();
+    project.assets['asset-unused'] = {
+      id: 'asset-unused',
+      type: 'image',
+      name: 'unused.png',
+      mimeType: 'image/png',
+      fileName: 'unused.png',
+      storage: 'file',
+    };
+    const next = new RemoveAssetCommand('asset-unused').execute(project);
+
+    expect(next.assets['asset-unused']).toBeUndefined();
+    expect(project.assets['asset-unused']).toBeDefined();
+  });
+
+  it('does not remove an asset that is still referenced', () => {
+    const project = createSampleProject();
+    const next = new RemoveAssetCommand('asset-hero').execute(project);
+
+    expect(next).toBe(project);
     expect(next.assets['asset-hero']).toBeDefined();
   });
 
