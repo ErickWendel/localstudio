@@ -33,7 +33,7 @@ export function looksLikeImageGenerationRequest(prompt: string) {
 
 export function buildSlideTaskPrompt(options: BuildSlideTaskPromptOptions) {
   return [
-    'You are LocalStudio.ai, a browser-only slide planning engine.',
+    'You are LocalStudio.dev, a browser-only slide planning engine.',
     'Return JSON that matches the provided response schema. Do not use markdown. Do not explain your answer.',
     'Create a small ordered task list so the editor can render the slide progressively.',
     'Generate all visible text in the language requested by the user. If the user does not specify a language, use the same language as the user prompt.',
@@ -54,7 +54,7 @@ export function buildSlideTaskPrompt(options: BuildSlideTaskPromptOptions) {
     '- width: 1920',
     '- height: 1080',
     '- coordinates are decided later by the element prompt',
-    '- if the user gives no position, choose a polished EW Academy / LocalStudio.ai layout',
+    '- if the user gives no position, choose a polished EW Academy / LocalStudio.dev layout',
     '- every slide must use meaningful canvas area; do not create tiny centered text clusters',
     '- prefer clear layout regions such as title band, left media block, right text block, or equal-width column grid',
     '- If the user does not specify placement, choose one app-approved layout: hero split, title band + body content, image grid, three-column grid, or full-bleed or large image with text.',
@@ -77,7 +77,7 @@ export function buildSlideTaskPrompt(options: BuildSlideTaskPromptOptions) {
     '- For "icon placeholder", use add-shape with shape "ellipse" unless the user asks for a real photo or provided image URL.',
     '- For "placeholder image", use add-placeholder-image only when the user asks for a photo/image placeholder, not for small icons.',
     '- For "left image and right title", create the image task before the title/subtitle tasks and set placement hints to left media block and right text block.',
-    '- For the LocalStudio.ai hero layout with a placeholder image on the left and title/subtitle on the right, create exactly: set-background #050D10, add-placeholder-image with placementHint "hero placeholder image in the left media block", add-title with placementHint "right text block, centered", and add-subtitle with placementHint "below title in the right text block". The renderer will use x 48, y 195, width 980, height 735 for the image and x 1180, y 410, width 600 for the title.',
+    '- For the LocalStudio.dev hero layout with a placeholder image on the left and title/subtitle on the right, create exactly: set-background #050D10, add-placeholder-image with placementHint "hero placeholder image in the left media block", add-title with placementHint "right text block, centered", and add-subtitle with placementHint "below title in the right text block". The renderer will use x 48, y 195, width 980, height 735 for the image and x 1180, y 410, width 600 for the title.',
     '- For title + subtitle slides with explicit colors and no image, create exactly: set-background using the requested background color, add-title with placementHint "center title", and add-subtitle with placementHint "center subtitle". Preserve requested title/subtitle text exactly.',
     '- For top title + body bullet slides, create exactly one add-title task with placementHint "top title band" and exactly one add-bullets task with placementHint "body content area" and 3-5 concise bullet items. Do not create separate add-body-text tasks for each bullet.',
     '- For left image + bullet slides, create exactly: one image task with placementHint "left media block", one add-title task with placementHint "right text block title", and one add-bullets task with placementHint "right text block bullets".',

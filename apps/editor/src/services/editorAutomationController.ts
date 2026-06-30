@@ -55,8 +55,15 @@ type SnapshotElement = Pick<
   'height' | 'id' | 'locked' | 'opacity' | 'rotation' | 'type' | 'visible' | 'width' | 'x' | 'y'
 > & {
   assetId?: string;
+  autoplayInPreview?: boolean;
+  controls?: boolean;
   fill?: string;
+  loop?: boolean;
+  muted?: boolean;
+  playing?: boolean;
   text?: string;
+  trimEndSeconds?: number | undefined;
+  trimStartSeconds?: number;
 };
 
 const VALID_TRANSLATION_SCOPES: TranslationScope[] = ['selection', 'slide', 'deck'];
@@ -100,6 +107,21 @@ function compactElement(element: DesignElement): SnapshotElement {
   }
   if (element.type === 'image') {
     return { ...base, assetId: element.assetId };
+  }
+  if (element.type === 'gif') {
+    return { ...base, assetId: element.assetId, playing: element.playing };
+  }
+  if (element.type === 'video') {
+    return {
+      ...base,
+      assetId: element.assetId,
+      autoplayInPreview: element.autoplayInPreview,
+      controls: element.controls,
+      loop: element.loop,
+      muted: element.muted,
+      trimEndSeconds: element.trimEndSeconds,
+      trimStartSeconds: element.trimStartSeconds,
+    };
   }
   return { ...base, fill: element.fill };
 }

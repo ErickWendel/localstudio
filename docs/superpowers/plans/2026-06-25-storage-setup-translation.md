@@ -5,7 +5,7 @@ Last updated: 2026-06-26
 
 ## Goal
 
-Keep LocalStudio.ai local-first: projects save to disk through the File System Access API, AI setup remains explicit, and translation works through the selected local browser provider.
+Keep LocalStudio.dev local-first: projects save to disk through the File System Access API, AI setup remains explicit, and translation works through the selected local browser provider.
 
 ## Implemented
 

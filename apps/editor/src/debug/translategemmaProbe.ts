@@ -75,7 +75,7 @@ function render() {
     </style>
     <section class="probe">
       <h1>TranslateGemma Probe</h1>
-      <p>Runs the same LocalStudio.ai TranslateGemma provider path used by the editor.</p>
+      <p>Runs the same LocalStudio.dev TranslateGemma provider path used by the editor.</p>
       <button id="run-probe" type="button">Run English to Portuguese</button>
       <progress id="progress" max="100" value="0"></progress>
       <pre id="log">Idle.</pre>

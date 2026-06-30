@@ -2,6 +2,7 @@ import {
   AddElementsCommand,
   AlignElementCommand,
   AddImageElementCommand,
+  AddMediaElementCommand,
   DeleteElementCommand,
   DeletePageCommand,
   DuplicatePageCommand,
@@ -20,6 +21,7 @@ import {
   UpdateElementFrameCommand,
   UpdateElementFramesCommand,
   UpdateElementStyleCommand,
+  UpdateMediaPlaybackCommand,
   UpdatePageBackgroundCommand,
   UpdateTextContentCommand,
   TranslateTextElementsCommand,
@@ -390,6 +392,132 @@ describe('editor commands', () => {
     expect(next.elements['image-imported']).toMatchObject({ assetId: 'asset-imported' });
     expect(next.pages[0]?.elementIds.at(-1)).toBe('image-imported');
     expect(project.assets['asset-imported']).toBeUndefined();
+  });
+
+  it('adds imported GIF and video elements as topmost animated media layers', () => {
+    const project = createSampleProject();
+    const withGif = new AddMediaElementCommand('page-1', {
+      asset: {
+        id: 'asset-gif',
+        type: 'gif',
+        name: 'Looping animation',
+        mimeType: 'image/gif',
+        objectUrl: 'data:image/gif;base64,abc',
+      },
+      element: {
+        id: 'gif-imported',
+        type: 'gif',
+        assetId: 'asset-gif',
+        x: 480,
+        y: 240,
+        width: 640,
+        height: 360,
+        rotation: 0,
+        locked: false,
+        opacity: 1,
+        visible: true,
+        playing: true,
+      },
+    }).execute(project);
+    const next = new AddMediaElementCommand('page-1', {
+      asset: {
+        id: 'asset-video',
+        type: 'video',
+        name: 'Demo clip',
+        mimeType: 'video/mp4',
+        objectUrl: 'data:video/mp4;base64,abc',
+      },
+      element: {
+        id: 'video-imported',
+        type: 'video',
+        assetId: 'asset-video',
+        x: 500,
+        y: 260,
+        width: 800,
+        height: 450,
+        rotation: 0,
+        locked: false,
+        opacity: 1,
+        visible: true,
+        loop: true,
+        controls: true,
+        muted: true,
+        autoplayInPreview: true,
+        trimStartSeconds: 2,
+        trimEndSeconds: 8,
+      },
+    }).execute(withGif);
+
+    expect(next.assets['asset-gif']).toMatchObject({ type: 'gif', mimeType: 'image/gif' });
+    expect(next.assets['asset-video']).toMatchObject({ type: 'video', mimeType: 'video/mp4' });
+    expect(next.elements['gif-imported']).toMatchObject({ type: 'gif', playing: true });
+    expect(next.elements['video-imported']).toMatchObject({
+      type: 'video',
+      loop: true,
+      controls: true,
+      muted: true,
+      autoplayInPreview: true,
+      trimStartSeconds: 2,
+      trimEndSeconds: 8,
+    });
+    expect(next.pages[0]?.elementIds.slice(-2)).toEqual(['gif-imported', 'video-imported']);
+  });
+
+  it('updates animated media playback settings immutably', () => {
+    const project = new AddMediaElementCommand('page-1', {
+      asset: {
+        id: 'asset-video',
+        type: 'video',
+        name: 'Demo clip',
+        mimeType: 'video/mp4',
+        objectUrl: 'blob:video',
+      },
+      element: {
+        id: 'video-imported',
+        type: 'video',
+        assetId: 'asset-video',
+        x: 0,
+        y: 0,
+        width: 640,
+        height: 360,
+        rotation: 0,
+        locked: false,
+        opacity: 1,
+        visible: true,
+        loop: false,
+        controls: false,
+        muted: false,
+        autoplayInPreview: false,
+        trimStartSeconds: 0,
+      },
+    }).execute(createSampleProject());
+
+    const next = new UpdateMediaPlaybackCommand('video-imported', {
+      loop: true,
+      controls: true,
+      muted: true,
+      autoplayInPreview: true,
+      trimStartSeconds: 1.5,
+      trimEndSeconds: 9.25,
+    }).execute(project);
+
+    expect(next.elements['video-imported']).toMatchObject({
+      type: 'video',
+      loop: true,
+      controls: true,
+      muted: true,
+      autoplayInPreview: true,
+      trimStartSeconds: 1.5,
+      trimEndSeconds: 9.25,
+    });
+    expect(project.elements['video-imported']).toMatchObject({
+      type: 'video',
+      loop: false,
+      controls: false,
+      muted: false,
+      autoplayInPreview: false,
+      trimStartSeconds: 0,
+    });
   });
 
   it('adds multiple pasted elements as topmost layers', () => {

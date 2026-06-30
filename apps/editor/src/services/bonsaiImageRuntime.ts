@@ -114,7 +114,7 @@ async function cleanupBonsaiDemoSideEffects(module: BonsaiRuntimeModule, removeA
   try {
     await module.destroyBonsaiDemoScene?.();
   } catch {
-    // The Three.js landing scene is not part of LocalStudio.ai and can fail independently.
+    // The Three.js landing scene is not part of LocalStudio.dev and can fail independently.
   }
 
   removeAddedBodyChildren();

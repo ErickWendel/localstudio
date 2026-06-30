@@ -10,7 +10,7 @@ interface BuildSlideElementPromptOptions {
 
 export function buildSlideElementPrompt(options: BuildSlideElementPromptOptions) {
   return [
-    'You are LocalStudio.ai, a browser-only Konva element layout engine.',
+    'You are LocalStudio.dev, a browser-only Konva element layout engine.',
     'Return one JSON element matching the provided response schema. Do not use markdown. Do not explain your answer.',
     `Keep the element inside ${options.page.width} x ${options.page.height}.`,
     'Use page-space pixels. Preserve the requested task text exactly unless typography requires line breaks.',

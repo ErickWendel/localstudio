@@ -2,7 +2,7 @@
 
 > **For agentic workers:** Keep this plan updated with checkbox progress. Implement in small slices, keep the feature file-backed, and use the active lint/typecheck/unit/build toolchain unless browser e2e is explicitly reintroduced in a future plan.
 
-**Goal:** Add a Google Slides-style local version history to LocalStudio.ai. The header gets a history/time icon near the persistence icon, hover shows the last edited date-time, click opens version history, selecting a version previews it at the first detected change, and restoring a version writes it back as the current project.
+**Goal:** Add a Google Slides-style local version history to LocalStudio.dev. The header gets a history/time icon near the persistence icon, hover shows the last edited date-time, click opens version history, selecting a version previews it at the first detected change, and restoring a version writes it back as the current project.
 
 **Storage:** Store history inside the user-selected project folder:
 
@@ -80,7 +80,7 @@ history/
   - selected version highlighted
   - `Highlight changes` toggle
 - [ ] Add preview mode header with back action, selected timestamp, and `Restore this version`.
-- [x] Use LocalStudio.ai black/green styling rather than copying Google’s light theme.
+- [x] Use LocalStudio.dev black/green styling rather than copying Google’s light theme.
 
 ### Task 5: Tests
 

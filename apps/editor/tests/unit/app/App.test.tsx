@@ -27,7 +27,7 @@ describe('App', () => {
   it('renders the application root', async () => {
     render(<App />);
 
-    expect(await screen.findByText('LocalStudio.ai')).toBeInTheDocument();
+    expect(await screen.findByText('LocalStudio.dev')).toBeInTheDocument();
   });
 
   it('starts with a blank project when requested from a new project tab', async () => {
@@ -71,7 +71,7 @@ describe('App', () => {
     render(<App />);
 
     expect(await screen.findByText('Untitled Project')).toBeInTheDocument();
-    expect(screen.queryByText('LocalStudio.ai runs locally in this browser.')).not.toBeInTheDocument();
+    expect(screen.queryByText('LocalStudio.dev runs locally in this browser.')).not.toBeInTheDocument();
   });
 
   it('opens the editor even when browser capabilities are unavailable', async () => {
@@ -81,7 +81,7 @@ describe('App', () => {
     render(<App />);
 
     expect(await screen.findByText('Untitled Project')).toBeInTheDocument();
-    expect(screen.queryByText('LocalStudio.ai runs locally in this browser.')).not.toBeInTheDocument();
+    expect(screen.queryByText('LocalStudio.dev runs locally in this browser.')).not.toBeInTheDocument();
   });
 
   it('renders the WebMCP showcase page at /webmcp', () => {
@@ -95,6 +95,14 @@ describe('App', () => {
       'src',
       '/editor/?webmcp=1&newProject=1',
     );
+  });
+
+  it('renders the WebMCP showcase page at /webmcp/', () => {
+    window.history.replaceState({}, '', '/webmcp/');
+
+    render(<App />);
+
+    expect(screen.getByRole('heading', { name: 'WebMCP showcase' })).toBeInTheDocument();
   });
 
   it('renders the WebMCP showcase page under the editor base path', () => {
@@ -127,6 +135,14 @@ describe('App', () => {
 
     expect(await screen.findByLabelText('Embedded shared deck')).toBeInTheDocument();
     expect(screen.queryByText('Public view')).not.toBeInTheDocument();
+  });
+
+  it('renders the WebMCP showcase page under the editor base path with a trailing slash', () => {
+    window.history.replaceState({}, '', '/editor/webmcp/');
+
+    render(<App />);
+
+    expect(screen.getByRole('heading', { name: 'WebMCP showcase' })).toBeInTheDocument();
   });
 
   it('opens editable command input for a WebMCP workflow step', async () => {

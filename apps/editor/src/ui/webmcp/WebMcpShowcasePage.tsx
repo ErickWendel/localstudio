@@ -188,7 +188,7 @@ export function WebMcpShowcasePage() {
           <span className="webmcp-signal" aria-hidden="true">
             <Radar size={18} />
           </span>
-          <span>LocalStudio.ai</span>
+          <span>LocalStudio.dev</span>
         </div>
         <div className="webmcp-hero">
           <p className="webmcp-kicker">Browser agent surface</p>

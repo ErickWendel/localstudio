@@ -310,6 +310,24 @@ function MiniElement({
     );
   }
 
+  if (element.type === 'gif') {
+    const asset = project.assets[element.assetId];
+    return asset?.objectUrl ? (
+      <img alt="" className="page-card-mini-element" src={asset.objectUrl} style={style} />
+    ) : (
+      <span className="page-card-mini-element page-card-mini-placeholder" style={style} />
+    );
+  }
+
+  if (element.type === 'video') {
+    const asset = project.assets[element.assetId];
+    return asset?.objectUrl ? (
+      <video className="page-card-mini-element" muted playsInline preload="metadata" src={asset.objectUrl} style={style} />
+    ) : (
+      <span className="page-card-mini-element page-card-mini-placeholder" style={style} />
+    );
+  }
+
   return (
     <span
       className="page-card-mini-element"

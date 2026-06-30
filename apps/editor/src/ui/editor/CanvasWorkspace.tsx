@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, ty
 import type Konva from 'konva';
 import { Circle, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transformer } from 'react-konva';
 import type { ElementFramePatch, ImageCropPatch } from '../../domain/commands/basicCommands';
-import type { CropRect, DesignElement, ImageElement, ProjectDocument, SelectionState } from '../../domain/model';
+import type { CropRect, DesignElement, GifElement, ImageElement, ProjectDocument, SelectionState, VideoElement } from '../../domain/model';
 import { getNormalizedElementPoint } from './backgroundSelection';
 import { FloatingSelectionToolbar } from './FloatingSelectionToolbar';
 import { calculateImageCropPatch, type ImageCropHandle } from './imageCrop';
@@ -39,7 +39,7 @@ interface CanvasWorkspaceProps {
   onDeleteSelectedElement?: (() => void) | undefined;
   onDuplicateSelectedElement?: (() => void) | undefined;
   onFlipSelectedImage?: (() => void) | undefined;
-  onInsertImage?: (() => void) | undefined;
+  onInsertMedia?: (() => void) | undefined;
   onInsertText?: (() => void) | undefined;
   onSelectElement?: ((elementId: string, options?: { additive?: boolean }) => void) | undefined;
   onSendSelectedElementBackward?: (() => void) | undefined;
@@ -128,7 +128,7 @@ export function CanvasWorkspace({
   onDeleteSelectedElement,
   onDuplicateSelectedElement,
   onFlipSelectedImage,
-  onInsertImage,
+  onInsertMedia,
   onInsertText,
   onSelectElement,
   onSendSelectedElementBackward,
@@ -171,6 +171,9 @@ export function CanvasWorkspace({
   const visibleElements = sourceVisibleElements
     .map((element) => getDraftedElement(element))
     .filter(isDesignElement);
+  const visibleMediaElements = visibleElements.filter(
+    (element): element is GifElement | VideoElement => element.type === 'gif' || element.type === 'video',
+  );
   const hasSelection = selection.elementIds.length > 0;
   const showEditorOverlays = !presentationMode && !readOnly;
   const selectedElement = getDraftedElement(project.elements[selection.elementIds[0] ?? '']);
@@ -649,6 +652,20 @@ export function CanvasWorkspace({
                   );
                 }
 
+                if (element.type === 'gif' || element.type === 'video') {
+                  const selected = selection.elementIds.includes(element.id);
+                  return (
+                    <Rect
+                      {...commonProps}
+                      key={element.id}
+                      fill="rgba(0,0,0,0.01)"
+                      stroke={selected ? '#37FD76' : 'rgba(55,253,118,0.28)'}
+                      strokeWidth={selected ? 2 : 1}
+                      {...(!selected ? { dash: [6, 5] } : {})}
+                    />
+                  );
+                }
+
                 return (
                   <Text
                     {...commonProps}
@@ -749,6 +766,26 @@ export function CanvasWorkspace({
               ) : null}
             </Layer>
           </Stage>
+          <div className="canvas-media-layer" aria-hidden={visibleMediaElements.length === 0 ? true : undefined}>
+            {visibleMediaElements.map((element) => {
+              const asset = project.assets[element.assetId];
+              return (
+                <CanvasMediaElement
+                  key={element.id}
+                  assetName={asset?.name ?? (element.type === 'video' ? 'Imported video' : 'Imported GIF')}
+                  assetUrl={asset?.objectUrl}
+                  element={element}
+                  interactive={
+                    presentationMode ||
+                    readOnly ||
+                    (element.type === 'video' && selection.elementIds.includes(element.id))
+                  }
+                  previewMode={presentationMode || readOnly}
+                  scale={{ x: scaleX, y: scaleY }}
+                />
+              );
+            })}
+          </div>
           {showEditorOverlays && selectedElement?.type === 'image' && isCropModeActive ? (
             <CropFrameOverlay
               element={selectedElement}
@@ -803,12 +840,12 @@ export function CanvasWorkspace({
             <button type="button" aria-label="Insert Text" title="Insert Text" onClick={onInsertText}>
               <span className="material-symbols-outlined">title</span>
             </button>
-            <button type="button" aria-label="Insert Image" title="Insert Image" onClick={onInsertImage}>
+            <button type="button" aria-label="Insert Media" title="Insert Media" onClick={onInsertMedia}>
               <span className="material-symbols-outlined">add_photo_alternate</span>
             </button>
           </div>
         ) : null}
-        {showEditorOverlays && hasSelection && selectedElement?.type !== 'text' ? (
+        {showEditorOverlays && hasSelection && (selectedElement?.type === 'image' || selectedElement?.type === 'shape') ? (
           <FloatingSelectionToolbar
             elementType={selectedElement?.type === 'image' ? 'image' : 'shape'}
             onAlignCenter={onAlignSelectedElement}
@@ -912,6 +949,118 @@ interface CanvasImageElementProps {
   assetUrl: string | undefined;
   commonProps: CommonElementProps;
   element: Extract<DesignElement, { type: 'image' }>;
+}
+
+interface CanvasMediaElementProps {
+  assetName: string;
+  assetUrl: string | undefined;
+  element: GifElement | VideoElement;
+  interactive: boolean;
+  previewMode: boolean;
+  scale: { x: number; y: number };
+}
+
+function getMediaStyle(element: GifElement | VideoElement, scale: { x: number; y: number }, interactive: boolean) {
+  return {
+    height: `${element.height * scale.y}px`,
+    left: `${element.x * scale.x}px`,
+    opacity: element.opacity,
+    pointerEvents: interactive ? 'auto' : 'none',
+    top: `${element.y * scale.y}px`,
+    transform: `rotate(${element.rotation}deg)`,
+    width: `${element.width * scale.x}px`,
+  } as const;
+}
+
+function CanvasMediaElement({ assetName, assetUrl, element, interactive, previewMode, scale }: CanvasMediaElementProps) {
+  if (element.type === 'gif') {
+    return (
+      <img
+        aria-label={assetName}
+        className="canvas-media-element"
+        src={element.playing ? assetUrl : undefined}
+        style={getMediaStyle(element, scale, interactive)}
+      />
+    );
+  }
+
+  return (
+    <CanvasVideoElement
+      assetName={assetName}
+      assetUrl={assetUrl}
+      element={element}
+      interactive={interactive}
+      previewMode={previewMode}
+      scale={scale}
+    />
+  );
+}
+
+interface CanvasVideoElementProps {
+  assetName: string;
+  assetUrl: string | undefined;
+  element: VideoElement;
+  interactive: boolean;
+  previewMode: boolean;
+  scale: { x: number; y: number };
+}
+
+function CanvasVideoElement({ assetName, assetUrl, element, interactive, previewMode, scale }: CanvasVideoElementProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const previousTrimRef = useRef<{ assetUrl: string | undefined; end: number | undefined; start: number } | undefined>(undefined);
+  const autoplay = previewMode && element.autoplayInPreview;
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const start = Math.max(0, element.trimStartSeconds);
+    const end = element.trimEndSeconds !== undefined && element.trimEndSeconds > 0
+      ? Math.max(0, element.trimEndSeconds)
+      : undefined;
+    const previousTrim = previousTrimRef.current;
+    const assetChanged = previousTrim?.assetUrl !== assetUrl;
+    if (assetChanged || previousTrim?.start !== start) {
+      video.currentTime = start;
+    } else if (previousTrim?.end !== end && end !== undefined) {
+      video.currentTime = end;
+    }
+    previousTrimRef.current = { assetUrl, end, start };
+  }, [assetUrl, element.trimEndSeconds, element.trimStartSeconds]);
+
+  function enforceTrimWindow(video: HTMLVideoElement) {
+    const trimEnd = element.trimEndSeconds;
+    if (trimEnd === undefined || trimEnd <= 0) return;
+    if (video.currentTime < trimEnd) return;
+    if (element.loop) {
+      video.currentTime = Math.max(0, element.trimStartSeconds);
+      return;
+    }
+    video.pause();
+  }
+
+  return (
+    <video
+      aria-label={assetName}
+      autoPlay={autoplay}
+      className="canvas-media-element"
+      controls={element.controls}
+      data-trim-end={element.trimEndSeconds ?? ''}
+      data-trim-start={element.trimStartSeconds}
+      loop={element.loop}
+      muted={element.muted}
+      playsInline
+      preload="metadata"
+      ref={videoRef}
+      src={assetUrl}
+      style={getMediaStyle(element, scale, interactive)}
+      onLoadedMetadata={(event) => {
+        event.currentTarget.currentTime = Math.max(0, element.trimStartSeconds);
+      }}
+      onTimeUpdate={(event) => {
+        enforceTrimWindow(event.currentTarget);
+      }}
+    />
+  );
 }
 
 function CanvasImageElement({ assetUrl, commonProps, element }: CanvasImageElementProps) {

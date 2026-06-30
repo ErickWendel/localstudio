@@ -331,7 +331,7 @@ export function AiToolsPanel({
                 </IconButton>
               ) : null}
             </div>
-            <p>Choose how LocalStudio.ai detects source text language before translation.</p>
+            <p>Choose how LocalStudio.dev detects source text language before translation.</p>
             <label className="translation-target-control">
               <span className="translation-target-label">Detection Model</span>
               <select

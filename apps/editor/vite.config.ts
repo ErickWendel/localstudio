@@ -1,6 +1,9 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Connect } from 'vite';
 
+const siteBase = process.env.LOCALSTUDIO_BASE_PATH ?? '/';
+const editorBase = new URL('editor/', `https://localstudio.invalid${siteBase}`).pathname;
+
 function rewriteWebMcpRoute(req: Connect.IncomingMessage) {
   if (!req.url) return;
   if (req.url === '/webmcp') {
@@ -31,7 +34,7 @@ function webMcpRouteAlias() {
 }
 
 export default defineConfig({
-  base: '/editor/',
+  base: editorBase,
   plugins: [webMcpRouteAlias(), react()],
   build: {
     emptyOutDir: false,

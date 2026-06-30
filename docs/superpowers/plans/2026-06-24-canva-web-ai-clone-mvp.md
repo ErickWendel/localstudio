@@ -1,4 +1,4 @@
-# LocalStudio.ai MVP Plan Status
+# LocalStudio.dev MVP Plan Status
 
 Date: 2026-06-24
 Last updated: 2026-06-26
@@ -15,7 +15,7 @@ Use the spec as the source of truth:
 
 - React/Vite/TypeScript app scaffold.
 - Strict lint/type/test setup with Husky pre-commit hooks.
-- LocalStudio.ai black/green editor shell.
+- LocalStudio.dev black/green editor shell.
 - Canva-style layout: top toolbar, click-toggle left tool rail, central vertical page workspace, right Pages panel, docked prompt bar, and footer controls.
 - Normalized project/page/asset/element model.
 - Immutable command-based editor updates.

@@ -22,9 +22,9 @@ import { GEMMA_LLM_MODEL_ID, TRANSLATEGEMMA_MODEL_ID } from '../../../../src/ser
 import { MockImageGenerationService } from '../../../../src/services/inMemoryAiServices';
 import { InMemoryModelSetupService } from '../../../../src/services/modelSetupService';
 import { EditorShell } from '../../../../src/ui/editor/EditorShell';
+import { imagePromptExamples } from '../../../../src/ui/editor/promptRecipes';
 
-const createImageExample =
-  'A realistic photo of a person using an AI-powered web app on a tablet in a modern city environment, glass buildings and people blurred in the background, subject positioned on the left, camera at eye level, natural daylight, urban innovation and technology atmosphere';
+const createImageExample = imagePromptExamples[0];
 
 function createAppServices(options: Parameters<typeof createRealAppServices>[0] = {}) {
   return createRealAppServices({

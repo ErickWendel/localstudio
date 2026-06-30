@@ -33,9 +33,9 @@ export function FirstRunSetupScreen({ setupState, onRefresh, onContinue }: First
   return (
     <main className="setup-screen">
       <section className="setup-panel" aria-labelledby="setup-title">
-        <p className="setup-kicker font-orbitron">LocalStudio.ai setup</p>
+        <p className="setup-kicker font-orbitron">LocalStudio.dev setup</p>
         <h1 id="setup-title" className="font-orbitron">
-          LocalStudio.ai runs locally in this browser.
+          LocalStudio.dev runs locally in this browser.
         </h1>
         <p className="setup-copy">
           Confirm this browser can save project folders and run local AI providers before opening the

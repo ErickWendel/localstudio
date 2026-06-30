@@ -67,6 +67,16 @@ describe('TopToolbar', () => {
     expect(onPersistenceToggle).toHaveBeenCalledWith(true);
   });
 
+  it('links to the public GitHub repository from the editor toolbar', () => {
+    render(<TopToolbar project={createSampleProject()} language="PT-BR" />);
+
+    expect(screen.getByRole('link', { name: 'Star LocalStudio.dev on GitHub' })).toHaveAttribute(
+      'href',
+      'https://github.com/ErickWendel/localstudio',
+    );
+    expect(screen.getByLabelText('9999 GitHub stars')).toBeInTheDocument();
+  });
+
   it('marks persistence as unavailable when the browser cannot save local folders', async () => {
     const user = userEvent.setup();
     const onPersistenceToggle = vi.fn();

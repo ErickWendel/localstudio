@@ -1,36 +1,107 @@
-# LocalStudio.ai
+# LocalStudio.dev
 
-Browser-only Canva-style slides and image editor MVP, with a product landing page in the same repo.
+[![CI](https://github.com/ErickWendel/localstudio/actions/workflows/ci.yml/badge.svg)](https://github.com/ErickWendel/localstudio/actions/workflows/ci.yml)
+[![Pages](https://github.com/ErickWendel/localstudio/actions/workflows/pages.yml/badge.svg)](https://github.com/ErickWendel/localstudio/actions/workflows/pages.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Node 26](https://img.shields.io/badge/Node-26-5FA04E?logo=nodedotjs&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=111)
+![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)
 
-## Workspace Layout
+Browser-only Canva-style slides and image editing, powered by local Web AI.
 
-- `apps/landing` is the lightweight marketing site served at `/`.
-- `apps/editor` is the heavy Web AI editor served at `/editor/`.
-- `packages/brand` contains shared LocalStudio.ai colors, fonts, and design tokens.
+[Live demo](https://localstudio.dev/) · [WebMCP showcase](https://localstudio.dev/webmcp/) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md)
 
-## Current MVP Snapshot
+## What It Does
 
-- LocalStudio.ai landing page presenting the Web AI positioning and linking into the editor.
-- LocalStudio.ai editor shell with layered slide canvas, click-toggle left tool rail, Text/Layout/Design/AI Tools/Assets panels, right-side Pages panel, local image import, text editing, layer controls, copy/paste, undo/redo, zoom, presentation fullscreen, and PNG export path.
-- Local-first persistence through the browser File System Access API, with project metadata and assets saved to a user-selected folder.
-- Browser-local AI flows for background removal via Segment Anything-style WebGPU segmentation, Chrome Built-in AI translation, Chrome Prompt API prompt-to-slides, and Bonsai Image WebGPU create-image generation.
-- AI Tools owns local model/API setup, translation target selection, Prompt API readiness, and image-generation size/steps/seed configuration.
-- Latest target checks: `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build`.
+LocalStudio.dev runs in the browser: compose slides, generate layouts, create image assets, translate text, edit images, save project history, and export designs without a backend.
 
-## Scripts
+### Prompt-to-slide
 
-- `npm run dev` starts the landing page dev server.
-- `npm run dev:editor` starts the editor dev server.
-- `npm run dev:landing` starts the landing page dev server explicitly.
-- `npm run lint` runs ESLint.
-- `npm run typecheck` runs TypeScript strict checks across the brand package and both apps.
-- `npm run test` runs unit tests for the landing page and editor.
-- `npm run build` creates one deployable `dist/` folder with the landing page at `/` and editor at `/editor/`.
+A prompt becomes editable slide layers, not a flat generated image.
 
-## Design Source
+![Prompt to slide](apps/landing/public/prompt-to-slide.gif)
 
-Approved Stitch handoff lives at:
+### Prompt-to-image
 
-`docs/design/stitch/ew-canvas-ai/README.md`
+A prompt becomes an image asset while you keep composing the same slide.
 
-The canonical header comes from `screens/ai-tools.html`, with the export button treatment from `screens/design.html`.
+![Prompt to image](apps/landing/public/prompt-to-image.gif)
+
+### Translate
+
+Translate selected text, one page, or the full deck in place.
+
+![Translate](apps/landing/public/translate.gif)
+
+### Edit images
+
+Remove the background, then flip or expand the image as a normal layer.
+
+![Edit images](apps/landing/public/edit-images.gif)
+
+### Work locally
+
+Save project files to disk and restore from local version history.
+
+![Local project history](apps/landing/public/fs-history.gif)
+
+### Powered by Web AI
+
+Browser-native AI capabilities keep the workflow fast, private, and local-first.
+
+![Web AI setup](apps/landing/public/powered-webau.gif)
+
+### WebMCP showcase
+
+Expose the editor as a browser agent surface, discover local tools, and run a guided same-origin automation demo.
+
+[Open the WebMCP showcase](https://localstudio.dev/webmcp/)
+
+## Quick Start
+
+```bash
+npm ci
+npm run dev
+```
+
+Focused local apps:
+
+```bash
+npm run dev:landing
+npm run dev:editor
+```
+
+Quality checks:
+
+```bash
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+```
+
+## Browser AI Stack
+
+Some features need Chrome experimental APIs, WebGPU, browser-managed model caches, and local folder permissions.
+
+- Chrome APIs: [Prompt API](https://developer.chrome.com/docs/ai/prompt-api), [Translator API](https://developer.chrome.com/docs/ai/translator-api), [Language Detector API](https://developer.chrome.com/docs/ai/language-detection)
+- Hugging Face models: [Gemma 4 E2B](https://huggingface.co/onnx-community/gemma-4-E2B-it-ONNX), [TranslateGemma 4B](https://huggingface.co/onnx-community/translategemma-text-4b-it-ONNX), [XLM-RoBERTa language detection](https://huggingface.co/onnx-community/xlm-roberta-base-language-detection-ONNX), [SlimSAM](https://huggingface.co/Xenova/slimsam-77-uniform), [Bonsai Image 4B](https://huggingface.co/prism-ml/bonsai-image-ternary-4B-mlx-2bit)
+- WebML references: [Bonsai Image WebGPU Space](https://huggingface.co/spaces/webml-community/bonsai-image-webgpu), [Hugging Face WebML community](https://huggingface.co/webml-community)
+
+## Workspace
+
+- `apps/landing`: product page at `/`
+- `apps/editor`: Web AI editor at `/editor/`
+- `packages/brand`: shared LocalStudio.dev tokens and CSS
+
+## Roadmap
+
+- More browser/device verification for WebGPU flows.
+- Better model selection and generation history.
+- Deeper export formats beyond PNG.
+- More examples built with the editor.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

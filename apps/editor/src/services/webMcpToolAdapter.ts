@@ -72,7 +72,7 @@ export class WebMcpToolAdapter {
     return [
       {
         name: 'create_project',
-        description: 'Create a new blank LocalStudio AI project in the active editor tab.',
+        description: 'Create a new blank LocalStudio.dev project in the active editor tab.',
         inputSchema: {
           type: 'object',
           properties: { name: { type: 'string' } },
@@ -110,7 +110,7 @@ export class WebMcpToolAdapter {
       },
       {
         name: 'translate_text',
-        description: 'Translate visible text in the active LocalStudio AI project. Scope must be selection, slide, or deck.',
+        description: 'Translate visible text in the active LocalStudio.dev project. Scope must be selection, slide, or deck.',
         inputSchema: {
           type: 'object',
           required: ['scope', 'targetLanguage'],
@@ -124,7 +124,7 @@ export class WebMcpToolAdapter {
       },
       {
         name: 'get_project_snapshot',
-        description: 'Return a compact JSON snapshot of the active LocalStudio AI project without large image payloads.',
+        description: 'Return a compact JSON snapshot of the active LocalStudio.dev project without large image payloads.',
         inputSchema: {
           type: 'object',
           properties: {},

@@ -6,7 +6,12 @@ import { EditorShell } from './ui/editor/EditorShell';
 import { PublicDeckViewer } from './ui/share/PublicDeckViewer';
 import { WebMcpShowcasePage } from './ui/webmcp/WebMcpShowcasePage';
 
+function normalizeRoutePath(pathname: string) {
+  return pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
+}
+
 export function App() {
+  const pathname = normalizeRoutePath(window.location.pathname);
   const shareRoute = getShareRoute(window.location.pathname);
   if (shareRoute) {
     const services = createAppServices();
@@ -19,7 +24,7 @@ export function App() {
     );
   }
 
-  if (window.location.pathname === '/webmcp' || window.location.pathname === '/editor/webmcp') {
+  if (pathname === '/webmcp' || pathname === '/editor/webmcp') {
     return <WebMcpShowcasePage />;
   }
 

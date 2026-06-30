@@ -266,6 +266,82 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
     expect(savedAsset.objectUrl).toBeUndefined();
   });
 
+  it('moves GIF and video assets into assets/ with media file extensions', async () => {
+    const directory = new MockDirectoryHandle();
+    const repository = new BrowserFileSystemProjectRepository({
+      pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
+    });
+    const project = createSampleProject();
+    project.assets['asset-gif'] = {
+      id: 'asset-gif',
+      type: 'gif',
+      name: 'Animation',
+      mimeType: 'image/gif',
+      objectUrl: 'data:image/gif;base64,Z2lm',
+    };
+    project.assets['asset-video'] = {
+      id: 'asset-video',
+      type: 'video',
+      name: 'Clip',
+      mimeType: 'video/mp4',
+      objectUrl: 'data:video/mp4;base64,bXA0',
+    };
+    project.elements['gif-imported'] = {
+      id: 'gif-imported',
+      type: 'gif',
+      assetId: 'asset-gif',
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      rotation: 0,
+      locked: false,
+      visible: true,
+      opacity: 1,
+      playing: true,
+    };
+    project.elements['video-imported'] = {
+      id: 'video-imported',
+      type: 'video',
+      assetId: 'asset-video',
+      x: 0,
+      y: 0,
+      width: 160,
+      height: 90,
+      rotation: 0,
+      locked: false,
+      visible: true,
+      opacity: 1,
+      loop: true,
+      controls: true,
+      muted: true,
+      autoplayInPreview: true,
+      trimStartSeconds: 1,
+      trimEndSeconds: 4,
+    };
+    project.pages[0]?.elementIds.push('gif-imported', 'video-imported');
+
+    await repository.saveProject(project);
+
+    const assetsDirectory = directory.directories.get('assets')!;
+    expect(assetsDirectory.files.has('asset-gif.gif')).toBe(true);
+    expect(assetsDirectory.files.has('asset-video.mp4')).toBe(true);
+    const savedProject = JSON.parse(directory.files.get('project.json') as string) as ProjectDocument;
+    expect(savedProject.assets['asset-gif']).toMatchObject({
+      type: 'gif',
+      fileName: 'asset-gif.gif',
+      storage: 'file',
+    });
+    expect(savedProject.assets['asset-video']).toMatchObject({
+      type: 'video',
+      fileName: 'asset-video.mp4',
+      storage: 'file',
+    });
+    expect(savedProject.assets['asset-gif']?.objectUrl).toBeUndefined();
+    expect(savedProject.assets['asset-video']?.objectUrl).toBeUndefined();
+  });
+
   it('keeps unreferenced file-backed assets in project metadata and assets folder on save', async () => {
     const directory = new MockDirectoryHandle();
     const assetsDirectory = new MockDirectoryHandle();
