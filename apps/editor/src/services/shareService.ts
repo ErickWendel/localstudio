@@ -1,4 +1,5 @@
 import type { ProjectDocument } from '../domain/model';
+import { getPublicBasePath, normalizeBasePath } from '../app/publicBasePath';
 import type { ShareMetadata, ShareRecord, ShareService } from './interfaces';
 
 const SHARE_STORAGE_KEY = 'localstudio.ai.public-shares.v1';
@@ -8,6 +9,7 @@ interface ShareStore {
 }
 
 interface BrowserShareServiceOptions {
+  basePath?: string;
   origin?: string;
   storage?: Storage;
 }
@@ -58,10 +60,12 @@ function nextUpdatedAt(currentUpdatedAt: string) {
 }
 
 export class BrowserShareService implements ShareService {
+  private readonly basePath: string;
   private readonly origin: string;
   private readonly storage: Storage | undefined;
 
   constructor(options: BrowserShareServiceOptions = {}) {
+    this.basePath = normalizeBasePath(options.basePath ?? getPublicBasePath());
     this.origin = options.origin ?? getDefaultOrigin();
     this.storage = options.storage ?? getDefaultStorage();
   }
@@ -102,11 +106,11 @@ export class BrowserShareService implements ShareService {
   }
 
   getPublicUrl(shareId: string): string {
-    return `${this.origin}/s/${shareId}`;
+    return `${this.origin}${this.basePath}s/${shareId}`;
   }
 
   getEmbedUrl(shareId: string): string {
-    return `${this.origin}/embed/${shareId}`;
+    return `${this.origin}${this.basePath}embed/${shareId}`;
   }
 
   getEmbedHtml(shareId: string): string {

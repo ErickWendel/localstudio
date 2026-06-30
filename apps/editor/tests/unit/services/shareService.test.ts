@@ -14,10 +14,10 @@ describe('BrowserShareService', () => {
     const share = await service.createShare(createSampleProject());
 
     expect(share.shareId).toBe('00000000-0000-4000-8000-000000000001');
-    expect(share.publicUrl).toBe('https://localstudio.test/s/00000000-0000-4000-8000-000000000001');
-    expect(share.embedUrl).toBe('https://localstudio.test/embed/00000000-0000-4000-8000-000000000001');
+    expect(share.publicUrl).toBe('https://localstudio.test/editor/s/00000000-0000-4000-8000-000000000001');
+    expect(share.embedUrl).toBe('https://localstudio.test/editor/embed/00000000-0000-4000-8000-000000000001');
     expect(share.embedHtml).toContain('<iframe');
-    expect(share.embedHtml).toContain('https://localstudio.test/embed/00000000-0000-4000-8000-000000000001');
+    expect(share.embedHtml).toContain('https://localstudio.test/editor/embed/00000000-0000-4000-8000-000000000001');
     expect(share.status).toBe('published');
   });
 

@@ -1039,10 +1039,10 @@ describe('EditorShell', () => {
     await user.click(screen.getByRole('button', { name: 'Copy link' }));
 
     expect(
-      await screen.findByDisplayValue(`${window.location.origin}/s/00000000-0000-4000-8000-000000000301`),
+      await screen.findByDisplayValue(`${window.location.origin}/editor/s/00000000-0000-4000-8000-000000000301`),
     ).toBeInTheDocument();
     expect(writeText).toHaveBeenCalledWith(
-      `${window.location.origin}/s/00000000-0000-4000-8000-000000000301`,
+      `${window.location.origin}/editor/s/00000000-0000-4000-8000-000000000301`,
     );
   });
 

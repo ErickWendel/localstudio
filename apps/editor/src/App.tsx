@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { createAppServices } from './app/composition';
+import { getPublicBasePath } from './app/publicBasePath';
 import { createBlankProject } from './domain/sampleProject';
 import { EditorShell } from './ui/editor/EditorShell';
 import { PublicDeckViewer } from './ui/share/PublicDeckViewer';
@@ -26,7 +27,8 @@ export function App() {
 }
 
 function getShareRoute(pathname: string) {
-  const match = pathname.match(/^\/(s|embed)\/([^/]+)$/);
+  const routePathname = stripBasePath(pathname);
+  const match = routePathname.match(/^\/(s|embed)\/([^/]+)$/);
   if (!match) return undefined;
   const shareId = match[2];
   if (!shareId) return undefined;
@@ -34,6 +36,15 @@ function getShareRoute(pathname: string) {
     embed: match[1] === 'embed',
     shareId: decodeURIComponent(shareId),
   };
+}
+
+function stripBasePath(pathname: string) {
+  const basePath = getPublicBasePath();
+  if (basePath === '/') return pathname;
+
+  if (!pathname.startsWith(basePath)) return pathname;
+
+  return `/${pathname.slice(basePath.length)}`;
 }
 
 function EditorApp() {

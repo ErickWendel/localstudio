@@ -109,7 +109,7 @@ describe('App', () => {
     const shareService = new BrowserShareService({ origin: window.location.origin });
     vi.spyOn(crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000101');
     await shareService.createShare(createSampleProject());
-    window.history.replaceState({}, '', '/s/00000000-0000-4000-8000-000000000101');
+    window.history.replaceState({}, '', '/editor/s/00000000-0000-4000-8000-000000000101');
 
     render(<App />);
 
@@ -121,7 +121,7 @@ describe('App', () => {
     const shareService = new BrowserShareService({ origin: window.location.origin });
     vi.spyOn(crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000102');
     await shareService.createShare(createSampleProject());
-    window.history.replaceState({}, '', '/embed/00000000-0000-4000-8000-000000000102');
+    window.history.replaceState({}, '', '/editor/embed/00000000-0000-4000-8000-000000000102');
 
     render(<App />);
 
