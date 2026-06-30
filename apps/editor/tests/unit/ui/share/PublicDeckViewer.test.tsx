@@ -17,10 +17,21 @@ describe('PublicDeckViewer', () => {
 
     render(<PublicDeckViewer shareId={share.shareId} shareService={shareService} />);
 
-    expect(await screen.findByRole('heading', { name: 'Untitled AI Deck' })).toBeInTheDocument();
+    expect(await screen.findByLabelText('Public presentation')).toHaveClass('public-deck-viewer-present');
+    expect(screen.queryByRole('heading', { name: 'Untitled AI Deck' })).not.toBeInTheDocument();
     expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-selected-elements', '');
     expect(screen.getByRole('button', { name: 'Previous slide' })).toBeDisabled();
     expect(screen.getByText('1 / 1')).toBeInTheDocument();
+  });
+
+  it('keeps embeds in a compact shared deck layout', async () => {
+    const shareService = new BrowserShareService({ origin: 'https://localstudio.test' });
+    const share = await shareService.createShare(createSampleProject());
+
+    render(<PublicDeckViewer shareId={share.shareId} shareService={shareService} embed />);
+
+    expect(await screen.findByLabelText('Embedded shared deck')).toHaveClass('public-deck-viewer-embed');
+    expect(screen.getByLabelText('Embedded shared deck')).not.toHaveClass('public-deck-viewer-present');
   });
 
   it('moves between slides with next and previous controls', async () => {

@@ -3423,6 +3423,7 @@ button {
 }
 
 .public-deck-viewer {
+  position: relative;
   min-height: 100vh;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
@@ -3430,6 +3431,15 @@ button {
   padding: 24px;
   color: var(--ew-text);
   background: #05080a;
+}
+
+.public-deck-viewer-present {
+  height: 100vh;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+  background: #000;
 }
 
 .public-deck-viewer-embed {
@@ -3470,12 +3480,27 @@ button {
   justify-content: center;
 }
 
-.public-deck-stage-shell .canvas-stage-shell {
+.public-deck-stage-shell .canvas-workspace {
+  height: 100%;
+}
+
+.public-deck-stage-shell .canvas-frame {
   width: min(100%, 1180px);
   max-height: 72vh;
 }
 
-.public-deck-viewer-embed .public-deck-stage-shell .canvas-stage-shell {
+.public-deck-viewer-present .public-deck-stage-shell {
+  height: 100vh;
+  padding: 0;
+}
+
+.public-deck-viewer-present .public-deck-stage-shell .canvas-frame {
+  width: min(100vw, calc(100vh * 16 / 9));
+  max-height: 100vh;
+  box-shadow: none;
+}
+
+.public-deck-viewer-embed .public-deck-stage-shell .canvas-frame {
   width: 100%;
   max-height: calc(100vh - 58px);
 }
@@ -3485,6 +3510,19 @@ button {
   align-items: center;
   justify-content: center;
   gap: 12px;
+}
+
+.public-deck-viewer-present .public-deck-controls {
+  position: absolute;
+  right: 50%;
+  bottom: 18px;
+  z-index: 5;
+  transform: translateX(50%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(10px);
 }
 
 .public-deck-page-count,

@@ -18,6 +18,9 @@ export function PublicDeckViewer({ shareId, shareService, embed = false }: Publi
   const [viewerState, setViewerState] = useState<ViewerState>({ status: 'loading' });
   const [activePageIndex, setActivePageIndex] = useState(0);
   const emptySelection = useMemo<SelectionState>(() => ({ pageId: '', elementIds: [] }), []);
+  const viewerClassName = embed
+    ? 'public-deck-viewer public-deck-viewer-embed'
+    : 'public-deck-viewer public-deck-viewer-present';
 
   useEffect(() => {
     let isActive = true;
@@ -52,7 +55,7 @@ export function PublicDeckViewer({ shareId, shareService, embed = false }: Publi
 
   if (viewerState.status === 'loading') {
     return (
-      <main className={embed ? 'public-deck-viewer public-deck-viewer-embed' : 'public-deck-viewer'}>
+      <main className={viewerClassName}>
         <p className="public-deck-status">Loading deck...</p>
       </main>
     );
@@ -60,7 +63,7 @@ export function PublicDeckViewer({ shareId, shareService, embed = false }: Publi
 
   if (viewerState.status === 'missing') {
     return (
-      <main className={embed ? 'public-deck-viewer public-deck-viewer-embed' : 'public-deck-viewer'}>
+      <main className={viewerClassName}>
         <section className="public-deck-empty">
           <h1>Deck not found</h1>
           <p>This shared deck is unavailable or the link is incorrect.</p>
@@ -73,7 +76,7 @@ export function PublicDeckViewer({ shareId, shareService, embed = false }: Publi
   const activePage = project.pages[activePageIndex] ?? project.pages[0];
   if (!activePage) {
     return (
-      <main className={embed ? 'public-deck-viewer public-deck-viewer-embed' : 'public-deck-viewer'}>
+      <main className={viewerClassName}>
         <section className="public-deck-empty">
           <h1>Deck could not be loaded</h1>
           <p>This shared deck does not contain any slides.</p>
@@ -86,17 +89,9 @@ export function PublicDeckViewer({ shareId, shareService, embed = false }: Publi
 
   return (
     <main
-      className={embed ? 'public-deck-viewer public-deck-viewer-embed' : 'public-deck-viewer'}
-      aria-label={embed ? 'Embedded shared deck' : 'Public shared deck'}
+      className={viewerClassName}
+      aria-label={embed ? 'Embedded shared deck' : 'Public presentation'}
     >
-      {!embed ? (
-        <header className="public-deck-header">
-          <div>
-            <span className="public-deck-kicker">Public view</span>
-            <h1>{project.name}</h1>
-          </div>
-        </header>
-      ) : null}
       <section className="public-deck-stage-shell" aria-label="Shared slide preview">
         <CanvasWorkspace
           project={project}

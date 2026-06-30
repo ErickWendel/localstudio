@@ -113,7 +113,7 @@ describe('App', () => {
 
     render(<App />);
 
-    expect(await screen.findByRole('heading', { name: 'Untitled AI Deck' })).toBeInTheDocument();
+    expect(await screen.findByLabelText('Public presentation')).toHaveClass('public-deck-viewer-present');
     expect(screen.getByText('1 / 1')).toBeInTheDocument();
   });
 
