@@ -82,6 +82,43 @@ describe('LeftToolPanel', () => {
     expect(onImportMedia).toHaveBeenCalledWith(file);
   });
 
+  it('lists project assets with usage status and removal controls', async () => {
+    const project = createSampleProject();
+    project.assets['asset-unused'] = {
+      id: 'asset-unused',
+      type: 'image',
+      name: 'Unused Logo.png',
+      mimeType: 'image/png',
+      fileName: 'unused-logo.png',
+      storage: 'file',
+    };
+    const onRemoveAsset = vi.fn();
+
+    render(
+      <LeftToolPanel
+        activeTab="assets"
+        open
+        onTabChange={vi.fn()}
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        modelStates={modelStates}
+        onRemoveAsset={onRemoveAsset}
+      />,
+    );
+
+    expect(screen.getByText('Futuristic landscape')).toBeInTheDocument();
+    expect(screen.getByText('Unused Logo.png')).toBeInTheDocument();
+    expect(screen.getByText('Used')).toBeInTheDocument();
+    expect(screen.getByText('Unused')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove Unused Logo.png' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Remove Futuristic landscape' })).toBeDisabled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove Unused Logo.png' }));
+
+    expect(onRemoveAsset).toHaveBeenCalledWith('asset-unused');
+  });
+
   it('adds styled text presets from the Text menu', async () => {
     const user = userEvent.setup();
     const onInsertText = vi.fn();

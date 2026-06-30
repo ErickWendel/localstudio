@@ -10,6 +10,7 @@ import {
   RenamePageCommand,
   ReorderPageCommand,
   ReorderElementCommand,
+  RemoveAssetCommand,
   ReplaceImageAssetCommand,
   SetPageVisibilityCommand,
   SetZOrderCommand,
@@ -73,13 +74,13 @@ describe('editor commands', () => {
     expect(next.pages[0]?.elementIds).not.toContain('text-subtitle');
   });
 
-  it('deletes an image element and its owned asset', () => {
+  it('deletes an image element while keeping its asset in the project library', () => {
     const project = createSampleProject();
     const command = new DeleteElementCommand('page-1', 'image-hero');
     const next = command.execute(project);
 
     expect(next.elements['image-hero']).toBeUndefined();
-    expect(next.assets['asset-hero']).toBeUndefined();
+    expect(next.assets['asset-hero']).toBeDefined();
     expect(next.pages[0]?.elementIds).not.toContain('image-hero');
   });
 
@@ -107,7 +108,7 @@ describe('editor commands', () => {
     });
     expect(next.pages[0]?.elementIds).toEqual(project.pages[0]?.elementIds);
     expect(next.assets['asset-generated-replacement']).toBeDefined();
-    expect(next.assets['asset-hero']).toBeUndefined();
+    expect(next.assets['asset-hero']).toBeDefined();
     expect(project.elements['image-hero']).toMatchObject({ type: 'image', assetId: 'asset-hero' });
   });
 
@@ -150,6 +151,30 @@ describe('editor commands', () => {
     });
 
     expect(next.elements['image-hero']).toBeUndefined();
+    expect(next.assets['asset-hero']).toBeDefined();
+  });
+
+  it('removes an unused asset from the project', () => {
+    const project = createSampleProject();
+    project.assets['asset-unused'] = {
+      id: 'asset-unused',
+      type: 'image',
+      name: 'unused.png',
+      mimeType: 'image/png',
+      fileName: 'unused.png',
+      storage: 'file',
+    };
+    const next = new RemoveAssetCommand('asset-unused').execute(project);
+
+    expect(next.assets['asset-unused']).toBeUndefined();
+    expect(project.assets['asset-unused']).toBeDefined();
+  });
+
+  it('does not remove an asset that is still referenced', () => {
+    const project = createSampleProject();
+    const next = new RemoveAssetCommand('asset-hero').execute(project);
+
+    expect(next).toBe(project);
     expect(next.assets['asset-hero']).toBeDefined();
   });
 

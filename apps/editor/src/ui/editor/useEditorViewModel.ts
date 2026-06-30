@@ -14,6 +14,7 @@ import {
   RenamePageCommand,
   ReorderPageCommand,
   ReorderElementCommand,
+  RemoveAssetCommand,
   ReplaceImageAssetCommand,
   SetElementLockCommand,
   SetElementVisibilityCommand,
@@ -1739,6 +1740,10 @@ export function useEditorViewModel(services: AppServices) {
     });
   }
 
+  function removeAsset(assetId: string) {
+    commitProject((currentProject) => new RemoveAssetCommand(assetId).execute(currentProject));
+  }
+
   function deleteSelectedElement() {
     const deletableElementIds = selectedElementIds.filter((elementId) => !processingElementIds.includes(elementId));
     if (deletableElementIds.length === 0) return;
@@ -2503,6 +2508,7 @@ export function useEditorViewModel(services: AppServices) {
     setElementLock,
     deleteElement,
     reorderElement,
+    removeAsset,
     importImageFile,
     importMediaFile: importImageFile,
   };

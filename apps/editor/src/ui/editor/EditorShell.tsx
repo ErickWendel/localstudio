@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type Konva from 'konva';
 import type { AppServices } from '../../app/composition';
+import type { ShareMetadata } from '../../services/interfaces';
 import { EditorAutomationController, type EditorAutomationDelegate } from '../../services/editorAutomationController';
 import { IMAGE_EDITING_MODEL_ID } from '../../services/modelSetupService';
 import {
@@ -16,6 +17,7 @@ import { ScrollingCanvasWorkspace } from './ScrollingCanvasWorkspace';
 import { TopToolbar } from './TopToolbar';
 import { VersionHistoryPanel } from './VersionHistoryPanel';
 import { useEditorViewModel } from './useEditorViewModel';
+import { SharePanel } from '../share/SharePanel';
 
 interface EditorShellProps {
   services: AppServices;
@@ -85,6 +87,8 @@ export function EditorShell({ services }: EditorShellProps) {
   const vm = useEditorViewModel(services);
   const automationDelegateRef = useRef(vm.automation);
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
+  const [sharePanelOpen, setSharePanelOpen] = useState(false);
+  const [shareMetadata, setShareMetadata] = useState<ShareMetadata | undefined>();
   const stageRef = useRef<Konva.Stage>(null);
   const workspaceRef = useRef<HTMLElement>(null);
   const slideFrameRef = useRef<HTMLDivElement>(null);
@@ -107,6 +111,21 @@ export function EditorShell({ services }: EditorShellProps) {
     url.searchParams.delete('project');
     url.searchParams.set('newProject', '1');
     window.open(url.toString(), '_blank', 'noopener,noreferrer');
+  }
+
+  async function copyPublicShareLink() {
+    const nextShare = shareMetadata
+      ? await services.shareService.updateShare(shareMetadata.shareId, vm.project)
+      : await services.shareService.createShare(vm.project);
+    const copiedShare: ShareMetadata = { ...nextShare, status: 'copied' };
+    setShareMetadata(copiedShare);
+    await navigator.clipboard?.writeText(copiedShare.publicUrl);
+    return copiedShare;
+  }
+
+  function presentFromSharePanel() {
+    setSharePanelOpen(false);
+    void vm.toggleFullscreen(slideFrameRef.current);
   }
 
   function isAnimatedMediaFile(file: File) {
@@ -243,6 +262,26 @@ export function EditorShell({ services }: EditorShellProps) {
     };
   }, []);
 
+  useEffect(() => {
+    const shareId = shareMetadata?.shareId;
+    if (!shareId) return undefined;
+    const timeoutId = window.setTimeout(() => {
+      setShareMetadata((current) => (current ? { ...current, status: 'syncing' } : current));
+      void services.shareService
+        .updateShare(shareId, vm.project)
+        .then((nextShare) => {
+          setShareMetadata(nextShare);
+        })
+        .catch(() => {
+          setShareMetadata((current) => (current ? { ...current, status: 'sync-failed' } : current));
+        });
+    }, 1000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [services.shareService, shareMetadata?.shareId, vm.project]);
+
   return (
     <div className="app-shell">
       <TopToolbar
@@ -260,7 +299,6 @@ export function EditorShell({ services }: EditorShellProps) {
         persistenceAvailable={services.persistenceAvailable}
         onDelete={isHistoryReadOnly ? undefined : vm.deleteSelectedElement}
         onDuplicate={isHistoryReadOnly ? undefined : vm.duplicateSelectedElement}
-        onExport={exportCurrentPageAsPng}
         onImportProject={() => {
           void vm.importProject();
         }}
@@ -277,6 +315,9 @@ export function EditorShell({ services }: EditorShellProps) {
         onSelectLayers={() => {
           vm.setActiveTab('layout');
           setLeftPanelOpen(true);
+        }}
+        onShare={() => {
+          setSharePanelOpen(true);
         }}
         onTranslateDeck={isHistoryReadOnly ? undefined : () => {
           void vm.translateDeck();
@@ -306,6 +347,7 @@ export function EditorShell({ services }: EditorShellProps) {
           onImportImage={isHistoryReadOnly ? undefined : (file) => {
             void vm.importImageFile(file);
           }}
+          onRemoveAsset={isHistoryReadOnly ? undefined : vm.removeAsset}
           onImportMedia={isHistoryReadOnly ? undefined : importMediaFile}
           onInsertText={isHistoryReadOnly ? undefined : vm.insertTextElement}
           modelStates={vm.modelStates}
@@ -470,6 +512,18 @@ export function EditorShell({ services }: EditorShellProps) {
           onSelectVersion={(versionId) => {
             void vm.selectVersion(versionId);
           }}
+        />
+      ) : null}
+      {sharePanelOpen ? (
+        <SharePanel
+          projectName={vm.project.name}
+          share={shareMetadata}
+          onClose={() => {
+            setSharePanelOpen(false);
+          }}
+          onCopyLink={copyPublicShareLink}
+          onDownload={exportCurrentPageAsPng}
+          onPresent={presentFromSharePanel}
         />
       ) : null}
       <EditorFooter

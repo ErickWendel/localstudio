@@ -11,6 +11,7 @@ import type {
   PromptService,
   ProjectRepository,
   SmartGrabService,
+  ShareService,
   TranslatorService,
 } from '../services/interfaces';
 import {
@@ -27,6 +28,7 @@ import { BrowserFileSystemProjectRepository } from '../services/browserFileSyste
 import { DisabledProjectRepository } from '../services/disabledProjectRepository';
 import { BrowserLocalSetupService } from '../services/localSetupService';
 import { BrowserModelSetupService } from '../services/modelSetupService';
+import { BrowserShareService } from '../services/shareService';
 import { TransformersLanguageDetectionRuntime } from '../services/webGpuLanguageDetectionRuntime';
 import { TransformersTextGenerationRuntime } from '../services/webGpuTextGenerationRuntime';
 
@@ -37,6 +39,7 @@ export interface AppServices {
   persistenceAvailable: boolean;
   projectRepository: ProjectRepository;
   exportService: ExportService;
+  shareService: ShareService;
   localSetupService: LocalSetupService;
   modelSetupService: ModelSetupService;
   translatorService: TranslatorService;
@@ -73,6 +76,7 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     persistenceAvailable,
     projectRepository: createProjectRepository(persistenceAvailable),
     exportService: new BrowserExportService(),
+    shareService: new BrowserShareService(),
     localSetupService: new BrowserLocalSetupService(),
     modelSetupService,
     translatorService: new BrowserTranslatorService(

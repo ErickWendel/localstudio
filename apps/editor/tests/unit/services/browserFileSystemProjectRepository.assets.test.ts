@@ -55,6 +55,11 @@ class MockDirectoryHandle {
     this.directories.delete(name);
     return Promise.resolve();
   }
+  async *entries(): AsyncIterableIterator<[string, { kind: 'file' | 'directory'; name: string }]> {
+    await Promise.resolve();
+    for (const name of this.files.keys()) yield [name, { kind: 'file', name }];
+    for (const name of this.directories.keys()) yield [name, { kind: 'directory', name }];
+  }
   queryPermission(): Promise<PermissionState> {
     return Promise.resolve('granted');
   }
@@ -337,7 +342,7 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
     expect(savedProject.assets['asset-video']?.objectUrl).toBeUndefined();
   });
 
-  it('removes stale file-backed assets from project metadata and assets folder on save', async () => {
+  it('keeps unreferenced file-backed assets in project metadata and assets folder on save', async () => {
     const directory = new MockDirectoryHandle();
     const assetsDirectory = new MockDirectoryHandle();
     directory.directories.set('assets', assetsDirectory);
@@ -359,7 +364,26 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
     await repository.saveProject(project);
 
     const savedProject = JSON.parse(directory.files.get('project.json') as string) as ProjectDocument;
-    expect(savedProject.assets['asset-stale']).toBeUndefined();
-    expect(assetsDirectory.files.has('asset-stale.png')).toBe(false);
+    expect(savedProject.assets['asset-stale']).toMatchObject({
+      id: 'asset-stale',
+      fileName: 'asset-stale.png',
+      storage: 'file',
+    });
+    expect(assetsDirectory.files.has('asset-stale.png')).toBe(true);
+  });
+
+  it('removes asset files that no longer have project metadata on save', async () => {
+    const directory = new MockDirectoryHandle();
+    const assetsDirectory = new MockDirectoryHandle();
+    directory.directories.set('assets', assetsDirectory);
+    assetsDirectory.files.set('asset-removed.png', new Blob(['removed'], { type: 'image/png' }));
+    const repository = new BrowserFileSystemProjectRepository({
+      pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
+    });
+
+    await repository.saveProject(createSampleProject());
+
+    expect(assetsDirectory.files.has('asset-removed.png')).toBe(false);
   });
 });
