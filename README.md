@@ -46,6 +46,32 @@ Save project files to disk and restore from local version history.
 
 ![Local project history](apps/landing/public/fs-history.gif)
 
+### Mirror projects with MinIO
+
+LocalStudio can mirror the complete project folder to MinIO so another computer can import the same project, assets, and version history. Local disk is still the source of truth while editing; MinIO sync runs in the background after successful local saves.
+
+Start the local MinIO stack:
+
+```bash
+docker compose -f docker-compose.minio.yml up
+```
+
+Default local settings:
+
+- API endpoint: `http://localhost:9000`
+- Console: `http://localhost:9001`
+- Bucket: `localstudio`
+- Access key: `localstudio`
+- Secret key: `localstudio123`
+- Region: `us-east-1`
+- Public base URL: `http://localhost:9000/localstudio`
+- Prefix: `mirrors`
+- Path-style URLs: enabled
+
+In the editor, open `File` -> `Mirror Settings` and enter those values. Use `File` -> `Mirror Now` to force an upload, or `File` -> `Import Remote` on another computer to download a mirrored project into a new local folder and continue syncing.
+
+The dev compose file sets the `localstudio` bucket to public download mode so mirrored files can be shared through the public base URL. For production, use a MinIO bucket or prefix policy that matches what you intend to publish. Browser-stored MinIO keys are persisted locally, so scope credentials to this bucket and avoid using root credentials outside local development.
+
 ### Powered by Web AI
 
 Browser-native AI capabilities keep the workflow fast, private, and local-first.

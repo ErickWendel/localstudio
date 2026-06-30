@@ -3,6 +3,7 @@ interface EditorFooterProps {
   pageCount: number;
   pagesPanelOpen?: boolean;
   zoomPercent: number;
+  onOpenSettings?: () => void;
   onResetZoom?: () => void;
   onTogglePagesPanel?: () => void;
   onZoomIn?: () => void;
@@ -14,6 +15,7 @@ export function EditorFooter({
   pageCount,
   pagesPanelOpen = true,
   zoomPercent,
+  onOpenSettings,
   onResetZoom,
   onTogglePagesPanel,
   onZoomIn,
@@ -21,7 +23,19 @@ export function EditorFooter({
 }: EditorFooterProps) {
   return (
     <footer className="editor-footer" aria-label="Editor footer controls">
-      <div className="editor-footer-left" />
+      <div className="editor-footer-left">
+        <button
+          className="stitch-icon-button footer-settings-button"
+          type="button"
+          aria-label="Mirror settings"
+          title="Mirror settings"
+          onClick={onOpenSettings}
+        >
+          <span className="material-symbols-outlined" aria-hidden="true">
+            settings
+          </span>
+        </button>
+      </div>
       <div className="editor-footer-right">
         <div className="footer-zoom-controls" aria-label="Zoom controls">
           <button
@@ -35,7 +49,12 @@ export function EditorFooter({
               remove
             </span>
           </button>
-          <button className="zoom-value" type="button" aria-label="Reset zoom" onClick={onResetZoom}>
+          <button
+            className="zoom-value"
+            type="button"
+            aria-label="Reset zoom"
+            onClick={onResetZoom}
+          >
             {zoomPercent}%
           </button>
           <button

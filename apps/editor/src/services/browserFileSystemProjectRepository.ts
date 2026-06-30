@@ -1,5 +1,6 @@
 import type { ProjectDocument } from '../domain/model';
 import type {
+  MirrorFile,
   ProjectRepository,
   VersionHistoryEntry,
   VersionHistoryManifest,
@@ -23,7 +24,9 @@ type PermissionCapableDirectoryHandle = FileSystemDirectoryHandle & {
 
 type WindowWithDirectoryPicker = Window &
   typeof globalThis & {
-    showDirectoryPicker?: (options?: { mode?: 'read' | 'readwrite' }) => Promise<FileSystemDirectoryHandle>;
+    showDirectoryPicker?: (options?: {
+      mode?: 'read' | 'readwrite';
+    }) => Promise<FileSystemDirectoryHandle>;
   };
 
 const PROJECT_FILE_NAME = 'project.json';
@@ -99,7 +102,11 @@ async function createFileBackedProjectSnapshot(
 
     if (!isDataUrl(asset.objectUrl) && !isBlobUrl(asset.objectUrl)) continue;
     const fileName = asset.fileName ?? `${assetId}.${getAssetFileExtension(asset.mimeType)}`;
-    await writeBlobFileToDirectory(assetsDirectory, fileName, await objectUrlToBlob(asset.objectUrl));
+    await writeBlobFileToDirectory(
+      assetsDirectory,
+      fileName,
+      await objectUrlToBlob(asset.objectUrl),
+    );
     const assetForDisk = { ...asset };
     delete assetForDisk.objectUrl;
     projectForDisk.assets[assetId] = {
@@ -123,11 +130,24 @@ async function writeBlobFileToDirectory(
   await writable.close();
 }
 
+async function readProjectNameFromMirrorFiles(files: MirrorFile[]) {
+  const projectFile = files.find((file) => file.path === PROJECT_FILE_NAME);
+  if (!projectFile) return undefined;
+  const project = JSON.parse(await projectFile.blob.text()) as ProjectDocument;
+  return project.name.trim() || undefined;
+}
+
 function getChangedElementKeys(previousProject: ProjectDocument, nextProject: ProjectDocument) {
   const changedElementIds = new Set<string>();
-  const elementIds = new Set([...Object.keys(previousProject.elements), ...Object.keys(nextProject.elements)]);
+  const elementIds = new Set([
+    ...Object.keys(previousProject.elements),
+    ...Object.keys(nextProject.elements),
+  ]);
   for (const elementId of elementIds) {
-    if (JSON.stringify(previousProject.elements[elementId]) !== JSON.stringify(nextProject.elements[elementId])) {
+    if (
+      JSON.stringify(previousProject.elements[elementId]) !==
+      JSON.stringify(nextProject.elements[elementId])
+    ) {
       changedElementIds.add(elementId);
     }
   }
@@ -158,7 +178,10 @@ function createChangeSummary(project: ProjectDocument, previousProject?: Project
     firstChangedElementId ??= elementId;
   }
 
-  const pageIds = new Set([...previousProject.pages.map((page) => page.id), ...project.pages.map((page) => page.id)]);
+  const pageIds = new Set([
+    ...previousProject.pages.map((page) => page.id),
+    ...project.pages.map((page) => page.id),
+  ]);
   for (const pageId of pageIds) {
     const previousPage = previousProject.pages.find((page) => page.id === pageId);
     const nextPage = project.pages.find((page) => page.id === pageId);
@@ -166,12 +189,19 @@ function createChangeSummary(project: ProjectDocument, previousProject?: Project
       changeCount += 1;
       firstChangedPageId ??= nextPage?.id ?? previousPage?.id;
       const pageElementIds = [...(nextPage?.elementIds ?? []), ...(previousPage?.elementIds ?? [])];
-      firstChangedElementId ??= pageElementIds.find((elementId) => changedElementIds.has(elementId));
+      firstChangedElementId ??= pageElementIds.find((elementId) =>
+        changedElementIds.has(elementId),
+      );
     }
   }
 
-  for (const assetId of new Set([...Object.keys(previousProject.assets), ...Object.keys(project.assets)])) {
-    if (JSON.stringify(previousProject.assets[assetId]) !== JSON.stringify(project.assets[assetId])) {
+  for (const assetId of new Set([
+    ...Object.keys(previousProject.assets),
+    ...Object.keys(project.assets),
+  ])) {
+    if (
+      JSON.stringify(previousProject.assets[assetId]) !== JSON.stringify(project.assets[assetId])
+    ) {
       changeCount += 1;
     }
   }
@@ -195,6 +225,8 @@ function createChangeSummary(project: ProjectDocument, previousProject?: Project
 
 export class BrowserFileSystemProjectRepository implements ProjectRepository {
   private directoryHandle: FileSystemDirectoryHandle | null = null;
+  private parentDirectoryHandle: FileSystemDirectoryHandle | null = null;
+  private projectDirectoryName: string | null = null;
   private readonly recentProjectStore: RecentProjectHandleStore;
 
   constructor(private readonly options: FileSystemProjectRepositoryOptions = {}) {
@@ -207,6 +239,28 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     await this.recentProjectStore.save(this.directoryHandle);
     const project = await this.loadProject();
     if (project) await this.recentProjectStore.save(this.directoryHandle, project.name);
+    return project;
+  }
+
+  async importMirrorFiles(files: MirrorFile): Promise<ProjectDocument>;
+  async importMirrorFiles(files: MirrorFile[]): Promise<ProjectDocument>;
+  async importMirrorFiles(files: MirrorFile | MirrorFile[]): Promise<ProjectDocument> {
+    const pickDirectory = this.options.pickDirectory ?? getBrowserDirectoryPicker();
+    const selectedDirectoryHandle = await pickDirectory();
+    const mirrorFiles = Array.isArray(files) ? files : [files];
+    const projectDirectoryName = await readProjectNameFromMirrorFiles(mirrorFiles);
+    this.parentDirectoryHandle = projectDirectoryName ? selectedDirectoryHandle : null;
+    this.projectDirectoryName = projectDirectoryName ?? selectedDirectoryHandle.name ?? null;
+    this.directoryHandle = projectDirectoryName
+      ? await selectedDirectoryHandle.getDirectoryHandle(projectDirectoryName, { create: true })
+      : selectedDirectoryHandle;
+    await this.ensureReadWritePermission(this.directoryHandle);
+    for (const file of mirrorFiles) {
+      await this.writeMirrorFile(this.directoryHandle, file);
+    }
+    const project = await this.loadProject();
+    if (!project) throw new Error('The mirrored project did not include project.json.');
+    await this.recentProjectStore.save(this.directoryHandle, project.name);
     return project;
   }
 
@@ -230,8 +284,12 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     return this.hydrateProjectAssets(project);
   }
 
-  async saveProject(project: ProjectDocument): Promise<void> {
-    const directoryHandle = await this.ensureProjectDirectory(project.name);
+  async saveProject(
+    project: ProjectDocument,
+    options?: { projectDirectoryName?: string },
+  ): Promise<void> {
+    const previousProjectDirectoryName = this.projectDirectoryName;
+    const directoryHandle = await this.ensureProjectDirectory(project.name, options);
     const assetsDirectory = await directoryHandle.getDirectoryHandle('assets', { create: true });
     await Promise.all([
       directoryHandle.getDirectoryHandle('cache', { create: true }),
@@ -254,6 +312,15 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
       schemaVersion: 1,
       savedAt: new Date().toISOString(),
     });
+    if (
+      previousProjectDirectoryName &&
+      previousProjectDirectoryName !== this.projectDirectoryName &&
+      this.parentDirectoryHandle?.removeEntry
+    ) {
+      await this.parentDirectoryHandle
+        .removeEntry(previousProjectDirectoryName, { recursive: true })
+        .catch(() => undefined);
+    }
   }
 
   async getVersionHistory(): Promise<VersionHistoryEntry[]> {
@@ -262,11 +329,16 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     return manifest.versions;
   }
 
-  async saveVersion(project: ProjectDocument, metadata: VersionSnapshotMetadata): Promise<VersionHistoryEntry> {
+  async saveVersion(
+    project: ProjectDocument,
+    metadata: VersionSnapshotMetadata,
+  ): Promise<VersionHistoryEntry> {
     const directoryHandle = await this.ensureProjectDirectory(project.name);
     const assetsDirectory = await directoryHandle.getDirectoryHandle('assets', { create: true });
     const historyDirectory = await directoryHandle.getDirectoryHandle('history', { create: true });
-    const versionsDirectory = await historyDirectory.getDirectoryHandle('versions', { create: true });
+    const versionsDirectory = await historyDirectory.getDirectoryHandle('versions', {
+      create: true,
+    });
     const manifest = await this.readVersionHistoryManifest(directoryHandle, project.id);
     const createdAt = new Date().toISOString();
     const id = createVersionId(new Date(createdAt));
@@ -280,15 +352,26 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
       summary: changeSummary.summary,
       changeCount: changeSummary.changeCount,
       fileName,
-      ...(changeSummary.firstChangedPageId ? { firstChangedPageId: changeSummary.firstChangedPageId } : {}),
-      ...(changeSummary.firstChangedElementId ? { firstChangedElementId: changeSummary.firstChangedElementId } : {}),
+      ...(changeSummary.firstChangedPageId
+        ? { firstChangedPageId: changeSummary.firstChangedPageId }
+        : {}),
+      ...(changeSummary.firstChangedElementId
+        ? { firstChangedElementId: changeSummary.firstChangedElementId }
+        : {}),
     };
 
     const projectForHistory = await createFileBackedProjectSnapshot(project, assetsDirectory);
-    await this.writeJsonFile(versionsDirectory, fileName, cloneProjectForHistory(projectForHistory));
+    await this.writeJsonFile(
+      versionsDirectory,
+      fileName,
+      cloneProjectForHistory(projectForHistory),
+    );
     const nextVersions = [entry, ...manifest.versions.filter((version) => version.id !== entry.id)];
     const retainedVersions = nextVersions.slice(0, VERSION_HISTORY_LIMIT);
-    await this.removePrunedVersionFiles(versionsDirectory, nextVersions.slice(VERSION_HISTORY_LIMIT));
+    await this.removePrunedVersionFiles(
+      versionsDirectory,
+      nextVersions.slice(VERSION_HISTORY_LIMIT),
+    );
     await this.writeJsonFile(historyDirectory, VERSION_HISTORY_FILE_NAME, {
       schemaVersion: 1,
       projectId: project.id,
@@ -310,10 +393,34 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     return this.hydrateProjectAssets(JSON.parse(await file.text()) as ProjectDocument);
   }
 
-  private async ensureProjectDirectory(projectName?: string): Promise<FileSystemDirectoryHandle> {
+  private async ensureProjectDirectory(
+    projectName?: string,
+    options?: { projectDirectoryName?: string },
+  ): Promise<FileSystemDirectoryHandle> {
+    const requestedProjectDirectoryName =
+      options?.projectDirectoryName?.trim() ||
+      (this.parentDirectoryHandle && projectName?.trim() ? projectName.trim() : undefined);
+
     if (!this.directoryHandle) {
       const pickDirectory = this.options.pickDirectory ?? getBrowserDirectoryPicker();
-      this.directoryHandle = await pickDirectory();
+      const selectedDirectoryHandle = await pickDirectory();
+      this.parentDirectoryHandle = requestedProjectDirectoryName ? selectedDirectoryHandle : null;
+      this.projectDirectoryName = requestedProjectDirectoryName ?? selectedDirectoryHandle.name ?? null;
+      this.directoryHandle = requestedProjectDirectoryName
+        ? await selectedDirectoryHandle.getDirectoryHandle(requestedProjectDirectoryName, {
+            create: true,
+          })
+        : selectedDirectoryHandle;
+    } else if (
+      requestedProjectDirectoryName &&
+      this.parentDirectoryHandle &&
+      requestedProjectDirectoryName !== this.projectDirectoryName
+    ) {
+      this.directoryHandle = await this.parentDirectoryHandle.getDirectoryHandle(
+        requestedProjectDirectoryName,
+        { create: true },
+      );
+      this.projectDirectoryName = requestedProjectDirectoryName;
     }
     const directoryHandle = this.directoryHandle;
     await this.ensureReadWritePermission(directoryHandle);
@@ -332,10 +439,16 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
       const nextPermission = await permissionCapableHandle.requestPermission(permissions);
       if (nextPermission === 'granted') return;
     }
-    throw new Error('LocalStudio.dev needs permission to read and write the selected project folder.');
+    throw new Error(
+      'LocalStudio.dev needs permission to read and write the selected project folder.',
+    );
   }
 
-  private async writeJsonFile(directoryHandle: FileSystemDirectoryHandle, fileName: string, value: unknown) {
+  private async writeJsonFile(
+    directoryHandle: FileSystemDirectoryHandle,
+    fileName: string,
+    value: unknown,
+  ) {
     const temporaryFileName = `${fileName}.tmp`;
     await this.writeTextFile(directoryHandle, temporaryFileName, JSON.stringify(value, null, 2));
     await this.writeTextFile(directoryHandle, fileName, JSON.stringify(value, null, 2));
@@ -344,7 +457,11 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     }
   }
 
-  private async writeTextFile(directoryHandle: FileSystemDirectoryHandle, fileName: string, value: string) {
+  private async writeTextFile(
+    directoryHandle: FileSystemDirectoryHandle,
+    fileName: string,
+    value: string,
+  ) {
     const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
     const writable = await fileHandle.createWritable();
     await writable.write(value);
@@ -369,9 +486,25 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     await Promise.all(removals);
   }
 
-  private async removePrunedVersionFiles(directoryHandle: FileSystemDirectoryHandle, entries: VersionHistoryEntry[]) {
+  private async writeMirrorFile(directoryHandle: FileSystemDirectoryHandle, file: MirrorFile) {
+    const pathParts = file.path.split('/').filter(Boolean);
+    const fileName = pathParts.pop();
+    if (!fileName) return;
+    let currentDirectory = directoryHandle;
+    for (const directoryName of pathParts) {
+      currentDirectory = await currentDirectory.getDirectoryHandle(directoryName, { create: true });
+    }
+    await writeBlobFileToDirectory(currentDirectory, fileName, file.blob);
+  }
+
+  private async removePrunedVersionFiles(
+    directoryHandle: FileSystemDirectoryHandle,
+    entries: VersionHistoryEntry[],
+  ) {
     if (!directoryHandle.removeEntry) return;
-    await Promise.all(entries.map((entry) => directoryHandle.removeEntry(entry.fileName).catch(() => undefined)));
+    await Promise.all(
+      entries.map((entry) => directoryHandle.removeEntry(entry.fileName).catch(() => undefined)),
+    );
   }
 
   private async readVersionHistoryManifest(
@@ -422,7 +555,12 @@ class BrowserRecentProjectHandleStore implements RecentProjectHandleStore {
     if (typeof window === 'undefined') return null;
     const database = await this.openDatabase();
     if (projectName) {
-      return (await this.getValue<FileSystemDirectoryHandle>(database, this.getProjectHandleKey(projectName))) ?? null;
+      return (
+        (await this.getValue<FileSystemDirectoryHandle>(
+          database,
+          this.getProjectHandleKey(projectName),
+        )) ?? null
+      );
     }
     if (window.localStorage.getItem(this.localStorageKey) !== 'true') return null;
     return (await this.getValue<FileSystemDirectoryHandle>(database, this.handleKey)) ?? null;
@@ -488,7 +626,8 @@ class BrowserRecentProjectHandleStore implements RecentProjectHandleStore {
 }
 
 function getBrowserDirectoryPicker() {
-  const browserWindow = typeof window === 'undefined' ? undefined : (window as WindowWithDirectoryPicker);
+  const browserWindow =
+    typeof window === 'undefined' ? undefined : (window as WindowWithDirectoryPicker);
   if (!browserWindow?.showDirectoryPicker) {
     throw new Error('The File System Access API is not available in this browser.');
   }

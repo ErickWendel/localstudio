@@ -8,6 +8,7 @@ describe('EditorFooter', () => {
     const user = userEvent.setup();
     const handlers = {
       onResetZoom: vi.fn(),
+      onOpenSettings: vi.fn(),
       onTogglePagesPanel: vi.fn(),
       onZoomIn: vi.fn(),
       onZoomOut: vi.fn(),
@@ -24,6 +25,7 @@ describe('EditorFooter', () => {
     );
 
     expect(screen.getByText('2 / 4')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Mirror settings' }));
     await user.click(screen.getByRole('button', { name: 'Zoom Out' }));
     await user.click(screen.getByRole('button', { name: 'Reset zoom' }));
     await user.click(screen.getByRole('button', { name: 'Zoom In' }));
@@ -33,6 +35,7 @@ describe('EditorFooter', () => {
     expect(handlers.onResetZoom).toHaveBeenCalledTimes(1);
     expect(handlers.onZoomIn).toHaveBeenCalledTimes(1);
     expect(handlers.onTogglePagesPanel).toHaveBeenCalledTimes(1);
+    expect(handlers.onOpenSettings).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('button', { name: 'Enter fullscreen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Exit fullscreen' })).not.toBeInTheDocument();
   });

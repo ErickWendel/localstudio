@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import type Konva from 'konva';
 import type { AppServices } from '../../app/composition';
 import type { ShareMetadata } from '../../services/interfaces';
-import { EditorAutomationController, type EditorAutomationDelegate } from '../../services/editorAutomationController';
+import {
+  EditorAutomationController,
+  type EditorAutomationDelegate,
+} from '../../services/editorAutomationController';
 import { IMAGE_EDITING_MODEL_ID } from '../../services/modelSetupService';
 import {
   WebMcpToolAdapter,
@@ -11,9 +14,13 @@ import {
 } from '../../services/webMcpToolAdapter';
 import { EditorFooter } from './EditorFooter';
 import { LeftToolPanel } from './LeftToolPanel';
+import { LocalProjectSetupPanel } from './LocalProjectSetupPanel';
+import { MirrorSettingsPanel } from './MirrorSettingsPanel';
 import { PagesPanel } from './PagesPanel';
 import { PromptBar } from './PromptBar';
+import { RemoteImportPanel } from './RemoteImportPanel';
 import { ScrollingCanvasWorkspace } from './ScrollingCanvasWorkspace';
+import { SettingsPanel } from './SettingsPanel';
 import { TopToolbar } from './TopToolbar';
 import { VersionHistoryPanel } from './VersionHistoryPanel';
 import { useEditorViewModel } from './useEditorViewModel';
@@ -47,7 +54,9 @@ function hasBrowserTextSelection() {
 function getClipboardImageFile(clipboardData: DataTransfer | null) {
   if (!clipboardData) return undefined;
 
-  const fileFromFiles = Array.from(clipboardData.files).find((file) => file.type.startsWith('image/'));
+  const fileFromFiles = Array.from(clipboardData.files).find((file) =>
+    file.type.startsWith('image/'),
+  );
   if (fileFromFiles) return fileFromFiles;
 
   for (const item of Array.from(clipboardData.items)) {
@@ -61,7 +70,10 @@ function getClipboardImageFile(clipboardData: DataTransfer | null) {
 
 function hasEditorObjectClipboardMarker(clipboardData: DataTransfer | null) {
   if (!clipboardData) return false;
-  if (clipboardData.types && Array.from(clipboardData.types).includes(EDITOR_OBJECT_CLIPBOARD_TYPE)) {
+  if (
+    clipboardData.types &&
+    Array.from(clipboardData.types).includes(EDITOR_OBJECT_CLIPBOARD_TYPE)
+  ) {
     return true;
   }
   return clipboardData.getData?.(EDITOR_OBJECT_CLIPBOARD_TYPE) === EDITOR_OBJECT_CLIPBOARD_MARKER;
@@ -95,7 +107,10 @@ export function EditorShell({ services }: EditorShellProps) {
   const toolbarImageInputRef = useRef<HTMLInputElement>(null);
   const hasSelection = vm.selection.elementIds.length > 0;
   const isHistoryReadOnly = vm.versionHistoryOpen;
-  const activePageIndex = Math.max(0, vm.project.pages.findIndex((page) => page.id === vm.activePageId));
+  const activePageIndex = Math.max(
+    0,
+    vm.project.pages.findIndex((page) => page.id === vm.activePageId),
+  );
 
   function exportCurrentPageAsPng() {
     const dataUrl = stageRef.current?.toDataURL({ mimeType: 'image/png', pixelRatio: 2 });
@@ -229,7 +244,8 @@ export function EditorShell({ services }: EditorShellProps) {
   useEffect(() => {
     function handleCopy(event: ClipboardEvent) {
       if (isHistoryReadOnly) return;
-      if (isEditableInteractionTarget(event.target) || hasBrowserTextSelection() || !hasSelection) return;
+      if (isEditableInteractionTarget(event.target) || hasBrowserTextSelection() || !hasSelection)
+        return;
       event.preventDefault();
       vm.copySelectedElements();
       writeEditorObjectClipboardMarker(event.clipboardData);
@@ -237,7 +253,8 @@ export function EditorShell({ services }: EditorShellProps) {
 
     function handleCut(event: ClipboardEvent) {
       if (isHistoryReadOnly) return;
-      if (isEditableInteractionTarget(event.target) || hasBrowserTextSelection() || !hasSelection) return;
+      if (isEditableInteractionTarget(event.target) || hasBrowserTextSelection() || !hasSelection)
+        return;
       event.preventDefault();
       vm.cutSelectedElements();
       writeEditorObjectClipboardMarker(event.clipboardData);
@@ -318,15 +335,36 @@ export function EditorShell({ services }: EditorShellProps) {
         canUndo={!isHistoryReadOnly && vm.canUndo}
         hasSelection={!isHistoryReadOnly && hasSelection}
         persistenceEnabled={vm.persistenceEnabled}
+        mirrorState={vm.mirrorState}
+        persistenceAttention={vm.persistenceAttention}
+        persistenceNotice={vm.persistenceNotice}
+        localProjectSetupPanel={
+          vm.localProjectSetupOpen ? (
+            <LocalProjectSetupPanel
+              initialName={vm.project.name}
+              onCancel={vm.closeLocalProjectSetup}
+              onConfirm={(projectName) => {
+                void vm.confirmLocalProjectSetup(projectName);
+              }}
+            />
+          ) : null
+        }
         lastEditedAt={vm.lastEditedAt}
         saveAnimationKey={vm.saveAnimationKey}
         canTranslateDeck={vm.canTranslateDeck}
         persistenceAvailable={services.persistenceAvailable}
         onDelete={isHistoryReadOnly ? undefined : vm.deleteSelectedElement}
         onDuplicate={isHistoryReadOnly ? undefined : vm.duplicateSelectedElement}
+        onImportRemoteMirror={() => {
+          void vm.importRemoteMirror();
+        }}
         onImportProject={() => {
           void vm.importProject();
         }}
+        onMirrorNow={() => {
+          vm.requestMirrorNow();
+        }}
+        onMirrorToggle={vm.setMirrorEnabled}
         onNewProject={openBlankProjectInNewTab}
         onOpenVersionHistory={() => {
           void vm.openVersionHistory();
@@ -345,14 +383,23 @@ export function EditorShell({ services }: EditorShellProps) {
           setSharePanelOpen(true);
         }}
         onStartPresenterMode={startPresenterMode}
-        onTranslateDeck={isHistoryReadOnly ? undefined : () => {
-          void vm.translateDeck();
+        onSaveLocal={() => {
+          void vm.saveLocalNow();
         }}
+        onTranslateDeck={
+          isHistoryReadOnly
+            ? undefined
+            : () => {
+                void vm.translateDeck();
+              }
+        }
         onUndo={isHistoryReadOnly ? undefined : vm.undo}
         onZoomIn={vm.zoomIn}
         onZoomOut={vm.zoomOut}
       />
-      <div className={vm.pagesPanelOpen ? 'editor-grid' : 'editor-grid editor-grid-pages-collapsed'}>
+      <div
+        className={vm.pagesPanelOpen ? 'editor-grid' : 'editor-grid editor-grid-pages-collapsed'}
+      >
         <LeftToolPanel
           activeTab={vm.activeTab}
           animationPreview={vm.animationPreview}
@@ -374,17 +421,28 @@ export function EditorShell({ services }: EditorShellProps) {
           onClearPageTransition={isHistoryReadOnly ? undefined : vm.clearPageTransition}
           onSetPageTransition={isHistoryReadOnly ? undefined : vm.setPageTransition}
           onSetElementAnimationBuilds={isHistoryReadOnly ? undefined : vm.setElementAnimationBuilds}
-          onClearElementAnimationBuild={isHistoryReadOnly ? undefined : vm.clearElementAnimationBuild}
-          onReorderElementAnimationBuild={isHistoryReadOnly ? undefined : vm.reorderElementAnimationBuild}
+          onClearElementAnimationBuild={
+            isHistoryReadOnly ? undefined : vm.clearElementAnimationBuild
+          }
+          onReorderElementAnimationBuild={
+            isHistoryReadOnly ? undefined : vm.reorderElementAnimationBuild
+          }
           onPlayAnimationPreview={vm.playAnimationPreview}
-          onImportImage={isHistoryReadOnly ? undefined : (file) => {
-            void vm.importImageFile(file);
-          }}
+          onImportImage={
+            isHistoryReadOnly
+              ? undefined
+              : (file) => {
+                  void vm.importImageFile(file);
+                }
+          }
           onRemoveAsset={isHistoryReadOnly ? undefined : vm.removeAsset}
           onImportMedia={isHistoryReadOnly ? undefined : importMediaFile}
           onInsertText={isHistoryReadOnly ? undefined : vm.insertTextElement}
           modelStates={vm.modelStates}
-          attentionModelId={vm.aiToolsAttentionModelId ?? (vm.backgroundSelectionNotice ? IMAGE_EDITING_MODEL_ID : undefined)}
+          attentionModelId={
+            vm.aiToolsAttentionModelId ??
+            (vm.backgroundSelectionNotice ? IMAGE_EDITING_MODEL_ID : undefined)
+          }
           createImageOptions={vm.createImageOptions}
           translationLanguageOptions={vm.translationLanguageOptions}
           promptProviderStates={vm.promptProviderStates}
@@ -417,7 +475,9 @@ export function EditorShell({ services }: EditorShellProps) {
           }}
         />
         <section
-          className={leftPanelOpen ? 'workspace-column workspace-column-left-panel-open' : 'workspace-column'}
+          className={
+            leftPanelOpen ? 'workspace-column workspace-column-left-panel-open' : 'workspace-column'
+          }
           aria-label="Canvas workspace"
           ref={workspaceRef}
         >
@@ -440,48 +500,88 @@ export function EditorShell({ services }: EditorShellProps) {
             canTranslateSelection={vm.canTranslateSelection}
             isTranslating={vm.isTranslating}
             translationNotice={vm.translationNotice}
-            onAlignSelectedElement={isHistoryReadOnly ? undefined : () => {
-              vm.alignSelectedElement('page-center');
-            }}
+            onAlignSelectedElement={
+              isHistoryReadOnly
+                ? undefined
+                : () => {
+                    vm.alignSelectedElement('page-center');
+                  }
+            }
             onAnimationPreviewAdvance={
               vm.isFullscreen || vm.animationPreview?.mode === 'presenter'
                 ? vm.advancePresentationPreview
                 : vm.advanceAnimationPreview
             }
-            onBackgroundSelectionToggle={isHistoryReadOnly ? undefined : vm.toggleBackgroundSelectionMode}
-            onBackgroundSubjectPick={isHistoryReadOnly ? undefined : (elementId, point) => {
-              void vm.pickBackgroundSubject(elementId, point);
-            }}
+            onBackgroundSelectionToggle={
+              isHistoryReadOnly ? undefined : vm.toggleBackgroundSelectionMode
+            }
+            onBackgroundSubjectPick={
+              isHistoryReadOnly
+                ? undefined
+                : (elementId, point) => {
+                    void vm.pickBackgroundSubject(elementId, point);
+                  }
+            }
             onBackgroundPreviewPoint={isHistoryReadOnly ? undefined : vm.previewBackgroundSubject}
             onBackgroundRefinePoint={isHistoryReadOnly ? undefined : vm.refineBackgroundSubject}
-            onBringSelectedElementForward={isHistoryReadOnly ? undefined : () => {
-              vm.setSelectedElementZOrder('forward');
-            }}
-            onCancelBackgroundSelection={isHistoryReadOnly ? undefined : vm.cancelBackgroundSelectionMode}
+            onBringSelectedElementForward={
+              isHistoryReadOnly
+                ? undefined
+                : () => {
+                    vm.setSelectedElementZOrder('forward');
+                  }
+            }
+            onCancelBackgroundSelection={
+              isHistoryReadOnly ? undefined : vm.cancelBackgroundSelectionMode
+            }
             onClearSelection={isHistoryReadOnly ? undefined : vm.clearSelection}
             onDeleteSelectedElement={isHistoryReadOnly ? undefined : vm.deleteSelectedElement}
             onDuplicateSelectedElement={isHistoryReadOnly ? undefined : vm.duplicateSelectedElement}
             onFlipSelectedImage={isHistoryReadOnly ? undefined : vm.flipSelectedImage}
-            onInsertMedia={isHistoryReadOnly ? undefined : () => {
-              toolbarImageInputRef.current?.click();
-            }}
-            onInsertText={isHistoryReadOnly ? undefined : () => {
-              vm.insertTextElement();
-            }}
-            onOpenAnimations={isHistoryReadOnly ? undefined : () => {
-              vm.setActiveTab('animations');
-              setLeftPanelOpen(true);
-            }}
+            onInsertMedia={
+              isHistoryReadOnly
+                ? undefined
+                : () => {
+                    toolbarImageInputRef.current?.click();
+                  }
+            }
+            onInsertText={
+              isHistoryReadOnly
+                ? undefined
+                : () => {
+                    vm.insertTextElement();
+                  }
+            }
+            onOpenAnimations={
+              isHistoryReadOnly
+                ? undefined
+                : () => {
+                    vm.setActiveTab('animations');
+                    setLeftPanelOpen(true);
+                  }
+            }
             onSelectElement={isHistoryReadOnly ? undefined : selectElement}
-            onSendSelectedElementBackward={isHistoryReadOnly ? undefined : () => {
-              vm.setSelectedElementZOrder('backward');
-            }}
-            onTranslatePage={isHistoryReadOnly ? undefined : (pageId) => {
-              void vm.translatePage(pageId);
-            }}
-            onTranslateSelectedText={isHistoryReadOnly ? undefined : () => {
-              void vm.translateSelectedText();
-            }}
+            onSendSelectedElementBackward={
+              isHistoryReadOnly
+                ? undefined
+                : () => {
+                    vm.setSelectedElementZOrder('backward');
+                  }
+            }
+            onTranslatePage={
+              isHistoryReadOnly
+                ? undefined
+                : (pageId) => {
+                    void vm.translatePage(pageId);
+                  }
+            }
+            onTranslateSelectedText={
+              isHistoryReadOnly
+                ? undefined
+                : () => {
+                    void vm.translateSelectedText();
+                  }
+            }
             onUpdateImageCrop={isHistoryReadOnly ? undefined : vm.updateImageCrop}
             onUpdateElementFrame={isHistoryReadOnly ? undefined : vm.updateElementFrame}
             onUpdateElementFrames={isHistoryReadOnly ? undefined : vm.updateElementFrames}
@@ -508,20 +608,22 @@ export function EditorShell({ services }: EditorShellProps) {
               event.target.value = '';
             }}
           />
-          {!isHistoryReadOnly ? <PromptBar
-            createImageNotice={vm.createImageNotice}
-            createImageStatus={vm.createImageStatus}
-            createImageOptions={vm.createImageOptions}
-            generationNotice={vm.promptGenerationNotice}
-            generationStatus={vm.promptGenerationStatus}
-            isGeneratingImage={vm.isGeneratingImage}
-            isGeneratingSlide={vm.isGeneratingSlide}
-            selectedImageElementId={vm.selectedImagePromptElementId}
-            onCreateImagePromptIntent={() => vm.ensureImageGenerationReadyForPrompt()}
-            onCreateImageSubmit={(prompt, options) => vm.generateImageFromPrompt(prompt, options)}
-            onSlidePromptSubmit={(prompt) => vm.generateSlideFromPrompt(prompt)}
-            onStopGeneration={vm.stopPromptGeneration}
-          /> : null}
+          {!isHistoryReadOnly ? (
+            <PromptBar
+              createImageNotice={vm.createImageNotice}
+              createImageStatus={vm.createImageStatus}
+              createImageOptions={vm.createImageOptions}
+              generationNotice={vm.promptGenerationNotice}
+              generationStatus={vm.promptGenerationStatus}
+              isGeneratingImage={vm.isGeneratingImage}
+              isGeneratingSlide={vm.isGeneratingSlide}
+              selectedImageElementId={vm.selectedImagePromptElementId}
+              onCreateImagePromptIntent={() => vm.ensureImageGenerationReadyForPrompt()}
+              onCreateImageSubmit={(prompt, options) => vm.generateImageFromPrompt(prompt, options)}
+              onSlidePromptSubmit={(prompt) => vm.generateSlideFromPrompt(prompt)}
+              onStopGeneration={vm.stopPromptGeneration}
+            />
+          ) : null}
         </section>
         {vm.pagesPanelOpen ? (
           <PagesPanel
@@ -536,9 +638,13 @@ export function EditorShell({ services }: EditorShellProps) {
             onReorderPage={isHistoryReadOnly ? undefined : vm.reorderPage}
             onSelectPage={vm.selectPage}
             onSetPageVisibility={isHistoryReadOnly ? undefined : vm.setPageVisibility}
-            onTranslatePage={isHistoryReadOnly ? undefined : (pageId) => {
-              void vm.translatePage(pageId);
-            }}
+            onTranslatePage={
+              isHistoryReadOnly
+                ? undefined
+                : (pageId) => {
+                    void vm.translatePage(pageId);
+                  }
+            }
           />
         ) : null}
       </div>
@@ -569,12 +675,39 @@ export function EditorShell({ services }: EditorShellProps) {
           onPresent={presentFromSharePanel}
         />
       ) : null}
+      {vm.settingsOpen ? (
+        <SettingsPanel
+          onClose={vm.closeSettings}
+          onOpenMirrorSettings={vm.openMirrorSettings}
+        />
+      ) : null}
+      {vm.mirrorSettingsOpen ? (
+        <MirrorSettingsPanel
+          config={vm.mirrorConfig}
+          mirrorState={vm.mirrorState}
+          onClose={vm.closeMirrorSettings}
+          onSave={vm.saveMirrorConfig}
+          onTestConnection={vm.testMirrorConnection}
+        />
+      ) : null}
+      {vm.remoteImportOpen ? (
+        <RemoteImportPanel
+          error={vm.remoteImportError}
+          projects={vm.remoteImportProjects}
+          status={vm.remoteImportStatus}
+          onClose={vm.closeRemoteImport}
+          onImportProject={(projectId) => {
+            void vm.importRemoteMirrorProject(projectId);
+          }}
+        />
+      ) : null}
       <EditorFooter
         activePageIndex={activePageIndex}
         pageCount={vm.project.pages.length}
         pagesPanelOpen={vm.pagesPanelOpen}
         zoomPercent={vm.zoomPercent}
         onResetZoom={vm.resetZoom}
+        onOpenSettings={vm.openSettings}
         onTogglePagesPanel={vm.togglePagesPanel}
         onZoomIn={vm.zoomIn}
         onZoomOut={vm.zoomOut}

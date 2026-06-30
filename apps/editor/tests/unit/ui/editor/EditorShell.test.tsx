@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { createAppServices as createRealAppServices } from '../../../../src/app/composition';
@@ -6,9 +6,14 @@ import type { Asset, ProjectDocument } from '../../../../src/domain/model';
 import { createSampleProject } from '../../../../src/domain/sampleProject';
 import type {
   BackgroundRemovalService,
+  MirrorFile,
+  MirrorProjectSummary,
+  MirrorService,
+  MirrorState,
   ProjectRepository,
   TranslatorService,
 } from '../../../../src/services/interfaces';
+import type { MinioMirrorConfig } from '../../../../src/services/minioMirrorService';
 import type { WebMcpDemoWindow, WebMcpTool } from '../../../../src/services/webMcpToolAdapter';
 import { InMemoryModelSetupService } from '../../../../src/services/modelSetupService';
 import { EditorShell } from '../../../../src/ui/editor/EditorShell';
@@ -73,6 +78,48 @@ class SavingProjectRepository implements ProjectRepository {
   }
 }
 
+const mirrorConfig: MinioMirrorConfig = {
+  accessKey: 'localstudio',
+  bucket: 'localstudio',
+  endpoint: 'http://localhost:9000',
+  pathStyle: true,
+  publicBaseUrl: 'http://localhost:9000/localstudio',
+  region: 'us-east-1',
+  secretKey: 'localstudio123',
+  prefix: 'mirrors',
+};
+
+class RecordingMirrorService implements MirrorService<MinioMirrorConfig> {
+  constructor(private readonly storedConfig: MinioMirrorConfig | null = mirrorConfig) {}
+
+  clearConfig = vi.fn();
+
+  syncProject = vi.fn(
+    (
+      project: ProjectDocument,
+      repository: ProjectRepository,
+      config: MinioMirrorConfig,
+    ): Promise<MirrorState> => {
+      void project;
+      void repository;
+      void config;
+      return Promise.resolve({ enabled: true, status: 'synced' });
+    },
+  );
+
+  loadConfig(): MinioMirrorConfig | null {
+    return this.storedConfig;
+  }
+
+  saveConfig(): void {
+    return undefined;
+  }
+
+  listProjects = vi.fn((): Promise<MirrorProjectSummary[]> => Promise.resolve([]));
+
+  downloadProject = vi.fn((): Promise<MirrorFile[]> => Promise.resolve([]));
+}
+
 class RecordingTranslatorService implements TranslatorService {
   prepareTranslation = vi.fn(
     (
@@ -112,6 +159,25 @@ class ImportingProjectRepository implements ProjectRepository {
   saveProject(project: ProjectDocument): Promise<void> {
     this.savedProjects.push(project);
     return Promise.resolve();
+  }
+}
+
+class RemoteMirrorImportingProjectRepository implements ProjectRepository {
+  importedFilePaths: string[] = [];
+
+  loadProject(): Promise<ProjectDocument | null> {
+    return Promise.resolve(null);
+  }
+
+  saveProject(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  async importMirrorFiles(files: MirrorFile[]): Promise<ProjectDocument> {
+    this.importedFilePaths = files.map((file) => file.path);
+    const projectFile = files.find((file) => file.path === 'project.json');
+    if (!projectFile) throw new Error('Missing project.json');
+    return JSON.parse(await projectFile.blob.text()) as ProjectDocument;
   }
 }
 
@@ -394,8 +460,38 @@ describe('EditorShell', () => {
     render(<EditorShell services={services} />);
 
     await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    expect(screen.getByRole('dialog', { name: 'Save local project' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Save local project' })).toHaveAttribute(
+      'data-anchor',
+      'persistence',
+    );
+    await user.clear(screen.getByRole('textbox', { name: 'Project folder name' }));
+    await user.type(screen.getByRole('textbox', { name: 'Project folder name' }), 'Mirror Debug Deck');
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
 
     expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit project name Mirror Debug Deck' })).toBeInTheDocument();
+  });
+
+  it('re-enables persistence without opening the folder setup again', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const repository = new SavingProjectRepository();
+    services.projectRepository = repository;
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+    expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Persistence enabled' }));
+    expect(screen.getByRole('button', { name: 'Persistence disabled' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+
+    expect(screen.queryByRole('dialog', { name: 'Save local project' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
+    expect(repository.savedProjects).toHaveLength(2);
   });
 
   it('writes the persisted project name into the tab URL', async () => {
@@ -406,6 +502,7 @@ describe('EditorShell', () => {
     render(<EditorShell services={services} />);
 
     await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
 
     expect(window.location.search).toBe('?project=Untitled+AI+Deck');
   });
@@ -418,6 +515,7 @@ describe('EditorShell', () => {
     render(<EditorShell services={services} />);
 
     await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
     expect(repository.savedProjects.at(-1)?.name).toBe('Untitled AI Deck');
 
     await user.click(screen.getByRole('button', { name: 'Edit project name Untitled AI Deck' }));
@@ -438,6 +536,129 @@ describe('EditorShell', () => {
     expect(await screen.findByRole('button', { name: 'Persistence disabled' })).toBeInTheDocument();
   });
 
+  it('prompts the user to save before mirroring an unsaved project from the File menu', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Mirror Now' }));
+
+    expect(screen.getByText('Save the project before mirroring.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Persistence disabled' })).toHaveClass(
+      'persistence-attention',
+    );
+  });
+
+  it('opens mirror settings when mirroring is requested without a saved mirror config', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    services.projectRepository = new SavingProjectRepository();
+    services.mirrorService = new RecordingMirrorService(null);
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Mirror Now' }));
+
+    expect(screen.getByRole('dialog', { name: 'Mirror settings' })).toBeInTheDocument();
+  });
+
+  it('syncs the current project after mirror settings are saved', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const repository = new SavingProjectRepository();
+    const mirrorService = new RecordingMirrorService(null);
+    services.projectRepository = repository;
+    services.mirrorService = mirrorService;
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+    await user.click(screen.getByRole('button', { name: 'Mirror settings' }));
+    await user.click(within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('button', {
+      name: 'Mirror settings',
+    }));
+    await user.click(screen.getByRole('button', { name: 'Save settings' }));
+
+    await waitFor(() => {
+      expect(mirrorService.syncProject).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Untitled AI Deck' }),
+        repository,
+        mirrorConfig,
+      );
+    });
+  });
+
+  it('mirrors the renamed project name from the header bar', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const repository = new SavingProjectRepository();
+    const mirrorService = new RecordingMirrorService(null);
+    services.projectRepository = repository;
+    services.mirrorService = mirrorService;
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+    await user.click(screen.getByRole('button', { name: 'Mirror settings' }));
+    await user.click(within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('button', {
+      name: 'Mirror settings',
+    }));
+    await user.click(screen.getByRole('button', { name: 'Save settings' }));
+    await waitFor(() => {
+      expect(mirrorService.syncProject).toHaveBeenCalledTimes(1);
+    });
+    mirrorService.syncProject.mockClear();
+
+    await user.click(screen.getByRole('button', { name: 'Edit project name Untitled AI Deck' }));
+    await user.clear(screen.getByRole('textbox', { name: 'Project name' }));
+    await user.type(screen.getByRole('textbox', { name: 'Project name' }), 'Renamed Mirror Deck{Enter}');
+
+    await waitFor(
+      () => {
+        expect(mirrorService.syncProject).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'Renamed Mirror Deck' }),
+          repository,
+          mirrorConfig,
+        );
+      },
+      { timeout: 2000 },
+    );
+  });
+
+  it('disables mirroring when the mirror status icon is clicked', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const mirrorService = new RecordingMirrorService();
+    const repository = new DeferredLoadingProjectRepository();
+    services.projectRepository = repository;
+    services.mirrorService = mirrorService;
+    render(<EditorShell services={services} />);
+
+    act(() => {
+      repository.resolveLoadedProject({
+        ...services.initialProject,
+        name: 'Mirrored Folder',
+      });
+    });
+
+    const mirrorButton = await screen.findByRole('button', { name: 'Mirror up to date' });
+    await user.click(mirrorButton);
+
+    expect(mirrorService.clearConfig).not.toHaveBeenCalled();
+    expect(screen.getByText('Local only')).toBeInTheDocument();
+
+    const disabledMirrorButton = screen.getByRole('button', { name: 'Mirror disabled' });
+    expect(disabledMirrorButton).not.toBeDisabled();
+    await user.click(disabledMirrorButton);
+
+    await waitFor(() => {
+      expect(mirrorService.syncProject).toHaveBeenCalledTimes(2);
+    });
+    expect(await screen.findByRole('button', { name: 'Mirror up to date' })).toBeInTheDocument();
+  });
+
   it('imports an existing project from the File menu', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
@@ -456,6 +677,38 @@ describe('EditorShell', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
     expect(window.location.search).toBe('?project=Imported+LocalStudio+Project');
+  });
+
+  it('displays the remote project name after importing a mirrored project', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const repository = new RemoteMirrorImportingProjectRepository();
+    const mirrorService = new RecordingMirrorService(mirrorConfig);
+    services.projectRepository = repository;
+    services.mirrorService = mirrorService;
+    mirrorService.listProjects.mockResolvedValue([
+      { id: 'Remote Mirror Deck', name: 'Remote Mirror Deck', syncedAt: '2026-06-30T10:00:00.000Z' },
+    ]);
+    mirrorService.downloadProject.mockResolvedValue([
+      {
+        path: 'project.json',
+        blob: new Blob(
+          [JSON.stringify({ ...services.initialProject, id: 'remote-project', name: 'Remote Mirror Deck' })],
+          { type: 'application/json' },
+        ),
+      },
+    ]);
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Import Remote' }));
+    await user.click(await screen.findByRole('button', { name: 'Import Remote Mirror Deck' }));
+
+    expect(
+      await screen.findByRole('button', { name: 'Edit project name Remote Mirror Deck' }),
+    ).toBeInTheDocument();
+    expect(repository.importedFilePaths).toContain('project.json');
+    expect(window.location.search).toBe('?project=Remote+Mirror+Deck');
   });
 
   it('preserves hydrated sample hero object URLs during import normalization', async () => {
@@ -507,6 +760,7 @@ describe('EditorShell', () => {
     const { unmount } = render(<EditorShell services={firstServices} />);
 
     await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
     unmount();
     const secondServices = createAppServices();
     secondServices.projectRepository = new SavingProjectRepository();
@@ -536,6 +790,37 @@ describe('EditorShell', () => {
       await screen.findByRole('button', { name: 'Edit project name Restored LocalStudio Project' }),
     ).toBeInTheDocument();
     expect(repository.savedProjects).toHaveLength(0);
+  });
+
+  it('restores mirroring from saved config and syncs the loaded local project', async () => {
+    const repository = new DeferredLoadingProjectRepository();
+    const mirrorService = new RecordingMirrorService();
+    const services = createAppServices();
+    services.projectRepository = repository;
+    services.mirrorService = mirrorService;
+
+    render(<EditorShell services={services} />);
+
+    act(() => {
+      repository.resolveLoadedProject({
+        ...services.initialProject,
+        id: 'mirrored-project',
+        name: 'Mirrored Folder',
+      });
+    });
+
+    expect(
+      await screen.findByRole('button', { name: 'Edit project name Mirrored Folder' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(mirrorService.syncProject).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'mirrored-project', name: 'Mirrored Folder' }),
+        repository,
+        mirrorConfig,
+      );
+    });
   });
 
   it('disables persistence and keeps the initial project when startup restore fails', async () => {
@@ -942,6 +1227,7 @@ describe('EditorShell', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
 
     await waitFor(() => {
       const savedProject = repository.savedProjects.at(-1);
@@ -1063,6 +1349,7 @@ describe('EditorShell', () => {
       expect(screen.getByRole('button', { name: 'Add a heading' })).toHaveAttribute('aria-pressed', 'true');
     });
     await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
     await waitFor(() => {
       const insertedText = Object.values(repository.savedProjects.at(-1)?.elements ?? {}).find(
         (element) =>
@@ -1263,6 +1550,7 @@ describe('EditorShell', () => {
       });
     });
     await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
 
     await waitFor(() => {
       const title = repository.savedProjects.at(-1)?.elements['text-title'];
