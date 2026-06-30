@@ -2,14 +2,38 @@ import { useMemo } from 'react';
 import { createAppServices } from './app/composition';
 import { createBlankProject } from './domain/sampleProject';
 import { EditorShell } from './ui/editor/EditorShell';
+import { PublicDeckViewer } from './ui/share/PublicDeckViewer';
 import { WebMcpShowcasePage } from './ui/webmcp/WebMcpShowcasePage';
 
 export function App() {
+  const shareRoute = getShareRoute(window.location.pathname);
+  if (shareRoute) {
+    const services = createAppServices();
+    return (
+      <PublicDeckViewer
+        shareId={shareRoute.shareId}
+        shareService={services.shareService}
+        embed={shareRoute.embed}
+      />
+    );
+  }
+
   if (window.location.pathname === '/webmcp' || window.location.pathname === '/editor/webmcp') {
     return <WebMcpShowcasePage />;
   }
 
   return <EditorApp />;
+}
+
+function getShareRoute(pathname: string) {
+  const match = pathname.match(/^\/(s|embed)\/([^/]+)$/);
+  if (!match) return undefined;
+  const shareId = match[2];
+  if (!shareId) return undefined;
+  return {
+    embed: match[1] === 'embed',
+    shareId: decodeURIComponent(shareId),
+  };
 }
 
 function EditorApp() {

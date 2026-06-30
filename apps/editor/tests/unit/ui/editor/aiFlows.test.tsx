@@ -24,7 +24,7 @@ import { InMemoryModelSetupService } from '../../../../src/services/modelSetupSe
 import { EditorShell } from '../../../../src/ui/editor/EditorShell';
 
 const createImageExample =
-  'Create an icy Bonsai tree in a rainy forest with snowy mountains in the background, photo realistic';
+  'A realistic photo of a person using an AI-powered web app on a tablet in a modern city environment, glass buildings and people blurred in the background, subject positioned on the left, camera at eye level, natural daylight, urban innovation and technology atmosphere';
 
 function createAppServices(options: Parameters<typeof createRealAppServices>[0] = {}) {
   return createRealAppServices({

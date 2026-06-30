@@ -2,6 +2,8 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '../../../src/App';
+import { createSampleProject } from '../../../src/domain/sampleProject';
+import { BrowserShareService } from '../../../src/services/shareService';
 import { TRANSLATION_LANGUAGE_OPTIONS } from '../../../src/ui/editor/translationLanguages';
 
 describe('App', () => {
@@ -101,6 +103,30 @@ describe('App', () => {
     render(<App />);
 
     expect(screen.getByRole('heading', { name: 'WebMCP showcase' })).toBeInTheDocument();
+  });
+
+  it('renders a public shared deck page', async () => {
+    const shareService = new BrowserShareService({ origin: window.location.origin });
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000101');
+    await shareService.createShare(createSampleProject());
+    window.history.replaceState({}, '', '/s/00000000-0000-4000-8000-000000000101');
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Untitled AI Deck' })).toBeInTheDocument();
+    expect(screen.getByText('1 / 1')).toBeInTheDocument();
+  });
+
+  it('renders a compact embedded shared deck page', async () => {
+    const shareService = new BrowserShareService({ origin: window.location.origin });
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000102');
+    await shareService.createShare(createSampleProject());
+    window.history.replaceState({}, '', '/embed/00000000-0000-4000-8000-000000000102');
+
+    render(<App />);
+
+    expect(await screen.findByLabelText('Embedded shared deck')).toBeInTheDocument();
+    expect(screen.queryByText('Public view')).not.toBeInTheDocument();
   });
 
   it('opens editable command input for a WebMCP workflow step', async () => {

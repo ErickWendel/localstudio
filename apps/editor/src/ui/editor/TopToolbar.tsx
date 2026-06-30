@@ -16,7 +16,6 @@ interface TopToolbarProps {
   canTranslateDeck?: boolean;
   onDelete?: (() => void) | undefined;
   onDuplicate?: (() => void) | undefined;
-  onExport?: (() => void) | undefined;
   onImportProject?: (() => void) | undefined;
   onOpenVersionHistory?: (() => void) | undefined;
   onNewProject?: (() => void) | undefined;
@@ -25,6 +24,7 @@ interface TopToolbarProps {
   onRedo?: (() => void) | undefined;
   onResetZoom?: (() => void) | undefined;
   onSelectLayers?: (() => void) | undefined;
+  onShare?: (() => void) | undefined;
   onTranslateDeck?: (() => void) | undefined;
   onUndo?: (() => void) | undefined;
   onZoomIn?: (() => void) | undefined;
@@ -56,7 +56,6 @@ export function TopToolbar({
   canTranslateDeck = false,
   onDelete,
   onDuplicate,
-  onExport,
   onImportProject,
   onOpenVersionHistory,
   onNewProject,
@@ -65,6 +64,7 @@ export function TopToolbar({
   onRedo,
   onResetZoom,
   onSelectLayers,
+  onShare,
   onTranslateDeck,
   onUndo,
   onZoomIn,
@@ -82,13 +82,13 @@ export function TopToolbar({
     projectNameInputRef.current?.select();
   }, [isEditingProjectName]);
 
-  function triggerExport() {
-    if (onExport) {
-      onExport();
+  function triggerShare() {
+    if (onShare) {
+      onShare();
       return;
     }
 
-    window.alert(`Export PNG/PDF wiring ready for ${project.name}`);
+    window.alert(`Share wiring ready for ${project.name}`);
   }
 
   function closeMenu() {
@@ -112,7 +112,7 @@ export function TopToolbar({
         disabled: !persistenceAvailable,
         onSelect: () => onPersistenceToggle?.(true),
       },
-      { label: 'Export', onSelect: triggerExport },
+      { label: 'Share', onSelect: triggerShare },
     ],
     Edit: [
   { label: 'Undo', disabled: !canUndo, onSelect: onUndo },
@@ -311,11 +311,11 @@ export function TopToolbar({
           </span>
           <span>{language}</span>
         </button>
-        <button className="export-button font-orbitron" type="button" onClick={triggerExport}>
+        <button className="export-button font-orbitron" type="button" onClick={triggerShare}>
           <span className="material-symbols-outlined" aria-hidden="true">
             ios_share
           </span>
-          <span>Export</span>
+          <span>Share</span>
         </button>
         <button className="profile-avatar" type="button" aria-label="User profile">
           <span className="profile-avatar-core" aria-hidden="true" />

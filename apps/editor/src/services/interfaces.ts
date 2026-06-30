@@ -73,6 +73,34 @@ export interface ExportService {
   downloadDataUrl(dataUrl: string, fileName: string): void;
 }
 
+export type ShareStatus = 'published' | 'copied' | 'syncing' | 'sync-failed';
+
+export interface ShareMetadata {
+  shareId: string;
+  publicUrl: string;
+  embedUrl: string;
+  embedHtml: string;
+  createdAt: string;
+  updatedAt: string;
+  status: ShareStatus;
+}
+
+export interface ShareRecord {
+  shareId: string;
+  createdAt: string;
+  updatedAt: string;
+  project: ProjectDocument;
+}
+
+export interface ShareService {
+  createShare(project: ProjectDocument): Promise<ShareMetadata>;
+  updateShare(shareId: string, project: ProjectDocument): Promise<ShareMetadata>;
+  getShare(shareId: string): Promise<ShareRecord | null>;
+  getPublicUrl(shareId: string): string;
+  getEmbedUrl(shareId: string): string;
+  getEmbedHtml(shareId: string): string;
+}
+
 export interface ModelSetupService {
   getModelStates(): Promise<ModelState[]>;
   downloadRequiredModels(): Promise<ModelState[]>;

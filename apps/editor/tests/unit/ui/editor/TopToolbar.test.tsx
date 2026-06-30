@@ -7,7 +7,7 @@ import { TopToolbar } from '../../../../src/ui/editor/TopToolbar';
 describe('TopToolbar', () => {
   it('opens Stitch header menus and wires available actions', async () => {
     const user = userEvent.setup();
-    const onExport = vi.fn();
+    const onShare = vi.fn();
     const onImportProject = vi.fn();
     const onNewProject = vi.fn();
     const onPersistenceToggle = vi.fn();
@@ -18,7 +18,7 @@ describe('TopToolbar', () => {
       <TopToolbar
         project={createSampleProject()}
         language="PT-BR"
-        onExport={onExport}
+        onShare={onShare}
         onImportProject={onImportProject}
         onNewProject={onNewProject}
         onPersistenceToggle={onPersistenceToggle}
@@ -38,8 +38,8 @@ describe('TopToolbar', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Save Local' }));
     expect(onPersistenceToggle).toHaveBeenCalledWith(true);
     await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Export' }));
-    expect(onExport).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('menuitem', { name: 'Share' }));
+    expect(onShare).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole('button', { name: 'View' }));
     await user.click(screen.getByRole('menuitem', { name: 'Toggle Layers Panel' }));

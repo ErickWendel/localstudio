@@ -1016,9 +1016,50 @@ describe('EditorShell', () => {
 
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'Export' }));
+    await user.click(screen.getByRole('button', { name: 'Share' }));
+    await user.click(screen.getByRole('button', { name: 'Download' }));
 
     expect(downloadDataUrl).toHaveBeenCalledWith(expect.stringMatching(/^data:image\/png/), 'slide.png');
+  });
+
+  it('creates and shows a public link from the share panel', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000301');
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText,
+      },
+    });
+
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Share' }));
+    await user.click(screen.getByRole('button', { name: 'Copy link' }));
+
+    expect(
+      await screen.findByDisplayValue(`${window.location.origin}/s/00000000-0000-4000-8000-000000000301`),
+    ).toBeInTheDocument();
+    expect(writeText).toHaveBeenCalledWith(
+      `${window.location.origin}/s/00000000-0000-4000-8000-000000000301`,
+    );
+  });
+
+  it('enters fullscreen presentation mode from the share panel', async () => {
+    const user = userEvent.setup();
+    const requestFullscreen = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+      configurable: true,
+      value: requestFullscreen,
+    });
+
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Share' }));
+    await user.click(screen.getByRole('button', { name: 'Present' }));
+
+    expect(requestFullscreen).toHaveBeenCalled();
   });
 
   it('does not show the page size overlay on the canvas', () => {
