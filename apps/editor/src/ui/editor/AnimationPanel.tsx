@@ -15,7 +15,9 @@ interface AnimationPanelProps {
   animationPreview?:
     | {
         activeBuildElementId: string | undefined;
+        mode?: 'editor' | 'presenter';
         pageId: string;
+        phase: 'transition' | 'animation' | 'waiting' | 'complete';
         playing: boolean;
         waitingForClick: boolean;
       }
@@ -51,6 +53,8 @@ function getElementLabel(project: ProjectDocument, elementId: string) {
   if (!element) return elementId;
   if (element.type === 'text') return element.text.trim().split('\n')[0] || 'Text';
   if (element.type === 'image') return 'Image';
+  if (element.type === 'gif') return 'GIF';
+  if (element.type === 'video') return 'Video';
   return element.shape === 'ellipse' ? 'Ellipse' : 'Rectangle';
 }
 
@@ -169,7 +173,7 @@ export function AnimationPanel({
             aria-label="Play animation preview"
             className="compact-action"
             type="button"
-            onClick={onPlayAnimationPreview}
+            onClick={() => onPlayAnimationPreview?.()}
           >
             <span className="material-symbols-outlined" aria-hidden="true">
               play_arrow

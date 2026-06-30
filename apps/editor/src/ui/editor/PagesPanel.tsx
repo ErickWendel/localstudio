@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import type { DesignElement, Page, ProjectDocument } from '../../domain/model';
 
+type DropPosition = 'before' | 'after';
+
 interface PagesPanelProps {
   activePageId: string;
   canTranslate?: boolean;
@@ -31,6 +33,7 @@ export function PagesPanel({
   onTranslatePage,
 }: PagesPanelProps) {
   const [editingPageId, setEditingPageId] = useState<string | undefined>();
+  const [dropIndicator, setDropIndicator] = useState<{ pageId: string; position: DropPosition } | undefined>();
   const [draftName, setDraftName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -56,13 +59,29 @@ export function PagesPanel({
     event.dataTransfer.setData('application/x-localstudio-page-id', pageId);
   }
 
-  function handleDrop(event: DragEvent<HTMLElement>, targetIndex: number) {
+  function getDropPosition(event: DragEvent<HTMLElement>): DropPosition {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return event.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+  }
+
+  function handleDragOver(event: DragEvent<HTMLElement>, pageId: string) {
     event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    setDropIndicator({ pageId, position: getDropPosition(event) });
+  }
+
+  function handleDrop(event: DragEvent<HTMLElement>, targetPageId: string) {
+    event.preventDefault();
+    const position = getDropPosition(event);
+    setDropIndicator(undefined);
     const pageId = event.dataTransfer.getData('application/x-localstudio-page-id');
-    if (!pageId) return;
+    if (!pageId || pageId === targetPageId) return;
     const currentIndex = project.pages.findIndex((page) => page.id === pageId);
-    if (currentIndex === -1 || currentIndex === targetIndex) return;
-    onReorderPage?.(pageId, targetIndex);
+    if (currentIndex === -1) return;
+    const pagesWithoutDragged = project.pages.filter((page) => page.id !== pageId);
+    const targetIndex = pagesWithoutDragged.findIndex((page) => page.id === targetPageId);
+    if (targetIndex === -1) return;
+    onReorderPage?.(pageId, position === 'after' ? targetIndex + 1 : targetIndex);
   }
 
   return (
@@ -89,21 +108,35 @@ export function PagesPanel({
         {project.pages.map((page, index) => {
           const visible = page.visible ?? true;
           const isActive = page.id === activePageId;
+          const dropPosition = dropIndicator?.pageId === page.id ? dropIndicator.position : undefined;
+          const className = [
+            'page-card',
+            isActive ? 'page-card-active' : '',
+            dropPosition === 'before' ? 'drop-indicator-before' : '',
+            dropPosition === 'after' ? 'drop-indicator-after' : '',
+          ]
+            .filter(Boolean)
+            .join(' ');
           return (
             <article
               aria-label={`Page ${index + 1}: ${page.name}`}
-              className={isActive ? 'page-card page-card-active' : 'page-card'}
+              className={className}
+              data-drop-position={dropPosition}
               draggable
               key={page.id}
+              onDragEnd={() => setDropIndicator(undefined)}
+              onDragLeave={(event) => {
+                if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+                setDropIndicator((current) => (current?.pageId === page.id ? undefined : current));
+              }}
               onDragOver={(event) => {
-                event.preventDefault();
-                event.dataTransfer.dropEffect = 'move';
+                handleDragOver(event, page.id);
               }}
               onDragStart={(event) => {
                 handleDragStart(event, page.id);
               }}
               onDrop={(event) => {
-                handleDrop(event, index);
+                handleDrop(event, page.id);
               }}
             >
               <span className="page-card-number" aria-hidden="true">

@@ -17,7 +17,9 @@ interface LeftToolPanelProps {
   animationPreview?:
     | {
         activeBuildElementId: string | undefined;
+        mode?: 'editor' | 'presenter';
         pageId: string;
+        phase: 'transition' | 'animation' | 'waiting' | 'complete';
         playing: boolean;
         waitingForClick: boolean;
       }

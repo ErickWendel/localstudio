@@ -170,6 +170,7 @@ describe('LeftToolPanel', () => {
         animationPreview={{
           activeBuildElementId: 'text-title',
           pageId: 'page-1',
+          phase: 'waiting',
           playing: true,
           waitingForClick: true,
         }}

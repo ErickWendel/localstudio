@@ -25,7 +25,7 @@ interface TopToolbarProps {
   onResetZoom?: (() => void) | undefined;
   onSelectLayers?: (() => void) | undefined;
   onShare?: (() => void) | undefined;
-  onStartPresenterMode?: (() => void) | undefined;
+  onStartPresenterMode?: ((options?: { fromBeginning?: boolean }) => void) | undefined;
   onTranslateDeck?: (() => void) | undefined;
   onUndo?: (() => void) | undefined;
   onZoomIn?: (() => void) | undefined;
@@ -114,6 +114,7 @@ export function TopToolbar({
   onZoomOut,
 }: TopToolbarProps) {
   const [openMenu, setOpenMenu] = useState<HeaderMenu | null>(null);
+  const [playMenuOpen, setPlayMenuOpen] = useState(false);
   const [isEditingProjectName, setIsEditingProjectName] = useState(false);
   const [projectNameDraft, setProjectNameDraft] = useState(project.name);
   const projectNameInputRef = useRef<HTMLInputElement>(null);
@@ -137,6 +138,15 @@ export function TopToolbar({
 
   function closeMenu() {
     setOpenMenu(null);
+  }
+
+  function startPresenterMode(options?: { fromBeginning?: boolean }) {
+    if (options) {
+      onStartPresenterMode?.(options);
+    } else {
+      onStartPresenterMode?.();
+    }
+    setPlayMenuOpen(false);
   }
 
   function commitProjectName() {
@@ -217,9 +227,10 @@ export function TopToolbar({
                     : 'toolbar-menu-item font-orbitron'
                 }
                 type="button"
-                onClick={() => {
-                  setOpenMenu((current) => (current === item ? null : item));
-                }}
+              onClick={() => {
+                setPlayMenuOpen(false);
+                setOpenMenu((current) => (current === item ? null : item));
+              }}
               >
                 {item}
               </button>
@@ -281,18 +292,50 @@ export function TopToolbar({
               {project.name}
             </button>
           )}
-          <button
-            className="project-play-button"
-            type="button"
-            aria-label="Play presentation"
-            title="Play presentation"
-            onClick={onStartPresenterMode}
-          >
-            <span className="material-symbols-outlined" aria-hidden="true">
-              play_arrow
-            </span>
-            <span>Play</span>
-          </button>
+          <div className="project-play-shell">
+            <button
+              className="project-play-button project-play-main"
+              type="button"
+              aria-label="Play presentation"
+              title="Play presentation"
+              onClick={() => startPresenterMode()}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">
+                play_arrow
+              </span>
+              <span>Play</span>
+            </button>
+            <button
+              className="project-play-button project-play-menu-button"
+              type="button"
+              aria-expanded={playMenuOpen}
+              aria-label="Presentation play options"
+              title="Presentation play options"
+              onClick={() => {
+                setOpenMenu(null);
+                setPlayMenuOpen((current) => !current);
+              }}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">
+                keyboard_arrow_down
+              </span>
+            </button>
+            {playMenuOpen ? (
+              <div className="toolbar-dropdown project-play-dropdown" role="menu" aria-label="Presentation play menu">
+                <button
+                  className="toolbar-dropdown-item project-play-dropdown-item"
+                  role="menuitem"
+                  type="button"
+                  onClick={() => startPresenterMode({ fromBeginning: true })}
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    skip_previous
+                  </span>
+                  <span>Play from beginning</span>
+                </button>
+              </div>
+            ) : null}
+          </div>
           <span className="local-only-badge">Local only</span>
         </div>
       </div>

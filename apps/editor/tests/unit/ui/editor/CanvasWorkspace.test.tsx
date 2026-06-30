@@ -176,6 +176,7 @@ describe('CanvasWorkspace', () => {
         animationPreview={{
           activeBuildElementId: 'image-hero',
           pageId: 'page-1',
+          phase: 'waiting',
           hiddenElementIds: ['image-hero'],
           playing: true,
           waitingForClick: true,
@@ -191,6 +192,77 @@ describe('CanvasWorkspace', () => {
     fireEvent.mouseDown(container.querySelector('canvas')!);
 
     expect(onAnimationPreviewAdvance).toHaveBeenCalledTimes(1);
+  });
+
+  it('advances completed animation previews by click in presentation mode', () => {
+    const onAnimationPreviewAdvance = vi.fn();
+    const { container } = render(
+      <CanvasWorkspace
+        project={createSampleProject()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        animationPreview={{
+          activeBuildElementId: undefined,
+          pageId: 'page-1',
+          phase: 'complete',
+          hiddenElementIds: [],
+          playing: true,
+          waitingForClick: false,
+        }}
+        presentationMode
+        onAnimationPreviewAdvance={onAnimationPreviewAdvance}
+      />,
+    );
+
+    fireEvent.mouseDown(container.querySelector('canvas')!);
+
+    expect(onAnimationPreviewAdvance).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides canvas quick actions while animation preview is active', () => {
+    render(
+      <CanvasWorkspace
+        project={createSampleProject()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        animationPreview={{
+          activeBuildElementId: undefined,
+          pageId: 'page-1',
+          phase: 'transition',
+          hiddenElementIds: [],
+          playing: true,
+          waitingForClick: false,
+        }}
+        onInsertMedia={vi.fn()}
+        onInsertText={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Insert Text' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Insert Media' })).not.toBeInTheDocument();
+  });
+
+  it('shows canvas quick actions after animation preview completes', () => {
+    render(
+      <CanvasWorkspace
+        project={createSampleProject()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        animationPreview={{
+          activeBuildElementId: undefined,
+          pageId: 'page-1',
+          phase: 'complete',
+          hiddenElementIds: [],
+          playing: true,
+          waitingForClick: false,
+        }}
+        onInsertMedia={vi.fn()}
+        onInsertText={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Insert Text' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Insert Media' })).toBeInTheDocument();
   });
 
   it('shows numbered animation build badges and highlights the selected animated element', () => {

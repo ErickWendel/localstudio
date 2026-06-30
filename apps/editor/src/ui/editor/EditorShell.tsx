@@ -125,7 +125,14 @@ export function EditorShell({ services }: EditorShellProps) {
 
   function presentFromSharePanel() {
     setSharePanelOpen(false);
-    void vm.toggleFullscreen(slideFrameRef.current);
+    void vm.toggleFullscreen(workspaceRef.current);
+  }
+
+  function startPresenterMode(options?: { fromBeginning?: boolean }) {
+    const pageId = options?.fromBeginning ? vm.project.pages[0]?.id : vm.activePageId;
+    if (!pageId) return;
+    vm.playPresentationPreview(pageId);
+    void vm.toggleFullscreen(workspaceRef.current);
   }
 
   function isAnimatedMediaFile(file: File) {
@@ -178,6 +185,24 @@ export function EditorShell({ services }: EditorShellProps) {
         event.preventDefault();
         vm.cancelBackgroundSelectionMode();
         return;
+      }
+
+      const isPresenterPlayback = vm.animationPreview?.mode === 'presenter';
+      const isPreviewNavigationActive = vm.isFullscreen || Boolean(isPresenterPlayback && vm.animationPreview?.playing);
+      if (isPreviewNavigationActive && !isEditableInteractionTarget(event.target)) {
+        const isNextPreviewKey =
+          event.key === 'ArrowRight' ||
+          event.key === 'ArrowDown' ||
+          event.key === 'PageDown' ||
+          event.key === ' ' ||
+          event.key === 'Enter';
+        const isPreviousPreviewKey = event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'PageUp';
+        if (isNextPreviewKey || isPreviousPreviewKey) {
+          event.preventDefault();
+          if (isNextPreviewKey) vm.advancePresentationPreview();
+          if (isPreviousPreviewKey) vm.rewindPresentationPreview();
+          return;
+        }
       }
 
       if (event.key !== 'Delete' && event.key !== 'Backspace') return;
@@ -319,10 +344,7 @@ export function EditorShell({ services }: EditorShellProps) {
         onShare={() => {
           setSharePanelOpen(true);
         }}
-        onStartPresenterMode={() => {
-          vm.playAnimationPreview();
-          void vm.toggleFullscreen(slideFrameRef.current);
-        }}
+        onStartPresenterMode={startPresenterMode}
         onTranslateDeck={isHistoryReadOnly ? undefined : () => {
           void vm.translateDeck();
         }}
@@ -405,7 +427,7 @@ export function EditorShell({ services }: EditorShellProps) {
             selection={vm.selection}
             slideFrameRef={slideFrameRef}
             stageRef={stageRef}
-            presentationMode={vm.isFullscreen}
+            presentationMode={vm.isFullscreen || vm.animationPreview?.mode === 'presenter'}
             readOnly={isHistoryReadOnly}
             zoomPercent={vm.zoomPercent}
             backgroundSelectionMode={vm.backgroundSelectionMode}
@@ -421,7 +443,11 @@ export function EditorShell({ services }: EditorShellProps) {
             onAlignSelectedElement={isHistoryReadOnly ? undefined : () => {
               vm.alignSelectedElement('page-center');
             }}
-            onAnimationPreviewAdvance={vm.advanceAnimationPreview}
+            onAnimationPreviewAdvance={
+              vm.isFullscreen || vm.animationPreview?.mode === 'presenter'
+                ? vm.advancePresentationPreview
+                : vm.advanceAnimationPreview
+            }
             onBackgroundSelectionToggle={isHistoryReadOnly ? undefined : vm.toggleBackgroundSelectionMode}
             onBackgroundSubjectPick={isHistoryReadOnly ? undefined : (elementId, point) => {
               void vm.pickBackgroundSubject(elementId, point);

@@ -35,7 +35,9 @@ interface CanvasWorkspaceProps {
     | {
         activeBuildElementId: string | undefined;
         hiddenElementIds: string[];
+        mode?: 'editor' | 'presenter';
         pageId: string;
+        phase: 'transition' | 'animation' | 'waiting' | 'complete';
         playing: boolean;
         waitingForClick: boolean;
       }
@@ -100,6 +102,8 @@ function getElementLabel(element: DesignElement | undefined) {
   if (!element) return 'Element';
   if (element.type === 'text') return element.text.trim().split('\n')[0] || 'Text';
   if (element.type === 'image') return 'Image';
+  if (element.type === 'gif') return 'GIF';
+  if (element.type === 'video') return 'Video';
   return element.shape === 'ellipse' ? 'Ellipse' : 'Rectangle';
 }
 
@@ -205,7 +209,8 @@ export function CanvasWorkspace({
     (element): element is GifElement | VideoElement => element.type === 'gif' || element.type === 'video',
   );
   const hasSelection = selection.elementIds.length > 0;
-  const showEditorOverlays = !presentationMode && !readOnly;
+  const isPresenterPlayback = presentationMode || animationPreview?.mode === 'presenter';
+  const showEditorOverlays = !isPresenterPlayback && !readOnly;
   const selectedElement = getDraftedElement(project.elements[selection.elementIds[0] ?? '']);
   const isCropModeActive = selectedElement?.type === 'image' && cropModeElementId === selectedElement.id;
   const backgroundSelectionTargetId =
@@ -220,6 +225,14 @@ export function CanvasWorkspace({
   const activeProcessingBlink = hasProcessingElements && processingBlinkOn;
   const animationPreviewHiddenElementIds =
     animationPreview?.pageId === activePageId ? animationPreview.hiddenElementIds : [];
+  const isAnimationPreviewRunning =
+    animationPreview?.pageId === activePageId &&
+    animationPreview.playing &&
+    animationPreview.phase !== 'complete';
+  const canAdvanceAnimationPreviewByClick =
+    animationPreview?.pageId === activePageId &&
+    (animationPreview.waitingForClick ||
+      (isPresenterPlayback && animationPreview.playing && animationPreview.phase === 'complete'));
   const animationBuildBadges: Array<{ build: ElementAnimationBuild; element: DesignElement; index: number }> = [];
   for (const [index, build] of (page?.animationBuilds ?? []).entries()) {
     const element = getDraftedElement(project.elements[build.elementId]);
@@ -515,7 +528,7 @@ export function CanvasWorkspace({
       x: element.x * scaleX,
       y: element.y * scaleY,
       onClick: (event: Konva.KonvaEventObject<MouseEvent>) => {
-        if (animationPreview?.waitingForClick) {
+        if (canAdvanceAnimationPreviewByClick) {
           event.cancelBubble = true;
           onAnimationPreviewAdvance?.();
           return;
@@ -585,7 +598,7 @@ export function CanvasWorkspace({
   }
 
   function handleStagePointerDown(event: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
-    if (animationPreview?.waitingForClick) {
+    if (canAdvanceAnimationPreviewByClick) {
       onAnimationPreviewAdvance?.();
       return;
     }
@@ -618,6 +631,8 @@ export function CanvasWorkspace({
         data-selected-elements={selection.elementIds.join(',')}
         data-drag-guide={dragGuide ? 'active' : 'idle'}
         data-animation-preview={animationPreview?.playing && animationPreview.pageId === activePageId ? 'playing' : 'idle'}
+        data-animation-preview-mode={animationPreview?.pageId === activePageId ? (animationPreview.mode ?? 'editor') : 'idle'}
+        data-animation-preview-phase={animationPreview?.pageId === activePageId ? animationPreview.phase : 'idle'}
         data-animation-preview-waiting={animationPreview?.waitingForClick ? 'true' : 'false'}
         style={{
           transform: `scale(${zoomPercent / 100})`,
@@ -919,7 +934,7 @@ export function CanvasWorkspace({
             Click the slide to play the next animation.
           </div>
         ) : null}
-        {showEditorOverlays && !backgroundSelectionMode && !processingSelectedImageId ? (
+        {showEditorOverlays && !backgroundSelectionMode && !processingSelectedImageId && !isAnimationPreviewRunning ? (
           <div className="canvas-quick-actions" aria-label="Canvas insert actions">
             <button type="button" aria-label="Insert Text" title="Insert Text" onClick={onInsertText}>
               <span className="material-symbols-outlined">title</span>

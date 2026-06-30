@@ -118,7 +118,9 @@ interface ElementClipboardState {
 interface AnimationPreviewState {
   activeBuildElementId: string | undefined;
   hiddenElementIds: string[];
+  mode: 'editor' | 'presenter';
   pageId: string;
+  phase: 'transition' | 'animation' | 'waiting' | 'complete';
   playing: boolean;
   waitingForClick: boolean;
 }
@@ -488,6 +490,7 @@ export function useEditorViewModel(services: AppServices) {
   const backgroundPreviewTimeoutRef = useRef<number | undefined>(undefined);
   const animationPreviewQueueRef = useRef<ElementAnimationBuild[]>([]);
   const animationPreviewTimeoutsRef = useRef<number[]>([]);
+  const wasFullscreenRef = useRef(false);
   const backgroundPreviewSequenceRef = useRef(0);
   const backgroundPreparationSequenceRef = useRef(0);
   const languageDetectionSequenceRef = useRef(0);
@@ -533,7 +536,18 @@ export function useEditorViewModel(services: AppServices) {
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
     function handleFullscreenChange() {
-      setIsFullscreen(Boolean(document.fullscreenElement));
+      const isFullscreenActive = Boolean(document.fullscreenElement);
+      setIsFullscreen(isFullscreenActive);
+      if (wasFullscreenRef.current && !isFullscreenActive) {
+        for (const timeoutId of animationPreviewTimeoutsRef.current) {
+          window.clearTimeout(timeoutId);
+        }
+        animationPreviewTimeoutsRef.current = [];
+        animationPreviewQueueRef.current = [];
+        setAnimationPreview(undefined);
+        setSelectedElementIds([]);
+      }
+      wasFullscreenRef.current = isFullscreenActive;
     }
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => {
@@ -1495,10 +1509,20 @@ export function useEditorViewModel(services: AppServices) {
     animationPreviewTimeoutsRef.current.push(timeoutId);
   }
 
-  function finishAnimationPreview() {
+  function completeAnimationPreviewSlide() {
     animationPreviewQueueRef.current = [];
     clearAnimationPreviewTimers();
-    setAnimationPreview(undefined);
+    setAnimationPreview((current) =>
+      current
+        ? {
+            ...current,
+            activeBuildElementId: undefined,
+            hiddenElementIds: [],
+            phase: 'complete',
+            waitingForClick: false,
+          }
+        : current,
+    );
   }
 
   function revealAnimationBuild(build: ElementAnimationBuild) {
@@ -1517,20 +1541,34 @@ export function useEditorViewModel(services: AppServices) {
   function runNextAnimationBuild() {
     const nextBuild = animationPreviewQueueRef.current[0];
     if (!nextBuild) {
-      scheduleAnimationPreview(finishAnimationPreview, 520);
+      completeAnimationPreviewSlide();
       return;
     }
 
     if (nextBuild.trigger === 'on-click') {
       setAnimationPreview((current) =>
-        current ? { ...current, activeBuildElementId: nextBuild.elementId, waitingForClick: true } : current,
+        current
+          ? {
+              ...current,
+              activeBuildElementId: nextBuild.elementId,
+              phase: 'waiting',
+              waitingForClick: true,
+            }
+          : current,
       );
       return;
     }
 
     animationPreviewQueueRef.current = animationPreviewQueueRef.current.slice(1);
     setAnimationPreview((current) =>
-      current ? { ...current, activeBuildElementId: nextBuild.elementId, waitingForClick: false } : current,
+      current
+        ? {
+            ...current,
+            activeBuildElementId: nextBuild.elementId,
+            phase: 'animation',
+            waitingForClick: false,
+          }
+        : current,
     );
     scheduleAnimationPreview(() => {
       revealAnimationBuild(nextBuild);
@@ -1541,12 +1579,19 @@ export function useEditorViewModel(services: AppServices) {
   function advanceAnimationPreview() {
     const nextBuild = animationPreviewQueueRef.current[0];
     if (!nextBuild) {
-      finishAnimationPreview();
+      completeAnimationPreviewSlide();
       return;
     }
     animationPreviewQueueRef.current = animationPreviewQueueRef.current.slice(1);
     setAnimationPreview((current) =>
-      current ? { ...current, activeBuildElementId: nextBuild.elementId, waitingForClick: false } : current,
+      current
+        ? {
+            ...current,
+            activeBuildElementId: nextBuild.elementId,
+            phase: 'animation',
+            waitingForClick: false,
+          }
+        : current,
     );
     scheduleAnimationPreview(() => {
       revealAnimationBuild(nextBuild);
@@ -1554,26 +1599,63 @@ export function useEditorViewModel(services: AppServices) {
     }, nextBuild.delayMs);
   }
 
-  function playAnimationPreview() {
-    const page = projectRef.current.pages.find((item) => item.id === activePageIdRef.current);
+  function playAnimationPreview(pageId = activePageIdRef.current, mode: AnimationPreviewState['mode'] = 'editor') {
+    const page = projectRef.current.pages.find((item) => item.id === pageId);
     if (!page) return;
     const builds = (page.animationBuilds ?? []).filter((build) => page.elementIds.includes(build.elementId));
     clearAnimationPreviewTimers();
     animationPreviewQueueRef.current = builds;
+    const transitionDelay = page.transition?.delayMs ?? 0;
     setAnimationPreview({
       activeBuildElementId: undefined,
       hiddenElementIds: builds.map((build) => build.elementId),
+      mode,
       pageId: page.id,
+      phase: transitionDelay > 0 ? 'transition' : builds.length > 0 ? 'animation' : 'complete',
       playing: true,
       waitingForClick: false,
     });
 
-    const transitionDelay = page.transition?.delayMs ?? 0;
     if (builds.length === 0) {
-      scheduleAnimationPreview(finishAnimationPreview, transitionDelay + 520);
+      if (transitionDelay > 0) {
+        scheduleAnimationPreview(completeAnimationPreviewSlide, transitionDelay);
+      }
       return;
     }
     scheduleAnimationPreview(runNextAnimationBuild, transitionDelay);
+  }
+
+  function goToPresentationPage(offset: -1 | 1) {
+    const pages = projectRef.current.pages;
+    const currentIndex = pages.findIndex((page) => page.id === activePageIdRef.current);
+    if (currentIndex < 0) return false;
+    const nextPage = pages[currentIndex + offset];
+    if (!nextPage) return false;
+    activePageIdRef.current = nextPage.id;
+    setActivePageId(nextPage.id);
+    setSelectedElementIds([]);
+    playAnimationPreview(nextPage.id, 'presenter');
+    return true;
+  }
+
+  function playPresentationPreview(pageId = activePageIdRef.current) {
+    activePageIdRef.current = pageId;
+    setActivePageId(pageId);
+    setSelectedElementIds([]);
+    playAnimationPreview(pageId, 'presenter');
+  }
+
+  function advancePresentationPreview() {
+    if (animationPreview?.waitingForClick) {
+      advanceAnimationPreview();
+      return true;
+    }
+    if (animationPreview?.phase !== 'complete') return Boolean(animationPreview?.playing);
+    return goToPresentationPage(1);
+  }
+
+  function rewindPresentationPreview() {
+    return goToPresentationPage(-1);
   }
 
   function getTranslatableTextElementIds(
@@ -2078,8 +2160,8 @@ export function useEditorViewModel(services: AppServices) {
     });
   }
 
-  function addPage() {
-    const sourcePage = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
+  function addPage(afterPageId = activePageId) {
+    const sourcePage = project.pages.find((item) => item.id === afterPageId) ?? project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
     if (!sourcePage) return;
     const pageId = createId('page');
     const nextPage: Page = {
@@ -2092,11 +2174,17 @@ export function useEditorViewModel(services: AppServices) {
     };
 
     commitProject(
-      (currentProject) => ({
-        ...currentProject,
-        pages: [...currentProject.pages, nextPage],
-        updatedAt: new Date().toISOString(),
-      }),
+      (currentProject) => {
+        const afterIndex = currentProject.pages.findIndex((page) => page.id === afterPageId);
+        const insertIndex = afterIndex >= 0 ? afterIndex + 1 : currentProject.pages.length;
+        const pages = [...currentProject.pages];
+        pages.splice(insertIndex, 0, nextPage);
+        return {
+          ...currentProject,
+          pages,
+          updatedAt: new Date().toISOString(),
+        };
+      },
       { activePageId: pageId, selectedElementIds: [] },
     );
   }
@@ -2670,7 +2758,10 @@ export function useEditorViewModel(services: AppServices) {
     clearElementAnimationBuild,
     reorderElementAnimationBuild,
     playAnimationPreview,
+    playPresentationPreview,
     advanceAnimationPreview,
+    advancePresentationPreview,
+    rewindPresentationPreview,
     updateTextContent,
     setElementVisibility,
     setElementLock,

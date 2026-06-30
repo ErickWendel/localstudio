@@ -34,8 +34,8 @@ function getLayerLabel(element: DesignElement, project: ProjectDocument) {
   if (element.type === 'image') return project.assets[element.assetId]?.name ?? 'Imported Image';
   if (element.type === 'gif') return project.assets[element.assetId]?.name ?? 'Imported GIF';
   if (element.type === 'video') return project.assets[element.assetId]?.name ?? 'Imported Video';
-  if (element.type === 'shape') return 'Background Shape';
-  return element.id;
+  if (element.type === 'text') return element.text.trim().split('\n')[0] || 'Text';
+  return 'Background Shape';
 }
 
 function getLayerIcon(element: DesignElement) {
