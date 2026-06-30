@@ -2,10 +2,12 @@ import type {
   Asset,
   BaseElement,
   DesignElement,
+  GifElement,
   ImageElement,
   Page,
   PageBackground,
   ProjectDocument,
+  VideoElement,
 } from '../model';
 import type { EditorCommand } from './types';
 
@@ -18,6 +20,13 @@ export type AlignMode = 'horizontal-center' | 'vertical-center' | 'page-center';
 export type ZOrderMode = 'front' | 'back' | 'forward' | 'backward';
 export type ElementFramePatch = Partial<Pick<BaseElement, 'height' | 'rotation' | 'width' | 'x' | 'y'>>;
 export type ImageCropPatch = ElementFramePatch & { crop: NonNullable<ImageElement['crop']> };
+export type GifPlaybackPatch = Partial<Pick<GifElement, 'playing'>>;
+export type VideoPlaybackPatch = Partial<
+  Pick<VideoElement, 'autoplayInPreview' | 'controls' | 'loop' | 'muted' | 'trimStartSeconds'>
+> & {
+  trimEndSeconds?: number | undefined;
+};
+export type MediaPlaybackPatch = GifPlaybackPatch | VideoPlaybackPatch;
 export type ElementStylePatch = Partial<{
   align: 'left' | 'center' | 'right';
   fill: string;
@@ -42,7 +51,9 @@ type TextTranslationValue = string | TextTranslationPatch;
 function collectReferencedAssetIds(project: ProjectDocument): Set<string> {
   const referencedAssetIds = new Set<string>();
   for (const element of Object.values(project.elements)) {
-    if (element.type === 'image') referencedAssetIds.add(element.assetId);
+    if (element.type === 'image' || element.type === 'gif' || element.type === 'video') {
+      referencedAssetIds.add(element.assetId);
+    }
   }
   for (const page of project.pages) {
     if (page.background.type === 'asset') referencedAssetIds.add(page.background.assetId);
@@ -410,6 +421,72 @@ export class AddImageElementCommand implements EditorCommand {
           ? { ...page, elementIds: [...page.elementIds, this.payload.element.id] }
           : page,
       ),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+}
+
+export class AddMediaElementCommand implements EditorCommand {
+  readonly description = 'Add media element';
+
+  constructor(
+    private readonly pageId: string,
+    private readonly payload: { asset: Asset; element: GifElement | VideoElement },
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    return {
+      ...project,
+      assets: {
+        ...project.assets,
+        [this.payload.asset.id]: this.payload.asset,
+      },
+      elements: {
+        ...project.elements,
+        [this.payload.element.id]: this.payload.element,
+      },
+      pages: project.pages.map((page) =>
+        page.id === this.pageId
+          ? { ...page, elementIds: [...page.elementIds, this.payload.element.id] }
+          : page,
+      ),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+}
+
+export class UpdateMediaPlaybackCommand implements EditorCommand {
+  readonly description = 'Update media playback';
+
+  constructor(
+    private readonly elementId: string,
+    private readonly patch: MediaPlaybackPatch,
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    const element = project.elements[this.elementId];
+    if (!element || element.locked) return project;
+    if (element.type !== 'gif' && element.type !== 'video') return project;
+    const nextElement: DesignElement =
+      element.type === 'gif'
+        ? { ...element, ...(this.patch as GifPlaybackPatch) }
+        : (() => {
+            const { trimEndSeconds, ...patch } = this.patch as VideoPlaybackPatch;
+            const next: VideoElement = { ...element, ...patch };
+            if (trimEndSeconds !== undefined) {
+              next.trimEndSeconds = trimEndSeconds;
+            } else if ('trimEndSeconds' in this.patch) {
+              delete next.trimEndSeconds;
+            }
+            return next;
+          })();
+
+    return {
+      ...project,
+      elements: {
+        ...project.elements,
+        [this.elementId]: nextElement,
+      },
       updatedAt: new Date().toISOString(),
     };
   }

@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { createSampleProject } from '../../../../src/domain/sampleProject';
+import type { ProjectDocument } from '../../../../src/domain/model';
 import { RightPanel } from '../../../../src/ui/editor/RightPanel';
 
 const modelStates = [
@@ -18,6 +19,59 @@ const modelStates = [
 
 describe('RightPanel', () => {
   const project = createSampleProject();
+
+  function createMediaProject(): ProjectDocument {
+    const mediaProject = createSampleProject();
+    mediaProject.assets['asset-video'] = {
+      id: 'asset-video',
+      type: 'video',
+      name: 'Demo clip',
+      mimeType: 'video/mp4',
+      objectUrl: 'blob:video',
+    };
+    mediaProject.assets['asset-gif'] = {
+      id: 'asset-gif',
+      type: 'gif',
+      name: 'Animated loop',
+      mimeType: 'image/gif',
+      objectUrl: 'blob:gif',
+    };
+    mediaProject.elements['video-demo'] = {
+      id: 'video-demo',
+      type: 'video',
+      assetId: 'asset-video',
+      x: 0,
+      y: 0,
+      width: 640,
+      height: 360,
+      rotation: 0,
+      locked: false,
+      visible: true,
+      opacity: 1,
+      loop: false,
+      controls: false,
+      muted: false,
+      autoplayInPreview: false,
+      trimStartSeconds: 0,
+      trimEndSeconds: 0,
+    };
+    mediaProject.elements['gif-demo'] = {
+      id: 'gif-demo',
+      type: 'gif',
+      assetId: 'asset-gif',
+      x: 0,
+      y: 0,
+      width: 320,
+      height: 180,
+      rotation: 0,
+      locked: false,
+      visible: true,
+      opacity: 1,
+      playing: true,
+    };
+    mediaProject.pages[0]?.elementIds.push('video-demo', 'gif-demo');
+    return mediaProject;
+  }
 
   it('switches between Layout, Design, and AI Tools tabs', async () => {
     const user = userEvent.setup();
@@ -233,5 +287,65 @@ describe('RightPanel', () => {
 
     await user.selectOptions(screen.getByLabelText('Selected text alignment'), 'left');
     expect(onUpdateElementStyle).toHaveBeenCalledWith('text-title', { align: 'left' });
+  });
+
+  it('shows video playback settings for selected videos', async () => {
+    const user = userEvent.setup();
+    const onUpdateMediaPlayback = vi.fn();
+
+    render(
+      <RightPanel
+        activeTab="design"
+        onTabChange={vi.fn()}
+        project={createMediaProject()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['video-demo'] }}
+        modelStates={modelStates}
+        onUpdateMediaPlayback={onUpdateMediaPlayback}
+      />,
+    );
+
+    expect(screen.getByText('Playback')).toBeInTheDocument();
+    expect(screen.getByLabelText('Loop selected video')).not.toBeChecked();
+    expect(screen.getByLabelText('Show selected video controls')).not.toBeChecked();
+    expect(screen.getByLabelText('Mute selected video')).not.toBeChecked();
+    expect(screen.getByLabelText('Autoplay selected video in preview')).not.toBeChecked();
+
+    await user.click(screen.getByLabelText('Loop selected video'));
+    expect(onUpdateMediaPlayback).toHaveBeenCalledWith('video-demo', { loop: true });
+
+    expect(screen.getByLabelText('Selected video trim start')).toHaveAttribute('type', 'range');
+    expect(screen.getByLabelText('Selected video trim end')).toHaveAttribute('type', 'range');
+
+    fireEvent.change(screen.getByLabelText('Selected video trim start'), {
+      target: { value: '1.5' },
+    });
+    expect(onUpdateMediaPlayback).toHaveBeenCalledWith('video-demo', { trimStartSeconds: 1.5 });
+
+    fireEvent.change(screen.getByLabelText('Selected video trim end'), {
+      target: { value: '9.5' },
+    });
+    expect(onUpdateMediaPlayback).toHaveBeenCalledWith('video-demo', { trimEndSeconds: 9.5 });
+  });
+
+  it('does not show playback controls for selected GIF objects', () => {
+    const onUpdateMediaPlayback = vi.fn();
+
+    render(
+      <RightPanel
+        activeTab="design"
+        onTabChange={vi.fn()}
+        project={createMediaProject()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['gif-demo'] }}
+        modelStates={modelStates}
+        onUpdateMediaPlayback={onUpdateMediaPlayback}
+      />,
+    );
+
+    expect(screen.queryByText('GIF Playback')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Play selected GIF')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Selected video trim start')).not.toBeInTheDocument();
+    expect(onUpdateMediaPlayback).not.toHaveBeenCalled();
   });
 });

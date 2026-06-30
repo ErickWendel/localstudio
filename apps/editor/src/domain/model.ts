@@ -1,4 +1,4 @@
-export type ElementType = 'text' | 'image' | 'shape';
+export type ElementType = 'text' | 'image' | 'gif' | 'video' | 'shape';
 
 export interface ProjectDocument {
   id: string;
@@ -26,7 +26,7 @@ export type PageBackground =
 
 export interface Asset {
   id: string;
-  type: 'image';
+  type: 'image' | 'gif' | 'video';
   name: string;
   mimeType: string;
   objectUrl?: string;
@@ -34,7 +34,7 @@ export interface Asset {
   storage?: 'inline' | 'file' | 'remote';
 }
 
-export type DesignElement = TextElement | ImageElement | ShapeElement;
+export type DesignElement = TextElement | ImageElement | GifElement | VideoElement | ShapeElement;
 
 export interface BaseElement {
   id: string;
@@ -64,6 +64,23 @@ export interface ImageElement extends BaseElement {
   assetId: string;
   crop?: CropRect;
   flipX?: boolean;
+}
+
+export interface GifElement extends BaseElement {
+  type: 'gif';
+  assetId: string;
+  playing: boolean;
+}
+
+export interface VideoElement extends BaseElement {
+  type: 'video';
+  assetId: string;
+  loop: boolean;
+  controls: boolean;
+  muted: boolean;
+  autoplayInPreview: boolean;
+  trimStartSeconds: number;
+  trimEndSeconds?: number;
 }
 
 export interface ShapeElement extends BaseElement {

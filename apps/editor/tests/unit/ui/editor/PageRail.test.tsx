@@ -26,7 +26,7 @@ describe('PageRail', () => {
     expect(onAddPage).toHaveBeenCalledTimes(1);
   });
 
-  it('imports a local image file from disk', async () => {
+  it('imports a local media file from disk', async () => {
     const user = userEvent.setup();
     const onImportImage = vi.fn();
     const file = new File(['image-bytes'], 'sample.png', { type: 'image/png' });
@@ -39,7 +39,7 @@ describe('PageRail', () => {
       />,
     );
 
-    await user.upload(screen.getByLabelText('Import image file'), file);
+    await user.upload(screen.getByLabelText('Import media file'), file);
 
     expect(onImportImage).toHaveBeenCalledWith(file);
   });

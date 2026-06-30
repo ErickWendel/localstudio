@@ -33,7 +33,11 @@ const VERSION_HISTORY_LIMIT = 100;
 
 function getAssetFileExtension(mimeType: string) {
   if (mimeType === 'image/jpeg') return 'jpg';
+  if (mimeType === 'image/gif') return 'gif';
   if (mimeType === 'image/webp') return 'webp';
+  if (mimeType === 'video/mp4') return 'mp4';
+  if (mimeType === 'video/webm') return 'webm';
+  if (mimeType === 'video/quicktime') return 'mov';
   return 'png';
 }
 
@@ -61,7 +65,9 @@ async function objectUrlToBlob(objectUrl: string) {
 function collectReferencedAssetIds(project: ProjectDocument) {
   const referencedAssetIds = new Set<string>();
   for (const element of Object.values(project.elements)) {
-    if (element.type === 'image') referencedAssetIds.add(element.assetId);
+    if (element.type === 'image' || element.type === 'gif' || element.type === 'video') {
+      referencedAssetIds.add(element.assetId);
+    }
   }
   for (const page of project.pages) {
     if (page.background.type === 'asset') referencedAssetIds.add(page.background.assetId);

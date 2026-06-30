@@ -1,4 +1,4 @@
-import { Eye, EyeOff, GripVertical, Image, Lock, Search, Square, Trash2, Type, Unlock } from 'lucide-react';
+import { Eye, EyeOff, Film, GripVertical, Image, Lock, Search, Square, Trash2, Type, Unlock, Video } from 'lucide-react';
 import type { DesignElement, ProjectDocument, SelectionState } from '../../domain/model';
 import { IconButton } from '../components/IconButton';
 import { PanelSection } from '../components/PanelSection';
@@ -29,6 +29,8 @@ function getLayerLabel(element: DesignElement, project: ProjectDocument) {
     return `${project.assets[element.assetId]?.name ?? 'Imported Image'} copy`;
   }
   if (element.type === 'image') return project.assets[element.assetId]?.name ?? 'Imported Image';
+  if (element.type === 'gif') return project.assets[element.assetId]?.name ?? 'Imported GIF';
+  if (element.type === 'video') return project.assets[element.assetId]?.name ?? 'Imported Video';
   if (element.type === 'shape') return 'Background Shape';
   return element.id;
 }
@@ -36,6 +38,8 @@ function getLayerLabel(element: DesignElement, project: ProjectDocument) {
 function getLayerIcon(element: DesignElement) {
   if (element.type === 'text') return Type;
   if (element.type === 'image') return Image;
+  if (element.type === 'gif') return Film;
+  if (element.type === 'video') return Video;
   return Square;
 }
 

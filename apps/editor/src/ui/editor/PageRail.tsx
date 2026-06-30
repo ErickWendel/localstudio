@@ -6,10 +6,11 @@ interface PageRailProps {
   activePageId: string;
   onAddPage?: () => void;
   onImportImage?: (file: File) => void;
+  onImportMedia?: (file: File) => void;
   onSelectPage?: (pageId: string) => void;
 }
 
-export function PageRail({ project, activePageId, onAddPage, onImportImage, onSelectPage }: PageRailProps) {
+export function PageRail({ project, activePageId, onAddPage, onImportImage, onImportMedia, onSelectPage }: PageRailProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
@@ -65,14 +66,18 @@ export function PageRail({ project, activePageId, onAddPage, onImportImage, onSe
         </button>
         <input
           ref={fileInputRef}
-          aria-label="Import image file"
+          aria-label="Import media file"
           className="visually-hidden-input"
           type="file"
-          accept="image/*"
+          accept="image/*,video/*"
           onChange={(event) => {
             const file = event.target.files?.[0];
             if (!file) return;
-            onImportImage?.(file);
+            if (onImportMedia) {
+              onImportMedia(file);
+            } else {
+              onImportImage?.(file);
+            }
             event.target.value = '';
           }}
         />

@@ -1,6 +1,6 @@
 import { Brush, Layers3, Sparkles } from 'lucide-react';
 import type { PageBackground, ProjectDocument, SelectionState } from '../../domain/model';
-import type { ElementStylePatch } from '../../domain/commands/basicCommands';
+import type { ElementStylePatch, MediaPlaybackPatch } from '../../domain/commands/basicCommands';
 import type { AiProviderState, ModelState } from '../../services/interfaces';
 import { SegmentedTabs, type SegmentedTab } from '../components/SegmentedTabs';
 import { AiToolsPanel } from './AiToolsPanel';
@@ -43,6 +43,7 @@ interface RightPanelProps {
   onDeleteElement?: (elementId: string) => void;
   onReorderElement?: (elementId: string, targetElementId: string) => void;
   onUpdateElementStyle?: (elementId: string, patch: ElementStylePatch) => void;
+  onUpdateMediaPlayback?: (elementId: string, patch: MediaPlaybackPatch) => void;
   onUpdatePageBackground?: (background: PageBackground) => void;
 }
 
@@ -84,6 +85,7 @@ export function RightPanel({
   onDeleteElement,
   onReorderElement,
   onUpdateElementStyle,
+  onUpdateMediaPlayback,
   onUpdatePageBackground,
 }: RightPanelProps) {
   return (
@@ -132,6 +134,7 @@ export function RightPanel({
             activePageId={activePageId}
             selection={selection}
             {...(onUpdateElementStyle ? { onUpdateElementStyle } : {})}
+            {...(onUpdateMediaPlayback ? { onUpdateMediaPlayback } : {})}
             {...(onUpdatePageBackground ? { onUpdatePageBackground } : {})}
           />
         ) : null}
