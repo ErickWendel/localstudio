@@ -41,7 +41,7 @@ interface RightPanelProps {
   onSetElementVisibility?: (elementId: string, visible: boolean) => void;
   onSetElementLock?: (elementId: string, locked: boolean) => void;
   onDeleteElement?: (elementId: string) => void;
-  onReorderElement?: (elementId: string, targetElementId: string) => void;
+  onReorderElement?: (elementId: string, targetElementId: string, position?: 'before' | 'after') => void;
   onUpdateElementStyle?: (elementId: string, patch: ElementStylePatch) => void;
   onUpdateMediaPlayback?: (elementId: string, patch: MediaPlaybackPatch) => void;
   onUpdatePageBackground?: (background: PageBackground) => void;

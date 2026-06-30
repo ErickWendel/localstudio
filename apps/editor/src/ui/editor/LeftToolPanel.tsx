@@ -14,6 +14,14 @@ import type { RightPanelTab, TextPreset } from './useEditorViewModel';
 
 interface LeftToolPanelProps {
   activeTab: RightPanelTab;
+  animationPreview?:
+    | {
+        activeBuildElementId: string | undefined;
+        pageId: string;
+        playing: boolean;
+        waitingForClick: boolean;
+      }
+    | undefined;
   activeSlideLanguage?: { code: string; displayCode: string; flag: string; label: string } | undefined;
   onTabChange: (tab: RightPanelTab) => void;
   open?: boolean;
@@ -53,7 +61,7 @@ interface LeftToolPanelProps {
   onSetElementVisibility?: ((elementId: string, visible: boolean) => void) | undefined;
   onSetElementLock?: ((elementId: string, locked: boolean) => void) | undefined;
   onDeleteElement?: ((elementId: string) => void) | undefined;
-  onReorderElement?: ((elementId: string, targetElementId: string) => void) | undefined;
+  onReorderElement?: ((elementId: string, targetElementId: string, position?: 'before' | 'after') => void) | undefined;
   onUpdateElementStyle?: ((elementId: string, patch: ElementStylePatch) => void) | undefined;
   onUpdateMediaPlayback?: ((elementId: string, patch: MediaPlaybackPatch) => void) | undefined;
   onUpdatePageBackground?: ((background: PageBackground) => void) | undefined;
@@ -76,6 +84,7 @@ const menuItems: Array<{ id: RightPanelTab; label: string; icon: typeof Layers3 
 
 export function LeftToolPanel({
   activeTab,
+  animationPreview,
   activeSlideLanguage,
   onTabChange,
   open = false,
@@ -198,6 +207,7 @@ export function LeftToolPanel({
         ) : null}
         {panelOpen && activeTab === 'animations' ? (
           <AnimationPanel
+            animationPreview={animationPreview}
             project={project}
             activePageId={activePageId}
             selection={selection}

@@ -1,4 +1,4 @@
-import type { DragEvent } from 'react';
+import { useState, type DragEvent } from 'react';
 import type {
   ElementAnimationBuild,
   ElementAnimationBuild as ElementAnimationPatchSource,
@@ -8,8 +8,18 @@ import type {
 } from '../../domain/model';
 
 type ElementAnimationPatch = Omit<ElementAnimationPatchSource, 'elementId' | 'id'>;
+type DurationChangeHandler = (durationMs: number) => void;
+type DropPosition = 'before' | 'after';
 
 interface AnimationPanelProps {
+  animationPreview?:
+    | {
+        activeBuildElementId: string | undefined;
+        pageId: string;
+        playing: boolean;
+        waitingForClick: boolean;
+      }
+    | undefined;
   project: ProjectDocument;
   activePageId: string;
   selection: SelectionState;
@@ -21,15 +31,17 @@ interface AnimationPanelProps {
   onSetPageTransition?: ((transition: SlideTransition) => void) | undefined;
 }
 
+const DEFAULT_ANIMATION_DURATION_MS = 500;
+
 const DEFAULT_ELEMENT_ANIMATION: ElementAnimationPatch = {
   effect: 'reveal',
   trigger: 'on-click',
-  delayMs: 0,
+  delayMs: DEFAULT_ANIMATION_DURATION_MS,
 };
 
 const DEFAULT_SLIDE_TRANSITION: SlideTransition = {
   effect: 'reveal',
-  delayMs: 0,
+  delayMs: DEFAULT_ANIMATION_DURATION_MS,
 };
 
 const ANIMATION_BUILD_DRAG_TYPE = 'application/x-localstudio-animation-build-element-id';
@@ -48,7 +60,61 @@ function getBuildPatch(build: ElementAnimationBuild | undefined): ElementAnimati
     : DEFAULT_ELEMENT_ANIMATION;
 }
 
+function toDurationMs(value: string) {
+  return Math.max(0, Number(value) * 1000 || 0);
+}
+
+function getDropPosition(event: DragEvent<HTMLElement>): DropPosition {
+  const rect = event.currentTarget.getBoundingClientRect();
+  return event.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+}
+
+function DurationField({
+  ariaLabel,
+  disabled = false,
+  valueMs,
+  onChange,
+}: {
+  ariaLabel: string;
+  disabled?: boolean;
+  valueMs: number;
+  onChange: DurationChangeHandler;
+}) {
+  const valueSeconds = valueMs / 1000;
+
+  return (
+    <label className="animation-field animation-duration-field">
+      <span>Duration</span>
+      <div className="animation-duration-controls">
+        <input
+          aria-label={`${ariaLabel} slider`}
+          disabled={disabled}
+          max={5}
+          min={0}
+          step={0.1}
+          type="range"
+          value={valueSeconds}
+          onChange={(event) => onChange(toDurationMs(event.target.value))}
+        />
+        <input
+          aria-label={ariaLabel}
+          disabled={disabled}
+          min={0}
+          step={0.1}
+          type="number"
+          value={valueSeconds}
+          onChange={(event) => onChange(toDurationMs(event.target.value))}
+        />
+        <span className="animation-duration-unit" aria-hidden="true">
+          s
+        </span>
+      </div>
+    </label>
+  );
+}
+
 export function AnimationPanel({
+  animationPreview,
   project,
   activePageId,
   selection,
@@ -59,10 +125,15 @@ export function AnimationPanel({
   onSetElementAnimationBuilds,
   onSetPageTransition,
 }: AnimationPanelProps) {
+  const [dropIndicator, setDropIndicator] = useState<{ elementId: string; position: DropPosition } | undefined>();
   const page = project.pages.find((item) => item.id === activePageId);
   const selectedElementIds = selection.elementIds.filter((elementId) => page?.elementIds.includes(elementId));
   const animationBuilds = (page?.animationBuilds ?? []).filter((build) => page?.elementIds.includes(build.elementId));
   const transition = page?.transition;
+  const activePreviewBuildElementId =
+    animationPreview?.pageId === activePageId && animationPreview.playing
+      ? animationPreview.activeBuildElementId
+      : undefined;
 
   function handleBuildDragStart(event: DragEvent<HTMLDivElement>, elementId: string) {
     event.dataTransfer.effectAllowed = 'move';
@@ -70,18 +141,23 @@ export function AnimationPanel({
     event.dataTransfer.setData('text/plain', elementId);
   }
 
-  function handleBuildDragOver(event: DragEvent<HTMLDivElement>) {
+  function handleBuildDragOver(event: DragEvent<HTMLDivElement>, elementId: string) {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
+    setDropIndicator({ elementId, position: getDropPosition(event) });
   }
 
-  function handleBuildDrop(event: DragEvent<HTMLDivElement>, targetIndex: number) {
+  function handleBuildDrop(event: DragEvent<HTMLDivElement>, targetElementId: string) {
     event.preventDefault();
+    const position = getDropPosition(event);
+    setDropIndicator(undefined);
     const draggedElementId =
       event.dataTransfer.getData(ANIMATION_BUILD_DRAG_TYPE) || event.dataTransfer.getData('text/plain');
-    const draggedIndex = animationBuilds.findIndex((build) => build.elementId === draggedElementId);
-    if (draggedIndex === -1 || draggedIndex === targetIndex) return;
-    onReorderElementAnimationBuild?.(draggedElementId, targetIndex);
+    if (!draggedElementId || draggedElementId === targetElementId) return;
+    const buildsWithoutDragged = animationBuilds.filter((build) => build.elementId !== draggedElementId);
+    const targetIndex = buildsWithoutDragged.findIndex((build) => build.elementId === targetElementId);
+    if (targetIndex === -1) return;
+    onReorderElementAnimationBuild?.(draggedElementId, position === 'after' ? targetIndex + 1 : targetIndex);
   }
 
   return (
@@ -122,23 +198,17 @@ export function AnimationPanel({
             <option value="reveal">Reveal</option>
           </select>
         </label>
-        <label className="animation-field">
-          <span>Delay</span>
-          <input
-            aria-label="Slide transition delay"
-            disabled={!transition}
-            min={0}
-            step={0.1}
-            type="number"
-            value={(transition?.delayMs ?? 0) / 1000}
-            onChange={(event) => {
-              onSetPageTransition?.({
-                effect: 'reveal',
-                delayMs: Math.max(0, Number(event.target.value) * 1000 || 0),
-              });
-            }}
-          />
-        </label>
+        <DurationField
+          ariaLabel="Slide transition duration"
+          disabled={!transition}
+          valueMs={transition?.delayMs ?? DEFAULT_ANIMATION_DURATION_MS}
+          onChange={(durationMs) => {
+            onSetPageTransition?.({
+              effect: 'reveal',
+              delayMs: durationMs,
+            });
+          }}
+        />
       </div>
 
       <div className="panel-section">
@@ -151,17 +221,37 @@ export function AnimationPanel({
             const elementId = build.elementId;
             const label = getElementLabel(project, elementId);
             const patch = getBuildPatch(build);
+            const dropPosition = dropIndicator?.elementId === elementId ? dropIndicator.position : undefined;
+            const isActivePreviewBuild = activePreviewBuildElementId === elementId;
+            const rowClassName = [
+              'animation-build-row',
+              isActivePreviewBuild ? 'animation-build-row-active' : '',
+              dropPosition === 'before' ? 'drop-indicator-before' : '',
+              dropPosition === 'after' ? 'drop-indicator-after' : '',
+            ]
+              .filter(Boolean)
+              .join(' ');
             return (
               <div
                 aria-label={`Build ${index + 1}: ${label}`}
-                className="animation-build-row"
+                aria-current={isActivePreviewBuild ? 'step' : undefined}
+                className={rowClassName}
+                data-drop-position={dropPosition}
                 draggable
                 key={build.id}
                 role="listitem"
-                onDragOver={handleBuildDragOver}
+                onDragEnd={() => setDropIndicator(undefined)}
+                onDragLeave={(event) => {
+                  if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+                  setDropIndicator((current) => (current?.elementId === elementId ? undefined : current));
+                }}
+                onDragOver={(event) => handleBuildDragOver(event, elementId)}
                 onDragStart={(event) => handleBuildDragStart(event, elementId)}
-                onDrop={(event) => handleBuildDrop(event, index)}
+                onDrop={(event) => handleBuildDrop(event, elementId)}
               >
+                {isActivePreviewBuild ? (
+                  <span className="animation-build-playhead" aria-label={`Current animation step ${index + 1}`} />
+                ) : null}
                 <div className="animation-build-title">
                   <span className="animation-build-name">
                     <span className="material-symbols-outlined animation-build-drag-handle" aria-hidden="true">
@@ -247,22 +337,16 @@ export function AnimationPanel({
                     <option value="after-previous">After previous build</option>
                   </select>
                 </label>
-                <label className="animation-field">
-                  <span>Delay</span>
-                  <input
-                    aria-label={`Delay for ${label}`}
-                    min={0}
-                    step={0.1}
-                    type="number"
-                    value={patch.delayMs / 1000}
-                    onChange={(event) => {
-                      onSetElementAnimationBuilds?.([elementId], {
-                        ...patch,
-                        delayMs: Math.max(0, Number(event.target.value) * 1000 || 0),
-                      });
-                    }}
-                  />
-                </label>
+                <DurationField
+                  ariaLabel={`Duration for ${label}`}
+                  valueMs={patch.delayMs}
+                  onChange={(durationMs) => {
+                    onSetElementAnimationBuilds?.([elementId], {
+                      ...patch,
+                      delayMs: durationMs,
+                    });
+                  }}
+                />
               </div>
             );
           })}

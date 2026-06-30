@@ -116,6 +116,7 @@ interface ElementClipboardState {
 }
 
 interface AnimationPreviewState {
+  activeBuildElementId: string | undefined;
   hiddenElementIds: string[];
   pageId: string;
   playing: boolean;
@@ -1505,6 +1506,7 @@ export function useEditorViewModel(services: AppServices) {
       current
         ? {
             ...current,
+            activeBuildElementId: undefined,
             hiddenElementIds: current.hiddenElementIds.filter((elementId) => elementId !== build.elementId),
             waitingForClick: false,
           }
@@ -1520,11 +1522,16 @@ export function useEditorViewModel(services: AppServices) {
     }
 
     if (nextBuild.trigger === 'on-click') {
-      setAnimationPreview((current) => (current ? { ...current, waitingForClick: true } : current));
+      setAnimationPreview((current) =>
+        current ? { ...current, activeBuildElementId: nextBuild.elementId, waitingForClick: true } : current,
+      );
       return;
     }
 
     animationPreviewQueueRef.current = animationPreviewQueueRef.current.slice(1);
+    setAnimationPreview((current) =>
+      current ? { ...current, activeBuildElementId: nextBuild.elementId, waitingForClick: false } : current,
+    );
     scheduleAnimationPreview(() => {
       revealAnimationBuild(nextBuild);
       runNextAnimationBuild();
@@ -1538,6 +1545,9 @@ export function useEditorViewModel(services: AppServices) {
       return;
     }
     animationPreviewQueueRef.current = animationPreviewQueueRef.current.slice(1);
+    setAnimationPreview((current) =>
+      current ? { ...current, activeBuildElementId: nextBuild.elementId, waitingForClick: false } : current,
+    );
     scheduleAnimationPreview(() => {
       revealAnimationBuild(nextBuild);
       runNextAnimationBuild();
@@ -1551,6 +1561,7 @@ export function useEditorViewModel(services: AppServices) {
     clearAnimationPreviewTimers();
     animationPreviewQueueRef.current = builds;
     setAnimationPreview({
+      activeBuildElementId: undefined,
       hiddenElementIds: builds.map((build) => build.elementId),
       pageId: page.id,
       playing: true,
@@ -2052,7 +2063,7 @@ export function useEditorViewModel(services: AppServices) {
     commitProject((currentProject) => new UpdateImageCropCommand(elementId, patch).execute(currentProject));
   }
 
-  function reorderElement(elementId: string, targetElementId: string) {
+  function reorderElement(elementId: string, targetElementId: string, position: 'before' | 'after' = 'before') {
     commitProject((currentProject) => {
       const page = currentProject.pages.find((item) => item.id === activePageId);
       if (!page) return currentProject;
@@ -2060,7 +2071,7 @@ export function useEditorViewModel(services: AppServices) {
       const displayOrder = [...page.elementIds].reverse().filter((id) => id !== elementId);
       const targetDisplayIndex = displayOrder.indexOf(targetElementId);
       if (targetDisplayIndex < 0) return currentProject;
-      displayOrder.splice(targetDisplayIndex, 0, elementId);
+      displayOrder.splice(position === 'after' ? targetDisplayIndex + 1 : targetDisplayIndex, 0, elementId);
       const nextPageOrder = [...displayOrder].reverse();
       const targetPageIndex = nextPageOrder.indexOf(elementId);
       return new ReorderElementCommand(activePageId, elementId, targetPageIndex).execute(currentProject);

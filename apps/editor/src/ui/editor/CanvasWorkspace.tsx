@@ -32,7 +32,13 @@ interface CanvasWorkspaceProps {
   processingElementIds?: string[];
   backgroundPreview?: { elementId: string; maskUrl?: string; pending: boolean; score?: number } | undefined;
   animationPreview?:
-    | { hiddenElementIds: string[]; pageId: string; playing: boolean; waitingForClick: boolean }
+    | {
+        activeBuildElementId: string | undefined;
+        hiddenElementIds: string[];
+        pageId: string;
+        playing: boolean;
+        waitingForClick: boolean;
+      }
     | undefined;
   backgroundPreparation?:
     | { elementId: string; progress: number; status: 'preparing' | 'ready' | 'failed' }
@@ -905,6 +911,14 @@ export function CanvasWorkspace({
           ) : null}
           <span className="canvas-fallback-label">Selected Image</span>
         </div>
+        {showEditorOverlays && animationPreview?.pageId === activePageId && animationPreview.waitingForClick ? (
+          <div className="animation-preview-hint" role="status">
+            <span className="material-symbols-outlined" aria-hidden="true">
+              ads_click
+            </span>
+            Click the slide to play the next animation.
+          </div>
+        ) : null}
         {showEditorOverlays && !backgroundSelectionMode && !processingSelectedImageId ? (
           <div className="canvas-quick-actions" aria-label="Canvas insert actions">
             <button type="button" aria-label="Insert Text" title="Insert Text" onClick={onInsertText}>

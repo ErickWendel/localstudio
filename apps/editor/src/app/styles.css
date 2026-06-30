@@ -1516,6 +1516,34 @@ button {
   cursor: pointer;
 }
 
+.animation-preview-hint {
+  position: absolute;
+  left: 50%;
+  bottom: -46px;
+  z-index: 15;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(520px, 100%);
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 184, 0, 0.42);
+  border-radius: 5px;
+  background: rgba(17, 19, 13, 0.94);
+  color: var(--ew-text);
+  padding: 8px 11px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.3;
+  white-space: nowrap;
+  box-shadow: 0 0 22px rgba(255, 184, 0, 0.16);
+  pointer-events: none;
+}
+
+.animation-preview-hint .material-symbols-outlined {
+  color: #ffb800;
+  font-size: 18px;
+}
+
 .background-selection-progress {
   width: 96px;
   height: 6px;
@@ -2902,6 +2930,7 @@ button {
 }
 
 .animation-build-row {
+  position: relative;
   display: grid;
   gap: 9px;
   padding: 10px;
@@ -2920,6 +2949,50 @@ button {
 .animation-build-row:focus-within {
   border-color: rgba(55, 253, 118, 0.3);
   box-shadow: 0 0 16px rgba(55, 253, 118, 0.08);
+}
+
+.animation-build-row-active {
+  border-color: rgba(255, 184, 0, 0.56);
+  box-shadow: 0 0 18px rgba(255, 184, 0, 0.14);
+}
+
+.animation-build-playhead {
+  position: absolute;
+  left: -18px;
+  top: 50%;
+  width: 0;
+  height: 0;
+  transform: translateY(-50%);
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-left: 9px solid #ffb800;
+  filter: drop-shadow(0 0 7px rgba(255, 184, 0, 0.54));
+}
+
+.drop-indicator-before,
+.drop-indicator-after {
+  position: relative;
+}
+
+.drop-indicator-before::before,
+.drop-indicator-after::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--ew-green);
+  box-shadow: 0 0 12px rgba(55, 253, 118, 0.64);
+  pointer-events: none;
+}
+
+.drop-indicator-before::before {
+  top: -6px;
+}
+
+.drop-indicator-after::after {
+  bottom: -6px;
 }
 
 .animation-build-title,
@@ -2998,6 +3071,39 @@ button {
   color: var(--ew-text);
   font: inherit;
   padding: 0 8px;
+}
+
+.animation-duration-field {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.animation-duration-controls {
+  display: grid;
+  grid-template-columns: minmax(96px, 1fr) 58px 12px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.animation-duration-controls input[type='range'] {
+  width: 100%;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  accent-color: var(--ew-green);
+  background: transparent;
+}
+
+.animation-duration-controls input[type='number'] {
+  width: 58px;
+  text-align: right;
+}
+
+.animation-duration-unit {
+  color: var(--ew-muted);
+  font-size: 11px;
+  font-weight: 900;
 }
 
 .tool-card-list,

@@ -174,6 +174,7 @@ describe('CanvasWorkspace', () => {
         activePageId="page-1"
         selection={{ pageId: 'page-1', elementIds: [] }}
         animationPreview={{
+          activeBuildElementId: 'image-hero',
           pageId: 'page-1',
           hiddenElementIds: ['image-hero'],
           playing: true,
@@ -185,6 +186,7 @@ describe('CanvasWorkspace', () => {
 
     expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview', 'playing');
     expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview-waiting', 'true');
+    expect(screen.getByText('Click the slide to play the next animation.')).toBeInTheDocument();
 
     fireEvent.mouseDown(container.querySelector('canvas')!);
 

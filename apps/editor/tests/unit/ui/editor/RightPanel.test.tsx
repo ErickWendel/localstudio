@@ -251,10 +251,23 @@ describe('RightPanel', () => {
       getData: vi.fn(() => 'text-title'),
       setData: vi.fn(),
     };
+    vi.spyOn(subtitleRow, 'getBoundingClientRect').mockReturnValue({
+      bottom: 40,
+      height: 40,
+      left: 0,
+      right: 100,
+      top: 0,
+      width: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
     fireEvent.dragStart(titleRow, { dataTransfer });
-    fireEvent.drop(subtitleRow, { dataTransfer });
+    fireEvent.dragOver(subtitleRow, { dataTransfer, clientY: 39 });
+    expect(subtitleRow).toHaveAttribute('data-drop-position', 'after');
+    fireEvent.drop(subtitleRow, { dataTransfer, clientY: 39 });
 
-    expect(onReorderElement).toHaveBeenCalledWith('text-title', 'text-subtitle');
+    expect(onReorderElement).toHaveBeenCalledWith('text-title', 'text-subtitle', 'after');
   });
 
   it('updates selected text design properties and page background', async () => {

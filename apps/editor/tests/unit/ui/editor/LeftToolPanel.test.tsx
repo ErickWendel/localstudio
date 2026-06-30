@@ -167,6 +167,12 @@ describe('LeftToolPanel', () => {
     render(
       <LeftToolPanel
         activeTab="animations"
+        animationPreview={{
+          activeBuildElementId: 'text-title',
+          pageId: 'page-1',
+          playing: true,
+          waitingForClick: true,
+        }}
         open
         onTabChange={vi.fn()}
         project={project}
@@ -189,6 +195,11 @@ describe('LeftToolPanel', () => {
     expect(screen.getByText('AI Design Revolution')).toBeInTheDocument();
     expect(screen.getByLabelText('Build 1')).toBeInTheDocument();
     expect(screen.getByLabelText('Build 2')).toBeInTheDocument();
+    expect(screen.getByRole('listitem', { name: 'Build 2: AI Design Revolution' })).toHaveAttribute(
+      'aria-current',
+      'step',
+    );
+    expect(screen.getByLabelText('Current animation step 2')).toBeInTheDocument();
 
     const dataTransfer = {
       dropEffect: '',
@@ -196,15 +207,29 @@ describe('LeftToolPanel', () => {
       getData: vi.fn(() => 'text-title'),
       setData: vi.fn(),
     };
-    fireEvent.dragStart(screen.getByRole('listitem', { name: 'Build 2: AI Design Revolution' }), { dataTransfer });
-    fireEvent.dragOver(screen.getByRole('listitem', { name: 'Build 1: Image' }), { dataTransfer });
-    fireEvent.drop(screen.getByRole('listitem', { name: 'Build 1: Image' }), { dataTransfer });
+    const titleBuildRow = screen.getByRole('listitem', { name: 'Build 2: AI Design Revolution' });
+    const imageBuildRow = screen.getByRole('listitem', { name: 'Build 1: Image' });
+    vi.spyOn(imageBuildRow, 'getBoundingClientRect').mockReturnValue({
+      bottom: 40,
+      height: 40,
+      left: 0,
+      right: 100,
+      top: 0,
+      width: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+    fireEvent.dragStart(titleBuildRow, { dataTransfer });
+    fireEvent.dragOver(imageBuildRow, { dataTransfer, clientY: -1 });
+    expect(imageBuildRow).toHaveAttribute('data-drop-position', 'after');
+    fireEvent.drop(imageBuildRow, { dataTransfer, clientY: -1 });
 
     expect(dataTransfer.setData).toHaveBeenCalledWith(
       'application/x-localstudio-animation-build-element-id',
       'text-title',
     );
-    expect(onReorderElementAnimationBuild).toHaveBeenCalledWith('text-title', 0);
+    expect(onReorderElementAnimationBuild).toHaveBeenCalledWith('text-title', 1);
 
     await user.selectOptions(screen.getByRole('combobox', { name: 'Slide transition effect' }), 'reveal');
     await user.selectOptions(screen.getByRole('combobox', { name: 'Slide transition effect' }), 'none');
@@ -213,7 +238,7 @@ describe('LeftToolPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Move AI Design Revolution animation up' }));
     await user.click(screen.getByRole('button', { name: 'Play animation preview' }));
 
-    expect(onSetPageTransition).toHaveBeenCalledWith({ effect: 'reveal', delayMs: 0 });
+    expect(onSetPageTransition).toHaveBeenCalledWith({ effect: 'reveal', delayMs: 500 });
     expect(onClearPageTransition).toHaveBeenCalledTimes(1);
     expect(onClearElementAnimationBuild).toHaveBeenCalledWith('image-hero');
     expect(onSetElementAnimationBuilds).toHaveBeenCalledWith(
@@ -249,7 +274,7 @@ describe('LeftToolPanel', () => {
 
     expect(onSetElementAnimationBuilds).toHaveBeenCalledWith(
       ['text-title', 'image-hero'],
-      { effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+      { effect: 'reveal', trigger: 'on-click', delayMs: 500 },
     );
     expect(onPlayAnimationPreview).toHaveBeenCalledTimes(1);
   });
