@@ -248,21 +248,23 @@ const requirements: Array<{
 ];
 
 function useAnimatedStarCount(target: number) {
-  const [count, setCount] = useState(0);
+  const [count, setCount] = useState(target);
 
   useEffect(() => {
-    const durationMs = 280;
+    const startCount = Math.max(0, target - 999);
+    const durationMs = 2800;
+    const holdMs = 1400;
+    const cycleMs = durationMs + holdMs;
     let animationFrame = 0;
     const start = performance.now();
 
     const tick = (now: number) => {
-      const progress = Math.min((now - start) / durationMs, 1);
+      const elapsed = (now - start) % cycleMs;
+      const progress = Math.min(elapsed / durationMs, 1);
       const easedProgress = 1 - Math.pow(1 - progress, 3);
-      setCount(Math.round(target * easedProgress));
+      setCount(Math.round(startCount + (target - startCount) * easedProgress));
 
-      if (progress < 1) {
-        animationFrame = requestAnimationFrame(tick);
-      }
+      animationFrame = requestAnimationFrame(tick);
     };
 
     animationFrame = requestAnimationFrame(tick);
