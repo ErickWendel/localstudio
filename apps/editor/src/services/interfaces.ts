@@ -6,7 +6,12 @@ import type {
 } from '../domain/generatedSlide';
 
 export type ModelStatus = 'unavailable' | 'needs-download' | 'downloading' | 'ready' | 'failed';
-export type AiCapability = 'prompt' | 'translation' | 'language-detection' | 'image-generation' | 'image-editing';
+export type AiCapability =
+  | 'prompt'
+  | 'translation'
+  | 'language-detection'
+  | 'image-generation'
+  | 'image-editing';
 export type AiProviderRuntime = 'chrome-built-in' | 'webgpu-huggingface';
 export type AiProviderCompatibility = 'compatible' | 'incompatible' | 'unknown';
 
@@ -36,11 +41,48 @@ export interface AiProviderState {
 
 export interface ProjectRepository {
   importProject?(): Promise<ProjectDocument | null>;
+  importMirrorFiles?(files: MirrorFile[]): Promise<ProjectDocument>;
   loadProject(options?: { projectName?: string }): Promise<ProjectDocument | null>;
-  saveProject(project: ProjectDocument): Promise<void>;
+  saveProject(project: ProjectDocument, options?: { projectDirectoryName?: string }): Promise<void>;
   getVersionHistory?(): Promise<VersionHistoryEntry[]>;
-  saveVersion?(project: ProjectDocument, metadata: VersionSnapshotMetadata): Promise<VersionHistoryEntry>;
+  saveVersion?(
+    project: ProjectDocument,
+    metadata: VersionSnapshotMetadata,
+  ): Promise<VersionHistoryEntry>;
   loadVersion?(versionId: string): Promise<ProjectDocument | null>;
+}
+
+export interface MirrorFile {
+  path: string;
+  blob: Blob;
+}
+
+export type MirrorStatus = 'disabled' | 'idle' | 'syncing' | 'synced' | 'failed';
+
+export interface MirrorState {
+  enabled: boolean;
+  status: MirrorStatus;
+  lastSyncedAt?: string;
+  error?: string;
+}
+
+export interface MirrorProjectSummary {
+  id: string;
+  name: string;
+  syncedAt: string;
+}
+
+export interface MirrorService<TConfig = unknown> {
+  loadConfig(): TConfig | null;
+  saveConfig(config: TConfig): void;
+  clearConfig(): void;
+  syncProject(
+    project: ProjectDocument,
+    repository: ProjectRepository,
+    config: TConfig,
+  ): Promise<MirrorState>;
+  listProjects(config: TConfig): Promise<MirrorProjectSummary[]>;
+  downloadProject(projectId: string, config: TConfig): Promise<MirrorFile[]>;
 }
 
 export interface VersionHistoryEntry {
@@ -104,7 +146,10 @@ export interface ShareService {
 export interface ModelSetupService {
   getModelStates(): Promise<ModelState[]>;
   downloadRequiredModels(): Promise<ModelState[]>;
-  downloadModel(id: string, options?: { onProgress?: (progress: number) => void }): Promise<ModelState>;
+  downloadModel(
+    id: string,
+    options?: { onProgress?: (progress: number) => void },
+  ): Promise<ModelState>;
   removeModel?(id: string): Promise<ModelState>;
 }
 
@@ -143,7 +188,11 @@ export interface TranslatorService {
     targetLanguage: string,
     options?: { onProgress?: (progress: number) => void },
   ): Promise<void>;
-  translate(text: string, targetLanguage: string, options?: { sourceLanguage?: string }): Promise<string>;
+  translate(
+    text: string,
+    targetLanguage: string,
+    options?: { sourceLanguage?: string },
+  ): Promise<string>;
 }
 
 export type PromptApiAvailability = 'unavailable' | 'downloadable' | 'downloading' | 'ready';
@@ -192,11 +241,17 @@ export interface BackgroundRemovalService {
   ): Promise<void>;
   previewBackgroundMask(
     asset: Asset,
-    options?: { points?: Array<{ x: number; y: number; positive: boolean }>; subjectPoint?: { x: number; y: number } },
+    options?: {
+      points?: Array<{ x: number; y: number; positive: boolean }>;
+      subjectPoint?: { x: number; y: number };
+    },
   ): Promise<{ maskUrl: string; score: number }>;
   removeBackground(
     asset: Asset,
-    options?: { points?: Array<{ x: number; y: number; positive: boolean }>; subjectPoint?: { x: number; y: number } },
+    options?: {
+      points?: Array<{ x: number; y: number; positive: boolean }>;
+      subjectPoint?: { x: number; y: number };
+    },
   ): Promise<{ asset: Asset; bounds?: { x: number; y: number; width: number; height: number } }>;
 }
 

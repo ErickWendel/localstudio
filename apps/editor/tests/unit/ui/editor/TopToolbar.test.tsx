@@ -9,8 +9,10 @@ describe('TopToolbar', () => {
     const user = userEvent.setup();
     const onShare = vi.fn();
     const onImportProject = vi.fn();
+    const onImportRemoteMirror = vi.fn();
+    const onMirrorNow = vi.fn();
     const onNewProject = vi.fn();
-    const onPersistenceToggle = vi.fn();
+    const onSaveLocal = vi.fn();
     const onSelectLayers = vi.fn();
     const onTranslateDeck = vi.fn();
 
@@ -20,8 +22,10 @@ describe('TopToolbar', () => {
         language="PT-BR"
         onShare={onShare}
         onImportProject={onImportProject}
+        onImportRemoteMirror={onImportRemoteMirror}
+        onMirrorNow={onMirrorNow}
         onNewProject={onNewProject}
-        onPersistenceToggle={onPersistenceToggle}
+        onSaveLocal={onSaveLocal}
         onSelectLayers={onSelectLayers}
         onTranslateDeck={onTranslateDeck}
         canTranslateDeck
@@ -35,11 +39,23 @@ describe('TopToolbar', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Import Project' }));
     expect(onImportProject).toHaveBeenCalledTimes(1);
     await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Save Local' }));
-    expect(onPersistenceToggle).toHaveBeenCalledWith(true);
+    await user.click(screen.getByRole('menuitem', { name: 'Import Remote' }));
+    expect(onImportRemoteMirror).toHaveBeenCalledTimes(1);
     await user.click(screen.getByRole('button', { name: 'File' }));
     await user.click(screen.getByRole('menuitem', { name: 'Share' }));
     expect(onShare).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    expect(screen.getByRole('separator', { name: 'File storage actions' })).toBeInTheDocument();
+    await user.click(screen.getByRole('menuitem', { name: 'Save' }));
+    expect(onSaveLocal).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Mirror Now' }));
+    expect(onMirrorNow).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    expect(screen.queryByRole('menuitem', { name: 'Save Local' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Export' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'MinIO Mirror Settings' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'View' }));
     await user.click(screen.getByRole('menuitem', { name: 'Toggle Layers Panel' }));
@@ -99,8 +115,86 @@ describe('TopToolbar', () => {
     expect(persistenceButton).toHaveTextContent('×');
 
     await user.click(screen.getByRole('button', { name: 'File' }));
-    expect(screen.getByRole('menuitem', { name: 'Save Local' })).toBeDisabled();
+    expect(screen.queryByRole('menuitem', { name: 'Save Local' })).not.toBeInTheDocument();
     expect(onPersistenceToggle).not.toHaveBeenCalled();
+  });
+
+  it('shows mirror status beside persistence and syncs when clicked', async () => {
+    const user = userEvent.setup();
+    const onMirrorNow = vi.fn();
+    const onMirrorToggle = vi.fn();
+    const { rerender } = render(
+      <TopToolbar
+        project={createSampleProject()}
+        language="PT-BR"
+        persistenceEnabled={false}
+        mirrorState={{ enabled: true, status: 'synced' }}
+        onMirrorNow={onMirrorNow}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Mirror disabled' })).toBeDisabled();
+
+    rerender(
+      <TopToolbar
+        project={createSampleProject()}
+        language="PT-BR"
+        persistenceEnabled
+        mirrorState={{ enabled: true, status: 'syncing' }}
+        onMirrorNow={onMirrorNow}
+        onMirrorToggle={onMirrorToggle}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Mirror syncing' })).toHaveClass('mirror-syncing');
+
+    rerender(
+      <TopToolbar
+        project={createSampleProject()}
+        language="PT-BR"
+        persistenceEnabled
+        mirrorState={{ enabled: true, status: 'synced' }}
+        onMirrorNow={onMirrorNow}
+        onMirrorToggle={onMirrorToggle}
+      />,
+    );
+    const mirrorButton = screen.getByRole('button', { name: 'Mirror up to date' });
+    expect(mirrorButton).toHaveClass('mirror-synced');
+    await user.click(mirrorButton);
+    expect(onMirrorToggle).toHaveBeenCalledWith(false);
+    expect(onMirrorNow).not.toHaveBeenCalled();
+  });
+
+  it('labels deck storage state by persistence and mirror activation', () => {
+    const { rerender } = render(
+      <TopToolbar
+        project={createSampleProject()}
+        language="PT-BR"
+        persistenceEnabled={false}
+        mirrorState={{ enabled: false, status: 'disabled' }}
+      />,
+    );
+
+    expect(screen.getByText('Unsaved deck')).toBeInTheDocument();
+
+    rerender(
+      <TopToolbar
+        project={createSampleProject()}
+        language="PT-BR"
+        persistenceEnabled
+        mirrorState={{ enabled: false, status: 'disabled' }}
+      />,
+    );
+    expect(screen.getByText('Local only')).toBeInTheDocument();
+
+    rerender(
+      <TopToolbar
+        project={createSampleProject()}
+        language="PT-BR"
+        persistenceEnabled
+        mirrorState={{ enabled: true, status: 'syncing' }}
+      />,
+    );
+    expect(screen.getByText('Mirroring')).toBeInTheDocument();
   });
 
   it('opens version history from the toolbar when persistence is enabled', async () => {
