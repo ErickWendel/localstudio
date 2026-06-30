@@ -72,13 +72,13 @@ describe('editor commands', () => {
     expect(next.pages[0]?.elementIds).not.toContain('text-subtitle');
   });
 
-  it('deletes an image element and its owned asset', () => {
+  it('deletes an image element while keeping its asset in the project library', () => {
     const project = createSampleProject();
     const command = new DeleteElementCommand('page-1', 'image-hero');
     const next = command.execute(project);
 
     expect(next.elements['image-hero']).toBeUndefined();
-    expect(next.assets['asset-hero']).toBeUndefined();
+    expect(next.assets['asset-hero']).toBeDefined();
     expect(next.pages[0]?.elementIds).not.toContain('image-hero');
   });
 
@@ -106,7 +106,7 @@ describe('editor commands', () => {
     });
     expect(next.pages[0]?.elementIds).toEqual(project.pages[0]?.elementIds);
     expect(next.assets['asset-generated-replacement']).toBeDefined();
-    expect(next.assets['asset-hero']).toBeUndefined();
+    expect(next.assets['asset-hero']).toBeDefined();
     expect(project.elements['image-hero']).toMatchObject({ type: 'image', assetId: 'asset-hero' });
   });
 

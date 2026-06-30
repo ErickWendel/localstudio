@@ -1,4 +1,4 @@
-import type { Asset, ProjectDocument } from '../domain/model';
+import type { ProjectDocument } from '../domain/model';
 import type {
   ProjectRepository,
   VersionHistoryEntry,
@@ -58,24 +58,6 @@ async function objectUrlToBlob(objectUrl: string) {
   return response.blob();
 }
 
-function collectReferencedAssetIds(project: ProjectDocument) {
-  const referencedAssetIds = new Set<string>();
-  for (const element of Object.values(project.elements)) {
-    if (element.type === 'image') referencedAssetIds.add(element.assetId);
-  }
-  for (const page of project.pages) {
-    if (page.background.type === 'asset') referencedAssetIds.add(page.background.assetId);
-  }
-  return referencedAssetIds;
-}
-
-function getReferencedAssets(project: ProjectDocument) {
-  const referencedAssetIds = collectReferencedAssetIds(project);
-  return Object.fromEntries(
-    Object.entries(project.assets).filter(([assetId]) => referencedAssetIds.has(assetId)),
-  );
-}
-
 function createVersionId(date = new Date()) {
   return date.toISOString().replace(/[:.]/g, '-');
 }
@@ -97,13 +79,13 @@ async function createFileBackedProjectSnapshot(
   project: ProjectDocument,
   assetsDirectory: FileSystemDirectoryHandle,
 ): Promise<ProjectDocument> {
-  const referencedAssets = getReferencedAssets(project);
+  const projectAssets = project.assets;
   const projectForDisk: ProjectDocument = {
     ...project,
-    assets: { ...referencedAssets },
+    assets: { ...projectAssets },
   };
 
-  for (const [assetId, asset] of Object.entries(referencedAssets)) {
+  for (const [assetId, asset] of Object.entries(projectAssets)) {
     if (asset.storage === 'file' && asset.fileName) {
       const assetForDisk = { ...asset };
       delete assetForDisk.objectUrl;
@@ -252,10 +234,6 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
       directoryHandle.getDirectoryHandle('config', { create: true }),
     ]);
 
-    const staleAssets = Object.entries(project.assets)
-      .filter(([assetId]) => !collectReferencedAssetIds(project).has(assetId))
-      .map(([, asset]) => asset);
-
     const projectForDisk = await createFileBackedProjectSnapshot(project, assetsDirectory);
     const retainedAssetFileNames = new Set(
       Object.values(projectForDisk.assets)
@@ -263,7 +241,6 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
         .filter((fileName): fileName is string => Boolean(fileName)),
     );
 
-    await this.removeStaleAssetFiles(assetsDirectory, staleAssets);
     await this.removeUnretainedAssetFiles(assetsDirectory, retainedAssetFileNames);
     await this.writeJsonFile(directoryHandle, PROJECT_FILE_NAME, projectForDisk);
     const configDirectory = await directoryHandle.getDirectoryHandle('config', { create: true });
@@ -368,15 +345,6 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     const writable = await fileHandle.createWritable();
     await writable.write(value);
     await writable.close();
-  }
-
-  private async removeStaleAssetFiles(directoryHandle: FileSystemDirectoryHandle, staleAssets: Asset[]) {
-    await Promise.all(
-      staleAssets.map(async (asset) => {
-        if (asset.storage !== 'file' || !asset.fileName || !directoryHandle.removeEntry) return;
-        await directoryHandle.removeEntry(asset.fileName).catch(() => undefined);
-      }),
-    );
   }
 
   private async removeUnretainedAssetFiles(

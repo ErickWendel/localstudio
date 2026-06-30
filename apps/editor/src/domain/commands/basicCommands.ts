@@ -40,14 +40,6 @@ interface TextTranslationPatch {
 
 type TextTranslationValue = string | TextTranslationPatch;
 
-function removeUnreferencedAssets(project: ProjectDocument): ProjectDocument {
-  const referencedAssetIds = collectReferencedAssetIds(project);
-  const assets = Object.fromEntries(
-    Object.entries(project.assets).filter(([assetId]) => referencedAssetIds.has(assetId)),
-  );
-  return { ...project, assets };
-}
-
 export class RemoveAssetCommand implements EditorCommand {
   readonly description = 'Remove asset';
 
@@ -183,7 +175,7 @@ export class DeleteElementCommand implements EditorCommand {
     const { [this.elementId]: deleted, ...remainingElements } = project.elements;
     void deleted;
 
-    return removeUnreferencedAssets({
+    return {
       ...project,
       elements: remainingElements,
       pages: project.pages.map((page) =>
@@ -191,7 +183,7 @@ export class DeleteElementCommand implements EditorCommand {
           ? { ...page, elementIds: page.elementIds.filter((id) => id !== this.elementId) }
           : page,
       ),
-    });
+    };
   }
 }
 
@@ -256,12 +248,12 @@ export class DeletePageCommand implements EditorCommand {
     const elements = Object.fromEntries(
       Object.entries(project.elements).filter(([elementId]) => !deletedElementIds.has(elementId)),
     );
-    return removeUnreferencedAssets({
+    return {
       ...project,
       elements,
       pages: project.pages.filter((item) => item.id !== this.pageId),
       updatedAt: new Date().toISOString(),
-    });
+    };
   }
 }
 
@@ -435,7 +427,7 @@ export class ReplaceImageAssetCommand implements EditorCommand {
     const element = project.elements[this.elementId];
     if (!element || element.type !== 'image' || element.locked) return project;
 
-    return removeUnreferencedAssets({
+    return {
       ...project,
       assets: {
         ...project.assets,
@@ -449,7 +441,7 @@ export class ReplaceImageAssetCommand implements EditorCommand {
         },
       },
       updatedAt: new Date().toISOString(),
-    });
+    };
   }
 }
 

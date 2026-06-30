@@ -266,7 +266,7 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
     expect(savedAsset.objectUrl).toBeUndefined();
   });
 
-  it('removes stale file-backed assets from project metadata and assets folder on save', async () => {
+  it('keeps unreferenced file-backed assets in project metadata and assets folder on save', async () => {
     const directory = new MockDirectoryHandle();
     const assetsDirectory = new MockDirectoryHandle();
     directory.directories.set('assets', assetsDirectory);
@@ -288,8 +288,12 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
     await repository.saveProject(project);
 
     const savedProject = JSON.parse(directory.files.get('project.json') as string) as ProjectDocument;
-    expect(savedProject.assets['asset-stale']).toBeUndefined();
-    expect(assetsDirectory.files.has('asset-stale.png')).toBe(false);
+    expect(savedProject.assets['asset-stale']).toMatchObject({
+      id: 'asset-stale',
+      fileName: 'asset-stale.png',
+      storage: 'file',
+    });
+    expect(assetsDirectory.files.has('asset-stale.png')).toBe(true);
   });
 
   it('removes asset files that no longer have project metadata on save', async () => {
