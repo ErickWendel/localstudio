@@ -1,4 +1,4 @@
-import { forwardRef, type ComponentProps, type ReactNode, useImperativeHandle, useRef } from 'react';
+import { forwardRef, type ComponentProps, type ReactNode, useEffect, useImperativeHandle, useRef } from 'react';
 import type { ElementStylePatch } from '../../domain/commands/basicCommands';
 import { CanvasWorkspace } from './CanvasWorkspace';
 import { TextSelectionToolbar } from './TextSelectionToolbar';
@@ -8,7 +8,7 @@ type CanvasWorkspaceProps = ComponentProps<typeof CanvasWorkspace>;
 interface ScrollingCanvasWorkspaceProps extends CanvasWorkspaceProps {
   canTranslateCurrentSlide?: boolean;
   children?: ReactNode;
-  onAddPage?: (() => void) | undefined;
+  onAddPage?: ((afterPageId?: string) => void) | undefined;
   onActivePageFromScroll?: ((pageId: string) => void) | undefined;
   onDeletePage?: ((pageId: string) => void) | undefined;
   onDuplicatePage?: ((pageId: string) => void) | undefined;
@@ -39,6 +39,8 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
   ref,
 ) {
   const pageRefs = useRef(new Map<string, HTMLElement>());
+  const programmaticScrollReleaseRef = useRef<number | undefined>(undefined);
+  const programmaticScrollRef = useRef(false);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const selectedElement = project.elements[canvasProps.selection.elementIds[0] ?? ''];
   const showTextToolbar =
@@ -48,13 +50,39 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
   const textToolbarDisabled =
     Boolean(canvasProps.isTranslating) ||
     Boolean(selectedElement?.type === 'text' && canvasProps.processingElementIds?.includes(selectedElement.id));
+  const showPageControls = !canvasProps.presentationMode;
   useImperativeHandle(ref, () => scrollerRef.current as HTMLDivElement, []);
+
+  useEffect(() => {
+    const activePageElement = pageRefs.current.get(activePageId);
+    if (!activePageElement?.scrollIntoView) return;
+    programmaticScrollRef.current = true;
+    if (programmaticScrollReleaseRef.current !== undefined) {
+      window.clearTimeout(programmaticScrollReleaseRef.current);
+    }
+    activePageElement.scrollIntoView({ block: 'start', behavior: 'auto' });
+    programmaticScrollReleaseRef.current = window.setTimeout(() => {
+      programmaticScrollRef.current = false;
+      programmaticScrollReleaseRef.current = undefined;
+    }, 120);
+  }, [activePageId, project.pages.length]);
+
+  useEffect(
+    () => () => {
+      if (programmaticScrollReleaseRef.current !== undefined) {
+        window.clearTimeout(programmaticScrollReleaseRef.current);
+      }
+    },
+    [],
+  );
 
   function updateActivePageFromScroll() {
     if (!onActivePageFromScroll) return;
+    if (programmaticScrollRef.current) return;
+    const scrollerRect = scrollerRef.current?.getBoundingClientRect();
     const entries = Array.from(pageRefs.current.entries());
     if (entries.length === 0) return;
-    const viewportCenter = window.innerHeight / 2;
+    const viewportCenter = scrollerRect ? scrollerRect.top + scrollerRect.height / 2 : window.innerHeight / 2;
     const closest = entries
       .map(([pageId, element]) => {
         const rect = element.getBoundingClientRect();
@@ -133,6 +161,18 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
                 <span>{visible ? page.name : `${page.name} hidden`}</span>
               </button>
             )}
+            {showPageControls && onAddPage ? (
+              <button
+                aria-label={`Add page after ${page.name}`}
+                className="scroll-page-insert"
+                type="button"
+                onClick={() => onAddPage(page.id)}
+              >
+                <span className="material-symbols-outlined" aria-hidden="true">
+                  add
+                </span>
+              </button>
+            ) : null}
           </section>
         );
       })}
@@ -150,7 +190,7 @@ interface PageHeaderProps {
   name: string;
   pageId: string;
   visible: boolean;
-  onAddPage?: () => void;
+  onAddPage?: (afterPageId?: string) => void;
   onDeletePage?: (pageId: string) => void;
   onDuplicatePage?: (pageId: string) => void;
   onRenamePage?: (pageId: string, name: string) => void;
@@ -196,7 +236,7 @@ function PageHeader({
         <IconAction label={`Duplicate ${name}`} icon="content_copy" onClick={() => onDuplicatePage?.(pageId)} />
         <IconAction disabled={!canTranslate} label={`Translate ${name}`} icon="translate" onClick={() => onTranslatePage?.(pageId)} />
         <IconAction disabled={!canDelete} label={`Delete ${name}`} icon="delete" danger onClick={() => onDeletePage?.(pageId)} />
-        <IconAction label="Add page" icon="add" {...(onAddPage ? { onClick: onAddPage } : {})} />
+        <IconAction label="Add page" icon="add" {...(onAddPage ? { onClick: () => onAddPage(pageId) } : {})} />
       </div>
     </header>
   );

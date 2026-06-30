@@ -17,6 +17,7 @@ interface FloatingSelectionToolbarProps {
   onFlipImage?: (() => void) | undefined;
   onDelete?: (() => void) | undefined;
   onDuplicate?: (() => void) | undefined;
+  onOpenAnimations?: (() => void) | undefined;
   onSendBackward?: (() => void) | undefined;
   onTranslateSelectedText?: (() => void) | undefined;
   backgroundSelectionActive?: boolean;
@@ -34,6 +35,7 @@ export function FloatingSelectionToolbar({
   onFlipImage,
   onDelete,
   onDuplicate,
+  onOpenAnimations,
   onSendBackward,
   onTranslateSelectedText,
   backgroundSelectionActive = false,
@@ -67,6 +69,7 @@ export function FloatingSelectionToolbar({
       { label: 'Bring Forward', icon: 'flip_to_front', onClick: onBringForward },
     ],
     [
+      { label: 'Animate', icon: 'animation', display: 'label', onClick: onOpenAnimations },
       { label: 'Duplicate', icon: 'content_copy', onClick: onDuplicate },
       { label: 'Delete', icon: 'delete', onClick: onDelete, tone: 'danger' },
     ],
@@ -79,6 +82,7 @@ export function FloatingSelectionToolbar({
       { label: 'Send Backward', icon: 'flip_to_back', onClick: onSendBackward },
     ],
     [
+      { label: 'Animate', icon: 'animation', display: 'label', onClick: onOpenAnimations },
       { label: 'Duplicate', icon: 'content_copy', onClick: onDuplicate },
       { label: 'Lock', icon: 'lock' },
     ],

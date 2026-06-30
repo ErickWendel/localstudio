@@ -5,6 +5,40 @@ import { createSampleProject } from '../../../../src/domain/sampleProject';
 import { ScrollingCanvasWorkspace } from '../../../../src/ui/editor/ScrollingCanvasWorkspace';
 
 describe('ScrollingCanvasWorkspace', () => {
+  it('scrolls the active slide into view after active page changes', () => {
+    const project = createSampleProject();
+    project.pages.push({
+      ...project.pages[0]!,
+      id: 'page-2',
+      name: 'Second Slide',
+      elementIds: [],
+    });
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+
+    const { rerender } = render(
+      <ScrollingCanvasWorkspace
+        activePageId="page-1"
+        project={project}
+        selection={{ pageId: 'page-1', elementIds: [] }}
+      />,
+    );
+
+    scrollIntoView.mockClear();
+    rerender(
+      <ScrollingCanvasWorkspace
+        activePageId="page-2"
+        project={project}
+        selection={{ pageId: 'page-2', elementIds: [] }}
+      />,
+    );
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start', behavior: 'auto' });
+  });
+
   it('activates placeholder pages and exposes page header actions', async () => {
     const user = userEvent.setup();
     const project = createSampleProject();
@@ -49,7 +83,10 @@ describe('ScrollingCanvasWorkspace', () => {
     expect(handlers.onDeletePage).toHaveBeenCalledWith('page-1');
 
     await user.click(screen.getAllByRole('button', { name: 'Add page' })[0]!);
-    expect(handlers.onAddPage).toHaveBeenCalledTimes(1);
+    expect(handlers.onAddPage).toHaveBeenCalledWith('page-1');
+
+    await user.click(screen.getByRole('button', { name: 'Add page after Second Slide' }));
+    expect(handlers.onAddPage).toHaveBeenCalledWith('page-2');
   });
 
   it('keeps text editing controls in the sticky slide toolbar and wires translation', async () => {
