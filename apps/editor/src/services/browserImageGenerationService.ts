@@ -6,18 +6,12 @@ import {
   DEFAULT_IMAGE_GENERATION_STEPS,
   IMAGE_GENERATION_TRANSFORMERS_MODEL_ID,
 } from './imageGenerationModels';
+import { createPrefixedId } from './idUtils';
 
 interface BrowserImageGenerationServiceOptions {
   createId?: (prefix: string) => string;
   createObjectUrl?: (blob: Blob) => string;
   runtime?: BonsaiImageRuntime;
-}
-
-function defaultCreateId(prefix: string) {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return `${prefix}-${crypto.randomUUID()}`;
-  }
-  return `${prefix}-${Date.now().toString(36)}`;
 }
 
 function sanitizeImageName(prompt: string) {
@@ -59,7 +53,7 @@ export class BrowserImageGenerationService implements ImageGenerationService {
     });
 
     return {
-      id: this.options.createId?.('asset-generated-image') ?? defaultCreateId('asset-generated-image'),
+      id: this.options.createId?.('asset-generated-image') ?? createPrefixedId('asset-generated-image'),
       type: 'image',
       name: sanitizeImageName(trimmedPrompt),
       mimeType: blob.type || 'image/png',

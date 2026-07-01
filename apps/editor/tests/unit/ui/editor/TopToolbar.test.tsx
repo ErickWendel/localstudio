@@ -235,6 +235,20 @@ describe('TopToolbar', () => {
     expect(onShare).not.toHaveBeenCalled();
   });
 
+  it('does not show stale share fallback UI when no share handler is provided', async () => {
+    const user = userEvent.setup();
+    const alert = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
+
+    render(<TopToolbar project={createSampleProject()} language="PT-BR" />);
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Share' }));
+    await user.click(screen.getByRole('button', { name: 'Share' }));
+
+    expect(alert).not.toHaveBeenCalled();
+    alert.mockRestore();
+  });
+
   it('opens version history from the toolbar when persistence is enabled', async () => {
     const user = userEvent.setup();
     const onOpenVersionHistory = vi.fn();

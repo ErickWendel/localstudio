@@ -84,11 +84,12 @@ describe('BrowserShareService', () => {
 
     expect(share.shareId).toBe('00000000-0000-4000-8000-000000000001');
     const publicUrl = new URL(share.publicUrl);
-    expect(publicUrl.pathname).toBe('/editor/s/00000000-0000-4000-8000-000000000001');
+    expect(publicUrl.pathname).toBe('/editor/');
+    expect(publicUrl.searchParams.get('share')).toBe('00000000-0000-4000-8000-000000000001');
     expect(publicUrl.searchParams.get('src')).toBe(
       'http://localhost:9000/localstudio/mirrors/public-shares/00000000-0000-4000-8000-000000000001/share.json',
     );
-    expect(share.embedHtml).toContain('/editor/embed/00000000-0000-4000-8000-000000000001');
+    expect(share.embedHtml).toContain('/editor/?embed=00000000-0000-4000-8000-000000000001');
     expect(share.embedHtml).toContain('src=');
 
     const putUrls = Array.from(uploadedBodies.keys());
@@ -131,5 +132,24 @@ describe('BrowserShareService', () => {
     await expect(service.createShare(createSampleProject())).rejects.toThrow(
       'Public sharing requires active external storage.',
     );
+  });
+
+  it('encodes share ids and escapes embed iframe URLs', () => {
+    const service = new BrowserShareService({
+      mirrorService: new MinioMirrorService({ fetch: vi.fn() }),
+      origin: 'https://localstudio.test',
+    });
+    const shareId = 'deck "quoted"&<tag>';
+
+    expect(service.getPublicUrl(shareId)).toBe(
+      'https://localstudio.test/editor/?share=deck+%22quoted%22%26%3Ctag%3E',
+    );
+    expect(service.getEmbedUrl(shareId)).toBe(
+      'https://localstudio.test/editor/?embed=deck+%22quoted%22%26%3Ctag%3E',
+    );
+    expect(service.getEmbedHtml(shareId)).toContain(
+      'src="https://localstudio.test/editor/?embed=deck+%22quoted%22%26%3Ctag%3E"',
+    );
+    expect(service.getEmbedHtml(shareId)).not.toContain(shareId);
   });
 });

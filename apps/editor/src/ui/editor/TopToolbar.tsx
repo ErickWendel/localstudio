@@ -158,12 +158,7 @@ export function TopToolbar({
 
   function triggerShare() {
     if (!publicSharingAvailable) return;
-    if (onShare) {
-      onShare();
-      return;
-    }
-
-    window.alert(`Share wiring ready for ${project.name}`);
+    onShare?.();
   }
 
   function closeMenu() {

@@ -1,4 +1,5 @@
 import type { LocalSetupService, LocalSetupState, SetupCapabilityState } from './interfaces';
+import { getBrowserLocalStorage } from './browserStorage';
 
 export const SETUP_COMPLETE_KEY = 'localstudio.ai.setup-complete';
 
@@ -23,11 +24,11 @@ export class BrowserLocalSetupService implements LocalSetupService {
   }
 
   markSetupComplete(): void {
-    window.localStorage.setItem(SETUP_COMPLETE_KEY, 'true');
+    getBrowserLocalStorage()?.setItem(SETUP_COMPLETE_KEY, 'true');
   }
 
   hasCompletedSetup(): boolean {
-    return window.localStorage.getItem(SETUP_COMPLETE_KEY) === 'true';
+    return getBrowserLocalStorage()?.getItem(SETUP_COMPLETE_KEY) === 'true';
   }
 
   private checkFileSystem(): SetupCapabilityState {

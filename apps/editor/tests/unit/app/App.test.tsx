@@ -83,12 +83,12 @@ describe('App', () => {
     expect(screen.queryByText('LocalStudio.dev runs locally in this browser.')).not.toBeInTheDocument();
   });
 
-  it('renders the WebMCP showcase page at /webmcp', () => {
+  it('renders the WebMCP showcase page at /webmcp', async () => {
     window.history.replaceState({}, '', '/webmcp');
 
     render(<App />);
 
-    expect(screen.getByRole('heading', { name: 'WebMCP showcase' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'WebMCP showcase' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Discover tools' })).toBeInTheDocument();
     expect(screen.getByTitle('LocalStudio editor WebMCP demo')).toHaveAttribute(
       'src',
@@ -96,20 +96,20 @@ describe('App', () => {
     );
   });
 
-  it('renders the WebMCP showcase page at /webmcp/', () => {
+  it('renders the WebMCP showcase page at /webmcp/', async () => {
     window.history.replaceState({}, '', '/webmcp/');
 
     render(<App />);
 
-    expect(screen.getByRole('heading', { name: 'WebMCP showcase' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'WebMCP showcase' })).toBeInTheDocument();
   });
 
-  it('renders the WebMCP showcase page under the editor base path', () => {
+  it('renders the WebMCP showcase page under the editor base path', async () => {
     window.history.replaceState({}, '', '/editor/webmcp');
 
     render(<App />);
 
-    expect(screen.getByRole('heading', { name: 'WebMCP showcase' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'WebMCP showcase' })).toBeInTheDocument();
   });
 
   it('renders a public shared deck page', async () => {
@@ -140,6 +140,34 @@ describe('App', () => {
     expect(screen.getByText('1 / 1')).toBeInTheDocument();
   });
 
+  it('renders a public shared deck page from a static-host-safe query route', async () => {
+    const shareId = '00000000-0000-4000-8000-000000000103';
+    const sourceUrl = `http://localhost:9000/localstudio/mirrors/public-shares/${shareId}/share.json`;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              schemaVersion: 1,
+              shareId,
+              createdAt: '2026-06-30T10:00:00.000Z',
+              updatedAt: '2026-06-30T10:00:00.000Z',
+              project: createSampleProject(),
+            }),
+            { headers: { 'content-type': 'application/json' }, status: 200 },
+          ),
+        );
+      }),
+    );
+    window.history.replaceState({}, '', `/editor/?share=${shareId}&src=${encodeURIComponent(sourceUrl)}`);
+
+    render(<App />);
+
+    expect(await screen.findByLabelText('Public presentation')).toHaveClass('public-deck-viewer-present');
+    expect(screen.getByText('1 / 1')).toBeInTheDocument();
+  });
+
   it('renders a compact embedded shared deck page', async () => {
     const shareId = '00000000-0000-4000-8000-000000000102';
     const sourceUrl = `http://localhost:9000/localstudio/mirrors/public-shares/${shareId}/share.json`;
@@ -161,6 +189,34 @@ describe('App', () => {
       }),
     );
     window.history.replaceState({}, '', `/editor/embed/${shareId}?src=${encodeURIComponent(sourceUrl)}`);
+
+    render(<App />);
+
+    expect(await screen.findByLabelText('Embedded shared deck')).toBeInTheDocument();
+    expect(screen.queryByText('Public view')).not.toBeInTheDocument();
+  });
+
+  it('renders a compact embedded shared deck page from a static-host-safe query route', async () => {
+    const shareId = '00000000-0000-4000-8000-000000000104';
+    const sourceUrl = `http://localhost:9000/localstudio/mirrors/public-shares/${shareId}/share.json`;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              schemaVersion: 1,
+              shareId,
+              createdAt: '2026-06-30T10:00:00.000Z',
+              updatedAt: '2026-06-30T10:00:00.000Z',
+              project: createSampleProject(),
+            }),
+            { headers: { 'content-type': 'application/json' }, status: 200 },
+          ),
+        );
+      }),
+    );
+    window.history.replaceState({}, '', `/editor/?embed=${shareId}&src=${encodeURIComponent(sourceUrl)}`);
 
     render(<App />);
 

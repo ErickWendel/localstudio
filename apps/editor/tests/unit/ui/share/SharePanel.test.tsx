@@ -69,6 +69,27 @@ describe('SharePanel', () => {
     expect(screen.getByText('Copied')).toBeInTheDocument();
   });
 
+  it('shows an error when share publishing fails', async () => {
+    const user = userEvent.setup();
+    const onCopyLink = vi.fn().mockRejectedValue(new Error('Could not upload share.json'));
+
+    render(
+      <SharePanel
+        projectName="Untitled AI Deck"
+        onClose={vi.fn()}
+        onCopyLink={onCopyLink}
+        onDownload={vi.fn()}
+        onPresent={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Copy link' }));
+
+    expect(await screen.findByText('Share failed')).toBeInTheDocument();
+    expect(screen.getByText('Could not upload share.json')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy link' })).not.toBeDisabled();
+  });
+
   it('runs download and present actions', async () => {
     const user = userEvent.setup();
     const onDownload = vi.fn();

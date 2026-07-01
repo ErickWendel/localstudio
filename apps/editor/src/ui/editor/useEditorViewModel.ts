@@ -46,7 +46,6 @@ import type { GeneratedSlideElement } from '../../domain/generatedSlide';
 import { fitImageWithinPage } from '../../domain/imageSizing';
 import type {
   DesignElement,
-  ElementAnimationBuild,
   ImageElement,
   Page,
   PageBackground,
@@ -84,12 +83,26 @@ import {
   IMAGE_GENERATION_MODEL_ID,
 } from '../../services/imageGenerationModels';
 import { IMAGE_EDITING_MODEL_ID } from '../../services/modelSetupService';
+import { createPrefixedId } from '../../services/idUtils';
 import { looksLikeImageGenerationRequest } from '../../services/prompts/slideTaskPrompt';
 import {
   defaultCreateImagePromptOptions,
   type CreateImagePromptOptions,
 } from './imagePromptOptions';
 import { TRANSLATION_LANGUAGE_OPTIONS } from './translationLanguages';
+import {
+  getLanguageDisplayCode,
+  getLanguageOption,
+  isSupportedTranslationLanguageCode,
+  normalizeLanguageCode,
+} from './translationLanguageUtils';
+import {
+  readPersistencePreference,
+  readTranslationTargetLanguage,
+  writePersistencePreference,
+  writeTranslationTargetLanguage,
+} from './editorPreferences';
+import { useAnimationPreviewController } from './useAnimationPreviewController';
 
 export type RightPanelTab = 'layout' | 'text' | 'elements' | 'design' | 'ai-tools' | 'assets' | 'animations';
 export type TextPreset = 'title' | 'subtitle' | 'body';
@@ -135,20 +148,8 @@ interface ElementClipboardState {
   elements: DesignElement[];
 }
 
-interface AnimationPreviewState {
-  activeBuildElementId: string | undefined;
-  hiddenElementIds: string[];
-  mode: 'editor' | 'presenter';
-  pageId: string;
-  phase: 'transition' | 'animation' | 'waiting' | 'complete';
-  playing: boolean;
-  waitingForClick: boolean;
-}
-
 export type RemoteImportStatus = 'loading' | 'ready' | 'empty' | 'importing' | 'failed';
 
-const PERSISTENCE_PREFERENCE_KEY = 'ew-canvas-ai.persistence-enabled';
-const TRANSLATION_TARGET_LANGUAGE_KEY = 'localstudio.ai.translation-target-language';
 const IMAGE_EDITING_MODEL_REQUIRED_MESSAGE = 'You must download the image editing tools first.';
 const PROMPT_API_REQUIRED_MESSAGE = 'LLM model must be prepared before using prompt-to-slides.';
 const IMAGE_GENERATION_MODEL_REQUIRED_MESSAGE =
@@ -156,64 +157,13 @@ const IMAGE_GENERATION_MODEL_REQUIRED_MESSAGE =
 const IMAGE_PROMPT_MODE_REQUIRED_MESSAGE = 'Use Create image from the + menu to generate images.';
 const IMAGE_GENERATION_DIMENSION_MULTIPLE = 16;
 const BACKGROUND_PREVIEW_DEBOUNCE_MS = 120;
-const DEFAULT_SLIDE_LANGUAGE_CODE = 'pt';
 const PASTED_ELEMENT_OFFSET = 32;
-function normalizeLanguageCode(languageCode: string | undefined) {
-  const normalized = languageCode?.trim();
-  if (!normalized) return DEFAULT_SLIDE_LANGUAGE_CODE;
-  const lower = normalized.toLowerCase();
-  const aliases: Record<string, string> = {
-    ca: 'es',
-    gl: 'es',
-    he: 'iw',
-    'pt-br': 'pt',
-    'pt-pt': 'pt',
-    nb: 'no',
-    nn: 'no',
-    'zh-hk': 'zh-Hant',
-    'zh-mo': 'zh-Hant',
-    'zh-tw': 'zh-Hant',
-  };
-  const aliased = aliases[lower] ?? lower;
-  if (aliased === 'zh-hant') return 'zh-Hant';
-  if (TRANSLATION_LANGUAGE_OPTIONS.some((option) => option.code === aliased)) return aliased;
-  const baseLanguage = aliased.split('-')[0];
-  if (baseLanguage && TRANSLATION_LANGUAGE_OPTIONS.some((option) => option.code === baseLanguage)) {
-    return baseLanguage;
-  }
-  return DEFAULT_SLIDE_LANGUAGE_CODE;
-}
-
-function getLanguageOption(languageCode: string | undefined) {
-  const code = normalizeLanguageCode(languageCode);
-  return (
-    TRANSLATION_LANGUAGE_OPTIONS.find((option) => option.code === code) ??
-    TRANSLATION_LANGUAGE_OPTIONS.find((option) => option.code === DEFAULT_SLIDE_LANGUAGE_CODE)!
-  );
-}
 
 function normalizeImageGenerationDimension(value: number) {
   return Math.max(
     IMAGE_GENERATION_DIMENSION_MULTIPLE,
     Math.round(value / IMAGE_GENERATION_DIMENSION_MULTIPLE) * IMAGE_GENERATION_DIMENSION_MULTIPLE,
   );
-}
-
-function getLanguageDisplayCode(languageCode: string) {
-  return languageCode === 'zh-Hant' ? 'ZH-HANT' : languageCode.toUpperCase();
-}
-
-function readPersistencePreference() {
-  if (typeof window === 'undefined') return false;
-  return window.localStorage.getItem(PERSISTENCE_PREFERENCE_KEY) === 'true';
-}
-
-function readTranslationTargetLanguage() {
-  if (typeof window === 'undefined') return '';
-  const storedTarget = window.localStorage.getItem(TRANSLATION_TARGET_LANGUAGE_KEY);
-  return TRANSLATION_LANGUAGE_OPTIONS.some((option) => option.code === storedTarget)
-    ? (storedTarget ?? '')
-    : '';
 }
 
 function writeProjectNameToUrl(projectName: string) {
@@ -343,13 +293,6 @@ function getMediaAssetType(file: File): 'image' | 'gif' | 'video' {
   if (file.type === 'image/gif') return 'gif';
   if (file.type.startsWith('video/')) return 'video';
   return 'image';
-}
-
-function createId(prefix: string) {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return `${prefix}-${crypto.randomUUID()}`;
-  }
-  return `${prefix}-${Date.now().toString(36)}`;
 }
 
 function waitForNextPaint() {
@@ -531,7 +474,6 @@ export function useEditorViewModel(services: AppServices) {
   });
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationNotice, setTranslationNotice] = useState<string | undefined>();
-  const [animationPreview, setAnimationPreview] = useState<AnimationPreviewState | undefined>();
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [versionHistoryEntries, setVersionHistoryEntries] = useState<VersionHistoryEntry[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState<string | undefined>();
@@ -573,8 +515,6 @@ export function useEditorViewModel(services: AppServices) {
   };
   const backgroundSelectionPointsRef = useRef<Record<string, BackgroundSelectionPoint[]>>({});
   const backgroundPreviewTimeoutRef = useRef<number | undefined>(undefined);
-  const animationPreviewQueueRef = useRef<ElementAnimationBuild[]>([]);
-  const animationPreviewTimeoutsRef = useRef<number[]>([]);
   const wasFullscreenRef = useRef(false);
   const backgroundPreviewSequenceRef = useRef(0);
   const backgroundPreparationSequenceRef = useRef(0);
@@ -599,6 +539,20 @@ export function useEditorViewModel(services: AppServices) {
       label: option.label,
     };
   }, [activePageId, pageLanguageCodes]);
+  const {
+    animationPreview,
+    advanceAnimationPreview,
+    advancePresentationPreview,
+    clearAnimationPreview,
+    playAnimationPreview,
+    playPresentationPreview,
+    rewindPresentationPreview,
+  } = useAnimationPreviewController({
+    activePageIdRef,
+    projectRef,
+    setActivePageId,
+    setSelectedElementIds,
+  });
 
   useEffect(() => {
     async function refreshAiReadiness() {
@@ -626,12 +580,7 @@ export function useEditorViewModel(services: AppServices) {
       const isFullscreenActive = Boolean(document.fullscreenElement);
       setIsFullscreen(isFullscreenActive);
       if (wasFullscreenRef.current && !isFullscreenActive) {
-        for (const timeoutId of animationPreviewTimeoutsRef.current) {
-          window.clearTimeout(timeoutId);
-        }
-        animationPreviewTimeoutsRef.current = [];
-        animationPreviewQueueRef.current = [];
-        setAnimationPreview(undefined);
+        clearAnimationPreview();
         setSelectedElementIds([]);
       }
       wasFullscreenRef.current = isFullscreenActive;
@@ -640,15 +589,7 @@ export function useEditorViewModel(services: AppServices) {
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      for (const timeoutId of animationPreviewTimeoutsRef.current) {
-        window.clearTimeout(timeoutId);
-      }
-    };
-  }, []);
+  }, [clearAnimationPreview]);
 
   useEffect(() => {
     let isMounted = true;
@@ -704,7 +645,7 @@ export function useEditorViewModel(services: AppServices) {
         setPersistenceEnabled(false);
         setHasLoadedProject(true);
         if (typeof window !== 'undefined') {
-          window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'false');
+          writePersistencePreference(false);
         }
       });
 
@@ -743,7 +684,7 @@ export function useEditorViewModel(services: AppServices) {
       .catch(() => {
         setPersistenceEnabled(false);
         if (typeof window !== 'undefined') {
-          window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'false');
+          writePersistencePreference(false);
         }
       });
   }, [hasLoadedProject, persistenceEnabled, project, services.projectRepository]);
@@ -1292,7 +1233,7 @@ export function useEditorViewModel(services: AppServices) {
         return;
       }
 
-      const elementId = createId('image-generated');
+      const elementId = createPrefixedId('image-generated');
       const fittedImage = fitImageWithinPage({
         imageWidth: generationOptions.width,
         imageHeight: generationOptions.height,
@@ -1441,7 +1382,7 @@ export function useEditorViewModel(services: AppServices) {
       setPersistenceAttention(false);
       setPersistenceNotice(undefined);
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'false');
+        writePersistencePreference(false);
       }
       return;
     }
@@ -1469,12 +1410,12 @@ export function useEditorViewModel(services: AppServices) {
       setLocalProjectSetupOpen(false);
       writeProjectNameToUrl(projectToSave.name);
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'true');
+        writePersistencePreference(true);
       }
     } catch {
       setPersistenceEnabled(false);
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'false');
+        writePersistencePreference(false);
       }
     }
   }
@@ -1509,7 +1450,7 @@ export function useEditorViewModel(services: AppServices) {
     } catch {
       setPersistenceEnabled(false);
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'false');
+        writePersistencePreference(false);
       }
     }
   }
@@ -1540,12 +1481,12 @@ export function useEditorViewModel(services: AppServices) {
       setLocalProjectSetupOpen(false);
       writeProjectNameToUrl(nextProject.name);
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'true');
+        writePersistencePreference(true);
       }
     } catch {
       setPersistenceEnabled(false);
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'false');
+        writePersistencePreference(false);
       }
     }
   }
@@ -1580,12 +1521,12 @@ export function useEditorViewModel(services: AppServices) {
       }
       writeProjectNameToUrl(normalizedProject.name);
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'true');
+        writePersistencePreference(true);
       }
     } catch {
       setPersistenceEnabled(false);
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'false');
+        writePersistencePreference(false);
       }
     }
   }
@@ -1780,7 +1721,7 @@ export function useEditorViewModel(services: AppServices) {
           .catch(() => undefined);
       }
       writeProjectNameToUrl(normalizedProject.name);
-      window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'true');
+      writePersistencePreference(true);
       setMirrorState({ enabled: true, status: 'synced', lastSyncedAt: new Date().toISOString() });
       setRemoteImportOpen(false);
     } catch (error) {
@@ -1940,7 +1881,7 @@ export function useEditorViewModel(services: AppServices) {
       new SetElementAnimationBuildsCommand(
         activePageId,
         elementIds,
-        (elementId) => createId(`animation-${elementId}`),
+        (elementId) => createPrefixedId(`animation-${elementId}`),
         patch,
       ).execute(currentProject),
     );
@@ -1956,167 +1897,6 @@ export function useEditorViewModel(services: AppServices) {
     commitProject((currentProject) =>
       new ReorderElementAnimationBuildCommand(activePageId, elementId, targetIndex).execute(currentProject),
     );
-  }
-
-  function clearAnimationPreviewTimers() {
-    for (const timeoutId of animationPreviewTimeoutsRef.current) {
-      window.clearTimeout(timeoutId);
-    }
-    animationPreviewTimeoutsRef.current = [];
-  }
-
-  function scheduleAnimationPreview(callback: () => void, delayMs: number) {
-    const timeoutId = window.setTimeout(callback, Math.max(0, delayMs));
-    animationPreviewTimeoutsRef.current.push(timeoutId);
-  }
-
-  function completeAnimationPreviewSlide() {
-    animationPreviewQueueRef.current = [];
-    clearAnimationPreviewTimers();
-    setAnimationPreview((current) =>
-      current
-        ? {
-            ...current,
-            activeBuildElementId: undefined,
-            hiddenElementIds: [],
-            phase: 'complete',
-            waitingForClick: false,
-          }
-        : current,
-    );
-  }
-
-  function revealAnimationBuild(build: ElementAnimationBuild) {
-    setAnimationPreview((current) =>
-      current
-        ? {
-            ...current,
-            activeBuildElementId: undefined,
-            hiddenElementIds: current.hiddenElementIds.filter((elementId) => elementId !== build.elementId),
-            waitingForClick: false,
-          }
-        : current,
-    );
-  }
-
-  function runNextAnimationBuild() {
-    const nextBuild = animationPreviewQueueRef.current[0];
-    if (!nextBuild) {
-      completeAnimationPreviewSlide();
-      return;
-    }
-
-    if (nextBuild.trigger === 'on-click') {
-      setAnimationPreview((current) =>
-        current
-          ? {
-              ...current,
-              activeBuildElementId: nextBuild.elementId,
-              phase: 'waiting',
-              waitingForClick: true,
-            }
-          : current,
-      );
-      return;
-    }
-
-    animationPreviewQueueRef.current = animationPreviewQueueRef.current.slice(1);
-    setAnimationPreview((current) =>
-      current
-        ? {
-            ...current,
-            activeBuildElementId: nextBuild.elementId,
-            phase: 'animation',
-            waitingForClick: false,
-          }
-        : current,
-    );
-    scheduleAnimationPreview(() => {
-      revealAnimationBuild(nextBuild);
-      runNextAnimationBuild();
-    }, nextBuild.delayMs);
-  }
-
-  function advanceAnimationPreview() {
-    const nextBuild = animationPreviewQueueRef.current[0];
-    if (!nextBuild) {
-      completeAnimationPreviewSlide();
-      return;
-    }
-    animationPreviewQueueRef.current = animationPreviewQueueRef.current.slice(1);
-    setAnimationPreview((current) =>
-      current
-        ? {
-            ...current,
-            activeBuildElementId: nextBuild.elementId,
-            phase: 'animation',
-            waitingForClick: false,
-          }
-        : current,
-    );
-    scheduleAnimationPreview(() => {
-      revealAnimationBuild(nextBuild);
-      runNextAnimationBuild();
-    }, nextBuild.delayMs);
-  }
-
-  function playAnimationPreview(pageId = activePageIdRef.current, mode: AnimationPreviewState['mode'] = 'editor') {
-    const page = projectRef.current.pages.find((item) => item.id === pageId);
-    if (!page) return;
-    const builds = (page.animationBuilds ?? []).filter((build) => page.elementIds.includes(build.elementId));
-    clearAnimationPreviewTimers();
-    animationPreviewQueueRef.current = builds;
-    const transitionDelay = page.transition?.delayMs ?? 0;
-    setAnimationPreview({
-      activeBuildElementId: undefined,
-      hiddenElementIds: builds.map((build) => build.elementId),
-      mode,
-      pageId: page.id,
-      phase: transitionDelay > 0 ? 'transition' : builds.length > 0 ? 'animation' : 'complete',
-      playing: true,
-      waitingForClick: false,
-    });
-
-    if (builds.length === 0) {
-      if (transitionDelay > 0) {
-        scheduleAnimationPreview(completeAnimationPreviewSlide, transitionDelay);
-      }
-      return;
-    }
-    scheduleAnimationPreview(runNextAnimationBuild, transitionDelay);
-  }
-
-  function goToPresentationPage(offset: -1 | 1) {
-    const pages = projectRef.current.pages;
-    const currentIndex = pages.findIndex((page) => page.id === activePageIdRef.current);
-    if (currentIndex < 0) return false;
-    const nextPage = pages[currentIndex + offset];
-    if (!nextPage) return false;
-    activePageIdRef.current = nextPage.id;
-    setActivePageId(nextPage.id);
-    setSelectedElementIds([]);
-    playAnimationPreview(nextPage.id, 'presenter');
-    return true;
-  }
-
-  function playPresentationPreview(pageId = activePageIdRef.current) {
-    activePageIdRef.current = pageId;
-    setActivePageId(pageId);
-    setSelectedElementIds([]);
-    playAnimationPreview(pageId, 'presenter');
-  }
-
-  function advancePresentationPreview() {
-    if (animationPreview?.waitingForClick) {
-      advanceAnimationPreview();
-      return true;
-    }
-    if (animationPreview?.phase !== 'complete') return Boolean(animationPreview?.playing);
-    return goToPresentationPage(1);
-  }
-
-  function rewindPresentationPreview() {
-    return goToPresentationPage(-1);
   }
 
   function getTranslatableTextElementIds(
@@ -2207,17 +1987,15 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   async function setTranslationTargetLanguage(languageCode: string) {
-    const nextLanguage = TRANSLATION_LANGUAGE_OPTIONS.some((option) => option.code === languageCode)
-      ? languageCode
-      : '';
+    const nextLanguage = isSupportedTranslationLanguageCode(languageCode) ? languageCode : '';
     setTranslationTargetLanguageState(nextLanguage);
     setTranslationTargetAttention(false);
     setTranslationNotice(undefined);
     if (typeof window !== 'undefined') {
       if (nextLanguage) {
-        window.localStorage.setItem(TRANSLATION_TARGET_LANGUAGE_KEY, nextLanguage);
+        writeTranslationTargetLanguage(nextLanguage);
       } else {
-        window.localStorage.removeItem(TRANSLATION_TARGET_LANGUAGE_KEY);
+        writeTranslationTargetLanguage('');
       }
     }
 
@@ -2448,7 +2226,7 @@ export function useEditorViewModel(services: AppServices) {
     if (elementClipboard.elements.length === 0) return false;
     const pastedElements = elementClipboard.elements.map((element) => ({
       ...element,
-      id: createId(`${element.id}-copy`),
+      id: createPrefixedId(`${element.id}-copy`),
       x: element.x + PASTED_ELEMENT_OFFSET,
       y: element.y + PASTED_ELEMENT_OFFSET,
       locked: false,
@@ -2520,7 +2298,7 @@ export function useEditorViewModel(services: AppServices) {
     const elementId = selectedElementIds[0];
     if (!elementId) return;
     if (processingElementIds.includes(elementId)) return;
-    const nextElementId = createId(`${elementId}-copy`);
+    const nextElementId = createPrefixedId(`${elementId}-copy`);
     commitProject(
       (currentProject) =>
         new DuplicateElementCommand(activePageId, elementId, nextElementId).execute(currentProject),
@@ -2599,7 +2377,7 @@ export function useEditorViewModel(services: AppServices) {
     const style = presetStyles[preset];
     const width = style.width;
     const height = style.height;
-    const elementId = createId('text');
+    const elementId = createPrefixedId('text');
     const nextElement: DesignElement = {
       id: elementId,
       type: 'text',
@@ -2648,7 +2426,7 @@ export function useEditorViewModel(services: AppServices) {
       triangle: { width: 190, height: 180 },
     };
     const { width, height } = defaultFrame[shape];
-    const elementId = createId('shape');
+    const elementId = createPrefixedId('shape');
     const nextElement: ShapeElement = {
       id: elementId,
       type: 'shape',
@@ -2727,7 +2505,7 @@ export function useEditorViewModel(services: AppServices) {
   function addPage(afterPageId = activePageId) {
     const sourcePage = project.pages.find((item) => item.id === afterPageId) ?? project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
     if (!sourcePage) return;
-    const pageId = createId('page');
+    const pageId = createPrefixedId('page');
     const nextPage: Page = {
       id: pageId,
       name: `Slide ${project.pages.length + 1}`,
@@ -2756,11 +2534,11 @@ export function useEditorViewModel(services: AppServices) {
   function duplicatePage(pageId: string) {
     const page = project.pages.find((item) => item.id === pageId);
     if (!page) return;
-    const nextPageId = createId('page');
+    const nextPageId = createPrefixedId('page');
     commitProject(
       (currentProject) =>
         new DuplicatePageCommand(pageId, nextPageId, (elementId) =>
-          createId(`${elementId}-page`),
+          createPrefixedId(`${elementId}-page`),
         ).execute(currentProject),
       { activePageId: nextPageId, selectedElementIds: [] },
     );
@@ -3115,8 +2893,8 @@ export function useEditorViewModel(services: AppServices) {
     const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
     if (!page) return;
 
-    const assetId = createId('asset');
-    const elementId = createId(assetType);
+    const assetId = createPrefixedId('asset');
+    const elementId = createPrefixedId(assetType);
     const mediaName =
       file.name.trim() ||
       (assetType === 'video'

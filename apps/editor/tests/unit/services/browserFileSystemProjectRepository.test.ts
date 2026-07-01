@@ -228,6 +228,84 @@ describe('BrowserFileSystemProjectRepository', () => {
     expect(projectDirectory.directories.get('config')?.files.has('localstudio.json')).toBe(true);
   });
 
+  it('keeps imported projects loadable when a mirrored asset file is missing locally', async () => {
+    const directory = new MockDirectoryHandle('Projects');
+    const project = {
+      ...createSampleProject(),
+      name: 'Remote Mirror',
+      assets: {
+        'missing-asset': {
+          id: 'missing-asset',
+          type: 'image',
+          name: 'Missing asset',
+          mimeType: 'image/png',
+          storage: 'file',
+          fileName: 'missing.png',
+        },
+      },
+    };
+    const repository = new BrowserFileSystemProjectRepository({
+      pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
+    });
+
+    const importedProject = await repository.importMirrorFiles([
+      {
+        path: 'project.json',
+        blob: new Blob([JSON.stringify(project)], { type: 'application/json' }),
+      },
+    ]);
+
+    expect(importedProject.assets['missing-asset']).toMatchObject({
+      fileName: 'missing.png',
+      storage: 'file',
+    });
+  });
+
+  it('returns null when an imported version manifest references a missing snapshot file', async () => {
+    const directory = new MockDirectoryHandle('Projects');
+    const project = createSampleProject();
+    const repository = new BrowserFileSystemProjectRepository({
+      pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
+    });
+
+    await repository.importMirrorFiles([
+      {
+        path: 'project.json',
+        blob: new Blob([JSON.stringify({ ...project, name: 'Remote Mirror' })], {
+          type: 'application/json',
+        }),
+      },
+      {
+        path: 'history/manifest.json',
+        blob: new Blob(
+          [
+            JSON.stringify({
+              schemaVersion: 1,
+              projectId: project.id,
+              latestVersionId: 'version-missing',
+              versions: [
+                {
+                  id: 'version-missing',
+                  createdAt: '2026-06-30T10:00:00.000Z',
+                  authorName: 'Local user',
+                  projectName: 'Remote Mirror',
+                  summary: 'Imported stale manifest',
+                  changeCount: 1,
+                  fileName: 'version-missing.json',
+                },
+              ],
+            }),
+          ],
+          { type: 'application/json' },
+        ),
+      },
+    ]);
+
+    await expect(repository.loadVersion('version-missing')).resolves.toBeNull();
+  });
+
   it('reopens the last project folder from the recent handle store', async () => {
     const directory = new MockDirectoryHandle();
     const recentProjectStore = new MemoryRecentProjectHandleStore();
