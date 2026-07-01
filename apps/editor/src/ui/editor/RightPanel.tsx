@@ -9,7 +9,7 @@ import type { CreateImagePromptOptions } from './imagePromptOptions';
 import { LayersPanel } from './LayersPanel';
 import type { RightPanelTab } from './useEditorViewModel';
 
-type LegacyRightPanelTab = Exclude<RightPanelTab, 'assets' | 'text' | 'animations'>;
+type LegacyRightPanelTab = Exclude<RightPanelTab, 'assets' | 'animations' | 'elements' | 'text'>;
 
 interface RightPanelProps {
   activeTab: LegacyRightPanelTab;

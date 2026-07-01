@@ -1,4 +1,15 @@
 export type ElementType = 'text' | 'image' | 'gif' | 'video' | 'shape';
+export type ShapeKind =
+  | 'arc'
+  | 'arrow'
+  | 'diamond'
+  | 'ellipse'
+  | 'line'
+  | 'parallelogram'
+  | 'pentagon'
+  | 'rect'
+  | 'rounded-rect'
+  | 'triangle';
 
 export interface ProjectDocument {
   id: string;
@@ -103,8 +114,8 @@ export interface VideoElement extends BaseElement {
 
 export interface ShapeElement extends BaseElement {
   type: 'shape';
-  shape: 'rect' | 'ellipse';
-  fill: string;
+  shape: ShapeKind;
+  fill?: string;
   stroke?: string;
   strokeWidth?: number;
 }

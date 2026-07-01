@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import type Konva from 'konva';
-import { Circle, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transformer } from 'react-konva';
+import { Arrow, Circle, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transformer } from 'react-konva';
 import type { ElementFramePatch, ImageCropPatch } from '../../domain/commands/basicCommands';
 import type {
   CropRect,
@@ -10,6 +10,7 @@ import type {
   ImageElement,
   ProjectDocument,
   SelectionState,
+  ShapeElement,
   VideoElement,
 } from '../../domain/model';
 import { getNormalizedElementPoint } from './backgroundSelection';
@@ -76,7 +77,6 @@ interface CommonElementProps {
   draggable: boolean;
   height: number;
   opacity: number;
-  ref: (node: Konva.Node | null) => void;
   rotation: number;
   width: number;
   x: number;
@@ -129,6 +129,27 @@ function useCanvasImage(src: string | undefined) {
   }, [src]);
 
   return loadedImage && loadedImage.src === src ? loadedImage.image : undefined;
+}
+
+function getPolygonPoints(shape: ShapeElement['shape'], width: number, height: number) {
+  if (shape === 'triangle') return [width / 2, 0, width, height, 0, height];
+  if (shape === 'diamond') return [width / 2, 0, width, height / 2, width / 2, height, 0, height / 2];
+  if (shape === 'parallelogram') return [width * 0.24, 0, width, 0, width * 0.76, height, 0, height];
+  if (shape === 'pentagon') {
+    return Array.from({ length: 5 }).flatMap((_, index) => {
+      const angle = -Math.PI / 2 + (index * Math.PI * 2) / 5;
+      return [width / 2 + Math.cos(angle) * (width / 2), height / 2 + Math.sin(angle) * (height / 2)];
+    });
+  }
+  return [];
+}
+
+function getShapePaint(element: ShapeElement) {
+  const strokeWidth = element.stroke && (element.strokeWidth ?? 0) > 0 ? (element.strokeWidth ?? 0) : 0;
+  return {
+    ...(element.fill ? { fill: element.fill } : {}),
+    ...(element.stroke && strokeWidth > 0 ? { stroke: element.stroke, strokeWidth } : {}),
+  };
 }
 
 export function CanvasWorkspace({
@@ -252,6 +273,9 @@ export function CanvasWorkspace({
     page?.background.type === 'color'
       ? page.background.color
       : page?.background.colorFallback ?? '#050D10';
+  const setElementNodeRef = useCallback((elementId: string, node: Konva.Node | null) => {
+    nodeRefs.current[elementId] = node;
+  }, []);
 
   useEffect(() => {
     const selectedNodes = selection.elementIds
@@ -520,9 +544,6 @@ export function CanvasWorkspace({
         : isProcessing && activeProcessingBlink
           ? 0.38
           : element.opacity,
-      ref: (node: Konva.Node | null) => {
-        nodeRefs.current[element.id] = node;
-      },
       rotation: element.rotation,
       width: element.width * scaleX,
       x: element.x * scaleX,
@@ -698,15 +719,101 @@ export function CanvasWorkspace({
               <Rect fill={pageBackground} height={stageHeight} listening={false} width={stageWidth} x={0} y={0} />
               {visibleElements.map((element) => {
                 const commonProps = getCommonElementProps(element);
+                const nodeRef = (node: Konva.Node | null) => {
+                  setElementNodeRef(element.id, node);
+                };
 
                 if (element.type === 'shape') {
-                  return (
-                    <Rect
-                      {...commonProps}
-                      key={element.id}
-                      fill={element.fill}
-                    />
-                  );
+                  const paint = getShapePaint(element);
+                  if (element.shape === 'ellipse') {
+                    return (
+                      <Rect
+                        {...commonProps}
+                        {...paint}
+                        key={element.id}
+                        cornerRadius={Math.min(commonProps.width, commonProps.height) / 2}
+                        ref={nodeRef}
+                      />
+                    );
+                  }
+                  if (element.shape === 'rounded-rect') {
+                    return (
+                      <Rect
+                        {...commonProps}
+                        {...paint}
+                        key={element.id}
+                        cornerRadius={Math.min(commonProps.width, commonProps.height) * 0.18}
+                        ref={nodeRef}
+                      />
+                    );
+                  }
+                  if (element.shape === 'line') {
+                    return (
+                      <Line
+                        {...commonProps}
+                        key={element.id}
+                        points={[0, commonProps.height, commonProps.width, 0]}
+                        ref={nodeRef}
+                        stroke={element.stroke ?? element.fill ?? '#37FD76'}
+                        strokeWidth={Math.max(1, element.strokeWidth ?? 4)}
+                      />
+                    );
+                  }
+                  if (element.shape === 'arrow') {
+                    return (
+                      <Arrow
+                        {...commonProps}
+                        key={element.id}
+                        fill={element.stroke ?? element.fill ?? '#37FD76'}
+                        points={[0, commonProps.height / 2, commonProps.width, commonProps.height / 2]}
+                        pointerLength={Math.min(42, commonProps.width * 0.22)}
+                        pointerWidth={Math.min(46, commonProps.height * 0.48)}
+                        ref={nodeRef}
+                        stroke={element.stroke ?? element.fill ?? '#37FD76'}
+                        strokeWidth={Math.max(1, element.strokeWidth ?? 10)}
+                      />
+                    );
+                  }
+                  if (element.shape === 'arc') {
+                    return (
+                      <Line
+                        {...commonProps}
+                        key={element.id}
+                        bezier
+                        ref={nodeRef}
+                        points={[
+                          0,
+                          commonProps.height,
+                          commonProps.width * 0.12,
+                          0,
+                          commonProps.width * 0.88,
+                          0,
+                          commonProps.width,
+                          commonProps.height,
+                        ]}
+                        stroke={element.stroke ?? element.fill ?? '#37FD76'}
+                        strokeWidth={Math.max(1, element.strokeWidth ?? 4)}
+                      />
+                    );
+                  }
+                  if (
+                    element.shape === 'triangle' ||
+                    element.shape === 'pentagon' ||
+                    element.shape === 'diamond' ||
+                    element.shape === 'parallelogram'
+                  ) {
+                    return (
+                      <Line
+                        {...commonProps}
+                        {...paint}
+                        closed
+                        key={element.id}
+                        points={getPolygonPoints(element.shape, commonProps.width, commonProps.height)}
+                        ref={nodeRef}
+                      />
+                    );
+                  }
+                  return <Rect {...commonProps} {...paint} key={element.id} ref={nodeRef} />;
                 }
 
                 if (element.type === 'image') {
@@ -717,6 +824,7 @@ export function CanvasWorkspace({
                       assetUrl={asset?.objectUrl}
                       commonProps={commonProps}
                       element={element}
+                      nodeRef={nodeRef}
                     />
                   );
                 }
@@ -728,6 +836,7 @@ export function CanvasWorkspace({
                       {...commonProps}
                       key={element.id}
                       fill="rgba(0,0,0,0.01)"
+                      ref={nodeRef}
                       stroke={selected ? '#37FD76' : 'rgba(55,253,118,0.28)'}
                       strokeWidth={selected ? 2 : 1}
                       {...(!selected ? { dash: [6, 5] } : {})}
@@ -747,6 +856,7 @@ export function CanvasWorkspace({
                     align={element.align}
                     lineHeight={0.9}
                     padding={TEXT_FRAME_PADDING * scaleY}
+                    ref={nodeRef}
                     visible={editingTextId !== element.id}
                   />
                 );
@@ -1049,6 +1159,7 @@ interface CanvasImageElementProps {
   assetUrl: string | undefined;
   commonProps: CommonElementProps;
   element: Extract<DesignElement, { type: 'image' }>;
+  nodeRef: (node: Konva.Node | null) => void;
 }
 
 interface CanvasMediaElementProps {
@@ -1163,7 +1274,7 @@ function CanvasVideoElement({ assetName, assetUrl, element, interactive, preview
   );
 }
 
-function CanvasImageElement({ assetUrl, commonProps, element }: CanvasImageElementProps) {
+function CanvasImageElement({ assetUrl, commonProps, element, nodeRef }: CanvasImageElementProps) {
   const image = useCanvasImage(assetUrl);
   const crop = element.crop && image
     ? {
@@ -1189,11 +1300,12 @@ function CanvasImageElement({ assetUrl, commonProps, element }: CanvasImageEleme
         stroke="#37FD76"
         strokeWidth={1}
         cornerRadius={6}
+        ref={nodeRef}
       />
     );
   }
 
-  return <KonvaImage {...imageProps} image={image} {...(crop ? { crop } : {})} cornerRadius={6} />;
+  return <KonvaImage {...imageProps} image={image} {...(crop ? { crop } : {})} cornerRadius={6} ref={nodeRef} />;
 }
 
 interface CropFrameOverlayProps {

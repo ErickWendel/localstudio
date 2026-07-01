@@ -32,6 +32,38 @@ import {
   TranslateTextElementsCommand,
 } from '../../../../src/domain/commands/basicCommands';
 import { createSampleProject } from '../../../../src/domain/sampleProject';
+import type { ShapeElement } from '../../../../src/domain/model';
+
+function createShapeFixture(overrides: Partial<ShapeElement> = {}) {
+  const project = createSampleProject();
+  const shape: ShapeElement = {
+    id: 'shape-test',
+    type: 'shape',
+    shape: 'rect',
+    x: 120,
+    y: 160,
+    width: 240,
+    height: 180,
+    rotation: 0,
+    locked: false,
+    visible: true,
+    opacity: 1,
+    fill: '#37FD76',
+    stroke: '#FFFFFF',
+    strokeWidth: 4,
+    ...overrides,
+  };
+  return {
+    ...project,
+    elements: {
+      ...project.elements,
+      [shape.id]: shape,
+    },
+    pages: project.pages.map((page) =>
+      page.id === 'page-1' ? { ...page, elementIds: [...page.elementIds, shape.id] } : page,
+    ),
+  };
+}
 
 describe('editor commands', () => {
   it('aligns an element to page horizontal center immutably', () => {
@@ -264,6 +296,44 @@ describe('editor commands', () => {
       fill: '#37FD76',
       fontSize: 96,
       opacity: 1,
+    });
+  });
+
+  it('clears shape fill and border style immutably', () => {
+    const project = createShapeFixture();
+    const next = new UpdateElementStyleCommand('shape-test', {
+      fill: null,
+      stroke: null,
+      strokeWidth: 0,
+    }).execute(project);
+
+    expect(next).not.toBe(project);
+    expect(next.elements['shape-test']).toMatchObject({
+      type: 'shape',
+      strokeWidth: 0,
+    });
+    expect(next.elements['shape-test']).not.toHaveProperty('fill');
+    expect(next.elements['shape-test']).not.toHaveProperty('stroke');
+    expect(project.elements['shape-test']).toMatchObject({
+      fill: '#37FD76',
+      stroke: '#FFFFFF',
+      strokeWidth: 4,
+    });
+  });
+
+  it('does not update locked shape style', () => {
+    const project = createShapeFixture({ locked: true });
+    const next = new UpdateElementStyleCommand('shape-test', {
+      fill: null,
+      stroke: null,
+      strokeWidth: 0,
+    }).execute(project);
+
+    expect(next).toBe(project);
+    expect(next.elements['shape-test']).toMatchObject({
+      fill: '#37FD76',
+      stroke: '#FFFFFF',
+      strokeWidth: 4,
     });
   });
 

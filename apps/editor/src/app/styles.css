@@ -3337,6 +3337,67 @@ button {
   gap: 8px;
 }
 
+.elements-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.element-tile {
+  position: relative;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: #2b2d31;
+  color: rgba(255, 255, 255, 0.82);
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.element-tile:hover {
+  border-color: rgba(55, 253, 118, 0.48);
+  background: #34363b;
+  color: #ffffff;
+  box-shadow: 0 0 18px rgba(55, 253, 118, 0.12);
+  transform: translateY(-1px);
+}
+
+.element-tile-icon {
+  position: relative;
+  z-index: 1;
+}
+
+.element-shape-preview {
+  position: absolute;
+  width: 42%;
+  height: 26%;
+  border: 2px solid currentColor;
+}
+
+.element-preview-parallelogram {
+  transform: skewX(-18deg);
+}
+
+.element-shape-preview-svg {
+  position: absolute;
+  z-index: 1;
+  width: 38px;
+  height: 38px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3px;
+}
+
 .text-brand-preview button,
 .text-preset-button {
   width: 100%;

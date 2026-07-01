@@ -2,10 +2,23 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { createSampleProject } from '../../../../src/domain/sampleProject';
-import type { ProjectDocument, VideoElement } from '../../../../src/domain/model';
+import type { ProjectDocument, ShapeElement, VideoElement } from '../../../../src/domain/model';
 import { CanvasWorkspace } from '../../../../src/ui/editor/CanvasWorkspace';
 
 describe('CanvasWorkspace', () => {
+  const shapeCatalog: ShapeElement['shape'][] = [
+    'ellipse',
+    'line',
+    'rect',
+    'rounded-rect',
+    'triangle',
+    'pentagon',
+    'diamond',
+    'parallelogram',
+    'arrow',
+    'arc',
+  ];
+
   function createMediaProject(): ProjectDocument {
     const project = createSampleProject();
     project.assets['asset-video'] = {
@@ -93,6 +106,54 @@ describe('CanvasWorkspace', () => {
     expect(screen.getByRole('button', { name: 'Flip' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Crop' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Animate' })).toBeInTheDocument();
+  });
+
+  it('renders every supported shape catalog item without crashing', () => {
+    const project = createSampleProject();
+    const shapes = Object.fromEntries(
+      shapeCatalog.map((shape, index) => [
+        `shape-${shape}`,
+        {
+          id: `shape-${shape}`,
+          type: 'shape' as const,
+          shape,
+          x: 80 + index * 24,
+          y: 120 + index * 18,
+          width: 180,
+          height: 140,
+          rotation: 0,
+          locked: false,
+          visible: true,
+          opacity: 1,
+          fill: '#37FD76',
+          stroke: '#FFFFFF',
+          strokeWidth: 2,
+        },
+      ]),
+    );
+    const shapedProject: ProjectDocument = {
+      ...project,
+      elements: {
+        ...project.elements,
+        ...shapes,
+      },
+      pages: project.pages.map((page) =>
+        page.id === 'page-1'
+          ? { ...page, elementIds: [...page.elementIds, ...Object.keys(shapes)] }
+          : page,
+      ),
+    };
+
+    const { container } = render(
+      <CanvasWorkspace
+        project={shapedProject}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['shape-arrow'] }}
+      />,
+    );
+
+    expect(container.querySelector('canvas')).toBeInTheDocument();
+    expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-selected-elements', 'shape-arrow');
   });
 
   it('toggles crop mode for selected images', async () => {

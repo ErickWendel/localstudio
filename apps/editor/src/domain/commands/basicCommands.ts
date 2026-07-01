@@ -32,12 +32,12 @@ export type VideoPlaybackPatch = Partial<
 export type MediaPlaybackPatch = GifPlaybackPatch | VideoPlaybackPatch;
 export type ElementStylePatch = Partial<{
   align: 'left' | 'center' | 'right';
-  fill: string;
+  fill: string | null;
   fontFamily: string;
   fontSize: number;
   fontWeight: number;
   opacity: number;
-  stroke: string;
+  stroke: string | null;
   strokeWidth: number;
 }>;
 export type ElementAnimationPatch = Omit<ElementAnimationBuild, 'elementId' | 'id'>;
@@ -687,7 +687,7 @@ export class UpdateElementStyleCommand implements EditorCommand {
       nextElement = {
         ...nextElement,
         ...(this.patch.align ? { align: this.patch.align } : {}),
-        ...(this.patch.fill ? { fill: this.patch.fill } : {}),
+        ...(typeof this.patch.fill === 'string' ? { fill: this.patch.fill } : {}),
         ...(this.patch.fontFamily ? { fontFamily: this.patch.fontFamily } : {}),
         ...(this.patch.fontSize !== undefined ? { fontSize: Math.max(1, this.patch.fontSize) } : {}),
         ...(this.patch.fontWeight !== undefined ? { fontWeight: this.patch.fontWeight } : {}),
@@ -695,12 +695,20 @@ export class UpdateElementStyleCommand implements EditorCommand {
     }
 
     if (element.type === 'shape') {
-      nextElement = {
+      const { fill, stroke, strokeWidth } = this.patch;
+      const nextShapeElement = {
         ...nextElement,
-        ...(this.patch.fill ? { fill: this.patch.fill } : {}),
-        ...(this.patch.stroke ? { stroke: this.patch.stroke } : {}),
-        ...(this.patch.strokeWidth !== undefined ? { strokeWidth: Math.max(0, this.patch.strokeWidth) } : {}),
+        ...(typeof fill === 'string' ? { fill } : {}),
+        ...(typeof stroke === 'string' ? { stroke } : {}),
+        ...(strokeWidth !== undefined ? { strokeWidth: Math.max(0, strokeWidth) } : {}),
       };
+      if (fill === null) {
+        delete nextShapeElement.fill;
+      }
+      if (stroke === null) {
+        delete nextShapeElement.stroke;
+      }
+      nextElement = nextShapeElement;
     }
 
     return {

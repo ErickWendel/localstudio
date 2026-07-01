@@ -1,12 +1,21 @@
-import { Brush, Clapperboard, ImagePlus, Layers3, Sparkles, Type } from 'lucide-react';
+import { Brush, Clapperboard, ImagePlus, Layers3, Shapes, Sparkles, Type } from 'lucide-react';
 import { useMemo, useRef } from 'react';
 import { collectReferencedAssetIds } from '../../domain/assetUsage';
-import type { Asset, ElementAnimationBuild, PageBackground, ProjectDocument, SelectionState, SlideTransition } from '../../domain/model';
+import type {
+  Asset,
+  ElementAnimationBuild,
+  PageBackground,
+  ProjectDocument,
+  SelectionState,
+  ShapeKind,
+  SlideTransition,
+} from '../../domain/model';
 import type { ElementStylePatch, MediaPlaybackPatch } from '../../domain/commands/basicCommands';
 import type { AiProviderState, ModelState } from '../../services/interfaces';
 import { AiToolsPanel } from './AiToolsPanel';
 import { AnimationPanel } from './AnimationPanel';
 import { DesignPanel } from './DesignPanel';
+import { ElementsPanel } from './ElementsPanel';
 import type { CreateImagePromptOptions } from './imagePromptOptions';
 import { LayersPanel } from './LayersPanel';
 import { TextPanel } from './TextPanel';
@@ -49,6 +58,7 @@ interface LeftToolPanelProps {
   onRemoveAsset?: ((assetId: string) => void) | undefined;
   onImportMedia?: ((file: File) => void) | undefined;
   onInsertText?: ((preset: TextPreset) => void) | undefined;
+  onInsertShape?: ((shape: ShapeKind) => void) | undefined;
   onPreparePromptApi?: (() => Promise<void>) | undefined;
   onPrepareLanguageDetectionProvider?: (() => Promise<void>) | undefined;
   onPrepareTranslationProvider?: (() => Promise<void>) | undefined;
@@ -78,6 +88,7 @@ interface LeftToolPanelProps {
 const menuItems: Array<{ id: RightPanelTab; label: string; icon: typeof Layers3 }> = [
   { id: 'layout', label: 'Layout', icon: Layers3 },
   { id: 'text', label: 'Text', icon: Type },
+  { id: 'elements', label: 'Elements', icon: Shapes },
   { id: 'design', label: 'Design', icon: Brush },
   { id: 'animations', label: 'Animate', icon: Clapperboard },
   { id: 'ai-tools', label: 'AI Tools', icon: Sparkles },
@@ -112,6 +123,7 @@ export function LeftToolPanel({
   onRemoveAsset,
   onImportMedia,
   onInsertText,
+  onInsertShape,
   onPreparePromptApi,
   onPrepareLanguageDetectionProvider,
   onPrepareTranslationProvider,
@@ -206,6 +218,9 @@ export function LeftToolPanel({
         ) : null}
         {panelOpen && activeTab === 'text' ? (
           <TextPanel {...(onInsertText ? { onInsertText } : {})} />
+        ) : null}
+        {panelOpen && activeTab === 'elements' ? (
+          <ElementsPanel {...(onInsertShape ? { onInsertShape } : {})} />
         ) : null}
         {panelOpen && activeTab === 'animations' ? (
           <AnimationPanel

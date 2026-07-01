@@ -52,6 +52,8 @@ import type {
   PageBackground,
   ProjectDocument,
   SelectionState,
+  ShapeElement,
+  ShapeKind,
   SlideTransition,
 } from '../../domain/model';
 import {
@@ -89,7 +91,7 @@ import {
 } from './imagePromptOptions';
 import { TRANSLATION_LANGUAGE_OPTIONS } from './translationLanguages';
 
-export type RightPanelTab = 'layout' | 'text' | 'design' | 'ai-tools' | 'assets' | 'animations';
+export type RightPanelTab = 'layout' | 'text' | 'elements' | 'design' | 'ai-tools' | 'assets' | 'animations';
 export type TextPreset = 'title' | 'subtitle' | 'body';
 
 interface EditorHistory {
@@ -2628,6 +2630,53 @@ export function useEditorViewModel(services: AppServices) {
     );
   }
 
+  function insertShapeElement(shape: ShapeKind) {
+    const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
+    if (!page) return;
+    const selectedElement = project.elements[selectedElementIds[0] ?? ''];
+    const isLinearShape = shape === 'line' || shape === 'arc';
+    const defaultFrame: Record<ShapeKind, { width: number; height: number }> = {
+      arc: { width: 260, height: 180 },
+      arrow: { width: 260, height: 140 },
+      diamond: { width: 180, height: 180 },
+      ellipse: { width: 180, height: 180 },
+      line: { width: 260, height: 120 },
+      parallelogram: { width: 240, height: 150 },
+      pentagon: { width: 190, height: 190 },
+      rect: { width: 180, height: 180 },
+      'rounded-rect': { width: 240, height: 150 },
+      triangle: { width: 190, height: 180 },
+    };
+    const { width, height } = defaultFrame[shape];
+    const elementId = createId('shape');
+    const nextElement: ShapeElement = {
+      id: elementId,
+      type: 'shape',
+      shape,
+      x: selectedElement
+        ? Math.min(page.width - width, selectedElement.x + PASTED_ELEMENT_OFFSET)
+        : (page.width - width) / 2,
+      y: selectedElement
+        ? Math.min(page.height - height, selectedElement.y + PASTED_ELEMENT_OFFSET)
+        : (page.height - height) / 2,
+      width,
+      height,
+      rotation: 0,
+      locked: false,
+      visible: true,
+      opacity: 1,
+      ...(isLinearShape
+        ? { stroke: '#37FD76', strokeWidth: 4 }
+        : { fill: '#37FD76' }),
+    };
+
+    commitProject(
+      (currentProject) => new AddElementsCommand(activePageId, [nextElement]).execute(currentProject),
+      { selectedElementIds: [elementId] },
+    );
+    setActiveTab('design');
+  }
+
   function alignSelectedElement(mode: AlignMode) {
     const elementId = selectedElementIds[0];
     if (!elementId) return;
@@ -3319,6 +3368,7 @@ export function useEditorViewModel(services: AppServices) {
     cutSelectedElements,
     pasteCopiedElements,
     insertTextElement,
+    insertShapeElement,
     alignSelectedElement,
     setSelectedElementZOrder,
     flipSelectedImage,

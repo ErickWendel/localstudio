@@ -438,6 +438,7 @@ export function EditorShell({ services }: EditorShellProps) {
           onRemoveAsset={isHistoryReadOnly ? undefined : vm.removeAsset}
           onImportMedia={isHistoryReadOnly ? undefined : importMediaFile}
           onInsertText={isHistoryReadOnly ? undefined : vm.insertTextElement}
+          onInsertShape={isHistoryReadOnly ? undefined : vm.insertShapeElement}
           modelStates={vm.modelStates}
           attentionModelId={
             vm.aiToolsAttentionModelId ??
