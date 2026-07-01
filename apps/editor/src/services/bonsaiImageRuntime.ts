@@ -341,7 +341,10 @@ export class WorkerBackedBonsaiImageRuntime implements BonsaiImageRuntime {
   }
 
   private getFallbackRuntime() {
-    this.fallbackRuntime ??= this.options.fallbackRuntime ?? new BrowserBonsaiImageRuntime();
+    if (!this.options.fallbackRuntime) {
+      throw new Error('Web workers are required for browser image generation.');
+    }
+    this.fallbackRuntime ??= this.options.fallbackRuntime;
     return this.fallbackRuntime;
   }
 
