@@ -145,4 +145,30 @@ describe('LeftToolPanel', () => {
     expect(onInsertText).toHaveBeenNthCalledWith(2, 'subtitle');
     expect(onInsertText).toHaveBeenNthCalledWith(3, 'body');
   });
+
+  it('opens the Elements menu and inserts a selected shape', async () => {
+    const user = userEvent.setup();
+    const onInsertShape = vi.fn();
+
+    render(
+      <LeftToolPanel
+        activeTab="elements"
+        open
+        onTabChange={vi.fn()}
+        project={createSampleProject()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        modelStates={modelStates}
+        onInsertShape={onInsertShape}
+      />,
+    );
+
+    expect(screen.getByRole('tab', { name: 'Elements' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('button', { name: 'Add circle' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add arrow' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Add triangle' }));
+
+    expect(onInsertShape).toHaveBeenCalledWith('triangle');
+  });
 });

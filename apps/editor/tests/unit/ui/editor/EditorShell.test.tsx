@@ -206,7 +206,7 @@ function createReadyPrepareTranslationMock() {
   );
 }
 
-async function openLeftTab(user: ReturnType<typeof userEvent.setup>, name: 'AI Tools' | 'Layout') {
+async function openLeftTab(user: ReturnType<typeof userEvent.setup>, name: 'AI Tools' | 'Elements' | 'Layout') {
   const tab = screen.getByRole('tab', { name });
   if (tab.getAttribute('aria-selected') !== 'true') {
     await user.click(tab);
@@ -310,6 +310,28 @@ describe('EditorShell', () => {
 
     await openLeftTab(user, 'Layout');
     expect(screen.getByRole('button', { name: 'Selected Image' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('inserts and selects a shape from the Elements panel', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    await openLeftTab(user, 'Elements');
+    await user.click(screen.getByRole('button', { name: 'Add triangle' }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-selected-elements',
+        expect.stringMatching(/^shape-/),
+      );
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: 'Design' })).toHaveAttribute('aria-selected', 'true');
+    });
+    expect(screen.getByLabelText('Selected shape fill mode')).toBeInTheDocument();
+
+    await openLeftTab(user, 'Layout');
+    expect(screen.getByRole('button', { name: 'Background Shape' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('switches to the layout panel from the header view menu', async () => {

@@ -1,11 +1,12 @@
-import { Brush, ImagePlus, Layers3, Sparkles, Type } from 'lucide-react';
+import { Brush, ImagePlus, Layers3, Shapes, Sparkles, Type } from 'lucide-react';
 import { useMemo, useRef } from 'react';
 import { collectReferencedAssetIds } from '../../domain/assetUsage';
-import type { Asset, PageBackground, ProjectDocument, SelectionState } from '../../domain/model';
+import type { Asset, PageBackground, ProjectDocument, SelectionState, ShapeKind } from '../../domain/model';
 import type { ElementStylePatch, MediaPlaybackPatch } from '../../domain/commands/basicCommands';
 import type { AiProviderState, ModelState } from '../../services/interfaces';
 import { AiToolsPanel } from './AiToolsPanel';
 import { DesignPanel } from './DesignPanel';
+import { ElementsPanel } from './ElementsPanel';
 import type { CreateImagePromptOptions } from './imagePromptOptions';
 import { LayersPanel } from './LayersPanel';
 import { TextPanel } from './TextPanel';
@@ -38,6 +39,7 @@ interface LeftToolPanelProps {
   onRemoveAsset?: ((assetId: string) => void) | undefined;
   onImportMedia?: ((file: File) => void) | undefined;
   onInsertText?: ((preset: TextPreset) => void) | undefined;
+  onInsertShape?: ((shape: ShapeKind) => void) | undefined;
   onPreparePromptApi?: (() => Promise<void>) | undefined;
   onPrepareLanguageDetectionProvider?: (() => Promise<void>) | undefined;
   onPrepareTranslationProvider?: (() => Promise<void>) | undefined;
@@ -61,6 +63,7 @@ interface LeftToolPanelProps {
 const menuItems: Array<{ id: RightPanelTab; label: string; icon: typeof Layers3 }> = [
   { id: 'layout', label: 'Layout', icon: Layers3 },
   { id: 'text', label: 'Text', icon: Type },
+  { id: 'elements', label: 'Elements', icon: Shapes },
   { id: 'design', label: 'Design', icon: Brush },
   { id: 'ai-tools', label: 'AI Tools', icon: Sparkles },
   { id: 'assets', label: 'Assets', icon: ImagePlus },
@@ -93,6 +96,7 @@ export function LeftToolPanel({
   onRemoveAsset,
   onImportMedia,
   onInsertText,
+  onInsertShape,
   onPreparePromptApi,
   onPrepareLanguageDetectionProvider,
   onPrepareTranslationProvider,
@@ -181,6 +185,9 @@ export function LeftToolPanel({
         ) : null}
         {panelOpen && activeTab === 'text' ? (
           <TextPanel {...(onInsertText ? { onInsertText } : {})} />
+        ) : null}
+        {panelOpen && activeTab === 'elements' ? (
+          <ElementsPanel {...(onInsertShape ? { onInsertShape } : {})} />
         ) : null}
         {panelOpen && activeTab === 'ai-tools' ? (
           <AiToolsPanel

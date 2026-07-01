@@ -123,7 +123,10 @@ function compactElement(element: DesignElement): SnapshotElement {
       trimStartSeconds: element.trimStartSeconds,
     };
   }
-  return { ...base, fill: element.fill };
+  return {
+    ...base,
+    ...(element.fill ? { fill: element.fill } : {}),
+  };
 }
 
 export function createProjectSnapshot(state: EditorAutomationState): ProjectSnapshot {

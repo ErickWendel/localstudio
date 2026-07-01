@@ -1,8 +1,17 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import type Konva from 'konva';
-import { Circle, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transformer } from 'react-konva';
+import { Arrow, Circle, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transformer } from 'react-konva';
 import type { ElementFramePatch, ImageCropPatch } from '../../domain/commands/basicCommands';
-import type { CropRect, DesignElement, GifElement, ImageElement, ProjectDocument, SelectionState, VideoElement } from '../../domain/model';
+import type {
+  CropRect,
+  DesignElement,
+  GifElement,
+  ImageElement,
+  ProjectDocument,
+  SelectionState,
+  ShapeElement,
+  VideoElement,
+} from '../../domain/model';
 import { getNormalizedElementPoint } from './backgroundSelection';
 import { FloatingSelectionToolbar } from './FloatingSelectionToolbar';
 import { calculateImageCropPatch, type ImageCropHandle } from './imageCrop';
@@ -98,6 +107,27 @@ function useCanvasImage(src: string | undefined) {
   }, [src]);
 
   return loadedImage && loadedImage.src === src ? loadedImage.image : undefined;
+}
+
+function getPolygonPoints(shape: ShapeElement['shape'], width: number, height: number) {
+  if (shape === 'triangle') return [width / 2, 0, width, height, 0, height];
+  if (shape === 'diamond') return [width / 2, 0, width, height / 2, width / 2, height, 0, height / 2];
+  if (shape === 'parallelogram') return [width * 0.24, 0, width, 0, width * 0.76, height, 0, height];
+  if (shape === 'pentagon') {
+    return Array.from({ length: 5 }).flatMap((_, index) => {
+      const angle = -Math.PI / 2 + (index * Math.PI * 2) / 5;
+      return [width / 2 + Math.cos(angle) * (width / 2), height / 2 + Math.sin(angle) * (height / 2)];
+    });
+  }
+  return [];
+}
+
+function getShapePaint(element: ShapeElement) {
+  const strokeWidth = element.stroke && (element.strokeWidth ?? 0) > 0 ? (element.strokeWidth ?? 0) : 0;
+  return {
+    ...(element.fill ? { fill: element.fill } : {}),
+    ...(element.stroke && strokeWidth > 0 ? { stroke: element.stroke, strokeWidth } : {}),
+  };
 }
 
 export function CanvasWorkspace({
@@ -631,13 +661,90 @@ export function CanvasWorkspace({
                 const commonProps = getCommonElementProps(element);
 
                 if (element.type === 'shape') {
-                  return (
-                    <Rect
-                      {...commonProps}
-                      key={element.id}
-                      fill={element.fill}
-                    />
-                  );
+                  const paint = getShapePaint(element);
+                  if (element.shape === 'ellipse') {
+                    return (
+                      <Rect
+                        {...commonProps}
+                        {...paint}
+                        key={element.id}
+                        cornerRadius={Math.min(commonProps.width, commonProps.height) / 2}
+                      />
+                    );
+                  }
+                  if (element.shape === 'rounded-rect') {
+                    return (
+                      <Rect
+                        {...commonProps}
+                        {...paint}
+                        key={element.id}
+                        cornerRadius={Math.min(commonProps.width, commonProps.height) * 0.18}
+                      />
+                    );
+                  }
+                  if (element.shape === 'line') {
+                    return (
+                      <Line
+                        {...commonProps}
+                        key={element.id}
+                        points={[0, commonProps.height, commonProps.width, 0]}
+                        stroke={element.stroke ?? element.fill ?? '#37FD76'}
+                        strokeWidth={Math.max(1, element.strokeWidth ?? 4)}
+                      />
+                    );
+                  }
+                  if (element.shape === 'arrow') {
+                    return (
+                      <Arrow
+                        {...commonProps}
+                        key={element.id}
+                        fill={element.stroke ?? element.fill ?? '#37FD76'}
+                        points={[0, commonProps.height / 2, commonProps.width, commonProps.height / 2]}
+                        pointerLength={Math.min(42, commonProps.width * 0.22)}
+                        pointerWidth={Math.min(46, commonProps.height * 0.48)}
+                        stroke={element.stroke ?? element.fill ?? '#37FD76'}
+                        strokeWidth={Math.max(1, element.strokeWidth ?? 10)}
+                      />
+                    );
+                  }
+                  if (element.shape === 'arc') {
+                    return (
+                      <Line
+                        {...commonProps}
+                        key={element.id}
+                        bezier
+                        points={[
+                          0,
+                          commonProps.height,
+                          commonProps.width * 0.12,
+                          0,
+                          commonProps.width * 0.88,
+                          0,
+                          commonProps.width,
+                          commonProps.height,
+                        ]}
+                        stroke={element.stroke ?? element.fill ?? '#37FD76'}
+                        strokeWidth={Math.max(1, element.strokeWidth ?? 4)}
+                      />
+                    );
+                  }
+                  if (
+                    element.shape === 'triangle' ||
+                    element.shape === 'pentagon' ||
+                    element.shape === 'diamond' ||
+                    element.shape === 'parallelogram'
+                  ) {
+                    return (
+                      <Line
+                        {...commonProps}
+                        {...paint}
+                        closed
+                        key={element.id}
+                        points={getPolygonPoints(element.shape, commonProps.width, commonProps.height)}
+                      />
+                    );
+                  }
+                  return <Rect {...commonProps} {...paint} key={element.id} />;
                 }
 
                 if (element.type === 'image') {

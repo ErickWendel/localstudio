@@ -6,7 +6,7 @@ import type {
   SelectionState,
   VideoElement,
 } from '../../domain/model';
-import type { MediaPlaybackPatch } from '../../domain/commands/basicCommands';
+import type { ElementStylePatch, MediaPlaybackPatch } from '../../domain/commands/basicCommands';
 import { PanelSection } from '../components/PanelSection';
 import { TEXT_FONT_FAMILIES, TEXT_FONT_WEIGHTS } from './textStyleOptions';
 
@@ -16,19 +16,7 @@ interface DesignPanelProps {
   project: ProjectDocument;
   activePageId: string;
   selection: SelectionState;
-  onUpdateElementStyle?: (
-    elementId: string,
-    patch: Partial<{
-      align: 'left' | 'center' | 'right';
-      fill: string;
-      fontFamily: string;
-      fontSize: number;
-      fontWeight: number;
-      opacity: number;
-      stroke: string;
-      strokeWidth: number;
-    }>,
-  ) => void;
+  onUpdateElementStyle?: (elementId: string, patch: ElementStylePatch) => void;
   onUpdateMediaPlayback?: (elementId: string, patch: MediaPlaybackPatch) => void;
   onUpdatePageBackground?: (background: PageBackground) => void;
 }
@@ -222,38 +210,79 @@ export function DesignPanel({
         <PanelSection title="Shape">
           <label className="design-control">
             <span>Fill</span>
-            <input
-              aria-label="Selected shape fill"
-              type="color"
-              value={selectedElement.fill}
+            <select
+              aria-label="Selected shape fill mode"
+              value={selectedElement.fill ? 'color' : 'none'}
               onChange={(event) => {
-                updateSelectedStyle({ fill: event.target.value });
+                updateSelectedStyle({
+                  fill: event.target.value === 'color' ? selectedElement.fill ?? '#37FD76' : null,
+                });
               }}
-            />
+            >
+              <option value="none">No fill</option>
+              <option value="color">Color fill</option>
+            </select>
           </label>
+          {selectedElement.fill ? (
+            <label className="design-control">
+              <span>Fill color</span>
+              <input
+                aria-label="Selected shape fill color"
+                type="color"
+                value={selectedElement.fill}
+                onChange={(event) => {
+                  updateSelectedStyle({ fill: event.target.value });
+                }}
+              />
+            </label>
+          ) : null}
           <label className="design-control">
-            <span>Stroke</span>
-            <input
-              aria-label="Selected shape stroke"
-              type="color"
-              value={selectedElement.stroke ?? '#37FD76'}
+            <span>Border</span>
+            <select
+              aria-label="Selected shape border mode"
+              value={selectedElement.stroke && (selectedElement.strokeWidth ?? 0) > 0 ? 'color' : 'none'}
               onChange={(event) => {
-                updateSelectedStyle({ stroke: event.target.value });
+                updateSelectedStyle(
+                  event.target.value === 'color'
+                    ? {
+                        stroke: selectedElement.stroke ?? '#37FD76',
+                        strokeWidth: selectedElement.strokeWidth && selectedElement.strokeWidth > 0 ? selectedElement.strokeWidth : 2,
+                      }
+                    : { stroke: null, strokeWidth: 0 },
+                );
               }}
-            />
+            >
+              <option value="none">No border</option>
+              <option value="color">Color border</option>
+            </select>
           </label>
-          <label className="design-control">
-            <span>Stroke width</span>
-            <input
-              aria-label="Selected shape stroke width"
-              min="0"
-              type="number"
-              value={selectedElement.strokeWidth ?? 0}
-              onChange={(event) => {
-                updateSelectedStyle({ strokeWidth: Number(event.target.value) });
-              }}
-            />
-          </label>
+          {selectedElement.stroke && (selectedElement.strokeWidth ?? 0) > 0 ? (
+            <>
+              <label className="design-control">
+                <span>Border color</span>
+                <input
+                  aria-label="Selected shape border color"
+                  type="color"
+                  value={selectedElement.stroke}
+                  onChange={(event) => {
+                    updateSelectedStyle({ stroke: event.target.value });
+                  }}
+                />
+              </label>
+              <label className="design-control">
+                <span>Border width</span>
+                <input
+                  aria-label="Selected shape border width"
+                  min="1"
+                  type="number"
+                  value={selectedElement.strokeWidth ?? 2}
+                  onChange={(event) => {
+                    updateSelectedStyle({ strokeWidth: Number(event.target.value) });
+                  }}
+                />
+              </label>
+            </>
+          ) : null}
         </PanelSection>
       ) : null}
     </div>
