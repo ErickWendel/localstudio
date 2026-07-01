@@ -8,47 +8,111 @@
 ![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)
 
-Browser-only Canva-style slides and image editing, powered by local Web AI.
+Design slides with local AI, then keep editing.
+
+LocalStudio.dev is a browser-native Canva-style editor that turns prompt generation, image creation, translation,
+background removal, local project history, and S3-compatible sharing into one editable slide workflow.
 
 [Live demo](https://localstudio.dev/) · [WebMCP showcase](https://localstudio.dev/webmcp/) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md)
 
-## What It Does
+## About It
 
-LocalStudio.dev runs in the browser: compose slides, generate layouts, create image assets, translate text, edit images, save project history, and export designs without a backend.
+LocalStudio.dev runs in the browser without a product backend. Your deck remains a layered document: prompts become
+editable slide objects, generated images stay as normal assets, translated text updates in place, and project files can
+be saved to a local folder you control.
 
-### Prompt-to-slide
+| Landing section | What it proves |
+| --- | --- |
+| About it | Browser-native slide creation with local AI and editable output. |
+| Features | Layered editing, local persistence, and S3-compatible project mirroring. |
+| WebMCP Showcase | Host pages and agents can discover editor tools and drive the same local-first surface. |
+| Requirements | Chrome-first browser APIs, WebGPU model caches, and local storage expectations. |
 
-A prompt becomes editable slide layers, not a flat generated image.
+![LocalStudio prompt-to-slide workflow](apps/landing/public/prompt-to-slide.gif)
 
-![Prompt to slide](apps/landing/public/prompt-to-slide.gif)
+## Features
 
-### Prompt-to-image
+### Editable AI output
 
-A prompt becomes an image asset while you keep composing the same slide.
+A prompt becomes Konva-ready slide layers, not a flat generated image. The editor keeps the result selectable,
+reorderable, translatable, exportable, and ready for follow-up edits.
+
+### Product workflow
+
+| Workflow | Result |
+| --- | --- |
+| Prompt to slides | Turn a plain-language request into editable slide layers. |
+| Translate the deck | Translate one text layer, one page, or the whole deck while preserving layout intent. |
+| Remove backgrounds | Segment an image subject and keep refining before applying the edit. |
+| Create images | Generate an asset from the prompt bar and drop it into the active slide. |
+| Save local projects | Store metadata and assets in a folder instead of a remote workspace. |
+| Share your slides | Use your own external storage to publish stable links or reimport projects on other machines. |
+
+### Feature proof
+
+Prompt-to-image creates a reusable asset inside the same deck.
 
 ![Prompt to image](apps/landing/public/prompt-to-image.gif)
 
-### Translate
-
-Translate selected text, one page, or the full deck in place.
+Translation updates selected text, a page, or the full deck in place.
 
 ![Translate](apps/landing/public/translate.gif)
 
-### Edit images
-
-Remove the background, then flip or expand the image as a normal layer.
+Image editing removes backgrounds, flips, and expands images as normal layers.
 
 ![Edit images](apps/landing/public/edit-images.gif)
 
-### Work locally
-
-Save project files to disk and restore from local version history.
+Local project history restores saved versions from disk.
 
 ![Local project history](apps/landing/public/fs-history.gif)
 
-### Mirror projects with MinIO
+### S3-compatible mirror
 
-LocalStudio can mirror the complete project folder to MinIO so another computer can import the same project, assets, and version history. Local disk is still the source of truth while editing; MinIO sync runs in the background after successful local saves.
+Local projects can still publish public links. S3-compatible storage keeps viewer assets reachable while the editable
+project starts on your machine. MinIO works as the local/self-hosted example, but the same mirror shape fits AWS S3,
+Cloudflare R2, or any compatible endpoint.
+
+Mirrored payloads include:
+
+- Project JSON
+- Referenced assets
+- Version history
+- Local config
+- Public share payloads
+
+Keys stay in this browser profile. Scope credentials to the bucket or prefix you intend to use.
+
+## Web AI
+
+Model choice is a product feature. LocalStudio uses Chrome built-in AI APIs when available and WebGPU models when users
+need explicit control over the model behind each workflow.
+
+- Chrome APIs: [Prompt API](https://developer.chrome.com/docs/ai/prompt-api), [Translator API](https://developer.chrome.com/docs/ai/translator-api), [Language Detector API](https://developer.chrome.com/docs/ai/language-detection)
+- Hugging Face models: [Gemma 4 E2B](https://huggingface.co/onnx-community/gemma-4-E2B-it-ONNX), [TranslateGemma 4B](https://huggingface.co/onnx-community/translategemma-text-4b-it-ONNX), [XLM-RoBERTa language detection](https://huggingface.co/onnx-community/xlm-roberta-base-language-detection-ONNX), [SlimSAM](https://huggingface.co/Xenova/slimsam-77-uniform), [Bonsai Image 4B](https://huggingface.co/prism-ml/bonsai-image-ternary-4B-mlx-2bit)
+- WebML references: [Bonsai Image WebGPU Space](https://huggingface.co/spaces/webml-community/bonsai-image-webgpu), [Hugging Face WebML community](https://huggingface.co/webml-community)
+
+![Web AI setup](apps/landing/public/powered-webau.gif)
+
+## WebMCP Showcase
+
+WebMCP exposes LocalStudio actions as semantic browser tools, so an external page can discover capabilities, create a
+project, generate assets, translate the deck, and read the resulting project snapshot.
+
+- Tool discovery from the editor iframe
+- Prompt, image, translate, and snapshot actions
+- Same local-first editor surface behind every call
+
+[Open the WebMCP showcase](https://localstudio.dev/webmcp/)
+
+## Requirements
+
+LocalStudio runs in the browser, but modern browser AI workflows still need the right local surface.
+
+- Chrome browser is recommended for Chrome-first browser AI and file system APIs.
+- At least 10GB free storage is recommended for model weights, browser-managed caches, generated assets, and local project history.
+- Local folder permissions are required for project persistence flows.
+
+## Mirror Setup
 
 Start the local MinIO stack:
 
@@ -68,21 +132,13 @@ Default local settings:
 - Prefix: `mirrors`
 - Path-style URLs: enabled
 
-In the editor, open `File` -> `Mirror Settings` and enter those values. Use `File` -> `Mirror Now` to force an upload, or `File` -> `Import Remote` on another computer to download a mirrored project into a new local folder and continue syncing.
+In the editor, open `Settings` -> `Mirror Settings` and enter those values. Use `File` -> `Mirror Now` to force an upload,
+or `File` -> `Import Remote` on another computer to download a mirrored project into a new local folder and continue
+syncing.
 
-The dev compose file sets the `localstudio` bucket to public download mode so mirrored files can be shared through the public base URL. For production, use a MinIO bucket or prefix policy that matches what you intend to publish. Browser-stored MinIO keys are persisted locally, so scope credentials to this bucket and avoid using root credentials outside local development.
-
-### Powered by Web AI
-
-Browser-native AI capabilities keep the workflow fast, private, and local-first.
-
-![Web AI setup](apps/landing/public/powered-webau.gif)
-
-### WebMCP showcase
-
-Expose the editor as a browser agent surface, discover local tools, and run a guided same-origin automation demo.
-
-[Open the WebMCP showcase](https://localstudio.dev/webmcp/)
+The dev compose file sets the `localstudio` bucket to public download mode so mirrored files can be shared through the
+public base URL. For production, use a bucket or prefix policy that matches what you intend to publish. Browser-stored
+keys are persisted locally, so avoid root credentials outside local development.
 
 ## Quick Start
 
@@ -106,14 +162,6 @@ npm run typecheck
 npm run test
 npm run build
 ```
-
-## Browser AI Stack
-
-Some features need Chrome experimental APIs, WebGPU, browser-managed model caches, and local folder permissions.
-
-- Chrome APIs: [Prompt API](https://developer.chrome.com/docs/ai/prompt-api), [Translator API](https://developer.chrome.com/docs/ai/translator-api), [Language Detector API](https://developer.chrome.com/docs/ai/language-detection)
-- Hugging Face models: [Gemma 4 E2B](https://huggingface.co/onnx-community/gemma-4-E2B-it-ONNX), [TranslateGemma 4B](https://huggingface.co/onnx-community/translategemma-text-4b-it-ONNX), [XLM-RoBERTa language detection](https://huggingface.co/onnx-community/xlm-roberta-base-language-detection-ONNX), [SlimSAM](https://huggingface.co/Xenova/slimsam-77-uniform), [Bonsai Image 4B](https://huggingface.co/prism-ml/bonsai-image-ternary-4B-mlx-2bit)
-- WebML references: [Bonsai Image WebGPU Space](https://huggingface.co/spaces/webml-community/bonsai-image-webgpu), [Hugging Face WebML community](https://huggingface.co/webml-community)
 
 ## Workspace
 
