@@ -214,9 +214,17 @@ export function MirrorSettingsPanel({
 
       <div className="mirror-settings-actions">
         <button
-          className={mirrorState.enabled ? 'footer-toggle' : 'footer-toggle footer-toggle-active'}
+          className={
+            mirrorState.enabled
+              ? 'footer-toggle mirror-settings-toggle-danger'
+              : 'footer-toggle mirror-settings-toggle-success'
+          }
           type="button"
-          onClick={() => onEnabledChange(!mirrorState.enabled)}
+          onClick={() => {
+            const nextEnabled = !mirrorState.enabled;
+            onEnabledChange(nextEnabled);
+            if (nextEnabled) void testConnection();
+          }}
         >
           {mirrorState.enabled ? 'Disable mirroring' : 'Enable mirroring'}
         </button>

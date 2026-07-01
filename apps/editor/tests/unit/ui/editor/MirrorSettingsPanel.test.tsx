@@ -95,6 +95,7 @@ describe('MirrorSettingsPanel', () => {
     const user = userEvent.setup();
     const onEnabledChange = vi.fn();
     const onSave = vi.fn();
+    const onTestConnection = vi.fn(() => Promise.resolve());
 
     function StatefulMirrorSettingsPanel() {
       const [enabled, setEnabled] = useState(true);
@@ -109,17 +110,30 @@ describe('MirrorSettingsPanel', () => {
             onEnabledChange(nextEnabled);
           }}
           onSave={onSave}
-          onTestConnection={vi.fn()}
+          onTestConnection={onTestConnection}
         />
       );
     }
 
     render(<StatefulMirrorSettingsPanel />);
 
+    expect(screen.getByRole('button', { name: 'Disable mirroring' })).toHaveClass(
+      'mirror-settings-toggle-danger',
+    );
+
     await user.click(screen.getByRole('button', { name: 'Disable mirroring' }));
 
     expect(onEnabledChange).toHaveBeenCalledWith(false);
+    expect(screen.getByRole('button', { name: 'Enable mirroring' })).toHaveClass(
+      'mirror-settings-toggle-success',
+    );
     expect(screen.getByRole('button', { name: 'Save settings' })).toBeDisabled();
     expect(onSave).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Enable mirroring' }));
+
+    expect(onEnabledChange).toHaveBeenLastCalledWith(true);
+    expect(onTestConnection).toHaveBeenCalledWith(config);
+    expect(await screen.findByText('Connection is ready.')).toBeInTheDocument();
   });
 });
