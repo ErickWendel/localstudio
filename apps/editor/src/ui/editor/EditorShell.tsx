@@ -111,6 +111,8 @@ export function EditorShell({ services }: EditorShellProps) {
     0,
     vm.project.pages.findIndex((page) => page.id === vm.activePageId),
   );
+  const publicSharingAvailable = vm.mirrorState.enabled && vm.mirrorState.status === 'synced';
+  const publicSharingUnavailableReason = vm.mirrorState.error ?? 'Public sharing requires active external storage.';
 
   function exportCurrentPageAsPng() {
     const dataUrl = stageRef.current?.toDataURL({ mimeType: 'image/png', pixelRatio: 2 });
@@ -307,6 +309,14 @@ export function EditorShell({ services }: EditorShellProps) {
   useEffect(() => {
     const shareId = shareMetadata?.shareId;
     if (!shareId) return undefined;
+    if (!publicSharingAvailable) {
+      const timeoutId = window.setTimeout(() => {
+        setShareMetadata((current) => (current ? { ...current, status: 'sync-failed' } : current));
+      }, 0);
+      return () => {
+        window.clearTimeout(timeoutId);
+      };
+    }
     const timeoutId = window.setTimeout(() => {
       setShareMetadata((current) => (current ? { ...current, status: 'syncing' } : current));
       void services.shareService
@@ -322,7 +332,7 @@ export function EditorShell({ services }: EditorShellProps) {
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [services.shareService, shareMetadata?.shareId, vm.project]);
+  }, [publicSharingAvailable, services.shareService, shareMetadata?.shareId, vm.project]);
 
   return (
     <div className="app-shell">
@@ -335,6 +345,8 @@ export function EditorShell({ services }: EditorShellProps) {
         canUndo={!isHistoryReadOnly && vm.canUndo}
         hasSelection={!isHistoryReadOnly && hasSelection}
         persistenceEnabled={vm.persistenceEnabled}
+        publicSharingAvailable={publicSharingAvailable}
+        publicSharingUnavailableReason={publicSharingUnavailableReason}
         mirrorState={vm.mirrorState}
         persistenceAttention={vm.persistenceAttention}
         persistenceNotice={vm.persistenceNotice}

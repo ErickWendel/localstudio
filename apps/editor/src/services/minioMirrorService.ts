@@ -292,6 +292,11 @@ function createObjectUrl(config: MinioMirrorConfig, key = '', query: Record<stri
   return url;
 }
 
+function createPublicObjectUrl(config: MinioMirrorConfig, key: string) {
+  const publicBaseUrl = config.publicBaseUrl.trim().replace(/\/+$/g, '');
+  return `${publicBaseUrl}/${encodeKeyPath(key)}`;
+}
+
 async function createSignedHeaders(
   config: MinioMirrorConfig,
   method: string,
@@ -457,6 +462,14 @@ export class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
     );
     files.push({ path: MIRROR_MANIFEST_FILE_NAME, blob: textBlob(manifest) });
     return files;
+  }
+
+  getPublicObjectUrl(key: string, config: MinioMirrorConfig): string {
+    return createPublicObjectUrl(config, key);
+  }
+
+  async uploadPublicObject(key: string, blob: Blob, config: MinioMirrorConfig): Promise<void> {
+    await this.putObject(key, blob, config);
   }
 
   private async loadRemoteManifest(projectKey: string, config: MinioMirrorConfig) {

@@ -11,6 +11,9 @@ import type {
   MirrorService,
   MirrorState,
   ProjectRepository,
+  ShareMetadata,
+  ShareRecord,
+  ShareService,
   TranslatorService,
 } from '../../../../src/services/interfaces';
 import type { MinioMirrorConfig } from '../../../../src/services/minioMirrorService';
@@ -24,6 +27,20 @@ function createAppServices(options: Parameters<typeof createRealAppServices>[0] 
     initialProject: createSampleProject(),
     ...options,
   });
+}
+
+async function waitForShareButtonReady() {
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: 'Share' })).not.toBeDisabled();
+  });
+}
+
+function enableSyncedSharing(services: ReturnType<typeof createAppServices>) {
+  services.mirrorService = new RecordingMirrorService();
+  services.shareService = new RecordingShareService();
+  services.projectRepository = new LoadingProjectRepository(createSampleProject());
+  services.persistenceAvailable = true;
+  services.skipStoredProjectLoad = false;
 }
 
 class InstantBackgroundRemovalService implements BackgroundRemovalService {
@@ -78,6 +95,21 @@ class SavingProjectRepository implements ProjectRepository {
   }
 }
 
+class LoadingProjectRepository implements ProjectRepository {
+  savedProjects: ProjectDocument[] = [];
+
+  constructor(private readonly project: ProjectDocument) {}
+
+  loadProject(): Promise<ProjectDocument | null> {
+    return Promise.resolve(this.project);
+  }
+
+  saveProject(project: ProjectDocument): Promise<void> {
+    this.savedProjects.push(project);
+    return Promise.resolve();
+  }
+}
+
 const mirrorConfig: MinioMirrorConfig = {
   accessKey: 'localstudio',
   bucket: 'localstudio',
@@ -118,6 +150,57 @@ class RecordingMirrorService implements MirrorService<MinioMirrorConfig> {
   listProjects = vi.fn((): Promise<MirrorProjectSummary[]> => Promise.resolve([]));
 
   downloadProject = vi.fn((): Promise<MirrorFile[]> => Promise.resolve([]));
+}
+
+class RecordingShareService implements ShareService {
+  records = new Map<string, ShareRecord>();
+
+  constructor(private readonly origin = window.location.origin) {}
+
+  createShare = vi.fn((project: ProjectDocument): Promise<ShareMetadata> => {
+    const shareId = crypto.randomUUID();
+    const now = new Date().toISOString();
+    this.records.set(shareId, { shareId, createdAt: now, updatedAt: now, project });
+    return Promise.resolve(this.createMetadata(shareId, now));
+  });
+
+  updateShare = vi.fn((shareId: string, project: ProjectDocument): Promise<ShareMetadata> => {
+    const now = new Date().toISOString();
+    this.records.set(shareId, { shareId, createdAt: now, updatedAt: now, project });
+    return Promise.resolve(this.createMetadata(shareId, now));
+  });
+
+  getShare = vi.fn((shareId: string): Promise<ShareRecord | null> =>
+    Promise.resolve(this.records.get(shareId) ?? null),
+  );
+
+  getPublicUrl(shareId: string): string {
+    return `${this.origin}/editor/s/${shareId}?src=${encodeURIComponent(
+      `http://localhost:9000/localstudio/mirrors/public-shares/${shareId}/share.json`,
+    )}`;
+  }
+
+  getEmbedUrl(shareId: string): string {
+    return `${this.origin}/editor/embed/${shareId}?src=${encodeURIComponent(
+      `http://localhost:9000/localstudio/mirrors/public-shares/${shareId}/share.json`,
+    )}`;
+  }
+
+  getEmbedHtml(shareId: string): string {
+    return `<iframe src="${this.getEmbedUrl(shareId)}" width="960" height="540"></iframe>`;
+  }
+
+  private createMetadata(shareId: string, timestamp: string): ShareMetadata {
+    return {
+      shareId,
+      publicUrl: this.getPublicUrl(shareId),
+      embedUrl: this.getEmbedUrl(shareId),
+      embedHtml: this.getEmbedHtml(shareId),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      status: 'published',
+    };
+  }
 }
 
 class RecordingTranslatorService implements TranslatorService {
@@ -1718,9 +1801,16 @@ describe('EditorShell', () => {
     expect(screen.getByRole('button', { name: 'BG Remover' })).toBeInTheDocument();
   });
 
+  it('keeps Share disabled until the MinIO mirror is synced', () => {
+    render(<EditorShell services={createAppServices()} />);
+
+    expect(screen.getByRole('button', { name: 'Share' })).toBeDisabled();
+  });
+
   it('exports the current slide as a PNG file', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
+    enableSyncedSharing(services);
     const downloadDataUrl = vi.fn();
     services.exportService = {
       getPageImageFileName: () => 'slide.png',
@@ -1730,6 +1820,7 @@ describe('EditorShell', () => {
 
     render(<EditorShell services={services} />);
 
+    await waitForShareButtonReady();
     await user.click(screen.getByRole('button', { name: 'Share' }));
     await user.click(screen.getByRole('button', { name: 'Download' }));
 
@@ -1746,18 +1837,24 @@ describe('EditorShell', () => {
         writeText,
       },
     });
+    const services = createAppServices();
+    enableSyncedSharing(services);
 
-    render(<EditorShell services={createAppServices()} />);
+    render(<EditorShell services={services} />);
 
+    await waitForShareButtonReady();
     await user.click(screen.getByRole('button', { name: 'Share' }));
     await user.click(screen.getByRole('button', { name: 'Copy link' }));
 
+    const expectedPublicUrl = `${
+      window.location.origin
+    }/editor/s/00000000-0000-4000-8000-000000000301?src=${encodeURIComponent(
+      'http://localhost:9000/localstudio/mirrors/public-shares/00000000-0000-4000-8000-000000000301/share.json',
+    )}`;
     expect(
-      await screen.findByDisplayValue(`${window.location.origin}/editor/s/00000000-0000-4000-8000-000000000301`),
+      await screen.findByDisplayValue(expectedPublicUrl),
     ).toBeInTheDocument();
-    expect(writeText).toHaveBeenCalledWith(
-      `${window.location.origin}/editor/s/00000000-0000-4000-8000-000000000301`,
-    );
+    expect(writeText).toHaveBeenCalledWith(expectedPublicUrl);
   });
 
   it('enters fullscreen presentation mode from the share panel', async () => {
@@ -1767,9 +1864,12 @@ describe('EditorShell', () => {
       configurable: true,
       value: requestFullscreen,
     });
+    const services = createAppServices();
+    enableSyncedSharing(services);
 
-    render(<EditorShell services={createAppServices()} />);
+    render(<EditorShell services={services} />);
 
+    await waitForShareButtonReady();
     await user.click(screen.getByRole('button', { name: 'Share' }));
     await user.click(screen.getByRole('button', { name: 'Present' }));
 

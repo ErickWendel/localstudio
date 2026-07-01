@@ -12,6 +12,8 @@ interface TopToolbarProps {
   hasSelection?: boolean;
   persistenceEnabled?: boolean;
   persistenceAvailable?: boolean;
+  publicSharingAvailable?: boolean;
+  publicSharingUnavailableReason?: string;
   lastEditedAt?: string | undefined;
   mirrorState?: MirrorState;
   localProjectSetupPanel?: ReactNode;
@@ -110,6 +112,8 @@ export function TopToolbar({
   hasSelection = false,
   persistenceEnabled = false,
   persistenceAvailable = true,
+  publicSharingAvailable = true,
+  publicSharingUnavailableReason = 'Public sharing requires active external storage.',
   lastEditedAt,
   mirrorState = { enabled: false, status: 'disabled' },
   localProjectSetupPanel,
@@ -153,6 +157,7 @@ export function TopToolbar({
   }, [isEditingProjectName]);
 
   function triggerShare() {
+    if (!publicSharingAvailable) return;
     if (onShare) {
       onShare();
       return;
@@ -187,7 +192,7 @@ export function TopToolbar({
       { label: 'New Project', disabled: !onNewProject, onSelect: onNewProject },
       { label: 'Import Project', disabled: !onImportProject, onSelect: onImportProject },
       { label: 'Import Remote', disabled: !onImportRemoteMirror, onSelect: onImportRemoteMirror },
-      { label: 'Share', onSelect: triggerShare },
+      { label: 'Share', disabled: !publicSharingAvailable, onSelect: triggerShare },
       { kind: 'separator', label: 'File storage actions' },
       { label: 'Save', disabled: !onSaveLocal, onSelect: onSaveLocal },
       { label: 'Mirror Now', disabled: !onMirrorNow, onSelect: onMirrorNow },
@@ -273,6 +278,7 @@ export function TopToolbar({
   ]
     .filter(Boolean)
     .join(' ');
+  const shareTitle = publicSharingAvailable ? 'Share' : publicSharingUnavailableReason;
 
   return (
     <header className="top-toolbar">
@@ -530,7 +536,13 @@ export function TopToolbar({
             {stars}
           </span>
         </a>
-        <button className="export-button font-orbitron" type="button" onClick={triggerShare}>
+        <button
+          className="export-button font-orbitron"
+          disabled={!publicSharingAvailable}
+          title={shareTitle}
+          type="button"
+          onClick={triggerShare}
+        >
           <span className="material-symbols-outlined" aria-hidden="true">
             ios_share
           </span>

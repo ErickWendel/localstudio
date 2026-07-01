@@ -4398,7 +4398,7 @@ button {
   gap: 0;
   overflow: hidden;
   padding: 0;
-  background: #000;
+  background: #050d10;
 }
 
 .public-deck-viewer-embed {
@@ -4453,10 +4453,24 @@ button {
   padding: 0;
 }
 
+.public-deck-viewer-present .public-deck-stage-shell .canvas-workspace {
+  width: 100vw;
+  height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
 .public-deck-viewer-present .public-deck-stage-shell .canvas-frame {
   width: min(100vw, calc(100vh * 16 / 9));
   max-height: 100vh;
+  border: 0;
+  outline: 0;
   box-shadow: none;
+  transform: none !important;
+}
+
+.public-deck-viewer-present .public-deck-stage-shell .canvas-artboard {
+  border-radius: 0;
 }
 
 .public-deck-viewer-embed .public-deck-stage-shell .canvas-frame {
