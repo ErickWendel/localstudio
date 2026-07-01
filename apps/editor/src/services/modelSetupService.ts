@@ -21,7 +21,8 @@ import {
 } from './imageGenerationModels';
 import { WorkerBackedBonsaiImageRuntime } from './bonsaiImageRuntime';
 import { getBrowserLocalStorage, type BrowserKeyValueStorage } from './browserStorage';
-import { createMonotonicProgressReporter, createTransformersProgressCallback } from './progress';
+import { createMonotonicProgressReporter } from './progress';
+import { TransformersRuntimeClient } from './transformersRuntimeClient';
 
 export const IMAGE_EDITING_MODEL_ID = 'image-editing-models';
 export const IMAGE_EDITING_TRANSFORMERS_MODEL_ID = 'Xenova/slimsam-77-uniform';
@@ -113,19 +114,10 @@ function getReadyKey(id: string) {
 }
 
 export class TransformersImageEditingModelLoader implements ImageEditingModelLoader {
+  constructor(private readonly runtimeClient = new TransformersRuntimeClient()) {}
+
   async loadImageEditingModel(): Promise<void> {
-    const { AutoProcessor, SamModel, env } = await import('@huggingface/transformers');
-
-    env.useBrowserCache = true;
-    env.cacheKey = TRANSFORMERS_CACHE_KEY;
-
-    await Promise.all([
-      SamModel.from_pretrained(IMAGE_EDITING_TRANSFORMERS_MODEL_ID, {
-        dtype: 'fp16',
-        device: 'webgpu',
-      }),
-      AutoProcessor.from_pretrained(IMAGE_EDITING_TRANSFORMERS_MODEL_ID),
-    ]);
+    await this.runtimeClient.preloadImageEditing();
   }
 }
 
@@ -136,36 +128,29 @@ export class TransformersImageGenerationModelLoader implements ImageGenerationMo
 }
 
 export class TransformersTextGenerationModelLoader implements TextGenerationModelLoader {
+  constructor(private readonly runtimeClient = new TransformersRuntimeClient()) {}
+
   async loadTextGenerationModel(modelId: string, options?: { onProgress?: (progress: number) => void }): Promise<void> {
-    const { pipeline, env } = await import('@huggingface/transformers');
+    await this.runtimeClient.preloadTextGeneration(modelId, options);
+  }
 
-    env.useBrowserCache = true;
-    env.cacheKey = TRANSFORMERS_CACHE_KEY;
+  releaseTextGenerationModel(modelId: string): Promise<void> {
+    return this.runtimeClient.releaseTextGeneration(modelId);
+  }
 
-    const textGeneration = await pipeline('text-generation', modelId, {
-      dtype: 'q4',
-      device: 'webgpu',
-      progress_callback: createTransformersProgressCallback(options?.onProgress),
-    });
-    await (textGeneration as { dispose?: () => Promise<void> | void }).dispose?.();
+  removeTextGenerationModel(modelId: string): Promise<void> {
+    return this.runtimeClient.removeTextGeneration(modelId);
   }
 }
 
 export class TransformersLanguageDetectionModelLoader implements LanguageDetectionModelLoader {
+  constructor(private readonly runtimeClient = new TransformersRuntimeClient()) {}
+
   async loadLanguageDetectionModel(
     modelId: string,
     options?: { onProgress?: (progress: number) => void },
   ): Promise<void> {
-    const { pipeline, env } = await import('@huggingface/transformers');
-
-    env.useBrowserCache = true;
-    env.cacheKey = TRANSFORMERS_CACHE_KEY;
-
-    const detector = await pipeline('text-classification', modelId, {
-      device: 'webgpu',
-      progress_callback: createTransformersProgressCallback(options?.onProgress),
-    });
-    await (detector as { dispose?: () => Promise<void> | void }).dispose?.();
+    await this.runtimeClient.preloadLanguageDetection(modelId, options);
   }
 }
 

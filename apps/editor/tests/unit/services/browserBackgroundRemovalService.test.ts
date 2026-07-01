@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, vi } from 'vitest';
 import type { Asset } from '../../../src/domain/model';
 import { BrowserBackgroundRemovalService } from '../../../src/services/browserBackgroundRemovalService';
+import type { BackgroundSegmentationResult } from '../../../src/services/transformersOperations';
 
 type MutableGlobal = typeof globalThis & { ImageData?: typeof ImageData };
 
@@ -89,7 +90,27 @@ describe('BrowserBackgroundRemovalService', () => {
   });
 
   it('does not inherit file storage metadata for generated replacement assets', async () => {
-    const service = new BrowserBackgroundRemovalService();
+    const runtime = {
+      prepareBackgroundRemoval: vi.fn(() => Promise.resolve()),
+      segmentBackgroundRemoval: vi.fn(
+        (): Promise<BackgroundSegmentationResult> =>
+          Promise.resolve({
+            imageInput: {
+              data: new Uint8Array([255, 0, 0, 255]),
+              width: 1,
+              height: 1,
+              channels: 4,
+            },
+            subjectMask: {
+              data: new Uint8Array([1]),
+              width: 1,
+              height: 1,
+              score: 1,
+            },
+          }),
+      ),
+    };
+    const service = new BrowserBackgroundRemovalService(runtime);
     const sourceAsset: Asset = {
       id: 'asset-hero',
       type: 'image',
