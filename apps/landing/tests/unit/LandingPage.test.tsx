@@ -3,8 +3,25 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LandingPage } from '../../src/LandingPage';
 
+function stubReducedMotion(matches: boolean) {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn((query: string) => ({
+      matches: query === '(prefers-reduced-motion: reduce)' ? matches : false,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  );
+}
+
 describe('LandingPage', () => {
   beforeEach(() => {
+    stubReducedMotion(false);
     vi.stubGlobal(
       'fetch',
       vi.fn(() =>
@@ -47,6 +64,7 @@ describe('LandingPage', () => {
       'src',
       '/prompt-to-slide.mp4',
     );
+    expect(screen.getByLabelText(/Prompt-to-slide workflow/i)).toHaveAttribute('preload', 'metadata');
     expect(screen.queryByText('Chrome Prompt API')).not.toBeInTheDocument();
     expect(screen.queryByText('Bonsai Image WebGPU')).not.toBeInTheDocument();
   });
@@ -113,6 +131,19 @@ describe('LandingPage', () => {
     expect(screen.getByRole('tab', { name: /Translate/i })).toHaveAttribute('aria-selected', 'true');
   });
 
+  it('does not auto-advance workflow demos for reduced-motion users', () => {
+    stubReducedMotion(true);
+    render(<LandingPage />);
+
+    expect(screen.getByRole('tab', { name: /Prompt-to-slide/i })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByLabelText('9999 GitHub stars')).toHaveTextContent('9999');
+
+    fireEvent.ended(screen.getByLabelText(/Prompt-to-slide workflow/i));
+
+    expect(screen.getByRole('tab', { name: /Prompt-to-slide/i })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByLabelText(/Prompt-to-slide workflow/i)).not.toHaveAttribute('autoplay');
+  });
+
   it('promotes the GitHub repository with a custom star button and feature showcase sections', () => {
     render(<LandingPage />);
 
@@ -128,6 +159,8 @@ describe('LandingPage', () => {
       'src',
       '/prompt-to-slide-showcase.png',
     );
+    expect(screen.getByRole('img', { name: /prompt-to-slide editor/i })).toHaveAttribute('loading', 'lazy');
+    expect(screen.getByRole('img', { name: /prompt-to-slide editor/i })).toHaveAttribute('decoding', 'async');
     expect(screen.getByRole('img', { name: /generated AI chip image/i })).toHaveAttribute(
       'src',
       '/prompt-to-image-showcase.png',
@@ -151,6 +184,8 @@ describe('LandingPage', () => {
       'src',
       '/webmcp-showcase.png',
     );
+    expect(screen.getByRole('img', { name: /WebMCP showcase page/i })).toHaveAttribute('loading', 'lazy');
+    expect(screen.getByRole('img', { name: /WebMCP showcase page/i })).toHaveAttribute('decoding', 'async');
     expect(screen.getByRole('link', { name: /Open WebMCP demo/i })).toHaveAttribute('href', '/webmcp/');
     expect(screen.getByRole('heading', { name: 'Chrome browser' })).toBeInTheDocument();
     expect(screen.getByText(/10GB free storage/i)).toBeInTheDocument();
