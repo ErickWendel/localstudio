@@ -2,19 +2,39 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createSampleProject } from '../../../../src/domain/sampleProject';
+import type { ShareRecord } from '../../../../src/services/interfaces';
 import { BrowserShareService } from '../../../../src/services/shareService';
 import { PublicDeckViewer } from '../../../../src/ui/share/PublicDeckViewer';
 
 describe('PublicDeckViewer', () => {
   beforeEach(() => {
-    window.localStorage.clear();
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000201');
+    window.history.replaceState({}, '', '/');
   });
 
-  it('renders a shared deck in read-only mode', async () => {
-    const shareService = new BrowserShareService({ origin: 'https://localstudio.test' });
-    const share = await shareService.createShare(createSampleProject());
+  function createRemoteShare(
+    shareId: string,
+    project = createSampleProject(),
+  ): { shareService: BrowserShareService; share: ShareRecord } {
+    const share: ShareRecord = {
+      shareId,
+      createdAt: '2026-06-30T10:00:00.000Z',
+      updatedAt: '2026-06-30T10:00:00.000Z',
+      project,
+    };
+    const sourceUrl = `http://localhost:9000/localstudio/mirrors/public-shares/${shareId}/share.json`;
+    window.history.replaceState({}, '', `/editor/s/${shareId}?src=${encodeURIComponent(sourceUrl)}`);
+    const requestFetch = vi.fn(async (url: RequestInfo | URL) => {
+      expect(url.toString()).toBe(sourceUrl);
+      return new Response(JSON.stringify({ schemaVersion: 1, ...share }), {
+        headers: { 'content-type': 'application/json' },
+        status: 200,
+      });
+    }) as typeof fetch;
+    return { share, shareService: new BrowserShareService({ fetch: requestFetch }) };
+  }
 
+  it('renders a shared deck in read-only mode', async () => {
+    const { share, shareService } = createRemoteShare('00000000-0000-4000-8000-000000000201');
     render(<PublicDeckViewer shareId={share.shareId} shareService={shareService} />);
 
     expect(await screen.findByLabelText('Public presentation')).toHaveClass('public-deck-viewer-present');
@@ -25,8 +45,7 @@ describe('PublicDeckViewer', () => {
   });
 
   it('keeps embeds in a compact shared deck layout', async () => {
-    const shareService = new BrowserShareService({ origin: 'https://localstudio.test' });
-    const share = await shareService.createShare(createSampleProject());
+    const { share, shareService } = createRemoteShare('00000000-0000-4000-8000-000000000202');
 
     render(<PublicDeckViewer shareId={share.shareId} shareService={shareService} embed />);
 
@@ -36,7 +55,6 @@ describe('PublicDeckViewer', () => {
 
   it('moves between slides with next and previous controls', async () => {
     const user = userEvent.setup();
-    const shareService = new BrowserShareService({ origin: 'https://localstudio.test' });
     const project = createSampleProject();
     project.pages.push({
       id: 'page-2',
@@ -46,7 +64,10 @@ describe('PublicDeckViewer', () => {
       background: { type: 'color', color: '#111111' },
       elementIds: [],
     });
-    const share = await shareService.createShare(project);
+    const { share, shareService } = createRemoteShare(
+      '00000000-0000-4000-8000-000000000203',
+      project,
+    );
 
     render(<PublicDeckViewer shareId={share.shareId} shareService={shareService} />);
 
@@ -60,7 +81,14 @@ describe('PublicDeckViewer', () => {
   });
 
   it('shows a not found state for missing shares', async () => {
-    const shareService = new BrowserShareService({ origin: 'https://localstudio.test' });
+    window.history.replaceState(
+      {},
+      '',
+      '/editor/s/missing-share?src=http%3A%2F%2Flocalhost%3A9000%2Flocalstudio%2Fmissing.json',
+    );
+    const shareService = new BrowserShareService({
+      fetch: vi.fn(async () => new Response(null, { status: 404 })) as typeof fetch,
+    });
 
     render(<PublicDeckViewer shareId="missing-share" shareService={shareService} />);
 

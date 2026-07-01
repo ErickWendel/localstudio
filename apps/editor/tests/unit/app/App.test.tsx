@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '../../../src/App';
 import { createSampleProject } from '../../../src/domain/sampleProject';
-import { BrowserShareService } from '../../../src/services/shareService';
 import { TRANSLATION_LANGUAGE_OPTIONS } from '../../../src/ui/editor/translationLanguages';
 
 describe('App', () => {
@@ -114,10 +113,24 @@ describe('App', () => {
   });
 
   it('renders a public shared deck page', async () => {
-    const shareService = new BrowserShareService({ origin: window.location.origin });
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000101');
-    await shareService.createShare(createSampleProject());
-    window.history.replaceState({}, '', '/editor/s/00000000-0000-4000-8000-000000000101');
+    const shareId = '00000000-0000-4000-8000-000000000101';
+    const sourceUrl = `http://localhost:9000/localstudio/mirrors/public-shares/${shareId}/share.json`;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        return new Response(
+          JSON.stringify({
+            schemaVersion: 1,
+            shareId,
+            createdAt: '2026-06-30T10:00:00.000Z',
+            updatedAt: '2026-06-30T10:00:00.000Z',
+            project: createSampleProject(),
+          }),
+          { headers: { 'content-type': 'application/json' }, status: 200 },
+        );
+      }),
+    );
+    window.history.replaceState({}, '', `/editor/s/${shareId}?src=${encodeURIComponent(sourceUrl)}`);
 
     render(<App />);
 
@@ -126,10 +139,24 @@ describe('App', () => {
   });
 
   it('renders a compact embedded shared deck page', async () => {
-    const shareService = new BrowserShareService({ origin: window.location.origin });
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000102');
-    await shareService.createShare(createSampleProject());
-    window.history.replaceState({}, '', '/editor/embed/00000000-0000-4000-8000-000000000102');
+    const shareId = '00000000-0000-4000-8000-000000000102';
+    const sourceUrl = `http://localhost:9000/localstudio/mirrors/public-shares/${shareId}/share.json`;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        return new Response(
+          JSON.stringify({
+            schemaVersion: 1,
+            shareId,
+            createdAt: '2026-06-30T10:00:00.000Z',
+            updatedAt: '2026-06-30T10:00:00.000Z',
+            project: createSampleProject(),
+          }),
+          { headers: { 'content-type': 'application/json' }, status: 200 },
+        );
+      }),
+    );
+    window.history.replaceState({}, '', `/editor/embed/${shareId}?src=${encodeURIComponent(sourceUrl)}`);
 
     render(<App />);
 

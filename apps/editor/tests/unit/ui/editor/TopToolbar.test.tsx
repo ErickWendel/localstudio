@@ -212,6 +212,29 @@ describe('TopToolbar', () => {
     expect(screen.getByText('Mirroring')).toBeInTheDocument();
   });
 
+  it('disables sharing until MinIO external storage is ready', async () => {
+    const user = userEvent.setup();
+    const onShare = vi.fn();
+
+    render(
+      <TopToolbar
+        project={createSampleProject()}
+        language="PT-BR"
+        publicSharingAvailable={false}
+        publicSharingUnavailableReason="Public sharing requires active external storage."
+        onShare={onShare}
+      />,
+    );
+
+    const shareButton = screen.getByRole('button', { name: 'Share' });
+    expect(shareButton).toBeDisabled();
+    expect(shareButton).toHaveAttribute('title', 'Public sharing requires active external storage.');
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    expect(screen.getByRole('menuitem', { name: 'Share' })).toBeDisabled();
+    expect(onShare).not.toHaveBeenCalled();
+  });
+
   it('opens version history from the toolbar when persistence is enabled', async () => {
     const user = userEvent.setup();
     const onOpenVersionHistory = vi.fn();

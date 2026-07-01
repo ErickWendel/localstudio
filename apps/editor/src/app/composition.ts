@@ -64,6 +64,7 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
   const textGenerationRuntime = new TransformersTextGenerationRuntime();
   const languageDetectionRuntime = new TransformersLanguageDetectionRuntime();
   const persistenceAvailable = isFileSystemAccessAvailable();
+  const mirrorService = new MinioMirrorService();
   const modelSetupService = new BrowserModelSetupService(
     undefined,
     undefined,
@@ -79,7 +80,7 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     persistenceAvailable,
     projectRepository: createProjectRepository(persistenceAvailable),
     exportService: new BrowserExportService(),
-    shareService: new BrowserShareService(),
+    shareService: new BrowserShareService({ mirrorService }),
     localSetupService: new BrowserLocalSetupService(),
     modelSetupService,
     translatorService: new BrowserTranslatorService(
@@ -100,7 +101,7 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     backgroundRemovalService: new BrowserBackgroundRemovalService(),
     smartGrabService: new MockSmartGrabService(),
     magicEraserService: new MockMagicEraserService(),
-    mirrorService: new MinioMirrorService(),
+    mirrorService,
   };
 }
 
