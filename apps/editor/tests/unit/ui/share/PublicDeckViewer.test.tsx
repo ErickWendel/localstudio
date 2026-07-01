@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createSampleProject } from '../../../../src/domain/sampleProject';
@@ -78,6 +78,58 @@ describe('PublicDeckViewer', () => {
 
     await user.click(screen.getByRole('button', { name: 'Previous slide' }));
     expect(screen.getByText('1 / 2')).toBeInTheDocument();
+  });
+
+  it('rewinds shared deck slides with the left arrow key after advancing', async () => {
+    const project = createSampleProject();
+    project.pages.push({
+      id: 'page-2',
+      name: 'Slide 2',
+      width: 1920,
+      height: 1080,
+      background: { type: 'color', color: '#111111' },
+      elementIds: [],
+    });
+    const { share, shareService } = createRemoteShare(
+      '00000000-0000-4000-8000-000000000205',
+      project,
+    );
+
+    render(<PublicDeckViewer shareId={share.shareId} shareService={shareService} />);
+
+    expect(await screen.findByText('1 / 2')).toBeInTheDocument();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(screen.getByText('2 / 2')).toBeInTheDocument();
+
+    await userEvent.keyboard('{ArrowLeft}');
+    expect(screen.getByText('1 / 2')).toBeInTheDocument();
+  });
+
+  it('starts shared decks in presenter animation playback mode', async () => {
+    const project = createSampleProject();
+    project.pages[0]!.animationBuilds = [
+      {
+        id: 'animation-title',
+        elementId: 'text-title',
+        effect: 'reveal',
+        trigger: 'on-click',
+        delayMs: 0,
+      },
+    ];
+    const { share, shareService } = createRemoteShare(
+      '00000000-0000-4000-8000-000000000204',
+      project,
+    );
+
+    render(<PublicDeckViewer shareId={share.shareId} shareService={shareService} />);
+
+    const slideCanvas = await screen.findByLabelText('Slide canvas');
+    expect(slideCanvas).toHaveAttribute('data-animation-preview', 'playing');
+    expect(slideCanvas).toHaveAttribute('data-animation-preview-mode', 'presenter');
+    await waitFor(() => {
+      expect(slideCanvas).toHaveAttribute('data-animation-preview-phase', 'waiting');
+      expect(slideCanvas).toHaveAttribute('data-animation-preview-waiting', 'true');
+    });
   });
 
   it('shows a not found state for missing shares', async () => {

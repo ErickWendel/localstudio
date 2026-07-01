@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { ProjectDocument, SelectionState } from '../../domain/model';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ElementAnimationBuild, ProjectDocument, SelectionState } from '../../domain/model';
 import type { ShareService } from '../../services/interfaces';
 import { CanvasWorkspace } from '../editor/CanvasWorkspace';
 
@@ -14,20 +14,180 @@ type ViewerState =
   | { status: 'missing' }
   | { status: 'ready'; project: ProjectDocument };
 
+interface AnimationPreviewState {
+  activeBuildElementId: string | undefined;
+  hiddenElementIds: string[];
+  mode: 'presenter';
+  pageId: string;
+  phase: 'transition' | 'animation' | 'waiting' | 'complete';
+  playing: boolean;
+  waitingForClick: boolean;
+}
+
 export function PublicDeckViewer({ shareId, shareService, embed = false }: PublicDeckViewerProps) {
   const [viewerState, setViewerState] = useState<ViewerState>({ status: 'loading' });
   const [activePageIndex, setActivePageIndex] = useState(0);
+  const [animationPreview, setAnimationPreview] = useState<AnimationPreviewState | undefined>();
+  const animationQueueRef = useRef<ElementAnimationBuild[]>([]);
+  const animationTimeoutsRef = useRef<number[]>([]);
   const emptySelection = useMemo<SelectionState>(() => ({ pageId: '', elementIds: [] }), []);
   const viewerClassName = embed
     ? 'public-deck-viewer public-deck-viewer-embed'
     : 'public-deck-viewer public-deck-viewer-present';
+
+  function clearAnimationTimers() {
+    for (const timeoutId of animationTimeoutsRef.current) {
+      window.clearTimeout(timeoutId);
+    }
+    animationTimeoutsRef.current = [];
+  }
+
+  function scheduleAnimation(callback: () => void, delayMs: number) {
+    const timeoutId = window.setTimeout(callback, Math.max(0, delayMs));
+    animationTimeoutsRef.current.push(timeoutId);
+  }
+
+  function completeAnimationSlide() {
+    animationQueueRef.current = [];
+    clearAnimationTimers();
+    setAnimationPreview((current) =>
+      current
+        ? {
+            ...current,
+            activeBuildElementId: undefined,
+            hiddenElementIds: [],
+            phase: 'complete',
+            waitingForClick: false,
+          }
+        : current,
+    );
+  }
+
+  function revealAnimationBuild(build: ElementAnimationBuild) {
+    setAnimationPreview((current) =>
+      current
+        ? {
+            ...current,
+            activeBuildElementId: undefined,
+            hiddenElementIds: current.hiddenElementIds.filter((elementId) => elementId !== build.elementId),
+            waitingForClick: false,
+          }
+        : current,
+    );
+  }
+
+  function runNextAnimationBuild() {
+    const nextBuild = animationQueueRef.current[0];
+    if (!nextBuild) {
+      completeAnimationSlide();
+      return;
+    }
+
+    if (nextBuild.trigger === 'on-click') {
+      setAnimationPreview((current) =>
+        current
+          ? {
+              ...current,
+              activeBuildElementId: nextBuild.elementId,
+              phase: 'waiting',
+              waitingForClick: true,
+            }
+          : current,
+      );
+      return;
+    }
+
+    animationQueueRef.current = animationQueueRef.current.slice(1);
+    setAnimationPreview((current) =>
+      current
+        ? {
+            ...current,
+            activeBuildElementId: nextBuild.elementId,
+            phase: 'animation',
+            waitingForClick: false,
+          }
+        : current,
+    );
+    scheduleAnimation(() => {
+      revealAnimationBuild(nextBuild);
+      runNextAnimationBuild();
+    }, nextBuild.delayMs);
+  }
+
+  function advanceAnimationPreview() {
+    const nextBuild = animationQueueRef.current[0];
+    if (!nextBuild) {
+      completeAnimationSlide();
+      return;
+    }
+    animationQueueRef.current = animationQueueRef.current.slice(1);
+    setAnimationPreview((current) =>
+      current
+        ? {
+            ...current,
+            activeBuildElementId: nextBuild.elementId,
+            phase: 'animation',
+            waitingForClick: false,
+          }
+        : current,
+    );
+    scheduleAnimation(() => {
+      revealAnimationBuild(nextBuild);
+      runNextAnimationBuild();
+    }, nextBuild.delayMs);
+  }
+
+  function playPresentationPage(project: ProjectDocument, pageIndex: number) {
+    const page = project.pages[pageIndex];
+    if (!page) return;
+    const builds = (page.animationBuilds ?? []).filter((build) => page.elementIds.includes(build.elementId));
+    clearAnimationTimers();
+    animationQueueRef.current = builds;
+    setActivePageIndex(pageIndex);
+    const transitionDelay = page.transition?.delayMs ?? 0;
+    setAnimationPreview({
+      activeBuildElementId: undefined,
+      hiddenElementIds: builds.map((build) => build.elementId),
+      mode: 'presenter',
+      pageId: page.id,
+      phase: transitionDelay > 0 ? 'transition' : builds.length > 0 ? 'animation' : 'complete',
+      playing: true,
+      waitingForClick: false,
+    });
+
+    if (builds.length === 0) {
+      if (transitionDelay > 0) scheduleAnimation(completeAnimationSlide, transitionDelay);
+      return;
+    }
+    scheduleAnimation(runNextAnimationBuild, transitionDelay);
+  }
+
+  function advancePresentation() {
+    if (viewerState.status !== 'ready') return;
+    if (animationPreview?.waitingForClick) {
+      advanceAnimationPreview();
+      return;
+    }
+    if (animationPreview?.phase !== 'complete') return;
+    playPresentationPage(viewerState.project, activePageIndex + 1);
+  }
+
+  function rewindPresentation() {
+    if (viewerState.status !== 'ready') return;
+    playPresentationPage(viewerState.project, activePageIndex - 1);
+  }
 
   useEffect(() => {
     let isActive = true;
     void shareService.getShare(shareId).then((record) => {
       if (!isActive) return;
       setViewerState(record ? { status: 'ready', project: record.project } : { status: 'missing' });
-      setActivePageIndex(0);
+      if (record) {
+        playPresentationPage(record.project, 0);
+      } else {
+        setActivePageIndex(0);
+        setAnimationPreview(undefined);
+      }
     });
     return () => {
       isActive = false;
@@ -35,15 +195,21 @@ export function PublicDeckViewer({ shareId, shareService, embed = false }: Publi
   }, [shareId, shareService]);
 
   useEffect(() => {
+    return () => {
+      clearAnimationTimers();
+    };
+  }, []);
+
+  useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (viewerState.status !== 'ready') return;
       if (event.key === 'ArrowLeft') {
         event.preventDefault();
-        setActivePageIndex((current) => Math.max(0, current - 1));
+        rewindPresentation();
       }
       if (event.key === 'ArrowRight') {
         event.preventDefault();
-        setActivePageIndex((current) => Math.min(viewerState.project.pages.length - 1, current + 1));
+        advancePresentation();
       }
     }
 
@@ -51,7 +217,7 @@ export function PublicDeckViewer({ shareId, shareService, embed = false }: Publi
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [viewerState]);
+  }, [activePageIndex, animationPreview, viewerState]);
 
   if (viewerState.status === 'loading') {
     return (
@@ -100,6 +266,8 @@ export function PublicDeckViewer({ shareId, shareService, embed = false }: Publi
           presentationMode
           readOnly
           zoomPercent={100}
+          animationPreview={animationPreview}
+          onAnimationPreviewAdvance={advancePresentation}
         />
       </section>
       <nav className="public-deck-controls" aria-label="Slide navigation">
@@ -109,7 +277,7 @@ export function PublicDeckViewer({ shareId, shareService, embed = false }: Publi
           type="button"
           aria-label="Previous slide"
           onClick={() => {
-            setActivePageIndex((current) => Math.max(0, current - 1));
+            rewindPresentation();
           }}
         >
           <span className="material-symbols-outlined" aria-hidden="true">
@@ -125,7 +293,7 @@ export function PublicDeckViewer({ shareId, shareService, embed = false }: Publi
           type="button"
           aria-label="Next slide"
           onClick={() => {
-            setActivePageIndex((current) => Math.min(project.pages.length - 1, current + 1));
+            advancePresentation();
           }}
         >
           <span className="material-symbols-outlined" aria-hidden="true">
