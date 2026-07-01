@@ -6,6 +6,8 @@ import {
   AddImageElementCommand,
   AddMediaElementCommand,
   AlignElementCommand,
+  ClearElementAnimationBuildCommand,
+  ClearPageTransitionCommand,
   DeleteElementCommand,
   DeletePageCommand,
   DuplicatePageCommand,
@@ -15,9 +17,12 @@ import {
   ReorderPageCommand,
   ReorderElementCommand,
   RemoveAssetCommand,
+  ReorderElementAnimationBuildCommand,
   ReplaceImageAssetCommand,
+  SetElementAnimationBuildsCommand,
   SetElementLockCommand,
   SetElementVisibilityCommand,
+  SetPageTransitionCommand,
   SetPageVisibilityCommand,
   SetZOrderCommand,
   ToggleImageFlipCommand,
@@ -30,6 +35,7 @@ import {
   UpdatePageBackgroundCommand,
   UpdateTextContentCommand,
   type AlignMode,
+  type ElementAnimationPatch,
   type ElementFramePatch,
   type ImageCropPatch,
   type ElementStylePatch,
@@ -40,6 +46,7 @@ import type { GeneratedSlideElement } from '../../domain/generatedSlide';
 import { fitImageWithinPage } from '../../domain/imageSizing';
 import type {
   DesignElement,
+  ElementAnimationBuild,
   ImageElement,
   Page,
   PageBackground,
@@ -47,10 +54,26 @@ import type {
   SelectionState,
   ShapeElement,
   ShapeKind,
+  SlideTransition,
 } from '../../domain/model';
-import { createBlankProject, SAMPLE_HERO_IMAGE_SIZE, SAMPLE_HERO_IMAGE_URL } from '../../domain/sampleProject';
+import {
+  createBlankProject,
+  SAMPLE_HERO_IMAGE_SIZE,
+  SAMPLE_HERO_IMAGE_URL,
+} from '../../domain/sampleProject';
 import type { EditorAutomationDelegate } from '../../services/editorAutomationController';
-import type { AiProviderState, ModelState, PromptApiAvailability, VersionHistoryEntry } from '../../services/interfaces';
+import type {
+  AiProviderState,
+  MirrorProjectSummary,
+  MirrorState,
+  ModelState,
+  PromptApiAvailability,
+  VersionHistoryEntry,
+} from '../../services/interfaces';
+import {
+  DEFAULT_MINIO_MIRROR_CONFIG,
+  type MinioMirrorConfig,
+} from '../../services/minioMirrorService';
 import {
   GEMMA_LLM_MODEL_ID,
   LANGUAGE_DETECTION_MODEL_ID,
@@ -62,10 +85,13 @@ import {
 } from '../../services/imageGenerationModels';
 import { IMAGE_EDITING_MODEL_ID } from '../../services/modelSetupService';
 import { looksLikeImageGenerationRequest } from '../../services/prompts/slideTaskPrompt';
-import { defaultCreateImagePromptOptions, type CreateImagePromptOptions } from './imagePromptOptions';
+import {
+  defaultCreateImagePromptOptions,
+  type CreateImagePromptOptions,
+} from './imagePromptOptions';
 import { TRANSLATION_LANGUAGE_OPTIONS } from './translationLanguages';
 
-export type RightPanelTab = 'layout' | 'text' | 'elements' | 'design' | 'ai-tools' | 'assets';
+export type RightPanelTab = 'layout' | 'text' | 'elements' | 'design' | 'ai-tools' | 'assets' | 'animations';
 export type TextPreset = 'title' | 'subtitle' | 'body';
 
 interface EditorHistory {
@@ -109,11 +135,24 @@ interface ElementClipboardState {
   elements: DesignElement[];
 }
 
+interface AnimationPreviewState {
+  activeBuildElementId: string | undefined;
+  hiddenElementIds: string[];
+  mode: 'editor' | 'presenter';
+  pageId: string;
+  phase: 'transition' | 'animation' | 'waiting' | 'complete';
+  playing: boolean;
+  waitingForClick: boolean;
+}
+
+export type RemoteImportStatus = 'loading' | 'ready' | 'empty' | 'importing' | 'failed';
+
 const PERSISTENCE_PREFERENCE_KEY = 'ew-canvas-ai.persistence-enabled';
 const TRANSLATION_TARGET_LANGUAGE_KEY = 'localstudio.ai.translation-target-language';
 const IMAGE_EDITING_MODEL_REQUIRED_MESSAGE = 'You must download the image editing tools first.';
 const PROMPT_API_REQUIRED_MESSAGE = 'LLM model must be prepared before using prompt-to-slides.';
-const IMAGE_GENERATION_MODEL_REQUIRED_MESSAGE = 'Download image generation models before creating images.';
+const IMAGE_GENERATION_MODEL_REQUIRED_MESSAGE =
+  'Download image generation models before creating images.';
 const IMAGE_PROMPT_MODE_REQUIRED_MESSAGE = 'Use Create image from the + menu to generate images.';
 const IMAGE_GENERATION_DIMENSION_MULTIPLE = 16;
 const BACKGROUND_PREVIEW_DEBOUNCE_MS = 120;
@@ -172,7 +211,9 @@ function readPersistencePreference() {
 function readTranslationTargetLanguage() {
   if (typeof window === 'undefined') return '';
   const storedTarget = window.localStorage.getItem(TRANSLATION_TARGET_LANGUAGE_KEY);
-  return TRANSLATION_LANGUAGE_OPTIONS.some((option) => option.code === storedTarget) ? storedTarget ?? '' : '';
+  return TRANSLATION_LANGUAGE_OPTIONS.some((option) => option.code === storedTarget)
+    ? (storedTarget ?? '')
+    : '';
 }
 
 function writeProjectNameToUrl(projectName: string) {
@@ -187,7 +228,8 @@ function writeProjectNameToUrl(projectName: string) {
 }
 
 function normalizeProjectDocument(project: ProjectDocument): ProjectDocument {
-  const shouldRestoreHeroImage = Boolean(project.assets['asset-hero']) && !project.elements['image-hero'];
+  const shouldRestoreHeroImage =
+    Boolean(project.assets['asset-hero']) && !project.elements['image-hero'];
   const pageId = project.pages[0]?.id;
   const elements: ProjectDocument['elements'] = {};
 
@@ -249,7 +291,7 @@ function normalizeProjectDocument(project: ProjectDocument): ProjectDocument {
             : page,
         )
       : project.pages
-    ).map((page) => ({ ...page, visible: page.visible ?? true })),
+    ).map((page) => ({ ...page, animationBuilds: page.animationBuilds ?? [], visible: page.visible ?? true })),
   };
 }
 
@@ -340,7 +382,13 @@ function getPageTextSample(project: ProjectDocument, pageId: string) {
 }
 
 type TranslationScope = 'selection' | 'slide' | 'deck';
-type TranslationPatch = { fontSize?: number; height?: number; text: string; width?: number; x?: number };
+type TranslationPatch = {
+  fontSize?: number;
+  height?: number;
+  text: string;
+  width?: number;
+  x?: number;
+};
 
 function normalizeTranslatedText(originalText: string, translatedText: string) {
   if (originalText.includes('\n')) return translatedText.trim();
@@ -371,8 +419,12 @@ function fitTranslatedTextToOriginalFrame(
 
   const desiredWidth = Math.ceil(estimatedWidth + horizontalPadding);
   const originalCenter = element.x + element.width / 2;
-  const pageWidth = page?.width ?? Math.max(element.x + desiredWidth, originalCenter + desiredWidth / 2);
-  const maxWidthAroundCenter = Math.max(1, 2 * Math.min(originalCenter, pageWidth - originalCenter));
+  const pageWidth =
+    page?.width ?? Math.max(element.x + desiredWidth, originalCenter + desiredWidth / 2);
+  const maxWidthAroundCenter = Math.max(
+    1,
+    2 * Math.min(originalCenter, pageWidth - originalCenter),
+  );
   const nextWidth = Math.max(element.width, Math.min(desiredWidth, maxWidthAroundCenter));
   const nextX = Math.max(0, Math.min(pageWidth - nextWidth, originalCenter - nextWidth / 2));
 
@@ -384,7 +436,10 @@ function fitTranslatedTextToOriginalFrame(
     };
   }
 
-  const estimatedLineCount = Math.max(1, Math.ceil(estimatedWidth / Math.max(1, nextWidth - horizontalPadding)));
+  const estimatedLineCount = Math.max(
+    1,
+    Math.ceil(estimatedWidth / Math.max(1, nextWidth - horizontalPadding)),
+  );
   return {
     text: normalizedText,
     width: nextWidth,
@@ -394,12 +449,19 @@ function fitTranslatedTextToOriginalFrame(
 }
 
 export function useEditorViewModel(services: AppServices) {
-  const initialProject = useMemo(() => normalizeProjectDocument(services.initialProject), [
-    services.initialProject,
-  ]);
+  const initialProject = useMemo(
+    () => normalizeProjectDocument(services.initialProject),
+    [services.initialProject],
+  );
+  const storedMirrorConfig = useMemo(
+    () => services.mirrorService.loadConfig(),
+    [services.mirrorService],
+  );
   const shouldRestoreStoredProject = useMemo(
-    () => !services.skipStoredProjectLoad && readPersistencePreference(),
-    [services.skipStoredProjectLoad],
+    () =>
+      !services.skipStoredProjectLoad &&
+      (readPersistencePreference() || Boolean(storedMirrorConfig)),
+    [services.skipStoredProjectLoad, storedMirrorConfig],
   );
   const [project, setProject] = useState<ProjectDocument>(initialProject);
   const projectRef = useRef(project);
@@ -407,6 +469,8 @@ export function useEditorViewModel(services: AppServices) {
   const [modelStates, setModelStates] = useState<ModelState[]>([]);
   const [hasLoadedProject, setHasLoadedProject] = useState(!shouldRestoreStoredProject);
   const [persistenceEnabled, setPersistenceEnabled] = useState(shouldRestoreStoredProject);
+  const [hasPersistedLocalProject, setHasPersistedLocalProject] =
+    useState(shouldRestoreStoredProject);
   const [activePageId, setActivePageId] = useState(initialProject.pages[0]?.id ?? '');
   const activePageIdRef = useRef(activePageId);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
@@ -419,20 +483,29 @@ export function useEditorViewModel(services: AppServices) {
   const [backgroundSelectionNotice, setBackgroundSelectionNotice] = useState<string | undefined>();
   const [processingElementIds, setProcessingElementIds] = useState<string[]>([]);
   const [backgroundPreview, setBackgroundPreview] = useState<BackgroundPreviewState | undefined>();
-  const [backgroundPreparation, setBackgroundPreparation] = useState<BackgroundPreparationState | undefined>();
-  const [translationTargetLanguage, setTranslationTargetLanguageState] = useState(readTranslationTargetLanguage);
+  const [backgroundPreparation, setBackgroundPreparation] = useState<
+    BackgroundPreparationState | undefined
+  >();
+  const [translationTargetLanguage, setTranslationTargetLanguageState] = useState(
+    readTranslationTargetLanguage,
+  );
   const [promptProviderStates, setPromptProviderStates] = useState<AiProviderState[]>([]);
   const [translationProviderStates, setTranslationProviderStates] = useState<AiProviderState[]>([]);
-  const [languageDetectionProviderStates, setLanguageDetectionProviderStates] = useState<AiProviderState[]>([]);
+  const [languageDetectionProviderStates, setLanguageDetectionProviderStates] = useState<
+    AiProviderState[]
+  >([]);
   const [translationTargetAttention, setTranslationTargetAttention] = useState(false);
-  const [translationPreparation, setTranslationPreparation] = useState<TranslationPreparationState>({
-    progress: 0,
-    status: readTranslationTargetLanguage() ? 'ready' : 'idle',
-  });
-  const [languageDetectionPreparation, setLanguageDetectionPreparation] = useState<TranslationPreparationState>({
-    progress: 0,
-    status: 'idle',
-  });
+  const [translationPreparation, setTranslationPreparation] = useState<TranslationPreparationState>(
+    {
+      progress: 0,
+      status: readTranslationTargetLanguage() ? 'ready' : 'idle',
+    },
+  );
+  const [languageDetectionPreparation, setLanguageDetectionPreparation] =
+    useState<TranslationPreparationState>({
+      progress: 0,
+      status: 'idle',
+    });
   const [promptPreparation, setPromptPreparation] = useState<PromptPreparationState>({
     availability: 'unavailable',
     progress: 0,
@@ -445,7 +518,9 @@ export function useEditorViewModel(services: AppServices) {
   const [isGeneratingSlide, setIsGeneratingSlide] = useState(false);
   const [createImageNotice, setCreateImageNotice] = useState<string | undefined>();
   const [createImageStatus, setCreateImageStatus] = useState<string | undefined>();
-  const [createImageOptions, setCreateImageOptions] = useState<CreateImagePromptOptions>(defaultCreateImagePromptOptions);
+  const [createImageOptions, setCreateImageOptions] = useState<CreateImagePromptOptions>(
+    defaultCreateImagePromptOptions,
+  );
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [aiToolsAttentionModelId, setAiToolsAttentionModelId] = useState<string | undefined>();
   const [pageLanguageCodes, setPageLanguageCodes] = useState<Record<string, string>>({});
@@ -456,6 +531,7 @@ export function useEditorViewModel(services: AppServices) {
   });
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationNotice, setTranslationNotice] = useState<string | undefined>();
+  const [animationPreview, setAnimationPreview] = useState<AnimationPreviewState | undefined>();
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [versionHistoryEntries, setVersionHistoryEntries] = useState<VersionHistoryEntry[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState<string | undefined>();
@@ -463,23 +539,52 @@ export function useEditorViewModel(services: AppServices) {
   const [highlightVersionChanges, setHighlightVersionChanges] = useState(true);
   const [lastEditedAt, setLastEditedAt] = useState<string | undefined>(initialProject.updatedAt);
   const [saveAnimationKey, setSaveAnimationKey] = useState(0);
-  const [, setBackgroundSelectionPoints] = useState<Record<string, BackgroundSelectionPoint[]>>(
-    {},
+  const [mirrorState, setMirrorState] = useState<MirrorState>(() => ({
+    enabled: Boolean(storedMirrorConfig),
+    status: storedMirrorConfig ? 'idle' : 'disabled',
+  }));
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [mirrorSettingsOpen, setMirrorSettingsOpen] = useState(false);
+  const [remoteImportOpen, setRemoteImportOpen] = useState(false);
+  const [localProjectSetupOpen, setLocalProjectSetupOpen] = useState(false);
+  const [persistenceAttention, setPersistenceAttention] = useState(false);
+  const [persistenceNotice, setPersistenceNotice] = useState<string | undefined>();
+  const [remoteImportStatus, setRemoteImportStatus] = useState<RemoteImportStatus>('loading');
+  const [remoteImportProjects, setRemoteImportProjects] = useState<MirrorProjectSummary[]>([]);
+  const [remoteImportError, setRemoteImportError] = useState<string | undefined>();
+  const [mirrorConfig, setMirrorConfig] = useState<MinioMirrorConfig>(
+    () => storedMirrorConfig ?? DEFAULT_MINIO_MIRROR_CONFIG,
   );
+  const [hasMirrorConfig, setHasMirrorConfig] = useState(Boolean(storedMirrorConfig));
+  const mirrorConfigRef = useRef<MinioMirrorConfig | null>(storedMirrorConfig);
+  const mirrorSyncInFlightRef = useRef(false);
+  const mirrorSyncQueuedRef = useRef(false);
+  const mirrorDebounceRef = useRef<number | undefined>(undefined);
+  const queueMirrorSyncRef = useRef<() => void>(() => undefined);
+  const syncMirrorNowRef = useRef<(project?: ProjectDocument) => void>(() => undefined);
+  const [, setBackgroundSelectionPoints] = useState<Record<string, BackgroundSelectionPoint[]>>({});
   projectRef.current = project;
   activePageIdRef.current = activePageId;
   selectedElementIdsRef.current = selectedElementIds;
+  mirrorConfigRef.current = hasMirrorConfig ? mirrorConfig : null;
+  queueMirrorSyncRef.current = queueMirrorSync;
+  syncMirrorNowRef.current = (projectToSync) => {
+    void syncMirrorNow(projectToSync);
+  };
   const backgroundSelectionPointsRef = useRef<Record<string, BackgroundSelectionPoint[]>>({});
   const backgroundPreviewTimeoutRef = useRef<number | undefined>(undefined);
+  const animationPreviewQueueRef = useRef<ElementAnimationBuild[]>([]);
+  const animationPreviewTimeoutsRef = useRef<number[]>([]);
+  const wasFullscreenRef = useRef(false);
   const backgroundPreviewSequenceRef = useRef(0);
   const backgroundPreparationSequenceRef = useRef(0);
   const languageDetectionSequenceRef = useRef(0);
   const skipNextProjectSaveRef = useRef(shouldRestoreStoredProject);
   const lastVersionProjectRef = useRef<ProjectDocument>(initialProject);
-  const selection = useMemo<SelectionState>(() => ({ pageId: activePageId, elementIds: selectedElementIds }), [
-    activePageId,
-    selectedElementIds,
-  ]);
+  const selection = useMemo<SelectionState>(
+    () => ({ pageId: activePageId, elementIds: selectedElementIds }),
+    [activePageId, selectedElementIds],
+  );
   const selectedImageElement = useMemo<ImageElement | undefined>(() => {
     if (selectedElementIds.length !== 1) return undefined;
     const element = project.elements[selectedElementIds[0] ?? ''];
@@ -506,7 +611,9 @@ export function useEditorViewModel(services: AppServices) {
         setTranslationProviderStates(await services.translatorService.getProviderStates());
       }
       if (services.translatorService.getLanguageDetectionProviderStates) {
-        setLanguageDetectionProviderStates(await services.translatorService.getLanguageDetectionProviderStates());
+        setLanguageDetectionProviderStates(
+          await services.translatorService.getLanguageDetectionProviderStates(),
+        );
       }
     }
 
@@ -516,11 +623,30 @@ export function useEditorViewModel(services: AppServices) {
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
     function handleFullscreenChange() {
-      setIsFullscreen(Boolean(document.fullscreenElement));
+      const isFullscreenActive = Boolean(document.fullscreenElement);
+      setIsFullscreen(isFullscreenActive);
+      if (wasFullscreenRef.current && !isFullscreenActive) {
+        for (const timeoutId of animationPreviewTimeoutsRef.current) {
+          window.clearTimeout(timeoutId);
+        }
+        animationPreviewTimeoutsRef.current = [];
+        animationPreviewQueueRef.current = [];
+        setAnimationPreview(undefined);
+        setSelectedElementIds([]);
+      }
+      wasFullscreenRef.current = isFullscreenActive;
     }
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      for (const timeoutId of animationPreviewTimeoutsRef.current) {
+        window.clearTimeout(timeoutId);
+      }
     };
   }, []);
 
@@ -548,7 +674,9 @@ export function useEditorViewModel(services: AppServices) {
     if (!persistenceEnabled) return;
 
     void services.projectRepository
-      .loadProject(services.storedProjectName ? { projectName: services.storedProjectName } : undefined)
+      .loadProject(
+        services.storedProjectName ? { projectName: services.storedProjectName } : undefined,
+      )
       .then((savedProject) => {
         if (!isMounted) return;
         if (savedProject) {
@@ -560,9 +688,14 @@ export function useEditorViewModel(services: AppServices) {
           lastVersionProjectRef.current = normalizedProject;
           setLastEditedAt(normalizedProject.updatedAt);
           if (services.projectRepository.getVersionHistory) {
-            void services.projectRepository.getVersionHistory().then(setVersionHistoryEntries).catch(() => undefined);
+            void services.projectRepository
+              .getVersionHistory()
+              .then(setVersionHistoryEntries)
+              .catch(() => undefined);
           }
           writeProjectNameToUrl(normalizedProject.name);
+          setHasPersistedLocalProject(true);
+          if (storedMirrorConfig) syncMirrorNowRef.current(normalizedProject);
         }
         setHasLoadedProject(true);
       })
@@ -578,7 +711,7 @@ export function useEditorViewModel(services: AppServices) {
     return () => {
       isMounted = false;
     };
-  }, [persistenceEnabled, services.projectRepository, services.storedProjectName]);
+  }, [persistenceEnabled, services.projectRepository, services.storedProjectName, storedMirrorConfig]);
 
   useEffect(() => {
     if (!hasLoadedProject || !persistenceEnabled) return;
@@ -589,6 +722,7 @@ export function useEditorViewModel(services: AppServices) {
     void services.projectRepository
       .saveProject(project)
       .then(async () => {
+        setHasPersistedLocalProject(true);
         setLastEditedAt(project.updatedAt);
         setSaveAnimationKey((current) => current + 1);
         if (!services.projectRepository.saveVersion) return;
@@ -597,9 +731,13 @@ export function useEditorViewModel(services: AppServices) {
         });
         lastVersionProjectRef.current = project;
         setLastEditedAt(entry.createdAt);
-        setVersionHistoryEntries((current) => [entry, ...current.filter((item) => item.id !== entry.id)]);
+        setVersionHistoryEntries((current) => [
+          entry,
+          ...current.filter((item) => item.id !== entry.id),
+        ]);
       })
       .then(() => {
+        queueMirrorSyncRef.current();
         writeProjectNameToUrl(project.name);
       })
       .catch(() => {
@@ -609,6 +747,14 @@ export function useEditorViewModel(services: AppServices) {
         }
       });
   }, [hasLoadedProject, persistenceEnabled, project, services.projectRepository]);
+
+  useEffect(() => {
+    return () => {
+      if (mirrorDebounceRef.current !== undefined) {
+        window.clearTimeout(mirrorDebounceRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (pageLanguageCodes[activePageId]) return;
@@ -689,13 +835,17 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function isBackgroundPreparationReady(elementId: string) {
-    return backgroundPreparation?.elementId === elementId && backgroundPreparation.status === 'ready';
+    return (
+      backgroundPreparation?.elementId === elementId && backgroundPreparation.status === 'ready'
+    );
   }
 
   async function downloadRequiredModels() {
     setModelStates((currentStates) =>
       currentStates.map((state) =>
-        state.required && state.status !== 'ready' ? { ...state, status: 'downloading', progress: 10 } : state,
+        state.required && state.status !== 'ready'
+          ? { ...state, status: 'downloading', progress: 10 }
+          : state,
       ),
     );
     const next = await services.modelSetupService.downloadRequiredModels();
@@ -707,7 +857,9 @@ export function useEditorViewModel(services: AppServices) {
       setTranslationProviderStates(await services.translatorService.getProviderStates());
     }
     if (services.translatorService.getLanguageDetectionProviderStates) {
-      setLanguageDetectionProviderStates(await services.translatorService.getLanguageDetectionProviderStates());
+      setLanguageDetectionProviderStates(
+        await services.translatorService.getLanguageDetectionProviderStates(),
+      );
     }
     if (next.some((state) => state.id === IMAGE_EDITING_MODEL_ID && state.status === 'ready')) {
       setBackgroundSelectionNotice(undefined);
@@ -721,7 +873,9 @@ export function useEditorViewModel(services: AppServices) {
   async function downloadModel(id: string) {
     setModelStates((currentStates) =>
       currentStates.map((state) =>
-        state.id === id && state.status !== 'ready' ? { ...state, status: 'downloading', progress: 10 } : state,
+        state.id === id && state.status !== 'ready'
+          ? { ...state, status: 'downloading', progress: 10 }
+          : state,
       ),
     );
     const next = await services.modelSetupService.downloadModel(id, {
@@ -743,7 +897,9 @@ export function useEditorViewModel(services: AppServices) {
       setTranslationProviderStates(await services.translatorService.getProviderStates());
     }
     if (services.translatorService.getLanguageDetectionProviderStates) {
-      setLanguageDetectionProviderStates(await services.translatorService.getLanguageDetectionProviderStates());
+      setLanguageDetectionProviderStates(
+        await services.translatorService.getLanguageDetectionProviderStates(),
+      );
     }
     if (id === IMAGE_EDITING_MODEL_ID && next.status === 'ready') {
       setBackgroundSelectionNotice(undefined);
@@ -757,7 +913,9 @@ export function useEditorViewModel(services: AppServices) {
   async function removeModel(id: string) {
     if (!services.modelSetupService.removeModel) return;
 
-    const selectedPromptProviderId = promptProviderStates.find((provider) => provider.modelId === id && provider.selected)?.id;
+    const selectedPromptProviderId = promptProviderStates.find(
+      (provider) => provider.modelId === id && provider.selected,
+    )?.id;
     const selectedTranslationProviderId = translationProviderStates.find(
       (provider) => provider.modelId === id && provider.selected,
     )?.id;
@@ -791,7 +949,9 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function isImageGenerationReady() {
-    return modelStates.some((state) => state.id === IMAGE_GENERATION_MODEL_ID && state.status === 'ready');
+    return modelStates.some(
+      (state) => state.id === IMAGE_GENERATION_MODEL_ID && state.status === 'ready',
+    );
   }
 
   function ensureImageGenerationReadyForPrompt() {
@@ -811,8 +971,14 @@ export function useEditorViewModel(services: AppServices) {
     const availability = await services.promptService.checkAvailability();
     setPromptPreparation((current) => ({
       availability,
-      progress: availability === 'ready' ? 100 : current.status === 'downloading' ? current.progress : 0,
-      status: availability === 'ready' ? 'ready' : current.status === 'downloading' ? 'downloading' : 'idle',
+      progress:
+        availability === 'ready' ? 100 : current.status === 'downloading' ? current.progress : 0,
+      status:
+        availability === 'ready'
+          ? 'ready'
+          : current.status === 'downloading'
+            ? 'downloading'
+            : 'idle',
     }));
     return availability;
   }
@@ -853,7 +1019,9 @@ export function useEditorViewModel(services: AppServices) {
       }
       setPromptPreparation({ availability: 'unavailable', progress: 0, status: 'failed' });
       setPromptApiAttention(true);
-      setPromptApiNotice(error instanceof Error ? error.message : 'Chrome Prompt API could not be prepared.');
+      setPromptApiNotice(
+        error instanceof Error ? error.message : 'Chrome Prompt API could not be prepared.',
+      );
     }
   }
 
@@ -912,7 +1080,8 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   async function prepareSelectedLanguageDetectionProvider(providerState?: AiProviderState) {
-    const selectedProvider = providerState ?? languageDetectionProviderStates.find((provider) => provider.selected);
+    const selectedProvider =
+      providerState ?? languageDetectionProviderStates.find((provider) => provider.selected);
     if (!selectedProvider?.modelId || selectedProvider.readiness === 'ready') return;
 
     setLanguageDetectionPreparation({ progress: 4, status: 'downloading' });
@@ -928,27 +1097,36 @@ export function useEditorViewModel(services: AppServices) {
       setLanguageDetectionPreparation({ progress: 100, status: 'ready' });
       setModelStates(await services.modelSetupService.getModelStates());
       if (services.translatorService.getLanguageDetectionProviderStates) {
-        setLanguageDetectionProviderStates(await services.translatorService.getLanguageDetectionProviderStates());
+        setLanguageDetectionProviderStates(
+          await services.translatorService.getLanguageDetectionProviderStates(),
+        );
       }
     } catch (error) {
       setLanguageDetectionPreparation({ progress: 0, status: 'failed' });
-      setTranslationNotice(error instanceof Error ? error.message : 'Language detection model could not be prepared.');
+      setTranslationNotice(
+        error instanceof Error ? error.message : 'Language detection model could not be prepared.',
+      );
     }
   }
 
   async function prepareSelectedTranslationProvider(providerState?: AiProviderState) {
-    const selectedProvider = providerState ?? translationProviderStates.find((provider) => provider.selected);
+    const selectedProvider =
+      providerState ?? translationProviderStates.find((provider) => provider.selected);
     if (selectedProvider?.modelId && selectedProvider.readiness !== 'ready') {
       setTranslationPreparation({ progress: 4, status: 'downloading' });
       try {
-        await services.translatorService.prepareTranslation('en', translationTargetLanguage || 'en', {
-          onProgress: (progress) => {
-            setTranslationPreparation((current) => ({
-              progress: Math.max(current.progress, 4, Math.min(100, Math.round(progress))),
-              status: progress >= 100 ? 'ready' : 'downloading',
-            }));
+        await services.translatorService.prepareTranslation(
+          'en',
+          translationTargetLanguage || 'en',
+          {
+            onProgress: (progress) => {
+              setTranslationPreparation((current) => ({
+                progress: Math.max(current.progress, 4, Math.min(100, Math.round(progress))),
+                status: progress >= 100 ? 'ready' : 'downloading',
+              }));
+            },
           },
-        });
+        );
         setTranslationPreparation({ progress: 100, status: 'ready' });
         setModelStates(await services.modelSetupService.getModelStates());
         if (services.translatorService.getProviderStates) {
@@ -963,7 +1141,9 @@ export function useEditorViewModel(services: AppServices) {
           }
         }
         setTranslationPreparation({ progress: 0, status: 'failed' });
-        setTranslationNotice(error instanceof Error ? error.message : 'Translation model could not be prepared.');
+        setTranslationNotice(
+          error instanceof Error ? error.message : 'Translation model could not be prepared.',
+        );
       }
     }
     if (translationTargetLanguage) {
@@ -1014,14 +1194,18 @@ export function useEditorViewModel(services: AppServices) {
     setIsGeneratingSlide(true);
     try {
       setPromptGenerationStatus('Planning slide...');
-      const generatedTasks = await services.promptService.generateSlideTasksFromPrompt(trimmedPrompt, {
-        targetLanguageHint: 'same as user prompt',
-      });
+      const generatedTasks = await services.promptService.generateSlideTasksFromPrompt(
+        trimmedPrompt,
+        {
+          targetLanguageHint: 'same as user prompt',
+        },
+      );
       if (!isCurrentRun()) return;
       const pageId = activePageId;
 
       commitProject(
-        (currentProject) => new PrepareGeneratedSlideCommand(pageId, generatedTasks.page).execute(currentProject),
+        (currentProject) =>
+          new PrepareGeneratedSlideCommand(pageId, generatedTasks.page).execute(currentProject),
         { activePageId: pageId, selectedElementIds: [] },
       );
 
@@ -1040,7 +1224,8 @@ export function useEditorViewModel(services: AppServices) {
         generatedElements.push(element);
         const selectedElementId = `generated-${pageId}-${element.id.replace(/[^a-z0-9-_]/gi, '-').toLowerCase()}`;
         commitProject(
-          (currentProject) => new AddGeneratedSlideElementCommand(pageId, element).execute(currentProject),
+          (currentProject) =>
+            new AddGeneratedSlideElementCommand(pageId, element).execute(currentProject),
           { activePageId: pageId, selectedElementIds: [selectedElementId] },
         );
       }
@@ -1051,7 +1236,9 @@ export function useEditorViewModel(services: AppServices) {
       }));
     } catch (error) {
       if (!isCurrentRun()) return;
-      setPromptGenerationNotice(error instanceof Error ? error.message : 'Prompt API could not generate the slide.');
+      setPromptGenerationNotice(
+        error instanceof Error ? error.message : 'Prompt API could not generate the slide.',
+      );
     } finally {
       if (isCurrentRun()) {
         setPromptGenerationStatus(undefined);
@@ -1098,7 +1285,8 @@ export function useEditorViewModel(services: AppServices) {
       if (!isCurrentRun()) return;
       if (imageToReplace) {
         commitProject(
-          (currentProject) => new ReplaceImageAssetCommand(imageToReplace.id, asset).execute(currentProject),
+          (currentProject) =>
+            new ReplaceImageAssetCommand(imageToReplace.id, asset).execute(currentProject),
           { selectedElementIds: [imageToReplace.id] },
         );
         return;
@@ -1184,7 +1372,11 @@ export function useEditorViewModel(services: AppServices) {
     });
   }
 
-  function getSelectionForProject(nextProject: ProjectDocument, pageId: string, currentSelection: string[]) {
+  function getSelectionForProject(
+    nextProject: ProjectDocument,
+    pageId: string,
+    currentSelection: string[],
+  ) {
     const page = nextProject.pages.find((item) => item.id === pageId) ?? nextProject.pages[0];
     const retainedSelection = currentSelection.filter((id) => page?.elementIds.includes(id));
     if (retainedSelection.length > 0) return retainedSelection;
@@ -1242,23 +1434,111 @@ export function useEditorViewModel(services: AppServices) {
     }));
   }
 
-  async function setPersistence(nextEnabled: boolean) {
+  function setPersistence(nextEnabled: boolean) {
     if (!nextEnabled) {
       setPersistenceEnabled(false);
+      setLocalProjectSetupOpen(false);
+      setPersistenceAttention(false);
+      setPersistenceNotice(undefined);
       if (typeof window !== 'undefined') {
         window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'false');
       }
       return;
     }
 
+    if (hasPersistedLocalProject) {
+      void reenablePersistence();
+      return;
+    }
+
+    setLocalProjectSetupOpen(true);
+  }
+
+  async function reenablePersistence() {
     try {
-      await services.projectRepository.saveProject(project);
-      lastVersionProjectRef.current = project;
-      setLastEditedAt(project.updatedAt);
+      const projectToSave = projectRef.current;
+      await services.projectRepository.saveProject(projectToSave);
+      lastVersionProjectRef.current = projectToSave;
+      setHasPersistedLocalProject(true);
+      setLastEditedAt(projectToSave.updatedAt);
       setSaveAnimationKey((current) => current + 1);
       skipNextProjectSaveRef.current = true;
       setPersistenceEnabled(true);
-      writeProjectNameToUrl(project.name);
+      setPersistenceAttention(false);
+      setPersistenceNotice(undefined);
+      setLocalProjectSetupOpen(false);
+      writeProjectNameToUrl(projectToSave.name);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'true');
+      }
+    } catch {
+      setPersistenceEnabled(false);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'false');
+      }
+    }
+  }
+
+  async function persistCurrentProject(projectToSave = projectRef.current) {
+    await services.projectRepository.saveProject(projectToSave);
+    setHasPersistedLocalProject(true);
+    const previousProject = lastVersionProjectRef.current;
+    lastVersionProjectRef.current = projectToSave;
+    setLastEditedAt(projectToSave.updatedAt);
+    setSaveAnimationKey((current) => current + 1);
+    if (!services.projectRepository.saveVersion) return;
+    const entry = await services.projectRepository.saveVersion(projectToSave, {
+      previousProject,
+      force: true,
+    });
+    setLastEditedAt(entry.createdAt);
+    setVersionHistoryEntries((current) => [
+      entry,
+      ...current.filter((item) => item.id !== entry.id),
+    ]);
+  }
+
+  async function saveLocalNow() {
+    if (!persistenceEnabled) {
+      setPersistence(true);
+      return;
+    }
+    try {
+      await persistCurrentProject();
+      writeProjectNameToUrl(projectRef.current.name);
+    } catch {
+      setPersistenceEnabled(false);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'false');
+      }
+    }
+  }
+
+  function closeLocalProjectSetup() {
+    setLocalProjectSetupOpen(false);
+  }
+
+  async function confirmLocalProjectSetup(projectName: string) {
+    const nextName = projectName.trim();
+    if (!nextName) return;
+    const nextProject = {
+      ...projectRef.current,
+      name: nextName,
+      updatedAt: new Date().toISOString(),
+    };
+    try {
+      await services.projectRepository.saveProject(nextProject, { projectDirectoryName: nextName });
+      setProject(nextProject);
+      lastVersionProjectRef.current = nextProject;
+      setLastEditedAt(nextProject.updatedAt);
+      setSaveAnimationKey((current) => current + 1);
+      skipNextProjectSaveRef.current = true;
+      setHasPersistedLocalProject(true);
+      setPersistenceEnabled(true);
+      setPersistenceAttention(false);
+      setPersistenceNotice(undefined);
+      setLocalProjectSetupOpen(false);
+      writeProjectNameToUrl(nextProject.name);
       if (typeof window !== 'undefined') {
         window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'true');
       }
@@ -1288,11 +1568,15 @@ export function useEditorViewModel(services: AppServices) {
       clearBackgroundPreparation();
       clearBackgroundSelectionPoints();
       skipNextProjectSaveRef.current = true;
+      setHasPersistedLocalProject(true);
       setPersistenceEnabled(true);
       lastVersionProjectRef.current = normalizedProject;
       setLastEditedAt(normalizedProject.updatedAt);
       if (services.projectRepository.getVersionHistory) {
-        void services.projectRepository.getVersionHistory().then(setVersionHistoryEntries).catch(() => undefined);
+        void services.projectRepository
+          .getVersionHistory()
+          .then(setVersionHistoryEntries)
+          .catch(() => undefined);
       }
       writeProjectNameToUrl(normalizedProject.name);
       if (typeof window !== 'undefined') {
@@ -1303,6 +1587,210 @@ export function useEditorViewModel(services: AppServices) {
       if (typeof window !== 'undefined') {
         window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'false');
       }
+    }
+  }
+
+  function openSettings() {
+    setSettingsOpen(true);
+  }
+
+  function closeSettings() {
+    setSettingsOpen(false);
+  }
+
+  function openMirrorSettings() {
+    setSettingsOpen(false);
+    setMirrorSettingsOpen(true);
+  }
+
+  function closeMirrorSettings() {
+    setMirrorSettingsOpen(false);
+  }
+
+  function closeRemoteImport() {
+    setRemoteImportOpen(false);
+  }
+
+  function saveMirrorConfig(config: MinioMirrorConfig) {
+    services.mirrorService.saveConfig(config);
+    setMirrorConfig(config);
+    setHasMirrorConfig(true);
+    mirrorConfigRef.current = config;
+    setMirrorState({ enabled: true, status: 'idle' });
+    void syncMirrorNow();
+  }
+
+  function setMirrorEnabled(enabled: boolean) {
+    if (enabled) {
+      if (!mirrorConfigRef.current) {
+        openMirrorSettings();
+        return;
+      }
+      setMirrorState({ enabled: true, status: 'idle' });
+      void syncMirrorNow();
+      return;
+    }
+    setMirrorState({ enabled: false, status: 'disabled' });
+  }
+
+  async function testMirrorConnection(config: MinioMirrorConfig) {
+    setMirrorState({ enabled: true, status: 'syncing' });
+    try {
+      await services.mirrorService.listProjects(config);
+      setMirrorState({ enabled: true, status: 'idle' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'MinIO connection failed.';
+      setMirrorState({
+        enabled: true,
+        status: 'failed',
+        error: message,
+      });
+      throw new Error(message, { cause: error });
+    }
+  }
+
+  function queueMirrorSync() {
+    if (!mirrorState.enabled || !mirrorConfigRef.current) return;
+    if (typeof window === 'undefined') {
+      void syncMirrorNow();
+      return;
+    }
+    if (mirrorDebounceRef.current !== undefined) {
+      window.clearTimeout(mirrorDebounceRef.current);
+    }
+    mirrorDebounceRef.current = window.setTimeout(() => {
+      void syncMirrorNow();
+    }, 750);
+  }
+
+  async function syncMirrorNow(projectToSync: ProjectDocument = projectRef.current) {
+    const config = mirrorConfigRef.current;
+    if (!config) {
+      openMirrorSettings();
+      return;
+    }
+    if (mirrorSyncInFlightRef.current) {
+      mirrorSyncQueuedRef.current = true;
+      return;
+    }
+    mirrorSyncInFlightRef.current = true;
+    setMirrorState((current) => {
+      const { error, ...rest } = current;
+      void error;
+      return { ...rest, enabled: true, status: 'syncing' };
+    });
+    try {
+      const nextState = await services.mirrorService.syncProject(
+        projectToSync,
+        services.projectRepository,
+        mirrorConfigRef.current!,
+      );
+      setMirrorState(nextState);
+    } catch (error) {
+      setMirrorState({
+        enabled: true,
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'MinIO mirror sync failed.',
+      });
+    } finally {
+      mirrorSyncInFlightRef.current = false;
+      if (mirrorSyncQueuedRef.current) {
+        mirrorSyncQueuedRef.current = false;
+        void syncMirrorNow();
+      }
+    }
+  }
+
+  function requestMirrorNow() {
+    if (!persistenceEnabled) {
+      setPersistenceAttention(true);
+      setPersistenceNotice('Save the project before mirroring.');
+      return;
+    }
+    if (!mirrorConfigRef.current) {
+      openMirrorSettings();
+      return;
+    }
+    if (!mirrorState.enabled) {
+      setMirrorState({ enabled: true, status: 'idle' });
+    }
+    void syncMirrorNow();
+  }
+
+  async function importRemoteMirror() {
+    const config = mirrorConfigRef.current;
+    if (!config) {
+      openMirrorSettings();
+      return;
+    }
+    if (!config || !services.projectRepository.importMirrorFiles) return;
+    setRemoteImportOpen(true);
+    setRemoteImportStatus('loading');
+    setRemoteImportError(undefined);
+    try {
+      const mirrors = await services.mirrorService.listProjects(config);
+      if (mirrors.length === 0) {
+        setRemoteImportProjects([]);
+        setRemoteImportStatus('empty');
+        return;
+      }
+      setRemoteImportProjects(mirrors);
+      setRemoteImportStatus('ready');
+    } catch (error) {
+      setRemoteImportStatus('failed');
+      setRemoteImportError(
+        error instanceof Error ? error.message : 'Could not list mirrored projects.',
+      );
+      setMirrorState({
+        enabled: Boolean(config),
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'MinIO mirror import failed.',
+      });
+    }
+  }
+
+  async function importRemoteMirrorProject(projectId: string) {
+    const config = mirrorConfigRef.current;
+    if (!config || !services.projectRepository.importMirrorFiles) return;
+    setRemoteImportStatus('importing');
+    setRemoteImportError(undefined);
+    try {
+      const files = await services.mirrorService.downloadProject(projectId, config);
+      const importedProject = await services.projectRepository.importMirrorFiles(files);
+      const normalizedProject = normalizeProjectDocument(importedProject);
+      setProject(normalizedProject);
+      setActivePageId(normalizedProject.pages[0]?.id ?? '');
+      setPageLanguageCodes({});
+      setSelectedElementIds([]);
+      setHistory({ past: [], future: [] });
+      setBackgroundSelectionMode(false);
+      setBackgroundSelectionNotice(undefined);
+      clearBackgroundPreview();
+      clearBackgroundPreparation();
+      clearBackgroundSelectionPoints();
+      skipNextProjectSaveRef.current = true;
+      setHasPersistedLocalProject(true);
+      setPersistenceEnabled(true);
+      lastVersionProjectRef.current = normalizedProject;
+      setLastEditedAt(normalizedProject.updatedAt);
+      if (services.projectRepository.getVersionHistory) {
+        void services.projectRepository
+          .getVersionHistory()
+          .then(setVersionHistoryEntries)
+          .catch(() => undefined);
+      }
+      writeProjectNameToUrl(normalizedProject.name);
+      window.localStorage.setItem(PERSISTENCE_PREFERENCE_KEY, 'true');
+      setMirrorState({ enabled: true, status: 'synced', lastSyncedAt: new Date().toISOString() });
+      setRemoteImportOpen(false);
+    } catch (error) {
+      setRemoteImportStatus('failed');
+      setRemoteImportError(error instanceof Error ? error.message : 'MinIO mirror import failed.');
+      setMirrorState({
+        enabled: Boolean(config),
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'MinIO mirror import failed.',
+      });
     }
   }
 
@@ -1351,7 +1839,10 @@ export function useEditorViewModel(services: AppServices) {
         previousProject: project,
         force: true,
       });
-      setVersionHistoryEntries((current) => [entry, ...current.filter((item) => item.id !== entry.id)]);
+      setVersionHistoryEntries((current) => [
+        entry,
+        ...current.filter((item) => item.id !== entry.id),
+      ]);
       setLastEditedAt(entry.createdAt);
     }
     lastVersionProjectRef.current = normalizedProject;
@@ -1386,7 +1877,10 @@ export function useEditorViewModel(services: AppServices) {
             ? patch
             : {
                 ...patch,
-                height: Math.max(patch.height, getMinimumTextHeight(element.text, element.fontSize)),
+                height: Math.max(
+                  patch.height,
+                  getMinimumTextHeight(element.text, element.fontSize),
+                ),
               }
           : patch;
       return new UpdateElementFrameCommand(elementId, nextPatch).execute(currentProject);
@@ -1394,7 +1888,9 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function updateElementFrames(patches: Record<string, ElementFramePatch>) {
-    commitProject((currentProject) => new UpdateElementFramesCommand(patches).execute(currentProject));
+    commitProject((currentProject) =>
+      new UpdateElementFramesCommand(patches).execute(currentProject),
+    );
   }
 
   function updateTextContent(elementId: string, text: string) {
@@ -1404,7 +1900,9 @@ export function useEditorViewModel(services: AppServices) {
       if (!element || element.type !== 'text') return nextProject;
       const minimumHeight = getMinimumTextHeight(element.text, element.fontSize);
       if (element.height >= minimumHeight) return nextProject;
-      return new UpdateElementFrameCommand(elementId, { height: minimumHeight }).execute(nextProject);
+      return new UpdateElementFrameCommand(elementId, { height: minimumHeight }).execute(
+        nextProject,
+      );
     });
   }
 
@@ -1415,7 +1913,9 @@ export function useEditorViewModel(services: AppServices) {
       if (!element || element.type !== 'text') return nextProject;
       const minimumHeight = getMinimumTextHeight(element.text, element.fontSize);
       if (element.height >= minimumHeight) return nextProject;
-      return new UpdateElementFrameCommand(elementId, { height: minimumHeight }).execute(nextProject);
+      return new UpdateElementFrameCommand(elementId, { height: minimumHeight }).execute(
+        nextProject,
+      );
     });
   }
 
@@ -1425,6 +1925,200 @@ export function useEditorViewModel(services: AppServices) {
     );
   }
 
+  function setPageTransition(transition: SlideTransition) {
+    commitProject((currentProject) =>
+      new SetPageTransitionCommand(activePageId, transition).execute(currentProject),
+    );
+  }
+
+  function clearPageTransition() {
+    commitProject((currentProject) => new ClearPageTransitionCommand(activePageId).execute(currentProject));
+  }
+
+  function setElementAnimationBuilds(elementIds: string[], patch: ElementAnimationPatch) {
+    commitProject((currentProject) =>
+      new SetElementAnimationBuildsCommand(
+        activePageId,
+        elementIds,
+        (elementId) => createId(`animation-${elementId}`),
+        patch,
+      ).execute(currentProject),
+    );
+  }
+
+  function clearElementAnimationBuild(elementId: string) {
+    commitProject((currentProject) =>
+      new ClearElementAnimationBuildCommand(activePageId, elementId).execute(currentProject),
+    );
+  }
+
+  function reorderElementAnimationBuild(elementId: string, targetIndex: number) {
+    commitProject((currentProject) =>
+      new ReorderElementAnimationBuildCommand(activePageId, elementId, targetIndex).execute(currentProject),
+    );
+  }
+
+  function clearAnimationPreviewTimers() {
+    for (const timeoutId of animationPreviewTimeoutsRef.current) {
+      window.clearTimeout(timeoutId);
+    }
+    animationPreviewTimeoutsRef.current = [];
+  }
+
+  function scheduleAnimationPreview(callback: () => void, delayMs: number) {
+    const timeoutId = window.setTimeout(callback, Math.max(0, delayMs));
+    animationPreviewTimeoutsRef.current.push(timeoutId);
+  }
+
+  function completeAnimationPreviewSlide() {
+    animationPreviewQueueRef.current = [];
+    clearAnimationPreviewTimers();
+    setAnimationPreview((current) =>
+      current
+        ? {
+            ...current,
+            activeBuildElementId: undefined,
+            hiddenElementIds: [],
+            phase: 'complete',
+            waitingForClick: false,
+          }
+        : current,
+    );
+  }
+
+  function revealAnimationBuild(build: ElementAnimationBuild) {
+    setAnimationPreview((current) =>
+      current
+        ? {
+            ...current,
+            activeBuildElementId: undefined,
+            hiddenElementIds: current.hiddenElementIds.filter((elementId) => elementId !== build.elementId),
+            waitingForClick: false,
+          }
+        : current,
+    );
+  }
+
+  function runNextAnimationBuild() {
+    const nextBuild = animationPreviewQueueRef.current[0];
+    if (!nextBuild) {
+      completeAnimationPreviewSlide();
+      return;
+    }
+
+    if (nextBuild.trigger === 'on-click') {
+      setAnimationPreview((current) =>
+        current
+          ? {
+              ...current,
+              activeBuildElementId: nextBuild.elementId,
+              phase: 'waiting',
+              waitingForClick: true,
+            }
+          : current,
+      );
+      return;
+    }
+
+    animationPreviewQueueRef.current = animationPreviewQueueRef.current.slice(1);
+    setAnimationPreview((current) =>
+      current
+        ? {
+            ...current,
+            activeBuildElementId: nextBuild.elementId,
+            phase: 'animation',
+            waitingForClick: false,
+          }
+        : current,
+    );
+    scheduleAnimationPreview(() => {
+      revealAnimationBuild(nextBuild);
+      runNextAnimationBuild();
+    }, nextBuild.delayMs);
+  }
+
+  function advanceAnimationPreview() {
+    const nextBuild = animationPreviewQueueRef.current[0];
+    if (!nextBuild) {
+      completeAnimationPreviewSlide();
+      return;
+    }
+    animationPreviewQueueRef.current = animationPreviewQueueRef.current.slice(1);
+    setAnimationPreview((current) =>
+      current
+        ? {
+            ...current,
+            activeBuildElementId: nextBuild.elementId,
+            phase: 'animation',
+            waitingForClick: false,
+          }
+        : current,
+    );
+    scheduleAnimationPreview(() => {
+      revealAnimationBuild(nextBuild);
+      runNextAnimationBuild();
+    }, nextBuild.delayMs);
+  }
+
+  function playAnimationPreview(pageId = activePageIdRef.current, mode: AnimationPreviewState['mode'] = 'editor') {
+    const page = projectRef.current.pages.find((item) => item.id === pageId);
+    if (!page) return;
+    const builds = (page.animationBuilds ?? []).filter((build) => page.elementIds.includes(build.elementId));
+    clearAnimationPreviewTimers();
+    animationPreviewQueueRef.current = builds;
+    const transitionDelay = page.transition?.delayMs ?? 0;
+    setAnimationPreview({
+      activeBuildElementId: undefined,
+      hiddenElementIds: builds.map((build) => build.elementId),
+      mode,
+      pageId: page.id,
+      phase: transitionDelay > 0 ? 'transition' : builds.length > 0 ? 'animation' : 'complete',
+      playing: true,
+      waitingForClick: false,
+    });
+
+    if (builds.length === 0) {
+      if (transitionDelay > 0) {
+        scheduleAnimationPreview(completeAnimationPreviewSlide, transitionDelay);
+      }
+      return;
+    }
+    scheduleAnimationPreview(runNextAnimationBuild, transitionDelay);
+  }
+
+  function goToPresentationPage(offset: -1 | 1) {
+    const pages = projectRef.current.pages;
+    const currentIndex = pages.findIndex((page) => page.id === activePageIdRef.current);
+    if (currentIndex < 0) return false;
+    const nextPage = pages[currentIndex + offset];
+    if (!nextPage) return false;
+    activePageIdRef.current = nextPage.id;
+    setActivePageId(nextPage.id);
+    setSelectedElementIds([]);
+    playAnimationPreview(nextPage.id, 'presenter');
+    return true;
+  }
+
+  function playPresentationPreview(pageId = activePageIdRef.current) {
+    activePageIdRef.current = pageId;
+    setActivePageId(pageId);
+    setSelectedElementIds([]);
+    playAnimationPreview(pageId, 'presenter');
+  }
+
+  function advancePresentationPreview() {
+    if (animationPreview?.waitingForClick) {
+      advanceAnimationPreview();
+      return true;
+    }
+    if (animationPreview?.phase !== 'complete') return Boolean(animationPreview?.playing);
+    return goToPresentationPage(1);
+  }
+
+  function rewindPresentationPreview() {
+    return goToPresentationPage(-1);
+  }
+
   function getTranslatableTextElementIds(
     scope: TranslationScope,
     sourceProject = project,
@@ -1432,12 +2126,15 @@ export function useEditorViewModel(services: AppServices) {
   ) {
     const getVisibleUnlockedTextId = (elementId: string) => {
       const element = sourceProject.elements[elementId];
-      if (!element || element.type !== 'text' || element.locked || element.visible === false) return undefined;
+      if (!element || element.type !== 'text' || element.locked || element.visible === false)
+        return undefined;
       return element.id;
     };
 
     if (scope === 'selection') {
-      return selectedElementIds.map(getVisibleUnlockedTextId).filter((id): id is string => Boolean(id));
+      return selectedElementIds
+        .map(getVisibleUnlockedTextId)
+        .filter((id): id is string => Boolean(id));
     }
 
     const pages =
@@ -1472,7 +2169,10 @@ export function useEditorViewModel(services: AppServices) {
           options?.sourceLanguage ? { sourceLanguage: options.sourceLanguage } : undefined,
         );
         const page = project.pages.find((item) => item.elementIds.includes(elementId));
-        return [elementId, fitTranslatedTextToOriginalFrame(element, translatedText, page)] as const;
+        return [
+          elementId,
+          fitTranslatedTextToOriginalFrame(element, translatedText, page),
+        ] as const;
       }),
     );
     const translations = Object.fromEntries(
@@ -1481,7 +2181,9 @@ export function useEditorViewModel(services: AppServices) {
       ),
     );
 
-    commitProject((currentProject) => new TranslateTextElementsCommand(translations).execute(currentProject));
+    commitProject((currentProject) =>
+      new TranslateTextElementsCommand(translations).execute(currentProject),
+    );
     return Array.from(
       new Set(
         elementIds
@@ -1542,9 +2244,12 @@ export function useEditorViewModel(services: AppServices) {
           },
         }),
       );
-      const selectedTranslationProvider = translationProviderStates.find((provider) => provider.selected);
+      const selectedTranslationProvider = translationProviderStates.find(
+        (provider) => provider.selected,
+      );
       const shouldPrepareLanguagePair =
-        !selectedTranslationProvider?.modelId || selectedTranslationProvider.runtime === 'chrome-built-in';
+        !selectedTranslationProvider?.modelId ||
+        selectedTranslationProvider.runtime === 'chrome-built-in';
       if (shouldPrepareLanguagePair) {
         setTranslationPreparation({ progress: 8, sourceLanguage, status: 'downloading' });
         await services.translatorService.prepareTranslation(sourceLanguage, nextLanguage, {
@@ -1560,7 +2265,9 @@ export function useEditorViewModel(services: AppServices) {
       setTranslationPreparation({ progress: 100, sourceLanguage, status: 'ready' });
     } catch (error) {
       setTranslationPreparation({ progress: 0, status: 'failed' });
-      setTranslationNotice(error instanceof Error ? error.message : 'Translation language could not be prepared.');
+      setTranslationNotice(
+        error instanceof Error ? error.message : 'Translation language could not be prepared.',
+      );
     }
   }
 
@@ -1602,11 +2309,15 @@ export function useEditorViewModel(services: AppServices) {
         const normalizedTargetLanguage = normalizeLanguageCode(translationTargetLanguage);
         setPageLanguageCodes((current) => ({
           ...current,
-          ...Object.fromEntries(translatedPageIds.map((pageId) => [pageId, normalizedTargetLanguage])),
+          ...Object.fromEntries(
+            translatedPageIds.map((pageId) => [pageId, normalizedTargetLanguage]),
+          ),
         }));
       }
     } catch (error) {
-      setTranslationNotice(error instanceof Error ? error.message : 'Translation could not be completed.');
+      setTranslationNotice(
+        error instanceof Error ? error.message : 'Translation could not be completed.',
+      );
     } finally {
       setIsTranslating(false);
     }
@@ -1628,7 +2339,13 @@ export function useEditorViewModel(services: AppServices) {
     return projectRef.current;
   }
 
-  async function generateImageForAutomation(input: { height?: number; prompt: string; seed?: number; steps?: number; width?: number }) {
+  async function generateImageForAutomation(input: {
+    height?: number;
+    prompt: string;
+    seed?: number;
+    steps?: number;
+    width?: number;
+  }) {
     const options =
       input.height !== undefined ||
       input.seed !== undefined ||
@@ -1646,15 +2363,25 @@ export function useEditorViewModel(services: AppServices) {
     return projectRef.current;
   }
 
-  async function translateTextForAutomation(input: { pageId?: string; scope: TranslationScope; targetLanguage: string }) {
+  async function translateTextForAutomation(input: {
+    pageId?: string;
+    scope: TranslationScope;
+    targetLanguage: string;
+  }) {
     await setTranslationTargetLanguage(input.targetLanguage);
     const translationOptions = input.pageId ? { pageId: input.pageId } : undefined;
-    const translatedPageIds = await translateTextScope(input.scope, input.targetLanguage, translationOptions);
+    const translatedPageIds = await translateTextScope(
+      input.scope,
+      input.targetLanguage,
+      translationOptions,
+    );
     if (translatedPageIds.length > 0) {
       const normalizedTargetLanguage = normalizeLanguageCode(input.targetLanguage);
       setPageLanguageCodes((current) => ({
         ...current,
-        ...Object.fromEntries(translatedPageIds.map((pageId) => [pageId, normalizedTargetLanguage])),
+        ...Object.fromEntries(
+          translatedPageIds.map((pageId) => [pageId, normalizedTargetLanguage]),
+        ),
       }));
     }
     return {
@@ -1688,7 +2415,9 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function setElementLock(elementId: string, locked: boolean) {
-    commitProject((currentProject) => new SetElementLockCommand(elementId, locked).execute(currentProject));
+    commitProject((currentProject) =>
+      new SetElementLockCommand(elementId, locked).execute(currentProject),
+    );
   }
 
   function getSelectedElementsForClipboard() {
@@ -1727,7 +2456,9 @@ export function useEditorViewModel(services: AppServices) {
 
     commitProject(
       (currentProject) =>
-        new AddElementsCommand(activePageId, pastedElements, elementClipboard.assets).execute(currentProject),
+        new AddElementsCommand(activePageId, pastedElements, elementClipboard.assets).execute(
+          currentProject,
+        ),
       { selectedElementIds: pastedElements.map((element) => element.id) },
     );
     setElementClipboard({
@@ -1754,7 +2485,9 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function deleteSelectedElement() {
-    const deletableElementIds = selectedElementIds.filter((elementId) => !processingElementIds.includes(elementId));
+    const deletableElementIds = selectedElementIds.filter(
+      (elementId) => !processingElementIds.includes(elementId),
+    );
     if (deletableElementIds.length === 0) return;
     setBackgroundSelectionMode(false);
     setBackgroundSelectionNotice(undefined);
@@ -1801,7 +2534,13 @@ export function useEditorViewModel(services: AppServices) {
     const selectedElement = project.elements[selectedElementIds[0] ?? ''];
     const titleTemplate = project.elements['text-title'];
     const subtitleTemplate = project.elements['text-subtitle'];
-    const presetStyles: Record<TextPreset, Omit<Extract<DesignElement, { type: 'text' }>, 'id' | 'locked' | 'opacity' | 'rotation' | 'type' | 'visible' | 'x' | 'y'>> = {
+    const presetStyles: Record<
+      TextPreset,
+      Omit<
+        Extract<DesignElement, { type: 'text' }>,
+        'id' | 'locked' | 'opacity' | 'rotation' | 'type' | 'visible' | 'x' | 'y'
+      >
+    > = {
       title:
         titleTemplate?.type === 'text'
           ? {
@@ -1885,7 +2624,8 @@ export function useEditorViewModel(services: AppServices) {
     };
 
     commitProject(
-      (currentProject) => new AddElementsCommand(activePageId, [nextElement]).execute(currentProject),
+      (currentProject) =>
+        new AddElementsCommand(activePageId, [nextElement]).execute(currentProject),
       { selectedElementIds: [elementId] },
     );
   }
@@ -1940,26 +2680,34 @@ export function useEditorViewModel(services: AppServices) {
   function alignSelectedElement(mode: AlignMode) {
     const elementId = selectedElementIds[0];
     if (!elementId) return;
-    commitProject((currentProject) => new AlignElementCommand(activePageId, elementId, mode).execute(currentProject));
+    commitProject((currentProject) =>
+      new AlignElementCommand(activePageId, elementId, mode).execute(currentProject),
+    );
   }
 
   function setSelectedElementZOrder(mode: ZOrderMode) {
     const elementId = selectedElementIds[0];
     if (!elementId) return;
-    commitProject((currentProject) => new SetZOrderCommand(activePageId, elementId, mode).execute(currentProject));
+    commitProject((currentProject) =>
+      new SetZOrderCommand(activePageId, elementId, mode).execute(currentProject),
+    );
   }
 
   function flipSelectedImage() {
     const elementId = selectedElementIds[0];
     if (!elementId || selectedElementIds.length !== 1) return;
-    commitProject((currentProject) => new ToggleImageFlipCommand(elementId).execute(currentProject));
+    commitProject((currentProject) =>
+      new ToggleImageFlipCommand(elementId).execute(currentProject),
+    );
   }
 
   function updateImageCrop(elementId: string, patch: ImageCropPatch) {
-    commitProject((currentProject) => new UpdateImageCropCommand(elementId, patch).execute(currentProject));
+    commitProject((currentProject) =>
+      new UpdateImageCropCommand(elementId, patch).execute(currentProject),
+    );
   }
 
-  function reorderElement(elementId: string, targetElementId: string) {
+  function reorderElement(elementId: string, targetElementId: string, position: 'before' | 'after' = 'before') {
     commitProject((currentProject) => {
       const page = currentProject.pages.find((item) => item.id === activePageId);
       if (!page) return currentProject;
@@ -1967,15 +2715,17 @@ export function useEditorViewModel(services: AppServices) {
       const displayOrder = [...page.elementIds].reverse().filter((id) => id !== elementId);
       const targetDisplayIndex = displayOrder.indexOf(targetElementId);
       if (targetDisplayIndex < 0) return currentProject;
-      displayOrder.splice(targetDisplayIndex, 0, elementId);
+      displayOrder.splice(position === 'after' ? targetDisplayIndex + 1 : targetDisplayIndex, 0, elementId);
       const nextPageOrder = [...displayOrder].reverse();
       const targetPageIndex = nextPageOrder.indexOf(elementId);
-      return new ReorderElementCommand(activePageId, elementId, targetPageIndex).execute(currentProject);
+      return new ReorderElementCommand(activePageId, elementId, targetPageIndex).execute(
+        currentProject,
+      );
     });
   }
 
-  function addPage() {
-    const sourcePage = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
+  function addPage(afterPageId = activePageId) {
+    const sourcePage = project.pages.find((item) => item.id === afterPageId) ?? project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
     if (!sourcePage) return;
     const pageId = createId('page');
     const nextPage: Page = {
@@ -1988,11 +2738,17 @@ export function useEditorViewModel(services: AppServices) {
     };
 
     commitProject(
-      (currentProject) => ({
-        ...currentProject,
-        pages: [...currentProject.pages, nextPage],
-        updatedAt: new Date().toISOString(),
-      }),
+      (currentProject) => {
+        const afterIndex = currentProject.pages.findIndex((page) => page.id === afterPageId);
+        const insertIndex = afterIndex >= 0 ? afterIndex + 1 : currentProject.pages.length;
+        const pages = [...currentProject.pages];
+        pages.splice(insertIndex, 0, nextPage);
+        return {
+          ...currentProject,
+          pages,
+          updatedAt: new Date().toISOString(),
+        };
+      },
       { activePageId: pageId, selectedElementIds: [] },
     );
   }
@@ -2003,9 +2759,9 @@ export function useEditorViewModel(services: AppServices) {
     const nextPageId = createId('page');
     commitProject(
       (currentProject) =>
-        new DuplicatePageCommand(pageId, nextPageId, (elementId) => createId(`${elementId}-page`)).execute(
-          currentProject,
-        ),
+        new DuplicatePageCommand(pageId, nextPageId, (elementId) =>
+          createId(`${elementId}-page`),
+        ).execute(currentProject),
       { activePageId: nextPageId, selectedElementIds: [] },
     );
   }
@@ -2015,17 +2771,23 @@ export function useEditorViewModel(services: AppServices) {
     const pageIndex = project.pages.findIndex((page) => page.id === pageId);
     if (pageIndex < 0) return;
     const nextPageId =
-      project.pages[pageIndex + 1]?.id ?? project.pages[pageIndex - 1]?.id ?? project.pages[0]?.id ?? '';
-    commitProject(
-      (currentProject) => new DeletePageCommand(pageId).execute(currentProject),
-      { activePageId: nextPageId, selectedElementIds: [] },
-    );
+      project.pages[pageIndex + 1]?.id ??
+      project.pages[pageIndex - 1]?.id ??
+      project.pages[0]?.id ??
+      '';
+    commitProject((currentProject) => new DeletePageCommand(pageId).execute(currentProject), {
+      activePageId: nextPageId,
+      selectedElementIds: [],
+    });
   }
 
   function reorderPage(pageId: string, targetIndex: number) {
-    commitProject((currentProject) => new ReorderPageCommand(pageId, targetIndex).execute(currentProject), {
-      activePageId: pageId,
-    });
+    commitProject(
+      (currentProject) => new ReorderPageCommand(pageId, targetIndex).execute(currentProject),
+      {
+        activePageId: pageId,
+      },
+    );
   }
 
   function renamePage(pageId: string, name: string) {
@@ -2033,7 +2795,9 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function setPageVisibility(pageId: string, visible: boolean) {
-    commitProject((currentProject) => new SetPageVisibilityCommand(pageId, visible).execute(currentProject));
+    commitProject((currentProject) =>
+      new SetPageVisibilityCommand(pageId, visible).execute(currentProject),
+    );
   }
 
   function activateScrolledPage(pageId: string) {
@@ -2072,9 +2836,11 @@ export function useEditorViewModel(services: AppServices) {
     setProject(previousProject);
     const nextActivePageId = previousProject.pages.some((page) => page.id === activePageId)
       ? activePageId
-      : previousProject.pages[0]?.id ?? '';
+      : (previousProject.pages[0]?.id ?? '');
     setActivePageId(nextActivePageId);
-    setSelectedElementIds(getSelectionForProject(previousProject, nextActivePageId, selectedElementIds));
+    setSelectedElementIds(
+      getSelectionForProject(previousProject, nextActivePageId, selectedElementIds),
+    );
   }
 
   function redo() {
@@ -2088,9 +2854,11 @@ export function useEditorViewModel(services: AppServices) {
     setProject(nextProject);
     const nextActivePageId = nextProject.pages.some((page) => page.id === activePageId)
       ? activePageId
-      : nextProject.pages[0]?.id ?? '';
+      : (nextProject.pages[0]?.id ?? '');
     setActivePageId(nextActivePageId);
-    setSelectedElementIds(getSelectionForProject(nextProject, nextActivePageId, selectedElementIds));
+    setSelectedElementIds(
+      getSelectionForProject(nextProject, nextActivePageId, selectedElementIds),
+    );
   }
 
   function zoomIn() {
@@ -2205,15 +2973,21 @@ export function useEditorViewModel(services: AppServices) {
       return {
         elementId,
         pending: true,
-        ...(shouldKeepCurrentPreview && currentPreview.maskUrl ? { maskUrl: currentPreview.maskUrl } : {}),
-        ...(shouldKeepCurrentPreview && currentPreview.score !== undefined ? { score: currentPreview.score } : {}),
+        ...(shouldKeepCurrentPreview && currentPreview.maskUrl
+          ? { maskUrl: currentPreview.maskUrl }
+          : {}),
+        ...(shouldKeepCurrentPreview && currentPreview.score !== undefined
+          ? { score: currentPreview.score }
+          : {}),
       };
     });
 
     backgroundPreviewTimeoutRef.current = window.setTimeout(() => {
       void (async () => {
         try {
-          const result = await services.backgroundRemovalService.previewBackgroundMask(asset, { points });
+          const result = await services.backgroundRemovalService.previewBackgroundMask(asset, {
+            points,
+          });
           if (backgroundPreviewSequenceRef.current !== sequence) return;
           setBackgroundPreview({
             elementId,
@@ -2224,7 +2998,9 @@ export function useEditorViewModel(services: AppServices) {
         } catch {
           if (backgroundPreviewSequenceRef.current !== sequence) return;
           setBackgroundPreview((currentPreview) =>
-            currentPreview?.elementId === elementId ? { ...currentPreview, pending: false } : currentPreview,
+            currentPreview?.elementId === elementId
+              ? { ...currentPreview, pending: false }
+              : currentPreview,
           );
         }
       })();
@@ -2251,14 +3027,20 @@ export function useEditorViewModel(services: AppServices) {
       return {
         elementId,
         pending: true,
-        ...(shouldKeepCurrentPreview && currentPreview.maskUrl ? { maskUrl: currentPreview.maskUrl } : {}),
-        ...(shouldKeepCurrentPreview && currentPreview.score !== undefined ? { score: currentPreview.score } : {}),
+        ...(shouldKeepCurrentPreview && currentPreview.maskUrl
+          ? { maskUrl: currentPreview.maskUrl }
+          : {}),
+        ...(shouldKeepCurrentPreview && currentPreview.score !== undefined
+          ? { score: currentPreview.score }
+          : {}),
       };
     });
 
     void (async () => {
       try {
-        const result = await services.backgroundRemovalService.previewBackgroundMask(asset, { points });
+        const result = await services.backgroundRemovalService.previewBackgroundMask(asset, {
+          points,
+        });
         if (backgroundPreviewSequenceRef.current !== sequence) return;
         setBackgroundPreview({
           elementId,
@@ -2328,13 +3110,20 @@ export function useEditorViewModel(services: AppServices) {
   async function importImageFile(file: File) {
     const dataUrl = await readImageFileAsDataUrl(file);
     const assetType = getMediaAssetType(file);
-    const mediaSize = assetType === 'video' ? await readVideoSize(dataUrl) : await readImageSize(dataUrl);
+    const mediaSize =
+      assetType === 'video' ? await readVideoSize(dataUrl) : await readImageSize(dataUrl);
     const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
     if (!page) return;
 
     const assetId = createId('asset');
     const elementId = createId(assetType);
-    const mediaName = file.name.trim() || (assetType === 'video' ? 'Pasted video' : assetType === 'gif' ? 'Pasted GIF' : 'Pasted image');
+    const mediaName =
+      file.name.trim() ||
+      (assetType === 'video'
+        ? 'Pasted video'
+        : assetType === 'gif'
+          ? 'Pasted GIF'
+          : 'Pasted image');
     const fittedMedia = fitImageWithinPage({
       imageWidth: mediaSize.width,
       imageHeight: mediaSize.height,
@@ -2410,34 +3199,36 @@ export function useEditorViewModel(services: AppServices) {
 
     commitProject(
       (currentProject) =>
-      new AddImageElementCommand(activePageId, {
-        asset: {
-          id: assetId,
-          type: 'image',
-          name: mediaName,
-          mimeType: file.type || 'image/*',
-          objectUrl: dataUrl,
-        },
-        element: {
-          id: elementId,
-          type: 'image',
-          assetId,
-          x: fittedMedia.x,
-          y: fittedMedia.y,
-          width: fittedMedia.width,
-          height: fittedMedia.height,
-          rotation: 0,
-          locked: false,
-          visible: true,
-          opacity: 1,
-        },
-      }).execute(currentProject),
+        new AddImageElementCommand(activePageId, {
+          asset: {
+            id: assetId,
+            type: 'image',
+            name: mediaName,
+            mimeType: file.type || 'image/*',
+            objectUrl: dataUrl,
+          },
+          element: {
+            id: elementId,
+            type: 'image',
+            assetId,
+            x: fittedMedia.x,
+            y: fittedMedia.y,
+            width: fittedMedia.width,
+            height: fittedMedia.height,
+            rotation: 0,
+            locked: false,
+            visible: true,
+            opacity: 1,
+          },
+        }).execute(currentProject),
       { selectedElementIds: [elementId] },
     );
   }
 
   function updateMediaPlayback(elementId: string, patch: MediaPlaybackPatch) {
-    commitProject((currentProject) => new UpdateMediaPlaybackCommand(elementId, patch).execute(currentProject));
+    commitProject((currentProject) =>
+      new UpdateMediaPlaybackCommand(elementId, patch).execute(currentProject),
+    );
   }
 
   return {
@@ -2448,6 +3239,17 @@ export function useEditorViewModel(services: AppServices) {
     pagesPanelOpen,
     isFullscreen,
     persistenceEnabled,
+    persistenceAttention,
+    persistenceNotice,
+    mirrorState,
+    mirrorConfig,
+    settingsOpen,
+    mirrorSettingsOpen,
+    localProjectSetupOpen,
+    remoteImportOpen,
+    remoteImportStatus,
+    remoteImportProjects,
+    remoteImportError,
     versionHistoryOpen,
     versionHistoryEntries,
     selectedVersionId,
@@ -2460,6 +3262,7 @@ export function useEditorViewModel(services: AppServices) {
     processingElementIds,
     backgroundPreview,
     backgroundPreparation,
+    animationPreview,
     canUndo: history.past.length > 0,
     canRedo: history.future.length > 0,
     selection,
@@ -2469,6 +3272,21 @@ export function useEditorViewModel(services: AppServices) {
     modelStates,
     setProjectName,
     setPersistence,
+    saveLocalNow,
+    closeLocalProjectSetup,
+    confirmLocalProjectSetup,
+    openSettings,
+    closeSettings,
+    openMirrorSettings,
+    closeMirrorSettings,
+    saveMirrorConfig,
+    testMirrorConnection,
+    syncMirrorNow,
+    requestMirrorNow,
+    setMirrorEnabled,
+    importRemoteMirror,
+    importRemoteMirrorProject,
+    closeRemoteImport,
     importProject,
     openVersionHistory,
     closeVersionHistory,
@@ -2560,6 +3378,16 @@ export function useEditorViewModel(services: AppServices) {
     updateElementStyle,
     updateMediaPlayback,
     updatePageBackground,
+    clearPageTransition,
+    setPageTransition,
+    setElementAnimationBuilds,
+    clearElementAnimationBuild,
+    reorderElementAnimationBuild,
+    playAnimationPreview,
+    playPresentationPreview,
+    advanceAnimationPreview,
+    advancePresentationPreview,
+    rewindPresentationPreview,
     updateTextContent,
     setElementVisibility,
     setElementLock,

@@ -1,11 +1,10 @@
 interface EditorFooterProps {
   activePageIndex: number;
-  isFullscreen?: boolean;
   pageCount: number;
   pagesPanelOpen?: boolean;
   zoomPercent: number;
+  onOpenSettings?: () => void;
   onResetZoom?: () => void;
-  onToggleFullscreen?: () => void;
   onTogglePagesPanel?: () => void;
   onZoomIn?: () => void;
   onZoomOut?: () => void;
@@ -13,19 +12,30 @@ interface EditorFooterProps {
 
 export function EditorFooter({
   activePageIndex,
-  isFullscreen = false,
   pageCount,
   pagesPanelOpen = true,
   zoomPercent,
+  onOpenSettings,
   onResetZoom,
-  onToggleFullscreen,
   onTogglePagesPanel,
   onZoomIn,
   onZoomOut,
 }: EditorFooterProps) {
   return (
     <footer className="editor-footer" aria-label="Editor footer controls">
-      <div className="editor-footer-left" />
+      <div className="editor-footer-left">
+        <button
+          className="stitch-icon-button footer-settings-button"
+          type="button"
+          aria-label="Mirror settings"
+          title="Mirror settings"
+          onClick={onOpenSettings}
+        >
+          <span className="material-symbols-outlined" aria-hidden="true">
+            settings
+          </span>
+        </button>
+      </div>
       <div className="editor-footer-right">
         <div className="footer-zoom-controls" aria-label="Zoom controls">
           <button
@@ -39,7 +49,12 @@ export function EditorFooter({
               remove
             </span>
           </button>
-          <button className="zoom-value" type="button" aria-label="Reset zoom" onClick={onResetZoom}>
+          <button
+            className="zoom-value"
+            type="button"
+            aria-label="Reset zoom"
+            onClick={onResetZoom}
+          >
             {zoomPercent}%
           </button>
           <button
@@ -68,16 +83,6 @@ export function EditorFooter({
         <span className="footer-page-count">
           {activePageIndex + 1} / {pageCount}
         </span>
-        <button
-          className={isFullscreen ? 'footer-toggle footer-toggle-active' : 'footer-toggle'}
-          type="button"
-          aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-          onClick={onToggleFullscreen}
-        >
-          <span className="material-symbols-outlined" aria-hidden="true">
-            {isFullscreen ? 'fullscreen_exit' : 'fullscreen'}
-          </span>
-        </button>
       </div>
     </footer>
   );

@@ -28,12 +28,30 @@ export interface Page {
   height: number;
   background: PageBackground;
   elementIds: string[];
+  transition?: SlideTransition;
+  animationBuilds?: ElementAnimationBuild[];
   visible?: boolean;
 }
 
 export type PageBackground =
   | { type: 'color'; color: string }
   | { type: 'asset'; assetId: string; colorFallback: string };
+
+export type AnimationEffect = 'reveal';
+export type AnimationTrigger = 'on-click' | 'after-transition' | 'after-previous';
+
+export interface SlideTransition {
+  effect: AnimationEffect;
+  delayMs: number;
+}
+
+export interface ElementAnimationBuild {
+  id: string;
+  elementId: string;
+  effect: AnimationEffect;
+  trigger: AnimationTrigger;
+  delayMs: number;
+}
 
 export interface Asset {
   id: string;

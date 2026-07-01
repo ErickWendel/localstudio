@@ -55,9 +55,23 @@ describe('PagesPanel', () => {
       getData: vi.fn(() => 'page-1'),
       setData: vi.fn(),
     };
-    fireEvent.dragStart(screen.getByRole('article', { name: 'Page 1: Slide 1' }), { dataTransfer });
-    fireEvent.dragOver(screen.getByRole('article', { name: 'Page 2: Second Slide' }), { dataTransfer });
-    fireEvent.drop(screen.getByRole('article', { name: 'Page 2: Second Slide' }), { dataTransfer });
+    const firstPageCard = screen.getByRole('article', { name: 'Page 1: Slide 1' });
+    const secondPageCard = screen.getByRole('article', { name: 'Page 2: Second Slide' });
+    vi.spyOn(secondPageCard, 'getBoundingClientRect').mockReturnValue({
+      bottom: 40,
+      height: 40,
+      left: 0,
+      right: 100,
+      top: 0,
+      width: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+    fireEvent.dragStart(firstPageCard, { dataTransfer });
+    fireEvent.dragOver(secondPageCard, { dataTransfer, clientY: 39 });
+    expect(secondPageCard).toHaveAttribute('data-drop-position', 'after');
+    fireEvent.drop(secondPageCard, { dataTransfer, clientY: 39 });
     expect(dataTransfer.setData).toHaveBeenCalledWith('application/x-localstudio-page-id', 'page-1');
     expect(handlers.onReorderPage).toHaveBeenCalledWith('page-1', 1);
 

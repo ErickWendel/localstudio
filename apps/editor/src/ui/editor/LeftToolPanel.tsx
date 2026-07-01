@@ -1,10 +1,19 @@
-import { Brush, ImagePlus, Layers3, Shapes, Sparkles, Type } from 'lucide-react';
+import { Brush, Clapperboard, ImagePlus, Layers3, Shapes, Sparkles, Type } from 'lucide-react';
 import { useMemo, useRef } from 'react';
 import { collectReferencedAssetIds } from '../../domain/assetUsage';
-import type { Asset, PageBackground, ProjectDocument, SelectionState, ShapeKind } from '../../domain/model';
+import type {
+  Asset,
+  ElementAnimationBuild,
+  PageBackground,
+  ProjectDocument,
+  SelectionState,
+  ShapeKind,
+  SlideTransition,
+} from '../../domain/model';
 import type { ElementStylePatch, MediaPlaybackPatch } from '../../domain/commands/basicCommands';
 import type { AiProviderState, ModelState } from '../../services/interfaces';
 import { AiToolsPanel } from './AiToolsPanel';
+import { AnimationPanel } from './AnimationPanel';
 import { DesignPanel } from './DesignPanel';
 import { ElementsPanel } from './ElementsPanel';
 import type { CreateImagePromptOptions } from './imagePromptOptions';
@@ -14,6 +23,16 @@ import type { RightPanelTab, TextPreset } from './useEditorViewModel';
 
 interface LeftToolPanelProps {
   activeTab: RightPanelTab;
+  animationPreview?:
+    | {
+        activeBuildElementId: string | undefined;
+        mode?: 'editor' | 'presenter';
+        pageId: string;
+        phase: 'transition' | 'animation' | 'waiting' | 'complete';
+        playing: boolean;
+        waitingForClick: boolean;
+      }
+    | undefined;
   activeSlideLanguage?: { code: string; displayCode: string; flag: string; label: string } | undefined;
   onTabChange: (tab: RightPanelTab) => void;
   open?: boolean;
@@ -54,10 +73,16 @@ interface LeftToolPanelProps {
   onSetElementVisibility?: ((elementId: string, visible: boolean) => void) | undefined;
   onSetElementLock?: ((elementId: string, locked: boolean) => void) | undefined;
   onDeleteElement?: ((elementId: string) => void) | undefined;
-  onReorderElement?: ((elementId: string, targetElementId: string) => void) | undefined;
+  onReorderElement?: ((elementId: string, targetElementId: string, position?: 'before' | 'after') => void) | undefined;
   onUpdateElementStyle?: ((elementId: string, patch: ElementStylePatch) => void) | undefined;
   onUpdateMediaPlayback?: ((elementId: string, patch: MediaPlaybackPatch) => void) | undefined;
   onUpdatePageBackground?: ((background: PageBackground) => void) | undefined;
+  onClearPageTransition?: (() => void) | undefined;
+  onSetPageTransition?: ((transition: SlideTransition) => void) | undefined;
+  onSetElementAnimationBuilds?: ((elementIds: string[], patch: Omit<ElementAnimationBuild, 'elementId' | 'id'>) => void) | undefined;
+  onClearElementAnimationBuild?: ((elementId: string) => void) | undefined;
+  onReorderElementAnimationBuild?: ((elementId: string, targetIndex: number) => void) | undefined;
+  onPlayAnimationPreview?: (() => void) | undefined;
 }
 
 const menuItems: Array<{ id: RightPanelTab; label: string; icon: typeof Layers3 }> = [
@@ -65,12 +90,14 @@ const menuItems: Array<{ id: RightPanelTab; label: string; icon: typeof Layers3 
   { id: 'text', label: 'Text', icon: Type },
   { id: 'elements', label: 'Elements', icon: Shapes },
   { id: 'design', label: 'Design', icon: Brush },
+  { id: 'animations', label: 'Animate', icon: Clapperboard },
   { id: 'ai-tools', label: 'AI Tools', icon: Sparkles },
   { id: 'assets', label: 'Assets', icon: ImagePlus },
 ];
 
 export function LeftToolPanel({
   activeTab,
+  animationPreview,
   activeSlideLanguage,
   onTabChange,
   open = false,
@@ -115,6 +142,12 @@ export function LeftToolPanel({
   onUpdateElementStyle,
   onUpdateMediaPlayback,
   onUpdatePageBackground,
+  onClearPageTransition,
+  onSetPageTransition,
+  onSetElementAnimationBuilds,
+  onClearElementAnimationBuild,
+  onReorderElementAnimationBuild,
+  onPlayAnimationPreview,
 }: LeftToolPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isAttentionOpen = Boolean(attentionModelId || promptApiAttention || translationTargetAttention);
@@ -188,6 +221,20 @@ export function LeftToolPanel({
         ) : null}
         {panelOpen && activeTab === 'elements' ? (
           <ElementsPanel {...(onInsertShape ? { onInsertShape } : {})} />
+        ) : null}
+        {panelOpen && activeTab === 'animations' ? (
+          <AnimationPanel
+            animationPreview={animationPreview}
+            project={project}
+            activePageId={activePageId}
+            selection={selection}
+            {...(onClearPageTransition ? { onClearPageTransition } : {})}
+            {...(onSetPageTransition ? { onSetPageTransition } : {})}
+            {...(onSetElementAnimationBuilds ? { onSetElementAnimationBuilds } : {})}
+            {...(onClearElementAnimationBuild ? { onClearElementAnimationBuild } : {})}
+            {...(onReorderElementAnimationBuild ? { onReorderElementAnimationBuild } : {})}
+            {...(onPlayAnimationPreview ? { onPlayAnimationPreview } : {})}
+          />
         ) : null}
         {panelOpen && activeTab === 'ai-tools' ? (
           <AiToolsPanel

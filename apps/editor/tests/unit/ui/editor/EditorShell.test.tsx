@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { createAppServices as createRealAppServices } from '../../../../src/app/composition';
@@ -6,9 +6,14 @@ import type { Asset, ProjectDocument } from '../../../../src/domain/model';
 import { createSampleProject } from '../../../../src/domain/sampleProject';
 import type {
   BackgroundRemovalService,
+  MirrorFile,
+  MirrorProjectSummary,
+  MirrorService,
+  MirrorState,
   ProjectRepository,
   TranslatorService,
 } from '../../../../src/services/interfaces';
+import type { MinioMirrorConfig } from '../../../../src/services/minioMirrorService';
 import type { WebMcpDemoWindow, WebMcpTool } from '../../../../src/services/webMcpToolAdapter';
 import { InMemoryModelSetupService } from '../../../../src/services/modelSetupService';
 import { EditorShell } from '../../../../src/ui/editor/EditorShell';
@@ -73,6 +78,48 @@ class SavingProjectRepository implements ProjectRepository {
   }
 }
 
+const mirrorConfig: MinioMirrorConfig = {
+  accessKey: 'localstudio',
+  bucket: 'localstudio',
+  endpoint: 'http://localhost:9000',
+  pathStyle: true,
+  publicBaseUrl: 'http://localhost:9000/localstudio',
+  region: 'us-east-1',
+  secretKey: 'localstudio123',
+  prefix: 'mirrors',
+};
+
+class RecordingMirrorService implements MirrorService<MinioMirrorConfig> {
+  constructor(private readonly storedConfig: MinioMirrorConfig | null = mirrorConfig) {}
+
+  clearConfig = vi.fn();
+
+  syncProject = vi.fn(
+    (
+      project: ProjectDocument,
+      repository: ProjectRepository,
+      config: MinioMirrorConfig,
+    ): Promise<MirrorState> => {
+      void project;
+      void repository;
+      void config;
+      return Promise.resolve({ enabled: true, status: 'synced' });
+    },
+  );
+
+  loadConfig(): MinioMirrorConfig | null {
+    return this.storedConfig;
+  }
+
+  saveConfig(): void {
+    return undefined;
+  }
+
+  listProjects = vi.fn((): Promise<MirrorProjectSummary[]> => Promise.resolve([]));
+
+  downloadProject = vi.fn((): Promise<MirrorFile[]> => Promise.resolve([]));
+}
+
 class RecordingTranslatorService implements TranslatorService {
   prepareTranslation = vi.fn(
     (
@@ -112,6 +159,25 @@ class ImportingProjectRepository implements ProjectRepository {
   saveProject(project: ProjectDocument): Promise<void> {
     this.savedProjects.push(project);
     return Promise.resolve();
+  }
+}
+
+class RemoteMirrorImportingProjectRepository implements ProjectRepository {
+  importedFilePaths: string[] = [];
+
+  loadProject(): Promise<ProjectDocument | null> {
+    return Promise.resolve(null);
+  }
+
+  saveProject(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  async importMirrorFiles(files: MirrorFile[]): Promise<ProjectDocument> {
+    this.importedFilePaths = files.map((file) => file.path);
+    const projectFile = files.find((file) => file.path === 'project.json');
+    if (!projectFile) throw new Error('Missing project.json');
+    return JSON.parse(await projectFile.blob.text()) as ProjectDocument;
   }
 }
 
@@ -206,7 +272,10 @@ function createReadyPrepareTranslationMock() {
   );
 }
 
-async function openLeftTab(user: ReturnType<typeof userEvent.setup>, name: 'AI Tools' | 'Elements' | 'Layout') {
+async function openLeftTab(
+  user: ReturnType<typeof userEvent.setup>,
+  name: 'AI Tools' | 'Animate' | 'Elements' | 'Layout',
+) {
   const tab = screen.getByRole('tab', { name });
   if (tab.getAttribute('aria-selected') !== 'true') {
     await user.click(tab);
@@ -242,6 +311,14 @@ describe('EditorShell', () => {
   afterEach(() => {
     window.history.pushState({}, '', '/editor/');
     Object.defineProperty(document, 'modelContext', {
+      configurable: true,
+      value: undefined,
+    });
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      value: null,
+    });
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
       configurable: true,
       value: undefined,
     });
@@ -408,8 +485,38 @@ describe('EditorShell', () => {
     render(<EditorShell services={services} />);
 
     await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    expect(screen.getByRole('dialog', { name: 'Save local project' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Save local project' })).toHaveAttribute(
+      'data-anchor',
+      'persistence',
+    );
+    await user.clear(screen.getByRole('textbox', { name: 'Project folder name' }));
+    await user.type(screen.getByRole('textbox', { name: 'Project folder name' }), 'Mirror Debug Deck');
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
 
     expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit project name Mirror Debug Deck' })).toBeInTheDocument();
+  });
+
+  it('re-enables persistence without opening the folder setup again', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const repository = new SavingProjectRepository();
+    services.projectRepository = repository;
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+    expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Persistence enabled' }));
+    expect(screen.getByRole('button', { name: 'Persistence disabled' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+
+    expect(screen.queryByRole('dialog', { name: 'Save local project' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
+    expect(repository.savedProjects).toHaveLength(2);
   });
 
   it('writes the persisted project name into the tab URL', async () => {
@@ -420,6 +527,7 @@ describe('EditorShell', () => {
     render(<EditorShell services={services} />);
 
     await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
 
     expect(window.location.search).toBe('?project=Untitled+AI+Deck');
   });
@@ -432,6 +540,7 @@ describe('EditorShell', () => {
     render(<EditorShell services={services} />);
 
     await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
     expect(repository.savedProjects.at(-1)?.name).toBe('Untitled AI Deck');
 
     await user.click(screen.getByRole('button', { name: 'Edit project name Untitled AI Deck' }));
@@ -452,6 +561,129 @@ describe('EditorShell', () => {
     expect(await screen.findByRole('button', { name: 'Persistence disabled' })).toBeInTheDocument();
   });
 
+  it('prompts the user to save before mirroring an unsaved project from the File menu', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Mirror Now' }));
+
+    expect(screen.getByText('Save the project before mirroring.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Persistence disabled' })).toHaveClass(
+      'persistence-attention',
+    );
+  });
+
+  it('opens mirror settings when mirroring is requested without a saved mirror config', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    services.projectRepository = new SavingProjectRepository();
+    services.mirrorService = new RecordingMirrorService(null);
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Mirror Now' }));
+
+    expect(screen.getByRole('dialog', { name: 'Mirror settings' })).toBeInTheDocument();
+  });
+
+  it('syncs the current project after mirror settings are saved', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const repository = new SavingProjectRepository();
+    const mirrorService = new RecordingMirrorService(null);
+    services.projectRepository = repository;
+    services.mirrorService = mirrorService;
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+    await user.click(screen.getByRole('button', { name: 'Mirror settings' }));
+    await user.click(within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('button', {
+      name: 'Mirror settings',
+    }));
+    await user.click(screen.getByRole('button', { name: 'Save settings' }));
+
+    await waitFor(() => {
+      expect(mirrorService.syncProject).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Untitled AI Deck' }),
+        repository,
+        mirrorConfig,
+      );
+    });
+  });
+
+  it('mirrors the renamed project name from the header bar', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const repository = new SavingProjectRepository();
+    const mirrorService = new RecordingMirrorService(null);
+    services.projectRepository = repository;
+    services.mirrorService = mirrorService;
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+    await user.click(screen.getByRole('button', { name: 'Mirror settings' }));
+    await user.click(within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('button', {
+      name: 'Mirror settings',
+    }));
+    await user.click(screen.getByRole('button', { name: 'Save settings' }));
+    await waitFor(() => {
+      expect(mirrorService.syncProject).toHaveBeenCalledTimes(1);
+    });
+    mirrorService.syncProject.mockClear();
+
+    await user.click(screen.getByRole('button', { name: 'Edit project name Untitled AI Deck' }));
+    await user.clear(screen.getByRole('textbox', { name: 'Project name' }));
+    await user.type(screen.getByRole('textbox', { name: 'Project name' }), 'Renamed Mirror Deck{Enter}');
+
+    await waitFor(
+      () => {
+        expect(mirrorService.syncProject).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'Renamed Mirror Deck' }),
+          repository,
+          mirrorConfig,
+        );
+      },
+      { timeout: 2000 },
+    );
+  });
+
+  it('disables mirroring when the mirror status icon is clicked', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const mirrorService = new RecordingMirrorService();
+    const repository = new DeferredLoadingProjectRepository();
+    services.projectRepository = repository;
+    services.mirrorService = mirrorService;
+    render(<EditorShell services={services} />);
+
+    act(() => {
+      repository.resolveLoadedProject({
+        ...services.initialProject,
+        name: 'Mirrored Folder',
+      });
+    });
+
+    const mirrorButton = await screen.findByRole('button', { name: 'Mirror up to date' });
+    await user.click(mirrorButton);
+
+    expect(mirrorService.clearConfig).not.toHaveBeenCalled();
+    expect(screen.getByText('Local only')).toBeInTheDocument();
+
+    const disabledMirrorButton = screen.getByRole('button', { name: 'Mirror disabled' });
+    expect(disabledMirrorButton).not.toBeDisabled();
+    await user.click(disabledMirrorButton);
+
+    await waitFor(() => {
+      expect(mirrorService.syncProject).toHaveBeenCalledTimes(2);
+    });
+    expect(await screen.findByRole('button', { name: 'Mirror up to date' })).toBeInTheDocument();
+  });
+
   it('imports an existing project from the File menu', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
@@ -470,6 +702,38 @@ describe('EditorShell', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
     expect(window.location.search).toBe('?project=Imported+LocalStudio+Project');
+  });
+
+  it('displays the remote project name after importing a mirrored project', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const repository = new RemoteMirrorImportingProjectRepository();
+    const mirrorService = new RecordingMirrorService(mirrorConfig);
+    services.projectRepository = repository;
+    services.mirrorService = mirrorService;
+    mirrorService.listProjects.mockResolvedValue([
+      { id: 'Remote Mirror Deck', name: 'Remote Mirror Deck', syncedAt: '2026-06-30T10:00:00.000Z' },
+    ]);
+    mirrorService.downloadProject.mockResolvedValue([
+      {
+        path: 'project.json',
+        blob: new Blob(
+          [JSON.stringify({ ...services.initialProject, id: 'remote-project', name: 'Remote Mirror Deck' })],
+          { type: 'application/json' },
+        ),
+      },
+    ]);
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Import Remote' }));
+    await user.click(await screen.findByRole('button', { name: 'Import Remote Mirror Deck' }));
+
+    expect(
+      await screen.findByRole('button', { name: 'Edit project name Remote Mirror Deck' }),
+    ).toBeInTheDocument();
+    expect(repository.importedFilePaths).toContain('project.json');
+    expect(window.location.search).toBe('?project=Remote+Mirror+Deck');
   });
 
   it('preserves hydrated sample hero object URLs during import normalization', async () => {
@@ -521,6 +785,7 @@ describe('EditorShell', () => {
     const { unmount } = render(<EditorShell services={firstServices} />);
 
     await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
     unmount();
     const secondServices = createAppServices();
     secondServices.projectRepository = new SavingProjectRepository();
@@ -552,6 +817,37 @@ describe('EditorShell', () => {
     expect(repository.savedProjects).toHaveLength(0);
   });
 
+  it('restores mirroring from saved config and syncs the loaded local project', async () => {
+    const repository = new DeferredLoadingProjectRepository();
+    const mirrorService = new RecordingMirrorService();
+    const services = createAppServices();
+    services.projectRepository = repository;
+    services.mirrorService = mirrorService;
+
+    render(<EditorShell services={services} />);
+
+    act(() => {
+      repository.resolveLoadedProject({
+        ...services.initialProject,
+        id: 'mirrored-project',
+        name: 'Mirrored Folder',
+      });
+    });
+
+    expect(
+      await screen.findByRole('button', { name: 'Edit project name Mirrored Folder' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(mirrorService.syncProject).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'mirrored-project', name: 'Mirrored Folder' }),
+        repository,
+        mirrorConfig,
+      );
+    });
+  });
+
   it('disables persistence and keeps the initial project when startup restore fails', async () => {
     const services = createAppServices();
     services.projectRepository = new RejectingLoadProjectRepository();
@@ -573,6 +869,328 @@ describe('EditorShell', () => {
 
     await user.click(screen.getByRole('button', { name: 'Zoom Out' }));
     expect(screen.getByText('100%')).toBeInTheDocument();
+  });
+
+  it('keeps insert quick actions visible after adding a second slide', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.click(screen.getAllByRole('button', { name: 'Add page' })[0]!);
+
+    expect(screen.getByRole('button', { name: 'Rename Slide 2' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Insert Text' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Insert Media' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Insert Text' }));
+    await openLeftTab(user, 'Layout');
+    expect(screen.getByRole('button', { name: 'Add a heading' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('duplicates the active slide with copied elements and remapped animations', async () => {
+    const user = userEvent.setup();
+    const project = createSampleProject();
+    project.pages[0] = {
+      ...project.pages[0]!,
+      animationBuilds: [
+        { id: 'build-image-hero', elementId: 'image-hero', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+      ],
+    };
+
+    render(<EditorShell services={createAppServices({ initialProject: project })} />);
+
+    await user.click(screen.getByRole('button', { name: 'Duplicate Slide 1' }));
+
+    expect(screen.getByRole('button', { name: 'Rename Slide 1 copy' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Animation build 1 for Image')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Insert Text' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Insert Media' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Insert Text' }));
+    await openLeftTab(user, 'Layout');
+    expect(screen.getByRole('button', { name: 'Add a heading' })).toHaveAttribute('aria-pressed', 'true');
+    await openLeftTab(user, 'Animate');
+    expect(screen.getByRole('listitem', { name: 'Build 1: Image' })).toBeInTheDocument();
+  });
+
+  it('starts animation preview when playing the presentation from the toolbar', async () => {
+    const user = userEvent.setup();
+    const project = createSampleProject();
+    project.pages[0] = {
+      ...project.pages[0]!,
+      transition: { effect: 'reveal', delayMs: 0 },
+      animationBuilds: [
+        { id: 'build-image-hero', elementId: 'image-hero', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+      ],
+    };
+
+    render(<EditorShell services={createAppServices({ initialProject: project })} />);
+
+    await user.click(screen.getByRole('button', { name: 'Play presentation' }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview', 'playing');
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview-mode', 'presenter');
+    });
+    expect(screen.queryByLabelText('Animation build 1 for Image')).not.toBeInTheDocument();
+  });
+
+  it('starts animation preview from the Animate panel play button', async () => {
+    const user = userEvent.setup();
+    const project = createSampleProject();
+    project.pages[0] = {
+      ...project.pages[0]!,
+      animationBuilds: [
+        { id: 'build-image-hero', elementId: 'image-hero', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+      ],
+    };
+
+    render(<EditorShell services={createAppServices({ initialProject: project })} />);
+
+    await openLeftTab(user, 'Animate');
+    await user.click(screen.getByRole('button', { name: 'Play animation preview' }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview', 'playing');
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview-mode', 'editor');
+      expect(screen.getByText('Click the slide to play the next animation.')).toBeInTheDocument();
+    });
+  });
+
+  it('advances click-triggered animation preview with the right arrow key', async () => {
+    const user = userEvent.setup();
+    const project = createSampleProject();
+    project.pages[0] = {
+      ...project.pages[0]!,
+      transition: { effect: 'reveal', delayMs: 0 },
+      animationBuilds: [
+        { id: 'build-image-hero', elementId: 'image-hero', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+      ],
+    };
+
+    render(<EditorShell services={createAppServices({ initialProject: project })} />);
+
+    await user.click(screen.getByRole('button', { name: 'Play presentation' }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview-waiting', 'true');
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview-mode', 'presenter');
+    });
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+
+    await waitFor(() => {
+      expect(screen.queryByText('Click the slide to play the next animation.')).not.toBeInTheDocument();
+    });
+  });
+
+  it('uses arrow keys to move between slides after the current preview step completes', async () => {
+    const user = userEvent.setup();
+    const project = createSampleProject();
+    project.pages = [
+      {
+        ...project.pages[0]!,
+        transition: { effect: 'reveal', delayMs: 0 },
+        animationBuilds: [
+          { id: 'build-image-hero', elementId: 'image-hero', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+        ],
+      },
+      {
+        id: 'page-2',
+        name: 'Slide 2',
+        width: 1920,
+        height: 1080,
+        background: { type: 'color', color: '#050D10' },
+        elementIds: [],
+        animationBuilds: [],
+      },
+    ];
+
+    render(<EditorShell services={createAppServices({ initialProject: project })} />);
+
+    expect(screen.getByText('1 / 2')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Play presentation' }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview-waiting', 'true');
+    });
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+
+    await waitFor(() => {
+      expect(screen.queryByText('Click the slide to play the next animation.')).not.toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview-phase', 'complete');
+    });
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+
+    await waitFor(() => {
+      expect(screen.getByText('2 / 2')).toBeInTheDocument();
+    });
+
+    fireEvent.keyDown(window, { key: 'ArrowLeft' });
+
+    await waitFor(() => {
+      expect(screen.getByText('1 / 2')).toBeInTheDocument();
+    });
+  });
+
+  it('uses slide clicks to move between slides in presenter mode after the current preview step completes', async () => {
+    const user = userEvent.setup();
+    let fullscreenElement: Element | null = null;
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      get: () => fullscreenElement,
+    });
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+      configurable: true,
+      value: vi.fn(() => {
+        fullscreenElement = document.querySelector('[aria-label="Canvas workspace"]');
+        document.dispatchEvent(new Event('fullscreenchange'));
+        return Promise.resolve();
+      }),
+    });
+    const project = createSampleProject();
+    project.pages = [
+      {
+        ...project.pages[0]!,
+        transition: { effect: 'reveal', delayMs: 0 },
+        animationBuilds: [
+          { id: 'build-image-hero', elementId: 'image-hero', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+        ],
+      },
+      {
+        id: 'page-2',
+        name: 'Slide 2',
+        width: 1920,
+        height: 1080,
+        background: { type: 'color', color: '#050D10' },
+        elementIds: [],
+        animationBuilds: [],
+      },
+    ];
+    const { container } = render(<EditorShell services={createAppServices({ initialProject: project })} />);
+
+    await user.click(screen.getByRole('button', { name: 'Play presentation' }));
+
+    await waitFor(() => {
+      expect(document.fullscreenElement).toBe(screen.getByLabelText('Canvas workspace'));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview-waiting', 'true');
+    });
+
+    fireEvent.mouseDown(container.querySelector('canvas')!);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview-phase', 'complete');
+    });
+
+    fireEvent.mouseDown(container.querySelector('canvas')!);
+
+    await waitFor(() => {
+      expect(screen.getByText('2 / 2')).toBeInTheDocument();
+    });
+  });
+
+  it('plays the current slide by default and can play from the beginning from the toolbar menu', async () => {
+    const user = userEvent.setup();
+    const requestFullscreen = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+      configurable: true,
+      value: requestFullscreen,
+    });
+    const project = createSampleProject();
+    project.pages = [
+      project.pages[0]!,
+      {
+        id: 'page-2',
+        name: 'Slide 2',
+        width: 1920,
+        height: 1080,
+        background: { type: 'color', color: '#050D10' },
+        elementIds: [],
+        animationBuilds: [],
+      },
+    ];
+
+    render(<EditorShell services={createAppServices({ initialProject: project })} />);
+
+    await user.click(screen.getByRole('button', { name: 'Activate Slide 2' }));
+    expect(screen.getByText('2 / 2')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Play presentation' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('2 / 2')).toBeInTheDocument();
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview-mode', 'presenter');
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Presentation play options' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Play from beginning' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('1 / 2')).toBeInTheDocument();
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview-mode', 'presenter');
+    });
+  });
+
+  it('hides page insert controls in fullscreen presenter mode and restores a clean editor state on exit', async () => {
+    const user = userEvent.setup();
+    let fullscreenElement: Element | null = null;
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      get: () => fullscreenElement,
+    });
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+      configurable: true,
+      value: vi.fn(() => {
+        fullscreenElement = document.querySelector('[aria-label="Canvas workspace"]');
+        document.dispatchEvent(new Event('fullscreenchange'));
+        return Promise.resolve();
+      }),
+    });
+    const project = createSampleProject();
+    project.pages = [
+      {
+        ...project.pages[0]!,
+        animationBuilds: [
+          { id: 'build-image-hero', elementId: 'image-hero', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+        ],
+      },
+      {
+        id: 'page-2',
+        name: 'Slide 2',
+        width: 1920,
+        height: 1080,
+        background: { type: 'color', color: '#050D10' },
+        elementIds: [],
+        animationBuilds: [],
+      },
+    ];
+
+    render(<EditorShell services={createAppServices({ initialProject: project })} />);
+
+    await selectImageLayer(user);
+    expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-selected-elements', 'image-hero');
+    expect(screen.getByRole('button', { name: 'Add page after Slide 1' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Play presentation' }));
+
+    await waitFor(() => {
+      expect(document.fullscreenElement).toBe(screen.getByLabelText('Canvas workspace'));
+      expect(screen.queryByRole('button', { name: 'Add page after Slide 1' })).not.toBeInTheDocument();
+    });
+
+    fullscreenElement = null;
+    document.dispatchEvent(new Event('fullscreenchange'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Add page after Slide 1' })).toBeInTheDocument();
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview', 'idle');
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-selected-elements', '');
+    });
   });
 
   it('pastes an image from the clipboard as a new selected layer', async () => {
@@ -634,6 +1252,7 @@ describe('EditorShell', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
 
     await waitFor(() => {
       const savedProject = repository.savedProjects.at(-1);
@@ -752,13 +1371,10 @@ describe('EditorShell', () => {
 
     await user.click(screen.getByRole('button', { name: 'Insert Text' }));
     await waitFor(() => {
-      expect(
-        screen
-          .getAllByRole('button', { name: /text-/ })
-          .find((element) => element.getAttribute('aria-pressed') === 'true'),
-      ).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Add a heading' })).toHaveAttribute('aria-pressed', 'true');
     });
     await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
     await waitFor(() => {
       const insertedText = Object.values(repository.savedProjects.at(-1)?.elements ?? {}).find(
         (element) =>
@@ -959,6 +1575,7 @@ describe('EditorShell', () => {
       });
     });
     await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
 
     await waitFor(() => {
       const title = repository.savedProjects.at(-1)?.elements['text-title'];
@@ -1157,6 +1774,7 @@ describe('EditorShell', () => {
     await user.click(screen.getByRole('button', { name: 'Present' }));
 
     expect(requestFullscreen).toHaveBeenCalled();
+    expect(requestFullscreen.mock.instances[0]).toBe(screen.getByLabelText('Canvas workspace'));
   });
 
   it('does not show the page size overlay on the canvas', () => {

@@ -6,6 +6,7 @@ import type {
   ImageGenerationService,
   LocalSetupService,
   MagicEraserService,
+  MirrorService,
   ModelSetupService,
   PaletteService,
   PromptService,
@@ -31,6 +32,7 @@ import { BrowserModelSetupService } from '../services/modelSetupService';
 import { BrowserShareService } from '../services/shareService';
 import { TransformersLanguageDetectionRuntime } from '../services/webGpuLanguageDetectionRuntime';
 import { TransformersTextGenerationRuntime } from '../services/webGpuTextGenerationRuntime';
+import { MinioMirrorService, type MinioMirrorConfig } from '../services/minioMirrorService';
 
 export interface AppServices {
   initialProject: ProjectDocument;
@@ -49,6 +51,7 @@ export interface AppServices {
   backgroundRemovalService: BackgroundRemovalService;
   smartGrabService: SmartGrabService;
   magicEraserService: MagicEraserService;
+  mirrorService: MirrorService<MinioMirrorConfig>;
 }
 
 interface CreateAppServicesOptions {
@@ -86,12 +89,18 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
       textGenerationRuntime,
       languageDetectionRuntime,
     ),
-    promptService: new BrowserPromptService(modelSetupService, undefined, undefined, textGenerationRuntime),
+    promptService: new BrowserPromptService(
+      modelSetupService,
+      undefined,
+      undefined,
+      textGenerationRuntime,
+    ),
     imageGenerationService: new BrowserImageGenerationService(),
     paletteService: new MockPaletteService(),
     backgroundRemovalService: new BrowserBackgroundRemovalService(),
     smartGrabService: new MockSmartGrabService(),
     magicEraserService: new MockMagicEraserService(),
+    mirrorService: new MinioMirrorService(),
   };
 }
 

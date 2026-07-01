@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import type { ShapeKind } from '../../domain/model';
 
-export const elementShapeCatalog: Array<{
+const elementShapeCatalog: Array<{
   icon?: LucideIcon;
   label: string;
   shape: ShapeKind;

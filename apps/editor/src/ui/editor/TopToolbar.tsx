@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ProjectDocument } from '../../domain/model';
+import type { MirrorState } from '../../services/interfaces';
 
 interface TopToolbarProps {
   project: ProjectDocument;
@@ -12,19 +13,28 @@ interface TopToolbarProps {
   persistenceEnabled?: boolean;
   persistenceAvailable?: boolean;
   lastEditedAt?: string | undefined;
+  mirrorState?: MirrorState;
+  localProjectSetupPanel?: ReactNode;
+  persistenceAttention?: boolean;
+  persistenceNotice?: string | undefined;
   saveAnimationKey?: number;
   canTranslateDeck?: boolean;
   onDelete?: (() => void) | undefined;
   onDuplicate?: (() => void) | undefined;
   onImportProject?: (() => void) | undefined;
+  onImportRemoteMirror?: (() => void) | undefined;
+  onMirrorNow?: (() => void) | undefined;
+  onMirrorToggle?: ((enabled: boolean) => void) | undefined;
   onOpenVersionHistory?: (() => void) | undefined;
   onNewProject?: (() => void) | undefined;
   onPersistenceToggle?: ((enabled: boolean) => void) | undefined;
+  onSaveLocal?: (() => void) | undefined;
   onProjectNameChange?: ((name: string) => void) | undefined;
   onRedo?: (() => void) | undefined;
   onResetZoom?: (() => void) | undefined;
   onSelectLayers?: (() => void) | undefined;
   onShare?: (() => void) | undefined;
+  onStartPresenterMode?: ((options?: { fromBeginning?: boolean }) => void) | undefined;
   onTranslateDeck?: (() => void) | undefined;
   onUndo?: (() => void) | undefined;
   onZoomIn?: (() => void) | undefined;
@@ -33,11 +43,19 @@ interface TopToolbarProps {
 
 type HeaderMenu = 'File' | 'Edit' | 'View' | 'Help';
 
-interface HeaderMenuAction {
+interface HeaderMenuActionItem {
+  kind?: 'item';
   label: string;
   disabled?: boolean;
   onSelect?: (() => void) | undefined;
 }
+
+interface HeaderMenuSeparator {
+  kind: 'separator';
+  label: string;
+}
+
+type HeaderMenuAction = HeaderMenuActionItem | HeaderMenuSeparator;
 
 const menuLabels: HeaderMenu[] = ['File', 'Edit', 'View', 'Help'];
 const githubUrl = 'https://github.com/ErickWendel/localstudio';
@@ -93,11 +111,18 @@ export function TopToolbar({
   persistenceEnabled = false,
   persistenceAvailable = true,
   lastEditedAt,
+  mirrorState = { enabled: false, status: 'disabled' },
+  localProjectSetupPanel,
+  persistenceAttention = false,
+  persistenceNotice,
   saveAnimationKey = 0,
   canTranslateDeck = false,
   onDelete,
   onDuplicate,
   onImportProject,
+  onImportRemoteMirror,
+  onMirrorNow,
+  onMirrorToggle,
   onOpenVersionHistory,
   onNewProject,
   onPersistenceToggle,
@@ -106,12 +131,15 @@ export function TopToolbar({
   onResetZoom,
   onSelectLayers,
   onShare,
+  onStartPresenterMode,
+  onSaveLocal,
   onTranslateDeck,
   onUndo,
   onZoomIn,
   onZoomOut,
 }: TopToolbarProps) {
   const [openMenu, setOpenMenu] = useState<HeaderMenu | null>(null);
+  const [playMenuOpen, setPlayMenuOpen] = useState(false);
   const [isEditingProjectName, setIsEditingProjectName] = useState(false);
   const [projectNameDraft, setProjectNameDraft] = useState(project.name);
   const projectNameInputRef = useRef<HTMLInputElement>(null);
@@ -137,6 +165,15 @@ export function TopToolbar({
     setOpenMenu(null);
   }
 
+  function startPresenterMode(options?: { fromBeginning?: boolean }) {
+    if (options) {
+      onStartPresenterMode?.(options);
+    } else {
+      onStartPresenterMode?.();
+    }
+    setPlayMenuOpen(false);
+  }
+
   function commitProjectName() {
     const nextName = projectNameDraft.trim();
     if (nextName && nextName !== project.name) {
@@ -149,19 +186,22 @@ export function TopToolbar({
     File: [
       { label: 'New Project', disabled: !onNewProject, onSelect: onNewProject },
       { label: 'Import Project', disabled: !onImportProject, onSelect: onImportProject },
-      {
-        label: 'Save Local',
-        disabled: !persistenceAvailable,
-        onSelect: () => onPersistenceToggle?.(true),
-      },
+      { label: 'Import Remote', disabled: !onImportRemoteMirror, onSelect: onImportRemoteMirror },
       { label: 'Share', onSelect: triggerShare },
+      { kind: 'separator', label: 'File storage actions' },
+      { label: 'Save', disabled: !onSaveLocal, onSelect: onSaveLocal },
+      { label: 'Mirror Now', disabled: !onMirrorNow, onSelect: onMirrorNow },
     ],
     Edit: [
-  { label: 'Undo', disabled: !canUndo, onSelect: onUndo },
+      { label: 'Undo', disabled: !canUndo, onSelect: onUndo },
       { label: 'Redo', disabled: !canRedo, onSelect: onRedo },
       { label: 'Duplicate', disabled: !hasSelection, onSelect: onDuplicate },
       { label: 'Delete', disabled: !hasSelection, onSelect: onDelete },
-      { label: 'Translate Deck', disabled: !canTranslateDeck || !onTranslateDeck, onSelect: onTranslateDeck },
+      {
+        label: 'Translate Deck',
+        disabled: !canTranslateDeck || !onTranslateDeck,
+        onSelect: onTranslateDeck,
+      },
     ],
     View: [
       { label: 'Zoom Out', disabled: !onZoomOut, onSelect: onZoomOut },
@@ -178,6 +218,7 @@ export function TopToolbar({
   };
 
   function handleMenuAction(action: HeaderMenuAction) {
+    if (action.kind === 'separator') return;
     if (action.disabled) return;
     action.onSelect?.();
     closeMenu();
@@ -199,6 +240,39 @@ export function TopToolbar({
     : persistenceEnabled
       ? 'Persistence enabled'
       : 'Persistence disabled';
+  const mirrorLabel = !persistenceEnabled
+    ? 'Unsaved deck'
+    : !mirrorState.enabled
+      ? 'Local only'
+      : mirrorState.status === 'syncing'
+        ? 'Mirroring'
+        : mirrorState.status === 'failed'
+          ? 'Mirror failed'
+          : mirrorState.status === 'synced'
+            ? 'Mirrored'
+            : 'Local only';
+  const mirrorStatusDisabled = !persistenceEnabled;
+  const mirrorStatusLabel = mirrorStatusDisabled
+    ? 'Mirror disabled'
+    : !mirrorState.enabled
+      ? 'Mirror disabled'
+      : mirrorState.status === 'syncing'
+        ? 'Mirror syncing'
+        : mirrorState.status === 'synced'
+          ? 'Mirror up to date'
+          : mirrorState.status === 'failed'
+            ? 'Mirror failed'
+            : 'Mirror ready';
+  const mirrorStatusClassName = [
+    'stitch-icon-button',
+    'mirror-status-button',
+    mirrorStatusDisabled || !mirrorState.enabled ? 'mirror-disabled' : '',
+    !mirrorStatusDisabled && mirrorState.status === 'syncing' ? 'mirror-syncing' : '',
+    !mirrorStatusDisabled && mirrorState.status === 'synced' ? 'mirror-synced' : '',
+    !mirrorStatusDisabled && mirrorState.status === 'failed' ? 'mirror-failed' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <header className="top-toolbar">
@@ -216,6 +290,7 @@ export function TopToolbar({
                 }
                 type="button"
                 onClick={() => {
+                  setPlayMenuOpen(false);
                   setOpenMenu((current) => (current === item ? null : item));
                 }}
               >
@@ -223,20 +298,29 @@ export function TopToolbar({
               </button>
               {openMenu === item ? (
                 <div className="toolbar-dropdown" role="menu" aria-label={`${item} menu`}>
-                  {menuActions[item].map((action) => (
-                    <button
-                      className="toolbar-dropdown-item"
-                      disabled={action.disabled}
-                      key={action.label}
-                      role="menuitem"
-                      type="button"
-                      onClick={() => {
-                        handleMenuAction(action);
-                      }}
-                    >
-                      {action.label}
-                    </button>
-                  ))}
+                  {menuActions[item].map((action) =>
+                    action.kind === 'separator' ? (
+                      <div
+                        aria-label={action.label}
+                        className="toolbar-dropdown-separator"
+                        key={action.label}
+                        role="separator"
+                      />
+                    ) : (
+                      <button
+                        className="toolbar-dropdown-item"
+                        disabled={action.disabled}
+                        key={action.label}
+                        role="menuitem"
+                        type="button"
+                        onClick={() => {
+                          handleMenuAction(action);
+                        }}
+                      >
+                        {action.label}
+                      </button>
+                    ),
+                  )}
                 </div>
               ) : null}
             </div>
@@ -279,7 +363,57 @@ export function TopToolbar({
               {project.name}
             </button>
           )}
-          <span className="local-only-badge">Local only</span>
+          <div className="project-play-shell">
+            <button
+              className="project-play-button project-play-main"
+              type="button"
+              aria-label="Play presentation"
+              title="Play presentation"
+              onClick={() => startPresenterMode()}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">
+                play_arrow
+              </span>
+              <span>Play</span>
+            </button>
+            <button
+              className="project-play-button project-play-menu-button"
+              type="button"
+              aria-expanded={playMenuOpen}
+              aria-label="Presentation play options"
+              title="Presentation play options"
+              onClick={() => {
+                setOpenMenu(null);
+                setPlayMenuOpen((current) => !current);
+              }}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">
+                keyboard_arrow_down
+              </span>
+            </button>
+            {playMenuOpen ? (
+              <div
+                className="toolbar-dropdown project-play-dropdown"
+                role="menu"
+                aria-label="Presentation play menu"
+              >
+                <button
+                  className="toolbar-dropdown-item project-play-dropdown-item"
+                  role="menuitem"
+                  type="button"
+                  onClick={() => startPresenterMode({ fromBeginning: true })}
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    skip_previous
+                  </span>
+                  <span>Play from beginning</span>
+                </button>
+              </div>
+            ) : null}
+          </div>
+          <span className="local-only-badge" title={mirrorState.error}>
+            {mirrorLabel}
+          </span>
         </div>
       </div>
       <div className="toolbar-right">
@@ -290,7 +424,9 @@ export function TopToolbar({
                 ? 'stitch-icon-button persistence-off persistence-unavailable'
                 : persistenceEnabled
                   ? 'stitch-icon-button persistence-on'
-                  : 'stitch-icon-button persistence-off'
+                  : persistenceAttention
+                    ? 'stitch-icon-button persistence-off persistence-attention'
+                    : 'stitch-icon-button persistence-off'
             }
             disabled={!persistenceAvailable}
             title={persistenceTitle}
@@ -309,6 +445,30 @@ export function TopToolbar({
                 ×
               </span>
             ) : null}
+          </button>
+          {persistenceNotice ? (
+            <div className="persistence-notice" role="status">
+              {persistenceNotice}
+            </div>
+          ) : null}
+          {localProjectSetupPanel}
+          <button
+            className={mirrorStatusClassName}
+            disabled={mirrorStatusDisabled}
+            title={mirrorState.error ?? mirrorStatusLabel}
+            type="button"
+            aria-label={mirrorStatusLabel}
+            onClick={() => {
+              if (mirrorState.enabled) {
+                onMirrorToggle?.(false);
+                return;
+              }
+              onMirrorNow?.();
+            }}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              {mirrorState.status === 'syncing' ? 'sync' : 'cloud_sync'}
+            </span>
           </button>
           <button
             className="stitch-icon-button history-save-applied"
@@ -347,7 +507,11 @@ export function TopToolbar({
             </span>
           </button>
         </div>
-        <button className="language-chip" type="button" aria-label={`Current slide language ${languageLabel}`}>
+        <button
+          className="language-chip"
+          type="button"
+          aria-label={`Current slide language ${languageLabel}`}
+        >
           <span className="language-flag" aria-hidden="true">
             {languageFlag}
           </span>
