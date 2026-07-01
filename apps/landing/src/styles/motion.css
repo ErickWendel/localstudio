@@ -1,0 +1,236 @@
+.motion-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 28% 18%, rgba(55, 253, 118, 0.09), transparent 34%),
+    linear-gradient(135deg, rgba(54, 215, 255, 0.055), transparent 32%),
+    var(--ls-bg);
+}
+
+.motion-grid {
+  position: absolute;
+  inset: -72px;
+  background:
+    linear-gradient(rgba(55, 253, 118, 0.052) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(55, 253, 118, 0.052) 1px, transparent 1px);
+  background-size: 58px 58px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.92), rgba(0, 0, 0, 0.24) 78%, transparent);
+  animation: grid-drift 18s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+}
+
+.motion-backdrop::before,
+.motion-backdrop::after {
+  position: absolute;
+  content: '';
+  width: min(62vw, 760px);
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(105, 255, 137, 0.52), transparent);
+  opacity: 0.48;
+  transform-origin: center;
+}
+
+.motion-backdrop::before {
+  top: 22%;
+  left: -24%;
+  animation: trace-pass-a 9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.motion-backdrop::after {
+  right: -30%;
+  bottom: 18%;
+  background: linear-gradient(90deg, transparent, rgba(54, 215, 255, 0.36), transparent);
+  animation: trace-pass-b 12s cubic-bezier(0.4, 0, 0.2, 1) infinite 1.4s;
+}
+
+.motion-scan {
+  position: absolute;
+  width: 34vw;
+  min-width: 360px;
+  height: 130vh;
+  border-left: 1px solid rgba(105, 255, 137, 0.18);
+  border-right: 1px solid rgba(105, 255, 137, 0.06);
+  background: linear-gradient(90deg, transparent, rgba(55, 253, 118, 0.05), transparent);
+  transform: skewX(-18deg);
+  filter: blur(0.2px);
+}
+
+.motion-scan-primary {
+  left: -44vw;
+  top: -14vh;
+  animation: scan-primary 14s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.motion-scan-secondary {
+  right: -46vw;
+  top: -20vh;
+  border-left-color: rgba(54, 215, 255, 0.13);
+  background: linear-gradient(90deg, transparent, rgba(54, 215, 255, 0.035), transparent);
+  animation: scan-secondary 17s cubic-bezier(0.4, 0, 0.2, 1) infinite 3.2s;
+}
+
+.motion-data-field span {
+  position: absolute;
+  display: block;
+  width: 28px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(105, 255, 137, 0.5);
+  opacity: 0;
+  animation: data-tick 4.8s cubic-bezier(0.2, 0, 0, 1) infinite;
+}
+
+.motion-data-field span:nth-child(1) {
+  left: 12%;
+  top: 18%;
+}
+
+.motion-data-field span:nth-child(2) {
+  left: 24%;
+  top: 68%;
+  animation-delay: 0.4s;
+}
+
+.motion-data-field span:nth-child(3) {
+  left: 37%;
+  top: 34%;
+  width: 18px;
+  animation-delay: 0.9s;
+}
+
+.motion-data-field span:nth-child(4) {
+  left: 53%;
+  top: 74%;
+  background: rgba(54, 215, 255, 0.44);
+  animation-delay: 1.5s;
+}
+
+.motion-data-field span:nth-child(5) {
+  left: 68%;
+  top: 22%;
+  width: 36px;
+  animation-delay: 2s;
+}
+
+.motion-data-field span:nth-child(6) {
+  left: 83%;
+  top: 48%;
+  animation-delay: 2.4s;
+}
+
+.motion-data-field span:nth-child(7) {
+  left: 17%;
+  top: 86%;
+  background: rgba(54, 215, 255, 0.38);
+  animation-delay: 2.9s;
+}
+
+.motion-data-field span:nth-child(8) {
+  left: 44%;
+  top: 12%;
+  width: 16px;
+  animation-delay: 3.3s;
+}
+
+.motion-data-field span:nth-child(9) {
+  left: 73%;
+  top: 82%;
+  animation-delay: 3.9s;
+}
+
+.motion-data-field span:nth-child(10) {
+  left: 91%;
+  top: 28%;
+  width: 20px;
+  animation-delay: 4.4s;
+}
+
+@keyframes grid-drift {
+  from {
+    transform: translate3d(-10px, -8px, 0);
+  }
+
+  to {
+    transform: translate3d(22px, 18px, 0);
+  }
+}
+
+@keyframes trace-pass-a {
+  0% {
+    opacity: 0;
+    transform: translate3d(-8vw, 0, 0) rotate(12deg);
+  }
+
+  18%,
+  62% {
+    opacity: 0.48;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(138vw, 18vh, 0) rotate(12deg);
+  }
+}
+
+@keyframes trace-pass-b {
+  0% {
+    opacity: 0;
+    transform: translate3d(8vw, 0, 0) rotate(-16deg);
+  }
+
+  20%,
+  58% {
+    opacity: 0.36;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(-132vw, -14vh, 0) rotate(-16deg);
+  }
+}
+
+@keyframes scan-primary {
+  0%,
+  12% {
+    transform: translate3d(0, 0, 0) skewX(-18deg);
+  }
+
+  58%,
+  100% {
+    transform: translate3d(158vw, 0, 0) skewX(-18deg);
+  }
+}
+
+@keyframes scan-secondary {
+  0%,
+  16% {
+    transform: translate3d(0, 0, 0) skewX(-18deg);
+  }
+
+  64%,
+  100% {
+    transform: translate3d(-164vw, 0, 0) skewX(-18deg);
+  }
+}
+
+@keyframes data-tick {
+  0%,
+  12% {
+    opacity: 0;
+    transform: translate3d(-16px, 0, 0) scaleX(0.72);
+  }
+
+  28%,
+  48% {
+    opacity: 0.68;
+    transform: translate3d(0, 0, 0) scaleX(1);
+  }
+
+  72%,
+  100% {
+    opacity: 0;
+    transform: translate3d(20px, 0, 0) scaleX(0.82);
+  }
+}

@@ -1,0 +1,56 @@
+:root {
+  --motion-fast: 150ms;
+  --motion-standard: 420ms;
+  --motion-slow: 720ms;
+  --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-ease-out: cubic-bezier(0.2, 0, 0, 1);
+}
+
+[data-reveal] {
+  opacity: 0;
+  transform: translate3d(0, 24px, 0);
+  transition:
+    opacity var(--motion-standard) var(--motion-ease),
+    transform var(--motion-standard) var(--motion-ease),
+    border-color var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+  transition-delay: var(--reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+[data-reveal].is-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+[data-reveal='hero-copy'] {
+  transform: translate3d(-18px, 18px, 0);
+}
+
+[data-reveal='workflow-frame'] {
+  justify-self: end;
+  width: min(100%, 1060px);
+  transform: translate3d(18px, 24px, 0) scale(0.985);
+}
+
+[data-reveal='workflow-frame'].is-visible {
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+[data-reveal='demo-card'],
+[data-reveal='requirement-card'],
+[data-reveal='proof-item'] {
+  transform: translate3d(0, 18px, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal],
+  [data-reveal].is-visible {
+    opacity: 1;
+    transform: none;
+    transition: none;
+    will-change: auto;
+  }
+}
