@@ -15,6 +15,12 @@ const config: MinioMirrorConfig = {
   prefix: 'mirrors',
 };
 
+interface PublicSharePayloadFixture {
+  schemaVersion: 1;
+  shareId: string;
+  project: ProjectDocument;
+}
+
 function getRequestUrl(input: RequestInfo | URL) {
   if (input instanceof URL) return input.toString();
   if (input instanceof Request) return input.url;
@@ -99,7 +105,7 @@ describe('BrowserShareService', () => {
           'http://localhost:9000/localstudio/mirrors/public-shares/00000000-0000-4000-8000-000000000001/share.json',
         )!
         .text(),
-    );
+    ) as unknown as PublicSharePayloadFixture;
     expect(sharePayload).toMatchObject({
       schemaVersion: 1,
       shareId: '00000000-0000-4000-8000-000000000001',

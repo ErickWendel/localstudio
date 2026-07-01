@@ -310,8 +310,12 @@ export function EditorShell({ services }: EditorShellProps) {
     const shareId = shareMetadata?.shareId;
     if (!shareId) return undefined;
     if (!publicSharingAvailable) {
-      setShareMetadata((current) => (current ? { ...current, status: 'sync-failed' } : current));
-      return undefined;
+      const timeoutId = window.setTimeout(() => {
+        setShareMetadata((current) => (current ? { ...current, status: 'sync-failed' } : current));
+      }, 0);
+      return () => {
+        window.clearTimeout(timeoutId);
+      };
     }
     const timeoutId = window.setTimeout(() => {
       setShareMetadata((current) => (current ? { ...current, status: 'syncing' } : current));

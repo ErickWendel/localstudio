@@ -157,22 +157,22 @@ class RecordingShareService implements ShareService {
 
   constructor(private readonly origin = window.location.origin) {}
 
-  createShare = vi.fn(async (project: ProjectDocument): Promise<ShareMetadata> => {
+  createShare = vi.fn((project: ProjectDocument): Promise<ShareMetadata> => {
     const shareId = crypto.randomUUID();
     const now = new Date().toISOString();
     this.records.set(shareId, { shareId, createdAt: now, updatedAt: now, project });
-    return this.createMetadata(shareId, now);
+    return Promise.resolve(this.createMetadata(shareId, now));
   });
 
-  updateShare = vi.fn(async (shareId: string, project: ProjectDocument): Promise<ShareMetadata> => {
+  updateShare = vi.fn((shareId: string, project: ProjectDocument): Promise<ShareMetadata> => {
     const now = new Date().toISOString();
     this.records.set(shareId, { shareId, createdAt: now, updatedAt: now, project });
-    return this.createMetadata(shareId, now);
+    return Promise.resolve(this.createMetadata(shareId, now));
   });
 
-  getShare = vi.fn(async (shareId: string): Promise<ShareRecord | null> => {
-    return this.records.get(shareId) ?? null;
-  });
+  getShare = vi.fn((shareId: string): Promise<ShareRecord | null> =>
+    Promise.resolve(this.records.get(shareId) ?? null),
+  );
 
   getPublicUrl(shareId: string): string {
     return `${this.origin}/editor/s/${shareId}?src=${encodeURIComponent(

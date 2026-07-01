@@ -117,16 +117,18 @@ describe('App', () => {
     const sourceUrl = `http://localhost:9000/localstudio/mirrors/public-shares/${shareId}/share.json`;
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => {
-        return new Response(
-          JSON.stringify({
-            schemaVersion: 1,
-            shareId,
-            createdAt: '2026-06-30T10:00:00.000Z',
-            updatedAt: '2026-06-30T10:00:00.000Z',
-            project: createSampleProject(),
-          }),
-          { headers: { 'content-type': 'application/json' }, status: 200 },
+      vi.fn(() => {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              schemaVersion: 1,
+              shareId,
+              createdAt: '2026-06-30T10:00:00.000Z',
+              updatedAt: '2026-06-30T10:00:00.000Z',
+              project: createSampleProject(),
+            }),
+            { headers: { 'content-type': 'application/json' }, status: 200 },
+          ),
         );
       }),
     );
@@ -143,16 +145,18 @@ describe('App', () => {
     const sourceUrl = `http://localhost:9000/localstudio/mirrors/public-shares/${shareId}/share.json`;
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => {
-        return new Response(
-          JSON.stringify({
-            schemaVersion: 1,
-            shareId,
-            createdAt: '2026-06-30T10:00:00.000Z',
-            updatedAt: '2026-06-30T10:00:00.000Z',
-            project: createSampleProject(),
-          }),
-          { headers: { 'content-type': 'application/json' }, status: 200 },
+      vi.fn(() => {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              schemaVersion: 1,
+              shareId,
+              createdAt: '2026-06-30T10:00:00.000Z',
+              updatedAt: '2026-06-30T10:00:00.000Z',
+              project: createSampleProject(),
+            }),
+            { headers: { 'content-type': 'application/json' }, status: 200 },
+          ),
         );
       }),
     );
@@ -163,7 +167,6 @@ describe('App', () => {
     expect(await screen.findByLabelText('Embedded shared deck')).toBeInTheDocument();
     expect(screen.queryByText('Public view')).not.toBeInTheDocument();
   });
-
   it('renders the WebMCP showcase page under the editor base path with a trailing slash', () => {
     window.history.replaceState({}, '', '/editor/webmcp/');
 

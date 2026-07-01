@@ -11,6 +11,12 @@ describe('PublicDeckViewer', () => {
     window.history.replaceState({}, '', '/');
   });
 
+  function getRequestUrl(input: RequestInfo | URL) {
+    if (input instanceof Request) return input.url;
+    if (input instanceof URL) return input.toString();
+    return input;
+  }
+
   function createRemoteShare(
     shareId: string,
     project = createSampleProject(),
@@ -23,13 +29,15 @@ describe('PublicDeckViewer', () => {
     };
     const sourceUrl = `http://localhost:9000/localstudio/mirrors/public-shares/${shareId}/share.json`;
     window.history.replaceState({}, '', `/editor/s/${shareId}?src=${encodeURIComponent(sourceUrl)}`);
-    const requestFetch = vi.fn(async (url: RequestInfo | URL) => {
-      expect(url.toString()).toBe(sourceUrl);
-      return new Response(JSON.stringify({ schemaVersion: 1, ...share }), {
-        headers: { 'content-type': 'application/json' },
-        status: 200,
-      });
-    }) as typeof fetch;
+    const requestFetch: typeof fetch = vi.fn((input: RequestInfo | URL) => {
+      expect(getRequestUrl(input)).toBe(sourceUrl);
+      return Promise.resolve(
+        new Response(JSON.stringify({ schemaVersion: 1, ...share }), {
+          headers: { 'content-type': 'application/json' },
+          status: 200,
+        }),
+      );
+    });
     return { share, shareService: new BrowserShareService({ fetch: requestFetch }) };
   }
 
@@ -139,7 +147,7 @@ describe('PublicDeckViewer', () => {
       '/editor/s/missing-share?src=http%3A%2F%2Flocalhost%3A9000%2Flocalstudio%2Fmissing.json',
     );
     const shareService = new BrowserShareService({
-      fetch: vi.fn(async () => new Response(null, { status: 404 })) as typeof fetch,
+      fetch: vi.fn(() => Promise.resolve(new Response(null, { status: 404 }))),
     });
 
     render(<PublicDeckViewer shareId="missing-share" shareService={shareService} />);
