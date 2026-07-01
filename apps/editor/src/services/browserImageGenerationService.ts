@@ -1,5 +1,5 @@
 import type { Asset } from '../domain/model';
-import { BrowserBonsaiImageRuntime, type BonsaiImageRuntime } from './bonsaiImageRuntime';
+import { WorkerBackedBonsaiImageRuntime, type BonsaiImageRuntime } from './bonsaiImageRuntime';
 import type { ImageGenerationOptions, ImageGenerationService } from './interfaces';
 import {
   DEFAULT_IMAGE_GENERATION_SIZE,
@@ -23,7 +23,7 @@ export class BrowserImageGenerationService implements ImageGenerationService {
   private readonly runtime: BonsaiImageRuntime;
 
   constructor(private readonly options: BrowserImageGenerationServiceOptions = {}) {
-    this.runtime = options.runtime ?? new BrowserBonsaiImageRuntime();
+    this.runtime = options.runtime ?? new WorkerBackedBonsaiImageRuntime();
   }
 
   async generateImage(prompt: string, options: ImageGenerationOptions = {}): Promise<Asset> {

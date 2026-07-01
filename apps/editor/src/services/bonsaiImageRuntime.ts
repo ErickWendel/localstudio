@@ -51,13 +51,58 @@ interface BonsaiPipelineConstructor {
 
 interface BonsaiRuntimeModule {
   BonsaiImagePipeline: BonsaiPipelineConstructor;
-  cleanupBonsaiDemo?: () => Promise<void> | void;
-  destroyBonsaiDemoScene?: () => Promise<void> | void;
 }
 
 interface BrowserBonsaiImageRuntimeOptions {
   cacheName?: string;
   importRuntime?: () => Promise<BonsaiRuntimeModule>;
+}
+
+export type BonsaiImageWorkerRequest =
+  | {
+      id: string;
+      modelId: string;
+      type: 'preload';
+    }
+  | {
+      id: string;
+      options: Omit<BonsaiImageRuntimeGenerateOptions, 'onLoadProgress' | 'onStep'>;
+      type: 'generate';
+    };
+
+export type BonsaiImageWorkerResponse =
+  | {
+      id: string;
+      progress: number;
+      type: 'progress';
+    }
+  | {
+      id: string;
+      step: number;
+      totalSteps: number;
+      type: 'step';
+    }
+  | {
+      blob?: Blob;
+      id: string;
+      type: 'result';
+    }
+  | {
+      id: string;
+      message: string;
+      type: 'error';
+    };
+
+interface WorkerBackedBonsaiImageRuntimeOptions {
+  createWorker?: () => Worker;
+  fallbackRuntime?: BonsaiImageRuntime;
+}
+
+interface PendingWorkerRequest {
+  onLoadProgress?: ((progress: number) => void) | undefined;
+  onStep?: ((step: number, totalSteps: number) => void) | undefined;
+  reject: (error: Error) => void;
+  resolve: (blob?: Blob) => void;
 }
 
 const BONSAI_RUNTIME_CACHE_NAME = 'localstudio-ai-bonsai-image-runtime-v1';
@@ -83,41 +128,6 @@ async function deleteLegacyBonsaiModelCache() {
   } catch {
     // Best-effort cleanup only. The old cache is not used by the Bonsai runtime.
   }
-}
-
-function snapshotBodyChildren() {
-  if (typeof document === 'undefined') return () => undefined;
-  const body = document.body;
-  const existingChildren = new Set(Array.from(body.children));
-
-  return () => {
-    for (const child of Array.from(body.children)) {
-      if (existingChildren.has(child)) continue;
-      const className = typeof child.className === 'string' ? child.className : '';
-      const isLikelyDemoNode =
-        child instanceof HTMLCanvasElement ||
-        child.querySelector('canvas') !== null ||
-        child.id.toLowerCase().includes('bonsai') ||
-        className.toLowerCase().includes('bonsai');
-      if (isLikelyDemoNode) child.remove();
-    }
-  };
-}
-
-async function cleanupBonsaiDemoSideEffects(module: BonsaiRuntimeModule, removeAddedBodyChildren: () => void) {
-  try {
-    await module.cleanupBonsaiDemo?.();
-  } catch {
-    // The vendored demo cleanup is best-effort. Image generation must still continue.
-  }
-
-  try {
-    await module.destroyBonsaiDemoScene?.();
-  } catch {
-    // The Three.js landing scene is not part of LocalStudio.dev and can fail independently.
-  }
-
-  removeAddedBodyChildren();
 }
 
 function createBonsaiRuntimeProgressController(onProgress: (progress: number) => void) {
@@ -252,16 +262,137 @@ export class BrowserBonsaiImageRuntime implements BonsaiImageRuntime {
   }
 
   private async importRuntimeModule() {
-    const removeAddedBodyChildren = snapshotBodyChildren();
+    return this.options.importRuntime
+      ? this.options.importRuntime()
+      : ((await import('../vendor/bonsai-image-webgpu-runtime.js')) as BonsaiRuntimeModule);
+  }
+}
+
+export class WorkerBackedBonsaiImageRuntime implements BonsaiImageRuntime {
+  private fallbackRuntime: BonsaiImageRuntime | undefined;
+  private pendingRequests = new Map<string, PendingWorkerRequest>();
+  private worker: Worker | undefined;
+
+  constructor(private readonly options: WorkerBackedBonsaiImageRuntimeOptions = {}) {}
+
+  preload(modelId: string, options?: { onProgress?: (progress: number) => void }): Promise<void> {
+    if (this.fallbackRuntime) return this.fallbackRuntime.preload(modelId, options);
+    return this.request(
+      {
+        id: createRequestId(),
+        modelId,
+        type: 'preload',
+      },
+      { onLoadProgress: options?.onProgress },
+    ).then(() => undefined);
+  }
+
+  async generate(options: BonsaiImageRuntimeGenerateOptions): Promise<Blob> {
+    if (this.fallbackRuntime) return this.fallbackRuntime.generate(options);
+    const { onLoadProgress, onStep, ...workerOptions } = options;
+    const blob = await this.request(
+      {
+        id: createRequestId(),
+        options: workerOptions,
+        type: 'generate',
+      },
+      { onLoadProgress, onStep },
+    );
+    if (!blob) throw new Error('Bonsai image worker did not return an image.');
+    return blob;
+  }
+
+  private request(
+    request: BonsaiImageWorkerRequest,
+    handlers: Pick<PendingWorkerRequest, 'onLoadProgress' | 'onStep'> = {},
+  ) {
+    const worker = this.getWorker();
+    if (!worker) {
+      const fallback = this.getFallbackRuntime();
+      if (request.type === 'preload') {
+        return fallback.preload(
+          request.modelId,
+          handlers.onLoadProgress ? { onProgress: handlers.onLoadProgress } : undefined,
+        );
+      }
+      return fallback.generate({
+        ...request.options,
+        ...(handlers.onLoadProgress ? { onLoadProgress: handlers.onLoadProgress } : {}),
+        ...(handlers.onStep ? { onStep: handlers.onStep } : {}),
+      });
+    }
+
+    return new Promise<Blob | undefined>((resolve, reject) => {
+      this.pendingRequests.set(request.id, {
+        ...handlers,
+        reject,
+        resolve,
+      });
+      worker.postMessage(request);
+    });
+  }
+
+  private getWorker() {
+    if (this.worker) return this.worker;
     try {
-      const module = this.options.importRuntime
-        ? await this.options.importRuntime()
-        : ((await import('../vendor/bonsai-image-webgpu-runtime.js')) as BonsaiRuntimeModule);
-      await cleanupBonsaiDemoSideEffects(module, removeAddedBodyChildren);
-      return module;
-    } catch (error) {
-      removeAddedBodyChildren();
-      throw error;
+      const worker = this.options.createWorker?.() ?? createDefaultBonsaiWorker();
+      worker.onmessage = (event: MessageEvent<BonsaiImageWorkerResponse>) => {
+        this.handleWorkerResponse(event.data);
+      };
+      worker.onerror = (event) => {
+        const message = event instanceof ErrorEvent ? event.message : 'Bonsai image worker failed.';
+        this.rejectAllPending(message);
+      };
+      this.worker = worker;
+      return worker;
+    } catch {
+      this.fallbackRuntime = this.getFallbackRuntime();
+      return undefined;
     }
   }
+
+  private getFallbackRuntime() {
+    this.fallbackRuntime ??= this.options.fallbackRuntime ?? new BrowserBonsaiImageRuntime();
+    return this.fallbackRuntime;
+  }
+
+  private handleWorkerResponse(response: BonsaiImageWorkerResponse) {
+    const pending = this.pendingRequests.get(response.id);
+    if (!pending) return;
+    if (response.type === 'progress') {
+      pending.onLoadProgress?.(response.progress);
+      return;
+    }
+    if (response.type === 'step') {
+      pending.onStep?.(response.step, response.totalSteps);
+      return;
+    }
+    this.pendingRequests.delete(response.id);
+    if (response.type === 'error') {
+      pending.reject(new Error(response.message));
+      return;
+    }
+    pending.resolve(response.blob);
+  }
+
+  private rejectAllPending(message: string) {
+    for (const [id, pending] of this.pendingRequests) {
+      this.pendingRequests.delete(id);
+      pending.reject(new Error(message));
+    }
+  }
+}
+
+function createRequestId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `bonsai-request-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
+function createDefaultBonsaiWorker() {
+  if (typeof Worker === 'undefined') throw new Error('Web workers are not available.');
+  return new Worker(new URL('./bonsaiImageRuntime.worker.ts', import.meta.url), {
+    type: 'module',
+  });
 }

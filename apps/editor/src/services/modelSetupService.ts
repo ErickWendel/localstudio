@@ -19,7 +19,7 @@ import {
   IMAGE_GENERATION_TRANSFORMERS_MODEL_ID,
   TRANSFORMERS_CACHE_KEY,
 } from './imageGenerationModels';
-import { BrowserBonsaiImageRuntime } from './bonsaiImageRuntime';
+import { WorkerBackedBonsaiImageRuntime } from './bonsaiImageRuntime';
 import { getBrowserLocalStorage, type BrowserKeyValueStorage } from './browserStorage';
 import { createMonotonicProgressReporter, createTransformersProgressCallback } from './progress';
 
@@ -131,7 +131,7 @@ export class TransformersImageEditingModelLoader implements ImageEditingModelLoa
 
 export class TransformersImageGenerationModelLoader implements ImageGenerationModelLoader {
   async loadImageGenerationModel(options?: { onProgress?: (progress: number) => void }): Promise<void> {
-    await new BrowserBonsaiImageRuntime().preload(IMAGE_GENERATION_TRANSFORMERS_MODEL_ID, options);
+    await new WorkerBackedBonsaiImageRuntime().preload(IMAGE_GENERATION_TRANSFORMERS_MODEL_ID, options);
   }
 }
 
