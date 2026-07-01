@@ -1,11 +1,8 @@
 import type { Asset } from '../domain/model';
-import { WorkerBackedBonsaiImageRuntime, type BonsaiImageRuntime } from './bonsaiImageRuntime';
+import { bonsaiImageRuntime } from './image-generation/bonsaiImageRuntime';
+import type { BonsaiImageRuntime } from './image-generation/bonsaiImageRuntime';
 import type { ImageGenerationOptions, ImageGenerationService } from './interfaces';
-import {
-  DEFAULT_IMAGE_GENERATION_SIZE,
-  DEFAULT_IMAGE_GENERATION_STEPS,
-  IMAGE_GENERATION_TRANSFORMERS_MODEL_ID,
-} from './imageGenerationModels';
+import { imageGenerationModel } from './image-generation/imageGenerationModel';
 import { createPrefixedId } from './idUtils';
 
 interface BrowserImageGenerationServiceOptions {
@@ -23,19 +20,19 @@ export class BrowserImageGenerationService implements ImageGenerationService {
   private readonly runtime: BonsaiImageRuntime;
 
   constructor(private readonly options: BrowserImageGenerationServiceOptions = {}) {
-    this.runtime = options.runtime ?? new WorkerBackedBonsaiImageRuntime();
+    this.runtime = options.runtime ?? new bonsaiImageRuntime.WorkerBackedBonsaiImageRuntime();
   }
 
   async generateImage(prompt: string, options: ImageGenerationOptions = {}): Promise<Asset> {
     const trimmedPrompt = prompt.trim();
     if (!trimmedPrompt) throw new Error('Enter a prompt before generating an image.');
 
-    const steps = options.steps ?? DEFAULT_IMAGE_GENERATION_STEPS;
+    const steps = options.steps ?? imageGenerationModel.DEFAULT_IMAGE_GENERATION_STEPS;
     const blob = await this.runtime.generate({
-      modelId: IMAGE_GENERATION_TRANSFORMERS_MODEL_ID,
+      modelId: imageGenerationModel.IMAGE_GENERATION_TRANSFORMERS_MODEL_ID,
       prompt: trimmedPrompt,
-      height: options.height ?? DEFAULT_IMAGE_GENERATION_SIZE,
-      width: options.width ?? DEFAULT_IMAGE_GENERATION_SIZE,
+      height: options.height ?? imageGenerationModel.DEFAULT_IMAGE_GENERATION_SIZE,
+      width: options.width ?? imageGenerationModel.DEFAULT_IMAGE_GENERATION_SIZE,
       steps,
       ...(options.seed !== undefined ? { seed: options.seed } : {}),
       onLoadProgress: (progress) => {

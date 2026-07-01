@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createTransformersProgressCallback } from '../../../src/services/progress';
+import { progress } from '../../../src/services/model-setup/progress';
 
-describe('createTransformersProgressCallback', () => {
+describe('progress.createTransformersProgressCallback', () => {
   it('prefers Transformers.js aggregate progress over raw per-file progress', () => {
-    const progress: number[] = [];
-    const onProgress = createTransformersProgressCallback((value) => progress.push(value));
+    const reportedProgress: number[] = [];
+    const onProgress = progress.createTransformersProgressCallback((value) => reportedProgress.push(value));
 
     onProgress({
       file: 'model_q4.onnx',
@@ -23,12 +23,12 @@ describe('createTransformersProgressCallback', () => {
       total: 100,
     });
 
-    expect(progress).toEqual([18]);
+    expect(reportedProgress).toEqual([18]);
   });
 
   it('aggregates per-file progress when aggregate progress is unavailable', () => {
-    const progress: number[] = [];
-    const onProgress = createTransformersProgressCallback((value) => progress.push(value));
+    const reportedProgress: number[] = [];
+    const onProgress = progress.createTransformersProgressCallback((value) => reportedProgress.push(value));
 
     onProgress({
       file: 'a.onnx',
@@ -45,6 +45,6 @@ describe('createTransformersProgressCallback', () => {
       total: 100,
     });
 
-    expect(progress).toEqual([50, 50]);
+    expect(reportedProgress).toEqual([50, 50]);
   });
 });

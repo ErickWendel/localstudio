@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ImageElement } from '../../../../src/domain/model';
-import { calculateImageCropPatch } from '../../../../src/ui/editor/imageCrop';
+import { imageCrop } from '../../../../src/ui/editor/canvas/imageCrop';
 
 const imageElement: ImageElement = {
   id: 'image-1',
@@ -18,14 +18,14 @@ const imageElement: ImageElement = {
 
 describe('image crop helpers', () => {
   it('crops the left edge by updating frame and normalized crop rect', () => {
-    const patch = calculateImageCropPatch(imageElement, 'left', { x: 100, y: 0 });
+    const patch = imageCrop.calculateImageCropPatch(imageElement, 'left', { x: 100, y: 0 });
 
     expect(patch.frame).toMatchObject({ x: 200, y: 80, width: 300, height: 300 });
     expect(patch.crop).toMatchObject({ x: 0.25, y: 0, width: 0.75, height: 1 });
   });
 
   it('expands an already cropped edge without passing the original image bounds', () => {
-    const patch = calculateImageCropPatch(
+    const patch = imageCrop.calculateImageCropPatch(
       {
         ...imageElement,
         x: 200,
@@ -42,7 +42,7 @@ describe('image crop helpers', () => {
   });
 
   it('keeps a minimum crop area and frame size', () => {
-    const patch = calculateImageCropPatch(imageElement, 'right', { x: -1000, y: 0 });
+    const patch = imageCrop.calculateImageCropPatch(imageElement, 'right', { x: -1000, y: 0 });
 
     expect(patch.frame.width).toBeGreaterThanOrEqual(24);
     expect(patch.crop.width).toBeGreaterThanOrEqual(0.04);

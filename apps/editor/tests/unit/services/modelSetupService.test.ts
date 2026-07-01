@@ -1,45 +1,29 @@
 import { vi } from 'vitest';
-import {
-  GEMMA_LLM_DISPLAY_NAME,
-  GEMMA_LLM_MODEL_ID,
-  GEMMA_LLM_TRANSFORMERS_MODEL_ID,
-  LANGUAGE_DETECTION_DISPLAY_NAME,
-  LANGUAGE_DETECTION_MODEL_ID,
-  TRANSLATEGEMMA_DISPLAY_NAME,
-  TRANSLATEGEMMA_MODEL_ID,
-} from '../../../src/services/aiModelIds';
-import {
-  BrowserModelSetupService,
-  BrowserTransformersModelCache,
-  InMemoryModelSetupService,
-  type ImageEditingModelLoader,
-  type ImageGenerationModelLoader,
-  type LanguageDetectionModelLoader,
-  type ModelCacheStorage,
-  type TextGenerationModelLoader,
-} from '../../../src/services/modelSetupService';
-import { IMAGE_GENERATION_MODEL_ID, TRANSFORMERS_CACHE_KEY } from '../../../src/services/imageGenerationModels';
+import { aiModelCatalog } from '../../../src/services/model-setup/aiModelCatalog';
+import { modelSetupService } from '../../../src/services/model-setup/modelSetupService';
+import type { ImageEditingModelLoader, ImageGenerationModelLoader, LanguageDetectionModelLoader, ModelCacheStorage, TextGenerationModelLoader } from '../../../src/services/model-setup/modelSetupService';
+import { imageGenerationModel } from '../../../src/services/image-generation/imageGenerationModel';
 
-describe('InMemoryModelSetupService', () => {
+describe('modelSetupService.InMemoryModelSetupService', () => {
   it('downloads required models in parallel and exposes progress', async () => {
-    const service = new InMemoryModelSetupService();
+    const service = new modelSetupService.InMemoryModelSetupService();
     await service.downloadRequiredModels();
 
     const states = await service.getModelStates();
     expect(states.filter((state) => state.required).every((state) => state.status === 'ready')).toBe(true);
     expect(states).toHaveLength(5);
-    expect(states.find((state) => state.id === GEMMA_LLM_MODEL_ID)).toMatchObject({
-      label: GEMMA_LLM_DISPLAY_NAME,
+    expect(states.find((state) => state.id === aiModelCatalog.GEMMA_LLM_MODEL_ID)).toMatchObject({
+      label: aiModelCatalog.GEMMA_LLM_DISPLAY_NAME,
       required: false,
       status: 'needs-download',
     });
-    expect(states.find((state) => state.id === TRANSLATEGEMMA_MODEL_ID)).toMatchObject({
-      label: TRANSLATEGEMMA_DISPLAY_NAME,
+    expect(states.find((state) => state.id === aiModelCatalog.TRANSLATEGEMMA_MODEL_ID)).toMatchObject({
+      label: aiModelCatalog.TRANSLATEGEMMA_DISPLAY_NAME,
       required: false,
       status: 'needs-download',
     });
-    expect(states.find((state) => state.id === LANGUAGE_DETECTION_MODEL_ID)).toMatchObject({
-      label: LANGUAGE_DETECTION_DISPLAY_NAME,
+    expect(states.find((state) => state.id === aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID)).toMatchObject({
+      label: aiModelCatalog.LANGUAGE_DETECTION_DISPLAY_NAME,
       required: false,
       status: 'needs-download',
     });
@@ -48,8 +32,8 @@ describe('InMemoryModelSetupService', () => {
       label: 'Image Editing Models',
       description: 'Segmentation model for image editing.',
     });
-    expect(states.find((state) => state.id === IMAGE_GENERATION_MODEL_ID)).toMatchObject({
-      id: IMAGE_GENERATION_MODEL_ID,
+    expect(states.find((state) => state.id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID)).toMatchObject({
+      id: imageGenerationModel.IMAGE_GENERATION_MODEL_ID,
       label: 'Image Generation Models',
       description: 'Text-to-image model for generated slide assets.',
       status: 'needs-download',
@@ -58,7 +42,7 @@ describe('InMemoryModelSetupService', () => {
   });
 });
 
-describe('BrowserModelSetupService', () => {
+describe('modelSetupService.BrowserModelSetupService', () => {
   function createStorage(seed: Record<string, string> = {}) {
     const values = new Map(Object.entries(seed));
     return {
@@ -78,7 +62,7 @@ describe('BrowserModelSetupService', () => {
       loadImageEditingModel,
     };
     const storage = createStorage();
-    const service = new BrowserModelSetupService(loader, storage);
+    const service = new modelSetupService.BrowserModelSetupService(loader, storage);
 
     const state = await service.downloadModel('image-editing-models');
 
@@ -86,7 +70,7 @@ describe('BrowserModelSetupService', () => {
     expect(state).toMatchObject({ status: 'ready', progress: 100 });
     const states = await service.getModelStates();
     expect(states.find((item) => item.id === 'image-editing-models')).toMatchObject({ status: 'ready', progress: 100 });
-    expect(states.find((item) => item.id === IMAGE_GENERATION_MODEL_ID)).toMatchObject({
+    expect(states.find((item) => item.id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID)).toMatchObject({
       status: 'needs-download',
       progress: 0,
     });
@@ -104,16 +88,16 @@ describe('BrowserModelSetupService', () => {
     const imageGenerationLoader: ImageGenerationModelLoader = {
       loadImageGenerationModel,
     };
-    const service = new BrowserModelSetupService(imageEditingLoader, createStorage(), imageGenerationLoader);
+    const service = new modelSetupService.BrowserModelSetupService(imageEditingLoader, createStorage(), imageGenerationLoader);
 
     const progress: number[] = [];
-    const state = await service.downloadModel(IMAGE_GENERATION_MODEL_ID, {
+    const state = await service.downloadModel(imageGenerationModel.IMAGE_GENERATION_MODEL_ID, {
       onProgress: (value) => progress.push(value),
     });
 
     expect(loadImageGenerationModel).toHaveBeenCalledTimes(1);
     expect(loadImageEditingModel).not.toHaveBeenCalled();
-    expect(state).toMatchObject({ id: IMAGE_GENERATION_MODEL_ID, status: 'ready', progress: 100 });
+    expect(state).toMatchObject({ id: imageGenerationModel.IMAGE_GENERATION_MODEL_ID, status: 'ready', progress: 100 });
     expect(progress).toEqual([55, 100]);
   });
 
@@ -130,7 +114,7 @@ describe('BrowserModelSetupService', () => {
     const textGenerationLoader: TextGenerationModelLoader = {
       loadTextGenerationModel,
     };
-    const service = new BrowserModelSetupService(
+    const service = new modelSetupService.BrowserModelSetupService(
       { loadImageEditingModel },
       createStorage(),
       { loadImageGenerationModel },
@@ -138,11 +122,11 @@ describe('BrowserModelSetupService', () => {
     );
 
     const progress: number[] = [];
-    const state = await service.downloadModel(GEMMA_LLM_MODEL_ID, {
+    const state = await service.downloadModel(aiModelCatalog.GEMMA_LLM_MODEL_ID, {
       onProgress: (value) => progress.push(value),
     });
 
-    expect(state).toMatchObject({ id: GEMMA_LLM_MODEL_ID, status: 'ready', progress: 100 });
+    expect(state).toMatchObject({ id: aiModelCatalog.GEMMA_LLM_MODEL_ID, status: 'ready', progress: 100 });
     expect(progress).toEqual([10, 18, 18, 55, 100]);
   });
 
@@ -157,17 +141,17 @@ describe('BrowserModelSetupService', () => {
       loadTextGenerationModel,
       releaseTextGenerationModel,
     };
-    const service = new BrowserModelSetupService(
+    const service = new modelSetupService.BrowserModelSetupService(
       { loadImageEditingModel },
       createStorage(),
       { loadImageGenerationModel },
       textGenerationLoader,
     );
 
-    await service.downloadModel(GEMMA_LLM_MODEL_ID);
+    await service.downloadModel(aiModelCatalog.GEMMA_LLM_MODEL_ID);
 
-    expect(loadTextGenerationModel).toHaveBeenCalledWith(GEMMA_LLM_TRANSFORMERS_MODEL_ID, expect.any(Object));
-    expect(releaseTextGenerationModel).toHaveBeenCalledWith(GEMMA_LLM_TRANSFORMERS_MODEL_ID);
+    expect(loadTextGenerationModel).toHaveBeenCalledWith(aiModelCatalog.GEMMA_LLM_TRANSFORMERS_MODEL_ID, expect.any(Object));
+    expect(releaseTextGenerationModel).toHaveBeenCalledWith(aiModelCatalog.GEMMA_LLM_TRANSFORMERS_MODEL_ID);
   });
 
   it('downloads the language detection model independently', async () => {
@@ -181,7 +165,7 @@ describe('BrowserModelSetupService', () => {
     const languageDetectionLoader: LanguageDetectionModelLoader = {
       loadLanguageDetectionModel,
     };
-    const service = new BrowserModelSetupService(
+    const service = new modelSetupService.BrowserModelSetupService(
       { loadImageEditingModel },
       createStorage(),
       { loadImageGenerationModel },
@@ -191,11 +175,11 @@ describe('BrowserModelSetupService', () => {
     );
 
     const progress: number[] = [];
-    const state = await service.downloadModel(LANGUAGE_DETECTION_MODEL_ID, {
+    const state = await service.downloadModel(aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID, {
       onProgress: (value) => progress.push(value),
     });
 
-    expect(state).toMatchObject({ id: LANGUAGE_DETECTION_MODEL_ID, status: 'ready', progress: 100 });
+    expect(state).toMatchObject({ id: aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID, status: 'ready', progress: 100 });
     expect(progress).toEqual([42, 100]);
     expect(loadLanguageDetectionModel).toHaveBeenCalledTimes(1);
     expect(loadTextGenerationModel).not.toHaveBeenCalled();
@@ -206,7 +190,7 @@ describe('BrowserModelSetupService', () => {
     const loader: ImageEditingModelLoader = {
       loadImageEditingModel,
     };
-    const service = new BrowserModelSetupService(
+    const service = new modelSetupService.BrowserModelSetupService(
       loader,
       createStorage({ 'ew-canvas-ai.model.image-editing-models.ready': 'true' }),
     );
@@ -217,7 +201,7 @@ describe('BrowserModelSetupService', () => {
       status: 'ready',
       progress: 100,
     });
-    expect(states.find((state) => state.id === IMAGE_GENERATION_MODEL_ID)).toMatchObject({
+    expect(states.find((state) => state.id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID)).toMatchObject({
       status: 'needs-download',
       progress: 0,
     });
@@ -227,7 +211,7 @@ describe('BrowserModelSetupService', () => {
   it('restores image generation ready state from browser cache metadata', async () => {
     const loadImageEditingModel = vi.fn().mockResolvedValue(undefined);
     const loadImageGenerationModel = vi.fn().mockResolvedValue(undefined);
-    const service = new BrowserModelSetupService(
+    const service = new modelSetupService.BrowserModelSetupService(
       { loadImageEditingModel },
       createStorage({ 'ew-canvas-ai.model.image-generation-models.runtime-v1.ready': 'true' }),
       { loadImageGenerationModel },
@@ -235,8 +219,8 @@ describe('BrowserModelSetupService', () => {
 
     const states = await service.getModelStates();
 
-    expect(states.find((state) => state.id === IMAGE_GENERATION_MODEL_ID)).toMatchObject({
-      id: IMAGE_GENERATION_MODEL_ID,
+    expect(states.find((state) => state.id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID)).toMatchObject({
+      id: imageGenerationModel.IMAGE_GENERATION_MODEL_ID,
       status: 'ready',
       progress: 100,
     });
@@ -255,7 +239,7 @@ describe('BrowserModelSetupService', () => {
     const modelCacheStorage: ModelCacheStorage = {
       deleteModelArtifacts,
     };
-    const service = new BrowserModelSetupService(
+    const service = new modelSetupService.BrowserModelSetupService(
       { loadImageEditingModel },
       storage,
       undefined,
@@ -263,10 +247,10 @@ describe('BrowserModelSetupService', () => {
       modelCacheStorage,
     );
 
-    const state = await service.removeModel(TRANSLATEGEMMA_MODEL_ID);
+    const state = await service.removeModel(aiModelCatalog.TRANSLATEGEMMA_MODEL_ID);
 
     expect(state).toMatchObject({
-      id: TRANSLATEGEMMA_MODEL_ID,
+      id: aiModelCatalog.TRANSLATEGEMMA_MODEL_ID,
       status: 'needs-download',
       progress: 0,
     });
@@ -292,12 +276,12 @@ describe('BrowserModelSetupService', () => {
     };
     vi.stubGlobal('caches', {
       open: vi.fn((cacheName: string) => {
-        expect(cacheName).toBe(TRANSFORMERS_CACHE_KEY);
+        expect(cacheName).toBe(imageGenerationModel.TRANSFORMERS_CACHE_KEY);
         return Promise.resolve(cache);
       }),
     });
 
-    await new BrowserTransformersModelCache().deleteModelArtifacts('onnx-community/gemma-4-E2B-it-ONNX');
+    await new modelSetupService.BrowserTransformersModelCache().deleteModelArtifacts('onnx-community/gemma-4-E2B-it-ONNX');
 
     expect(deletedRequests).toEqual([
       'https://huggingface.co/onnx-community/gemma-4-E2B-it-ONNX/resolve/main/config.json',
@@ -306,15 +290,15 @@ describe('BrowserModelSetupService', () => {
   });
 
   it('restores language detection ready state from browser cache metadata', async () => {
-    const service = new BrowserModelSetupService(
+    const service = new modelSetupService.BrowserModelSetupService(
       { loadImageEditingModel: vi.fn().mockResolvedValue(undefined) },
       createStorage({ 'localstudio.ai.model.language-detection-webgpu.ready': 'true' }),
     );
 
     const states = await service.getModelStates();
 
-    expect(states.find((state) => state.id === LANGUAGE_DETECTION_MODEL_ID)).toMatchObject({
-      id: LANGUAGE_DETECTION_MODEL_ID,
+    expect(states.find((state) => state.id === aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID)).toMatchObject({
+      id: aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID,
       status: 'ready',
       progress: 100,
     });

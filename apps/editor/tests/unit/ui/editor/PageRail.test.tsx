@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
-import { createSampleProject } from '../../../../src/domain/sampleProject';
+import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 import { PageRail } from '../../../../src/ui/editor/PageRail';
 
 describe('PageRail', () => {
@@ -11,7 +11,7 @@ describe('PageRail', () => {
 
     render(
       <PageRail
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         activePageId="page-1"
         onAddPage={onAddPage}
       />,
@@ -33,7 +33,7 @@ describe('PageRail', () => {
 
     render(
       <PageRail
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         activePageId="page-1"
         onImportImage={onImportImage}
       />,

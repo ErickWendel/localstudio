@@ -1,5 +1,5 @@
 import { createAppServices } from '../../../src/app/composition';
-import { createBlankProject } from '../../../src/domain/sampleProject';
+import { sampleProject } from '../../../src/domain/projects/sampleProject';
 import { BrowserFileSystemProjectRepository } from '../../../src/services/browserFileSystemProjectRepository';
 import { BrowserImageGenerationService } from '../../../src/services/browserImageGenerationService';
 import { DisabledProjectRepository } from '../../../src/services/disabledProjectRepository';
@@ -43,7 +43,7 @@ describe('createAppServices', () => {
 
   it('starts new app services with a blank project by default', () => {
     const project = createAppServices().initialProject;
-    const blankProject = createBlankProject();
+    const blankProject = sampleProject.createBlankProject();
 
     expect(project.name).toBe(blankProject.name);
     expect(project.assets).toEqual({});

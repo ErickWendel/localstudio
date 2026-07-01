@@ -1,13 +1,13 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
-import { createSampleProject } from '../../../../src/domain/sampleProject';
+import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 import { PagesPanel } from '../../../../src/ui/editor/PagesPanel';
 
 describe('PagesPanel', () => {
   it('selects, adds, duplicates, hides, deletes, reorders, renames, and translates pages', async () => {
     const user = userEvent.setup();
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     project.pages.push({
       ...project.pages[0]!,
       id: 'page-2',

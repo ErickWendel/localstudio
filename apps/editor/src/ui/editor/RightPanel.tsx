@@ -1,11 +1,11 @@
 import { Brush, Layers3, Sparkles } from 'lucide-react';
 import type { PageBackground, ProjectDocument, SelectionState } from '../../domain/model';
-import type { ElementStylePatch, MediaPlaybackPatch } from '../../domain/commands/basicCommands';
+import type { ElementStylePatch, MediaPlaybackPatch } from '../../domain/commands/elements/basicCommands';
 import type { AiProviderState, ModelState } from '../../services/interfaces';
 import { SegmentedTabs, type SegmentedTab } from '../components/SegmentedTabs';
 import { AiToolsPanel } from './AiToolsPanel';
 import { DesignPanel } from './DesignPanel';
-import type { CreateImagePromptOptions } from './imagePromptOptions';
+import type { CreateImagePromptOptions } from './media/imagePromptOptions';
 import { LayersPanel } from './LayersPanel';
 import type { RightPanelTab } from './useEditorViewModel';
 

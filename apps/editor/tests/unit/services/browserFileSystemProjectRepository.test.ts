@@ -1,4 +1,4 @@
-import { createSampleProject } from '../../../src/domain/sampleProject';
+import { sampleProject } from '../../../src/domain/projects/sampleProject';
 import {
   BrowserFileSystemProjectRepository,
   type RecentProjectHandleStore,
@@ -106,7 +106,7 @@ describe('BrowserFileSystemProjectRepository', () => {
       pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
       recentProjectStore: new MemoryRecentProjectHandleStore(),
     });
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
 
     await repository.saveProject(project);
 
@@ -133,7 +133,7 @@ describe('BrowserFileSystemProjectRepository', () => {
       pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
       recentProjectStore: new MemoryRecentProjectHandleStore(),
     });
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
 
     await repository.saveProject(project);
     const loaded = await repository.loadProject();
@@ -148,7 +148,7 @@ describe('BrowserFileSystemProjectRepository', () => {
       pickDirectory: () => Promise.resolve(parentDirectory as unknown as FileSystemDirectoryHandle),
       recentProjectStore: new MemoryRecentProjectHandleStore(),
     });
-    const project = { ...createSampleProject(), name: 'Launch Deck' };
+    const project = { ...sampleProject.createSampleProject(), name: 'Launch Deck' };
 
     await repository.saveProject(project, { projectDirectoryName: 'Launch Deck' });
 
@@ -165,7 +165,7 @@ describe('BrowserFileSystemProjectRepository', () => {
       pickDirectory: () => Promise.resolve(parentDirectory as unknown as FileSystemDirectoryHandle),
       recentProjectStore: new MemoryRecentProjectHandleStore(),
     });
-    const project = { ...createSampleProject(), name: 'Launch Deck' };
+    const project = { ...sampleProject.createSampleProject(), name: 'Launch Deck' };
 
     await repository.saveProject(project, { projectDirectoryName: 'Launch Deck' });
     await repository.saveProject({ ...project, name: 'Renamed Launch Deck' });
@@ -180,7 +180,7 @@ describe('BrowserFileSystemProjectRepository', () => {
 
   it('imports an existing project folder without overwriting it first', async () => {
     const directory = new MockDirectoryHandle();
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     directory.files.set('project.json', JSON.stringify({ ...project, name: 'Imported Project' }));
     const repository = new BrowserFileSystemProjectRepository({
       pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
@@ -195,7 +195,7 @@ describe('BrowserFileSystemProjectRepository', () => {
 
   it('imports a mirrored remote project into a child folder named from the remote project', async () => {
     const directory = new MockDirectoryHandle('Projects');
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     const repository = new BrowserFileSystemProjectRepository({
       pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
       recentProjectStore: new MemoryRecentProjectHandleStore(),
@@ -231,7 +231,7 @@ describe('BrowserFileSystemProjectRepository', () => {
   it('keeps imported projects loadable when a mirrored asset file is missing locally', async () => {
     const directory = new MockDirectoryHandle('Projects');
     const project = {
-      ...createSampleProject(),
+      ...sampleProject.createSampleProject(),
       name: 'Remote Mirror',
       assets: {
         'missing-asset': {
@@ -264,7 +264,7 @@ describe('BrowserFileSystemProjectRepository', () => {
 
   it('returns null when an imported version manifest references a missing snapshot file', async () => {
     const directory = new MockDirectoryHandle('Projects');
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     const repository = new BrowserFileSystemProjectRepository({
       pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
       recentProjectStore: new MemoryRecentProjectHandleStore(),
@@ -309,7 +309,7 @@ describe('BrowserFileSystemProjectRepository', () => {
   it('reopens the last project folder from the recent handle store', async () => {
     const directory = new MockDirectoryHandle();
     const recentProjectStore = new MemoryRecentProjectHandleStore();
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     const firstRepository = new BrowserFileSystemProjectRepository({
       pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
       recentProjectStore,
@@ -328,8 +328,8 @@ describe('BrowserFileSystemProjectRepository', () => {
     const alphaDirectory = new MockDirectoryHandle();
     const betaDirectory = new MockDirectoryHandle();
     const recentProjectStore = new MemoryRecentProjectHandleStore();
-    const alphaProject = { ...createSampleProject(), id: 'alpha', name: 'Alpha Deck' };
-    const betaProject = { ...createSampleProject(), id: 'beta', name: 'Beta Deck' };
+    const alphaProject = { ...sampleProject.createSampleProject(), id: 'alpha', name: 'Alpha Deck' };
+    const betaProject = { ...sampleProject.createSampleProject(), id: 'beta', name: 'Beta Deck' };
 
     await new BrowserFileSystemProjectRepository({
       pickDirectory: () => Promise.resolve(alphaDirectory as unknown as FileSystemDirectoryHandle),
@@ -356,7 +356,7 @@ describe('BrowserFileSystemProjectRepository', () => {
       pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
       recentProjectStore: new MemoryRecentProjectHandleStore(),
     });
-    const previousProject = createSampleProject();
+    const previousProject = sampleProject.createSampleProject();
     const nextProject = {
       ...previousProject,
       elements: {

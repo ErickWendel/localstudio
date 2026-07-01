@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
-import { createSampleProject } from '../../../../src/domain/sampleProject';
+import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 import type { ProjectDocument } from '../../../../src/domain/model';
 import { RightPanel } from '../../../../src/ui/editor/RightPanel';
 
@@ -18,10 +18,10 @@ const modelStates = [
 ];
 
 describe('RightPanel', () => {
-  const project = createSampleProject();
+  const project = sampleProject.createSampleProject();
 
   function createMediaProject(): ProjectDocument {
-    const mediaProject = createSampleProject();
+    const mediaProject = sampleProject.createSampleProject();
     mediaProject.assets['asset-video'] = {
       id: 'asset-video',
       type: 'video',

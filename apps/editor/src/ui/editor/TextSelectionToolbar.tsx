@@ -1,6 +1,6 @@
-import type { ElementStylePatch } from '../../domain/commands/basicCommands';
+import type { ElementStylePatch } from '../../domain/commands/elements/basicCommands';
 import type { TextElement } from '../../domain/model';
-import { TEXT_FONT_FAMILIES } from './textStyleOptions';
+import { textStyleOptions } from './text/textStyleOptions';
 
 interface TextSelectionToolbarProps {
   disabled?: boolean;
@@ -39,7 +39,7 @@ export function TextSelectionToolbar({
           updateStyle({ fontFamily: event.target.value });
         }}
       >
-        {TEXT_FONT_FAMILIES.map((fontFamily) => (
+        {textStyleOptions.TEXT_FONT_FAMILIES.map((fontFamily) => (
           <option key={fontFamily} value={fontFamily}>
             {fontFamily}
           </option>

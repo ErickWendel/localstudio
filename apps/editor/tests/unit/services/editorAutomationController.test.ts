@@ -1,17 +1,17 @@
-import { EditorAutomationController } from '../../../src/services/editorAutomationController';
+import { editorAutomationController } from '../../../src/services/automation/editorAutomationController';
 import type { ProjectDocument } from '../../../src/domain/model';
-import { createSampleProject } from '../../../src/domain/sampleProject';
+import { sampleProject } from '../../../src/domain/projects/sampleProject';
 
 function projectWithName(name: string): ProjectDocument {
   return {
-    ...createSampleProject(),
+    ...sampleProject.createSampleProject(),
     name,
   };
 }
 
-describe('EditorAutomationController', () => {
+describe('editorAutomationController.EditorAutomationController', () => {
   it('creates a project through the automation delegate', async () => {
-    const controller = new EditorAutomationController({
+    const controller = new editorAutomationController.EditorAutomationController({
       createProject: vi.fn(() => Promise.resolve(projectWithName('Agent Deck'))),
       generateSlides: vi.fn(),
       generateImage: vi.fn(),
@@ -31,7 +31,7 @@ describe('EditorAutomationController', () => {
 
   it('generates slides and returns a compact project snapshot', async () => {
     const nextProject = projectWithName('Generated Deck');
-    const controller = new EditorAutomationController({
+    const controller = new editorAutomationController.EditorAutomationController({
       createProject: vi.fn(),
       generateSlides: vi.fn(() => Promise.resolve(nextProject)),
       generateImage: vi.fn(),
@@ -56,7 +56,7 @@ describe('EditorAutomationController', () => {
 
   it('rejects concurrent long-running work with a busy error', async () => {
     let resolveGeneration: ((project: ProjectDocument) => void) | undefined;
-    const controller = new EditorAutomationController({
+    const controller = new editorAutomationController.EditorAutomationController({
       createProject: vi.fn(),
       generateSlides: vi.fn(
         () =>
@@ -66,7 +66,7 @@ describe('EditorAutomationController', () => {
       ),
       generateImage: vi.fn(),
       translateText: vi.fn(),
-      getState: () => ({ project: createSampleProject(), selection: { pageId: 'page-1', elementIds: [] } }),
+      getState: () => ({ project: sampleProject.createSampleProject(), selection: { pageId: 'page-1', elementIds: [] } }),
     });
 
     const firstRun = controller.generateSlides({ prompt: 'Top title and three body bullets about why Web AI is useful.' });
@@ -75,19 +75,19 @@ describe('EditorAutomationController', () => {
       errorCode: 'busy',
       message: 'Another automation action is already running.',
     });
-    resolveGeneration?.(createSampleProject());
+    resolveGeneration?.(sampleProject.createSampleProject());
     await firstRun;
   });
 
   it('validates translation scope and image dimensions before calling the delegate', async () => {
     const generateImage = vi.fn();
     const translateText = vi.fn();
-    const controller = new EditorAutomationController({
+    const controller = new editorAutomationController.EditorAutomationController({
       createProject: vi.fn(),
       generateSlides: vi.fn(),
       generateImage,
       translateText,
-      getState: () => ({ project: createSampleProject(), selection: { pageId: 'page-1', elementIds: [] } }),
+      getState: () => ({ project: sampleProject.createSampleProject(), selection: { pageId: 'page-1', elementIds: [] } }),
     });
 
     await expect(controller.generateImage({ prompt: 'Create an image', width: 15 })).resolves.toMatchObject({

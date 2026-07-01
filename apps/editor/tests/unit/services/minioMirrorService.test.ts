@@ -1,11 +1,8 @@
 import { vi } from 'vitest';
 import type { ProjectDocument } from '../../../src/domain/model';
-import { createSampleProject } from '../../../src/domain/sampleProject';
-import {
-  createMirrorFiles,
-  MinioMirrorService,
-  type MinioMirrorConfig,
-} from '../../../src/services/minioMirrorService';
+import { sampleProject } from '../../../src/domain/projects/sampleProject';
+import { minioMirrorService } from '../../../src/services/mirror/minioMirrorService';
+import type { MinioMirrorConfig } from '../../../src/services/mirror/minioMirrorService';
 import type { ProjectRepository, VersionHistoryEntry } from '../../../src/services/interfaces';
 
 const config: MinioMirrorConfig = {
@@ -48,9 +45,9 @@ function getRequestUrl(input: RequestInfo | URL) {
   return input;
 }
 
-describe('createMirrorFiles', () => {
+describe('minioMirrorService.createMirrorFiles', () => {
   it('creates a complete portable project mirror payload', async () => {
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     const versionProject = {
       ...project,
       name: 'Older name',
@@ -66,7 +63,7 @@ describe('createMirrorFiles', () => {
       summary: '1 edit',
     };
 
-    const files = await createMirrorFiles(
+    const files = await minioMirrorService.createMirrorFiles(
       project,
       new VersionedRepository([version], versionProject),
       config,
@@ -103,9 +100,9 @@ describe('createMirrorFiles', () => {
   });
 });
 
-describe('MinioMirrorService', () => {
+describe('minioMirrorService.MinioMirrorService', () => {
   it('binds the browser fetch function when no fetch override is provided', async () => {
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     const originalFetch = globalThis.fetch;
     const fetchMock = vi.fn(function (this: unknown, input: RequestInfo | URL, init?: RequestInit) {
       expect(this).toBe(globalThis);
@@ -121,7 +118,7 @@ describe('MinioMirrorService', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     try {
-      await new MinioMirrorService({ now: () => new Date('2026-06-30T10:00:00.000Z') }).syncProject(
+      await new minioMirrorService.MinioMirrorService({ now: () => new Date('2026-06-30T10:00:00.000Z') }).syncProject(
         project,
         new VersionedRepository([], project),
         config,
@@ -134,7 +131,7 @@ describe('MinioMirrorService', () => {
   });
 
   it('uploads changed mirror files and skips unchanged remote entries', async () => {
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     const remoteManifest = {
       schemaVersion: 1,
       projectId: project.id,
@@ -165,7 +162,7 @@ describe('MinioMirrorService', () => {
       }
       return Promise.resolve(new Response('', { status: 404 }));
     });
-    const service = new MinioMirrorService({
+    const service = new minioMirrorService.MinioMirrorService({
       fetch: fetchMock,
       now: () => new Date('2026-06-30T10:00:00.000Z'),
     });
@@ -180,7 +177,7 @@ describe('MinioMirrorService', () => {
   });
 
   it('stores mirrored objects under the readable project name prefix', async () => {
-    const project = { ...createSampleProject(), name: 'Client Launch Deck' };
+    const project = { ...sampleProject.createSampleProject(), name: 'Client Launch Deck' };
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = getRequestUrl(input);
       if (init?.method === 'GET' && url.endsWith('localstudio-mirror.json')) {
@@ -191,7 +188,7 @@ describe('MinioMirrorService', () => {
       }
       return Promise.resolve(new Response('', { status: 404 }));
     });
-    const service = new MinioMirrorService({ fetch: fetchMock });
+    const service = new minioMirrorService.MinioMirrorService({ fetch: fetchMock });
 
     await service.syncProject(project, new VersionedRepository([], project), config);
 

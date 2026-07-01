@@ -1,7 +1,7 @@
 import { lazy, Suspense, useMemo } from 'react';
 import { createAppServices } from './app/composition';
-import { getPublicBasePath } from './app/publicBasePath';
-import { createBlankProject } from './domain/sampleProject';
+import { publicBasePath } from './app/routing/publicBasePath';
+import { sampleProject } from './domain/projects/sampleProject';
 
 const EditorShell = lazy(() =>
   import('./ui/editor/EditorShell').then((module) => ({ default: module.EditorShell })),
@@ -80,7 +80,7 @@ function getShareQueryRoute() {
 }
 
 function stripBasePath(pathname: string) {
-  const basePath = getPublicBasePath();
+  const basePath = publicBasePath.getPublicBasePath();
   if (basePath === '/') return pathname;
 
   if (!pathname.startsWith(basePath)) return pathname;
@@ -101,7 +101,7 @@ function EditorApp() {
     return createAppServices(
       shouldStartBlankProject
         ? {
-            initialProject: createBlankProject(),
+            initialProject: sampleProject.createBlankProject(),
             skipStoredProjectLoad: true,
           }
         : (() => {

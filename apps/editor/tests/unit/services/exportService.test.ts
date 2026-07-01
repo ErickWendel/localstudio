@@ -1,10 +1,10 @@
-import { createSampleProject } from '../../../src/domain/sampleProject';
+import { sampleProject } from '../../../src/domain/projects/sampleProject';
 import { BrowserExportService } from '../../../src/services/exportService';
 
 describe('BrowserExportService', () => {
   it('creates export file names for page images and PDF', () => {
     const service = new BrowserExportService();
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
 
     expect(service.getPageImageFileName(project, 'page-1', 'png')).toBe(
       'Untitled AI Deck-Slide 1.png',

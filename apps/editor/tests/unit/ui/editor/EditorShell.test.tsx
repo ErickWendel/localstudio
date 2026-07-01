@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { createAppServices as createRealAppServices } from '../../../../src/app/composition';
 import type { Asset, ProjectDocument } from '../../../../src/domain/model';
-import { createSampleProject } from '../../../../src/domain/sampleProject';
+import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 import type {
   BackgroundRemovalService,
   MirrorFile,
@@ -16,15 +16,15 @@ import type {
   ShareService,
   TranslatorService,
 } from '../../../../src/services/interfaces';
-import type { MinioMirrorConfig } from '../../../../src/services/minioMirrorService';
+import type { MinioMirrorConfig } from '../../../../src/services/mirror/minioMirrorService';
 import type { WebMcpDemoWindow, WebMcpTool } from '../../../../src/services/webMcpToolAdapter';
-import { InMemoryModelSetupService } from '../../../../src/services/modelSetupService';
+import { modelSetupService } from '../../../../src/services/model-setup/modelSetupService';
 import { EditorShell } from '../../../../src/ui/editor/EditorShell';
 
 function createAppServices(options: Parameters<typeof createRealAppServices>[0] = {}) {
   vi.stubGlobal('showDirectoryPicker', vi.fn());
   return createRealAppServices({
-    initialProject: createSampleProject(),
+    initialProject: sampleProject.createSampleProject(),
     ...options,
   });
 }
@@ -38,7 +38,7 @@ async function waitForShareButtonReady() {
 function enableSyncedSharing(services: ReturnType<typeof createAppServices>) {
   services.mirrorService = new RecordingMirrorService();
   services.shareService = new RecordingShareService();
-  services.projectRepository = new LoadingProjectRepository(createSampleProject());
+  services.projectRepository = new LoadingProjectRepository(sampleProject.createSampleProject());
   services.persistenceAvailable = true;
   services.skipStoredProjectLoad = false;
 }
@@ -310,7 +310,7 @@ function createClipboardData(options: { editorObject?: boolean; files?: File[] }
 }
 
 function createProjectWithVideo(): ProjectDocument {
-  const project = createSampleProject();
+  const project = sampleProject.createSampleProject();
   project.assets['asset-video'] = {
     id: 'asset-video',
     type: 'video',
@@ -970,7 +970,7 @@ describe('EditorShell', () => {
 
   it('duplicates the active slide with copied elements and remapped animations', async () => {
     const user = userEvent.setup();
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     project.pages[0] = {
       ...project.pages[0]!,
       animationBuilds: [
@@ -995,7 +995,7 @@ describe('EditorShell', () => {
 
   it('starts animation preview when playing the presentation from the toolbar', async () => {
     const user = userEvent.setup();
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     project.pages[0] = {
       ...project.pages[0]!,
       transition: { effect: 'reveal', delayMs: 0 },
@@ -1017,7 +1017,7 @@ describe('EditorShell', () => {
 
   it('starts animation preview from the Animate panel play button', async () => {
     const user = userEvent.setup();
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     project.pages[0] = {
       ...project.pages[0]!,
       animationBuilds: [
@@ -1039,7 +1039,7 @@ describe('EditorShell', () => {
 
   it('advances click-triggered animation preview with the right arrow key', async () => {
     const user = userEvent.setup();
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     project.pages[0] = {
       ...project.pages[0]!,
       transition: { effect: 'reveal', delayMs: 0 },
@@ -1066,7 +1066,7 @@ describe('EditorShell', () => {
 
   it('uses arrow keys to move between slides after the current preview step completes', async () => {
     const user = userEvent.setup();
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     project.pages = [
       {
         ...project.pages[0]!,
@@ -1133,7 +1133,7 @@ describe('EditorShell', () => {
         return Promise.resolve();
       }),
     });
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     project.pages = [
       {
         ...project.pages[0]!,
@@ -1184,7 +1184,7 @@ describe('EditorShell', () => {
       configurable: true,
       value: requestFullscreen,
     });
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     project.pages = [
       project.pages[0]!,
       {
@@ -1234,7 +1234,7 @@ describe('EditorShell', () => {
         return Promise.resolve();
       }),
     });
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     project.pages = [
       {
         ...project.pages[0]!,
@@ -1779,7 +1779,7 @@ describe('EditorShell', () => {
   it('enters and cancels background subject selection after image editing models are ready', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
-    services.modelSetupService = new InMemoryModelSetupService();
+    services.modelSetupService = new modelSetupService.InMemoryModelSetupService();
     services.backgroundRemovalService = new InstantBackgroundRemovalService();
     await services.modelSetupService.downloadModel('image-editing-models');
 

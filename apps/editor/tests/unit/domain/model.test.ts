@@ -1,8 +1,8 @@
-import { createSampleProject } from '../../../src/domain/sampleProject';
+import { sampleProject } from '../../../src/domain/projects/sampleProject';
 
 describe('project model', () => {
   it('creates a page-based layered project', () => {
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     const firstPage = project.pages[0];
 
     expect(project.name).toBe('Untitled AI Deck');
@@ -15,7 +15,7 @@ describe('project model', () => {
   });
 
   it('keeps z-order as page elementIds', () => {
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     const firstPage = project.pages[0]!;
     const topElementId = firstPage.elementIds.at(-1);
 
@@ -23,7 +23,7 @@ describe('project model', () => {
   });
 
   it('sizes the title text box for multiline editing handles', () => {
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     const title = project.elements['text-title'];
 
     expect(title?.type).toBe('text');

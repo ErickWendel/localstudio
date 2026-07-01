@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import type Konva from 'konva';
 import { Arrow, Circle, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transformer } from 'react-konva';
-import type { ElementFramePatch, ImageCropPatch } from '../../domain/commands/basicCommands';
+import type { ElementFramePatch, ImageCropPatch } from '../../domain/commands/elements/basicCommands';
 import type {
   CropRect,
   DesignElement,
@@ -14,14 +14,9 @@ import type {
 } from '../../domain/model';
 import { getNormalizedElementPoint } from './backgroundSelection';
 import { FloatingSelectionToolbar } from './FloatingSelectionToolbar';
-import { calculateImageCropPatch, type ImageCropHandle } from './imageCrop';
-import {
-  getElementLabel,
-  getPolygonPoints,
-  getShapePaint,
-  isDesignElement,
-  useCanvasImage,
-} from './canvasWorkspaceUtils';
+import { imageCrop } from './canvas/imageCrop';
+import type { ImageCropHandle } from './canvas/imageCrop';
+import { canvasWorkspaceUtils } from './canvas/canvasWorkspaceUtils';
 
 const TEXT_FRAME_PADDING = 6;
 
@@ -165,7 +160,7 @@ export function CanvasWorkspace({
   const sourceVisibleElements =
     page?.elementIds
       .map((id) => project.elements[id])
-      .filter(isDesignElement)
+      .filter(canvasWorkspaceUtils.isDesignElement)
       .filter((element) => element.visible !== false) ?? [];
   const getDraftedElement = (element: DesignElement | undefined): DesignElement | undefined => {
     if (!element || element.type !== 'image' || cropDraft?.elementId !== element.id) return element;
@@ -173,7 +168,7 @@ export function CanvasWorkspace({
   };
   const visibleElements = sourceVisibleElements
     .map((element) => getDraftedElement(element))
-    .filter(isDesignElement);
+    .filter(canvasWorkspaceUtils.isDesignElement);
   const visibleMediaElements = visibleElements.filter(
     (element): element is GifElement | VideoElement => element.type === 'gif' || element.type === 'video',
   );
@@ -392,10 +387,10 @@ export function CanvasWorkspace({
     event.preventDefault();
     event.stopPropagation();
     const start = { x: event.clientX, y: event.clientY };
-    let latestPatch: ReturnType<typeof calculateImageCropPatch> | undefined;
+    let latestPatch: ReturnType<typeof imageCrop.calculateImageCropPatch> | undefined;
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
-      latestPatch = calculateImageCropPatch(element, handle, {
+      latestPatch = imageCrop.calculateImageCropPatch(element, handle, {
         x: (moveEvent.clientX - start.x) / scaleX,
         y: (moveEvent.clientY - start.y) / scaleY,
       });
@@ -672,7 +667,7 @@ export function CanvasWorkspace({
                 };
 
                 if (element.type === 'shape') {
-                  const paint = getShapePaint(element);
+                  const paint = canvasWorkspaceUtils.getShapePaint(element);
                   if (element.shape === 'ellipse') {
                     return (
                       <Rect
@@ -756,7 +751,7 @@ export function CanvasWorkspace({
                         {...paint}
                         closed
                         key={element.id}
-                        points={getPolygonPoints(element.shape, commonProps.width, commonProps.height)}
+                        points={canvasWorkspaceUtils.getPolygonPoints(element.shape, commonProps.width, commonProps.height)}
                         ref={nodeRef}
                       />
                     );
@@ -964,7 +959,7 @@ export function CanvasWorkspace({
             <div className="animation-build-badges" aria-label="Animation build badges">
               {animationBuildBadges.map(({ build, element, index }) => (
                 <span
-                  aria-label={`Animation build ${index + 1} for ${getElementLabel(element)}`}
+                  aria-label={`Animation build ${index + 1} for ${canvasWorkspaceUtils.getElementLabel(element)}`}
                   className={
                     selection.elementIds.includes(build.elementId)
                       ? 'animation-build-badge animation-build-badge-selected'
@@ -1035,7 +1030,7 @@ interface BackgroundSelectionPreviewProps {
 }
 
 function BackgroundSelectionPreview({ element, maskUrl, pending = false, point, scale }: BackgroundSelectionPreviewProps) {
-  const maskImage = useCanvasImage(maskUrl);
+  const maskImage = canvasWorkspaceUtils.useCanvasImage(maskUrl);
   const x = element.x * scale.x;
   const y = element.y * scale.y;
   const width = element.width * scale.x;
@@ -1223,7 +1218,7 @@ function CanvasVideoElement({ assetName, assetUrl, element, interactive, preview
 }
 
 function CanvasImageElement({ assetUrl, commonProps, element, nodeRef }: CanvasImageElementProps) {
-  const image = useCanvasImage(assetUrl);
+  const image = canvasWorkspaceUtils.useCanvasImage(assetUrl);
   const crop = element.crop && image
     ? {
         x: element.crop.x * image.naturalWidth,

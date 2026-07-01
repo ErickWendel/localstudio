@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { MirrorSettingsPanel } from '../../../../src/ui/editor/MirrorSettingsPanel';
-import type { MinioMirrorConfig } from '../../../../src/services/minioMirrorService';
+import type { MinioMirrorConfig } from '../../../../src/services/mirror/minioMirrorService';
 
 const config: MinioMirrorConfig = {
   accessKey: 'localstudio',

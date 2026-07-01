@@ -1,12 +1,13 @@
 import type {
   AutomationResult,
-  EditorAutomationController,
   GenerateImageAutomationInput,
   TranslateTextAutomationInput,
-} from './editorAutomationController';
-import { imagePromptExamples, slidePromptExamples } from '../ui/editor/promptRecipes';
+} from './automation/editorAutomationController';
+import { editorAutomationController } from './automation/editorAutomationController';
+import { promptRecipes } from '../ui/editor/prompting/promptRecipes';
 
 type ToolInput = Record<string, unknown>;
+type EditorAutomationController = InstanceType<typeof editorAutomationController.EditorAutomationController>;
 
 export interface WebMcpTool {
   description: string;
@@ -84,7 +85,7 @@ export class WebMcpToolAdapter {
       },
       {
         name: 'generate_slides',
-        description: `Generate slide content on the active page from a prompt. Good prompt examples:\n${promptExamplesList(slidePromptExamples)}`,
+        description: `Generate slide content on the active page from a prompt. Good prompt examples:\n${promptExamplesList(promptRecipes.slidePromptExamples)}`,
         inputSchema: {
           type: 'object',
           required: ['prompt'],
@@ -94,7 +95,7 @@ export class WebMcpToolAdapter {
       },
       {
         name: 'generate_image',
-        description: `Generate an image for the active slide. If an image is selected, replace it; otherwise insert a fitted image. Good prompt examples:\n${promptExamplesList(imagePromptExamples)}`,
+        description: `Generate an image for the active slide. If an image is selected, replace it; otherwise insert a fitted image. Good prompt examples:\n${promptExamplesList(promptRecipes.imagePromptExamples)}`,
         inputSchema: {
           type: 'object',
           required: ['prompt'],

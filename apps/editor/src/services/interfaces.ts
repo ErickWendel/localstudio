@@ -3,7 +3,7 @@ import type {
   GeneratedSlideElement,
   GeneratedSlideTask,
   GeneratedSlideTasksDocument,
-} from '../domain/generatedSlide';
+} from '../domain/generated-slides/generatedSlide';
 
 export type ModelStatus = 'unavailable' | 'needs-download' | 'downloading' | 'ready' | 'failed';
 export type AiCapability =

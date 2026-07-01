@@ -1,16 +1,9 @@
-import {
-  GENERATED_SLIDE_ELEMENT_RESPONSE_SCHEMA,
-  GENERATED_SLIDE_TASKS_RESPONSE_SCHEMA,
-  parseGeneratedSlideElementJson,
-  parseGeneratedSlideTasksJson,
-  type GeneratedSlideElement,
-  type GeneratedSlideTask,
-  type GeneratedSlideTasksDocument,
-} from '../domain/generatedSlide';
+import { generatedSlide } from '../domain/generated-slides/generatedSlide';
+import type { GeneratedSlideElement, GeneratedSlideTask, GeneratedSlideTasksDocument } from '../domain/generated-slides/generatedSlide';
 import type { PromptApiAvailability, PromptService } from './interfaces';
 import { buildSlideElementPrompt } from './prompts/slideElementPrompt';
-import { applySlideElementLayoutPreset, normalizeSlideTasksForLayout } from './prompts/slideLayoutPresets';
-import { buildSlideTaskPrompt, extractImageUrls } from './prompts/slideTaskPrompt';
+import { slideLayoutPresets } from './prompting/slideLayoutPresets';
+import { slideTaskPrompt } from './prompting/slideTaskPrompt';
 
 type ChromePromptAvailability =
   | 'available'
@@ -80,15 +73,15 @@ export class ChromePromptService implements PromptService {
     options: { targetLanguageHint?: string } = {},
   ): Promise<GeneratedSlideTasksDocument> {
     const response = await this.promptWithStructuredOutput(
-      buildSlideTaskPrompt({
+      slideTaskPrompt.buildSlideTaskPrompt({
         userPrompt: prompt,
         targetLanguageHint: options.targetLanguageHint ?? 'same as user prompt',
-        imageUrls: extractImageUrls(prompt),
+        imageUrls: slideTaskPrompt.extractImageUrls(prompt),
       }),
-      GENERATED_SLIDE_TASKS_RESPONSE_SCHEMA,
+      generatedSlide.GENERATED_SLIDE_TASKS_RESPONSE_SCHEMA,
     );
     this.ready = true;
-    return normalizeSlideTasksForLayout(parseGeneratedSlideTasksJson(response), prompt);
+    return slideLayoutPresets.normalizeSlideTasksForLayout(generatedSlide.parseGeneratedSlideTasksJson(response), prompt);
   }
 
   async generateSlideElementFromTask(
@@ -108,10 +101,10 @@ export class ChromePromptService implements PromptService {
         page: context.page,
         existingElements: context.existingElements,
       }),
-      GENERATED_SLIDE_ELEMENT_RESPONSE_SCHEMA,
+      generatedSlide.GENERATED_SLIDE_ELEMENT_RESPONSE_SCHEMA,
     );
     this.ready = true;
-    return applySlideElementLayoutPreset(parseGeneratedSlideElementJson(response), {
+    return slideLayoutPresets.applySlideElementLayoutPreset(generatedSlide.parseGeneratedSlideElementJson(response), {
       task,
       allTasks: context.allTasks,
       page: context.page,

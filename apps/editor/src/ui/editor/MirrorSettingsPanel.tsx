@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { MirrorState } from '../../services/interfaces';
-import type { MinioMirrorConfig } from '../../services/minioMirrorService';
+import type { MinioMirrorConfig } from '../../services/mirror/minioMirrorService';
 
 interface MirrorSettingsPanelProps {
   config: MinioMirrorConfig;

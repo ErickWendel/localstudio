@@ -2,11 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import type Konva from 'konva';
 import type { AppServices } from '../../app/composition';
 import type { ShareMetadata } from '../../services/interfaces';
-import {
-  EditorAutomationController,
-  type EditorAutomationDelegate,
-} from '../../services/editorAutomationController';
-import { IMAGE_EDITING_MODEL_ID } from '../../services/modelSetupService';
+import { editorAutomationController } from '../../services/automation/editorAutomationController';
+import type { EditorAutomationDelegate } from '../../services/automation/editorAutomationController';
+import { modelSetupService } from '../../services/model-setup/modelSetupService';
 import {
   WebMcpToolAdapter,
   type WebMcpDemoWindow,
@@ -24,15 +22,7 @@ import { TopToolbar } from './TopToolbar';
 import { VersionHistoryPanel } from './VersionHistoryPanel';
 import { useEditorViewModel } from './useEditorViewModel';
 import { SharePanel } from '../share/SharePanel';
-import {
-  getClipboardImageFile,
-  getWebMcpModelContext,
-  hasBrowserTextSelection,
-  hasEditorObjectClipboardMarker,
-  isEditableInteractionTarget,
-  isWebMcpEnabled,
-  writeEditorObjectClipboardMarker,
-} from './editorShellBrowserUtils';
+import { editorShellBrowserUtils } from './browser/editorShellBrowserUtils';
 
 interface EditorShellProps {
   services: AppServices;
@@ -135,7 +125,7 @@ export function EditorShell({ services }: EditorShellProps) {
       }
 
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'a') {
-        if (isEditableInteractionTarget(event.target)) return;
+        if (editorShellBrowserUtils.isEditableInteractionTarget(event.target)) return;
         event.preventDefault();
         vm.selectAllElementsOnActivePage();
         return;
@@ -149,7 +139,7 @@ export function EditorShell({ services }: EditorShellProps) {
 
       const isPresenterPlayback = vm.animationPreview?.mode === 'presenter';
       const isPreviewNavigationActive = vm.isFullscreen || Boolean(isPresenterPlayback && vm.animationPreview?.playing);
-      if (isPreviewNavigationActive && !isEditableInteractionTarget(event.target)) {
+      if (isPreviewNavigationActive && !editorShellBrowserUtils.isEditableInteractionTarget(event.target)) {
         const isNextPreviewKey =
           event.key === 'ArrowRight' ||
           event.key === 'ArrowDown' ||
@@ -167,7 +157,7 @@ export function EditorShell({ services }: EditorShellProps) {
 
       if (event.key !== 'Delete' && event.key !== 'Backspace') return;
       const target = event.target;
-      if (isEditableInteractionTarget(target)) {
+      if (editorShellBrowserUtils.isEditableInteractionTarget(target)) {
         return;
       }
 
@@ -189,28 +179,28 @@ export function EditorShell({ services }: EditorShellProps) {
   useEffect(() => {
     function handleCopy(event: ClipboardEvent) {
       if (isHistoryReadOnly) return;
-      if (isEditableInteractionTarget(event.target) || hasBrowserTextSelection() || !hasSelection)
+      if (editorShellBrowserUtils.isEditableInteractionTarget(event.target) || editorShellBrowserUtils.hasBrowserTextSelection() || !hasSelection)
         return;
       event.preventDefault();
       vm.copySelectedElements();
-      writeEditorObjectClipboardMarker(event.clipboardData);
+      editorShellBrowserUtils.writeEditorObjectClipboardMarker(event.clipboardData);
     }
 
     function handleCut(event: ClipboardEvent) {
       if (isHistoryReadOnly) return;
-      if (isEditableInteractionTarget(event.target) || hasBrowserTextSelection() || !hasSelection)
+      if (editorShellBrowserUtils.isEditableInteractionTarget(event.target) || editorShellBrowserUtils.hasBrowserTextSelection() || !hasSelection)
         return;
       event.preventDefault();
       vm.cutSelectedElements();
-      writeEditorObjectClipboardMarker(event.clipboardData);
+      editorShellBrowserUtils.writeEditorObjectClipboardMarker(event.clipboardData);
     }
 
     function handlePaste(event: ClipboardEvent) {
       if (isHistoryReadOnly) return;
-      if (isEditableInteractionTarget(event.target)) return;
+      if (editorShellBrowserUtils.isEditableInteractionTarget(event.target)) return;
       event.preventDefault();
-      if (hasEditorObjectClipboardMarker(event.clipboardData) && vm.pasteCopiedElements()) return;
-      const imageFile = getClipboardImageFile(event.clipboardData);
+      if (editorShellBrowserUtils.hasEditorObjectClipboardMarker(event.clipboardData) && vm.pasteCopiedElements()) return;
+      const imageFile = editorShellBrowserUtils.getClipboardImageFile(event.clipboardData);
       if (imageFile) {
         void vm.importImageFile(imageFile);
         return;
@@ -229,7 +219,7 @@ export function EditorShell({ services }: EditorShellProps) {
   }, [hasSelection, isHistoryReadOnly, vm]);
 
   useEffect(() => {
-    if (!isWebMcpEnabled()) return undefined;
+    if (!editorShellBrowserUtils.isWebMcpEnabled()) return undefined;
     const delegate: EditorAutomationDelegate = {
       createProject: (input) => automationDelegateRef.current.createProject(input),
       generateSlides: (input) => automationDelegateRef.current.generateSlides(input),
@@ -237,9 +227,9 @@ export function EditorShell({ services }: EditorShellProps) {
       translateText: (input) => automationDelegateRef.current.translateText(input),
       getState: () => automationDelegateRef.current.getState(),
     };
-    const adapter = new WebMcpToolAdapter(new EditorAutomationController(delegate));
+    const adapter = new WebMcpToolAdapter(new editorAutomationController.EditorAutomationController(delegate));
     const demoWindow = window as WebMcpDemoWindow;
-    const modelContext = getWebMcpModelContext();
+    const modelContext = editorShellBrowserUtils.getWebMcpModelContext();
     demoWindow.localStudioWebMcpTools = adapter.createTools();
     const unregister = modelContext ? adapter.register(modelContext) : undefined;
 
@@ -397,7 +387,7 @@ export function EditorShell({ services }: EditorShellProps) {
           modelStates={vm.modelStates}
           attentionModelId={
             vm.aiToolsAttentionModelId ??
-            (vm.backgroundSelectionNotice ? IMAGE_EDITING_MODEL_ID : undefined)
+            (vm.backgroundSelectionNotice ? modelSetupService.IMAGE_EDITING_MODEL_ID : undefined)
           }
           createImageOptions={vm.createImageOptions}
           translationLanguageOptions={vm.translationLanguageOptions}

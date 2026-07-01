@@ -1,12 +1,8 @@
-import {
-  buildSlideTaskPrompt,
-  extractImageUrls,
-  looksLikeImageGenerationRequest,
-} from '../../../../src/services/prompts/slideTaskPrompt';
+import { slideTaskPrompt } from '../../../../src/services/prompting/slideTaskPrompt';
 
 describe('slide task prompt', () => {
   it('asks Prompt API for a staged task list using the design system', () => {
-    const prompt = buildSlideTaskPrompt({
+    const prompt = slideTaskPrompt.buildSlideTaskPrompt({
       userPrompt: 'A slide with the title Why Web AI Matters',
       targetLanguageHint: 'same as user prompt',
       imageUrls: [],
@@ -25,7 +21,7 @@ describe('slide task prompt', () => {
   });
 
   it('tells Prompt API to preserve the requested language', () => {
-    const prompt = buildSlideTaskPrompt({
+    const prompt = slideTaskPrompt.buildSlideTaskPrompt({
       userPrompt: 'Um slide em português sobre IA no navegador',
       targetLanguageHint: 'same as user prompt',
       imageUrls: [],
@@ -38,18 +34,18 @@ describe('slide task prompt', () => {
   it('allows remote image URLs without treating them as image generation', () => {
     const prompt = 'A slide using https://example.com/photo.jpeg as the main image';
 
-    expect(extractImageUrls(prompt)).toEqual(['https://example.com/photo.jpeg']);
-    expect(looksLikeImageGenerationRequest(prompt)).toBe(false);
+    expect(slideTaskPrompt.extractImageUrls(prompt)).toEqual(['https://example.com/photo.jpeg']);
+    expect(slideTaskPrompt.looksLikeImageGenerationRequest(prompt)).toBe(false);
   });
 
   it('detects image generation requests that should use Create image mode', () => {
-    expect(looksLikeImageGenerationRequest('generate an image of a futuristic browser')).toBe(true);
-    expect(looksLikeImageGenerationRequest('crie uma imagem de uma árvore congelada')).toBe(true);
-    expect(looksLikeImageGenerationRequest('a slide with a placeholder image on the left')).toBe(false);
+    expect(slideTaskPrompt.looksLikeImageGenerationRequest('generate an image of a futuristic browser')).toBe(true);
+    expect(slideTaskPrompt.looksLikeImageGenerationRequest('crie uma imagem de uma árvore congelada')).toBe(true);
+    expect(slideTaskPrompt.looksLikeImageGenerationRequest('a slide with a placeholder image on the left')).toBe(false);
   });
 
   it('includes a concrete three-column recipe so columns are not collapsed into centered text', () => {
-    const prompt = buildSlideTaskPrompt({
+    const prompt = slideTaskPrompt.buildSlideTaskPrompt({
       userPrompt: 'A slide with three columns about Web AI: Privacy, Speed, and No Backend, each with an icon placeholder and one sentence',
       targetLanguageHint: 'same as user prompt',
       imageUrls: [],
@@ -65,7 +61,7 @@ describe('slide task prompt', () => {
   });
 
   it('includes a concrete left-image hero recipe for placeholder image slides', () => {
-    const prompt = buildSlideTaskPrompt({
+    const prompt = slideTaskPrompt.buildSlideTaskPrompt({
       userPrompt:
         'Create a 16:9 dark LocalStudio.dev slide with the placeholder image expanded large on the left, the neon green title “AI Design Revolution” on the right, and the subtitle “Browser-native creative” below it.',
       targetLanguageHint: 'same as user prompt',
@@ -81,7 +77,7 @@ describe('slide task prompt', () => {
   });
 
   it('defines fallback layout and palette decisions when the user omits them', () => {
-    const prompt = buildSlideTaskPrompt({
+    const prompt = slideTaskPrompt.buildSlideTaskPrompt({
       userPrompt: 'Title at the top and bullet points in the body about why Web AI is useful.',
       targetLanguageHint: 'same as user prompt',
       imageUrls: [],
@@ -96,7 +92,7 @@ describe('slide task prompt', () => {
   });
 
   it('gives explicit recipes for compact prompt examples', () => {
-    const prompt = buildSlideTaskPrompt({
+    const prompt = slideTaskPrompt.buildSlideTaskPrompt({
       userPrompt: 'Image grid with 3 placeholder images and short Web AI captions.',
       targetLanguageHint: 'same as user prompt',
       imageUrls: [],

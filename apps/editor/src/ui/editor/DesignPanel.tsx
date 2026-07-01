@@ -6,9 +6,9 @@ import type {
   SelectionState,
   VideoElement,
 } from '../../domain/model';
-import type { ElementStylePatch, MediaPlaybackPatch } from '../../domain/commands/basicCommands';
+import type { ElementStylePatch, MediaPlaybackPatch } from '../../domain/commands/elements/basicCommands';
 import { PanelSection } from '../components/PanelSection';
-import { TEXT_FONT_FAMILIES, TEXT_FONT_WEIGHTS } from './textStyleOptions';
+import { textStyleOptions } from './text/textStyleOptions';
 
 const palette = ['#37FD76', '#050D10', '#FFFFFF', '#91999D', '#00779A'];
 
@@ -135,7 +135,7 @@ export function DesignPanel({
                 updateSelectedStyle({ fontFamily: event.target.value });
               }}
             >
-              {TEXT_FONT_FAMILIES.map((fontFamily) => (
+              {textStyleOptions.TEXT_FONT_FAMILIES.map((fontFamily) => (
                 <option key={fontFamily} value={fontFamily}>
                   {fontFamily}
                 </option>
@@ -163,7 +163,7 @@ export function DesignPanel({
                 updateSelectedStyle({ fontWeight: Number(event.target.value) });
               }}
             >
-              {TEXT_FONT_WEIGHTS.map((fontWeight) => (
+              {textStyleOptions.TEXT_FONT_WEIGHTS.map((fontWeight) => (
                 <option key={fontWeight} value={fontWeight}>
                   {fontWeight}
                 </option>

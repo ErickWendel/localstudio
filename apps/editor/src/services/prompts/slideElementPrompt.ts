@@ -1,4 +1,4 @@
-import type { GeneratedSlideElement, GeneratedSlideTask, GeneratedSlideTasksDocument } from '../../domain/generatedSlide';
+import type { GeneratedSlideElement, GeneratedSlideTask, GeneratedSlideTasksDocument } from '../../domain/generated-slides/generatedSlide';
 
 interface BuildSlideElementPromptOptions {
   userPrompt: string;

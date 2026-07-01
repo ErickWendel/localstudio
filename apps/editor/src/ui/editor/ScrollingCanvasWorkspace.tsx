@@ -1,5 +1,5 @@
 import { forwardRef, type ComponentProps, type ReactNode, useEffect, useImperativeHandle, useRef } from 'react';
-import type { ElementStylePatch } from '../../domain/commands/basicCommands';
+import type { ElementStylePatch } from '../../domain/commands/elements/basicCommands';
 import { CanvasWorkspace } from './CanvasWorkspace';
 import { TextSelectionToolbar } from './TextSelectionToolbar';
 

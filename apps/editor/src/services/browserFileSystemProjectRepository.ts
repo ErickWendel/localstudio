@@ -6,17 +6,10 @@ import type {
   VersionHistoryManifest,
   VersionSnapshotMetadata,
 } from './interfaces';
-import { getBrowserLocalStorage, type BrowserKeyValueStorage } from './browserStorage';
-import {
-  getAssetFileExtension,
-  isReadableObjectUrl,
-  objectUrlToBlob,
-} from './assetFileUtils';
-import {
-  cloneProjectForHistory,
-  createChangeSummary,
-  createVersionId,
-} from './projectVersionHistoryUtils';
+import { browserStorage } from './browser/browserStorage';
+import type { BrowserKeyValueStorage } from './browser/browserStorage';
+import { assetFileUtils } from './storage/assetFileUtils';
+import { projectVersionHistoryUtils } from './storage/projectVersionHistoryUtils';
 
 interface FileSystemProjectRepositoryOptions {
   pickDirectory?: () => Promise<FileSystemDirectoryHandle>;
@@ -67,12 +60,12 @@ async function createFileBackedProjectSnapshot(
       continue;
     }
 
-    if (!isReadableObjectUrl(asset.objectUrl)) continue;
-    const fileName = asset.fileName ?? `${assetId}.${getAssetFileExtension(asset.mimeType)}`;
+    if (!assetFileUtils.isReadableObjectUrl(asset.objectUrl)) continue;
+    const fileName = asset.fileName ?? `${assetId}.${assetFileUtils.getAssetFileExtension(asset.mimeType)}`;
     await writeBlobFileToDirectory(
       assetsDirectory,
       fileName,
-      await objectUrlToBlob(asset.objectUrl),
+      await assetFileUtils.objectUrlToBlob(asset.objectUrl),
     );
     const assetForDisk = { ...asset };
     delete assetForDisk.objectUrl;
@@ -235,9 +228,9 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     });
     const manifest = await this.readVersionHistoryManifest(directoryHandle, project.id);
     const createdAt = new Date().toISOString();
-    const id = createVersionId(new Date(createdAt));
+    const id = projectVersionHistoryUtils.createVersionId(new Date(createdAt));
     const fileName = `${id}.json`;
-    const changeSummary = createChangeSummary(project, metadata.previousProject);
+    const changeSummary = projectVersionHistoryUtils.createChangeSummary(project, metadata.previousProject);
     const entry: VersionHistoryEntry = {
       id,
       createdAt,
@@ -258,7 +251,7 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     await this.writeJsonFile(
       versionsDirectory,
       fileName,
-      cloneProjectForHistory(projectForHistory),
+      projectVersionHistoryUtils.cloneProjectForHistory(projectForHistory),
     );
     const nextVersions = [entry, ...manifest.versions.filter((version) => version.id !== entry.id)];
     const retainedVersions = nextVersions.slice(0, VERSION_HISTORY_LIMIT);
@@ -460,7 +453,7 @@ class BrowserRecentProjectHandleStore implements RecentProjectHandleStore {
   private readonly handleKey = 'last-project-directory';
   private readonly localStorageKey = 'localstudio.ai.last-project.available';
 
-  constructor(private readonly storage: BrowserKeyValueStorage | undefined = getBrowserLocalStorage()) {}
+  constructor(private readonly storage: BrowserKeyValueStorage | undefined = browserStorage.getBrowserLocalStorage()) {}
 
   async load(projectName?: string): Promise<FileSystemDirectoryHandle | null> {
     if (typeof window === 'undefined') return null;

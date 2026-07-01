@@ -2,11 +2,11 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import type { ProjectDocument, ShapeElement } from '../../../../src/domain/model';
-import { createSampleProject } from '../../../../src/domain/sampleProject';
+import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 import { DesignPanel } from '../../../../src/ui/editor/DesignPanel';
 
 function createProjectWithSelectedShape(): ProjectDocument {
-  const project = createSampleProject();
+  const project = sampleProject.createSampleProject();
   const shape: ShapeElement = {
     id: 'shape-test',
     type: 'shape',

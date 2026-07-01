@@ -1,16 +1,12 @@
 import { Download, ImagePlus, Languages, ScanSearch, X } from 'lucide-react';
-import {
-  GEMMA_LLM_MODEL_ID,
-  LANGUAGE_DETECTION_MODEL_ID,
-  TRANSLATEGEMMA_MODEL_ID,
-} from '../../services/aiModelIds';
-import { IMAGE_GENERATION_DISPLAY_NAME, IMAGE_GENERATION_MODEL_ID } from '../../services/imageGenerationModels';
+import { aiModelCatalog } from '../../services/model-setup/aiModelCatalog';
+import { imageGenerationModel } from '../../services/image-generation/imageGenerationModel';
 import type { AiProviderState, ModelState } from '../../services/interfaces';
-import { IMAGE_EDITING_DISPLAY_NAME, IMAGE_EDITING_MODEL_ID } from '../../services/modelSetupService';
+import { modelSetupService } from '../../services/model-setup/modelSetupService';
 import { IconButton } from '../components/IconButton';
 import { StatusPill } from '../components/StatusPill';
-import type { CreateImagePromptOptions } from './imagePromptOptions';
-import { defaultCreateImagePromptOptions, getImageSizeLabel, imageSizePresets } from './imagePromptOptions';
+import type { CreateImagePromptOptions } from './media/imagePromptOptions';
+import { imagePromptOptions } from './media/imagePromptOptions';
 
 interface AiToolsPanelProps {
   activeSlideLanguage?: { code: string; displayCode: string; flag: string; label: string } | undefined;
@@ -83,8 +79,8 @@ function getPreparationTone(status: 'idle' | 'downloading' | 'ready' | 'failed')
 }
 
 function getFixedModelDisplayName(modelId: string, fallback: string) {
-  if (modelId === IMAGE_EDITING_MODEL_ID) return IMAGE_EDITING_DISPLAY_NAME;
-  if (modelId === IMAGE_GENERATION_MODEL_ID) return IMAGE_GENERATION_DISPLAY_NAME;
+  if (modelId === modelSetupService.IMAGE_EDITING_MODEL_ID) return modelSetupService.IMAGE_EDITING_DISPLAY_NAME;
+  if (modelId === imageGenerationModel.IMAGE_GENERATION_MODEL_ID) return imageGenerationModel.IMAGE_GENERATION_DISPLAY_NAME;
   return fallback;
 }
 
@@ -105,7 +101,7 @@ export function AiToolsPanel({
   activeSlideLanguage,
   modelStates,
   attentionModelId,
-  createImageOptions = defaultCreateImagePromptOptions,
+  createImageOptions = imagePromptOptions.defaultCreateImagePromptOptions,
   promptProviderStates = [],
   translationProviderStates = [],
   languageDetectionProviderStates = [],
@@ -211,9 +207,9 @@ export function AiToolsPanel({
     selectedTranslationProvider?.modelId && selectedTranslationProvider.readiness === 'ready';
   const visibleModelStates = modelStates.filter(
     (model) =>
-      model.id !== GEMMA_LLM_MODEL_ID &&
-      model.id !== TRANSLATEGEMMA_MODEL_ID &&
-      model.id !== LANGUAGE_DETECTION_MODEL_ID,
+      model.id !== aiModelCatalog.GEMMA_LLM_MODEL_ID &&
+      model.id !== aiModelCatalog.TRANSLATEGEMMA_MODEL_ID &&
+      model.id !== aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID,
   );
 
   return (
@@ -549,15 +545,15 @@ export function AiToolsPanel({
                     <span style={{ width: `${model.progress}%` }} />
                   </div>
                 )}
-                {model.id === IMAGE_GENERATION_MODEL_ID ? (
+                {model.id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID ? (
                   <div className="image-generation-settings" aria-label="Image generation settings">
                     <div className="image-generation-setting">
                       <span className="translation-target-label">Size</span>
                       <div className="image-size-presets" role="group" aria-label="Image size">
-                        {imageSizePresets.map((preset) => (
+                        {imagePromptOptions.imageSizePresets.map((preset) => (
                           <button
                             key={preset.label}
-                            aria-pressed={getImageSizeLabel(createImageOptions) === preset.label}
+                            aria-pressed={imagePromptOptions.getImageSizeLabel(createImageOptions) === preset.label}
                             className="image-size-preset"
                             type="button"
                             onClick={() => {

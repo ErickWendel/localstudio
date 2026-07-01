@@ -1,15 +1,11 @@
 import { render, screen, within } from '@testing-library/react';
-import {
-  GEMMA_LLM_DISPLAY_NAME,
-  LANGUAGE_DETECTION_DISPLAY_NAME,
-  TRANSLATEGEMMA_DISPLAY_NAME,
-} from '../../../../src/services/aiModelIds';
+import { aiModelCatalog } from '../../../../src/services/model-setup/aiModelCatalog';
 import type { AiProviderState } from '../../../../src/services/interfaces';
 import { AiToolsPanel } from '../../../../src/ui/editor/AiToolsPanel';
 
 const gemmaProvider: AiProviderState = {
   id: 'gemma-4-webgpu',
-  label: GEMMA_LLM_DISPLAY_NAME,
+  label: aiModelCatalog.GEMMA_LLM_DISPLAY_NAME,
   description: 'Browser-local Gemma LLM for prompt-to-slides.',
   capability: 'prompt',
   runtime: 'webgpu-huggingface',
@@ -21,7 +17,7 @@ const gemmaProvider: AiProviderState = {
 
 const translateGemmaProvider: AiProviderState = {
   id: 'translategemma-webgpu',
-  label: TRANSLATEGEMMA_DISPLAY_NAME,
+  label: aiModelCatalog.TRANSLATEGEMMA_DISPLAY_NAME,
   description: 'Browser-local WebGPU translation model.',
   capability: 'translation',
   runtime: 'webgpu-huggingface',
@@ -33,7 +29,7 @@ const translateGemmaProvider: AiProviderState = {
 
 const languageDetectionProvider: AiProviderState = {
   id: 'language-detection-webgpu',
-  label: LANGUAGE_DETECTION_DISPLAY_NAME,
+  label: aiModelCatalog.LANGUAGE_DETECTION_DISPLAY_NAME,
   description: 'Browser-local XLM-RoBERTa language detection fallback.',
   capability: 'language-detection',
   runtime: 'webgpu-huggingface',

@@ -1,4 +1,4 @@
-import { imagePromptExamples, slidePromptExamples } from '../../../src/ui/editor/promptRecipes';
+import { promptRecipes } from '../../../src/ui/editor/prompting/promptRecipes';
 import { WebMcpToolAdapter, type WebMcpTool } from '../../../src/services/webMcpToolAdapter';
 
 describe('WebMcpToolAdapter', () => {
@@ -25,8 +25,8 @@ describe('WebMcpToolAdapter', () => {
     ]);
     const generateSlidesTool = tools.find((tool) => tool.name === 'generate_slides');
     const generateImageTool = tools.find((tool) => tool.name === 'generate_image');
-    expect(generateSlidesTool?.description).toContain(slidePromptExamples[0]);
-    expect(generateImageTool?.description).toContain(imagePromptExamples[0]);
+    expect(generateSlidesTool?.description).toContain(promptRecipes.slidePromptExamples[0]);
+    expect(generateImageTool?.description).toContain(promptRecipes.imagePromptExamples[0]);
   });
 
   it('forwards tool calls to the automation controller', async () => {

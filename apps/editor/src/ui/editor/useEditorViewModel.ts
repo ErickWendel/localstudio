@@ -1,48 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AppServices } from '../../app/composition';
-import {
-  AddGeneratedSlideElementCommand,
-  AddElementsCommand,
-  AddImageElementCommand,
-  AddMediaElementCommand,
-  AlignElementCommand,
-  ClearElementAnimationBuildCommand,
-  ClearPageTransitionCommand,
-  DeleteElementCommand,
-  DeletePageCommand,
-  DuplicatePageCommand,
-  DuplicateElementCommand,
-  PrepareGeneratedSlideCommand,
-  RenamePageCommand,
-  ReorderPageCommand,
-  ReorderElementCommand,
-  RemoveAssetCommand,
-  ReorderElementAnimationBuildCommand,
-  ReplaceImageAssetCommand,
-  SetElementAnimationBuildsCommand,
-  SetElementLockCommand,
-  SetElementVisibilityCommand,
-  SetPageTransitionCommand,
-  SetPageVisibilityCommand,
-  SetZOrderCommand,
-  ToggleImageFlipCommand,
-  UpdateImageCropCommand,
-  TranslateTextElementsCommand,
-  UpdateElementFramesCommand,
-  UpdateElementStyleCommand,
-  UpdateElementFrameCommand,
-  UpdateMediaPlaybackCommand,
-  UpdatePageBackgroundCommand,
-  UpdateTextContentCommand,
-  type AlignMode,
-  type ElementAnimationPatch,
-  type ElementFramePatch,
-  type ImageCropPatch,
-  type ElementStylePatch,
-  type MediaPlaybackPatch,
-  type ZOrderMode,
-} from '../../domain/commands/basicCommands';
-import type { GeneratedSlideElement } from '../../domain/generatedSlide';
+import { basicCommands } from '../../domain/commands/elements/basicCommands';
+import type { AlignMode, ElementAnimationPatch, ElementFramePatch, ImageCropPatch, ElementStylePatch, MediaPlaybackPatch, ZOrderMode } from '../../domain/commands/elements/basicCommands';
+import type { GeneratedSlideElement } from '../../domain/generated-slides/generatedSlide';
 import { fitImageWithinPage } from '../../domain/imageSizing';
 import type {
   DesignElement,
@@ -55,12 +15,8 @@ import type {
   ShapeKind,
   SlideTransition,
 } from '../../domain/model';
-import {
-  createBlankProject,
-  SAMPLE_HERO_IMAGE_SIZE,
-  SAMPLE_HERO_IMAGE_URL,
-} from '../../domain/sampleProject';
-import type { EditorAutomationDelegate } from '../../services/editorAutomationController';
+import { sampleProject } from '../../domain/projects/sampleProject';
+import type { EditorAutomationDelegate } from '../../services/automation/editorAutomationController';
 import type {
   AiProviderState,
   MirrorProjectSummary,
@@ -69,39 +25,18 @@ import type {
   PromptApiAvailability,
   VersionHistoryEntry,
 } from '../../services/interfaces';
-import {
-  DEFAULT_MINIO_MIRROR_CONFIG,
-  type MinioMirrorConfig,
-} from '../../services/minioMirrorService';
-import {
-  GEMMA_LLM_MODEL_ID,
-  LANGUAGE_DETECTION_MODEL_ID,
-  TRANSLATEGEMMA_MODEL_ID,
-} from '../../services/aiModelIds';
-import {
-  DEFAULT_IMAGE_GENERATION_SIZE,
-  IMAGE_GENERATION_MODEL_ID,
-} from '../../services/imageGenerationModels';
-import { IMAGE_EDITING_MODEL_ID } from '../../services/modelSetupService';
+import { minioMirrorService } from '../../services/mirror/minioMirrorService';
+import type { MinioMirrorConfig } from '../../services/mirror/minioMirrorService';
+import { aiModelCatalog } from '../../services/model-setup/aiModelCatalog';
+import { imageGenerationModel } from '../../services/image-generation/imageGenerationModel';
+import { modelSetupService } from '../../services/model-setup/modelSetupService';
 import { createPrefixedId } from '../../services/idUtils';
-import { looksLikeImageGenerationRequest } from '../../services/prompts/slideTaskPrompt';
-import {
-  defaultCreateImagePromptOptions,
-  type CreateImagePromptOptions,
-} from './imagePromptOptions';
+import { slideTaskPrompt } from '../../services/prompting/slideTaskPrompt';
+import { imagePromptOptions } from './media/imagePromptOptions';
+import type { CreateImagePromptOptions } from './media/imagePromptOptions';
 import { TRANSLATION_LANGUAGE_OPTIONS } from './translationLanguages';
-import {
-  getLanguageDisplayCode,
-  getLanguageOption,
-  isSupportedTranslationLanguageCode,
-  normalizeLanguageCode,
-} from './translationLanguageUtils';
-import {
-  readPersistencePreference,
-  readTranslationTargetLanguage,
-  writePersistencePreference,
-  writeTranslationTargetLanguage,
-} from './editorPreferences';
+import { translationLanguageUtils } from './translation/translationLanguageUtils';
+import { editorPreferences } from './persistence/editorPreferences';
 import { useAnimationPreviewController } from './useAnimationPreviewController';
 
 export type RightPanelTab = 'layout' | 'text' | 'elements' | 'design' | 'ai-tools' | 'assets' | 'animations';
@@ -192,7 +127,7 @@ function normalizeProjectDocument(project: ProjectDocument): ProjectDocument {
       element.height === 650;
     elements[id] = {
       ...element,
-      ...(isLegacyScaledHero ? SAMPLE_HERO_IMAGE_SIZE : {}),
+      ...(isLegacyScaledHero ? sampleProject.SAMPLE_HERO_IMAGE_SIZE : {}),
       visible: element.visible ?? true,
     };
   }
@@ -202,10 +137,10 @@ function normalizeProjectDocument(project: ProjectDocument): ProjectDocument {
       id: 'image-hero',
       type: 'image',
       assetId: 'asset-hero',
-      x: SAMPLE_HERO_IMAGE_SIZE.x,
-      y: SAMPLE_HERO_IMAGE_SIZE.y,
-      width: SAMPLE_HERO_IMAGE_SIZE.width,
-      height: SAMPLE_HERO_IMAGE_SIZE.height,
+      x: sampleProject.SAMPLE_HERO_IMAGE_SIZE.x,
+      y: sampleProject.SAMPLE_HERO_IMAGE_SIZE.y,
+      width: sampleProject.SAMPLE_HERO_IMAGE_SIZE.width,
+      height: sampleProject.SAMPLE_HERO_IMAGE_SIZE.height,
       rotation: 0,
       locked: false,
       visible: true,
@@ -221,7 +156,7 @@ function normalizeProjectDocument(project: ProjectDocument): ProjectDocument {
         ? {
             'asset-hero': {
               ...project.assets['asset-hero'],
-              objectUrl: project.assets['asset-hero'].objectUrl ?? SAMPLE_HERO_IMAGE_URL,
+              objectUrl: project.assets['asset-hero'].objectUrl ?? sampleProject.SAMPLE_HERO_IMAGE_URL,
             },
           }
         : {}),
@@ -403,7 +338,7 @@ export function useEditorViewModel(services: AppServices) {
   const shouldRestoreStoredProject = useMemo(
     () =>
       !services.skipStoredProjectLoad &&
-      (readPersistencePreference() || Boolean(storedMirrorConfig)),
+      (editorPreferences.readPersistencePreference() || Boolean(storedMirrorConfig)),
     [services.skipStoredProjectLoad, storedMirrorConfig],
   );
   const [project, setProject] = useState<ProjectDocument>(initialProject);
@@ -430,7 +365,7 @@ export function useEditorViewModel(services: AppServices) {
     BackgroundPreparationState | undefined
   >();
   const [translationTargetLanguage, setTranslationTargetLanguageState] = useState(
-    readTranslationTargetLanguage,
+    editorPreferences.readTranslationTargetLanguage,
   );
   const [promptProviderStates, setPromptProviderStates] = useState<AiProviderState[]>([]);
   const [translationProviderStates, setTranslationProviderStates] = useState<AiProviderState[]>([]);
@@ -441,7 +376,7 @@ export function useEditorViewModel(services: AppServices) {
   const [translationPreparation, setTranslationPreparation] = useState<TranslationPreparationState>(
     {
       progress: 0,
-      status: readTranslationTargetLanguage() ? 'ready' : 'idle',
+      status: editorPreferences.readTranslationTargetLanguage() ? 'ready' : 'idle',
     },
   );
   const [languageDetectionPreparation, setLanguageDetectionPreparation] =
@@ -462,7 +397,7 @@ export function useEditorViewModel(services: AppServices) {
   const [createImageNotice, setCreateImageNotice] = useState<string | undefined>();
   const [createImageStatus, setCreateImageStatus] = useState<string | undefined>();
   const [createImageOptions, setCreateImageOptions] = useState<CreateImagePromptOptions>(
-    defaultCreateImagePromptOptions,
+    imagePromptOptions.defaultCreateImagePromptOptions,
   );
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [aiToolsAttentionModelId, setAiToolsAttentionModelId] = useState<string | undefined>();
@@ -495,7 +430,7 @@ export function useEditorViewModel(services: AppServices) {
   const [remoteImportProjects, setRemoteImportProjects] = useState<MirrorProjectSummary[]>([]);
   const [remoteImportError, setRemoteImportError] = useState<string | undefined>();
   const [mirrorConfig, setMirrorConfig] = useState<MinioMirrorConfig>(
-    () => storedMirrorConfig ?? DEFAULT_MINIO_MIRROR_CONFIG,
+    () => storedMirrorConfig ?? minioMirrorService.DEFAULT_MINIO_MIRROR_CONFIG,
   );
   const [hasMirrorConfig, setHasMirrorConfig] = useState(Boolean(storedMirrorConfig));
   const mirrorConfigRef = useRef<MinioMirrorConfig | null>(storedMirrorConfig);
@@ -531,10 +466,10 @@ export function useEditorViewModel(services: AppServices) {
     return element?.type === 'image' ? element : undefined;
   }, [project.elements, selectedElementIds]);
   const activeSlideLanguage = useMemo(() => {
-    const option = getLanguageOption(pageLanguageCodes[activePageId]);
+    const option = translationLanguageUtils.getLanguageOption(pageLanguageCodes[activePageId]);
     return {
       code: option.code,
-      displayCode: getLanguageDisplayCode(option.code),
+      displayCode: translationLanguageUtils.getLanguageDisplayCode(option.code),
       flag: option.flag,
       label: option.label,
     };
@@ -645,7 +580,7 @@ export function useEditorViewModel(services: AppServices) {
         setPersistenceEnabled(false);
         setHasLoadedProject(true);
         if (typeof window !== 'undefined') {
-          writePersistencePreference(false);
+          editorPreferences.writePersistencePreference(false);
         }
       });
 
@@ -684,7 +619,7 @@ export function useEditorViewModel(services: AppServices) {
       .catch(() => {
         setPersistenceEnabled(false);
         if (typeof window !== 'undefined') {
-          writePersistencePreference(false);
+          editorPreferences.writePersistencePreference(false);
         }
       });
   }, [hasLoadedProject, persistenceEnabled, project, services.projectRepository]);
@@ -711,7 +646,7 @@ export function useEditorViewModel(services: AppServices) {
         if (languageDetectionSequenceRef.current !== sequence) return;
         setPageLanguageCodes((current) => ({
           ...current,
-          [activePageId]: normalizeLanguageCode(languageCode),
+          [activePageId]: translationLanguageUtils.normalizeLanguageCode(languageCode),
         }));
       })
       .catch(() => undefined);
@@ -802,10 +737,10 @@ export function useEditorViewModel(services: AppServices) {
         await services.translatorService.getLanguageDetectionProviderStates(),
       );
     }
-    if (next.some((state) => state.id === IMAGE_EDITING_MODEL_ID && state.status === 'ready')) {
+    if (next.some((state) => state.id === modelSetupService.IMAGE_EDITING_MODEL_ID && state.status === 'ready')) {
       setBackgroundSelectionNotice(undefined);
     }
-    if (next.some((state) => state.id === IMAGE_GENERATION_MODEL_ID && state.status === 'ready')) {
+    if (next.some((state) => state.id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID && state.status === 'ready')) {
       setCreateImageNotice(undefined);
       setAiToolsAttentionModelId(undefined);
     }
@@ -842,10 +777,10 @@ export function useEditorViewModel(services: AppServices) {
         await services.translatorService.getLanguageDetectionProviderStates(),
       );
     }
-    if (id === IMAGE_EDITING_MODEL_ID && next.status === 'ready') {
+    if (id === modelSetupService.IMAGE_EDITING_MODEL_ID && next.status === 'ready') {
       setBackgroundSelectionNotice(undefined);
     }
-    if (id === IMAGE_GENERATION_MODEL_ID && next.status === 'ready') {
+    if (id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID && next.status === 'ready') {
       setCreateImageNotice(undefined);
       setAiToolsAttentionModelId(undefined);
     }
@@ -878,20 +813,20 @@ export function useEditorViewModel(services: AppServices) {
           : await services.translatorService.getProviderStates();
       setTranslationProviderStates(nextTranslationProviders);
     }
-    if (id === GEMMA_LLM_MODEL_ID) {
+    if (id === aiModelCatalog.GEMMA_LLM_MODEL_ID) {
       setPromptPreparation({ availability: 'downloadable', progress: 0, status: 'idle' });
     }
-    if (id === TRANSLATEGEMMA_MODEL_ID) {
+    if (id === aiModelCatalog.TRANSLATEGEMMA_MODEL_ID) {
       setTranslationPreparation({ progress: 0, status: 'idle' });
     }
-    if (id === LANGUAGE_DETECTION_MODEL_ID) {
+    if (id === aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID) {
       setLanguageDetectionPreparation({ progress: 0, status: 'idle' });
     }
   }
 
   function isImageGenerationReady() {
     return modelStates.some(
-      (state) => state.id === IMAGE_GENERATION_MODEL_ID && state.status === 'ready',
+      (state) => state.id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID && state.status === 'ready',
     );
   }
 
@@ -903,7 +838,7 @@ export function useEditorViewModel(services: AppServices) {
     }
 
     setActiveTab('ai-tools');
-    setAiToolsAttentionModelId(IMAGE_GENERATION_MODEL_ID);
+    setAiToolsAttentionModelId(imageGenerationModel.IMAGE_GENERATION_MODEL_ID);
     setCreateImageNotice(IMAGE_GENERATION_MODEL_REQUIRED_MESSAGE);
     return false;
   }
@@ -1122,7 +1057,7 @@ export function useEditorViewModel(services: AppServices) {
     promptGenerationRunIdRef.current = runId;
     const isCurrentRun = () => promptGenerationRunIdRef.current === runId;
 
-    if (looksLikeImageGenerationRequest(trimmedPrompt)) {
+    if (slideTaskPrompt.looksLikeImageGenerationRequest(trimmedPrompt)) {
       setPromptGenerationStatus(undefined);
       setPromptGenerationNotice(IMAGE_PROMPT_MODE_REQUIRED_MESSAGE);
       return;
@@ -1146,7 +1081,7 @@ export function useEditorViewModel(services: AppServices) {
 
       commitProject(
         (currentProject) =>
-          new PrepareGeneratedSlideCommand(pageId, generatedTasks.page).execute(currentProject),
+          new basicCommands.PrepareGeneratedSlideCommand(pageId, generatedTasks.page).execute(currentProject),
         { activePageId: pageId, selectedElementIds: [] },
       );
 
@@ -1166,14 +1101,14 @@ export function useEditorViewModel(services: AppServices) {
         const selectedElementId = `generated-${pageId}-${element.id.replace(/[^a-z0-9-_]/gi, '-').toLowerCase()}`;
         commitProject(
           (currentProject) =>
-            new AddGeneratedSlideElementCommand(pageId, element).execute(currentProject),
+            new basicCommands.AddGeneratedSlideElementCommand(pageId, element).execute(currentProject),
           { activePageId: pageId, selectedElementIds: [selectedElementId] },
         );
       }
 
       setPageLanguageCodes((current) => ({
         ...current,
-        [pageId]: normalizeLanguageCode(generatedTasks.language),
+        [pageId]: translationLanguageUtils.normalizeLanguageCode(generatedTasks.language),
       }));
     } catch (error) {
       if (!isCurrentRun()) return;
@@ -1208,12 +1143,12 @@ export function useEditorViewModel(services: AppServices) {
     try {
       const generationOptions = {
         height: normalizeImageGenerationDimension(
-          imageToReplace?.height ?? options?.height ?? DEFAULT_IMAGE_GENERATION_SIZE,
+          imageToReplace?.height ?? options?.height ?? imageGenerationModel.DEFAULT_IMAGE_GENERATION_SIZE,
         ),
         ...(options?.seed !== undefined ? { seed: options.seed } : {}),
         ...(options?.steps !== undefined ? { steps: options.steps } : {}),
         width: normalizeImageGenerationDimension(
-          imageToReplace?.width ?? options?.width ?? DEFAULT_IMAGE_GENERATION_SIZE,
+          imageToReplace?.width ?? options?.width ?? imageGenerationModel.DEFAULT_IMAGE_GENERATION_SIZE,
         ),
       };
       const asset = await services.imageGenerationService.generateImage(trimmedPrompt, {
@@ -1227,7 +1162,7 @@ export function useEditorViewModel(services: AppServices) {
       if (imageToReplace) {
         commitProject(
           (currentProject) =>
-            new ReplaceImageAssetCommand(imageToReplace.id, asset).execute(currentProject),
+            new basicCommands.ReplaceImageAssetCommand(imageToReplace.id, asset).execute(currentProject),
           { selectedElementIds: [imageToReplace.id] },
         );
         return;
@@ -1243,7 +1178,7 @@ export function useEditorViewModel(services: AppServices) {
 
       commitProject(
         (currentProject) =>
-          new AddImageElementCommand(activePageId, {
+          new basicCommands.AddImageElementCommand(activePageId, {
             asset,
             element: {
               id: elementId,
@@ -1382,7 +1317,7 @@ export function useEditorViewModel(services: AppServices) {
       setPersistenceAttention(false);
       setPersistenceNotice(undefined);
       if (typeof window !== 'undefined') {
-        writePersistencePreference(false);
+        editorPreferences.writePersistencePreference(false);
       }
       return;
     }
@@ -1410,12 +1345,12 @@ export function useEditorViewModel(services: AppServices) {
       setLocalProjectSetupOpen(false);
       writeProjectNameToUrl(projectToSave.name);
       if (typeof window !== 'undefined') {
-        writePersistencePreference(true);
+        editorPreferences.writePersistencePreference(true);
       }
     } catch {
       setPersistenceEnabled(false);
       if (typeof window !== 'undefined') {
-        writePersistencePreference(false);
+        editorPreferences.writePersistencePreference(false);
       }
     }
   }
@@ -1450,7 +1385,7 @@ export function useEditorViewModel(services: AppServices) {
     } catch {
       setPersistenceEnabled(false);
       if (typeof window !== 'undefined') {
-        writePersistencePreference(false);
+        editorPreferences.writePersistencePreference(false);
       }
     }
   }
@@ -1481,12 +1416,12 @@ export function useEditorViewModel(services: AppServices) {
       setLocalProjectSetupOpen(false);
       writeProjectNameToUrl(nextProject.name);
       if (typeof window !== 'undefined') {
-        writePersistencePreference(true);
+        editorPreferences.writePersistencePreference(true);
       }
     } catch {
       setPersistenceEnabled(false);
       if (typeof window !== 'undefined') {
-        writePersistencePreference(false);
+        editorPreferences.writePersistencePreference(false);
       }
     }
   }
@@ -1521,12 +1456,12 @@ export function useEditorViewModel(services: AppServices) {
       }
       writeProjectNameToUrl(normalizedProject.name);
       if (typeof window !== 'undefined') {
-        writePersistencePreference(true);
+        editorPreferences.writePersistencePreference(true);
       }
     } catch {
       setPersistenceEnabled(false);
       if (typeof window !== 'undefined') {
-        writePersistencePreference(false);
+        editorPreferences.writePersistencePreference(false);
       }
     }
   }
@@ -1721,7 +1656,7 @@ export function useEditorViewModel(services: AppServices) {
           .catch(() => undefined);
       }
       writeProjectNameToUrl(normalizedProject.name);
-      writePersistencePreference(true);
+      editorPreferences.writePersistencePreference(true);
       setMirrorState({ enabled: true, status: 'synced', lastSyncedAt: new Date().toISOString() });
       setRemoteImportOpen(false);
     } catch (error) {
@@ -1824,24 +1759,24 @@ export function useEditorViewModel(services: AppServices) {
                 ),
               }
           : patch;
-      return new UpdateElementFrameCommand(elementId, nextPatch).execute(currentProject);
+      return new basicCommands.UpdateElementFrameCommand(elementId, nextPatch).execute(currentProject);
     });
   }
 
   function updateElementFrames(patches: Record<string, ElementFramePatch>) {
     commitProject((currentProject) =>
-      new UpdateElementFramesCommand(patches).execute(currentProject),
+      new basicCommands.UpdateElementFramesCommand(patches).execute(currentProject),
     );
   }
 
   function updateTextContent(elementId: string, text: string) {
     commitProject((currentProject) => {
-      const nextProject = new UpdateTextContentCommand(elementId, text).execute(currentProject);
+      const nextProject = new basicCommands.UpdateTextContentCommand(elementId, text).execute(currentProject);
       const element = nextProject.elements[elementId];
       if (!element || element.type !== 'text') return nextProject;
       const minimumHeight = getMinimumTextHeight(element.text, element.fontSize);
       if (element.height >= minimumHeight) return nextProject;
-      return new UpdateElementFrameCommand(elementId, { height: minimumHeight }).execute(
+      return new basicCommands.UpdateElementFrameCommand(elementId, { height: minimumHeight }).execute(
         nextProject,
       );
     });
@@ -1849,12 +1784,12 @@ export function useEditorViewModel(services: AppServices) {
 
   function updateElementStyle(elementId: string, patch: ElementStylePatch) {
     commitProject((currentProject) => {
-      const nextProject = new UpdateElementStyleCommand(elementId, patch).execute(currentProject);
+      const nextProject = new basicCommands.UpdateElementStyleCommand(elementId, patch).execute(currentProject);
       const element = nextProject.elements[elementId];
       if (!element || element.type !== 'text') return nextProject;
       const minimumHeight = getMinimumTextHeight(element.text, element.fontSize);
       if (element.height >= minimumHeight) return nextProject;
-      return new UpdateElementFrameCommand(elementId, { height: minimumHeight }).execute(
+      return new basicCommands.UpdateElementFrameCommand(elementId, { height: minimumHeight }).execute(
         nextProject,
       );
     });
@@ -1862,23 +1797,23 @@ export function useEditorViewModel(services: AppServices) {
 
   function updatePageBackground(background: PageBackground) {
     commitProject((currentProject) =>
-      new UpdatePageBackgroundCommand(activePageId, background).execute(currentProject),
+      new basicCommands.UpdatePageBackgroundCommand(activePageId, background).execute(currentProject),
     );
   }
 
   function setPageTransition(transition: SlideTransition) {
     commitProject((currentProject) =>
-      new SetPageTransitionCommand(activePageId, transition).execute(currentProject),
+      new basicCommands.SetPageTransitionCommand(activePageId, transition).execute(currentProject),
     );
   }
 
   function clearPageTransition() {
-    commitProject((currentProject) => new ClearPageTransitionCommand(activePageId).execute(currentProject));
+    commitProject((currentProject) => new basicCommands.ClearPageTransitionCommand(activePageId).execute(currentProject));
   }
 
   function setElementAnimationBuilds(elementIds: string[], patch: ElementAnimationPatch) {
     commitProject((currentProject) =>
-      new SetElementAnimationBuildsCommand(
+      new basicCommands.SetElementAnimationBuildsCommand(
         activePageId,
         elementIds,
         (elementId) => createPrefixedId(`animation-${elementId}`),
@@ -1889,13 +1824,13 @@ export function useEditorViewModel(services: AppServices) {
 
   function clearElementAnimationBuild(elementId: string) {
     commitProject((currentProject) =>
-      new ClearElementAnimationBuildCommand(activePageId, elementId).execute(currentProject),
+      new basicCommands.ClearElementAnimationBuildCommand(activePageId, elementId).execute(currentProject),
     );
   }
 
   function reorderElementAnimationBuild(elementId: string, targetIndex: number) {
     commitProject((currentProject) =>
-      new ReorderElementAnimationBuildCommand(activePageId, elementId, targetIndex).execute(currentProject),
+      new basicCommands.ReorderElementAnimationBuildCommand(activePageId, elementId, targetIndex).execute(currentProject),
     );
   }
 
@@ -1962,7 +1897,7 @@ export function useEditorViewModel(services: AppServices) {
     );
 
     commitProject((currentProject) =>
-      new TranslateTextElementsCommand(translations).execute(currentProject),
+      new basicCommands.TranslateTextElementsCommand(translations).execute(currentProject),
     );
     return Array.from(
       new Set(
@@ -1987,15 +1922,15 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   async function setTranslationTargetLanguage(languageCode: string) {
-    const nextLanguage = isSupportedTranslationLanguageCode(languageCode) ? languageCode : '';
+    const nextLanguage = translationLanguageUtils.isSupportedTranslationLanguageCode(languageCode) ? languageCode : '';
     setTranslationTargetLanguageState(nextLanguage);
     setTranslationTargetAttention(false);
     setTranslationNotice(undefined);
     if (typeof window !== 'undefined') {
       if (nextLanguage) {
-        writeTranslationTargetLanguage(nextLanguage);
+        editorPreferences.writeTranslationTargetLanguage(nextLanguage);
       } else {
-        writeTranslationTargetLanguage('');
+        editorPreferences.writeTranslationTargetLanguage('');
       }
     }
 
@@ -2012,7 +1947,7 @@ export function useEditorViewModel(services: AppServices) {
 
     setTranslationPreparation({ progress: 4, status: 'downloading' });
     try {
-      const sourceLanguage = normalizeLanguageCode(
+      const sourceLanguage = translationLanguageUtils.normalizeLanguageCode(
         await services.translatorService.detectLanguage(sampleText, {
           onProgress: (progress) => {
             setTranslationPreparation((current) => ({
@@ -2084,7 +2019,7 @@ export function useEditorViewModel(services: AppServices) {
         translationOptions,
       );
       if (translatedPageIds.length > 0) {
-        const normalizedTargetLanguage = normalizeLanguageCode(translationTargetLanguage);
+        const normalizedTargetLanguage = translationLanguageUtils.normalizeLanguageCode(translationTargetLanguage);
         setPageLanguageCodes((current) => ({
           ...current,
           ...Object.fromEntries(
@@ -2102,7 +2037,7 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function createProjectForAutomation(input: { name?: string }) {
-    const blankProject = createBlankProject();
+    const blankProject = sampleProject.createBlankProject();
     const nextProject = normalizeProjectDocument({
       ...blankProject,
       name: input.name?.trim() || blankProject.name,
@@ -2154,7 +2089,7 @@ export function useEditorViewModel(services: AppServices) {
       translationOptions,
     );
     if (translatedPageIds.length > 0) {
-      const normalizedTargetLanguage = normalizeLanguageCode(input.targetLanguage);
+      const normalizedTargetLanguage = translationLanguageUtils.normalizeLanguageCode(input.targetLanguage);
       setPageLanguageCodes((current) => ({
         ...current,
         ...Object.fromEntries(
@@ -2188,13 +2123,13 @@ export function useEditorViewModel(services: AppServices) {
 
   function setElementVisibility(elementId: string, visible: boolean) {
     commitProject((currentProject) =>
-      new SetElementVisibilityCommand(elementId, visible).execute(currentProject),
+      new basicCommands.SetElementVisibilityCommand(elementId, visible).execute(currentProject),
     );
   }
 
   function setElementLock(elementId: string, locked: boolean) {
     commitProject((currentProject) =>
-      new SetElementLockCommand(elementId, locked).execute(currentProject),
+      new basicCommands.SetElementLockCommand(elementId, locked).execute(currentProject),
     );
   }
 
@@ -2234,7 +2169,7 @@ export function useEditorViewModel(services: AppServices) {
 
     commitProject(
       (currentProject) =>
-        new AddElementsCommand(activePageId, pastedElements, elementClipboard.assets).execute(
+        new basicCommands.AddElementsCommand(activePageId, pastedElements, elementClipboard.assets).execute(
           currentProject,
         ),
       { selectedElementIds: pastedElements.map((element) => element.id) },
@@ -2248,7 +2183,7 @@ export function useEditorViewModel(services: AppServices) {
 
   function deleteElement(elementId: string) {
     commitProject((currentProject) => {
-      const nextProject = new DeleteElementCommand(activePageId, elementId).execute(currentProject);
+      const nextProject = new basicCommands.DeleteElementCommand(activePageId, elementId).execute(currentProject);
       const nextPage = nextProject.pages.find((page) => page.id === activePageId);
       if (selectedElementIds.includes(elementId)) {
         const nextSelectedId = nextPage?.elementIds.at(-1);
@@ -2259,7 +2194,7 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function removeAsset(assetId: string) {
-    commitProject((currentProject) => new RemoveAssetCommand(assetId).execute(currentProject));
+    commitProject((currentProject) => new basicCommands.RemoveAssetCommand(assetId).execute(currentProject));
   }
 
   function deleteSelectedElement() {
@@ -2277,7 +2212,7 @@ export function useEditorViewModel(services: AppServices) {
     commitProject((currentProject) => {
       const nextProject = deletableElementIds.reduce(
         (nextProjectState, elementId) =>
-          new DeleteElementCommand(activePageId, elementId).execute(nextProjectState),
+          new basicCommands.DeleteElementCommand(activePageId, elementId).execute(nextProjectState),
         currentProject,
       );
       const nextPage = nextProject.pages.find((page) => page.id === activePageId);
@@ -2301,7 +2236,7 @@ export function useEditorViewModel(services: AppServices) {
     const nextElementId = createPrefixedId(`${elementId}-copy`);
     commitProject(
       (currentProject) =>
-        new DuplicateElementCommand(activePageId, elementId, nextElementId).execute(currentProject),
+        new basicCommands.DuplicateElementCommand(activePageId, elementId, nextElementId).execute(currentProject),
       { selectedElementIds: [nextElementId] },
     );
   }
@@ -2403,7 +2338,7 @@ export function useEditorViewModel(services: AppServices) {
 
     commitProject(
       (currentProject) =>
-        new AddElementsCommand(activePageId, [nextElement]).execute(currentProject),
+        new basicCommands.AddElementsCommand(activePageId, [nextElement]).execute(currentProject),
       { selectedElementIds: [elementId] },
     );
   }
@@ -2449,7 +2384,7 @@ export function useEditorViewModel(services: AppServices) {
     };
 
     commitProject(
-      (currentProject) => new AddElementsCommand(activePageId, [nextElement]).execute(currentProject),
+      (currentProject) => new basicCommands.AddElementsCommand(activePageId, [nextElement]).execute(currentProject),
       { selectedElementIds: [elementId] },
     );
     setActiveTab('design');
@@ -2459,7 +2394,7 @@ export function useEditorViewModel(services: AppServices) {
     const elementId = selectedElementIds[0];
     if (!elementId) return;
     commitProject((currentProject) =>
-      new AlignElementCommand(activePageId, elementId, mode).execute(currentProject),
+      new basicCommands.AlignElementCommand(activePageId, elementId, mode).execute(currentProject),
     );
   }
 
@@ -2467,7 +2402,7 @@ export function useEditorViewModel(services: AppServices) {
     const elementId = selectedElementIds[0];
     if (!elementId) return;
     commitProject((currentProject) =>
-      new SetZOrderCommand(activePageId, elementId, mode).execute(currentProject),
+      new basicCommands.SetZOrderCommand(activePageId, elementId, mode).execute(currentProject),
     );
   }
 
@@ -2475,13 +2410,13 @@ export function useEditorViewModel(services: AppServices) {
     const elementId = selectedElementIds[0];
     if (!elementId || selectedElementIds.length !== 1) return;
     commitProject((currentProject) =>
-      new ToggleImageFlipCommand(elementId).execute(currentProject),
+      new basicCommands.ToggleImageFlipCommand(elementId).execute(currentProject),
     );
   }
 
   function updateImageCrop(elementId: string, patch: ImageCropPatch) {
     commitProject((currentProject) =>
-      new UpdateImageCropCommand(elementId, patch).execute(currentProject),
+      new basicCommands.UpdateImageCropCommand(elementId, patch).execute(currentProject),
     );
   }
 
@@ -2496,7 +2431,7 @@ export function useEditorViewModel(services: AppServices) {
       displayOrder.splice(position === 'after' ? targetDisplayIndex + 1 : targetDisplayIndex, 0, elementId);
       const nextPageOrder = [...displayOrder].reverse();
       const targetPageIndex = nextPageOrder.indexOf(elementId);
-      return new ReorderElementCommand(activePageId, elementId, targetPageIndex).execute(
+      return new basicCommands.ReorderElementCommand(activePageId, elementId, targetPageIndex).execute(
         currentProject,
       );
     });
@@ -2537,7 +2472,7 @@ export function useEditorViewModel(services: AppServices) {
     const nextPageId = createPrefixedId('page');
     commitProject(
       (currentProject) =>
-        new DuplicatePageCommand(pageId, nextPageId, (elementId) =>
+        new basicCommands.DuplicatePageCommand(pageId, nextPageId, (elementId) =>
           createPrefixedId(`${elementId}-page`),
         ).execute(currentProject),
       { activePageId: nextPageId, selectedElementIds: [] },
@@ -2553,7 +2488,7 @@ export function useEditorViewModel(services: AppServices) {
       project.pages[pageIndex - 1]?.id ??
       project.pages[0]?.id ??
       '';
-    commitProject((currentProject) => new DeletePageCommand(pageId).execute(currentProject), {
+    commitProject((currentProject) => new basicCommands.DeletePageCommand(pageId).execute(currentProject), {
       activePageId: nextPageId,
       selectedElementIds: [],
     });
@@ -2561,7 +2496,7 @@ export function useEditorViewModel(services: AppServices) {
 
   function reorderPage(pageId: string, targetIndex: number) {
     commitProject(
-      (currentProject) => new ReorderPageCommand(pageId, targetIndex).execute(currentProject),
+      (currentProject) => new basicCommands.ReorderPageCommand(pageId, targetIndex).execute(currentProject),
       {
         activePageId: pageId,
       },
@@ -2569,12 +2504,12 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function renamePage(pageId: string, name: string) {
-    commitProject((currentProject) => new RenamePageCommand(pageId, name).execute(currentProject));
+    commitProject((currentProject) => new basicCommands.RenamePageCommand(pageId, name).execute(currentProject));
   }
 
   function setPageVisibility(pageId: string, visible: boolean) {
     commitProject((currentProject) =>
-      new SetPageVisibilityCommand(pageId, visible).execute(currentProject),
+      new basicCommands.SetPageVisibilityCommand(pageId, visible).execute(currentProject),
     );
   }
 
@@ -2664,7 +2599,7 @@ export function useEditorViewModel(services: AppServices) {
       return;
     }
 
-    const imageEditingModel = modelStates.find((state) => state.id === IMAGE_EDITING_MODEL_ID);
+    const imageEditingModel = modelStates.find((state) => state.id === modelSetupService.IMAGE_EDITING_MODEL_ID);
     if (imageEditingModel?.status !== 'ready') {
       setActiveTab('ai-tools');
       setBackgroundSelectionNotice(IMAGE_EDITING_MODEL_REQUIRED_MESSAGE);
@@ -2912,7 +2847,7 @@ export function useEditorViewModel(services: AppServices) {
     if (assetType === 'gif') {
       commitProject(
         (currentProject) =>
-          new AddMediaElementCommand(activePageId, {
+          new basicCommands.AddMediaElementCommand(activePageId, {
             asset: {
               id: assetId,
               type: 'gif',
@@ -2943,7 +2878,7 @@ export function useEditorViewModel(services: AppServices) {
     if (assetType === 'video') {
       commitProject(
         (currentProject) =>
-          new AddMediaElementCommand(activePageId, {
+          new basicCommands.AddMediaElementCommand(activePageId, {
             asset: {
               id: assetId,
               type: 'video',
@@ -2977,7 +2912,7 @@ export function useEditorViewModel(services: AppServices) {
 
     commitProject(
       (currentProject) =>
-        new AddImageElementCommand(activePageId, {
+        new basicCommands.AddImageElementCommand(activePageId, {
           asset: {
             id: assetId,
             type: 'image',
@@ -3005,7 +2940,7 @@ export function useEditorViewModel(services: AppServices) {
 
   function updateMediaPlayback(elementId: string, patch: MediaPlaybackPatch) {
     commitProject((currentProject) =>
-      new UpdateMediaPlaybackCommand(elementId, patch).execute(currentProject),
+      new basicCommands.UpdateMediaPlaybackCommand(elementId, patch).execute(currentProject),
     );
   }
 

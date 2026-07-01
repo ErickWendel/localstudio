@@ -1,16 +1,7 @@
-import {
-  BrowserBonsaiImageRuntime,
-  WorkerBackedBonsaiImageRuntime,
-  type BonsaiImageRuntime,
-  type BonsaiImageWorkerRequest,
-  type BonsaiImageWorkerResponse,
-} from '../../../src/services/bonsaiImageRuntime';
+import { bonsaiImageRuntime } from '../../../src/services/image-generation/bonsaiImageRuntime';
+import type { BonsaiImageRuntime, BonsaiImageWorkerRequest, BonsaiImageWorkerResponse } from '../../../src/services/image-generation/bonsaiImageRuntime';
 import { BrowserImageGenerationService } from '../../../src/services/browserImageGenerationService';
-import {
-  DEFAULT_IMAGE_GENERATION_SIZE,
-  DEFAULT_IMAGE_GENERATION_STEPS,
-  IMAGE_GENERATION_TRANSFORMERS_MODEL_ID,
-} from '../../../src/services/imageGenerationModels';
+import { imageGenerationModel } from '../../../src/services/image-generation/imageGenerationModel';
 
 describe('BrowserImageGenerationService', () => {
   class TestRuntime implements BonsaiImageRuntime {
@@ -37,11 +28,11 @@ describe('BrowserImageGenerationService', () => {
 
     expect(runtime.generate).toHaveBeenCalledWith(
       expect.objectContaining({
-        modelId: IMAGE_GENERATION_TRANSFORMERS_MODEL_ID,
+        modelId: imageGenerationModel.IMAGE_GENERATION_TRANSFORMERS_MODEL_ID,
         prompt: 'An icy Bonsai tree',
-        height: DEFAULT_IMAGE_GENERATION_SIZE,
-        width: DEFAULT_IMAGE_GENERATION_SIZE,
-        steps: DEFAULT_IMAGE_GENERATION_STEPS,
+        height: imageGenerationModel.DEFAULT_IMAGE_GENERATION_SIZE,
+        width: imageGenerationModel.DEFAULT_IMAGE_GENERATION_SIZE,
+        steps: imageGenerationModel.DEFAULT_IMAGE_GENERATION_STEPS,
       }),
     );
     expect(progress).toEqual([
@@ -67,7 +58,7 @@ describe('BrowserImageGenerationService', () => {
   });
 });
 
-describe('BrowserBonsaiImageRuntime', () => {
+describe('bonsaiImageRuntime.BrowserBonsaiImageRuntime', () => {
   it('preloads the Bonsai runtime with from_pretrained and maps component progress', async () => {
     const pipeline = {
       generate: vi.fn(() =>
@@ -86,7 +77,7 @@ describe('BrowserBonsaiImageRuntime', () => {
     });
     const progress: number[] = [];
 
-    await new BrowserBonsaiImageRuntime({
+    await new bonsaiImageRuntime.BrowserBonsaiImageRuntime({
       cacheName: 'test-cache',
       importRuntime: () =>
         Promise.resolve({
@@ -119,7 +110,7 @@ describe('BrowserBonsaiImageRuntime', () => {
     expect('destroyBonsaiDemoScene' in runtimeModule).toBe(false);
     expect(document.body.children).toHaveLength(1);
 
-    await new BrowserBonsaiImageRuntime({
+    await new bonsaiImageRuntime.BrowserBonsaiImageRuntime({
       importRuntime: () =>
         Promise.resolve({
           BonsaiImagePipeline: {
@@ -158,7 +149,7 @@ describe('BrowserBonsaiImageRuntime', () => {
       });
     });
     const progress: number[] = [];
-    const preloadPromise = new BrowserBonsaiImageRuntime({
+    const preloadPromise = new bonsaiImageRuntime.BrowserBonsaiImageRuntime({
       importRuntime: () =>
         Promise.resolve({
           BonsaiImagePipeline: {
@@ -186,7 +177,7 @@ describe('BrowserBonsaiImageRuntime', () => {
       ),
     };
     const fromPretrained = vi.fn(() => Promise.resolve(pipeline));
-    const runtime = new BrowserBonsaiImageRuntime({
+    const runtime = new bonsaiImageRuntime.BrowserBonsaiImageRuntime({
       importRuntime: () =>
         Promise.resolve({
           BonsaiImagePipeline: {
@@ -219,7 +210,7 @@ describe('BrowserBonsaiImageRuntime', () => {
   });
 });
 
-describe('WorkerBackedBonsaiImageRuntime', () => {
+describe('bonsaiImageRuntime.WorkerBackedBonsaiImageRuntime', () => {
   class FakeWorker {
     onmessage: ((event: MessageEvent<BonsaiImageWorkerResponse>) => void) | null = null;
     onerror: ((event: ErrorEvent) => void) | null = null;
@@ -242,7 +233,7 @@ describe('WorkerBackedBonsaiImageRuntime', () => {
 
   it('preloads through the worker protocol and forwards progress', async () => {
     const worker = new FakeWorker();
-    const runtime = new WorkerBackedBonsaiImageRuntime({
+    const runtime = new bonsaiImageRuntime.WorkerBackedBonsaiImageRuntime({
       createWorker: () => worker as unknown as Worker,
     });
     const progress: number[] = [];
@@ -267,7 +258,7 @@ describe('WorkerBackedBonsaiImageRuntime', () => {
 
   it('generates through the worker protocol and forwards step callbacks', async () => {
     const worker = new FakeWorker();
-    const runtime = new WorkerBackedBonsaiImageRuntime({
+    const runtime = new bonsaiImageRuntime.WorkerBackedBonsaiImageRuntime({
       createWorker: () => worker as unknown as Worker,
     });
     const onStep = vi.fn();
@@ -306,7 +297,7 @@ describe('WorkerBackedBonsaiImageRuntime', () => {
 
   it('rejects when the worker reports an error', async () => {
     const worker = new FakeWorker();
-    const runtime = new WorkerBackedBonsaiImageRuntime({
+    const runtime = new bonsaiImageRuntime.WorkerBackedBonsaiImageRuntime({
       createWorker: () => worker as unknown as Worker,
     });
 
@@ -324,7 +315,7 @@ describe('WorkerBackedBonsaiImageRuntime', () => {
       preload: vi.fn(() => Promise.resolve()),
       generate: vi.fn(() => Promise.resolve(fallbackBlob)),
     } satisfies BonsaiImageRuntime;
-    const runtime = new WorkerBackedBonsaiImageRuntime({
+    const runtime = new bonsaiImageRuntime.WorkerBackedBonsaiImageRuntime({
       createWorker: () => worker as unknown as Worker,
       fallbackRuntime,
     });
@@ -350,7 +341,7 @@ describe('WorkerBackedBonsaiImageRuntime', () => {
       preload: vi.fn(() => Promise.resolve()),
       generate: vi.fn(() => Promise.resolve(new Blob(['image'], { type: 'image/png' }))),
     } satisfies BonsaiImageRuntime;
-    const runtime = new WorkerBackedBonsaiImageRuntime({
+    const runtime = new bonsaiImageRuntime.WorkerBackedBonsaiImageRuntime({
       createWorker: () => {
         throw new Error('workers unavailable');
       },

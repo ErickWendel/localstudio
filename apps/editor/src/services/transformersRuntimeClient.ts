@@ -4,7 +4,7 @@ import type {
   SegmentationPoint,
   TextGenerationInput,
   TextGenerationOptions,
-} from './transformersOperations';
+} from './model-setup/transformersOperations';
 
 export type TransformersWorkerRequest =
   | {

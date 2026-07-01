@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProjectDocument } from '../../../src/domain/model';
-import { createSampleProject } from '../../../src/domain/sampleProject';
-import { MinioMirrorService, type MinioMirrorConfig } from '../../../src/services/minioMirrorService';
+import { sampleProject } from '../../../src/domain/projects/sampleProject';
+import { minioMirrorService } from '../../../src/services/mirror/minioMirrorService';
+import type { MinioMirrorConfig } from '../../../src/services/mirror/minioMirrorService';
 import { BrowserShareService } from '../../../src/services/shareService';
 
 const config: MinioMirrorConfig = {
@@ -28,7 +29,7 @@ function getRequestUrl(input: RequestInfo | URL) {
 }
 
 function createProjectWithInlineAsset(): ProjectDocument {
-  const project = createSampleProject();
+  const project = sampleProject.createSampleProject();
   project.assets['asset-inline'] = {
     id: 'asset-inline',
     type: 'image',
@@ -73,7 +74,7 @@ describe('BrowserShareService', () => {
       }
       return Promise.resolve(new Response('', { status: 404 }));
     });
-    const mirrorService = new MinioMirrorService({ fetch: fetchMock });
+    const mirrorService = new minioMirrorService.MinioMirrorService({ fetch: fetchMock });
     mirrorService.saveConfig(config);
     const service = new BrowserShareService({
       mirrorService,
@@ -125,18 +126,18 @@ describe('BrowserShareService', () => {
 
   it('rejects publishing when MinIO config is missing', async () => {
     const service = new BrowserShareService({
-      mirrorService: new MinioMirrorService({ fetch: vi.fn() }),
+      mirrorService: new minioMirrorService.MinioMirrorService({ fetch: vi.fn() }),
       origin: 'https://localstudio.test',
     });
 
-    await expect(service.createShare(createSampleProject())).rejects.toThrow(
+    await expect(service.createShare(sampleProject.createSampleProject())).rejects.toThrow(
       'Public sharing requires active external storage.',
     );
   });
 
   it('encodes share ids and escapes embed iframe URLs', () => {
     const service = new BrowserShareService({
-      mirrorService: new MinioMirrorService({ fetch: vi.fn() }),
+      mirrorService: new minioMirrorService.MinioMirrorService({ fetch: vi.fn() }),
       origin: 'https://localstudio.test',
     });
     const shareId = 'deck "quoted"&<tag>';

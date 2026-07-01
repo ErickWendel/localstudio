@@ -10,13 +10,13 @@ import type {
   ShapeKind,
   SlideTransition,
 } from '../../domain/model';
-import type { ElementStylePatch, MediaPlaybackPatch } from '../../domain/commands/basicCommands';
+import type { ElementStylePatch, MediaPlaybackPatch } from '../../domain/commands/elements/basicCommands';
 import type { AiProviderState, ModelState } from '../../services/interfaces';
 import { AiToolsPanel } from './AiToolsPanel';
 import { AnimationPanel } from './AnimationPanel';
 import { DesignPanel } from './DesignPanel';
 import { ElementsPanel } from './ElementsPanel';
-import type { CreateImagePromptOptions } from './imagePromptOptions';
+import type { CreateImagePromptOptions } from './media/imagePromptOptions';
 import { LayersPanel } from './LayersPanel';
 import { TextPanel } from './TextPanel';
 import type { RightPanelTab, TextPreset } from './useEditorViewModel';

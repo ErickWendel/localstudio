@@ -1,8 +1,8 @@
 import { ImagePlus, Mic, Plus, SendHorizontal, Square, X } from 'lucide-react';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { IconButton } from '../components/IconButton';
-import type { CreateImagePromptOptions } from './imagePromptOptions';
-import { imagePromptExamples, slidePromptExamples } from './promptRecipes';
+import type { CreateImagePromptOptions } from './media/imagePromptOptions';
+import { promptRecipes } from './prompting/promptRecipes';
 
 interface PromptBarProps {
   createImageNotice?: string | undefined;
@@ -39,7 +39,7 @@ export function PromptBar({
   const [localSubmissionActive, setLocalSubmissionActive] = useState(false);
   const [value, setValue] = useState('');
   const activeMode = selectedImageElementId ? 'create-image' : mode;
-  const examples = activeMode === 'create-image' ? imagePromptExamples : slidePromptExamples;
+  const examples = activeMode === 'create-image' ? promptRecipes.imagePromptExamples : promptRecipes.slidePromptExamples;
   const isProcessing = isGeneratingSlide || isGeneratingImage || localSubmissionActive;
 
   useLayoutEffect(() => {

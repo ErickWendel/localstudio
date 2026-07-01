@@ -1,7 +1,7 @@
 import { vi } from 'vitest';
-import { BrowserLocalSetupService, SETUP_COMPLETE_KEY } from '../../../src/services/localSetupService';
+import { localSetupService } from '../../../src/services/browser/localSetupService';
 
-describe('BrowserLocalSetupService', () => {
+describe('localSetupService.BrowserLocalSetupService', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     Object.defineProperty(navigator, 'gpu', {
@@ -16,7 +16,7 @@ describe('BrowserLocalSetupService', () => {
     vi.stubGlobal('Translator', {
       availability: vi.fn().mockResolvedValue('available'),
     });
-    const service = new BrowserLocalSetupService();
+    const service = new localSetupService.BrowserLocalSetupService();
 
     const state = await service.checkReadiness();
 
@@ -29,7 +29,7 @@ describe('BrowserLocalSetupService', () => {
   it('reports missing browser capabilities as unavailable', async () => {
     vi.stubGlobal('showDirectoryPicker', undefined);
     vi.stubGlobal('Translator', undefined);
-    const service = new BrowserLocalSetupService();
+    const service = new localSetupService.BrowserLocalSetupService();
 
     const state = await service.checkReadiness();
 
@@ -47,7 +47,7 @@ describe('BrowserLocalSetupService', () => {
       configurable: true,
       value: {},
     });
-    const service = new BrowserLocalSetupService();
+    const service = new localSetupService.BrowserLocalSetupService();
 
     const state = await service.checkReadiness();
 
@@ -60,7 +60,7 @@ describe('BrowserLocalSetupService', () => {
     vi.stubGlobal('Translator', {
       availability: vi.fn().mockResolvedValue('downloading'),
     });
-    const service = new BrowserLocalSetupService();
+    const service = new localSetupService.BrowserLocalSetupService();
 
     const state = await service.checkReadiness();
 
@@ -69,13 +69,13 @@ describe('BrowserLocalSetupService', () => {
   });
 
   it('stores setup completion in localStorage', () => {
-    const service = new BrowserLocalSetupService();
+    const service = new localSetupService.BrowserLocalSetupService();
 
     expect(service.hasCompletedSetup()).toBe(false);
 
     service.markSetupComplete();
 
-    expect(window.localStorage.getItem(SETUP_COMPLETE_KEY)).toBe('true');
+    expect(window.localStorage.getItem(localSetupService.SETUP_COMPLETE_KEY)).toBe('true');
     expect(service.hasCompletedSetup()).toBe(true);
   });
 });

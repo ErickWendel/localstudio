@@ -5,9 +5,9 @@ import type {
   GeneratedSlideElement,
   GeneratedSlideTask,
   GeneratedSlideTasksDocument,
-} from '../../../../src/domain/generatedSlide';
+} from '../../../../src/domain/generated-slides/generatedSlide';
 import type { Asset } from '../../../../src/domain/model';
-import { createSampleProject } from '../../../../src/domain/sampleProject';
+import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 import type {
   AiProviderState,
   ImageGenerationService,
@@ -18,17 +18,17 @@ import type {
   PromptService,
   TranslatorService,
 } from '../../../../src/services/interfaces';
-import { GEMMA_LLM_MODEL_ID, TRANSLATEGEMMA_MODEL_ID } from '../../../../src/services/aiModelIds';
-import { MockImageGenerationService } from '../../../../src/services/inMemoryAiServices';
-import { InMemoryModelSetupService } from '../../../../src/services/modelSetupService';
+import { aiModelCatalog } from '../../../../src/services/model-setup/aiModelCatalog';
+import { inMemoryAiServices } from '../../../../src/services/testing/inMemoryAiServices';
+import { modelSetupService } from '../../../../src/services/model-setup/modelSetupService';
 import { EditorShell } from '../../../../src/ui/editor/EditorShell';
-import { imagePromptExamples } from '../../../../src/ui/editor/promptRecipes';
+import { promptRecipes } from '../../../../src/ui/editor/prompting/promptRecipes';
 
-const createImageExample = imagePromptExamples[0];
+const createImageExample = promptRecipes.imagePromptExamples[0];
 
 function createAppServices(options: Parameters<typeof createRealAppServices>[0] = {}) {
   return createRealAppServices({
-    initialProject: createSampleProject(),
+    initialProject: sampleProject.createSampleProject(),
     ...options,
   });
 }
@@ -288,7 +288,7 @@ class PromptProviderSelectionService extends TestPromptService {
         capability: 'prompt',
         runtime: 'webgpu-huggingface',
         compatibility: 'compatible',
-        modelId: GEMMA_LLM_MODEL_ID,
+        modelId: aiModelCatalog.GEMMA_LLM_MODEL_ID,
         readiness: this.availability === 'ready' ? 'ready' : 'needs-download',
         selected: this.selectedProviderId === 'gemma-4-webgpu',
       },
@@ -309,13 +309,13 @@ class PromptProviderSelectionService extends TestPromptService {
   }
 }
 
-class PromptModelSetupService extends InMemoryModelSetupService implements ModelSetupService {
+class PromptModelSetupService extends modelSetupService.InMemoryModelSetupService implements ModelSetupService {
   constructor(private readonly onGemmaRemoved?: () => void) {
     super();
   }
 
   private gemmaState: ModelState = {
-    id: GEMMA_LLM_MODEL_ID,
+    id: aiModelCatalog.GEMMA_LLM_MODEL_ID,
     label: 'Gemma 4 WebGPU LLM',
     provider: 'transformers',
     status: 'needs-download',
@@ -325,11 +325,11 @@ class PromptModelSetupService extends InMemoryModelSetupService implements Model
 
   override async getModelStates(): Promise<ModelState[]> {
     const states = await super.getModelStates();
-    return [...states.filter((state) => state.id !== GEMMA_LLM_MODEL_ID), { ...this.gemmaState }];
+    return [...states.filter((state) => state.id !== aiModelCatalog.GEMMA_LLM_MODEL_ID), { ...this.gemmaState }];
   }
 
   override async downloadModel(id: string, options?: { onProgress?: (progress: number) => void }): Promise<ModelState> {
-    if (id !== GEMMA_LLM_MODEL_ID) return super.downloadModel(id, options);
+    if (id !== aiModelCatalog.GEMMA_LLM_MODEL_ID) return super.downloadModel(id, options);
     options?.onProgress?.(40);
     options?.onProgress?.(100);
     this.gemmaState = { ...this.gemmaState, status: 'ready', progress: 100 };
@@ -337,7 +337,7 @@ class PromptModelSetupService extends InMemoryModelSetupService implements Model
   }
 
   override async removeModel(id: string): Promise<ModelState> {
-    if (id !== GEMMA_LLM_MODEL_ID) return super.removeModel(id);
+    if (id !== aiModelCatalog.GEMMA_LLM_MODEL_ID) return super.removeModel(id);
     this.onGemmaRemoved?.();
     this.gemmaState = { ...this.gemmaState, status: 'needs-download', progress: 0 };
     return { ...this.gemmaState };
@@ -382,7 +382,7 @@ class TranslationProviderSelectionService extends PreparingTranslatorService {
         capability: 'translation',
         runtime: 'webgpu-huggingface',
         compatibility: 'compatible',
-        modelId: TRANSLATEGEMMA_MODEL_ID,
+        modelId: aiModelCatalog.TRANSLATEGEMMA_MODEL_ID,
         readiness: this.translateGemmaReady ? 'ready' : 'needs-download',
         selected: this.selectedProviderId === 'translategemma-webgpu',
       },
@@ -403,14 +403,14 @@ class TranslationProviderSelectionService extends PreparingTranslatorService {
   }
 }
 
-class TranslationModelSetupService extends InMemoryModelSetupService implements ModelSetupService {
+class TranslationModelSetupService extends modelSetupService.InMemoryModelSetupService implements ModelSetupService {
   constructor(private readonly onTranslateGemmaRemoved?: () => void) {
     super();
   }
 
   override async removeModel(id: string): Promise<ModelState> {
     const next = await super.removeModel(id);
-    if (id === TRANSLATEGEMMA_MODEL_ID) {
+    if (id === aiModelCatalog.TRANSLATEGEMMA_MODEL_ID) {
       this.onTranslateGemmaRemoved?.();
     }
     return next;
@@ -442,7 +442,7 @@ describe('mocked AI flows', () => {
   it('downloads required models from AI Tools panel', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
-    services.modelSetupService = new InMemoryModelSetupService();
+    services.modelSetupService = new modelSetupService.InMemoryModelSetupService();
     render(<EditorShell services={services} />);
 
     await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
@@ -541,7 +541,7 @@ describe('mocked AI flows', () => {
   it('redirects create image prompt typing to AI Tools when image generation models are not ready', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
-    services.modelSetupService = new InMemoryModelSetupService();
+    services.modelSetupService = new modelSetupService.InMemoryModelSetupService();
     render(<EditorShell services={services} />);
 
     await user.type(screen.getByLabelText('Create image prompt'), 'cyberpunk course cover');
@@ -556,7 +556,7 @@ describe('mocked AI flows', () => {
   it('downloads image generation models before allowing create image prompts', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
-    services.modelSetupService = new InMemoryModelSetupService();
+    services.modelSetupService = new modelSetupService.InMemoryModelSetupService();
     render(<EditorShell services={services} />);
 
     await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
@@ -654,8 +654,8 @@ describe('mocked AI flows', () => {
   it('generates an image from create image mode and inserts it into the active slide', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
-    services.modelSetupService = new InMemoryModelSetupService();
-    services.imageGenerationService = new MockImageGenerationService();
+    services.modelSetupService = new modelSetupService.InMemoryModelSetupService();
+    services.imageGenerationService = new inMemoryAiServices.MockImageGenerationService();
     render(<EditorShell services={services} />);
 
     await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
@@ -683,7 +683,7 @@ describe('mocked AI flows', () => {
           'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lMFeWAAAAABJRU5ErkJggg==',
       });
     });
-    services.modelSetupService = new InMemoryModelSetupService();
+    services.modelSetupService = new modelSetupService.InMemoryModelSetupService();
     services.imageGenerationService = { generateImage };
     render(<EditorShell services={services} />);
 
@@ -720,7 +720,7 @@ describe('mocked AI flows', () => {
           'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lMFeWAAAAABJRU5ErkJggg==',
       });
     });
-    services.modelSetupService = new InMemoryModelSetupService();
+    services.modelSetupService = new modelSetupService.InMemoryModelSetupService();
     services.imageGenerationService = { generateImage };
     render(<EditorShell services={services} />);
 
@@ -749,7 +749,7 @@ describe('mocked AI flows', () => {
     const user = userEvent.setup();
     const services = createAppServices();
     const imageGenerationService = new SlowImageGenerationService();
-    services.modelSetupService = new InMemoryModelSetupService();
+    services.modelSetupService = new modelSetupService.InMemoryModelSetupService();
     services.imageGenerationService = imageGenerationService;
     render(<EditorShell services={services} />);
 
@@ -772,7 +772,7 @@ describe('mocked AI flows', () => {
     const user = userEvent.setup();
     const services = createAppServices();
     const imageGenerationService = new DeferredImageGenerationService();
-    services.modelSetupService = new InMemoryModelSetupService();
+    services.modelSetupService = new modelSetupService.InMemoryModelSetupService();
     services.imageGenerationService = imageGenerationService;
     render(<EditorShell services={services} />);
 
