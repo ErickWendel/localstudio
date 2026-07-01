@@ -422,6 +422,7 @@ export function useEditorViewModel(services: AppServices) {
   }));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mirrorSettingsOpen, setMirrorSettingsOpen] = useState(false);
+  const [mirrorDisabledBySettings, setMirrorDisabledBySettings] = useState(false);
   const [remoteImportOpen, setRemoteImportOpen] = useState(false);
   const [localProjectSetupOpen, setLocalProjectSetupOpen] = useState(false);
   const [persistenceAttention, setPersistenceAttention] = useState(false);
@@ -1390,6 +1391,39 @@ export function useEditorViewModel(services: AppServices) {
     }
   }
 
+  async function saveLocalAs() {
+    const projectToSave = projectRef.current;
+    try {
+      if (services.projectRepository.saveProjectAs) {
+        await services.projectRepository.saveProjectAs(projectToSave, {
+          projectDirectoryName: projectToSave.name,
+        });
+      } else {
+        await services.projectRepository.saveProject(projectToSave, {
+          projectDirectoryName: projectToSave.name,
+        });
+      }
+      lastVersionProjectRef.current = projectToSave;
+      setHasPersistedLocalProject(true);
+      setPersistenceEnabled(true);
+      setPersistenceAttention(false);
+      setPersistenceNotice(undefined);
+      setLocalProjectSetupOpen(false);
+      setLastEditedAt(projectToSave.updatedAt);
+      setSaveAnimationKey((current) => current + 1);
+      skipNextProjectSaveRef.current = true;
+      writeProjectNameToUrl(projectToSave.name);
+      if (typeof window !== 'undefined') {
+        editorPreferences.writePersistencePreference(true);
+      }
+    } catch {
+      setPersistenceEnabled(false);
+      if (typeof window !== 'undefined') {
+        editorPreferences.writePersistencePreference(false);
+      }
+    }
+  }
+
   function closeLocalProjectSetup() {
     setLocalProjectSetupOpen(false);
   }
@@ -1491,22 +1525,30 @@ export function useEditorViewModel(services: AppServices) {
     services.mirrorService.saveConfig(config);
     setMirrorConfig(config);
     setHasMirrorConfig(true);
+    setMirrorDisabledBySettings(false);
     mirrorConfigRef.current = config;
     setMirrorState({ enabled: true, status: 'idle' });
+    setMirrorSettingsOpen(false);
     void syncMirrorNow();
   }
 
-  function setMirrorEnabled(enabled: boolean) {
+  function setMirrorEnabled(enabled: boolean, options?: { fromSettings?: boolean }) {
     if (enabled) {
       if (!mirrorConfigRef.current) {
         openMirrorSettings();
         return;
       }
+      setMirrorDisabledBySettings(false);
       setMirrorState({ enabled: true, status: 'idle' });
       void syncMirrorNow();
       return;
     }
+    setMirrorDisabledBySettings(Boolean(options?.fromSettings));
     setMirrorState({ enabled: false, status: 'disabled' });
+  }
+
+  function setMirrorEnabledFromSettings(enabled: boolean) {
+    setMirrorEnabled(enabled, { fromSettings: true });
   }
 
   async function testMirrorConnection(config: MinioMirrorConfig) {
@@ -2955,6 +2997,7 @@ export function useEditorViewModel(services: AppServices) {
     persistenceAttention,
     persistenceNotice,
     mirrorState,
+    mirrorDisabledBySettings,
     mirrorConfig,
     settingsOpen,
     mirrorSettingsOpen,
@@ -2986,6 +3029,7 @@ export function useEditorViewModel(services: AppServices) {
     setProjectName,
     setPersistence,
     saveLocalNow,
+    saveLocalAs,
     closeLocalProjectSetup,
     confirmLocalProjectSetup,
     openSettings,
@@ -2997,6 +3041,7 @@ export function useEditorViewModel(services: AppServices) {
     syncMirrorNow,
     requestMirrorNow,
     setMirrorEnabled,
+    setMirrorEnabledFromSettings,
     importRemoteMirror,
     importRemoteMirrorProject,
     closeRemoteImport,

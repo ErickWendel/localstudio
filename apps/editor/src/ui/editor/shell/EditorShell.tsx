@@ -281,6 +281,7 @@ export function EditorShell({ services }: EditorShellProps) {
         publicSharingAvailable={publicSharingAvailable}
         publicSharingUnavailableReason={publicSharingUnavailableReason}
         mirrorState={vm.mirrorState}
+        mirrorDisabledBySettings={vm.mirrorDisabledBySettings}
         persistenceAttention={vm.persistenceAttention}
         persistenceNotice={vm.persistenceNotice}
         localProjectSetupPanel={
@@ -311,6 +312,7 @@ export function EditorShell({ services }: EditorShellProps) {
         }}
         onMirrorToggle={vm.setMirrorEnabled}
         onNewProject={openBlankProjectInNewTab}
+        onOpenMirrorSettings={vm.openMirrorSettings}
         onOpenVersionHistory={() => {
           void vm.openVersionHistory();
         }}
@@ -330,6 +332,9 @@ export function EditorShell({ services }: EditorShellProps) {
         onStartPresenterMode={startPresenterMode}
         onSaveLocal={() => {
           void vm.saveLocalNow();
+        }}
+        onSaveLocalAs={() => {
+          void vm.saveLocalAs();
         }}
         onTranslateDeck={
           isHistoryReadOnly
@@ -631,7 +636,9 @@ export function EditorShell({ services }: EditorShellProps) {
         <MirrorSettingsPanel
           config={vm.mirrorConfig}
           mirrorState={vm.mirrorState}
+          mirrorDisabledBySettings={vm.mirrorDisabledBySettings}
           onClose={vm.closeMirrorSettings}
+          onEnabledChange={vm.setMirrorEnabledFromSettings}
           onSave={vm.saveMirrorConfig}
           onTestConnection={vm.testMirrorConnection}
         />

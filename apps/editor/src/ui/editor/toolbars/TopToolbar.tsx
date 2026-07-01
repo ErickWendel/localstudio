@@ -16,6 +16,7 @@ interface TopToolbarProps {
   publicSharingUnavailableReason?: string;
   lastEditedAt?: string | undefined;
   mirrorState?: MirrorState;
+  mirrorDisabledBySettings?: boolean;
   localProjectSetupPanel?: ReactNode;
   persistenceAttention?: boolean;
   persistenceNotice?: string | undefined;
@@ -27,10 +28,12 @@ interface TopToolbarProps {
   onImportRemoteMirror?: (() => void) | undefined;
   onMirrorNow?: (() => void) | undefined;
   onMirrorToggle?: ((enabled: boolean) => void) | undefined;
+  onOpenMirrorSettings?: (() => void) | undefined;
   onOpenVersionHistory?: (() => void) | undefined;
   onNewProject?: (() => void) | undefined;
   onPersistenceToggle?: ((enabled: boolean) => void) | undefined;
   onSaveLocal?: (() => void) | undefined;
+  onSaveLocalAs?: (() => void) | undefined;
   onProjectNameChange?: ((name: string) => void) | undefined;
   onRedo?: (() => void) | undefined;
   onResetZoom?: (() => void) | undefined;
@@ -116,6 +119,7 @@ export function TopToolbar({
   publicSharingUnavailableReason = 'Public sharing requires active external storage.',
   lastEditedAt,
   mirrorState = { enabled: false, status: 'disabled' },
+  mirrorDisabledBySettings = false,
   localProjectSetupPanel,
   persistenceAttention = false,
   persistenceNotice,
@@ -127,6 +131,7 @@ export function TopToolbar({
   onImportRemoteMirror,
   onMirrorNow,
   onMirrorToggle,
+  onOpenMirrorSettings,
   onOpenVersionHistory,
   onNewProject,
   onPersistenceToggle,
@@ -137,6 +142,7 @@ export function TopToolbar({
   onShare,
   onStartPresenterMode,
   onSaveLocal,
+  onSaveLocalAs,
   onTranslateDeck,
   onUndo,
   onZoomIn,
@@ -190,6 +196,7 @@ export function TopToolbar({
       { label: 'Share', disabled: !publicSharingAvailable, onSelect: triggerShare },
       { kind: 'separator', label: 'File storage actions' },
       { label: 'Save', disabled: !onSaveLocal, onSelect: onSaveLocal },
+      { label: 'Save As...', disabled: !onSaveLocalAs, onSelect: onSaveLocalAs },
       { label: 'Mirror Now', disabled: !onMirrorNow, onSelect: onMirrorNow },
     ],
     Edit: [
@@ -460,6 +467,10 @@ export function TopToolbar({
             type="button"
             aria-label={mirrorStatusLabel}
             onClick={() => {
+              if (mirrorDisabledBySettings) {
+                onOpenMirrorSettings?.();
+                return;
+              }
               if (mirrorState.enabled) {
                 onMirrorToggle?.(false);
                 return;

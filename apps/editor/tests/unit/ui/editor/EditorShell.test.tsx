@@ -84,6 +84,7 @@ class RejectingLoadProjectRepository implements ProjectRepository {
 
 class SavingProjectRepository implements ProjectRepository {
   savedProjects: ProjectDocument[] = [];
+  savedProjectsAs: ProjectDocument[] = [];
 
   loadProject(): Promise<ProjectDocument | null> {
     return Promise.resolve(null);
@@ -91,6 +92,11 @@ class SavingProjectRepository implements ProjectRepository {
 
   saveProject(project: ProjectDocument): Promise<void> {
     this.savedProjects.push(project);
+    return Promise.resolve();
+  }
+
+  saveProjectAs(project: ProjectDocument): Promise<void> {
+    this.savedProjectsAs.push(project);
     return Promise.resolve();
   }
 }
@@ -633,6 +639,20 @@ describe('EditorShell', () => {
     expect(repository.savedProjects.at(-1)?.name).toBe('Autosaved Deck');
   });
 
+  it('saves the current project as a new local folder from the File menu', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const repository = new SavingProjectRepository();
+    services.projectRepository = repository;
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Save As...' }));
+
+    expect(repository.savedProjectsAs).toHaveLength(1);
+    expect(repository.savedProjectsAs[0]).toMatchObject({ name: 'Untitled AI Deck' });
+  });
+
   it('keeps persistence disabled when the project folder cannot be saved', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
@@ -735,7 +755,7 @@ describe('EditorShell', () => {
     );
   });
 
-  it('disables mirroring when the mirror status icon is clicked', async () => {
+  it('toggles mirroring from the mirror status icon when a saved config is available', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
     const mirrorService = new RecordingMirrorService();
@@ -765,6 +785,40 @@ describe('EditorShell', () => {
       expect(mirrorService.syncProject).toHaveBeenCalledTimes(2);
     });
     expect(await screen.findByRole('button', { name: 'Mirror up to date' })).toBeInTheDocument();
+  });
+
+  it('opens mirror settings from the disabled mirror icon after mirroring is disabled in settings', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const repository = new DeferredLoadingProjectRepository();
+    services.projectRepository = repository;
+    services.mirrorService = new RecordingMirrorService();
+    render(<EditorShell services={services} />);
+
+    act(() => {
+      repository.resolveLoadedProject({
+        ...services.initialProject,
+        name: 'Mirrored Folder',
+      });
+    });
+
+    await user.click(await screen.findByRole('button', { name: 'Mirror settings' }));
+    await user.click(within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('button', {
+      name: 'Mirror settings',
+    }));
+    await user.click(screen.getByRole('button', { name: 'Disable mirroring' }));
+
+    expect(screen.getByRole('button', { name: 'Mirror disabled' })).toHaveClass('mirror-disabled');
+
+    await user.click(screen.getByRole('button', { name: 'Mirror disabled' }));
+    expect(screen.getByRole('dialog', { name: 'Mirror settings' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Enable mirroring' }));
+    await user.click(screen.getByRole('button', { name: 'Save settings' }));
+
+    expect(await screen.findByRole('button', { name: 'Mirror up to date' })).toHaveClass(
+      'mirror-synced',
+    );
   });
 
   it('imports an existing project from the File menu', async () => {

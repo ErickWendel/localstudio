@@ -210,6 +210,16 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     }
   }
 
+  async saveProjectAs(
+    project: ProjectDocument,
+    options?: { projectDirectoryName?: string },
+  ): Promise<void> {
+    this.directoryHandle = null;
+    this.parentDirectoryHandle = null;
+    this.projectDirectoryName = null;
+    await this.saveProject(project, options);
+  }
+
   async getVersionHistory(): Promise<VersionHistoryEntry[]> {
     const directoryHandle = await this.ensureProjectDirectory();
     const manifest = await this.readVersionHistoryManifest(directoryHandle);
