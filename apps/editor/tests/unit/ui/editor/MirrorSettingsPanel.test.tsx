@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { useState } from 'react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { MirrorSettingsPanel } from '../../../../src/ui/editor/panels/MirrorSettingsPanel';
@@ -27,6 +28,7 @@ describe('MirrorSettingsPanel', () => {
           config={config}
           mirrorState={{ enabled: true, status: 'idle' }}
           onClose={onClose}
+          onEnabledChange={vi.fn()}
           onSave={vi.fn()}
           onTestConnection={vi.fn()}
         />
@@ -49,6 +51,7 @@ describe('MirrorSettingsPanel', () => {
         config={config}
         mirrorState={{ enabled: true, status: 'idle' }}
         onClose={onClose}
+        onEnabledChange={vi.fn()}
         onSave={onSave}
         onTestConnection={onTestConnection}
       />,
@@ -86,5 +89,37 @@ describe('MirrorSettingsPanel', () => {
 
     await user.click(screen.getByRole('button', { name: 'Save settings' }));
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ prefix: 'public-projects' }));
+  });
+
+  it('lets users disable mirroring from settings and keeps saving settings disabled while off', async () => {
+    const user = userEvent.setup();
+    const onEnabledChange = vi.fn();
+    const onSave = vi.fn();
+
+    function StatefulMirrorSettingsPanel() {
+      const [enabled, setEnabled] = useState(true);
+      return (
+        <MirrorSettingsPanel
+          config={config}
+          mirrorDisabledBySettings={!enabled}
+          mirrorState={{ enabled, status: enabled ? 'idle' : 'disabled' }}
+          onClose={vi.fn()}
+          onEnabledChange={(nextEnabled) => {
+            setEnabled(nextEnabled);
+            onEnabledChange(nextEnabled);
+          }}
+          onSave={onSave}
+          onTestConnection={vi.fn()}
+        />
+      );
+    }
+
+    render(<StatefulMirrorSettingsPanel />);
+
+    await user.click(screen.getByRole('button', { name: 'Disable mirroring' }));
+
+    expect(onEnabledChange).toHaveBeenCalledWith(false);
+    expect(screen.getByRole('button', { name: 'Save settings' })).toBeDisabled();
+    expect(onSave).not.toHaveBeenCalled();
   });
 });

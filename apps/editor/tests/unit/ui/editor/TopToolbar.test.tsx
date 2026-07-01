@@ -12,6 +12,7 @@ describe('TopToolbar', () => {
     const onImportRemoteMirror = vi.fn();
     const onMirrorNow = vi.fn();
     const onNewProject = vi.fn();
+    const onSaveLocalAs = vi.fn();
     const onSaveLocal = vi.fn();
     const onSelectLayers = vi.fn();
     const onTranslateDeck = vi.fn();
@@ -26,6 +27,7 @@ describe('TopToolbar', () => {
         onMirrorNow={onMirrorNow}
         onNewProject={onNewProject}
         onSaveLocal={onSaveLocal}
+        onSaveLocalAs={onSaveLocalAs}
         onSelectLayers={onSelectLayers}
         onTranslateDeck={onTranslateDeck}
         canTranslateDeck
@@ -48,6 +50,9 @@ describe('TopToolbar', () => {
     expect(screen.getByRole('separator', { name: 'File storage actions' })).toBeInTheDocument();
     await user.click(screen.getByRole('menuitem', { name: 'Save' }));
     expect(onSaveLocal).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Save As...' }));
+    expect(onSaveLocalAs).toHaveBeenCalledTimes(1);
     await user.click(screen.getByRole('button', { name: 'File' }));
     await user.click(screen.getByRole('menuitem', { name: 'Mirror Now' }));
     expect(onMirrorNow).toHaveBeenCalledTimes(1);
@@ -177,6 +182,29 @@ describe('TopToolbar', () => {
     await user.click(mirrorButton);
     expect(onMirrorToggle).toHaveBeenCalledWith(false);
     expect(onMirrorNow).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens mirror settings from the status icon when mirroring was disabled in settings', async () => {
+    const user = userEvent.setup();
+    const onMirrorNow = vi.fn();
+    const onOpenMirrorSettings = vi.fn();
+
+    render(
+      <TopToolbar
+        project={sampleProject.createSampleProject()}
+        language="PT-BR"
+        persistenceEnabled
+        mirrorDisabledBySettings
+        mirrorState={{ enabled: false, status: 'disabled' }}
+        onMirrorNow={onMirrorNow}
+        onOpenMirrorSettings={onOpenMirrorSettings}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Mirror disabled' }));
+
+    expect(onOpenMirrorSettings).toHaveBeenCalledTimes(1);
+    expect(onMirrorNow).not.toHaveBeenCalled();
   });
 
   it('labels deck storage state by persistence and mirror activation', () => {

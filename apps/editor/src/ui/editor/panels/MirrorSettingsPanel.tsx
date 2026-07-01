@@ -5,7 +5,9 @@ import type { MinioMirrorConfig } from '../../../services/mirror/minioMirrorServ
 interface MirrorSettingsPanelProps {
   config: MinioMirrorConfig;
   mirrorState: MirrorState;
+  mirrorDisabledBySettings?: boolean;
   onClose: () => void;
+  onEnabledChange: (enabled: boolean) => void;
   onSave: (config: MinioMirrorConfig) => void;
   onTestConnection: (config: MinioMirrorConfig) => void | Promise<void>;
 }
@@ -13,7 +15,9 @@ interface MirrorSettingsPanelProps {
 export function MirrorSettingsPanel({
   config,
   mirrorState,
+  mirrorDisabledBySettings = false,
   onClose,
+  onEnabledChange,
   onSave,
   onTestConnection,
 }: MirrorSettingsPanelProps) {
@@ -209,11 +213,19 @@ export function MirrorSettingsPanel({
       </div>
 
       <div className="mirror-settings-actions">
+        <button
+          className={mirrorState.enabled ? 'footer-toggle' : 'footer-toggle footer-toggle-active'}
+          type="button"
+          onClick={() => onEnabledChange(!mirrorState.enabled)}
+        >
+          {mirrorState.enabled ? 'Disable mirroring' : 'Enable mirroring'}
+        </button>
         <button className="footer-toggle" type="button" onClick={() => void testConnection()}>
           {connectionStatus === 'testing' ? 'Checking MinIO connection...' : 'Test connection'}
         </button>
         <button
           className="export-button font-orbitron"
+          disabled={mirrorDisabledBySettings}
           type="button"
           onClick={() => onSave(normalizedDraft())}
         >

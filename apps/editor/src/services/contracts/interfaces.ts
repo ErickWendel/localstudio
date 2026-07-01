@@ -44,6 +44,10 @@ export interface ProjectRepository {
   importMirrorFiles?(files: MirrorFile[]): Promise<ProjectDocument>;
   loadProject(options?: { projectName?: string }): Promise<ProjectDocument | null>;
   saveProject(project: ProjectDocument, options?: { projectDirectoryName?: string }): Promise<void>;
+  saveProjectAs?(
+    project: ProjectDocument,
+    options?: { projectDirectoryName?: string },
+  ): Promise<void>;
   getVersionHistory?(): Promise<VersionHistoryEntry[]>;
   saveVersion?(
     project: ProjectDocument,
