@@ -308,18 +308,7 @@ export class WorkerBackedBonsaiImageRuntime implements BonsaiImageRuntime {
   ) {
     const worker = this.getWorker();
     if (!worker) {
-      const fallback = this.getFallbackRuntime();
-      if (request.type === 'preload') {
-        return fallback.preload(
-          request.modelId,
-          handlers.onLoadProgress ? { onProgress: handlers.onLoadProgress } : undefined,
-        );
-      }
-      return fallback.generate({
-        ...request.options,
-        ...(handlers.onLoadProgress ? { onLoadProgress: handlers.onLoadProgress } : {}),
-        ...(handlers.onStep ? { onStep: handlers.onStep } : {}),
-      });
+      return this.executeFallbackRequest(request, handlers);
     }
 
     return new Promise<Blob | undefined>((resolve, reject) => {
@@ -380,6 +369,24 @@ export class WorkerBackedBonsaiImageRuntime implements BonsaiImageRuntime {
       this.pendingRequests.delete(id);
       pending.reject(new Error(message));
     }
+  }
+
+  private executeFallbackRequest(
+    request: BonsaiImageWorkerRequest,
+    handlers: Pick<PendingWorkerRequest, 'onLoadProgress' | 'onStep'> = {},
+  ): Promise<Blob | undefined> {
+    const fallback = this.getFallbackRuntime();
+    if (request.type === 'preload') {
+      return fallback.preload(
+        request.modelId,
+        handlers.onLoadProgress ? { onProgress: handlers.onLoadProgress } : undefined,
+      ).then(() => undefined);
+    }
+    return fallback.generate({
+      ...request.options,
+      ...(handlers.onLoadProgress ? { onLoadProgress: handlers.onLoadProgress } : {}),
+      ...(handlers.onStep ? { onStep: handlers.onStep } : {}),
+    });
   }
 }
 

@@ -68,7 +68,7 @@ describe('BrowserImageGenerationService', () => {
 });
 
 describe('BrowserBonsaiImageRuntime', () => {
-  it('preloads the Bonsai demo runtime with from_pretrained and maps component progress', async () => {
+  it('preloads the Bonsai runtime with from_pretrained and maps component progress', async () => {
     const pipeline = {
       generate: vi.fn(() =>
         Promise.resolve({
@@ -105,7 +105,7 @@ describe('BrowserBonsaiImageRuntime', () => {
     expect(progress).toEqual([3, 27, 55, 97, 100]);
   });
 
-  it('loads the runtime-only Bonsai module without relying on demo cleanup hooks', async () => {
+  it('imports the vendored runtime-only module without DOM side effects or cleanup hooks', async () => {
     const appRoot = document.createElement('div');
     appRoot.id = 'root';
     document.body.appendChild(appRoot);
@@ -113,15 +113,19 @@ describe('BrowserBonsaiImageRuntime', () => {
       generate: vi.fn(() => Promise.resolve(new Blob(['image'], { type: 'image/png' }))),
     };
     const fromPretrained = vi.fn(() => Promise.resolve(pipeline));
+    const runtimeModule = await import('../../../src/vendor/bonsai-image-webgpu-runtime.js');
+
+    expect('cleanupBonsaiDemo' in runtimeModule).toBe(false);
+    expect('destroyBonsaiDemoScene' in runtimeModule).toBe(false);
+    expect(document.body.children).toHaveLength(1);
 
     await new BrowserBonsaiImageRuntime({
-      importRuntime: () => {
-        return Promise.resolve({
+      importRuntime: () =>
+        Promise.resolve({
           BonsaiImagePipeline: {
             from_pretrained: fromPretrained,
           },
-        });
-      },
+        }),
     }).preload('prism-ml/bonsai-image-ternary-4B-mlx-2bit');
 
     expect(document.getElementById('root')).toBe(appRoot);
@@ -173,7 +177,7 @@ describe('BrowserBonsaiImageRuntime', () => {
     expect(progress).toEqual([3, 12, 14, 16, 100]);
   });
 
-  it('generates with the Bonsai demo runtime after loading it once', async () => {
+  it('generates with the Bonsai runtime after loading it once', async () => {
     const pipeline = {
       generate: vi.fn(() =>
         Promise.resolve({
@@ -311,6 +315,34 @@ describe('WorkerBackedBonsaiImageRuntime', () => {
     worker.emit({ id: requestId, type: 'error', message: 'worker failed' });
 
     await expect(preloadPromise).rejects.toThrow('worker failed');
+  });
+
+  it('does not fall back to the direct runtime after a worker runtime error', async () => {
+    const worker = new FakeWorker();
+    const fallbackBlob = new Blob(['image'], { type: 'image/png' });
+    const fallbackRuntime = {
+      preload: vi.fn(() => Promise.resolve()),
+      generate: vi.fn(() => Promise.resolve(fallbackBlob)),
+    } satisfies BonsaiImageRuntime;
+    const runtime = new WorkerBackedBonsaiImageRuntime({
+      createWorker: () => worker as unknown as Worker,
+      fallbackRuntime,
+    });
+    const onStep = vi.fn();
+
+    const generatePromise = runtime.generate({
+      modelId: 'model-id',
+      prompt: 'A neon bonsai',
+      height: 512,
+      width: 512,
+      steps: 4,
+      onStep,
+    });
+    const requestId = lastWorkerMessage(worker).id;
+    worker.emit({ id: requestId, type: 'error', message: 'document is not defined' });
+
+    await expect(generatePromise).rejects.toThrow('document is not defined');
+    expect(fallbackRuntime.generate).not.toHaveBeenCalled();
   });
 
   it('falls back to the direct runtime when worker creation fails', async () => {
