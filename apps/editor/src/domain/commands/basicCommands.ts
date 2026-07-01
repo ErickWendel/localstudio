@@ -12,6 +12,7 @@ import type {
   VideoElement,
 } from '../model';
 import { collectReferencedAssetIds } from '../assetUsage';
+import { getProjectUpdatedAt } from './projectMutationUtils';
 import type { EditorCommand } from './types';
 
 export {
@@ -65,7 +66,7 @@ export class RemoveAssetCommand implements EditorCommand {
     return {
       ...project,
       assets,
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -182,7 +183,7 @@ export class DuplicateElementCommand implements EditorCommand {
           ? { ...item, elementIds: [...item.elementIds, this.nextElementId] }
           : item,
       ),
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -269,7 +270,7 @@ export class DuplicatePageCommand implements EditorCommand {
         ...duplicatedElements,
       },
       pages,
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -291,7 +292,7 @@ export class DeletePageCommand implements EditorCommand {
       ...project,
       elements,
       pages: project.pages.filter((item) => item.id !== this.pageId),
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -312,7 +313,7 @@ export class ReorderPageCommand implements EditorCommand {
     return {
       ...project,
       pages,
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -331,7 +332,7 @@ export class RenamePageCommand implements EditorCommand {
     return {
       ...project,
       pages: project.pages.map((page) => (page.id === this.pageId ? { ...page, name: nextName } : page)),
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -350,7 +351,7 @@ export class SetPageVisibilityCommand implements EditorCommand {
       pages: project.pages.map((page) =>
         page.id === this.pageId ? { ...page, visible: this.visible } : page,
       ),
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -374,7 +375,7 @@ export class ReorderElementCommand implements EditorCommand {
         next.splice(Math.max(0, Math.min(this.targetIndex, next.length)), 0, this.elementId);
         return { ...page, elementIds: next };
       }),
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -397,7 +398,7 @@ export class SetElementVisibilityCommand implements EditorCommand {
         ...project.elements,
         [this.elementId]: { ...element, visible: this.visible },
       },
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -420,7 +421,7 @@ export class SetElementLockCommand implements EditorCommand {
         ...project.elements,
         [this.elementId]: { ...element, locked: this.locked },
       },
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -449,7 +450,7 @@ export class AddImageElementCommand implements EditorCommand {
           ? { ...page, elementIds: [...page.elementIds, this.payload.element.id] }
           : page,
       ),
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -478,7 +479,7 @@ export class AddMediaElementCommand implements EditorCommand {
           ? { ...page, elementIds: [...page.elementIds, this.payload.element.id] }
           : page,
       ),
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -515,7 +516,7 @@ export class UpdateMediaPlaybackCommand implements EditorCommand {
         ...project.elements,
         [this.elementId]: nextElement,
       },
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -545,7 +546,7 @@ export class ReplaceImageAssetCommand implements EditorCommand {
           assetId: this.asset.id,
         },
       },
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -577,7 +578,7 @@ export class AddElementsCommand implements EditorCommand {
           ? { ...page, elementIds: [...page.elementIds, ...this.elements.map((element) => element.id)] }
           : page,
       ),
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -605,7 +606,7 @@ export class UpdateElementFrameCommand implements EditorCommand {
           height: this.patch.height === undefined ? element.height : Math.max(1, this.patch.height),
         },
       },
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -636,7 +637,7 @@ export class UpdateElementFramesCommand implements EditorCommand {
     return {
       ...project,
       elements: nextElements,
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -662,7 +663,7 @@ export class UpdateTextContentCommand implements EditorCommand {
           text: this.text,
         },
       },
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -717,7 +718,7 @@ export class UpdateElementStyleCommand implements EditorCommand {
         ...project.elements,
         [this.elementId]: nextElement,
       },
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -740,7 +741,7 @@ export class ToggleImageFlipCommand implements EditorCommand {
           flipX: !element.flipX,
         },
       },
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -768,7 +769,7 @@ export class UpdateImageCropCommand implements EditorCommand {
           height: this.patch.height === undefined ? element.height : Math.max(1, this.patch.height),
         },
       },
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -787,7 +788,7 @@ export class UpdatePageBackgroundCommand implements EditorCommand {
       pages: project.pages.map((page) =>
         page.id === this.pageId ? { ...page, background: this.background } : page,
       ),
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -808,7 +809,7 @@ export class SetPageTransitionCommand implements EditorCommand {
           ? { ...page, transition: { ...this.transition, delayMs: Math.max(0, this.transition.delayMs) } }
           : page,
       ),
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -827,7 +828,7 @@ export class ClearPageTransitionCommand implements EditorCommand {
         void transition;
         return nextPage;
       }),
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -868,7 +869,7 @@ export class SetElementAnimationBuildsCommand implements EditorCommand {
         });
         return { ...page, animationBuilds: [...retainedBuilds, ...nextBuilds] };
       }),
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -887,7 +888,7 @@ export class ClearElementAnimationBuildCommand implements EditorCommand {
       pages: project.pages.map((page) =>
         page.id === this.pageId ? removeElementAnimationBuilds(page, new Set([this.elementId])) : page,
       ),
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -913,7 +914,7 @@ export class ReorderElementAnimationBuildCommand implements EditorCommand {
         nextBuilds.splice(Math.max(0, Math.min(this.targetIndex, nextBuilds.length)), 0, builds[currentIndex]!);
         return { ...page, animationBuilds: nextBuilds };
       }),
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -945,7 +946,7 @@ export class TranslateTextElementsCommand implements EditorCommand {
     return {
       ...project,
       elements: nextElements,
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }

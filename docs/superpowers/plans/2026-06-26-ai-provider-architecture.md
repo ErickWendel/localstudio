@@ -54,9 +54,11 @@ Translation:
   - disposes in-memory WebGPU text-generation pipeline sessions when available;
   - returns the model to `needs-download`;
   - keeps the same provider selected so users can refresh a model without switching providers.
+- New ML workflows should use worker-backed adapters by default, with direct main-thread runtime fallbacks reserved for tests and unsupported browsers.
 
 ## Remaining Work
 
+- Move Transformers text generation, language detection, and background removal behind the same worker-adapter pattern now used by Bonsai image generation.
 - Add deeper provider registry/default-selection tests.
 - Add more direct prompt provider tests for Gemma structured JSON behavior.
 - Add more direct translation provider tests for TranslateGemma unsupported-pair recovery.

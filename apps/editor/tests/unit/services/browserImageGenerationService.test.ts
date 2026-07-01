@@ -1,4 +1,10 @@
-import { BrowserBonsaiImageRuntime, type BonsaiImageRuntime } from '../../../src/services/bonsaiImageRuntime';
+import {
+  BrowserBonsaiImageRuntime,
+  WorkerBackedBonsaiImageRuntime,
+  type BonsaiImageRuntime,
+  type BonsaiImageWorkerRequest,
+  type BonsaiImageWorkerResponse,
+} from '../../../src/services/bonsaiImageRuntime';
 import { BrowserImageGenerationService } from '../../../src/services/browserImageGenerationService';
 import {
   DEFAULT_IMAGE_GENERATION_SIZE,
@@ -62,7 +68,7 @@ describe('BrowserImageGenerationService', () => {
 });
 
 describe('BrowserBonsaiImageRuntime', () => {
-  it('preloads the Bonsai demo runtime with from_pretrained and maps component progress', async () => {
+  it('preloads the Bonsai runtime with from_pretrained and maps component progress', async () => {
     const pipeline = {
       generate: vi.fn(() =>
         Promise.resolve({
@@ -99,7 +105,7 @@ describe('BrowserBonsaiImageRuntime', () => {
     expect(progress).toEqual([3, 27, 55, 97, 100]);
   });
 
-  it('removes Bonsai demo DOM side effects after importing the runtime', async () => {
+  it('imports the vendored runtime-only module without DOM side effects or cleanup hooks', async () => {
     const appRoot = document.createElement('div');
     appRoot.id = 'root';
     document.body.appendChild(appRoot);
@@ -107,29 +113,23 @@ describe('BrowserBonsaiImageRuntime', () => {
       generate: vi.fn(() => Promise.resolve(new Blob(['image'], { type: 'image/png' }))),
     };
     const fromPretrained = vi.fn(() => Promise.resolve(pipeline));
-    const cleanupBonsaiDemo = vi.fn();
-    const destroyBonsaiDemoScene = vi.fn();
+    const runtimeModule = await import('../../../src/vendor/bonsai-image-webgpu-runtime.js');
+
+    expect('cleanupBonsaiDemo' in runtimeModule).toBe(false);
+    expect('destroyBonsaiDemoScene' in runtimeModule).toBe(false);
+    expect(document.body.children).toHaveLength(1);
 
     await new BrowserBonsaiImageRuntime({
-      importRuntime: () => {
-        const demoContainer = document.createElement('div');
-        demoContainer.id = 'bonsai-demo';
-        demoContainer.appendChild(document.createElement('canvas'));
-        document.body.appendChild(demoContainer);
-        return Promise.resolve({
+      importRuntime: () =>
+        Promise.resolve({
           BonsaiImagePipeline: {
             from_pretrained: fromPretrained,
           },
-          cleanupBonsaiDemo,
-          destroyBonsaiDemoScene,
-        });
-      },
+        }),
     }).preload('prism-ml/bonsai-image-ternary-4B-mlx-2bit');
 
-    expect(cleanupBonsaiDemo).toHaveBeenCalled();
-    expect(destroyBonsaiDemoScene).toHaveBeenCalled();
     expect(document.getElementById('root')).toBe(appRoot);
-    expect(document.getElementById('bonsai-demo')).toBeNull();
+    expect(document.body.children).toHaveLength(1);
     appRoot.remove();
   });
 
@@ -177,7 +177,7 @@ describe('BrowserBonsaiImageRuntime', () => {
     expect(progress).toEqual([3, 12, 14, 16, 100]);
   });
 
-  it('generates with the Bonsai demo runtime after loading it once', async () => {
+  it('generates with the Bonsai runtime after loading it once', async () => {
     const pipeline = {
       generate: vi.fn(() =>
         Promise.resolve({
@@ -216,5 +216,149 @@ describe('BrowserBonsaiImageRuntime', () => {
       }),
     );
     expect(blob.type).toBe('image/png');
+  });
+});
+
+describe('WorkerBackedBonsaiImageRuntime', () => {
+  class FakeWorker {
+    onmessage: ((event: MessageEvent<BonsaiImageWorkerResponse>) => void) | null = null;
+    onerror: ((event: ErrorEvent) => void) | null = null;
+    messages: BonsaiImageWorkerRequest[] = [];
+    postMessage = vi.fn((message: BonsaiImageWorkerRequest) => {
+      this.messages.push(message);
+    });
+    terminate = vi.fn();
+
+    emit(response: BonsaiImageWorkerResponse) {
+      this.onmessage?.({ data: response } as MessageEvent<BonsaiImageWorkerResponse>);
+    }
+  }
+
+  function lastWorkerMessage(worker: FakeWorker) {
+    const message = worker.messages.at(-1);
+    if (!message) throw new Error('Expected the worker to receive a message.');
+    return message;
+  }
+
+  it('preloads through the worker protocol and forwards progress', async () => {
+    const worker = new FakeWorker();
+    const runtime = new WorkerBackedBonsaiImageRuntime({
+      createWorker: () => worker as unknown as Worker,
+    });
+    const progress: number[] = [];
+
+    const preloadPromise = runtime.preload('model-id', {
+      onProgress: (value) => progress.push(value),
+    });
+    const preloadMessage = lastWorkerMessage(worker);
+    expect(preloadMessage).toEqual({
+      id: preloadMessage.id,
+      type: 'preload',
+      modelId: 'model-id',
+    });
+    expect(preloadMessage.id).toEqual(expect.any(String));
+    const requestId = preloadMessage.id;
+    worker.emit({ id: requestId, type: 'progress', progress: 42 });
+    worker.emit({ id: requestId, type: 'result' });
+
+    await expect(preloadPromise).resolves.toBeUndefined();
+    expect(progress).toEqual([42]);
+  });
+
+  it('generates through the worker protocol and forwards step callbacks', async () => {
+    const worker = new FakeWorker();
+    const runtime = new WorkerBackedBonsaiImageRuntime({
+      createWorker: () => worker as unknown as Worker,
+    });
+    const onStep = vi.fn();
+
+    const generatePromise = runtime.generate({
+      modelId: 'model-id',
+      prompt: 'A neon bonsai',
+      height: 512,
+      width: 512,
+      steps: 4,
+      seed: 123,
+      onStep,
+    });
+    const generateMessage = lastWorkerMessage(worker);
+    expect(generateMessage).toEqual({
+      id: generateMessage.id,
+      type: 'generate',
+      options: {
+        modelId: 'model-id',
+        prompt: 'A neon bonsai',
+        height: 512,
+        width: 512,
+        steps: 4,
+        seed: 123,
+      },
+    });
+    expect(generateMessage.id).toEqual(expect.any(String));
+    const requestId = generateMessage.id;
+    const blob = new Blob(['image'], { type: 'image/png' });
+    worker.emit({ id: requestId, type: 'step', step: 2, totalSteps: 4 });
+    worker.emit({ id: requestId, type: 'result', blob });
+
+    await expect(generatePromise).resolves.toBe(blob);
+    expect(onStep).toHaveBeenCalledWith(2, 4);
+  });
+
+  it('rejects when the worker reports an error', async () => {
+    const worker = new FakeWorker();
+    const runtime = new WorkerBackedBonsaiImageRuntime({
+      createWorker: () => worker as unknown as Worker,
+    });
+
+    const preloadPromise = runtime.preload('model-id');
+    const requestId = lastWorkerMessage(worker).id;
+    worker.emit({ id: requestId, type: 'error', message: 'worker failed' });
+
+    await expect(preloadPromise).rejects.toThrow('worker failed');
+  });
+
+  it('does not fall back to the direct runtime after a worker runtime error', async () => {
+    const worker = new FakeWorker();
+    const fallbackBlob = new Blob(['image'], { type: 'image/png' });
+    const fallbackRuntime = {
+      preload: vi.fn(() => Promise.resolve()),
+      generate: vi.fn(() => Promise.resolve(fallbackBlob)),
+    } satisfies BonsaiImageRuntime;
+    const runtime = new WorkerBackedBonsaiImageRuntime({
+      createWorker: () => worker as unknown as Worker,
+      fallbackRuntime,
+    });
+    const onStep = vi.fn();
+
+    const generatePromise = runtime.generate({
+      modelId: 'model-id',
+      prompt: 'A neon bonsai',
+      height: 512,
+      width: 512,
+      steps: 4,
+      onStep,
+    });
+    const requestId = lastWorkerMessage(worker).id;
+    worker.emit({ id: requestId, type: 'error', message: 'document is not defined' });
+
+    await expect(generatePromise).rejects.toThrow('document is not defined');
+    expect(fallbackRuntime.generate).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the direct runtime when worker creation fails', async () => {
+    const fallbackRuntime = {
+      preload: vi.fn(() => Promise.resolve()),
+      generate: vi.fn(() => Promise.resolve(new Blob(['image'], { type: 'image/png' }))),
+    } satisfies BonsaiImageRuntime;
+    const runtime = new WorkerBackedBonsaiImageRuntime({
+      createWorker: () => {
+        throw new Error('workers unavailable');
+      },
+      fallbackRuntime,
+    });
+
+    await runtime.preload('model-id');
+
+    expect(fallbackRuntime.preload).toHaveBeenCalledWith('model-id', undefined);
   });
 });

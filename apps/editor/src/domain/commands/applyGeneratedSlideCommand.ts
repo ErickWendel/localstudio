@@ -6,6 +6,7 @@ import {
 } from '../../assets/placeholder-image';
 import type { Asset, DesignElement, ProjectDocument } from '../model';
 import type { GeneratedSlideElement, GeneratedSlideTasksDocument } from '../generatedSlide';
+import { getProjectUpdatedAt } from './projectMutationUtils';
 import type { EditorCommand } from './types';
 
 function generatedElementId(pageId: string, id: string) {
@@ -111,7 +112,7 @@ export class PrepareGeneratedSlideCommand implements EditorCommand {
             }
           : item,
       ),
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }
@@ -151,7 +152,7 @@ export class AddGeneratedSlideElementCommand implements EditorCommand {
             }
           : item,
       ),
-      updatedAt: new Date().toISOString(),
+      updatedAt: getProjectUpdatedAt(),
     };
   }
 }

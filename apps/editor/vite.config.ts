@@ -33,12 +33,39 @@ function webMcpRouteAlias() {
   };
 }
 
+function editorManualChunks(id: string) {
+  if (id.includes('@huggingface/transformers') || id.includes('onnxruntime-web')) {
+    return 'ml-transformers';
+  }
+  if (id.includes('bonsai-image-webgpu-runtime')) {
+    return 'ml-bonsai-image';
+  }
+  if (id.includes('react-konva') || id.includes('/konva/')) {
+    return 'canvas-workspace';
+  }
+  return undefined;
+}
+
 export default defineConfig({
   base: editorBase,
   plugins: [webMcpRouteAlias(), react()],
   build: {
+    chunkSizeWarningLimit: 1200,
     emptyOutDir: false,
     outDir: '../../dist/editor',
+    rollupOptions: {
+      output: {
+        manualChunks: editorManualChunks,
+      },
+    },
+  },
+  worker: {
+    format: 'es',
+    rollupOptions: {
+      output: {
+        manualChunks: editorManualChunks,
+      },
+    },
   },
   test: {
     environment: 'jsdom',

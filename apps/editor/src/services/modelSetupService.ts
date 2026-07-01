@@ -19,7 +19,8 @@ import {
   IMAGE_GENERATION_TRANSFORMERS_MODEL_ID,
   TRANSFORMERS_CACHE_KEY,
 } from './imageGenerationModels';
-import { BrowserBonsaiImageRuntime } from './bonsaiImageRuntime';
+import { WorkerBackedBonsaiImageRuntime } from './bonsaiImageRuntime';
+import { getBrowserLocalStorage, type BrowserKeyValueStorage } from './browserStorage';
 import { createMonotonicProgressReporter, createTransformersProgressCallback } from './progress';
 
 export const IMAGE_EDITING_MODEL_ID = 'image-editing-models';
@@ -27,12 +28,6 @@ export const IMAGE_EDITING_TRANSFORMERS_MODEL_ID = 'Xenova/slimsam-77-uniform';
 export const IMAGE_EDITING_DISPLAY_NAME = 'SlimSAM 77M';
 
 const IMAGE_EDITING_READY_KEY = 'ew-canvas-ai.model.image-editing-models.ready';
-
-interface ModelStorage {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-  removeItem?(key: string): void;
-}
 
 export interface ImageEditingModelLoader {
   loadImageEditingModel(): Promise<void>;
@@ -108,11 +103,6 @@ function cloneStates(states: ModelState[]) {
   return states.map((state) => ({ ...state }));
 }
 
-function getBrowserStorage(): ModelStorage | undefined {
-  if (typeof window === 'undefined') return undefined;
-  return window.localStorage;
-}
-
 function getReadyKey(id: string) {
   if (id === IMAGE_EDITING_MODEL_ID) return IMAGE_EDITING_READY_KEY;
   if (id === IMAGE_GENERATION_MODEL_ID) return IMAGE_GENERATION_READY_KEY;
@@ -141,7 +131,7 @@ export class TransformersImageEditingModelLoader implements ImageEditingModelLoa
 
 export class TransformersImageGenerationModelLoader implements ImageGenerationModelLoader {
   async loadImageGenerationModel(options?: { onProgress?: (progress: number) => void }): Promise<void> {
-    await new BrowserBonsaiImageRuntime().preload(IMAGE_GENERATION_TRANSFORMERS_MODEL_ID, options);
+    await new WorkerBackedBonsaiImageRuntime().preload(IMAGE_GENERATION_TRANSFORMERS_MODEL_ID, options);
   }
 }
 
@@ -203,7 +193,7 @@ export class BrowserModelSetupService implements ModelSetupService {
 
   constructor(
     private readonly imageEditingModelLoader: ImageEditingModelLoader = new TransformersImageEditingModelLoader(),
-    private readonly storage: ModelStorage | undefined = getBrowserStorage(),
+    private readonly storage: BrowserKeyValueStorage | undefined = getBrowserLocalStorage(),
     private readonly imageGenerationModelLoader: ImageGenerationModelLoader = new TransformersImageGenerationModelLoader(),
     private readonly textGenerationModelLoader: TextGenerationModelLoader = new TransformersTextGenerationModelLoader(),
     private readonly modelCacheStorage: ModelCacheStorage = new BrowserTransformersModelCache(),

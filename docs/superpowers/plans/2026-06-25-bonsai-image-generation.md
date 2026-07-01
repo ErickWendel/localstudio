@@ -1,7 +1,7 @@
 # Bonsai Image Generation Status
 
 Date: 2026-06-25
-Last updated: 2026-06-26
+Last updated: 2026-07-01
 
 ## Goal
 
@@ -17,9 +17,11 @@ Let users generate browser-local images from the prompt bar when `Create image` 
   - optional seed;
   - hover/focus help text explaining steps and seed.
 - Bonsai Image WebGPU runtime adapter is isolated in `src/services/bonsaiImageRuntime.ts`.
-- Vendored runtime lives under `src/vendor` so Vite lazy-loads it as source instead of importing a static `public/` asset.
+- Vendored runtime lives under `src/vendor` as a runtime-only slice of the upstream Space bundle, without the demo page or Three.js scene code.
+- Production image generation and image model preload use `WorkerBackedBonsaiImageRuntime` by default.
+- The worker protocol supports `preload`, `generate`, progress, result, and error messages, with a direct runtime fallback only for tests and environments that cannot construct module workers.
 - Model progress handling includes byte-level progress when available plus conservative setup progress for long runtime phases.
-- The adapter cleans up upstream demo DOM/WebGL side effects after import so the Hugging Face demo scene does not render inside the app.
+- LocalStudio only depends on the runtime surface: `BonsaiImagePipeline.from_pretrained()` and `pipeline.generate()`.
 - Generated PNGs are inserted into the active slide as selected image elements.
 - Prompt input clears immediately after submission while generation continues.
 
@@ -34,6 +36,7 @@ Let users generate browser-local images from the prompt bar when `Create image` 
 - Add generation history.
 - Add model/provider selection if binary/ternary or future image models are exposed.
 - Add richer error recovery for unsupported browser/GPU, interrupted downloads, and runtime import failures.
+- Replace the vendored runtime slice with an official source-built runtime-only Bonsai package if one becomes available.
 - Verify behavior on target Chrome/WebGPU builds and memory-constrained devices.
 - Reintroduce browser e2e coverage only through a future explicit plan after the flow stabilizes.
 

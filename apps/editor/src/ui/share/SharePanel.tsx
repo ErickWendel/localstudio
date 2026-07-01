@@ -29,13 +29,17 @@ export function SharePanel({
 }: SharePanelProps) {
   const [currentShare, setCurrentShare] = useState<ShareMetadata | undefined>(share);
   const [isCopying, setIsCopying] = useState(false);
+  const [copyError, setCopyError] = useState<string | undefined>();
   const statusLabel = getStatusLabel(currentShare, isCopying);
 
   async function handleCopyLink() {
     setIsCopying(true);
+    setCopyError(undefined);
     try {
       const nextShare = await onCopyLink();
       setCurrentShare(nextShare);
+    } catch (error) {
+      setCopyError(error instanceof Error ? error.message : 'Could not create the share link.');
     } finally {
       setIsCopying(false);
     }
@@ -61,8 +65,13 @@ export function SharePanel({
       </div>
 
       <section className="share-access-block" aria-label="Share access">
-        <span className="share-status-pill">{statusLabel}</span>
-        <p>{currentShare ? 'Unlisted: anyone with the link can view.' : 'Create a public view link for this deck.'}</p>
+        <span className="share-status-pill">{copyError ? 'Share failed' : statusLabel}</span>
+        <p>
+          {copyError ??
+            (currentShare
+              ? 'Unlisted: anyone with the link can view.'
+              : 'Create a public view link for this deck.')}
+        </p>
       </section>
 
       <button

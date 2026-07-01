@@ -1,13 +1,8 @@
 import type { AiProviderState, ModelState } from './interfaces';
+import { getBrowserLocalStorage, type BrowserKeyValueStorage } from './browserStorage';
 
-interface ProviderStorage {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-}
-
-export function getBrowserProviderStorage(): ProviderStorage | undefined {
-  if (typeof window === 'undefined') return undefined;
-  return window.localStorage;
+export function getBrowserProviderStorage(): BrowserKeyValueStorage | undefined {
+  return getBrowserLocalStorage();
 }
 
 export function isWebGpuCompatible() {

@@ -1,10 +1,20 @@
 import { getPublicBasePath, normalizeBasePath } from '../app/publicBasePath';
-import type { Asset, ProjectDocument } from '../domain/model';
+import { collectReferencedAssetIds } from '../domain/assetUsage';
+import type { ProjectDocument } from '../domain/model';
 import type { ShareMetadata, ShareRecord, ShareService } from './interfaces';
 import {
   MinioMirrorService,
   type MinioMirrorConfig,
 } from './minioMirrorService';
+import {
+  getAssetFileExtension,
+  objectUrlToBlobIfReadable,
+} from './assetFileUtils';
+import {
+  joinObjectKey,
+  jsonBlob,
+  normalizeObjectKeyPart,
+} from './storageObjectUtils';
 
 const PUBLIC_STORAGE_UNAVAILABLE_MESSAGE = 'Public sharing requires active external storage.';
 const SHARE_FILE_NAME = 'share.json';
@@ -41,79 +51,27 @@ function cloneProject(project: ProjectDocument): ProjectDocument {
   return JSON.parse(JSON.stringify(project)) as ProjectDocument;
 }
 
-function normalizePrefix(value: string) {
-  return value.trim().replace(/^\/+|\/+$/g, '');
-}
-
-function joinKey(...parts: string[]) {
-  return parts
-    .map((part) => part.replace(/^\/+|\/+$/g, ''))
-    .filter(Boolean)
-    .join('/');
-}
-
 function getShareRootKey(config: MinioMirrorConfig, shareId: string) {
-  return joinKey(normalizePrefix(config.prefix), 'public-shares', shareId);
+  return joinObjectKey(normalizeObjectKeyPart(config.prefix), 'public-shares', shareId);
 }
 
 function getShareFileKey(config: MinioMirrorConfig, shareId: string) {
-  return joinKey(getShareRootKey(config, shareId), SHARE_FILE_NAME);
+  return joinObjectKey(getShareRootKey(config, shareId), SHARE_FILE_NAME);
 }
 
-function getAssetFileExtension(mimeType: string) {
-  if (mimeType === 'image/jpeg') return 'jpg';
-  if (mimeType === 'image/gif') return 'gif';
-  if (mimeType === 'image/webp') return 'webp';
-  if (mimeType === 'video/mp4') return 'mp4';
-  if (mimeType === 'video/webm') return 'webm';
-  if (mimeType === 'video/quicktime') return 'mov';
-  return 'png';
-}
-
-function isDataUrl(value: string | undefined): value is string {
-  return Boolean(value?.startsWith('data:'));
-}
-
-function isBlobUrl(value: string | undefined): value is string {
-  return Boolean(value?.startsWith('blob:'));
-}
-
-function dataUrlToBlob(dataUrl: string) {
-  const [metadata, base64 = ''] = dataUrl.split(',');
-  const mimeType = metadata?.match(/^data:(.*?);base64$/)?.[1] ?? 'application/octet-stream';
-  const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
-  return new Blob([bytes], { type: mimeType });
-}
-
-function textBlob(value: unknown) {
-  return new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' });
-}
-
-function collectReferencedAssetIds(project: ProjectDocument) {
-  const referencedAssetIds = new Set<string>();
-  for (const element of Object.values(project.elements)) {
-    if (element.type === 'image' || element.type === 'gif' || element.type === 'video') {
-      referencedAssetIds.add(element.assetId);
-    }
-  }
-  for (const page of project.pages) {
-    if (page.background.type === 'asset') referencedAssetIds.add(page.background.assetId);
-  }
-  return referencedAssetIds;
-}
-
-async function assetToBlob(asset: Asset, requestFetch: typeof fetch | undefined) {
-  if (!asset.objectUrl) return undefined;
-  if (isDataUrl(asset.objectUrl)) return dataUrlToBlob(asset.objectUrl);
-  if (!isBlobUrl(asset.objectUrl)) return undefined;
-  if (!requestFetch) return undefined;
-  return requestFetch(asset.objectUrl).then((response) => response.blob());
-}
-
-function publicViewerUrl(origin: string, basePath: string, route: 's' | 'embed', shareId: string, shareUrl: string) {
-  const url = new URL(`${origin}${basePath}${route}/${encodeURIComponent(shareId)}`);
-  url.searchParams.set('src', shareUrl);
+function publicViewerUrl(origin: string, basePath: string, route: 'share' | 'embed', shareId: string, shareUrl: string) {
+  const url = new URL(`${origin}${basePath}`);
+  url.searchParams.set(route, shareId);
+  if (shareUrl) url.searchParams.set('src', shareUrl);
   return url.toString();
+}
+
+function escapeHtmlAttribute(value: string) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('"', '&quot;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
 }
 
 export class BrowserShareService implements ShareService {
@@ -161,20 +119,20 @@ export class BrowserShareService implements ShareService {
 
   getPublicUrl(shareId: string): string {
     const config = this.mirrorService.loadConfig();
-    if (!config) return `${this.origin}${this.basePath}s/${shareId}`;
+    if (!config) return publicViewerUrl(this.origin, this.basePath, 'share', shareId, '');
     const shareUrl = this.mirrorService.getPublicObjectUrl(getShareFileKey(config, shareId), config);
-    return publicViewerUrl(this.origin, this.basePath, 's', shareId, shareUrl);
+    return publicViewerUrl(this.origin, this.basePath, 'share', shareId, shareUrl);
   }
 
   getEmbedUrl(shareId: string): string {
     const config = this.mirrorService.loadConfig();
-    if (!config) return `${this.origin}${this.basePath}embed/${shareId}`;
+    if (!config) return publicViewerUrl(this.origin, this.basePath, 'embed', shareId, '');
     const shareUrl = this.mirrorService.getPublicObjectUrl(getShareFileKey(config, shareId), config);
     return publicViewerUrl(this.origin, this.basePath, 'embed', shareId, shareUrl);
   }
 
   getEmbedHtml(shareId: string): string {
-    return `<iframe src="${this.getEmbedUrl(shareId)}" width="960" height="540" style="border:0;aspect-ratio:16/9;width:100%;max-width:960px;" allowfullscreen></iframe>`;
+    return `<iframe src="${escapeHtmlAttribute(this.getEmbedUrl(shareId))}" width="960" height="540" style="border:0;aspect-ratio:16/9;width:100%;max-width:960px;" allowfullscreen></iframe>`;
   }
 
   private getShareSourceUrl() {
@@ -195,7 +153,7 @@ export class BrowserShareService implements ShareService {
       updatedAt: now,
       project: projectForShare,
     };
-    await this.mirrorService.uploadPublicObject(getShareFileKey(config, shareId), textBlob(payload), config);
+    await this.mirrorService.uploadPublicObject(getShareFileKey(config, shareId), jsonBlob(payload), config);
     return this.toMetadata(payload, 'published');
   }
 
@@ -210,11 +168,11 @@ export class BrowserShareService implements ShareService {
     await Promise.all(
       Object.entries(projectForShare.assets).map(async ([assetId, asset]) => {
         if (!referencedAssetIds.has(assetId)) return;
-        const blob = await assetToBlob(asset, this.fetchImpl);
+        const blob = await objectUrlToBlobIfReadable(asset.objectUrl, this.fetchImpl);
         if (!blob) return;
 
         const fileName = asset.fileName ?? `${asset.id}.${getAssetFileExtension(asset.mimeType)}`;
-        const key = joinKey(getShareRootKey(config, shareId), 'assets', fileName);
+        const key = joinObjectKey(getShareRootKey(config, shareId), 'assets', fileName);
         await this.mirrorService.uploadPublicObject(key, blob, config);
         projectForShare.assets[assetId] = {
           ...asset,

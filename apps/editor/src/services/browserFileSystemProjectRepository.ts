@@ -6,10 +6,25 @@ import type {
   VersionHistoryManifest,
   VersionSnapshotMetadata,
 } from './interfaces';
+import { getBrowserLocalStorage, type BrowserKeyValueStorage } from './browserStorage';
+import {
+  getAssetFileExtension,
+  isReadableObjectUrl,
+  objectUrlToBlob,
+} from './assetFileUtils';
+import {
+  cloneProjectForHistory,
+  createChangeSummary,
+  createVersionId,
+} from './projectVersionHistoryUtils';
 
 interface FileSystemProjectRepositoryOptions {
   pickDirectory?: () => Promise<FileSystemDirectoryHandle>;
   recentProjectStore?: RecentProjectHandleStore;
+}
+
+interface HydrateProjectAssetsOptions {
+  allowMissingAssetFiles?: boolean;
 }
 
 export interface RecentProjectHandleStore {
@@ -34,54 +49,6 @@ const PROJECT_CONFIG_FILE_NAME = 'localstudio.json';
 const VERSION_HISTORY_FILE_NAME = 'manifest.json';
 const VERSION_HISTORY_LIMIT = 100;
 
-function getAssetFileExtension(mimeType: string) {
-  if (mimeType === 'image/jpeg') return 'jpg';
-  if (mimeType === 'image/gif') return 'gif';
-  if (mimeType === 'image/webp') return 'webp';
-  if (mimeType === 'video/mp4') return 'mp4';
-  if (mimeType === 'video/webm') return 'webm';
-  if (mimeType === 'video/quicktime') return 'mov';
-  return 'png';
-}
-
-function isDataUrl(value: string | undefined): value is string {
-  return Boolean(value?.startsWith('data:'));
-}
-
-function isBlobUrl(value: string | undefined): value is string {
-  return Boolean(value?.startsWith('blob:'));
-}
-
-function dataUrlToBlob(dataUrl: string) {
-  const [metadata, base64 = ''] = dataUrl.split(',');
-  const mimeType = metadata?.match(/^data:(.*?);base64$/)?.[1] ?? 'application/octet-stream';
-  const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
-  return new Blob([bytes], { type: mimeType });
-}
-
-async function objectUrlToBlob(objectUrl: string) {
-  if (isDataUrl(objectUrl)) return dataUrlToBlob(objectUrl);
-  const response = await fetch(objectUrl);
-  return response.blob();
-}
-
-function createVersionId(date = new Date()) {
-  return date.toISOString().replace(/[:.]/g, '-');
-}
-
-function cloneProjectForHistory(project: ProjectDocument): ProjectDocument {
-  return {
-    ...project,
-    assets: Object.fromEntries(
-      Object.entries(project.assets).map(([assetId, asset]) => {
-        const assetForDisk = { ...asset };
-        delete assetForDisk.objectUrl;
-        return [assetId, assetForDisk];
-      }),
-    ),
-  };
-}
-
 async function createFileBackedProjectSnapshot(
   project: ProjectDocument,
   assetsDirectory: FileSystemDirectoryHandle,
@@ -100,7 +67,7 @@ async function createFileBackedProjectSnapshot(
       continue;
     }
 
-    if (!isDataUrl(asset.objectUrl) && !isBlobUrl(asset.objectUrl)) continue;
+    if (!isReadableObjectUrl(asset.objectUrl)) continue;
     const fileName = asset.fileName ?? `${assetId}.${getAssetFileExtension(asset.mimeType)}`;
     await writeBlobFileToDirectory(
       assetsDirectory,
@@ -137,90 +104,8 @@ async function readProjectNameFromMirrorFiles(files: MirrorFile[]) {
   return project.name.trim() || undefined;
 }
 
-function getChangedElementKeys(previousProject: ProjectDocument, nextProject: ProjectDocument) {
-  const changedElementIds = new Set<string>();
-  const elementIds = new Set([
-    ...Object.keys(previousProject.elements),
-    ...Object.keys(nextProject.elements),
-  ]);
-  for (const elementId of elementIds) {
-    if (
-      JSON.stringify(previousProject.elements[elementId]) !==
-      JSON.stringify(nextProject.elements[elementId])
-    ) {
-      changedElementIds.add(elementId);
-    }
-  }
-  return changedElementIds;
-}
-
-function createChangeSummary(project: ProjectDocument, previousProject?: ProjectDocument) {
-  if (!previousProject) {
-    const firstPage = project.pages[0];
-    return {
-      changeCount: 1,
-      summary: 'Initial saved version',
-      ...(firstPage ? { firstChangedPageId: firstPage.id } : {}),
-    };
-  }
-
-  let changeCount = 0;
-  let firstChangedPageId: string | undefined;
-  let firstChangedElementId: string | undefined;
-  const changedElementIds = getChangedElementKeys(previousProject, project);
-
-  for (const elementId of changedElementIds) {
-    changeCount += 1;
-    const page =
-      project.pages.find((item) => item.elementIds.includes(elementId)) ??
-      previousProject.pages.find((item) => item.elementIds.includes(elementId));
-    firstChangedPageId ??= page?.id;
-    firstChangedElementId ??= elementId;
-  }
-
-  const pageIds = new Set([
-    ...previousProject.pages.map((page) => page.id),
-    ...project.pages.map((page) => page.id),
-  ]);
-  for (const pageId of pageIds) {
-    const previousPage = previousProject.pages.find((page) => page.id === pageId);
-    const nextPage = project.pages.find((page) => page.id === pageId);
-    if (JSON.stringify(previousPage) !== JSON.stringify(nextPage)) {
-      changeCount += 1;
-      firstChangedPageId ??= nextPage?.id ?? previousPage?.id;
-      const pageElementIds = [...(nextPage?.elementIds ?? []), ...(previousPage?.elementIds ?? [])];
-      firstChangedElementId ??= pageElementIds.find((elementId) =>
-        changedElementIds.has(elementId),
-      );
-    }
-  }
-
-  for (const assetId of new Set([
-    ...Object.keys(previousProject.assets),
-    ...Object.keys(project.assets),
-  ])) {
-    if (
-      JSON.stringify(previousProject.assets[assetId]) !== JSON.stringify(project.assets[assetId])
-    ) {
-      changeCount += 1;
-    }
-  }
-
-  if (project.name !== previousProject.name) changeCount += 1;
-  if (changeCount === 0) {
-    return {
-      changeCount: 0,
-      summary: 'No visible changes',
-      ...(project.pages[0] ? { firstChangedPageId: project.pages[0].id } : {}),
-    };
-  }
-
-  return {
-    changeCount,
-    summary: `${changeCount} ${changeCount === 1 ? 'edit' : 'edits'}`,
-    ...(firstChangedPageId ? { firstChangedPageId } : {}),
-    ...(firstChangedElementId ? { firstChangedElementId } : {}),
-  };
+function isNotFoundError(error: unknown) {
+  return error instanceof DOMException && error.name === 'NotFoundError';
 }
 
 export class BrowserFileSystemProjectRepository implements ProjectRepository {
@@ -258,7 +143,9 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     for (const file of mirrorFiles) {
       await this.writeMirrorFile(this.directoryHandle, file);
     }
-    const project = await this.loadProject();
+    const project = await this.readProjectFromDirectory(this.directoryHandle, {
+      allowMissingAssetFiles: true,
+    });
     if (!project) throw new Error('The mirrored project did not include project.json.');
     await this.recentProjectStore.save(this.directoryHandle, project.name);
     return project;
@@ -271,17 +158,24 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     if (!this.directoryHandle) return null;
     await this.ensureReadWritePermission(this.directoryHandle);
 
+    return this.readProjectFromDirectory(this.directoryHandle);
+  }
+
+  private async readProjectFromDirectory(
+    directoryHandle: FileSystemDirectoryHandle,
+    options: HydrateProjectAssetsOptions = {},
+  ): Promise<ProjectDocument | null> {
     let file: File;
     try {
-      const fileHandle = await this.directoryHandle.getFileHandle(PROJECT_FILE_NAME);
+      const fileHandle = await directoryHandle.getFileHandle(PROJECT_FILE_NAME);
       file = await fileHandle.getFile();
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'NotFoundError') return null;
+      if (isNotFoundError(error)) return null;
       throw error;
     }
 
     const project = JSON.parse(await file.text()) as ProjectDocument;
-    return this.hydrateProjectAssets(project);
+    return this.hydrateProjectAssets(project, options);
   }
 
   async saveProject(
@@ -386,11 +280,18 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     const manifest = await this.readVersionHistoryManifest(directoryHandle);
     const entry = manifest.versions.find((version) => version.id === versionId);
     if (!entry) return null;
-    const historyDirectory = await directoryHandle.getDirectoryHandle('history');
-    const versionsDirectory = await historyDirectory.getDirectoryHandle('versions');
-    const fileHandle = await versionsDirectory.getFileHandle(entry.fileName);
-    const file = await fileHandle.getFile();
-    return this.hydrateProjectAssets(JSON.parse(await file.text()) as ProjectDocument);
+    try {
+      const historyDirectory = await directoryHandle.getDirectoryHandle('history');
+      const versionsDirectory = await historyDirectory.getDirectoryHandle('versions');
+      const fileHandle = await versionsDirectory.getFileHandle(entry.fileName);
+      const file = await fileHandle.getFile();
+      return this.hydrateProjectAssets(JSON.parse(await file.text()) as ProjectDocument, {
+        allowMissingAssetFiles: true,
+      });
+    } catch (error) {
+      if (isNotFoundError(error)) return null;
+      throw error;
+    }
   }
 
   private async ensureProjectDirectory(
@@ -517,12 +418,15 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
       const file = await fileHandle.getFile();
       return JSON.parse(await file.text()) as VersionHistoryManifest;
     } catch (error) {
-      if (error instanceof DOMException && error.name !== 'NotFoundError') throw error;
+      if (!isNotFoundError(error)) throw error;
       return { schemaVersion: 1, projectId, versions: [] };
     }
   }
 
-  private async hydrateProjectAssets(project: ProjectDocument): Promise<ProjectDocument> {
+  private async hydrateProjectAssets(
+    project: ProjectDocument,
+    options: HydrateProjectAssetsOptions = {},
+  ): Promise<ProjectDocument> {
     if (!this.directoryHandle) return project;
     const assets: ProjectDocument['assets'] = {};
     let assetsDirectory: FileSystemDirectoryHandle | undefined;
@@ -532,13 +436,18 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
         assets[assetId] = asset;
         continue;
       }
-      assetsDirectory ??= await this.directoryHandle.getDirectoryHandle('assets');
-      const fileHandle = await assetsDirectory.getFileHandle(asset.fileName);
-      const file = await fileHandle.getFile();
-      assets[assetId] = {
-        ...asset,
-        objectUrl: URL.createObjectURL(file),
-      };
+      try {
+        assetsDirectory ??= await this.directoryHandle.getDirectoryHandle('assets');
+        const fileHandle = await assetsDirectory.getFileHandle(asset.fileName);
+        const file = await fileHandle.getFile();
+        assets[assetId] = {
+          ...asset,
+          objectUrl: URL.createObjectURL(file),
+        };
+      } catch (error) {
+        if (!isNotFoundError(error) || !options.allowMissingAssetFiles) throw error;
+        assets[assetId] = asset;
+      }
     }
 
     return { ...project, assets };
@@ -551,6 +460,8 @@ class BrowserRecentProjectHandleStore implements RecentProjectHandleStore {
   private readonly handleKey = 'last-project-directory';
   private readonly localStorageKey = 'localstudio.ai.last-project.available';
 
+  constructor(private readonly storage: BrowserKeyValueStorage | undefined = getBrowserLocalStorage()) {}
+
   async load(projectName?: string): Promise<FileSystemDirectoryHandle | null> {
     if (typeof window === 'undefined') return null;
     const database = await this.openDatabase();
@@ -562,7 +473,7 @@ class BrowserRecentProjectHandleStore implements RecentProjectHandleStore {
         )) ?? null
       );
     }
-    if (window.localStorage.getItem(this.localStorageKey) !== 'true') return null;
+    if (this.storage?.getItem(this.localStorageKey) !== 'true') return null;
     return (await this.getValue<FileSystemDirectoryHandle>(database, this.handleKey)) ?? null;
   }
 
@@ -573,7 +484,7 @@ class BrowserRecentProjectHandleStore implements RecentProjectHandleStore {
     if (projectName) {
       await this.putValue(database, this.getProjectHandleKey(projectName), handle);
     }
-    window.localStorage.setItem(this.localStorageKey, 'true');
+    this.storage?.setItem(this.localStorageKey, 'true');
   }
 
   private getProjectHandleKey(projectName: string) {
