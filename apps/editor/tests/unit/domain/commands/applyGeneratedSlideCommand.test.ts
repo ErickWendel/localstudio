@@ -1,14 +1,11 @@
-import {
-  AddGeneratedSlideElementCommand,
-  PrepareGeneratedSlideCommand,
-} from '../../../../src/domain/commands/applyGeneratedSlideCommand';
-import type { ImageElement } from '../../../../src/domain/model';
-import { createSampleProject } from '../../../../src/domain/sampleProject';
+import { applyGeneratedSlideCommand } from '../../../../src/domain/commands/generated-slides/applyGeneratedSlideCommand';
+import type { ImageElement } from '../../../../src/domain/documents/model';
+import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 
 describe('generated slide commands', () => {
   it('prepares the active page by clearing current page elements and applying page metadata', () => {
-    const project = createSampleProject();
-    const next = new PrepareGeneratedSlideCommand('page-1', {
+    const project = sampleProject.createSampleProject();
+    const next = new applyGeneratedSlideCommand.PrepareGeneratedSlideCommand('page-1', {
       name: 'Why Web AI Matters',
       width: 1920,
       height: 1080,
@@ -25,14 +22,14 @@ describe('generated slide commands', () => {
   });
 
   it('appends a generated placeholder image immutably', () => {
-    const prepared = new PrepareGeneratedSlideCommand('page-1', {
+    const prepared = new applyGeneratedSlideCommand.PrepareGeneratedSlideCommand('page-1', {
       name: 'Why Web AI Matters',
       width: 1920,
       height: 1080,
       background: { type: 'color', color: '#050D10' },
-    }).execute(createSampleProject());
+    }).execute(sampleProject.createSampleProject());
 
-    const next = new AddGeneratedSlideElementCommand('page-1', {
+    const next = new applyGeneratedSlideCommand.AddGeneratedSlideElementCommand('page-1', {
       type: 'image',
       id: 'visual',
       assetRole: 'placeholder',
@@ -60,14 +57,14 @@ describe('generated slide commands', () => {
   });
 
   it('appends a generated remote image asset when the element has a remote src', () => {
-    const prepared = new PrepareGeneratedSlideCommand('page-1', {
+    const prepared = new applyGeneratedSlideCommand.PrepareGeneratedSlideCommand('page-1', {
       name: 'Remote image',
       width: 1920,
       height: 1080,
       background: { type: 'color', color: '#050D10' },
-    }).execute(createSampleProject());
+    }).execute(sampleProject.createSampleProject());
 
-    const next = new AddGeneratedSlideElementCommand('page-1', {
+    const next = new applyGeneratedSlideCommand.AddGeneratedSlideElementCommand('page-1', {
       type: 'image',
       id: 'remote',
       assetRole: 'remote',

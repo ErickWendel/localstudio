@@ -1,13 +1,8 @@
-import {
-  GENERATED_SLIDE_ELEMENT_RESPONSE_SCHEMA,
-  GENERATED_SLIDE_TASKS_RESPONSE_SCHEMA,
-  parseGeneratedSlideElementJson,
-  parseGeneratedSlideTasksJson,
-} from '../../../src/domain/generatedSlide';
+import { generatedSlide } from '../../../src/domain/generated-slides/generatedSlide';
 
 describe('generated slide validation', () => {
   it('parses staged slide tasks', () => {
-    const result = parseGeneratedSlideTasksJson(JSON.stringify({
+    const result = generatedSlide.parseGeneratedSlideTasksJson(JSON.stringify({
       language: 'en',
       page: {
         name: 'Why Web AI Matters',
@@ -27,7 +22,7 @@ describe('generated slide validation', () => {
   });
 
   it('parses a remote image task only when the URL is https', () => {
-    const result = parseGeneratedSlideTasksJson(JSON.stringify({
+    const result = generatedSlide.parseGeneratedSlideTasksJson(JSON.stringify({
       language: 'en',
       page: {
         name: 'Remote image',
@@ -51,7 +46,7 @@ describe('generated slide validation', () => {
 
   it('rejects non-https remote image tasks', () => {
     expect(() =>
-      parseGeneratedSlideTasksJson(JSON.stringify({
+      generatedSlide.parseGeneratedSlideTasksJson(JSON.stringify({
         language: 'en',
         page: {
           name: 'Bad',
@@ -73,7 +68,7 @@ describe('generated slide validation', () => {
   });
 
   it('parses and clamps one generated element', () => {
-    const result = parseGeneratedSlideElementJson(JSON.stringify({
+    const result = generatedSlide.parseGeneratedSlideElementJson(JSON.stringify({
       type: 'shape',
       id: 'shape',
       shape: 'rect',
@@ -97,7 +92,7 @@ describe('generated slide validation', () => {
   });
 
   it('normalizes generated text to a readable minimum size', () => {
-    const result = parseGeneratedSlideElementJson(JSON.stringify({
+    const result = generatedSlide.parseGeneratedSlideElementJson(JSON.stringify({
       type: 'text',
       id: 'tiny',
       text: 'Web AI',
@@ -123,11 +118,11 @@ describe('generated slide validation', () => {
   });
 
   it('exports JSON Schemas compatible with Prompt API responseConstraint', () => {
-    expect(GENERATED_SLIDE_TASKS_RESPONSE_SCHEMA).toMatchObject({
+    expect(generatedSlide.GENERATED_SLIDE_TASKS_RESPONSE_SCHEMA).toMatchObject({
       type: 'object',
       additionalProperties: false,
       required: ['language', 'page', 'tasks'],
     });
-    expect(Array.isArray(GENERATED_SLIDE_ELEMENT_RESPONSE_SCHEMA.oneOf)).toBe(true);
+    expect(Array.isArray(generatedSlide.GENERATED_SLIDE_ELEMENT_RESPONSE_SCHEMA.oneOf)).toBe(true);
   });
 });

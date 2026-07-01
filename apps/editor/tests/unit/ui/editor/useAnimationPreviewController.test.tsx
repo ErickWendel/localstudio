@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ProjectDocument } from '../../../../src/domain/model';
-import { useAnimationPreviewController } from '../../../../src/ui/editor/useAnimationPreviewController';
+import type { ProjectDocument } from '../../../../src/domain/documents/model';
+import { useAnimationPreviewController } from '../../../../src/ui/editor/animation/useAnimationPreviewController';
 
 function createProject(): ProjectDocument {
   return {

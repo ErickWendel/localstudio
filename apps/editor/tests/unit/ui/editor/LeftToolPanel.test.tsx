@@ -2,9 +2,9 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { vi } from 'vitest';
-import { createSampleProject } from '../../../../src/domain/sampleProject';
-import { LeftToolPanel } from '../../../../src/ui/editor/LeftToolPanel';
-import type { RightPanelTab } from '../../../../src/ui/editor/useEditorViewModel';
+import { sampleProject } from '../../../../src/domain/projects/sampleProject';
+import { LeftToolPanel } from '../../../../src/ui/editor/panels/LeftToolPanel';
+import type { RightPanelTab } from '../../../../src/ui/editor/state/useEditorViewModel';
 
 const modelStates = [
   {
@@ -35,7 +35,7 @@ describe('LeftToolPanel', () => {
             setActiveTab(tab);
           }}
           onOpenChange={setOpen}
-          project={createSampleProject()}
+          project={sampleProject.createSampleProject()}
           activePageId="page-1"
           selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
           modelStates={modelStates}
@@ -68,7 +68,7 @@ describe('LeftToolPanel', () => {
         activeTab="assets"
         open
         onTabChange={vi.fn()}
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         activePageId="page-1"
         selection={{ pageId: 'page-1', elementIds: [] }}
         modelStates={modelStates}
@@ -83,7 +83,7 @@ describe('LeftToolPanel', () => {
   });
 
   it('lists project assets with usage status and removal controls', async () => {
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     project.assets['asset-unused'] = {
       id: 'asset-unused',
       type: 'image',
@@ -128,7 +128,7 @@ describe('LeftToolPanel', () => {
         activeTab="text"
         open
         onTabChange={vi.fn()}
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         activePageId="page-1"
         selection={{ pageId: 'page-1', elementIds: [] }}
         modelStates={modelStates}
@@ -154,7 +154,7 @@ describe('LeftToolPanel', () => {
     const onReorderElementAnimationBuild = vi.fn();
     const onPlayAnimationPreview = vi.fn();
     const onSetElementAnimationBuilds = vi.fn();
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     project.pages[0] = {
       ...project.pages[0]!,
       transition: { effect: 'reveal', delayMs: 0 },
@@ -260,7 +260,7 @@ describe('LeftToolPanel', () => {
         activeTab="animations"
         open
         onTabChange={vi.fn()}
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         activePageId="page-1"
         selection={{ pageId: 'page-1', elementIds: ['text-title', 'image-hero'] }}
         modelStates={modelStates}
@@ -289,7 +289,7 @@ describe('LeftToolPanel', () => {
         activeTab="elements"
         open
         onTabChange={vi.fn()}
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         activePageId="page-1"
         selection={{ pageId: 'page-1', elementIds: [] }}
         modelStates={modelStates}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { rewriteEditorPreviewRoute } from '../../vite.config';
+import { rewriteEditorPreviewRoute } from '../../src/routing/rewriteEditorPreviewRoute';
 
 describe('editor preview routing', () => {
   it('rewrites public share deep links to the editor app entry', () => {

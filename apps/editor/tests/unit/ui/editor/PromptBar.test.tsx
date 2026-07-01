@@ -1,12 +1,12 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
-import { defaultCreateImagePromptOptions } from '../../../../src/ui/editor/imagePromptOptions';
-import { PromptBar } from '../../../../src/ui/editor/PromptBar';
+import { imagePromptOptions } from '../../../../src/ui/editor/media/imagePromptOptions';
+import { PromptBar } from '../../../../src/ui/editor/prompting/PromptBar';
 
 describe('PromptBar', () => {
   it('uses a multiline prompt field so long image prompts can wrap', () => {
-    render(<PromptBar createImageOptions={defaultCreateImagePromptOptions} />);
+    render(<PromptBar createImageOptions={imagePromptOptions.defaultCreateImagePromptOptions} />);
 
     const promptField = screen.getByLabelText('Create image prompt');
 
@@ -27,7 +27,7 @@ describe('PromptBar', () => {
 
     render(
       <PromptBar
-        createImageOptions={defaultCreateImagePromptOptions}
+        createImageOptions={imagePromptOptions.defaultCreateImagePromptOptions}
         onCreateImagePromptIntent={onCreateImagePromptIntent}
         onCreateImageSubmit={onCreateImageSubmit}
       />,
@@ -48,7 +48,7 @@ describe('PromptBar', () => {
     await waitFor(() => {
       expect(onCreateImageSubmit).toHaveBeenCalledWith(
         'Create a local Web AI hero',
-        defaultCreateImagePromptOptions,
+        imagePromptOptions.defaultCreateImagePromptOptions,
       );
     });
   });

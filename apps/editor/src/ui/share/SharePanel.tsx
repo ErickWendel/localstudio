@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { ShareMetadata } from '../../services/interfaces';
+import type { ShareMetadata } from '../../services/contracts/interfaces';
 
 interface SharePanelProps {
   projectName: string;

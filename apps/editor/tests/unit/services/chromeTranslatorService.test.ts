@@ -1,7 +1,7 @@
 import { vi } from 'vitest';
-import { ChromeTranslatorService } from '../../../src/services/chromeTranslatorService';
+import { chromeTranslatorService } from '../../../src/services/translation/chromeTranslatorService';
 
-describe('ChromeTranslatorService', () => {
+describe('chromeTranslatorService.ChromeTranslatorService', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -12,7 +12,7 @@ describe('ChromeTranslatorService', () => {
         detect: vi.fn().mockResolvedValue([{ detectedLanguage: 'en' }]),
       }),
     });
-    const service = new ChromeTranslatorService();
+    const service = new chromeTranslatorService.ChromeTranslatorService();
 
     await expect(service.detectLanguage('Hello')).resolves.toBe('en');
   });
@@ -23,7 +23,7 @@ describe('ChromeTranslatorService', () => {
         detect: vi.fn().mockResolvedValue([{ detectedLanguage: 'gl' }]),
       }),
     });
-    const service = new ChromeTranslatorService();
+    const service = new chromeTranslatorService.ChromeTranslatorService();
 
     await expect(service.detectLanguage('Revolución de deseño')).resolves.toBe('es');
   });
@@ -42,7 +42,7 @@ describe('ChromeTranslatorService', () => {
       availability,
       create,
     });
-    const service = new ChromeTranslatorService();
+    const service = new chromeTranslatorService.ChromeTranslatorService();
 
     await expect(service.translate('Hello', 'pt')).resolves.toBe('Ola');
     expect(availability).toHaveBeenCalledWith({ sourceLanguage: 'en', targetLanguage: 'pt' });
@@ -65,7 +65,7 @@ describe('ChromeTranslatorService', () => {
       availability: vi.fn().mockResolvedValue('downloadable'),
       create,
     });
-    const service = new ChromeTranslatorService();
+    const service = new chromeTranslatorService.ChromeTranslatorService();
 
     await expect(service.translate('Hola', 'en')).resolves.toBe('Hello');
     expect(create).toHaveBeenCalledWith(
@@ -89,7 +89,7 @@ describe('ChromeTranslatorService', () => {
         });
       }),
     });
-    const service = new ChromeTranslatorService();
+    const service = new chromeTranslatorService.ChromeTranslatorService();
 
     await service.prepareTranslation('es', 'en', { onProgress });
 
@@ -112,7 +112,7 @@ describe('ChromeTranslatorService', () => {
       availability: vi.fn().mockResolvedValue('downloadable'),
       create,
     });
-    const service = new ChromeTranslatorService();
+    const service = new chromeTranslatorService.ChromeTranslatorService();
 
     await service.prepareTranslation('es', 'en');
     await expect(service.translate('Hola', 'en')).resolves.toBe('Hello');
@@ -133,7 +133,7 @@ describe('ChromeTranslatorService', () => {
         translate: vi.fn().mockResolvedValue('Hello'),
       }),
     });
-    const service = new ChromeTranslatorService();
+    const service = new chromeTranslatorService.ChromeTranslatorService();
 
     await expect(service.translate('Hola', 'en')).resolves.toBe('Hello');
   });
@@ -152,7 +152,7 @@ describe('ChromeTranslatorService', () => {
       availability: vi.fn().mockResolvedValue('after-download'),
       create,
     });
-    const service = new ChromeTranslatorService();
+    const service = new chromeTranslatorService.ChromeTranslatorService();
 
     await expect(service.translate('Hola', 'en')).resolves.toBe('Hello');
     expect(create).toHaveBeenCalledWith(
@@ -173,7 +173,7 @@ describe('ChromeTranslatorService', () => {
         translate: vi.fn().mockResolvedValue('Ola'),
       }),
     });
-    const service = new ChromeTranslatorService();
+    const service = new chromeTranslatorService.ChromeTranslatorService();
 
     await expect(service.translate('Hello', 'pt')).resolves.toBe('Ola');
   });
@@ -189,7 +189,7 @@ describe('ChromeTranslatorService', () => {
       availability: vi.fn().mockResolvedValue('unavailable'),
       create,
     });
-    const service = new ChromeTranslatorService();
+    const service = new chromeTranslatorService.ChromeTranslatorService();
 
     await expect(service.translate('Hola', 'en')).rejects.toThrow(
       'Chrome Built-in AI translation is not ready for es to en. Availability: unavailable.',
@@ -206,7 +206,7 @@ describe('ChromeTranslatorService', () => {
       }),
     });
     vi.stubGlobal('Translator', { availability, create });
-    const service = new ChromeTranslatorService();
+    const service = new chromeTranslatorService.ChromeTranslatorService();
 
     await expect(service.translate('Ola', 'pt')).resolves.toBe('Ola');
     expect(availability).not.toHaveBeenCalled();
@@ -224,7 +224,7 @@ describe('ChromeTranslatorService', () => {
       availability: vi.fn().mockResolvedValue('available'),
       create,
     });
-    const service = new ChromeTranslatorService();
+    const service = new chromeTranslatorService.ChromeTranslatorService();
 
     await expect(service.translate('Hola', 'en', { sourceLanguage: 'es' })).resolves.toBe('Hello');
     expect(detectorCreate).not.toHaveBeenCalled();
@@ -242,7 +242,7 @@ describe('ChromeTranslatorService', () => {
       availability: vi.fn().mockResolvedValue('available'),
       create,
     });
-    const service = new ChromeTranslatorService();
+    const service = new chromeTranslatorService.ChromeTranslatorService();
 
     await expect(service.translate('Hola', 'en', { sourceLanguage: 'gl' })).resolves.toBe('Hello');
     expect(create).toHaveBeenCalledWith(
@@ -252,7 +252,7 @@ describe('ChromeTranslatorService', () => {
 
   it('rejects when Chrome Translator is unavailable', async () => {
     vi.stubGlobal('Translator', undefined);
-    const service = new ChromeTranslatorService();
+    const service = new chromeTranslatorService.ChromeTranslatorService();
 
     await expect(service.translate('Hello', 'pt')).rejects.toThrow(
       'Chrome Built-in AI translation is unavailable.',

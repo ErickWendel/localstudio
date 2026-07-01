@@ -1,8 +1,4 @@
-import {
-  imagePromptExamples,
-  promptRecipeCatalog,
-  slidePromptExamples,
-} from '../../../../src/ui/editor/promptRecipes';
+import { promptRecipes } from '../../../../src/ui/editor/prompting/promptRecipes';
 
 describe('promptRecipes', () => {
   it('shares the prompt examples used by UI and WebMCP metadata', () => {
@@ -14,9 +10,9 @@ describe('promptRecipes', () => {
       'A cinematic AI agent background showing multiple autonomous digital agents as glowing abstract orbs moving through a connected web of tasks, browser panels, APIs, and data pipelines, futuristic dark environment, strong sense of motion, deep perspective, premium technology style, no people, no logos, no readable text',
     ];
 
-    expect(slidePromptExamples).toContain('Three-image grid about Web AI, with matching captions.');
-    expect(imagePromptExamples).toEqual(contrastedImagePrompts);
-    expect(promptRecipeCatalog.slide.examples).toBe(slidePromptExamples);
-    expect(promptRecipeCatalog.image.examples).toBe(imagePromptExamples);
+    expect(promptRecipes.slidePromptExamples).toContain('Three-image grid about Web AI, with matching captions.');
+    expect(promptRecipes.imagePromptExamples).toEqual(contrastedImagePrompts);
+    expect(promptRecipes.promptRecipeCatalog.slide.examples).toBe(promptRecipes.slidePromptExamples);
+    expect(promptRecipes.promptRecipeCatalog.image.examples).toBe(promptRecipes.imagePromptExamples);
   });
 });

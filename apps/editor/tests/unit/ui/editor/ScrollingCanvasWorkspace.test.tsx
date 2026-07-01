@@ -1,12 +1,12 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
-import { createSampleProject } from '../../../../src/domain/sampleProject';
-import { ScrollingCanvasWorkspace } from '../../../../src/ui/editor/ScrollingCanvasWorkspace';
+import { sampleProject } from '../../../../src/domain/projects/sampleProject';
+import { ScrollingCanvasWorkspace } from '../../../../src/ui/editor/canvas/ScrollingCanvasWorkspace';
 
 describe('ScrollingCanvasWorkspace', () => {
   it('scrolls the active slide into view after active page changes', () => {
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     project.pages.push({
       ...project.pages[0]!,
       id: 'page-2',
@@ -41,7 +41,7 @@ describe('ScrollingCanvasWorkspace', () => {
 
   it('activates placeholder pages and exposes page header actions', async () => {
     const user = userEvent.setup();
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     project.pages.push({
       ...project.pages[0]!,
       id: 'page-2',
@@ -97,7 +97,7 @@ describe('ScrollingCanvasWorkspace', () => {
     render(
       <ScrollingCanvasWorkspace
         activePageId="page-1"
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         selection={{ pageId: 'page-1', elementIds: ['text-subtitle'] }}
         canTranslateSelection
         onTranslateSelectedText={onTranslateSelectedText}

@@ -1,7 +1,7 @@
 import { Bot, FileJson, ImagePlus, Languages, Play, Radar, SendHorizontal } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
-import { imagePromptExamples, slidePromptExamples } from '../editor/promptRecipes';
-import { TRANSLATION_LANGUAGE_OPTIONS } from '../editor/translationLanguages';
+import { promptRecipes } from '../editor/prompting/promptRecipes';
+import { TRANSLATION_LANGUAGE_OPTIONS } from '../editor/translation/translationLanguages';
 
 interface WebMcpToolLike {
   call?: (input: Record<string, unknown>) => unknown;
@@ -30,13 +30,13 @@ const demoSteps: DemoStep[] = [
   {
     label: 'Generate slide',
     toolName: 'generate_slides',
-    input: { prompt: slidePromptExamples[1] },
+    input: { prompt: promptRecipes.slidePromptExamples[1] },
   },
   {
     label: 'Generate image',
     toolName: 'generate_image',
     input: {
-      prompt: imagePromptExamples[1],
+      prompt: promptRecipes.imagePromptExamples[1],
       width: 512,
       height: 512,
       steps: 4,

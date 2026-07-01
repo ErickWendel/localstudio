@@ -1,10 +1,10 @@
-import { createSampleProject } from '../../../src/domain/sampleProject';
-import { DisabledProjectRepository } from '../../../src/services/disabledProjectRepository';
+import { sampleProject } from '../../../src/domain/projects/sampleProject';
+import { DisabledProjectRepository } from '../../../src/services/storage/disabledProjectRepository';
 
 describe('DisabledProjectRepository', () => {
   it('does not persist or reload project changes', async () => {
     const repository = new DisabledProjectRepository();
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
 
     await repository.saveProject(project);
 

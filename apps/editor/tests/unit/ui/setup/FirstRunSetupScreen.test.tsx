@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
-import type { LocalSetupState } from '../../../../src/services/interfaces';
+import type { LocalSetupState } from '../../../../src/services/contracts/interfaces';
 import { FirstRunSetupScreen } from '../../../../src/ui/setup/FirstRunSetupScreen';
 
 const readyState: LocalSetupState = {

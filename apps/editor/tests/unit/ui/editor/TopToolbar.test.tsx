@@ -1,8 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
-import { createSampleProject } from '../../../../src/domain/sampleProject';
-import { TopToolbar } from '../../../../src/ui/editor/TopToolbar';
+import { sampleProject } from '../../../../src/domain/projects/sampleProject';
+import { TopToolbar } from '../../../../src/ui/editor/toolbars/TopToolbar';
 
 describe('TopToolbar', () => {
   it('opens Stitch header menus and wires available actions', async () => {
@@ -18,7 +18,7 @@ describe('TopToolbar', () => {
 
     render(
       <TopToolbar
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         language="PT-BR"
         onShare={onShare}
         onImportProject={onImportProject}
@@ -72,7 +72,7 @@ describe('TopToolbar', () => {
 
     render(
       <TopToolbar
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         language="PT-BR"
         onPersistenceToggle={onPersistenceToggle}
       />,
@@ -84,7 +84,7 @@ describe('TopToolbar', () => {
   });
 
   it('links to the public GitHub repository from the editor toolbar', () => {
-    render(<TopToolbar project={createSampleProject()} language="PT-BR" />);
+    render(<TopToolbar project={sampleProject.createSampleProject()} language="PT-BR" />);
 
     expect(screen.getByRole('link', { name: 'Star LocalStudio.dev on GitHub' })).toHaveAttribute(
       'href',
@@ -99,7 +99,7 @@ describe('TopToolbar', () => {
 
     render(
       <TopToolbar
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         language="PT-BR"
         persistenceAvailable={false}
         onPersistenceToggle={onPersistenceToggle}
@@ -125,7 +125,7 @@ describe('TopToolbar', () => {
     const onMirrorToggle = vi.fn();
     const { rerender } = render(
       <TopToolbar
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         language="PT-BR"
         persistenceEnabled={false}
         mirrorState={{ enabled: true, status: 'synced' }}
@@ -137,7 +137,7 @@ describe('TopToolbar', () => {
 
     rerender(
       <TopToolbar
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         language="PT-BR"
         persistenceEnabled
         mirrorState={{ enabled: false, status: 'disabled' }}
@@ -152,7 +152,7 @@ describe('TopToolbar', () => {
 
     rerender(
       <TopToolbar
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         language="PT-BR"
         persistenceEnabled
         mirrorState={{ enabled: true, status: 'syncing' }}
@@ -164,7 +164,7 @@ describe('TopToolbar', () => {
 
     rerender(
       <TopToolbar
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         language="PT-BR"
         persistenceEnabled
         mirrorState={{ enabled: true, status: 'synced' }}
@@ -182,7 +182,7 @@ describe('TopToolbar', () => {
   it('labels deck storage state by persistence and mirror activation', () => {
     const { rerender } = render(
       <TopToolbar
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         language="PT-BR"
         persistenceEnabled={false}
         mirrorState={{ enabled: false, status: 'disabled' }}
@@ -193,7 +193,7 @@ describe('TopToolbar', () => {
 
     rerender(
       <TopToolbar
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         language="PT-BR"
         persistenceEnabled
         mirrorState={{ enabled: false, status: 'disabled' }}
@@ -203,7 +203,7 @@ describe('TopToolbar', () => {
 
     rerender(
       <TopToolbar
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         language="PT-BR"
         persistenceEnabled
         mirrorState={{ enabled: true, status: 'syncing' }}
@@ -218,7 +218,7 @@ describe('TopToolbar', () => {
 
     render(
       <TopToolbar
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         language="PT-BR"
         publicSharingAvailable={false}
         publicSharingUnavailableReason="Public sharing requires active external storage."
@@ -239,7 +239,7 @@ describe('TopToolbar', () => {
     const user = userEvent.setup();
     const alert = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
 
-    render(<TopToolbar project={createSampleProject()} language="PT-BR" />);
+    render(<TopToolbar project={sampleProject.createSampleProject()} language="PT-BR" />);
 
     await user.click(screen.getByRole('button', { name: 'File' }));
     await user.click(screen.getByRole('menuitem', { name: 'Share' }));
@@ -255,7 +255,7 @@ describe('TopToolbar', () => {
 
     render(
       <TopToolbar
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         language="PT-BR"
         persistenceEnabled
         lastEditedAt="2026-06-26T15:04:00.000Z"
@@ -276,7 +276,7 @@ describe('TopToolbar', () => {
 
     render(
       <TopToolbar
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         language="PT-BR"
         onProjectNameChange={onProjectNameChange}
       />,
@@ -295,7 +295,7 @@ describe('TopToolbar', () => {
 
     render(
       <TopToolbar
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         language="PT-BR"
         onStartPresenterMode={onStartPresenterMode}
       />,
@@ -313,7 +313,7 @@ describe('TopToolbar', () => {
 
     render(
       <TopToolbar
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         language="PT-BR"
         onStartPresenterMode={onStartPresenterMode}
       />,
@@ -327,7 +327,7 @@ describe('TopToolbar', () => {
 
   it('selects the full project name when entering rename mode', async () => {
     const user = userEvent.setup();
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
 
     render(<TopToolbar project={project} language="PT-BR" />);
 

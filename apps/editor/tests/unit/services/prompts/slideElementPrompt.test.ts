@@ -1,4 +1,4 @@
-import { buildSlideElementPrompt } from '../../../../src/services/prompts/slideElementPrompt';
+import { buildSlideElementPrompt } from '../../../../src/services/prompting/slideElementPrompt';
 
 describe('slide element prompt', () => {
   it('asks for exactly one concrete Konva-ready element', () => {

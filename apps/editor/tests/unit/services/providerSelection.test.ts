@@ -1,5 +1,5 @@
-import type { AiProviderState } from '../../../src/services/interfaces';
-import { selectDefaultProvider } from '../../../src/services/providerSelection';
+import type { AiProviderState } from '../../../src/services/contracts/interfaces';
+import { providerSelection } from '../../../src/services/model-setup/providerSelection';
 
 function provider(patch: Partial<AiProviderState> & Pick<AiProviderState, 'id' | 'runtime'>): AiProviderState {
   return {
@@ -13,9 +13,9 @@ function provider(patch: Partial<AiProviderState> & Pick<AiProviderState, 'id' |
   };
 }
 
-describe('selectDefaultProvider', () => {
+describe('providerSelection.selectDefaultProvider', () => {
   it('prefers ready Chrome over a stored external provider that is not downloaded', () => {
-    const selected = selectDefaultProvider(
+    const selected = providerSelection.selectDefaultProvider(
       [
         provider({ id: 'chrome-translator-api', runtime: 'chrome-built-in', readiness: 'ready' }),
         provider({ id: 'translategemma-webgpu', runtime: 'webgpu-huggingface', readiness: 'needs-download' }),
@@ -27,7 +27,7 @@ describe('selectDefaultProvider', () => {
   });
 
   it('keeps a stored external provider when its model is ready', () => {
-    const selected = selectDefaultProvider(
+    const selected = providerSelection.selectDefaultProvider(
       [
         provider({ id: 'chrome-translator-api', runtime: 'chrome-built-in', readiness: 'ready' }),
         provider({ id: 'translategemma-webgpu', runtime: 'webgpu-huggingface', readiness: 'ready' }),
@@ -39,7 +39,7 @@ describe('selectDefaultProvider', () => {
   });
 
   it('keeps an explicit external click even when the model still needs download', () => {
-    const selected = selectDefaultProvider(
+    const selected = providerSelection.selectDefaultProvider(
       [
         provider({ id: 'chrome-translator-api', runtime: 'chrome-built-in', readiness: 'ready' }),
         provider({ id: 'translategemma-webgpu', runtime: 'webgpu-huggingface', readiness: 'needs-download' }),

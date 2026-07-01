@@ -2,8 +2,8 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '../../../src/App';
-import { createSampleProject } from '../../../src/domain/sampleProject';
-import { TRANSLATION_LANGUAGE_OPTIONS } from '../../../src/ui/editor/translationLanguages';
+import { sampleProject } from '../../../src/domain/projects/sampleProject';
+import { TRANSLATION_LANGUAGE_OPTIONS } from '../../../src/ui/editor/translation/translationLanguages';
 
 describe('App', () => {
   beforeEach(() => {
@@ -125,7 +125,7 @@ describe('App', () => {
               shareId,
               createdAt: '2026-06-30T10:00:00.000Z',
               updatedAt: '2026-06-30T10:00:00.000Z',
-              project: createSampleProject(),
+              project: sampleProject.createSampleProject(),
             }),
             { headers: { 'content-type': 'application/json' }, status: 200 },
           ),
@@ -153,7 +153,7 @@ describe('App', () => {
               shareId,
               createdAt: '2026-06-30T10:00:00.000Z',
               updatedAt: '2026-06-30T10:00:00.000Z',
-              project: createSampleProject(),
+              project: sampleProject.createSampleProject(),
             }),
             { headers: { 'content-type': 'application/json' }, status: 200 },
           ),
@@ -181,7 +181,7 @@ describe('App', () => {
               shareId,
               createdAt: '2026-06-30T10:00:00.000Z',
               updatedAt: '2026-06-30T10:00:00.000Z',
-              project: createSampleProject(),
+              project: sampleProject.createSampleProject(),
             }),
             { headers: { 'content-type': 'application/json' }, status: 200 },
           ),
@@ -209,7 +209,7 @@ describe('App', () => {
               shareId,
               createdAt: '2026-06-30T10:00:00.000Z',
               updatedAt: '2026-06-30T10:00:00.000Z',
-              project: createSampleProject(),
+              project: sampleProject.createSampleProject(),
             }),
             { headers: { 'content-type': 'application/json' }, status: 200 },
           ),

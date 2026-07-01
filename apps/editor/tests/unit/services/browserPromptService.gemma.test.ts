@@ -1,18 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { GeneratedSlideTask } from '../../../src/domain/generatedSlide';
-import { GEMMA_LLM_TRANSFORMERS_MODEL_ID } from '../../../src/services/aiModelIds';
-import {
-  BrowserPromptService,
-  createGemmaStructuredJsonMessages,
-  GemmaPromptProvider,
-  GEMMA_PROMPT_PROVIDER_ID,
-} from '../../../src/services/browserPromptService';
-import type { ModelSetupService } from '../../../src/services/interfaces';
+import type { GeneratedSlideTask } from '../../../src/domain/generated-slides/generatedSlide';
+import { aiModelCatalog } from '../../../src/services/model-setup/aiModelCatalog';
+import { browserPromptService } from '../../../src/services/prompting/browserPromptService';
+import type { ModelSetupService } from '../../../src/services/contracts/interfaces';
 import type {
   TextGenerationInput,
   TextGenerationOptions,
   TextGenerationRuntime,
-} from '../../../src/services/webGpuTextGenerationRuntime';
+} from '../../../src/services/prompting/webGpuTextGenerationRuntime';
 
 class TestTextGenerationRuntime implements TextGenerationRuntime {
   preload = vi.fn<() => Promise<void>>(() => Promise.resolve());
@@ -38,9 +33,9 @@ class ProgressModelSetupService {
   downloadRequiredModels = vi.fn(() => Promise.resolve([]));
 }
 
-describe('GemmaPromptProvider structured JSON generation', () => {
+describe('browserPromptService.GemmaPromptProvider structured JSON generation', () => {
   it('builds chat-style JSON instructions for Gemma', () => {
-    const messages = createGemmaStructuredJsonMessages('Create a Web AI slide', { type: 'object' });
+    const messages = browserPromptService.createGemmaStructuredJsonMessages('Create a Web AI slide', { type: 'object' });
 
     expect(Array.isArray(messages)).toBe(true);
     const [message] = messages as Array<{ role: string; content: string }>;
@@ -65,13 +60,13 @@ describe('GemmaPromptProvider structured JSON generation', () => {
         { type: 'add-title', id: 'title', text: 'Why Web AI Matters', placementHint: 'top center' },
       ],
     }));
-    const provider = new GemmaPromptProvider(runtime);
+    const provider = new browserPromptService.GemmaPromptProvider(runtime);
 
     const tasks = await provider.generateSlideTasksFromPrompt('A slide about Web AI');
 
     expect(tasks.tasks).toHaveLength(2);
     const [modelId, promptInput, generationOptions] = runtime.generate.mock.calls[0]!;
-    expect(modelId).toBe(GEMMA_LLM_TRANSFORMERS_MODEL_ID);
+    expect(modelId).toBe(aiModelCatalog.GEMMA_LLM_TRANSFORMERS_MODEL_ID);
     expect(generationOptions).toEqual({ max_new_tokens: 3072 });
     expect(Array.isArray(promptInput)).toBe(true);
     const [message] = promptInput as Array<{ role: string; content: string }>;
@@ -93,7 +88,7 @@ describe('GemmaPromptProvider structured JSON generation', () => {
         },
         tasks: [{ type: 'add-title', id: 'title', text: 'Why Web AI Matters', placementHint: 'center' }],
       }));
-    const provider = new GemmaPromptProvider(runtime);
+    const provider = new browserPromptService.GemmaPromptProvider(runtime);
 
     const tasks = await provider.generateSlideTasksFromPrompt('A slide about Web AI');
 
@@ -104,7 +99,7 @@ describe('GemmaPromptProvider structured JSON generation', () => {
 
   it('does not double-map Gemma model setup progress near completion', async () => {
     const runtime = new TestTextGenerationRuntime();
-    const provider = new GemmaPromptProvider(runtime);
+    const provider = new browserPromptService.GemmaPromptProvider(runtime);
     const modelSetupService = new ProgressModelSetupService();
     const progress: number[] = [];
 
@@ -137,10 +132,10 @@ describe('GemmaPromptProvider structured JSON generation', () => {
       })),
     };
     const storage = {
-      getItem: vi.fn().mockReturnValue(GEMMA_PROMPT_PROVIDER_ID),
+      getItem: vi.fn().mockReturnValue(browserPromptService.GEMMA_PROMPT_PROVIDER_ID),
       setItem: vi.fn(),
     } as unknown as Storage;
-    const service = new BrowserPromptService(modelSetupService, undefined, storage, runtime);
+    const service = new browserPromptService.BrowserPromptService(modelSetupService, undefined, storage, runtime);
     const allTasks: Array<Exclude<GeneratedSlideTask, { type: 'set-background' }>> = [
       {
         type: 'add-placeholder-image',

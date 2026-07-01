@@ -1,21 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  LANGUAGE_DETECTION_PROVIDER_STORAGE_KEY,
-  createTranslateGemmaMessages,
-  toTranslateGemmaLanguageCode,
-} from '../../../src/services/browserTranslatorService';
-import {
-  LANGUAGE_DETECTION_MODEL_ID,
-  LANGUAGE_DETECTION_TRANSFORMERS_MODEL_ID,
-  TRANSLATEGEMMA_MODEL_ID,
-} from '../../../src/services/aiModelIds';
-import type { ModelSetupService, ModelState } from '../../../src/services/interfaces';
-import { BrowserTranslatorService } from '../../../src/services/browserTranslatorService';
-import { InMemoryModelSetupService } from '../../../src/services/modelSetupService';
-import { createEstimatedProgressTicker } from '../../../src/services/progress';
-import type { LanguageDetectionRuntime } from '../../../src/services/webGpuLanguageDetectionRuntime';
+import { aiModelCatalog } from '../../../src/services/model-setup/aiModelCatalog';
+import type { ModelSetupService, ModelState } from '../../../src/services/contracts/interfaces';
+import { browserTranslatorService } from '../../../src/services/translation/browserTranslatorService';
+import { modelSetupService } from '../../../src/services/model-setup/modelSetupService';
+import { progress } from '../../../src/services/model-setup/progress';
+import type { LanguageDetectionRuntime } from '../../../src/services/translation/webGpuLanguageDetectionRuntime';
 
-class RecordingModelSetupService extends InMemoryModelSetupService implements ModelSetupService {
+class RecordingModelSetupService extends modelSetupService.InMemoryModelSetupService implements ModelSetupService {
   override downloadModel = vi.fn((id: string, options?: { onProgress?: (progress: number) => void }): Promise<ModelState> => {
     options?.onProgress?.(50);
     return super.downloadModel(id, options);
@@ -31,7 +22,7 @@ class TestLanguageDetectionRuntime implements LanguageDetectionRuntime {
   detectLanguage = vi.fn(() => Promise.resolve({ language: 'fr', score: 0.99 }));
 }
 
-class DeferredModelSetupService extends InMemoryModelSetupService implements ModelSetupService {
+class DeferredModelSetupService extends modelSetupService.InMemoryModelSetupService implements ModelSetupService {
   resolveDownload: (() => void) | undefined;
 
   override downloadModel = vi.fn((id: string, options?: { onProgress?: (progress: number) => void }): Promise<ModelState> => {
@@ -68,9 +59,9 @@ describe('TranslateGemma helpers', () => {
 
   it('can keep progress moving during silent WebGPU finalization', () => {
     vi.useFakeTimers();
-    const progress: number[] = [];
+    const reportedProgress: number[] = [];
 
-    const stop = createEstimatedProgressTicker((value) => progress.push(value), {
+    const stop = progress.createEstimatedProgressTicker((value) => reportedProgress.push(value), {
       intervalMs: 100,
       max: 98,
       start: 92,
@@ -81,7 +72,7 @@ describe('TranslateGemma helpers', () => {
     stop();
     vi.advanceTimersByTime(350);
 
-    expect(progress).toEqual([94, 96, 98]);
+    expect(reportedProgress).toEqual([94, 96, 98]);
     vi.useRealTimers();
   });
 
@@ -97,7 +88,7 @@ describe('TranslateGemma helpers', () => {
       generate: vi.fn(),
       preload: vi.fn(() => Promise.resolve()),
     };
-    const service = new BrowserTranslatorService(
+    const service = new browserTranslatorService.BrowserTranslatorService(
       modelSetupService,
       undefined,
       undefined,
@@ -112,7 +103,7 @@ describe('TranslateGemma helpers', () => {
     vi.advanceTimersByTime(3_100);
 
     expect(modelSetupService.downloadModel).toHaveBeenCalledWith(
-      TRANSLATEGEMMA_MODEL_ID,
+      aiModelCatalog.TRANSLATEGEMMA_MODEL_ID,
       expect.any(Object),
     );
     expect(progress.some((value) => value > 92 && value < 100)).toBe(true);
@@ -124,15 +115,15 @@ describe('TranslateGemma helpers', () => {
   });
 
   it('maps browser language codes to TranslateGemma codes', () => {
-    expect(toTranslateGemmaLanguageCode('pt')).toBe('pt_BR');
-    expect(toTranslateGemmaLanguageCode('pt-BR')).toBe('pt_BR');
-    expect(toTranslateGemmaLanguageCode('iw')).toBe('he');
-    expect(toTranslateGemmaLanguageCode('zh-Hant')).toBe('zh');
+    expect(browserTranslatorService.toTranslateGemmaLanguageCode('pt')).toBe('pt_BR');
+    expect(browserTranslatorService.toTranslateGemmaLanguageCode('pt-BR')).toBe('pt_BR');
+    expect(browserTranslatorService.toTranslateGemmaLanguageCode('iw')).toBe('he');
+    expect(browserTranslatorService.toTranslateGemmaLanguageCode('zh-Hant')).toBe('zh');
   });
 
   it('creates the structured message shape expected by TranslateGemma', () => {
     expect(
-      createTranslateGemmaMessages({
+      browserTranslatorService.createTranslateGemmaMessages({
         sourceLanguage: 'en',
         targetLanguage: 'pt',
         text: 'Browser-native AI',
@@ -159,7 +150,7 @@ describe('TranslateGemma helpers', () => {
     });
     const modelSetupService = new RecordingModelSetupService();
     const languageRuntime = new TestLanguageDetectionRuntime();
-    const service = new BrowserTranslatorService(
+    const service = new browserTranslatorService.BrowserTranslatorService(
       modelSetupService,
       undefined,
       undefined,
@@ -182,7 +173,7 @@ describe('TranslateGemma helpers', () => {
     const modelSetupService = new RecordingModelSetupService();
     const languageRuntime = new TestLanguageDetectionRuntime();
     const progress: number[] = [];
-    const service = new BrowserTranslatorService(
+    const service = new browserTranslatorService.BrowserTranslatorService(
       modelSetupService,
       undefined,
       undefined,
@@ -197,12 +188,12 @@ describe('TranslateGemma helpers', () => {
     ).resolves.toBe('fr');
 
     expect(modelSetupService.downloadModel).toHaveBeenCalledWith(
-      LANGUAGE_DETECTION_MODEL_ID,
+      aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID,
       expect.any(Object),
     );
     expect(languageRuntime.preload).not.toHaveBeenCalled();
     expect(languageRuntime.detectLanguage).toHaveBeenCalledWith(
-      LANGUAGE_DETECTION_TRANSFORMERS_MODEL_ID,
+      aiModelCatalog.LANGUAGE_DETECTION_TRANSFORMERS_MODEL_ID,
       'Bonjour tout le monde',
     );
     expect(progress.at(-1)).toBe(100);
@@ -216,7 +207,7 @@ describe('TranslateGemma helpers', () => {
     });
     const modelSetupService = new RecordingModelSetupService();
     const languageRuntime = new TestLanguageDetectionRuntime();
-    const service = new BrowserTranslatorService(
+    const service = new browserTranslatorService.BrowserTranslatorService(
       modelSetupService,
       undefined,
       createStorage({ 'localstudio.ai.language-detection-provider': 'language-detection-webgpu' }),
@@ -241,7 +232,7 @@ describe('TranslateGemma helpers', () => {
       configurable: true,
       value: {},
     });
-    const service = new BrowserTranslatorService(
+    const service = new browserTranslatorService.BrowserTranslatorService(
       new RecordingModelSetupService(),
       undefined,
       createStorage(),
@@ -261,7 +252,7 @@ describe('TranslateGemma helpers', () => {
       expect.objectContaining({
         id: 'language-detection-webgpu',
         compatibility: 'compatible',
-        modelId: LANGUAGE_DETECTION_MODEL_ID,
+        modelId: aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID,
         readiness: 'needs-download',
         selected: true,
       }),
@@ -277,7 +268,7 @@ describe('TranslateGemma helpers', () => {
       value: {},
     });
     const storage = createStorage();
-    const service = new BrowserTranslatorService(
+    const service = new browserTranslatorService.BrowserTranslatorService(
       new RecordingModelSetupService(),
       undefined,
       storage,
@@ -287,7 +278,7 @@ describe('TranslateGemma helpers', () => {
 
     const states = await service.setLanguageDetectionProvider('language-detection-webgpu');
 
-    expect(storage.getItem(LANGUAGE_DETECTION_PROVIDER_STORAGE_KEY)).toBe('language-detection-webgpu');
+    expect(storage.getItem(browserTranslatorService.LANGUAGE_DETECTION_PROVIDER_STORAGE_KEY)).toBe('language-detection-webgpu');
     expect(states.find((state) => state.id === 'language-detection-webgpu')).toMatchObject({
       selected: true,
       readiness: 'needs-download',

@@ -1,19 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
-import { extractGeneratedText } from '../../../src/services/webGpuTextGenerationRuntime';
+import { webGpuTextGenerationRuntime } from '../../../src/services/prompting/webGpuTextGenerationRuntime';
 import {
   TransformersRuntimeClient,
   type TransformersWorkerRequest,
   type TransformersWorkerResponse,
-} from '../../../src/services/transformersRuntimeClient';
+} from '../../../src/services/model-setup/transformersRuntimeClient';
 
-describe('extractGeneratedText', () => {
+describe('webGpuTextGenerationRuntime.extractGeneratedText', () => {
   it('extracts plain generated text responses', () => {
-    expect(extractGeneratedText([{ generated_text: 'hello' }])).toBe('hello');
+    expect(webGpuTextGenerationRuntime.extractGeneratedText([{ generated_text: 'hello' }])).toBe('hello');
   });
 
   it('extracts the last assistant content from chat-style generated text responses', () => {
     expect(
-      extractGeneratedText([
+      webGpuTextGenerationRuntime.extractGeneratedText([
         {
           generated_text: [
             { role: 'user', content: { text: 'hello' } },

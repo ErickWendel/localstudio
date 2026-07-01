@@ -1,9 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createSampleProject } from '../../../../src/domain/sampleProject';
-import type { ShareRecord } from '../../../../src/services/interfaces';
-import { BrowserShareService } from '../../../../src/services/shareService';
+import { sampleProject } from '../../../../src/domain/projects/sampleProject';
+import type { ShareRecord } from '../../../../src/services/contracts/interfaces';
+import { BrowserShareService } from '../../../../src/services/sharing/shareService';
 import { PublicDeckViewer } from '../../../../src/ui/share/PublicDeckViewer';
 
 describe('PublicDeckViewer', () => {
@@ -19,7 +19,7 @@ describe('PublicDeckViewer', () => {
 
   function createRemoteShare(
     shareId: string,
-    project = createSampleProject(),
+    project = sampleProject.createSampleProject(),
   ): { shareService: BrowserShareService; share: ShareRecord } {
     const share: ShareRecord = {
       shareId,
@@ -63,7 +63,7 @@ describe('PublicDeckViewer', () => {
 
   it('moves between slides with next and previous controls', async () => {
     const user = userEvent.setup();
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     project.pages.push({
       id: 'page-2',
       name: 'Slide 2',
@@ -89,7 +89,7 @@ describe('PublicDeckViewer', () => {
   });
 
   it('rewinds shared deck slides with the left arrow key after advancing', async () => {
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     project.pages.push({
       id: 'page-2',
       name: 'Slide 2',
@@ -114,7 +114,7 @@ describe('PublicDeckViewer', () => {
   });
 
   it('starts shared decks in presenter animation playback mode', async () => {
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     project.pages[0]!.animationBuilds = [
       {
         id: 'animation-title',

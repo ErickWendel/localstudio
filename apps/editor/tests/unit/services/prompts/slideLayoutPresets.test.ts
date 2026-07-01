@@ -1,5 +1,5 @@
-import type { GeneratedSlideElement, GeneratedSlideTask, GeneratedSlideTasksDocument } from '../../../../src/domain/generatedSlide';
-import { applySlideElementLayoutPreset, normalizeSlideTasksForLayout } from '../../../../src/services/prompts/slideLayoutPresets';
+import type { GeneratedSlideElement, GeneratedSlideTask, GeneratedSlideTasksDocument } from '../../../../src/domain/generated-slides/generatedSlide';
+import { slideLayoutPresets } from '../../../../src/services/prompting/slideLayoutPresets';
 
 const page: GeneratedSlideTasksDocument['page'] = {
   name: 'AI Design Revolution',
@@ -197,7 +197,7 @@ describe('slide layout presets', () => {
       opacity: 1,
     };
 
-    expect(applySlideElementLayoutPreset(element, { task: tasks[1] as Exclude<GeneratedSlideTask, { type: 'set-background' }>, allTasks: tasks, page })).toMatchObject({
+    expect(slideLayoutPresets.applySlideElementLayoutPreset(element, { task: tasks[1] as Exclude<GeneratedSlideTask, { type: 'set-background' }>, allTasks: tasks, page })).toMatchObject({
       x: 48,
       y: 195,
       width: 980,
@@ -208,12 +208,12 @@ describe('slide layout presets', () => {
   });
 
   it('formats the right-side title and subtitle without changing their text', () => {
-    const title = applySlideElementLayoutPreset(textElement('title', 'AI Design Revolution'), {
+    const title = slideLayoutPresets.applySlideElementLayoutPreset(textElement('title', 'AI Design Revolution'), {
       task: tasks[2] as Exclude<GeneratedSlideTask, { type: 'set-background' }>,
       allTasks: tasks,
       page,
     });
-    const subtitle = applySlideElementLayoutPreset(textElement('subtitle', 'Browser-native creative'), {
+    const subtitle = slideLayoutPresets.applySlideElementLayoutPreset(textElement('subtitle', 'Browser-native creative'), {
       task: tasks[3] as Exclude<GeneratedSlideTask, { type: 'set-background' }>,
       allTasks: tasks,
       page,
@@ -246,7 +246,7 @@ describe('slide layout presets', () => {
   });
 
   it('keeps placeholder image hero prompts on the left-media right-text layout', () => {
-    const normalized = normalizeSlideTasksForLayout(
+    const normalized = slideLayoutPresets.normalizeSlideTasksForLayout(
       {
         language: 'en',
         page,
@@ -272,7 +272,7 @@ describe('slide layout presets', () => {
     };
 
     expect(
-      applySlideElementLayoutPreset(element, {
+      slideLayoutPresets.applySlideElementLayoutPreset(element, {
         task: gridTasks[3] as Exclude<GeneratedSlideTask, { type: 'set-background' }>,
         allTasks: gridTasks,
         page,
@@ -302,7 +302,7 @@ describe('slide layout presets', () => {
     };
 
     expect(
-      applySlideElementLayoutPreset(element, {
+      slideLayoutPresets.applySlideElementLayoutPreset(element, {
         task: gridTasks[2] as Exclude<GeneratedSlideTask, { type: 'set-background' }>,
         allTasks: gridTasks,
         page,
@@ -321,12 +321,12 @@ describe('slide layout presets', () => {
   });
 
   it('pins image grid titles and captions into readable regions', () => {
-    const title = applySlideElementLayoutPreset(textElement('grid-title', 'Web AI'), {
+    const title = slideLayoutPresets.applySlideElementLayoutPreset(textElement('grid-title', 'Web AI'), {
       task: gridTasks[1] as Exclude<GeneratedSlideTask, { type: 'set-background' }>,
       allTasks: gridTasks,
       page,
     });
-    const caption = applySlideElementLayoutPreset(textElement('caption-3', 'No backend required'), {
+    const caption = slideLayoutPresets.applySlideElementLayoutPreset(textElement('caption-3', 'No backend required'), {
       task: gridTasks[7] as Exclude<GeneratedSlideTask, { type: 'set-background' }>,
       allTasks: gridTasks,
       page,
@@ -355,7 +355,7 @@ describe('slide layout presets', () => {
   });
 
   it('removes unrequested subtitle-like text from image grid plans', () => {
-    const normalized = normalizeSlideTasksForLayout(
+    const normalized = slideLayoutPresets.normalizeSlideTasksForLayout(
       {
         language: 'en',
         page,
@@ -384,7 +384,7 @@ describe('slide layout presets', () => {
   });
 
   it('converts shape-based image grid placeholders into real placeholder image tasks', () => {
-    const normalized = normalizeSlideTasksForLayout(
+    const normalized = slideLayoutPresets.normalizeSlideTasksForLayout(
       {
         language: 'en',
         page,
@@ -411,7 +411,7 @@ describe('slide layout presets', () => {
   });
 
   it('adds placeholder image tasks for image grid prompts even when the model only returns text', () => {
-    const normalized = normalizeSlideTasksForLayout(
+    const normalized = slideLayoutPresets.normalizeSlideTasksForLayout(
       {
         language: 'en',
         page,
@@ -434,7 +434,7 @@ describe('slide layout presets', () => {
   });
 
   it('pins two-image grids into equal-width columns', () => {
-    const leftImage = applySlideElementLayoutPreset(
+    const leftImage = slideLayoutPresets.applySlideElementLayoutPreset(
       { type: 'image', id: 'two-grid-1', assetRole: 'placeholder', x: 0, y: 0, width: 100, height: 100, rotation: 0, opacity: 1 },
       {
         task: twoImageGridTasks[2] as Exclude<GeneratedSlideTask, { type: 'set-background' }>,
@@ -442,7 +442,7 @@ describe('slide layout presets', () => {
         page,
       },
     );
-    const rightCaption = applySlideElementLayoutPreset(textElement('two-caption-2', 'Keeps teams connected'), {
+    const rightCaption = slideLayoutPresets.applySlideElementLayoutPreset(textElement('two-caption-2', 'Keeps teams connected'), {
       task: twoImageGridTasks[5] as Exclude<GeneratedSlideTask, { type: 'set-background' }>,
       allTasks: twoImageGridTasks,
       page,
@@ -467,7 +467,7 @@ describe('slide layout presets', () => {
       { type: 'add-title', id: 'title-only', text: 'Web AI Runs Here', placementHint: 'best fit' },
     ];
 
-    const title = applySlideElementLayoutPreset(textElement('title-only', 'Web AI Runs Here'), {
+    const title = slideLayoutPresets.applySlideElementLayoutPreset(textElement('title-only', 'Web AI Runs Here'), {
       task: titleOnlyTasks[1] as Exclude<GeneratedSlideTask, { type: 'set-background' }>,
       allTasks: titleOnlyTasks,
       page,
@@ -487,7 +487,7 @@ describe('slide layout presets', () => {
   });
 
   it('normalizes bullet prompts into a title and one bullet-list task', () => {
-    const normalized = normalizeSlideTasksForLayout(
+    const normalized = slideLayoutPresets.normalizeSlideTasksForLayout(
       {
         language: 'en',
         page,
@@ -514,7 +514,7 @@ describe('slide layout presets', () => {
   });
 
   it('preserves explicit title and bullet text while compiling a left-image bullet layout', () => {
-    const normalized = normalizeSlideTasksForLayout(
+    const normalized = slideLayoutPresets.normalizeSlideTasksForLayout(
       {
         language: 'en',
         page,
@@ -542,12 +542,12 @@ describe('slide layout presets', () => {
   });
 
   it('pins bullet-only slides into readable title and body regions', () => {
-    const title = applySlideElementLayoutPreset(textElement('bullet-title', 'Why Web AI'), {
+    const title = slideLayoutPresets.applySlideElementLayoutPreset(textElement('bullet-title', 'Why Web AI'), {
       task: bulletTasks[1] as Exclude<GeneratedSlideTask, { type: 'set-background' }>,
       allTasks: bulletTasks,
       page,
     });
-    const bullets = applySlideElementLayoutPreset(textElement('bullets', '- Private by default\n- Fast local inference\n- No backend required'), {
+    const bullets = slideLayoutPresets.applySlideElementLayoutPreset(textElement('bullets', '- Private by default\n- Fast local inference\n- No backend required'), {
       task: bulletTasks[2] as Exclude<GeneratedSlideTask, { type: 'set-background' }>,
       allTasks: bulletTasks,
       page,
@@ -576,7 +576,7 @@ describe('slide layout presets', () => {
   });
 
   it('pins left-image bullet slides into media and right-content regions', () => {
-    const image = applySlideElementLayoutPreset(
+    const image = slideLayoutPresets.applySlideElementLayoutPreset(
       { type: 'image', id: 'left-image', assetRole: 'placeholder', x: 0, y: 0, width: 100, height: 100, rotation: 0, opacity: 1 },
       {
         task: leftImageBulletTasks[1] as Exclude<GeneratedSlideTask, { type: 'set-background' }>,
@@ -584,7 +584,7 @@ describe('slide layout presets', () => {
         page,
       },
     );
-    const bullets = applySlideElementLayoutPreset(textElement('mixed-bullets', '- My idea\n- His idea\n- Our idea'), {
+    const bullets = slideLayoutPresets.applySlideElementLayoutPreset(textElement('mixed-bullets', '- My idea\n- His idea\n- Our idea'), {
       task: leftImageBulletTasks[3] as Exclude<GeneratedSlideTask, { type: 'set-background' }>,
       allTasks: leftImageBulletTasks,
       page,
@@ -604,7 +604,7 @@ describe('slide layout presets', () => {
   });
 
   it('normalizes explicit title subtitle color prompts into a centered layout and page background', () => {
-    const normalized = normalizeSlideTasksForLayout(
+    const normalized = slideLayoutPresets.normalizeSlideTasksForLayout(
       {
         language: 'en',
         page,
@@ -626,12 +626,12 @@ describe('slide layout presets', () => {
   });
 
   it('pins centered title subtitle slides with requested colors', () => {
-    const title = applySlideElementLayoutPreset(textElement('color-title', 'Web AI Advantage'), {
+    const title = slideLayoutPresets.applySlideElementLayoutPreset(textElement('color-title', 'Web AI Advantage'), {
       task: titleSubtitleTasks[1] as Exclude<GeneratedSlideTask, { type: 'set-background' }>,
       allTasks: titleSubtitleTasks,
       page: { ...page, background: { type: 'color', color: '#2B0A4A' } },
     });
-    const subtitle = applySlideElementLayoutPreset(textElement('color-subtitle', 'Fast local intelligence'), {
+    const subtitle = slideLayoutPresets.applySlideElementLayoutPreset(textElement('color-subtitle', 'Fast local intelligence'), {
       task: titleSubtitleTasks[2] as Exclude<GeneratedSlideTask, { type: 'set-background' }>,
       allTasks: titleSubtitleTasks,
       page: { ...page, background: { type: 'color', color: '#2B0A4A' } },

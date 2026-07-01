@@ -1,5 +1,5 @@
-import { createBlankProject } from '../domain/sampleProject';
-import type { ProjectDocument } from '../domain/model';
+import { sampleProject } from '../domain/projects/sampleProject';
+import type { ProjectDocument } from '../domain/documents/model';
 import type {
   BackgroundRemovalService,
   ExportService,
@@ -14,25 +14,22 @@ import type {
   SmartGrabService,
   ShareService,
   TranslatorService,
-} from '../services/interfaces';
-import {
-  MockMagicEraserService,
-  MockPaletteService,
-  MockSmartGrabService,
-} from '../services/inMemoryAiServices';
-import { BrowserTranslatorService } from '../services/browserTranslatorService';
-import { BrowserPromptService } from '../services/browserPromptService';
-import { BrowserExportService } from '../services/exportService';
-import { BrowserBackgroundRemovalService } from '../services/browserBackgroundRemovalService';
-import { BrowserImageGenerationService } from '../services/browserImageGenerationService';
-import { BrowserFileSystemProjectRepository } from '../services/browserFileSystemProjectRepository';
-import { DisabledProjectRepository } from '../services/disabledProjectRepository';
-import { BrowserLocalSetupService } from '../services/localSetupService';
-import { BrowserModelSetupService } from '../services/modelSetupService';
-import { BrowserShareService } from '../services/shareService';
-import { TransformersLanguageDetectionRuntime } from '../services/webGpuLanguageDetectionRuntime';
-import { TransformersTextGenerationRuntime } from '../services/webGpuTextGenerationRuntime';
-import { MinioMirrorService, type MinioMirrorConfig } from '../services/minioMirrorService';
+} from '../services/contracts/interfaces';
+import { inMemoryAiServices } from '../services/testing/inMemoryAiServices';
+import { browserTranslatorService } from '../services/translation/browserTranslatorService';
+import { browserPromptService } from '../services/prompting/browserPromptService';
+import { BrowserExportService } from '../services/exporting/exportService';
+import { BrowserBackgroundRemovalService } from '../services/background-removal/browserBackgroundRemovalService';
+import { BrowserImageGenerationService } from '../services/image-generation/browserImageGenerationService';
+import { BrowserFileSystemProjectRepository } from '../services/storage/browserFileSystemProjectRepository';
+import { DisabledProjectRepository } from '../services/storage/disabledProjectRepository';
+import { localSetupService } from '../services/browser/localSetupService';
+import { modelSetupService } from '../services/model-setup/modelSetupService';
+import { BrowserShareService } from '../services/sharing/shareService';
+import { webGpuLanguageDetectionRuntime } from '../services/translation/webGpuLanguageDetectionRuntime';
+import { webGpuTextGenerationRuntime } from '../services/prompting/webGpuTextGenerationRuntime';
+import { minioMirrorService } from '../services/mirror/minioMirrorService';
+import type { MinioMirrorConfig } from '../services/mirror/minioMirrorService';
 
 export interface AppServices {
   initialProject: ProjectDocument;
@@ -61,11 +58,11 @@ interface CreateAppServicesOptions {
 }
 
 export function createAppServices(options: CreateAppServicesOptions = {}): AppServices {
-  const textGenerationRuntime = new TransformersTextGenerationRuntime();
-  const languageDetectionRuntime = new TransformersLanguageDetectionRuntime();
+  const textGenerationRuntime = new webGpuTextGenerationRuntime.TransformersTextGenerationRuntime();
+  const languageDetectionRuntime = new webGpuLanguageDetectionRuntime.TransformersLanguageDetectionRuntime();
   const persistenceAvailable = isFileSystemAccessAvailable();
-  const mirrorService = new MinioMirrorService();
-  const modelSetupService = new BrowserModelSetupService(
+  const mirrorService = new minioMirrorService.MinioMirrorService();
+  const browserModelSetupService = new modelSetupService.BrowserModelSetupService(
     undefined,
     undefined,
     undefined,
@@ -74,33 +71,33 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     languageDetectionRuntime,
   );
   return {
-    initialProject: options.initialProject ?? createBlankProject(),
+    initialProject: options.initialProject ?? sampleProject.createBlankProject(),
     skipStoredProjectLoad: options.skipStoredProjectLoad ?? false,
     ...(options.storedProjectName ? { storedProjectName: options.storedProjectName } : {}),
     persistenceAvailable,
     projectRepository: createProjectRepository(persistenceAvailable),
     exportService: new BrowserExportService(),
     shareService: new BrowserShareService({ mirrorService }),
-    localSetupService: new BrowserLocalSetupService(),
-    modelSetupService,
-    translatorService: new BrowserTranslatorService(
-      modelSetupService,
+    localSetupService: new localSetupService.BrowserLocalSetupService(),
+    modelSetupService: browserModelSetupService,
+    translatorService: new browserTranslatorService.BrowserTranslatorService(
+      browserModelSetupService,
       undefined,
       undefined,
       textGenerationRuntime,
       languageDetectionRuntime,
     ),
-    promptService: new BrowserPromptService(
-      modelSetupService,
+    promptService: new browserPromptService.BrowserPromptService(
+      browserModelSetupService,
       undefined,
       undefined,
       textGenerationRuntime,
     ),
     imageGenerationService: new BrowserImageGenerationService(),
-    paletteService: new MockPaletteService(),
+    paletteService: new inMemoryAiServices.MockPaletteService(),
     backgroundRemovalService: new BrowserBackgroundRemovalService(),
-    smartGrabService: new MockSmartGrabService(),
-    magicEraserService: new MockMagicEraserService(),
+    smartGrabService: new inMemoryAiServices.MockSmartGrabService(),
+    magicEraserService: new inMemoryAiServices.MockMagicEraserService(),
     mirrorService,
   };
 }

@@ -1,10 +1,10 @@
 import { afterEach, vi } from 'vitest';
-import type { ProjectDocument } from '../../../src/domain/model';
-import { createSampleProject } from '../../../src/domain/sampleProject';
+import type { ProjectDocument } from '../../../src/domain/documents/model';
+import { sampleProject } from '../../../src/domain/projects/sampleProject';
 import {
   BrowserFileSystemProjectRepository,
   type RecentProjectHandleStore,
-} from '../../../src/services/browserFileSystemProjectRepository';
+} from '../../../src/services/storage/browserFileSystemProjectRepository';
 
 class MockWritable {
   constructor(private readonly onClose: (value: string | Blob) => void) {}
@@ -90,7 +90,7 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
       pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
       recentProjectStore: new MemoryRecentProjectHandleStore(),
     });
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     project.assets['asset-hero'] = {
       ...project.assets['asset-hero']!,
       objectUrl: 'data:image/png;base64,aGVsbG8=',
@@ -123,7 +123,7 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
     directory.files.set(
       'project.json',
       JSON.stringify({
-        ...createSampleProject(),
+        ...sampleProject.createSampleProject(),
         assets: {
           'asset-hero': {
             id: 'asset-hero',
@@ -155,7 +155,7 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
     directory.files.set(
       'project.json',
       JSON.stringify({
-        ...createSampleProject(),
+        ...sampleProject.createSampleProject(),
         assets: {
           'asset-hero': {
             id: 'asset-hero',
@@ -194,7 +194,7 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
     directory.files.set(
       'project.json',
       JSON.stringify({
-        ...createSampleProject(),
+        ...sampleProject.createSampleProject(),
         assets: {
           'asset-hero': {
             id: 'asset-hero',
@@ -224,7 +224,7 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
       pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
       recentProjectStore: new MemoryRecentProjectHandleStore(),
     });
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     project.assets['asset-generated'] = {
       id: 'asset-generated',
       type: 'image',
@@ -272,7 +272,7 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
       pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
       recentProjectStore: new MemoryRecentProjectHandleStore(),
     });
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     project.assets['asset-gif'] = {
       id: 'asset-gif',
       type: 'gif',
@@ -351,7 +351,7 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
       pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
       recentProjectStore: new MemoryRecentProjectHandleStore(),
     });
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     project.assets['asset-stale'] = {
       id: 'asset-stale',
       type: 'image',
@@ -382,7 +382,7 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
       recentProjectStore: new MemoryRecentProjectHandleStore(),
     });
 
-    await repository.saveProject(createSampleProject());
+    await repository.saveProject(sampleProject.createSampleProject());
 
     expect(assetsDirectory.files.has('asset-removed.png')).toBe(false);
   });

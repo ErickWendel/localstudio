@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ElementAnimationBuild, ProjectDocument, SelectionState } from '../../domain/model';
-import type { ShareService } from '../../services/interfaces';
-import { CanvasWorkspace } from '../editor/CanvasWorkspace';
+import type { ElementAnimationBuild, ProjectDocument, SelectionState } from '../../domain/documents/model';
+import type { ShareService } from '../../services/contracts/interfaces';
+import { CanvasWorkspace } from '../editor/canvas/CanvasWorkspace';
 
 interface PublicDeckViewerProps {
   shareId: string;

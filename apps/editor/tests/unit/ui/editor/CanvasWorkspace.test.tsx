@@ -1,9 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
-import { createSampleProject } from '../../../../src/domain/sampleProject';
-import type { ProjectDocument, ShapeElement, VideoElement } from '../../../../src/domain/model';
-import { CanvasWorkspace } from '../../../../src/ui/editor/CanvasWorkspace';
+import { sampleProject } from '../../../../src/domain/projects/sampleProject';
+import type { ProjectDocument, ShapeElement, VideoElement } from '../../../../src/domain/documents/model';
+import { CanvasWorkspace } from '../../../../src/ui/editor/canvas/CanvasWorkspace';
 
 describe('CanvasWorkspace', () => {
   const shapeCatalog: ShapeElement['shape'][] = [
@@ -20,7 +20,7 @@ describe('CanvasWorkspace', () => {
   ];
 
   function createMediaProject(): ProjectDocument {
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     project.assets['asset-video'] = {
       id: 'asset-video',
       type: 'video',
@@ -90,7 +90,7 @@ describe('CanvasWorkspace', () => {
   }
 
   it('renders page elements and selected image toolbar', () => {
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     const { container } = render(
       <CanvasWorkspace
         project={project}
@@ -109,7 +109,7 @@ describe('CanvasWorkspace', () => {
   });
 
   it('renders every supported shape catalog item without crashing', () => {
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     const shapes = Object.fromEntries(
       shapeCatalog.map((shape, index) => [
         `shape-${shape}`,
@@ -158,7 +158,7 @@ describe('CanvasWorkspace', () => {
 
   it('toggles crop mode for selected images', async () => {
     const user = userEvent.setup();
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
 
     render(
       <CanvasWorkspace
@@ -177,7 +177,7 @@ describe('CanvasWorkspace', () => {
 
   it('exits crop mode when the user clicks the canvas background', async () => {
     const user = userEvent.setup();
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     const { container } = render(
       <CanvasWorkspace
         project={project}
@@ -197,7 +197,7 @@ describe('CanvasWorkspace', () => {
   });
 
   it('does not render document text outside the Konva canvas', () => {
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     const { container } = render(
       <CanvasWorkspace
         project={project}
@@ -213,7 +213,7 @@ describe('CanvasWorkspace', () => {
     const onClearSelection = vi.fn();
     const { container } = render(
       <CanvasWorkspace
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         activePageId="page-1"
         selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
         onClearSelection={onClearSelection}
@@ -231,7 +231,7 @@ describe('CanvasWorkspace', () => {
     const onAnimationPreviewAdvance = vi.fn();
     const { container } = render(
       <CanvasWorkspace
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         activePageId="page-1"
         selection={{ pageId: 'page-1', elementIds: [] }}
         animationPreview={{
@@ -259,7 +259,7 @@ describe('CanvasWorkspace', () => {
     const onAnimationPreviewAdvance = vi.fn();
     const { container } = render(
       <CanvasWorkspace
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         activePageId="page-1"
         selection={{ pageId: 'page-1', elementIds: [] }}
         animationPreview={{
@@ -283,7 +283,7 @@ describe('CanvasWorkspace', () => {
   it('hides canvas quick actions while animation preview is active', () => {
     render(
       <CanvasWorkspace
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         activePageId="page-1"
         selection={{ pageId: 'page-1', elementIds: [] }}
         animationPreview={{
@@ -306,7 +306,7 @@ describe('CanvasWorkspace', () => {
   it('shows canvas quick actions after animation preview completes', () => {
     render(
       <CanvasWorkspace
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         activePageId="page-1"
         selection={{ pageId: 'page-1', elementIds: [] }}
         animationPreview={{
@@ -327,7 +327,7 @@ describe('CanvasWorkspace', () => {
   });
 
   it('shows numbered animation build badges and highlights the selected animated element', () => {
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
     project.pages[0] = {
       ...project.pages[0]!,
       animationBuilds: [
@@ -353,7 +353,7 @@ describe('CanvasWorkspace', () => {
 
   it('shows background selection guidance and active cursor treatment', async () => {
     const user = userEvent.setup();
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
 
     render(
       <CanvasWorkspace
@@ -375,7 +375,7 @@ describe('CanvasWorkspace', () => {
   });
 
   it('shows selected image processing feedback while background removal runs', () => {
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
 
     render(
       <CanvasWorkspace
@@ -542,7 +542,7 @@ describe('CanvasWorkspace', () => {
   });
 
   it('shows image extraction progress before segmentation is ready', () => {
-    const project = createSampleProject();
+    const project = sampleProject.createSampleProject();
 
     render(
       <CanvasWorkspace
@@ -574,7 +574,7 @@ describe('CanvasWorkspace', () => {
 
     render(
       <CanvasWorkspace
-        project={createSampleProject()}
+        project={sampleProject.createSampleProject()}
         activePageId="page-1"
         selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
       />,
