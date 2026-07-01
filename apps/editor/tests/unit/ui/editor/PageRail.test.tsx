@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
-import { PageRail } from '../../../../src/ui/editor/PageRail';
+import { PageRail } from '../../../../src/ui/editor/canvas/PageRail';
 
 describe('PageRail', () => {
   it('shows the active slide and an add-slide tile instead of inactive placeholders', async () => {

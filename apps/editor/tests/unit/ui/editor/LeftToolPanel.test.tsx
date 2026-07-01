@@ -3,8 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
-import { LeftToolPanel } from '../../../../src/ui/editor/LeftToolPanel';
-import type { RightPanelTab } from '../../../../src/ui/editor/useEditorViewModel';
+import { LeftToolPanel } from '../../../../src/ui/editor/panels/LeftToolPanel';
+import type { RightPanelTab } from '../../../../src/ui/editor/state/useEditorViewModel';
 
 const modelStates = [
   {

@@ -1,4 +1,4 @@
-import type { AiProviderState } from '../../../src/services/interfaces';
+import type { AiProviderState } from '../../../src/services/contracts/interfaces';
 import { providerSelection } from '../../../src/services/model-setup/providerSelection';
 
 function provider(patch: Partial<AiProviderState> & Pick<AiProviderState, 'id' | 'runtime'>): AiProviderState {

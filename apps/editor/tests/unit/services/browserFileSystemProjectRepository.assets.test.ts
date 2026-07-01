@@ -1,10 +1,10 @@
 import { afterEach, vi } from 'vitest';
-import type { ProjectDocument } from '../../../src/domain/model';
+import type { ProjectDocument } from '../../../src/domain/documents/model';
 import { sampleProject } from '../../../src/domain/projects/sampleProject';
 import {
   BrowserFileSystemProjectRepository,
   type RecentProjectHandleStore,
-} from '../../../src/services/browserFileSystemProjectRepository';
+} from '../../../src/services/storage/browserFileSystemProjectRepository';
 
 class MockWritable {
   constructor(private readonly onClose: (value: string | Blob) => void) {}

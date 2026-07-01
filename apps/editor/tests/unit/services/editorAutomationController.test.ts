@@ -1,5 +1,5 @@
 import { editorAutomationController } from '../../../src/services/automation/editorAutomationController';
-import type { ProjectDocument } from '../../../src/domain/model';
+import type { ProjectDocument } from '../../../src/domain/documents/model';
 import { sampleProject } from '../../../src/domain/projects/sampleProject';
 
 function projectWithName(name: string): ProjectDocument {

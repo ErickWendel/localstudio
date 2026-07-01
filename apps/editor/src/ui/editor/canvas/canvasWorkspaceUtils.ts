@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { DesignElement, ShapeElement } from '../../../domain/model';
+import type { DesignElement, ShapeElement } from '../../../domain/documents/model';
 
 function isDesignElement(element: DesignElement | undefined): element is DesignElement {
   return Boolean(element);

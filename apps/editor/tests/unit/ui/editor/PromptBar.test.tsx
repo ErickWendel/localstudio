@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { imagePromptOptions } from '../../../../src/ui/editor/media/imagePromptOptions';
-import { PromptBar } from '../../../../src/ui/editor/PromptBar';
+import { PromptBar } from '../../../../src/ui/editor/prompting/PromptBar';
 
 describe('PromptBar', () => {
   it('uses a multiline prompt field so long image prompts can wrap', () => {

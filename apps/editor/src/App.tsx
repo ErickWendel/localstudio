@@ -4,7 +4,7 @@ import { publicBasePath } from './app/routing/publicBasePath';
 import { sampleProject } from './domain/projects/sampleProject';
 
 const EditorShell = lazy(() =>
-  import('./ui/editor/EditorShell').then((module) => ({ default: module.EditorShell })),
+  import('./ui/editor/shell/EditorShell').then((module) => ({ default: module.EditorShell })),
 );
 const PublicDeckViewer = lazy(() =>
   import('./ui/share/PublicDeckViewer').then((module) => ({ default: module.PublicDeckViewer })),

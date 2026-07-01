@@ -1,9 +1,9 @@
 import { vi } from 'vitest';
-import type { ProjectDocument } from '../../../src/domain/model';
+import type { ProjectDocument } from '../../../src/domain/documents/model';
 import { sampleProject } from '../../../src/domain/projects/sampleProject';
 import { minioMirrorService } from '../../../src/services/mirror/minioMirrorService';
 import type { MinioMirrorConfig } from '../../../src/services/mirror/minioMirrorService';
-import type { ProjectRepository, VersionHistoryEntry } from '../../../src/services/interfaces';
+import type { ProjectRepository, VersionHistoryEntry } from '../../../src/services/contracts/interfaces';
 
 const config: MinioMirrorConfig = {
   accessKey: 'localstudio',

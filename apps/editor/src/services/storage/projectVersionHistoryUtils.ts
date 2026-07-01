@@ -1,4 +1,4 @@
-import type { ProjectDocument } from '../../domain/model';
+import type { ProjectDocument } from '../../domain/documents/model';
 
 function createVersionId(date = new Date()) {
   return date.toISOString().replace(/[:.]/g, '-');

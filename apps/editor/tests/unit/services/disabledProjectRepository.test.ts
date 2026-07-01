@@ -1,5 +1,5 @@
 import { sampleProject } from '../../../src/domain/projects/sampleProject';
-import { DisabledProjectRepository } from '../../../src/services/disabledProjectRepository';
+import { DisabledProjectRepository } from '../../../src/services/storage/disabledProjectRepository';
 
 describe('DisabledProjectRepository', () => {
   it('does not persist or reload project changes', async () => {

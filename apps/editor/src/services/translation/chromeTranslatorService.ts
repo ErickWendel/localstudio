@@ -1,4 +1,4 @@
-import type { TranslatorService } from '../interfaces';
+import type { TranslatorService } from '../contracts/interfaces';
 
 type ChromeTranslationInstance = {
   ready?: Promise<void>;

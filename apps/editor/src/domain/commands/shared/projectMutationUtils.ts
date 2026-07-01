@@ -1,4 +1,4 @@
-import type { ProjectDocument } from '../../model';
+import type { ProjectDocument } from '../../documents/model';
 
 function getProjectUpdatedAt() {
   return new Date().toISOString();

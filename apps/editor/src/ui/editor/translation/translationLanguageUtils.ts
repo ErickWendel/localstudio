@@ -1,4 +1,4 @@
-import { TRANSLATION_LANGUAGE_OPTIONS } from '../translationLanguages';
+import { TRANSLATION_LANGUAGE_OPTIONS } from './translationLanguages';
 
 const DEFAULT_SLIDE_LANGUAGE_CODE = 'pt';
 

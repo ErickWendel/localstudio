@@ -6,7 +6,7 @@ import type {
   GeneratedSlideTask,
   GeneratedSlideTasksDocument,
 } from '../../../../src/domain/generated-slides/generatedSlide';
-import type { Asset } from '../../../../src/domain/model';
+import type { Asset } from '../../../../src/domain/documents/model';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 import type {
   AiProviderState,
@@ -17,11 +17,11 @@ import type {
   PromptApiAvailability,
   PromptService,
   TranslatorService,
-} from '../../../../src/services/interfaces';
+} from '../../../../src/services/contracts/interfaces';
 import { aiModelCatalog } from '../../../../src/services/model-setup/aiModelCatalog';
 import { inMemoryAiServices } from '../../../../src/services/testing/inMemoryAiServices';
 import { modelSetupService } from '../../../../src/services/model-setup/modelSetupService';
-import { EditorShell } from '../../../../src/ui/editor/EditorShell';
+import { EditorShell } from '../../../../src/ui/editor/shell/EditorShell';
 import { promptRecipes } from '../../../../src/ui/editor/prompting/promptRecipes';
 
 const createImageExample = promptRecipes.imagePromptExamples[0];

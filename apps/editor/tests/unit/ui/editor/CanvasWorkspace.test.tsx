@@ -2,8 +2,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
-import type { ProjectDocument, ShapeElement, VideoElement } from '../../../../src/domain/model';
-import { CanvasWorkspace } from '../../../../src/ui/editor/CanvasWorkspace';
+import type { ProjectDocument, ShapeElement, VideoElement } from '../../../../src/domain/documents/model';
+import { CanvasWorkspace } from '../../../../src/ui/editor/canvas/CanvasWorkspace';
 
 describe('CanvasWorkspace', () => {
   const shapeCatalog: ShapeElement['shape'][] = [

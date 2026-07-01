@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ImageElement } from '../../../../src/domain/model';
+import type { ImageElement } from '../../../../src/domain/documents/model';
 import { imageCrop } from '../../../../src/ui/editor/canvas/imageCrop';
 
 const imageElement: ImageElement = {

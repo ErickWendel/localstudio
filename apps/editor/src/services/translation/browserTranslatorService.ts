@@ -1,6 +1,6 @@
 import { aiModelCatalog } from '../model-setup/aiModelCatalog';
 import { chromeTranslatorService as chromeTranslator } from './chromeTranslatorService';
-import type { AiProviderState, ModelSetupService, TranslatorService } from '../interfaces';
+import type { AiProviderState, ModelSetupService, TranslatorService } from '../contracts/interfaces';
 import { providerSelection } from '../model-setup/providerSelection';
 import { progress as progressUtils } from '../model-setup/progress';
 import { webGpuLanguageDetectionRuntime } from './webGpuLanguageDetectionRuntime';

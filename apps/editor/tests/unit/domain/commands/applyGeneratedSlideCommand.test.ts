@@ -1,5 +1,5 @@
 import { applyGeneratedSlideCommand } from '../../../../src/domain/commands/generated-slides/applyGeneratedSlideCommand';
-import type { ImageElement } from '../../../../src/domain/model';
+import type { ImageElement } from '../../../../src/domain/documents/model';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 
 describe('generated slide commands', () => {

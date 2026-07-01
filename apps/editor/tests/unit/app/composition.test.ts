@@ -1,8 +1,8 @@
 import { createAppServices } from '../../../src/app/composition';
 import { sampleProject } from '../../../src/domain/projects/sampleProject';
-import { BrowserFileSystemProjectRepository } from '../../../src/services/browserFileSystemProjectRepository';
-import { BrowserImageGenerationService } from '../../../src/services/browserImageGenerationService';
-import { DisabledProjectRepository } from '../../../src/services/disabledProjectRepository';
+import { BrowserFileSystemProjectRepository } from '../../../src/services/storage/browserFileSystemProjectRepository';
+import { BrowserImageGenerationService } from '../../../src/services/image-generation/browserImageGenerationService';
+import { DisabledProjectRepository } from '../../../src/services/storage/disabledProjectRepository';
 
 describe('createAppServices', () => {
   const testWindow = window as Window & { showDirectoryPicker?: unknown };

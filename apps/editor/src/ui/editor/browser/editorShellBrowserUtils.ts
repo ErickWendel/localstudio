@@ -1,4 +1,4 @@
-import type { WebMcpModelContext } from '../../../services/webMcpToolAdapter';
+import type { WebMcpModelContext } from '../../../services/webmcp/webMcpToolAdapter';
 
 const EDITOR_OBJECT_CLIPBOARD_TYPE = 'application/x-localstudio-editor-elements';
 const EDITOR_OBJECT_CLIPBOARD_MARKER = '1';

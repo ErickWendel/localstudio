@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ShareMetadata } from '../../../../src/services/interfaces';
+import type { ShareMetadata } from '../../../../src/services/contracts/interfaces';
 import { SharePanel } from '../../../../src/ui/share/SharePanel';
 
 function createShareMetadata(overrides: Partial<ShareMetadata> = {}): ShareMetadata {

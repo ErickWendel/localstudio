@@ -1,4 +1,4 @@
-import { fitImageWithinPage } from '../../../src/domain/imageSizing';
+import { fitImageWithinPage } from '../../../src/domain/images/imageSizing';
 
 describe('fitImageWithinPage', () => {
   it('keeps images at natural size when they fit inside the page', () => {

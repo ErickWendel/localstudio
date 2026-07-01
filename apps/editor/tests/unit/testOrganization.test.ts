@@ -113,4 +113,26 @@ describe('test organization', () => {
 
     expect(violations).toEqual([]);
   });
+
+  it('keeps implementation files inside scoped context folders', async () => {
+    const repositoryRoot = join(process.cwd(), '..', '..');
+    const scopedRoots = [
+      join(repositoryRoot, 'apps/editor/src/services'),
+      join(repositoryRoot, 'apps/editor/src/domain'),
+      join(repositoryRoot, 'apps/editor/src/domain/commands'),
+      join(repositoryRoot, 'apps/editor/src/ui/editor'),
+    ];
+    const looseFiles: string[] = [];
+
+    for (const scopedRoot of scopedRoots) {
+      const entries = await readdir(scopedRoot, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isFile()) continue;
+        if (!/\.[cm]?[tj]sx?$/.test(entry.name)) continue;
+        looseFiles.push(relative(repositoryRoot, join(scopedRoot, entry.name)).split(sep).join('/'));
+      }
+    }
+
+    expect(looseFiles).toEqual([]);
+  });
 });

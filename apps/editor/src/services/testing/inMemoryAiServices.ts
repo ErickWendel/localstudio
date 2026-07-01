@@ -1,4 +1,4 @@
-import type { Asset } from '../../domain/model';
+import type { Asset } from '../../domain/documents/model';
 import type {
   BackgroundRemovalService,
   ImageGenerationOptions,
@@ -7,7 +7,7 @@ import type {
   PaletteService,
   SmartGrabService,
   TranslatorService,
-} from '../interfaces';
+} from '../contracts/interfaces';
 
 class MockTranslatorService implements TranslatorService {
   detectLanguage(text = ''): Promise<string> {

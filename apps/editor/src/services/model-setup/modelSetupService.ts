@@ -1,11 +1,11 @@
-import type { ModelSetupService, ModelState } from '../interfaces';
+import type { ModelSetupService, ModelState } from '../contracts/interfaces';
 import { aiModelCatalog } from './aiModelCatalog';
 import { imageGenerationModel } from '../image-generation/imageGenerationModel';
 import { bonsaiImageRuntime } from '../image-generation/bonsaiImageRuntime';
 import { browserStorage } from '../browser/browserStorage';
 import type { BrowserKeyValueStorage } from '../browser/browserStorage';
 import { progress } from './progress';
-import { TransformersRuntimeClient } from '../transformersRuntimeClient';
+import { TransformersRuntimeClient } from './transformersRuntimeClient';
 
 const IMAGE_EDITING_MODEL_ID = 'image-editing-models';
 const IMAGE_EDITING_TRANSFORMERS_MODEL_ID = 'Xenova/slimsam-77-uniform';

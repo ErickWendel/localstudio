@@ -2,7 +2,7 @@ import { sampleProject } from '../../../src/domain/projects/sampleProject';
 import {
   BrowserFileSystemProjectRepository,
   type RecentProjectHandleStore,
-} from '../../../src/services/browserFileSystemProjectRepository';
+} from '../../../src/services/storage/browserFileSystemProjectRepository';
 
 class MockWritable {
   constructor(private readonly onClose: (value: string | Blob) => void) {}

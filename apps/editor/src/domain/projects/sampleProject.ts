@@ -1,4 +1,4 @@
-import type { ProjectDocument } from '../model';
+import type { ProjectDocument } from '../documents/model';
 
 const SAMPLE_HERO_IMAGE_URL =
   'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRe1Oh1Q3hIcQYKNHc_GwRcQnT6uSgL02RVLBpt4tWMfYKZ2Ja97objCe8&s=10';

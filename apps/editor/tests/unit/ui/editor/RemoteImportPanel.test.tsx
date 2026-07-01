@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
-import { RemoteImportPanel } from '../../../../src/ui/editor/RemoteImportPanel';
+import { RemoteImportPanel } from '../../../../src/ui/editor/panels/RemoteImportPanel';
 
 describe('RemoteImportPanel', () => {
   it('shows mirrored projects as selectable rows and imports the chosen project', async () => {

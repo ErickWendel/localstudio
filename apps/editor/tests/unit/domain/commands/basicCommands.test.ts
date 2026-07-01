@@ -1,6 +1,6 @@
 import { basicCommands } from '../../../../src/domain/commands/elements/basicCommands';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
-import type { ShapeElement } from '../../../../src/domain/model';
+import type { ShapeElement } from '../../../../src/domain/documents/model';
 
 function createShapeFixture(overrides: Partial<ShapeElement> = {}) {
   const project = sampleProject.createSampleProject();

@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
-import { SettingsPanel } from '../../../../src/ui/editor/SettingsPanel';
+import { SettingsPanel } from '../../../../src/ui/editor/panels/SettingsPanel';
 
 describe('SettingsPanel', () => {
   it('opens mirror settings from the settings list', async () => {

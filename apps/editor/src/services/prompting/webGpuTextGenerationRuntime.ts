@@ -1,4 +1,4 @@
-import { TransformersRuntimeClient } from '../transformersRuntimeClient';
+import { TransformersRuntimeClient } from '../model-setup/transformersRuntimeClient';
 import { transformersOperations } from '../model-setup/transformersOperations';
 import type { TextGenerationInput, TextGenerationOptions } from '../model-setup/transformersOperations';
 

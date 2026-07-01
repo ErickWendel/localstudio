@@ -1,4 +1,4 @@
-import { getNormalizedElementPoint } from '../../../../src/ui/editor/backgroundSelection';
+import { getNormalizedElementPoint } from '../../../../src/ui/editor/background-selection/backgroundSelection';
 
 describe('background selection', () => {
   it('normalizes a stage pointer to the clicked element bounds', () => {

@@ -1,7 +1,7 @@
-import { collectReferencedAssetIds } from '../../domain/assetUsage';
-import type { Asset, ProjectDocument } from '../../domain/model';
+import { collectReferencedAssetIds } from '../../domain/assets/assetUsage';
+import type { Asset, ProjectDocument } from '../../domain/documents/model';
 import { assetFileUtils } from '../storage/assetFileUtils';
-import type { MirrorFile, ProjectRepository } from '../interfaces';
+import type { MirrorFile, ProjectRepository } from '../contracts/interfaces';
 import type { MinioMirrorConfig } from './minioMirrorService';
 import { minioObjectUtils } from './minioObjectUtils';
 import { storageObjectUtils } from '../storage/storageObjectUtils';

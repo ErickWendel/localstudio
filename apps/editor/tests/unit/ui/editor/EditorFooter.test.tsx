@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
-import { EditorFooter } from '../../../../src/ui/editor/EditorFooter';
+import { EditorFooter } from '../../../../src/ui/editor/shell/EditorFooter';
 
 describe('EditorFooter', () => {
   it('calls zoom and pages actions without exposing fullscreen', async () => {

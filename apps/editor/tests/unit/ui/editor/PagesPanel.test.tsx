@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
-import { PagesPanel } from '../../../../src/ui/editor/PagesPanel';
+import { PagesPanel } from '../../../../src/ui/editor/panels/PagesPanel';
 
 describe('PagesPanel', () => {
   it('selects, adds, duplicates, hides, deletes, reorders, renames, and translates pages', async () => {

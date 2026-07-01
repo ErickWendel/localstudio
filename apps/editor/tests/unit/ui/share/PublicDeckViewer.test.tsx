@@ -2,8 +2,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
-import type { ShareRecord } from '../../../../src/services/interfaces';
-import { BrowserShareService } from '../../../../src/services/shareService';
+import type { ShareRecord } from '../../../../src/services/contracts/interfaces';
+import { BrowserShareService } from '../../../../src/services/sharing/shareService';
 import { PublicDeckViewer } from '../../../../src/ui/share/PublicDeckViewer';
 
 describe('PublicDeckViewer', () => {

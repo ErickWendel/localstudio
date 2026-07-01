@@ -1,4 +1,4 @@
-import type { Asset, DesignElement, Page, ProjectDocument, SelectionState } from '../../domain/model';
+import type { Asset, DesignElement, Page, ProjectDocument, SelectionState } from '../../domain/documents/model';
 import type { CreateImagePromptOptions } from '../../ui/editor/media/imagePromptOptions';
 import { imagePromptOptions } from '../../ui/editor/media/imagePromptOptions';
 

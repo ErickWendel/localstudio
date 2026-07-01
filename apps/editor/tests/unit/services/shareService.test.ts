@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ProjectDocument } from '../../../src/domain/model';
+import type { ProjectDocument } from '../../../src/domain/documents/model';
 import { sampleProject } from '../../../src/domain/projects/sampleProject';
 import { minioMirrorService } from '../../../src/services/mirror/minioMirrorService';
 import type { MinioMirrorConfig } from '../../../src/services/mirror/minioMirrorService';
-import { BrowserShareService } from '../../../src/services/shareService';
+import { BrowserShareService } from '../../../src/services/sharing/shareService';
 
 const config: MinioMirrorConfig = {
   accessKey: 'localstudio',

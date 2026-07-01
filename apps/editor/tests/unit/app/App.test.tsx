@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '../../../src/App';
 import { sampleProject } from '../../../src/domain/projects/sampleProject';
-import { TRANSLATION_LANGUAGE_OPTIONS } from '../../../src/ui/editor/translationLanguages';
+import { TRANSLATION_LANGUAGE_OPTIONS } from '../../../src/ui/editor/translation/translationLanguages';
 
 describe('App', () => {
   beforeEach(() => {

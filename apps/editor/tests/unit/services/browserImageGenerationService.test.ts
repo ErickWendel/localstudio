@@ -1,6 +1,6 @@
 import { bonsaiImageRuntime } from '../../../src/services/image-generation/bonsaiImageRuntime';
 import type { BonsaiImageRuntime, BonsaiImageWorkerRequest, BonsaiImageWorkerResponse } from '../../../src/services/image-generation/bonsaiImageRuntime';
-import { BrowserImageGenerationService } from '../../../src/services/browserImageGenerationService';
+import { BrowserImageGenerationService } from '../../../src/services/image-generation/browserImageGenerationService';
 import { imageGenerationModel } from '../../../src/services/image-generation/imageGenerationModel';
 
 describe('BrowserImageGenerationService', () => {

@@ -2,8 +2,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
-import type { ProjectDocument } from '../../../../src/domain/model';
-import { RightPanel } from '../../../../src/ui/editor/RightPanel';
+import type { ProjectDocument } from '../../../../src/domain/documents/model';
+import { RightPanel } from '../../../../src/ui/editor/panels/RightPanel';
 
 const modelStates = [
   {

@@ -4,8 +4,8 @@ import type {
   MirrorService,
   MirrorState,
   ProjectRepository,
-} from '../interfaces';
-import type { ProjectDocument } from '../../domain/model';
+} from '../contracts/interfaces';
+import type { ProjectDocument } from '../../domain/documents/model';
 import type { BrowserKeyValueStorage } from '../browser/browserStorage';
 import { browserStorage } from '../browser/browserStorage';
 import { storageObjectUtils } from '../storage/storageObjectUtils';

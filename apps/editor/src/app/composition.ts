@@ -1,5 +1,5 @@
 import { sampleProject } from '../domain/projects/sampleProject';
-import type { ProjectDocument } from '../domain/model';
+import type { ProjectDocument } from '../domain/documents/model';
 import type {
   BackgroundRemovalService,
   ExportService,
@@ -14,18 +14,18 @@ import type {
   SmartGrabService,
   ShareService,
   TranslatorService,
-} from '../services/interfaces';
+} from '../services/contracts/interfaces';
 import { inMemoryAiServices } from '../services/testing/inMemoryAiServices';
 import { browserTranslatorService } from '../services/translation/browserTranslatorService';
 import { browserPromptService } from '../services/prompting/browserPromptService';
-import { BrowserExportService } from '../services/exportService';
-import { BrowserBackgroundRemovalService } from '../services/browserBackgroundRemovalService';
-import { BrowserImageGenerationService } from '../services/browserImageGenerationService';
-import { BrowserFileSystemProjectRepository } from '../services/browserFileSystemProjectRepository';
-import { DisabledProjectRepository } from '../services/disabledProjectRepository';
+import { BrowserExportService } from '../services/exporting/exportService';
+import { BrowserBackgroundRemovalService } from '../services/background-removal/browserBackgroundRemovalService';
+import { BrowserImageGenerationService } from '../services/image-generation/browserImageGenerationService';
+import { BrowserFileSystemProjectRepository } from '../services/storage/browserFileSystemProjectRepository';
+import { DisabledProjectRepository } from '../services/storage/disabledProjectRepository';
 import { localSetupService } from '../services/browser/localSetupService';
 import { modelSetupService } from '../services/model-setup/modelSetupService';
-import { BrowserShareService } from '../services/shareService';
+import { BrowserShareService } from '../services/sharing/shareService';
 import { webGpuLanguageDetectionRuntime } from '../services/translation/webGpuLanguageDetectionRuntime';
 import { webGpuTextGenerationRuntime } from '../services/prompting/webGpuTextGenerationRuntime';
 import { minioMirrorService } from '../services/mirror/minioMirrorService';

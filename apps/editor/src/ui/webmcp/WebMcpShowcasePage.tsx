@@ -1,7 +1,7 @@
 import { Bot, FileJson, ImagePlus, Languages, Play, Radar, SendHorizontal } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { promptRecipes } from '../editor/prompting/promptRecipes';
-import { TRANSLATION_LANGUAGE_OPTIONS } from '../editor/translationLanguages';
+import { TRANSLATION_LANGUAGE_OPTIONS } from '../editor/translation/translationLanguages';
 
 interface WebMcpToolLike {
   call?: (input: Record<string, unknown>) => unknown;

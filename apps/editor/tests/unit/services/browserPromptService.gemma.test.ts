@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { GeneratedSlideTask } from '../../../src/domain/generated-slides/generatedSlide';
 import { aiModelCatalog } from '../../../src/services/model-setup/aiModelCatalog';
 import { browserPromptService } from '../../../src/services/prompting/browserPromptService';
-import type { ModelSetupService } from '../../../src/services/interfaces';
+import type { ModelSetupService } from '../../../src/services/contracts/interfaces';
 import type {
   TextGenerationInput,
   TextGenerationOptions,

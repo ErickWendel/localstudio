@@ -1,4 +1,4 @@
-import type { LocalSetupState, SetupCapabilityState } from '../../services/interfaces';
+import type { LocalSetupState, SetupCapabilityState } from '../../services/contracts/interfaces';
 
 const statusLabels: Record<SetupCapabilityState['status'], string> = {
   ready: 'Ready',

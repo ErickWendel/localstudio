@@ -1,5 +1,5 @@
 import { promptRecipes } from '../../../src/ui/editor/prompting/promptRecipes';
-import { WebMcpToolAdapter, type WebMcpTool } from '../../../src/services/webMcpToolAdapter';
+import { WebMcpToolAdapter, type WebMcpTool } from '../../../src/services/webmcp/webMcpToolAdapter';
 
 describe('WebMcpToolAdapter', () => {
   it('registers discoverable WebMCP tools with prompt examples in metadata', () => {

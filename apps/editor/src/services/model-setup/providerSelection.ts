@@ -1,4 +1,4 @@
-import type { AiProviderState, ModelState } from '../interfaces';
+import type { AiProviderState, ModelState } from '../contracts/interfaces';
 import { browserStorage } from '../browser/browserStorage';
 import type { BrowserKeyValueStorage } from '../browser/browserStorage';
 

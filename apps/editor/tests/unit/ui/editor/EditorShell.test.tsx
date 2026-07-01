@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { createAppServices as createRealAppServices } from '../../../../src/app/composition';
-import type { Asset, ProjectDocument } from '../../../../src/domain/model';
+import type { Asset, ProjectDocument } from '../../../../src/domain/documents/model';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 import type {
   BackgroundRemovalService,
@@ -15,11 +15,11 @@ import type {
   ShareRecord,
   ShareService,
   TranslatorService,
-} from '../../../../src/services/interfaces';
+} from '../../../../src/services/contracts/interfaces';
 import type { MinioMirrorConfig } from '../../../../src/services/mirror/minioMirrorService';
-import type { WebMcpDemoWindow, WebMcpTool } from '../../../../src/services/webMcpToolAdapter';
+import type { WebMcpDemoWindow, WebMcpTool } from '../../../../src/services/webmcp/webMcpToolAdapter';
 import { modelSetupService } from '../../../../src/services/model-setup/modelSetupService';
-import { EditorShell } from '../../../../src/ui/editor/EditorShell';
+import { EditorShell } from '../../../../src/ui/editor/shell/EditorShell';
 
 function createAppServices(options: Parameters<typeof createRealAppServices>[0] = {}) {
   vi.stubGlobal('showDirectoryPicker', vi.fn());

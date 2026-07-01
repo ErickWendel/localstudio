@@ -4,7 +4,7 @@ import {
   TransformersRuntimeClient,
   type TransformersWorkerRequest,
   type TransformersWorkerResponse,
-} from '../../../src/services/transformersRuntimeClient';
+} from '../../../src/services/model-setup/transformersRuntimeClient';
 
 describe('webGpuTextGenerationRuntime.extractGeneratedText', () => {
   it('extracts plain generated text responses', () => {

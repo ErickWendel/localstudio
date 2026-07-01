@@ -1,11 +1,11 @@
 import { generatedSlide } from '../../domain/generated-slides/generatedSlide';
 import type { GeneratedSlideElement, GeneratedSlideTask, GeneratedSlideTasksDocument } from '../../domain/generated-slides/generatedSlide';
 import { aiModelCatalog } from '../model-setup/aiModelCatalog';
-import { ChromePromptService } from '../chromePromptService';
-import type { AiProviderState, ModelSetupService, PromptApiAvailability, PromptService } from '../interfaces';
+import { ChromePromptService } from './chromePromptService';
+import type { AiProviderState, ModelSetupService, PromptApiAvailability, PromptService } from '../contracts/interfaces';
 import { providerSelection } from '../model-setup/providerSelection';
 import { progress as progressUtils } from '../model-setup/progress';
-import { buildSlideElementPrompt } from '../prompts/slideElementPrompt';
+import { buildSlideElementPrompt } from './slideElementPrompt';
 import { slideLayoutPresets } from './slideLayoutPresets';
 import { slideTaskPrompt } from './slideTaskPrompt';
 import { webGpuTextGenerationRuntime } from './webGpuTextGenerationRuntime';

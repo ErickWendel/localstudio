@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
-import { TopToolbar } from '../../../../src/ui/editor/TopToolbar';
+import { TopToolbar } from '../../../../src/ui/editor/toolbars/TopToolbar';
 
 describe('TopToolbar', () => {
   it('opens Stitch header menus and wires available actions', async () => {

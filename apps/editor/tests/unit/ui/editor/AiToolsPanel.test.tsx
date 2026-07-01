@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { aiModelCatalog } from '../../../../src/services/model-setup/aiModelCatalog';
-import type { AiProviderState } from '../../../../src/services/interfaces';
-import { AiToolsPanel } from '../../../../src/ui/editor/AiToolsPanel';
+import type { AiProviderState } from '../../../../src/services/contracts/interfaces';
+import { AiToolsPanel } from '../../../../src/ui/editor/panels/AiToolsPanel';
 
 const gemmaProvider: AiProviderState = {
   id: 'gemma-4-webgpu',

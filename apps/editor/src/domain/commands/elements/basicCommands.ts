@@ -10,10 +10,10 @@ import type {
   ProjectDocument,
   SlideTransition,
   VideoElement,
-} from '../../model';
-import { collectReferencedAssetIds } from '../../assetUsage';
+} from '../../documents/model';
+import { collectReferencedAssetIds } from '../../assets/assetUsage';
 import { projectMutationUtils } from '../shared/projectMutationUtils';
-import type { EditorCommand } from '../types';
+import type { EditorCommand } from '../shared/types';
 
 import { applyGeneratedSlideCommand } from '../generated-slides/applyGeneratedSlideCommand';
 

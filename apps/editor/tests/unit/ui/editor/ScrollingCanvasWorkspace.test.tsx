@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
-import { ScrollingCanvasWorkspace } from '../../../../src/ui/editor/ScrollingCanvasWorkspace';
+import { ScrollingCanvasWorkspace } from '../../../../src/ui/editor/canvas/ScrollingCanvasWorkspace';
 
 describe('ScrollingCanvasWorkspace', () => {
   it('scrolls the active slide into view after active page changes', () => {

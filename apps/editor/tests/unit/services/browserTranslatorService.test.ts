@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { aiModelCatalog } from '../../../src/services/model-setup/aiModelCatalog';
-import type { ModelSetupService, ModelState } from '../../../src/services/interfaces';
+import type { ModelSetupService, ModelState } from '../../../src/services/contracts/interfaces';
 import { browserTranslatorService } from '../../../src/services/translation/browserTranslatorService';
 import { modelSetupService } from '../../../src/services/model-setup/modelSetupService';
 import { progress } from '../../../src/services/model-setup/progress';

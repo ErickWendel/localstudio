@@ -1,4 +1,4 @@
-import type { LocalSetupService, LocalSetupState, SetupCapabilityState } from '../interfaces';
+import type { LocalSetupService, LocalSetupState, SetupCapabilityState } from '../contracts/interfaces';
 import { browserStorage } from './browserStorage';
 
 const SETUP_COMPLETE_KEY = 'localstudio.ai.setup-complete';

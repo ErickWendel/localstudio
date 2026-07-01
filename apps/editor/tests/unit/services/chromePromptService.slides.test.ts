@@ -1,4 +1,4 @@
-import { ChromePromptService } from '../../../src/services/chromePromptService';
+import { ChromePromptService } from '../../../src/services/prompting/chromePromptService';
 
 describe('ChromePromptService slide generation', () => {
   afterEach(() => {

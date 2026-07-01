@@ -1,8 +1,8 @@
 import { placeholderImage } from '../../assets/placeholderImage';
-import type { Asset, DesignElement, ProjectDocument } from '../../model';
+import type { Asset, DesignElement, ProjectDocument } from '../../documents/model';
 import type { GeneratedSlideElement, GeneratedSlideTasksDocument } from '../../generated-slides/generatedSlide';
 import { projectMutationUtils } from '../shared/projectMutationUtils';
-import type { EditorCommand } from '../types';
+import type { EditorCommand } from '../shared/types';
 
 function generatedElementId(pageId: string, id: string) {
   return `generated-${pageId}-${id.replace(/[^a-z0-9-_]/gi, '-').toLowerCase()}`;
