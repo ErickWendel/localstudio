@@ -1,5 +1,6 @@
 import { type CSSProperties } from 'react';
 import { featureMediaImages } from '../content/featureMediaImages';
+import { Reveal } from './Reveal';
 
 type FeatureMediaStyle = CSSProperties & { '--feature-media-ratio'?: string };
 
@@ -8,8 +9,18 @@ export function FeatureMedia({ feature }: { feature: keyof typeof featureMediaIm
   const mediaImageStyle: FeatureMediaStyle = { '--feature-media-ratio': mediaImage.aspectRatio };
 
   return (
-    <div className="feature-media with-image" data-feature={feature} aria-label={`${feature} feature preview`}>
-      <div className="feature-media-canvas" style={mediaImageStyle}>
+    <Reveal
+      as="div"
+      className="feature-media with-image"
+      delay={80}
+      reveal="showcase-media"
+    >
+      <div
+        className="feature-media-canvas"
+        data-feature={feature}
+        aria-label={`${feature} feature preview`}
+        style={mediaImageStyle}
+      >
         <img
           className="feature-media-image"
           src={mediaImage.src}
@@ -17,7 +28,8 @@ export function FeatureMedia({ feature }: { feature: keyof typeof featureMediaIm
           loading="lazy"
           decoding="async"
         />
+        <span className="feature-media-scanline" aria-hidden="true" />
       </div>
-    </div>
+    </Reveal>
   );
 }

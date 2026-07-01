@@ -1,4 +1,4 @@
-import { BrainCircuit, Eraser, FolderOpen, ImagePlus, Languages } from 'lucide-react';
+import { BrainCircuit, Eraser, FolderOpen, ImagePlus, Languages, Share2 } from 'lucide-react';
 
 export const demoSteps = [
   {
@@ -30,5 +30,11 @@ export const demoSteps = [
     title: 'Save local projects',
     copy: 'Store metadata and assets in a folder you control instead of a remote workspace.',
     proof: 'Local project files',
+  },
+  {
+    icon: Share2,
+    title: 'Share your slides',
+    copy: 'Use your own external storage to publish stable links or reimport it into different machines.',
+    proof: 'Bring your bucket',
   },
 ] as const;

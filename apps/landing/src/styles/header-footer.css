@@ -47,12 +47,36 @@
 }
 
 .landing-nav a {
-  transition: color 150ms ease;
+  position: relative;
+  transition: color var(--motion-fast, 150ms) ease;
+}
+
+.landing-nav a::after {
+  position: absolute;
+  right: 0;
+  bottom: -10px;
+  left: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--ls-green);
+  content: '';
+  opacity: 0;
+  transform: scaleX(0.35);
+  transition:
+    opacity var(--motion-fast, 150ms) ease,
+    transform var(--motion-fast, 150ms) ease;
+  transform-origin: center;
 }
 
 .landing-nav a:hover,
-.landing-nav a:focus-visible {
+.landing-nav a:focus-visible,
+.landing-nav a.active {
   color: var(--ls-green-fixed);
+}
+
+.landing-nav a.active::after {
+  opacity: 1;
+  transform: scaleX(1);
 }
 
 .header-actions {

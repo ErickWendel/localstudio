@@ -1,6 +1,7 @@
 import { LandingFooter } from './components/LandingFooter';
 import { LandingHeader } from './components/LandingHeader';
 import { MotionBackdrop } from './components/MotionBackdrop';
+import { useActiveSection } from './hooks/useActiveSection';
 import { usePrefersReducedMotion } from './hooks/usePrefersReducedMotion';
 import { ClosingSection } from './sections/ClosingSection';
 import { DemoSection } from './sections/DemoSection';
@@ -14,17 +15,18 @@ import { WebMcpSection } from './sections/WebMcpSection';
 
 export function LandingPage() {
   const prefersReducedMotion = usePrefersReducedMotion();
+  const activeSectionId = useActiveSection();
 
   return (
     <main className="landing-shell">
       <MotionBackdrop />
-      <LandingHeader prefersReducedMotion={prefersReducedMotion} />
+      <LandingHeader activeSectionId={activeSectionId} prefersReducedMotion={prefersReducedMotion} />
       <HeroSection prefersReducedMotion={prefersReducedMotion} />
       <ShowcaseSection />
       <DemoSection />
       <WebAiSection />
       <WebMcpSection />
-      <FeaturesSection />
+      <FeaturesSection prefersReducedMotion={prefersReducedMotion} />
       <RequirementsSection />
       <ThanksSection />
       <ClosingSection />

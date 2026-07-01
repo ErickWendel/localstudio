@@ -53,6 +53,8 @@ export function WorkflowPreview({
               <source src={demoVideo.src} type="video/mp4" />
               <a href={demoVideo.fallbackSrc}>View the workflow demo</a>
             </video>
+            <span className="workflow-selection-pulse" aria-hidden="true" />
+            <span className="workflow-editor-cursor" aria-hidden="true" />
             <div className="slide-grid" />
             <div className="generated-shape shape-a" />
             <div className="generated-shape shape-b" />

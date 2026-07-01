@@ -44,14 +44,60 @@ describe('LandingPage', () => {
     expect(screen.getByRole('heading', { name: /Design slides with local AI/i })).toBeInTheDocument();
     expect(screen.getByText(/one continuous slide workflow/i)).toBeInTheDocument();
     expect(screen.getAllByText('Beta').length).toBeGreaterThan(0);
-    expect(screen.getByRole('link', { name: 'Workflow' })).toHaveAttribute('href', '#top');
-    expect(screen.getByRole('link', { name: 'Showcase' })).toHaveAttribute('href', '#showcase');
-    expect(screen.getByRole('link', { name: 'Web AI' })).toHaveAttribute('href', '#web-ai');
-    expect(screen.getByRole('link', { name: 'WebMCP' })).toHaveAttribute('href', '#webmcp');
-    expect(screen.getByRole('link', { name: 'Editor' })).toHaveAttribute('href', '#features');
+    expect(screen.getByRole('link', { name: 'About it' })).toHaveAttribute('href', '#top');
+    expect(screen.getByRole('link', { name: 'Features' })).toHaveAttribute('href', '#features');
+    expect(screen.getByRole('link', { name: 'WebMCP Showcase' })).toHaveAttribute('href', '#webmcp');
     expect(screen.getByRole('link', { name: 'Requirements' })).toHaveAttribute('href', '#requirements');
-    expect(screen.getByRole('link', { name: 'Thanks' })).toHaveAttribute('href', '#thanks');
+    expect(screen.queryByRole('link', { name: 'Workflow' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'S3 Mirror' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Showcase' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Web AI' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Thanks' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Open editor/i })).toHaveAttribute('href', '/editor/');
+  });
+
+  it('marks the current landing section in the header nav without changing anchor destinations', () => {
+    render(<LandingPage />);
+
+    expect(screen.getByRole('link', { name: 'About it' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'About it' })).toHaveAttribute('href', '#top');
+    expect(screen.getByRole('link', { name: 'Features' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('adds scroll reveal contracts to hero, media, cards, and calls to action', () => {
+    const { container } = render(<LandingPage />);
+
+    expect(container.querySelector('[data-reveal="hero-copy"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-reveal="workflow-frame"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-reveal="showcase-heading"]')).toBeInTheDocument();
+    expect(container.querySelectorAll('[data-reveal="showcase-media"]').length).toBeGreaterThan(0);
+    expect(container.querySelectorAll('[data-reveal="demo-card"]').length).toBeGreaterThan(0);
+    expect(container.querySelector('[data-reveal="web-ai-stack"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-reveal="webmcp-media"]')).toBeInTheDocument();
+    expect(container.querySelectorAll('[data-reveal="requirement-card"]').length).toBeGreaterThan(0);
+    expect(container.querySelector('[data-reveal="closing-cta"]')).toBeInTheDocument();
+  });
+
+  it('renders reveal content statically for reduced-motion users', () => {
+    stubReducedMotion(true);
+    const { container } = render(<LandingPage />);
+
+    const revealElements = Array.from(container.querySelectorAll('[data-reveal]'));
+
+    expect(revealElements.length).toBeGreaterThan(0);
+    expect(revealElements.every((element) => element.getAttribute('data-reveal-state') === 'visible')).toBe(true);
+    expect(revealElements.every((element) => element.classList.contains('is-visible'))).toBe(true);
+  });
+
+  it('adds product-surface motion affordances without new global decoration', () => {
+    const { container } = render(<LandingPage />);
+
+    expect(container.querySelector('.workflow-editor-cursor')).toBeInTheDocument();
+    expect(container.querySelector('.workflow-selection-pulse')).toBeInTheDocument();
+    expect(container.querySelectorAll('.feature-media-scanline').length).toBeGreaterThan(0);
+    expect(container.querySelector('.feature-media-layer-pulse')).not.toBeInTheDocument();
+    expect(container.querySelector('.webmcp-cursor-path')).toBeInTheDocument();
+    expect(container.querySelectorAll('.requirement-status-check').length).toBeGreaterThan(0);
   });
 
   it('keeps workflow steps product-focused instead of model-focused', () => {
@@ -67,6 +113,9 @@ describe('LandingPage', () => {
     expect(screen.getByLabelText(/Prompt-to-slide workflow/i)).toHaveAttribute('preload', 'metadata');
     expect(screen.queryByText('Chrome Prompt API')).not.toBeInTheDocument();
     expect(screen.queryByText('Bonsai Image WebGPU')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Share your slides' })).toBeInTheDocument();
+    expect(screen.getByText(/use your own external storage/i)).toBeInTheDocument();
+    expect(screen.getByText(/reimport it into different machines/i)).toBeInTheDocument();
   });
 
   it('lets people choose workflow demos from the hero carousel', async () => {
@@ -142,6 +191,31 @@ describe('LandingPage', () => {
 
     expect(screen.getByRole('tab', { name: /Prompt-to-slide/i })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByLabelText(/Prompt-to-slide workflow/i)).not.toHaveAttribute('autoplay');
+  });
+
+  it('explains S3-compatible mirroring as the bridge from local projects to public links', () => {
+    render(<LandingPage />);
+
+    expect(screen.getByRole('heading', { name: /Local projects can still publish public links/i })).toBeInTheDocument();
+    expect(screen.getByText(/S3-compatible storage keeps viewer assets reachable/i)).toBeInTheDocument();
+    expect(screen.getByText(/MinIO works as the local\/self-hosted example/i)).toBeInTheDocument();
+    expect(screen.getByText(/AWS S3, R2, or any compatible endpoint/i)).toBeInTheDocument();
+    expect(screen.getByLabelText('Feature details')).toContainElement(
+      screen.getByRole('heading', { name: /Local projects can still publish public links/i }),
+    );
+    expect(screen.getByText('project.json')).toBeInTheDocument();
+    expect(screen.getByText('assets/')).toBeInTheDocument();
+    expect(screen.getByText('history/')).toBeInTheDocument();
+    expect(screen.getByText('config/')).toBeInTheDocument();
+    expect(screen.getByText('share.json')).toBeInTheDocument();
+    expect(screen.getByLabelText('Local-to-public S3 mirror flow')).toHaveAttribute('data-motion', 'active');
+  });
+
+  it('renders the S3 mirror diagram as a static flow for reduced-motion users', () => {
+    stubReducedMotion(true);
+    render(<LandingPage />);
+
+    expect(screen.getByLabelText('Local-to-public S3 mirror flow')).toHaveAttribute('data-motion', 'static');
   });
 
   it('promotes the GitHub repository with a custom star button and feature showcase sections', () => {

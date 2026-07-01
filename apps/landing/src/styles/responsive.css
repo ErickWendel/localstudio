@@ -4,7 +4,7 @@
   .showcase-row.reverse,
   .web-ai-section,
   .webmcp-section .showcase-row,
-  .features-section,
+  .feature-details,
   .thanks-section {
     grid-template-columns: 1fr;
   }

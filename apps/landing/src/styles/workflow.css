@@ -52,6 +52,10 @@
     inset 0 0 0 1px rgba(255, 255, 255, 0.03);
 }
 
+.workflow-frame-reveal {
+  display: grid;
+}
+
 .workflow-copy {
   display: grid;
   gap: 6px;
@@ -178,6 +182,35 @@
   border: 1px solid rgba(105, 255, 137, 0.22);
   border-radius: 5px;
   background: #07130f;
+}
+
+.workflow-selection-pulse,
+.workflow-editor-cursor {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.workflow-selection-pulse {
+  right: 20%;
+  bottom: 22%;
+  width: 22%;
+  height: 16%;
+  border: 1px solid rgba(55, 253, 118, 0.82);
+  border-radius: 4px;
+  box-shadow: 0 0 0 0 rgba(55, 253, 118, 0.18);
+  animation: editor-selection-pulse 2.8s var(--motion-ease, cubic-bezier(0.4, 0, 0.2, 1)) infinite;
+}
+
+.workflow-editor-cursor {
+  right: 13%;
+  bottom: 14%;
+  width: 12px;
+  height: 18px;
+  clip-path: polygon(0 0, 0 100%, 32% 76%, 52% 100%, 72% 90%, 50% 66%, 100% 66%);
+  background: var(--ls-text);
+  filter: drop-shadow(0 0 8px rgba(55, 253, 118, 0.42));
+  animation: editor-cursor-drift 3.2s var(--motion-ease, cubic-bezier(0.4, 0, 0.2, 1)) infinite;
 }
 
 .workflow-demo-video {
@@ -461,6 +494,8 @@
 }
 
 .workflow-preview--video-only .slide-grid,
+.workflow-preview--video-only .workflow-selection-pulse,
+.workflow-preview--video-only .workflow-editor-cursor,
 .workflow-preview--video-only .generated-shape,
 .workflow-preview--video-only .generated-image,
 .workflow-preview--video-only .slide-copy,
@@ -468,6 +503,11 @@
 .workflow-preview--video-only .folder-card {
   opacity: 0;
   animation: none;
+}
+
+.workflow-preview--video-only .workflow-selection-pulse,
+.workflow-preview--video-only .workflow-editor-cursor {
+  display: none;
 }
 
 .workflow-tabs {
@@ -490,10 +530,10 @@
   font-weight: 800;
   cursor: pointer;
   transition:
-    border-color 150ms ease,
-    color 150ms ease,
-    background 150ms ease,
-    transform 150ms ease;
+    border-color var(--motion-fast, 150ms) ease,
+    color var(--motion-fast, 150ms) ease,
+    background var(--motion-fast, 150ms) ease,
+    transform var(--motion-fast, 150ms) ease;
 }
 
 .workflow-tabs button:hover,
@@ -520,5 +560,29 @@
 
   100% {
     transform: translateX(128%);
+  }
+}
+
+@keyframes editor-selection-pulse {
+  0%,
+  100% {
+    opacity: 0.58;
+    box-shadow: 0 0 0 0 rgba(55, 253, 118, 0);
+  }
+
+  48% {
+    opacity: 1;
+    box-shadow: 0 0 0 6px rgba(55, 253, 118, 0.16);
+  }
+}
+
+@keyframes editor-cursor-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+
+  46% {
+    transform: translate3d(-18px, -12px, 0);
   }
 }
