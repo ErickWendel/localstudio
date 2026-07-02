@@ -787,6 +787,9 @@ describe('EditorShell', () => {
       },
       { timeout: 2000 },
     );
+    await waitFor(() => {
+      expect(mirrorService.deleteProject).toHaveBeenCalledWith('Untitled AI Deck', mirrorConfig);
+    });
   });
 
   it('toggles mirroring from the mirror status icon when a saved config is available', async () => {

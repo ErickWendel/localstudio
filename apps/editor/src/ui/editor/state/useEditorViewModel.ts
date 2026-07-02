@@ -464,6 +464,7 @@ export function useEditorViewModel(services: AppServices) {
   const mirrorConfigRef = useRef<MinioMirrorConfig | null>(storedMirrorConfig);
   const mirrorSyncInFlightRef = useRef(false);
   const mirrorSyncQueuedRef = useRef(false);
+  const lastMirroredProjectNameRef = useRef<string | undefined>(undefined);
   const mirrorDebounceRef = useRef<number | undefined>(undefined);
   const queueMirrorSyncRef = useRef<() => void>(() => undefined);
   const syncMirrorNowRef = useRef<(project?: ProjectDocument) => void>(() => undefined);
@@ -1656,6 +1657,15 @@ export function useEditorViewModel(services: AppServices) {
         services.projectRepository,
         mirrorConfigRef.current!,
       );
+      const previousMirroredProjectName = lastMirroredProjectNameRef.current;
+      if (
+        previousMirroredProjectName &&
+        previousMirroredProjectName !== projectToSync.name &&
+        services.mirrorService.deleteProject
+      ) {
+        await services.mirrorService.deleteProject(previousMirroredProjectName, config);
+      }
+      lastMirroredProjectNameRef.current = projectToSync.name;
       setMirrorState(nextState);
     } catch (error) {
       setMirrorState({
