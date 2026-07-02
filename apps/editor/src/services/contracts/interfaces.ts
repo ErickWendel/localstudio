@@ -83,6 +83,7 @@ export interface MirrorService<TConfig = unknown> {
   ): Promise<MirrorState>;
   listProjects(config: TConfig): Promise<MirrorProjectSummary[]>;
   downloadProject(projectId: string, config: TConfig): Promise<MirrorFile[]>;
+  deleteProject?(projectId: string, config: TConfig): Promise<void>;
 }
 
 export interface VersionHistoryEntry {

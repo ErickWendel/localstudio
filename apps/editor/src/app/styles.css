@@ -2824,6 +2824,21 @@ button {
 .remote-import-list {
   display: grid;
   gap: 8px;
+  max-height: 600px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.remote-import-list-item {
+  display: grid;
+  gap: 8px;
+}
+
+.remote-import-row-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 8px;
 }
 
 .remote-import-row {
@@ -2869,6 +2884,62 @@ button {
   margin-top: 3px;
   color: var(--ew-muted);
   font-size: 11px;
+}
+
+.remote-import-confirm {
+  border: 1px solid rgba(255, 180, 171, 0.26);
+  border-radius: 6px;
+  background: rgba(46, 15, 18, 0.78);
+  padding: 10px;
+}
+
+.remote-import-confirm p {
+  margin: 0;
+  color: var(--ew-text);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.remote-import-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.remote-import-confirm-actions button {
+  min-height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ew-text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 10px;
+}
+
+.remote-import-confirm-actions .danger-button {
+  border-color: rgba(255, 180, 171, 0.42);
+  background: rgba(255, 180, 171, 0.12);
+  color: #ffdad6;
+}
+
+.remote-import-confirm-actions button:hover:not(:disabled),
+.remote-import-confirm-actions button:focus-visible {
+  border-color: rgba(122, 255, 199, 0.38);
+  background: rgba(55, 253, 118, 0.1);
+}
+
+.remote-import-confirm-actions .danger-button:hover:not(:disabled),
+.remote-import-confirm-actions .danger-button:focus-visible {
+  border-color: #ffb4ab;
+  background: rgba(255, 180, 171, 0.18);
+}
+
+.remote-import-confirm-actions button:disabled {
+  cursor: wait;
+  opacity: 0.64;
 }
 
 .prompt-examples {

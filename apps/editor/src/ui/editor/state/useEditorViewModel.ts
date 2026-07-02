@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AppServices } from '../../../app/composition';
 import { basicCommands } from '../../../domain/commands/elements/basicCommands';
-import type { AlignMode, ElementAnimationPatch, ElementFramePatch, ImageCropPatch, ElementStylePatch, MediaPlaybackPatch, ZOrderMode } from '../../../domain/commands/elements/basicCommands';
+import type {
+  AlignMode,
+  ElementAnimationPatch,
+  ElementFramePatch,
+  ImageCropPatch,
+  ElementStylePatch,
+  MediaPlaybackPatch,
+  ZOrderMode,
+} from '../../../domain/commands/elements/basicCommands';
 import type { GeneratedSlideElement } from '../../../domain/generated-slides/generatedSlide';
 import { fitImageWithinPage } from '../../../domain/images/imageSizing';
 import type {
@@ -39,7 +47,14 @@ import { translationLanguageUtils } from '../translation/translationLanguageUtil
 import { editorPreferences } from '../persistence/editorPreferences';
 import { useAnimationPreviewController } from '../animation/useAnimationPreviewController';
 
-export type RightPanelTab = 'layout' | 'text' | 'elements' | 'design' | 'ai-tools' | 'assets' | 'animations';
+export type RightPanelTab =
+  | 'layout'
+  | 'text'
+  | 'elements'
+  | 'design'
+  | 'ai-tools'
+  | 'assets'
+  | 'animations';
 export type TextPreset = 'title' | 'subtitle' | 'body';
 
 interface EditorHistory {
@@ -83,7 +98,13 @@ interface ElementClipboardState {
   elements: DesignElement[];
 }
 
-export type RemoteImportStatus = 'loading' | 'ready' | 'empty' | 'importing' | 'failed';
+export type RemoteImportStatus =
+  | 'loading'
+  | 'ready'
+  | 'empty'
+  | 'importing'
+  | 'deleting'
+  | 'failed';
 
 const IMAGE_EDITING_MODEL_REQUIRED_MESSAGE = 'You must download the image editing tools first.';
 const PROMPT_API_REQUIRED_MESSAGE = 'LLM model must be prepared before using prompt-to-slides.';
@@ -156,7 +177,8 @@ function normalizeProjectDocument(project: ProjectDocument): ProjectDocument {
         ? {
             'asset-hero': {
               ...project.assets['asset-hero'],
-              objectUrl: project.assets['asset-hero'].objectUrl ?? sampleProject.SAMPLE_HERO_IMAGE_URL,
+              objectUrl:
+                project.assets['asset-hero'].objectUrl ?? sampleProject.SAMPLE_HERO_IMAGE_URL,
             },
           }
         : {}),
@@ -176,7 +198,11 @@ function normalizeProjectDocument(project: ProjectDocument): ProjectDocument {
             : page,
         )
       : project.pages
-    ).map((page) => ({ ...page, animationBuilds: page.animationBuilds ?? [], visible: page.visible ?? true })),
+    ).map((page) => ({
+      ...page,
+      animationBuilds: page.animationBuilds ?? [],
+      visible: page.visible ?? true,
+    })),
   };
 }
 
@@ -347,8 +373,9 @@ export function useEditorViewModel(services: AppServices) {
   const [modelStates, setModelStates] = useState<ModelState[]>([]);
   const [hasLoadedProject, setHasLoadedProject] = useState(!shouldRestoreStoredProject);
   const [persistenceEnabled, setPersistenceEnabled] = useState(shouldRestoreStoredProject);
-  const [hasPersistedLocalProject, setHasPersistedLocalProject] =
-    useState(shouldRestoreStoredProject);
+  const [hasPersistedLocalProject, setHasPersistedLocalProject] = useState(
+    shouldRestoreStoredProject,
+  );
   const [activePageId, setActivePageId] = useState(initialProject.pages[0]?.id ?? '');
   const activePageIdRef = useRef(activePageId);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
@@ -587,7 +614,12 @@ export function useEditorViewModel(services: AppServices) {
     return () => {
       isMounted = false;
     };
-  }, [persistenceEnabled, services.projectRepository, services.storedProjectName, storedMirrorConfig]);
+  }, [
+    persistenceEnabled,
+    services.projectRepository,
+    services.storedProjectName,
+    storedMirrorConfig,
+  ]);
 
   useEffect(() => {
     if (!hasLoadedProject || !persistenceEnabled) return;
@@ -737,10 +769,20 @@ export function useEditorViewModel(services: AppServices) {
         await services.translatorService.getLanguageDetectionProviderStates(),
       );
     }
-    if (next.some((state) => state.id === modelSetupService.IMAGE_EDITING_MODEL_ID && state.status === 'ready')) {
+    if (
+      next.some(
+        (state) =>
+          state.id === modelSetupService.IMAGE_EDITING_MODEL_ID && state.status === 'ready',
+      )
+    ) {
       setBackgroundSelectionNotice(undefined);
     }
-    if (next.some((state) => state.id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID && state.status === 'ready')) {
+    if (
+      next.some(
+        (state) =>
+          state.id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID && state.status === 'ready',
+      )
+    ) {
       setCreateImageNotice(undefined);
       setAiToolsAttentionModelId(undefined);
     }
@@ -826,7 +868,8 @@ export function useEditorViewModel(services: AppServices) {
 
   function isImageGenerationReady() {
     return modelStates.some(
-      (state) => state.id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID && state.status === 'ready',
+      (state) =>
+        state.id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID && state.status === 'ready',
     );
   }
 
@@ -1081,7 +1124,9 @@ export function useEditorViewModel(services: AppServices) {
 
       commitProject(
         (currentProject) =>
-          new basicCommands.PrepareGeneratedSlideCommand(pageId, generatedTasks.page).execute(currentProject),
+          new basicCommands.PrepareGeneratedSlideCommand(pageId, generatedTasks.page).execute(
+            currentProject,
+          ),
         { activePageId: pageId, selectedElementIds: [] },
       );
 
@@ -1101,7 +1146,9 @@ export function useEditorViewModel(services: AppServices) {
         const selectedElementId = `generated-${pageId}-${element.id.replace(/[^a-z0-9-_]/gi, '-').toLowerCase()}`;
         commitProject(
           (currentProject) =>
-            new basicCommands.AddGeneratedSlideElementCommand(pageId, element).execute(currentProject),
+            new basicCommands.AddGeneratedSlideElementCommand(pageId, element).execute(
+              currentProject,
+            ),
           { activePageId: pageId, selectedElementIds: [selectedElementId] },
         );
       }
@@ -1143,12 +1190,16 @@ export function useEditorViewModel(services: AppServices) {
     try {
       const generationOptions = {
         height: normalizeImageGenerationDimension(
-          imageToReplace?.height ?? options?.height ?? imageGenerationModel.DEFAULT_IMAGE_GENERATION_SIZE,
+          imageToReplace?.height ??
+            options?.height ??
+            imageGenerationModel.DEFAULT_IMAGE_GENERATION_SIZE,
         ),
         ...(options?.seed !== undefined ? { seed: options.seed } : {}),
         ...(options?.steps !== undefined ? { steps: options.steps } : {}),
         width: normalizeImageGenerationDimension(
-          imageToReplace?.width ?? options?.width ?? imageGenerationModel.DEFAULT_IMAGE_GENERATION_SIZE,
+          imageToReplace?.width ??
+            options?.width ??
+            imageGenerationModel.DEFAULT_IMAGE_GENERATION_SIZE,
         ),
       };
       const asset = await services.imageGenerationService.generateImage(trimmedPrompt, {
@@ -1162,7 +1213,9 @@ export function useEditorViewModel(services: AppServices) {
       if (imageToReplace) {
         commitProject(
           (currentProject) =>
-            new basicCommands.ReplaceImageAssetCommand(imageToReplace.id, asset).execute(currentProject),
+            new basicCommands.ReplaceImageAssetCommand(imageToReplace.id, asset).execute(
+              currentProject,
+            ),
           { selectedElementIds: [imageToReplace.id] },
         );
         return;
@@ -1670,6 +1723,33 @@ export function useEditorViewModel(services: AppServices) {
     }
   }
 
+  async function deleteRemoteMirrorProject(projectId: string) {
+    const config = mirrorConfigRef.current;
+    if (!config || !services.mirrorService.deleteProject) return;
+    setRemoteImportStatus('deleting');
+    setRemoteImportError(undefined);
+    try {
+      await services.mirrorService.deleteProject(projectId, config);
+      let nextProjectCount = 0;
+      setRemoteImportProjects((projects) => {
+        const nextProjects = projects.filter((project) => project.id !== projectId);
+        nextProjectCount = nextProjects.length;
+        return nextProjects;
+      });
+      setRemoteImportStatus(nextProjectCount > 0 ? 'ready' : 'empty');
+    } catch (error) {
+      setRemoteImportStatus('failed');
+      setRemoteImportError(
+        error instanceof Error ? error.message : 'Could not delete mirrored project.',
+      );
+      setMirrorState({
+        enabled: Boolean(config),
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'MinIO mirror delete failed.',
+      });
+    }
+  }
+
   async function openVersionHistory() {
     if (!services.projectRepository.getVersionHistory) return;
     setVersionHistoryOpen(true);
@@ -1759,7 +1839,9 @@ export function useEditorViewModel(services: AppServices) {
                 ),
               }
           : patch;
-      return new basicCommands.UpdateElementFrameCommand(elementId, nextPatch).execute(currentProject);
+      return new basicCommands.UpdateElementFrameCommand(elementId, nextPatch).execute(
+        currentProject,
+      );
     });
   }
 
@@ -1771,33 +1853,39 @@ export function useEditorViewModel(services: AppServices) {
 
   function updateTextContent(elementId: string, text: string) {
     commitProject((currentProject) => {
-      const nextProject = new basicCommands.UpdateTextContentCommand(elementId, text).execute(currentProject);
+      const nextProject = new basicCommands.UpdateTextContentCommand(elementId, text).execute(
+        currentProject,
+      );
       const element = nextProject.elements[elementId];
       if (!element || element.type !== 'text') return nextProject;
       const minimumHeight = getMinimumTextHeight(element.text, element.fontSize);
       if (element.height >= minimumHeight) return nextProject;
-      return new basicCommands.UpdateElementFrameCommand(elementId, { height: minimumHeight }).execute(
-        nextProject,
-      );
+      return new basicCommands.UpdateElementFrameCommand(elementId, {
+        height: minimumHeight,
+      }).execute(nextProject);
     });
   }
 
   function updateElementStyle(elementId: string, patch: ElementStylePatch) {
     commitProject((currentProject) => {
-      const nextProject = new basicCommands.UpdateElementStyleCommand(elementId, patch).execute(currentProject);
+      const nextProject = new basicCommands.UpdateElementStyleCommand(elementId, patch).execute(
+        currentProject,
+      );
       const element = nextProject.elements[elementId];
       if (!element || element.type !== 'text') return nextProject;
       const minimumHeight = getMinimumTextHeight(element.text, element.fontSize);
       if (element.height >= minimumHeight) return nextProject;
-      return new basicCommands.UpdateElementFrameCommand(elementId, { height: minimumHeight }).execute(
-        nextProject,
-      );
+      return new basicCommands.UpdateElementFrameCommand(elementId, {
+        height: minimumHeight,
+      }).execute(nextProject);
     });
   }
 
   function updatePageBackground(background: PageBackground) {
     commitProject((currentProject) =>
-      new basicCommands.UpdatePageBackgroundCommand(activePageId, background).execute(currentProject),
+      new basicCommands.UpdatePageBackgroundCommand(activePageId, background).execute(
+        currentProject,
+      ),
     );
   }
 
@@ -1808,7 +1896,9 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function clearPageTransition() {
-    commitProject((currentProject) => new basicCommands.ClearPageTransitionCommand(activePageId).execute(currentProject));
+    commitProject((currentProject) =>
+      new basicCommands.ClearPageTransitionCommand(activePageId).execute(currentProject),
+    );
   }
 
   function setElementAnimationBuilds(elementIds: string[], patch: ElementAnimationPatch) {
@@ -1824,13 +1914,19 @@ export function useEditorViewModel(services: AppServices) {
 
   function clearElementAnimationBuild(elementId: string) {
     commitProject((currentProject) =>
-      new basicCommands.ClearElementAnimationBuildCommand(activePageId, elementId).execute(currentProject),
+      new basicCommands.ClearElementAnimationBuildCommand(activePageId, elementId).execute(
+        currentProject,
+      ),
     );
   }
 
   function reorderElementAnimationBuild(elementId: string, targetIndex: number) {
     commitProject((currentProject) =>
-      new basicCommands.ReorderElementAnimationBuildCommand(activePageId, elementId, targetIndex).execute(currentProject),
+      new basicCommands.ReorderElementAnimationBuildCommand(
+        activePageId,
+        elementId,
+        targetIndex,
+      ).execute(currentProject),
     );
   }
 
@@ -1922,7 +2018,9 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   async function setTranslationTargetLanguage(languageCode: string) {
-    const nextLanguage = translationLanguageUtils.isSupportedTranslationLanguageCode(languageCode) ? languageCode : '';
+    const nextLanguage = translationLanguageUtils.isSupportedTranslationLanguageCode(languageCode)
+      ? languageCode
+      : '';
     setTranslationTargetLanguageState(nextLanguage);
     setTranslationTargetAttention(false);
     setTranslationNotice(undefined);
@@ -2019,7 +2117,8 @@ export function useEditorViewModel(services: AppServices) {
         translationOptions,
       );
       if (translatedPageIds.length > 0) {
-        const normalizedTargetLanguage = translationLanguageUtils.normalizeLanguageCode(translationTargetLanguage);
+        const normalizedTargetLanguage =
+          translationLanguageUtils.normalizeLanguageCode(translationTargetLanguage);
         setPageLanguageCodes((current) => ({
           ...current,
           ...Object.fromEntries(
@@ -2089,7 +2188,9 @@ export function useEditorViewModel(services: AppServices) {
       translationOptions,
     );
     if (translatedPageIds.length > 0) {
-      const normalizedTargetLanguage = translationLanguageUtils.normalizeLanguageCode(input.targetLanguage);
+      const normalizedTargetLanguage = translationLanguageUtils.normalizeLanguageCode(
+        input.targetLanguage,
+      );
       setPageLanguageCodes((current) => ({
         ...current,
         ...Object.fromEntries(
@@ -2169,9 +2270,11 @@ export function useEditorViewModel(services: AppServices) {
 
     commitProject(
       (currentProject) =>
-        new basicCommands.AddElementsCommand(activePageId, pastedElements, elementClipboard.assets).execute(
-          currentProject,
-        ),
+        new basicCommands.AddElementsCommand(
+          activePageId,
+          pastedElements,
+          elementClipboard.assets,
+        ).execute(currentProject),
       { selectedElementIds: pastedElements.map((element) => element.id) },
     );
     setElementClipboard({
@@ -2183,7 +2286,9 @@ export function useEditorViewModel(services: AppServices) {
 
   function deleteElement(elementId: string) {
     commitProject((currentProject) => {
-      const nextProject = new basicCommands.DeleteElementCommand(activePageId, elementId).execute(currentProject);
+      const nextProject = new basicCommands.DeleteElementCommand(activePageId, elementId).execute(
+        currentProject,
+      );
       const nextPage = nextProject.pages.find((page) => page.id === activePageId);
       if (selectedElementIds.includes(elementId)) {
         const nextSelectedId = nextPage?.elementIds.at(-1);
@@ -2194,7 +2299,9 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function removeAsset(assetId: string) {
-    commitProject((currentProject) => new basicCommands.RemoveAssetCommand(assetId).execute(currentProject));
+    commitProject((currentProject) =>
+      new basicCommands.RemoveAssetCommand(assetId).execute(currentProject),
+    );
   }
 
   function deleteSelectedElement() {
@@ -2236,7 +2343,9 @@ export function useEditorViewModel(services: AppServices) {
     const nextElementId = createPrefixedId(`${elementId}-copy`);
     commitProject(
       (currentProject) =>
-        new basicCommands.DuplicateElementCommand(activePageId, elementId, nextElementId).execute(currentProject),
+        new basicCommands.DuplicateElementCommand(activePageId, elementId, nextElementId).execute(
+          currentProject,
+        ),
       { selectedElementIds: [nextElementId] },
     );
   }
@@ -2378,13 +2487,12 @@ export function useEditorViewModel(services: AppServices) {
       locked: false,
       visible: true,
       opacity: 1,
-      ...(isLinearShape
-        ? { stroke: '#37FD76', strokeWidth: 4 }
-        : { fill: '#37FD76' }),
+      ...(isLinearShape ? { stroke: '#37FD76', strokeWidth: 4 } : { fill: '#37FD76' }),
     };
 
     commitProject(
-      (currentProject) => new basicCommands.AddElementsCommand(activePageId, [nextElement]).execute(currentProject),
+      (currentProject) =>
+        new basicCommands.AddElementsCommand(activePageId, [nextElement]).execute(currentProject),
       { selectedElementIds: [elementId] },
     );
     setActiveTab('design');
@@ -2420,7 +2528,11 @@ export function useEditorViewModel(services: AppServices) {
     );
   }
 
-  function reorderElement(elementId: string, targetElementId: string, position: 'before' | 'after' = 'before') {
+  function reorderElement(
+    elementId: string,
+    targetElementId: string,
+    position: 'before' | 'after' = 'before',
+  ) {
     commitProject((currentProject) => {
       const page = currentProject.pages.find((item) => item.id === activePageId);
       if (!page) return currentProject;
@@ -2428,17 +2540,26 @@ export function useEditorViewModel(services: AppServices) {
       const displayOrder = [...page.elementIds].reverse().filter((id) => id !== elementId);
       const targetDisplayIndex = displayOrder.indexOf(targetElementId);
       if (targetDisplayIndex < 0) return currentProject;
-      displayOrder.splice(position === 'after' ? targetDisplayIndex + 1 : targetDisplayIndex, 0, elementId);
+      displayOrder.splice(
+        position === 'after' ? targetDisplayIndex + 1 : targetDisplayIndex,
+        0,
+        elementId,
+      );
       const nextPageOrder = [...displayOrder].reverse();
       const targetPageIndex = nextPageOrder.indexOf(elementId);
-      return new basicCommands.ReorderElementCommand(activePageId, elementId, targetPageIndex).execute(
-        currentProject,
-      );
+      return new basicCommands.ReorderElementCommand(
+        activePageId,
+        elementId,
+        targetPageIndex,
+      ).execute(currentProject);
     });
   }
 
   function addPage(afterPageId = activePageId) {
-    const sourcePage = project.pages.find((item) => item.id === afterPageId) ?? project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
+    const sourcePage =
+      project.pages.find((item) => item.id === afterPageId) ??
+      project.pages.find((item) => item.id === activePageId) ??
+      project.pages[0];
     if (!sourcePage) return;
     const pageId = createPrefixedId('page');
     const nextPage: Page = {
@@ -2488,15 +2609,19 @@ export function useEditorViewModel(services: AppServices) {
       project.pages[pageIndex - 1]?.id ??
       project.pages[0]?.id ??
       '';
-    commitProject((currentProject) => new basicCommands.DeletePageCommand(pageId).execute(currentProject), {
-      activePageId: nextPageId,
-      selectedElementIds: [],
-    });
+    commitProject(
+      (currentProject) => new basicCommands.DeletePageCommand(pageId).execute(currentProject),
+      {
+        activePageId: nextPageId,
+        selectedElementIds: [],
+      },
+    );
   }
 
   function reorderPage(pageId: string, targetIndex: number) {
     commitProject(
-      (currentProject) => new basicCommands.ReorderPageCommand(pageId, targetIndex).execute(currentProject),
+      (currentProject) =>
+        new basicCommands.ReorderPageCommand(pageId, targetIndex).execute(currentProject),
       {
         activePageId: pageId,
       },
@@ -2504,7 +2629,9 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function renamePage(pageId: string, name: string) {
-    commitProject((currentProject) => new basicCommands.RenamePageCommand(pageId, name).execute(currentProject));
+    commitProject((currentProject) =>
+      new basicCommands.RenamePageCommand(pageId, name).execute(currentProject),
+    );
   }
 
   function setPageVisibility(pageId: string, visible: boolean) {
@@ -2599,7 +2726,9 @@ export function useEditorViewModel(services: AppServices) {
       return;
     }
 
-    const imageEditingModel = modelStates.find((state) => state.id === modelSetupService.IMAGE_EDITING_MODEL_ID);
+    const imageEditingModel = modelStates.find(
+      (state) => state.id === modelSetupService.IMAGE_EDITING_MODEL_ID,
+    );
     if (imageEditingModel?.status !== 'ready') {
       setActiveTab('ai-tools');
       setBackgroundSelectionNotice(IMAGE_EDITING_MODEL_REQUIRED_MESSAGE);
@@ -2999,6 +3128,7 @@ export function useEditorViewModel(services: AppServices) {
     setMirrorEnabled,
     importRemoteMirror,
     importRemoteMirrorProject,
+    deleteRemoteMirrorProject,
     closeRemoteImport,
     importProject,
     openVersionHistory,
