@@ -67,6 +67,7 @@ describe('SharePanel', () => {
     const copyButton = screen.getByRole('button', { name: 'Copy link' });
     expect(copyButton).toBeDisabled();
     expect(copyButton).toHaveAttribute('title', message);
+    expect(copyButton).toHaveAttribute('data-loading', 'false');
 
     await user.click(screen.getByRole('button', { name: 'Download' }));
     await user.click(screen.getByRole('button', { name: 'Present' }));

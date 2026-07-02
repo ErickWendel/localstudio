@@ -82,6 +82,7 @@ export function SharePanel({
       <button
         className="share-copy-link-button font-orbitron"
         type="button"
+        data-loading={isCopying ? 'true' : 'false'}
         disabled={isCopying || publicLinkUnavailable}
         title={publicLinkUnavailableReason}
         onClick={() => {
