@@ -29,6 +29,7 @@ import type {
   AiProviderState,
   MirrorProjectSummary,
   MirrorState,
+  ModelDownloadProgressDetails,
   ModelState,
   PromptApiAvailability,
   VersionHistoryEntry,
@@ -81,13 +82,13 @@ interface BackgroundSelectionPoint {
   positive: boolean;
 }
 
-interface TranslationPreparationState {
+interface TranslationPreparationState extends ModelDownloadProgressDetails {
   progress: number;
   sourceLanguage?: string;
   status: 'idle' | 'downloading' | 'ready' | 'failed';
 }
 
-interface PromptPreparationState {
+interface PromptPreparationState extends ModelDownloadProgressDetails {
   availability: PromptApiAvailability;
   progress: number;
   status: 'idle' | 'downloading' | 'ready' | 'failed';
@@ -96,6 +97,18 @@ interface PromptPreparationState {
 interface ElementClipboardState {
   assets: ProjectDocument['assets'];
   elements: DesignElement[];
+}
+
+function getDownloadProgressPatch(
+  progress: number,
+  details: ModelDownloadProgressDetails | undefined,
+): ModelDownloadProgressDetails & { progress: number } {
+  return {
+    estimatedRemainingMs: details?.estimatedRemainingMs,
+    loadedBytes: details?.loadedBytes,
+    progress,
+    totalBytes: details?.totalBytes,
+  };
 }
 
 export type RemoteImportStatus =
@@ -799,10 +812,12 @@ export function useEditorViewModel(services: AppServices) {
       ),
     );
     const next = await services.modelSetupService.downloadModel(id, {
-      onProgress: (progress) => {
+      onProgress: (progress, details) => {
         setModelStates((currentStates) =>
           currentStates.map((state) =>
-            state.id === id ? { ...state, status: 'downloading', progress } : state,
+            state.id === id
+              ? { ...state, status: 'downloading', ...getDownloadProgressPatch(progress, details) }
+              : state,
           ),
         );
       },
@@ -914,11 +929,14 @@ export function useEditorViewModel(services: AppServices) {
     }));
     try {
       await services.promptService.preparePromptApi({
-        onProgress: (progress) => {
+        onProgress: (progress, details) => {
           setPromptPreparation((current) => ({
             ...current,
             availability: progress >= 100 ? 'ready' : current.availability,
-            progress: Math.max(current.progress, 4, Math.min(100, Math.round(progress))),
+            ...getDownloadProgressPatch(
+              Math.max(current.progress, 4, Math.min(100, Math.round(progress))),
+              details,
+            ),
             status: progress >= 100 ? 'ready' : 'downloading',
           }));
         },
@@ -1008,9 +1026,12 @@ export function useEditorViewModel(services: AppServices) {
     setLanguageDetectionPreparation({ progress: 4, status: 'downloading' });
     try {
       await services.translatorService.prepareLanguageDetection?.({
-        onProgress: (progress) => {
+        onProgress: (progress, details) => {
           setLanguageDetectionPreparation((current) => ({
-            progress: Math.max(current.progress, 4, Math.min(100, Math.round(progress))),
+            ...getDownloadProgressPatch(
+              Math.max(current.progress, 4, Math.min(100, Math.round(progress))),
+              details,
+            ),
             status: progress >= 100 ? 'ready' : 'downloading',
           }));
         },
@@ -1040,9 +1061,12 @@ export function useEditorViewModel(services: AppServices) {
           'en',
           translationTargetLanguage || 'en',
           {
-            onProgress: (progress) => {
+            onProgress: (progress, details) => {
               setTranslationPreparation((current) => ({
-                progress: Math.max(current.progress, 4, Math.min(100, Math.round(progress))),
+                ...getDownloadProgressPatch(
+                  Math.max(current.progress, 4, Math.min(100, Math.round(progress))),
+                  details,
+                ),
                 status: progress >= 100 ? 'ready' : 'downloading',
               }));
             },
@@ -2099,9 +2123,12 @@ export function useEditorViewModel(services: AppServices) {
     try {
       const sourceLanguage = translationLanguageUtils.normalizeLanguageCode(
         await services.translatorService.detectLanguage(sampleText, {
-          onProgress: (progress) => {
+          onProgress: (progress, details) => {
             setTranslationPreparation((current) => ({
-              progress: Math.max(current.progress, 4, Math.min(45, Math.round(progress * 0.45))),
+              ...getDownloadProgressPatch(
+                Math.max(current.progress, 4, Math.min(45, Math.round(progress * 0.45))),
+                details,
+              ),
               status: 'downloading',
             }));
           },
@@ -2116,9 +2143,12 @@ export function useEditorViewModel(services: AppServices) {
       if (shouldPrepareLanguagePair) {
         setTranslationPreparation({ progress: 8, sourceLanguage, status: 'downloading' });
         await services.translatorService.prepareTranslation(sourceLanguage, nextLanguage, {
-          onProgress: (progress) => {
+          onProgress: (progress, details) => {
             setTranslationPreparation((current) => ({
-              progress: Math.max(current.progress, 8, Math.min(100, Math.round(progress))),
+              ...getDownloadProgressPatch(
+                Math.max(current.progress, 8, Math.min(100, Math.round(progress))),
+                details,
+              ),
               sourceLanguage,
               status: progress >= 100 ? 'ready' : 'downloading',
             }));

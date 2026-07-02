@@ -1,5 +1,6 @@
 import { imageGenerationModel } from '../image-generation/imageGenerationModel';
 import { progress } from './progress';
+import type { ModelDownloadProgressDetails } from '../contracts/interfaces';
 
 const IMAGE_EDITING_TRANSFORMERS_MODEL_ID = 'Xenova/slimsam-77-uniform';
 
@@ -58,12 +59,18 @@ interface SegmentationResult extends EncodedAsset {
   scores: number[];
 }
 
-type TextGenerationPipeline = ((prompt: unknown, options?: TextGenerationOptions) => Promise<unknown>) & {
+type TextGenerationPipeline = ((
+  prompt: unknown,
+  options?: TextGenerationOptions,
+) => Promise<unknown>) & {
   dispose?: () => Promise<void> | void;
 };
 
 type TextClassificationResult = { label?: unknown; score?: unknown };
-type TextClassificationPipeline = ((text: string, options?: Record<string, unknown>) => Promise<unknown>) & {
+type TextClassificationPipeline = ((
+  text: string,
+  options?: Record<string, unknown>,
+) => Promise<unknown>) & {
   dispose?: () => Promise<void> | void;
 };
 
@@ -164,11 +171,18 @@ class DirectTransformersOperations {
   private languageDetectionPipelines = new Map<string, Promise<TextClassificationPipeline>>();
   private textGenerationPipelines = new Map<string, Promise<TextGenerationPipeline>>();
 
-  async preloadTextGeneration(modelId: string, options?: { onProgress?: (progress: number) => void }) {
+  async preloadTextGeneration(
+    modelId: string,
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
+  ) {
     await this.loadTextGenerationPipeline(modelId, options);
   }
 
-  async generateText(modelId: string, prompt: TextGenerationInput, options?: TextGenerationOptions) {
+  async generateText(
+    modelId: string,
+    prompt: TextGenerationInput,
+    options?: TextGenerationOptions,
+  ) {
     const textGeneration = await this.loadTextGenerationPipeline(modelId);
     const generationOptions: TextGenerationOptions = {
       do_sample: false,
@@ -198,7 +212,10 @@ class DirectTransformersOperations {
     await pipeline?.dispose?.();
   }
 
-  async preloadLanguageDetection(modelId: string, options?: { onProgress?: (progress: number) => void }) {
+  async preloadLanguageDetection(
+    modelId: string,
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
+  ) {
     await this.loadLanguageDetectionPipeline(modelId, options);
   }
 
@@ -216,19 +233,30 @@ class DirectTransformersOperations {
     options?.onProgress?.(100);
   }
 
-  async prepareBackgroundRemoval(objectUrl: string, options?: { onProgress?: (progress: number) => void }) {
+  async prepareBackgroundRemoval(
+    objectUrl: string,
+    options?: { onProgress?: (progress: number) => void },
+  ) {
     await this.encodeAsset(objectUrl, options?.onProgress);
     options?.onProgress?.(100);
   }
 
-  async segmentBackgroundRemoval(objectUrl: string, points: SegmentationPoint[]): Promise<BackgroundSegmentationResult> {
+  async segmentBackgroundRemoval(
+    objectUrl: string,
+    points: SegmentationPoint[],
+  ): Promise<BackgroundSegmentationResult> {
     const positivePoints = points.filter((point) => point.positive);
     const promptPoints = positivePoints.length > 0 ? positivePoints : points;
-    const segmentations = await Promise.all(promptPoints.map((point) => this.segment(objectUrl, [point])));
-    if (segmentations.length === 0) throw new Error('At least one point is required for segmentation.');
+    const segmentations = await Promise.all(
+      promptPoints.map((point) => this.segment(objectUrl, [point])),
+    );
+    if (segmentations.length === 0)
+      throw new Error('At least one point is required for segmentation.');
     const firstSegmentation = segmentations[0];
     if (!firstSegmentation) throw new Error('At least one point is required for segmentation.');
-    const subjectData = new Uint8Array(firstSegmentation.mask.width * firstSegmentation.mask.height);
+    const subjectData = new Uint8Array(
+      firstSegmentation.mask.width * firstSegmentation.mask.height,
+    );
     let scoreTotal = 0;
 
     for (const segmentation of segmentations) {
@@ -254,7 +282,10 @@ class DirectTransformersOperations {
     };
   }
 
-  private loadTextGenerationPipeline(modelId: string, options?: { onProgress?: (progress: number) => void }) {
+  private loadTextGenerationPipeline(
+    modelId: string,
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
+  ) {
     const existingPipeline = this.textGenerationPipelines.get(modelId);
     if (existingPipeline) return existingPipeline;
 
@@ -271,7 +302,10 @@ class DirectTransformersOperations {
     return pipelinePromise;
   }
 
-  private loadLanguageDetectionPipeline(modelId: string, options?: { onProgress?: (progress: number) => void }) {
+  private loadLanguageDetectionPipeline(
+    modelId: string,
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
+  ) {
     const existingPipeline = this.languageDetectionPipelines.get(modelId);
     if (existingPipeline) return existingPipeline;
 
@@ -287,7 +321,10 @@ class DirectTransformersOperations {
     return pipelinePromise;
   }
 
-  private async segment(objectUrl: string, points: SegmentationPoint[]): Promise<SegmentationResult> {
+  private async segment(
+    objectUrl: string,
+    points: SegmentationPoint[],
+  ): Promise<SegmentationResult> {
     const { model, processor, RawImage, Tensor } = await this.loadBackgroundModel();
     const encodedAsset = await this.encodeAsset(objectUrl);
     const reshaped = encodedAsset.imageProcessed.reshaped_input_sizes[0]!;
@@ -358,7 +395,8 @@ class DirectTransformersOperations {
   }
 
   private async createBackgroundModel() {
-    const { AutoProcessor, RawImage, SamModel, Tensor, env } = await import('@huggingface/transformers');
+    const { AutoProcessor, RawImage, SamModel, Tensor, env } =
+      await import('@huggingface/transformers');
 
     env.useBrowserCache = true;
     env.cacheKey = imageGenerationModel.TRANSFORMERS_CACHE_KEY;
@@ -380,7 +418,10 @@ class DirectTransformersOperations {
   }
 
   private getBestMaskIndex(scores: number[]) {
-    return scores.reduce((bestIndex, score, index) => (score > scores[bestIndex]! ? index : bestIndex), 0);
+    return scores.reduce(
+      (bestIndex, score, index) => (score > scores[bestIndex]! ? index : bestIndex),
+      0,
+    );
   }
 }
 

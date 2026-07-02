@@ -1,6 +1,11 @@
 import { aiModelCatalog } from '../model-setup/aiModelCatalog';
 import { chromeTranslatorService as chromeTranslator } from './chromeTranslatorService';
-import type { AiProviderState, ModelSetupService, TranslatorService } from '../contracts/interfaces';
+import type {
+  AiProviderState,
+  ModelDownloadProgressDetails,
+  ModelSetupService,
+  TranslatorService,
+} from '../contracts/interfaces';
 import { providerSelection } from '../model-setup/providerSelection';
 import { progress as progressUtils } from '../model-setup/progress';
 import { webGpuLanguageDetectionRuntime } from './webGpuLanguageDetectionRuntime';
@@ -21,14 +26,20 @@ interface TranslationProvider {
   description: string;
   runtime: AiProviderState['runtime'];
   modelId?: string | undefined;
-  checkCompatibility(): { compatible: boolean; disabledReason?: string | undefined } | Promise<{ compatible: boolean; disabledReason?: string | undefined }>;
+  checkCompatibility():
+    | { compatible: boolean; disabledReason?: string | undefined }
+    | Promise<{ compatible: boolean; disabledReason?: string | undefined }>;
   prepare(
     sourceLanguage: string,
     targetLanguage: string,
     modelSetupService: ModelSetupService,
-    options?: { onProgress?: (progress: number) => void },
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
   ): Promise<void>;
-  translate(text: string, targetLanguage: string, options?: { sourceLanguage?: string }): Promise<string>;
+  translate(
+    text: string,
+    targetLanguage: string,
+    options?: { sourceLanguage?: string },
+  ): Promise<string>;
   detectLanguage?(text: string): Promise<string>;
 }
 
@@ -39,7 +50,10 @@ interface LanguageDetectionProvider {
   runtime: AiProviderState['runtime'];
   modelId?: string | undefined;
   checkCompatibility(): { compatible: boolean; disabledReason?: string | undefined };
-  prepare(modelSetupService: ModelSetupService, options?: { onProgress?: (progress: number) => void }): Promise<void>;
+  prepare(
+    modelSetupService: ModelSetupService,
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
+  ): Promise<void>;
   detectLanguage(text: string): Promise<string>;
 }
 
@@ -91,7 +105,7 @@ const TRANSLATEGEMMA_LANGUAGE_ALIASES: Record<string, string> = {
   iw: 'he',
   pt: 'pt_BR',
   'pt-BR': 'pt_BR',
-  'pt_BR': 'pt_BR',
+  pt_BR: 'pt_BR',
   zh: 'zh',
   'zh-CN': 'zh',
   'zh-Hant': 'zh',
@@ -143,7 +157,9 @@ class ChromeTranslationProvider implements TranslationProvider {
   description = 'Uses Chrome built-in local translation support.';
   runtime = 'chrome-built-in' as const;
 
-  constructor(private readonly chromeTranslatorService = new chromeTranslator.ChromeTranslatorService()) {}
+  constructor(
+    private readonly chromeTranslatorService = new chromeTranslator.ChromeTranslatorService(),
+  ) {}
 
   async checkCompatibility() {
     const translator = getChromeTranslatorApi();
@@ -155,7 +171,10 @@ class ChromeTranslationProvider implements TranslationProvider {
     }
 
     try {
-      const availability = await translator.availability({ sourceLanguage: 'en', targetLanguage: 'pt' });
+      const availability = await translator.availability({
+        sourceLanguage: 'en',
+        targetLanguage: 'pt',
+      });
       return availability === 'unavailable'
         ? {
             compatible: false,
@@ -178,12 +197,16 @@ class ChromeTranslationProvider implements TranslationProvider {
     sourceLanguage: string,
     targetLanguage: string,
     _modelSetupService: ModelSetupService,
-    options?: { onProgress?: (progress: number) => void },
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
   ): Promise<void> {
     return this.chromeTranslatorService.prepareTranslation(sourceLanguage, targetLanguage, options);
   }
 
-  translate(text: string, targetLanguage: string, options?: { sourceLanguage?: string }): Promise<string> {
+  translate(
+    text: string,
+    targetLanguage: string,
+    options?: { sourceLanguage?: string },
+  ): Promise<string> {
     return this.chromeTranslatorService.translate(text, targetLanguage, options);
   }
 }
@@ -195,7 +218,9 @@ class TranslateGemmaProvider implements TranslationProvider {
   runtime = 'webgpu-huggingface' as const;
   modelId = aiModelCatalog.TRANSLATEGEMMA_MODEL_ID;
 
-  constructor(private readonly runtimeClient: TextGenerationRuntime = new webGpuTextGenerationRuntime.TransformersTextGenerationRuntime()) {}
+  constructor(
+    private readonly runtimeClient: TextGenerationRuntime = new webGpuTextGenerationRuntime.TransformersTextGenerationRuntime(),
+  ) {}
 
   checkCompatibility() {
     return providerSelection.isWebGpuCompatible()
@@ -207,24 +232,40 @@ class TranslateGemmaProvider implements TranslationProvider {
     _sourceLanguage: string,
     _targetLanguage: string,
     modelSetupService: ModelSetupService,
-    options?: { onProgress?: (progress: number) => void },
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
   ): Promise<void> {
-    const reportProgress = progressUtils.createMonotonicProgressReporter(options?.onProgress, { initial: 4, min: 4, max: 100 });
+    const reportProgress = progressUtils.createMonotonicProgressReporter(options?.onProgress, {
+      initial: 4,
+      min: 4,
+      max: 100,
+    });
     await modelSetupService.downloadModel(aiModelCatalog.TRANSLATEGEMMA_MODEL_ID, {
-      onProgress: (nextProgress) => reportProgress(nextProgress >= 99 ? 99 : progressUtils.mapProgressToRange(nextProgress, 4, 99)),
+      onProgress: (nextProgress, details) =>
+        reportProgress(
+          nextProgress >= 99 ? 99 : progressUtils.mapProgressToRange(nextProgress, 4, 99),
+          details,
+        ),
     });
     reportProgress(100);
   }
 
-  async translate(text: string, targetLanguage: string, options?: { sourceLanguage?: string }): Promise<string> {
+  async translate(
+    text: string,
+    targetLanguage: string,
+    options?: { sourceLanguage?: string },
+  ): Promise<string> {
     const messages = createTranslateGemmaMessages({
       sourceLanguage: options?.sourceLanguage,
       targetLanguage,
       text,
     });
-    return this.runtimeClient.generate(aiModelCatalog.TRANSLATEGEMMA_TRANSFORMERS_MODEL_ID, messages, {
-      max_new_tokens: Math.max(64, Math.min(1024, Math.ceil(text.length * 2.5))),
-    });
+    return this.runtimeClient.generate(
+      aiModelCatalog.TRANSLATEGEMMA_TRANSFORMERS_MODEL_ID,
+      messages,
+      {
+        max_new_tokens: Math.max(64, Math.min(1024, Math.ceil(text.length * 2.5))),
+      },
+    );
   }
 }
 
@@ -234,15 +275,23 @@ class ChromeLanguageDetectionProvider implements LanguageDetectionProvider {
   description = 'Detect slide text language using Chrome Built-in AI.';
   runtime = 'chrome-built-in' as const;
 
-  constructor(private readonly chromeTranslatorService = new chromeTranslator.ChromeTranslatorService()) {}
+  constructor(
+    private readonly chromeTranslatorService = new chromeTranslator.ChromeTranslatorService(),
+  ) {}
 
   checkCompatibility() {
     return chromeTranslator.hasChromeLanguageDetector()
       ? { compatible: true }
-      : { compatible: false, disabledReason: 'Chrome Built-in LanguageDetector is unavailable in this browser.' };
+      : {
+          compatible: false,
+          disabledReason: 'Chrome Built-in LanguageDetector is unavailable in this browser.',
+        };
   }
 
-  prepare(_modelSetupService: ModelSetupService, options?: { onProgress?: (progress: number) => void }) {
+  prepare(
+    _modelSetupService: ModelSetupService,
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
+  ) {
     options?.onProgress?.(100);
     return Promise.resolve();
   }
@@ -259,24 +308,43 @@ class WebGpuLanguageDetectionProvider implements LanguageDetectionProvider {
   runtime = 'webgpu-huggingface' as const;
   modelId = aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID;
 
-  constructor(private readonly runtimeClient: LanguageDetectionRuntime = new webGpuLanguageDetectionRuntime.TransformersLanguageDetectionRuntime()) {}
+  constructor(
+    private readonly runtimeClient: LanguageDetectionRuntime = new webGpuLanguageDetectionRuntime.TransformersLanguageDetectionRuntime(),
+  ) {}
 
   checkCompatibility() {
     return providerSelection.isWebGpuCompatible()
       ? { compatible: true }
-      : { compatible: false, disabledReason: 'WebGPU is required for external language detection.' };
+      : {
+          compatible: false,
+          disabledReason: 'WebGPU is required for external language detection.',
+        };
   }
 
-  async prepare(modelSetupService: ModelSetupService, options?: { onProgress?: (progress: number) => void }) {
-    const reportProgress = progressUtils.createMonotonicProgressReporter(options?.onProgress, { initial: 4, min: 4, max: 100 });
+  async prepare(
+    modelSetupService: ModelSetupService,
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
+  ) {
+    const reportProgress = progressUtils.createMonotonicProgressReporter(options?.onProgress, {
+      initial: 4,
+      min: 4,
+      max: 100,
+    });
     await modelSetupService.downloadModel(aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID, {
-      onProgress: (nextProgress) => reportProgress(nextProgress >= 99 ? 99 : progressUtils.mapProgressToRange(nextProgress, 4, 99)),
+      onProgress: (nextProgress, details) =>
+        reportProgress(
+          nextProgress >= 99 ? 99 : progressUtils.mapProgressToRange(nextProgress, 4, 99),
+          details,
+        ),
     });
     reportProgress(100);
   }
 
   async detectLanguage(text: string) {
-    const result = await this.runtimeClient.detectLanguage(aiModelCatalog.LANGUAGE_DETECTION_TRANSFORMERS_MODEL_ID, text);
+    const result = await this.runtimeClient.detectLanguage(
+      aiModelCatalog.LANGUAGE_DETECTION_TRANSFORMERS_MODEL_ID,
+      text,
+    );
     return chromeTranslator.normalizeDetectedLanguageCode(result.language);
   }
 }
@@ -296,7 +364,10 @@ class BrowserTranslatorService implements TranslatorService {
     textGenerationRuntime: TextGenerationRuntime = new webGpuTextGenerationRuntime.TransformersTextGenerationRuntime(),
     private readonly languageDetectionRuntime: LanguageDetectionRuntime = new webGpuLanguageDetectionRuntime.TransformersLanguageDetectionRuntime(),
   ) {
-    this.providers = providers ?? [new ChromeTranslationProvider(), new TranslateGemmaProvider(textGenerationRuntime)];
+    this.providers = providers ?? [
+      new ChromeTranslationProvider(),
+      new TranslateGemmaProvider(textGenerationRuntime),
+    ];
     this.languageDetectionProviders = [
       new ChromeLanguageDetectionProvider(),
       new WebGpuLanguageDetectionProvider(languageDetectionRuntime),
@@ -329,21 +400,27 @@ class BrowserTranslatorService implements TranslatorService {
         description: provider.description,
         capability: 'language-detection' as const,
         runtime: provider.runtime,
-        compatibility: compatibility.compatible ? 'compatible' as const : 'incompatible' as const,
+        compatibility: compatibility.compatible
+          ? ('compatible' as const)
+          : ('incompatible' as const),
         disabledReason: compatibility.disabledReason,
         modelId: provider.modelId,
         readiness:
           provider.runtime === 'chrome-built-in'
             ? compatibility.compatible
-              ? 'ready' as const
-              : 'unavailable' as const
+              ? ('ready' as const)
+              : ('unavailable' as const)
             : providerSelection.getModelReadiness(modelStates, provider.modelId),
         selected: false,
       } satisfies AiProviderState;
     });
-    const selected = providerSelection.selectDefaultProvider(states, this.selectedLanguageDetectionProviderId, {
-      forcePreferred: this.forceSelectedLanguageDetectionProvider,
-    });
+    const selected = providerSelection.selectDefaultProvider(
+      states,
+      this.selectedLanguageDetectionProviderId,
+      {
+        forcePreferred: this.forceSelectedLanguageDetectionProvider,
+      },
+    );
     this.selectedLanguageDetectionProviderId = selected?.id;
     return states.map((state) => ({ ...state, selected: state.id === selected?.id }));
   }
@@ -388,13 +465,18 @@ class BrowserTranslatorService implements TranslatorService {
     return states.map((state) => ({ ...state, selected: state.id === selected?.id }));
   }
 
-  async prepareLanguageDetection(options?: { onProgress?: (progress: number) => void }) {
+  async prepareLanguageDetection(options?: {
+    onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void;
+  }) {
     await this.getSelectedLanguageDetectionProvider().prepare(this.modelSetupService, options);
   }
 
   async detectLanguage(
     text: string,
-    options?: { allowModelPreparation?: boolean; onProgress?: (progress: number) => void },
+    options?: {
+      allowModelPreparation?: boolean;
+      onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void;
+    },
   ): Promise<string> {
     const provider = this.getSelectedLanguageDetectionProvider();
     if (options?.allowModelPreparation === false && provider.runtime !== 'chrome-built-in') {
@@ -411,12 +493,21 @@ class BrowserTranslatorService implements TranslatorService {
   async prepareTranslation(
     sourceLanguage: string,
     targetLanguage: string,
-    options?: { onProgress?: (progress: number) => void },
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
   ): Promise<void> {
-    await this.getSelectedProvider().prepare(sourceLanguage, targetLanguage, this.modelSetupService, options);
+    await this.getSelectedProvider().prepare(
+      sourceLanguage,
+      targetLanguage,
+      this.modelSetupService,
+      options,
+    );
   }
 
-  translate(text: string, targetLanguage: string, options?: { sourceLanguage?: string }): Promise<string> {
+  translate(
+    text: string,
+    targetLanguage: string,
+    options?: { sourceLanguage?: string },
+  ): Promise<string> {
     return this.getSelectedProvider().translate(text, targetLanguage, options);
   }
 
@@ -436,10 +527,14 @@ class BrowserTranslatorService implements TranslatorService {
 
     return (
       this.languageDetectionProviders.find(
-        (provider) => provider.id === CHROME_LANGUAGE_DETECTION_PROVIDER_ID && provider.checkCompatibility().compatible,
+        (provider) =>
+          provider.id === CHROME_LANGUAGE_DETECTION_PROVIDER_ID &&
+          provider.checkCompatibility().compatible,
       ) ??
       this.languageDetectionProviders.find(
-        (provider) => provider.id === WEBGPU_LANGUAGE_DETECTION_PROVIDER_ID && provider.checkCompatibility().compatible,
+        (provider) =>
+          provider.id === WEBGPU_LANGUAGE_DETECTION_PROVIDER_ID &&
+          provider.checkCompatibility().compatible,
       ) ??
       this.languageDetectionProviders[0]!
     );

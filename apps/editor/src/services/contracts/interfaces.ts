@@ -15,15 +15,24 @@ export type AiCapability =
 export type AiProviderRuntime = 'chrome-built-in' | 'webgpu-huggingface';
 export type AiProviderCompatibility = 'compatible' | 'incompatible' | 'unknown';
 
+export interface ModelDownloadProgressDetails {
+  estimatedRemainingMs?: number | undefined;
+  loadedBytes?: number | undefined;
+  totalBytes?: number | undefined;
+}
+
 export interface ModelState {
   id: string;
   label: string;
   description?: string;
   error?: string | undefined;
+  estimatedRemainingMs?: number | undefined;
+  loadedBytes?: number | undefined;
   provider: 'chrome' | 'transformers';
   status: ModelStatus;
   progress: number;
   required: boolean;
+  totalBytes?: number | undefined;
 }
 
 export interface AiProviderState {
@@ -153,7 +162,7 @@ export interface ModelSetupService {
   downloadRequiredModels(): Promise<ModelState[]>;
   downloadModel(
     id: string,
-    options?: { onProgress?: (progress: number) => void },
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
   ): Promise<ModelState>;
   removeModel?(id: string): Promise<ModelState>;
 }
@@ -183,15 +192,20 @@ export interface TranslatorService {
   setSelectedProvider?(providerId: string): Promise<AiProviderState[]>;
   getLanguageDetectionProviderStates?(): Promise<AiProviderState[]>;
   setLanguageDetectionProvider?(providerId: string): Promise<AiProviderState[]>;
-  prepareLanguageDetection?(options?: { onProgress?: (progress: number) => void }): Promise<void>;
+  prepareLanguageDetection?(options?: {
+    onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void;
+  }): Promise<void>;
   detectLanguage(
     text: string,
-    options?: { allowModelPreparation?: boolean; onProgress?: (progress: number) => void },
+    options?: {
+      allowModelPreparation?: boolean;
+      onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void;
+    },
   ): Promise<string>;
   prepareTranslation(
     sourceLanguage: string,
     targetLanguage: string,
-    options?: { onProgress?: (progress: number) => void },
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
   ): Promise<void>;
   translate(
     text: string,
@@ -207,7 +221,9 @@ export interface PromptService {
   getSelectedProviderId?(): string;
   setSelectedProvider?(providerId: string): Promise<AiProviderState[]>;
   checkAvailability(): Promise<PromptApiAvailability>;
-  preparePromptApi(options?: { onProgress?: (progress: number) => void }): Promise<void>;
+  preparePromptApi(options?: {
+    onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void;
+  }): Promise<void>;
   generateSlideTasksFromPrompt(
     prompt: string,
     options?: { targetLanguageHint?: string },

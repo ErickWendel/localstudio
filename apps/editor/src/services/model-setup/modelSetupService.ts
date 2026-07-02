@@ -1,4 +1,8 @@
-import type { ModelSetupService, ModelState } from '../contracts/interfaces';
+import type {
+  ModelDownloadProgressDetails,
+  ModelSetupService,
+  ModelState,
+} from '../contracts/interfaces';
 import { aiModelCatalog } from './aiModelCatalog';
 import { imageGenerationModel } from '../image-generation/imageGenerationModel';
 import { bonsaiImageRuntime } from '../image-generation/bonsaiImageRuntime';
@@ -18,17 +22,25 @@ export interface ImageEditingModelLoader {
 }
 
 export interface ImageGenerationModelLoader {
-  loadImageGenerationModel(options?: { onProgress?: (progress: number) => void }): Promise<void>;
+  loadImageGenerationModel(options?: {
+    onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void;
+  }): Promise<void>;
 }
 
 export interface TextGenerationModelLoader {
-  loadTextGenerationModel(modelId: string, options?: { onProgress?: (progress: number) => void }): Promise<void>;
+  loadTextGenerationModel(
+    modelId: string,
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
+  ): Promise<void>;
   removeTextGenerationModel?(modelId: string): Promise<void>;
   releaseTextGenerationModel?(modelId: string): Promise<void> | void;
 }
 
 export interface LanguageDetectionModelLoader {
-  loadLanguageDetectionModel(modelId: string, options?: { onProgress?: (progress: number) => void }): Promise<void>;
+  loadLanguageDetectionModel(
+    modelId: string,
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
+  ): Promise<void>;
 }
 
 export interface ModelCacheStorage {
@@ -89,10 +101,12 @@ function cloneStates(states: ModelState[]) {
 
 function getReadyKey(id: string) {
   if (id === IMAGE_EDITING_MODEL_ID) return IMAGE_EDITING_READY_KEY;
-  if (id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID) return imageGenerationModel.IMAGE_GENERATION_READY_KEY;
+  if (id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID)
+    return imageGenerationModel.IMAGE_GENERATION_READY_KEY;
   if (id === aiModelCatalog.GEMMA_LLM_MODEL_ID) return aiModelCatalog.GEMMA_LLM_READY_KEY;
   if (id === aiModelCatalog.TRANSLATEGEMMA_MODEL_ID) return aiModelCatalog.TRANSLATEGEMMA_READY_KEY;
-  if (id === aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID) return aiModelCatalog.LANGUAGE_DETECTION_READY_KEY;
+  if (id === aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID)
+    return aiModelCatalog.LANGUAGE_DETECTION_READY_KEY;
   return undefined;
 }
 
@@ -105,15 +119,23 @@ class TransformersImageEditingModelLoader implements ImageEditingModelLoader {
 }
 
 class TransformersImageGenerationModelLoader implements ImageGenerationModelLoader {
-  async loadImageGenerationModel(options?: { onProgress?: (progress: number) => void }): Promise<void> {
-    await new bonsaiImageRuntime.WorkerBackedBonsaiImageRuntime().preload(imageGenerationModel.IMAGE_GENERATION_TRANSFORMERS_MODEL_ID, options);
+  async loadImageGenerationModel(options?: {
+    onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void;
+  }): Promise<void> {
+    await new bonsaiImageRuntime.WorkerBackedBonsaiImageRuntime().preload(
+      imageGenerationModel.IMAGE_GENERATION_TRANSFORMERS_MODEL_ID,
+      options,
+    );
   }
 }
 
 class TransformersTextGenerationModelLoader implements TextGenerationModelLoader {
   constructor(private readonly runtimeClient = new TransformersRuntimeClient()) {}
 
-  async loadTextGenerationModel(modelId: string, options?: { onProgress?: (progress: number) => void }): Promise<void> {
+  async loadTextGenerationModel(
+    modelId: string,
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
+  ): Promise<void> {
     await this.runtimeClient.preloadTextGeneration(modelId, options);
   }
 
@@ -131,10 +153,20 @@ class TransformersLanguageDetectionModelLoader implements LanguageDetectionModel
 
   async loadLanguageDetectionModel(
     modelId: string,
-    options?: { onProgress?: (progress: number) => void },
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
   ): Promise<void> {
     await this.runtimeClient.preloadLanguageDetection(modelId, options);
   }
+}
+
+function withoutProgressDetails(patch: Partial<ModelState>): Partial<ModelState> {
+  if (patch.status === 'downloading') return patch;
+  return {
+    ...patch,
+    estimatedRemainingMs: undefined,
+    loadedBytes: undefined,
+    totalBytes: undefined,
+  };
 }
 
 class BrowserTransformersModelCache implements ModelCacheStorage {
@@ -161,29 +193,35 @@ class BrowserModelSetupService implements ModelSetupService {
 
   constructor(
     private readonly imageEditingModelLoader: ImageEditingModelLoader = new TransformersImageEditingModelLoader(),
-    private readonly storage: BrowserKeyValueStorage | undefined = browserStorage.getBrowserLocalStorage(),
+    private readonly storage:
+      | BrowserKeyValueStorage
+      | undefined = browserStorage.getBrowserLocalStorage(),
     private readonly imageGenerationModelLoader: ImageGenerationModelLoader = new TransformersImageGenerationModelLoader(),
     private readonly textGenerationModelLoader: TextGenerationModelLoader = new TransformersTextGenerationModelLoader(),
     private readonly modelCacheStorage: ModelCacheStorage = new BrowserTransformersModelCache(),
     private readonly languageDetectionModelLoader: LanguageDetectionModelLoader = new TransformersLanguageDetectionModelLoader(),
   ) {
     const imageEditingModelReady = storage?.getItem(IMAGE_EDITING_READY_KEY) === 'true';
-    const imageGenerationModelReady = storage?.getItem(imageGenerationModel.IMAGE_GENERATION_READY_KEY) === 'true';
+    const imageGenerationModelReady =
+      storage?.getItem(imageGenerationModel.IMAGE_GENERATION_READY_KEY) === 'true';
     const gemmaLlmReady = storage?.getItem(aiModelCatalog.GEMMA_LLM_READY_KEY) === 'true';
-    const translateGemmaReady = storage?.getItem(aiModelCatalog.TRANSLATEGEMMA_READY_KEY) === 'true';
-    const languageDetectionReady = storage?.getItem(aiModelCatalog.LANGUAGE_DETECTION_READY_KEY) === 'true';
+    const translateGemmaReady =
+      storage?.getItem(aiModelCatalog.TRANSLATEGEMMA_READY_KEY) === 'true';
+    const languageDetectionReady =
+      storage?.getItem(aiModelCatalog.LANGUAGE_DETECTION_READY_KEY) === 'true';
     this.states = initialStates.map((state) =>
       state.id === aiModelCatalog.GEMMA_LLM_MODEL_ID && gemmaLlmReady
         ? { ...state, status: 'ready', progress: 100 }
         : state.id === aiModelCatalog.TRANSLATEGEMMA_MODEL_ID && translateGemmaReady
           ? { ...state, status: 'ready', progress: 100 }
-        : state.id === aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID && languageDetectionReady
-          ? { ...state, status: 'ready', progress: 100 }
-        : state.id === IMAGE_EDITING_MODEL_ID && imageEditingModelReady
-        ? { ...state, status: 'ready', progress: 100 }
-        : state.id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID && imageGenerationModelReady
-          ? { ...state, status: 'ready', progress: 100 }
-        : { ...state },
+          : state.id === aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID && languageDetectionReady
+            ? { ...state, status: 'ready', progress: 100 }
+            : state.id === IMAGE_EDITING_MODEL_ID && imageEditingModelReady
+              ? { ...state, status: 'ready', progress: 100 }
+              : state.id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID &&
+                  imageGenerationModelReady
+                ? { ...state, status: 'ready', progress: 100 }
+                : { ...state },
     );
   }
 
@@ -198,16 +236,26 @@ class BrowserModelSetupService implements ModelSetupService {
     return this.getModelStates();
   }
 
-  async downloadModel(id: string, options?: { onProgress?: (progress: number) => void }): Promise<ModelState> {
+  async downloadModel(
+    id: string,
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
+  ): Promise<ModelState> {
     const current = this.states.find((state) => state.id === id);
     if (!current) throw new Error(`Unknown model: ${id}`);
     if (current.status === 'ready') return { ...current };
 
+    const startedAt = Date.now();
     this.setModelState(id, { status: 'downloading', progress: 10, error: undefined });
     const reportProgress = progress.createMonotonicProgressReporter(
-      (progress) => {
-        this.setModelState(id, { status: 'downloading', progress, error: undefined });
-        options?.onProgress?.(progress);
+      (progress, details) => {
+        const nextDetails = this.withRemainingTime(startedAt, details);
+        this.setModelState(id, {
+          status: 'downloading',
+          progress,
+          error: undefined,
+          ...nextDetails,
+        });
+        options?.onProgress?.(progress, nextDetails);
       },
       { initial: 10, min: 10, max: 99 },
     );
@@ -224,33 +272,50 @@ class BrowserModelSetupService implements ModelSetupService {
         this.storage?.setItem(imageGenerationModel.IMAGE_GENERATION_READY_KEY, 'true');
       }
       if (id === aiModelCatalog.GEMMA_LLM_MODEL_ID) {
-        await this.textGenerationModelLoader.loadTextGenerationModel(aiModelCatalog.GEMMA_LLM_TRANSFORMERS_MODEL_ID, {
-          onProgress: reportProgress,
-        });
-        await this.textGenerationModelLoader.releaseTextGenerationModel?.(aiModelCatalog.GEMMA_LLM_TRANSFORMERS_MODEL_ID);
+        await this.textGenerationModelLoader.loadTextGenerationModel(
+          aiModelCatalog.GEMMA_LLM_TRANSFORMERS_MODEL_ID,
+          {
+            onProgress: reportProgress,
+          },
+        );
+        await this.textGenerationModelLoader.releaseTextGenerationModel?.(
+          aiModelCatalog.GEMMA_LLM_TRANSFORMERS_MODEL_ID,
+        );
         this.storage?.setItem(aiModelCatalog.GEMMA_LLM_READY_KEY, 'true');
       }
       if (id === aiModelCatalog.TRANSLATEGEMMA_MODEL_ID) {
-        await this.textGenerationModelLoader.loadTextGenerationModel(aiModelCatalog.TRANSLATEGEMMA_TRANSFORMERS_MODEL_ID, {
-          onProgress: reportProgress,
-        });
-        await this.textGenerationModelLoader.releaseTextGenerationModel?.(aiModelCatalog.TRANSLATEGEMMA_TRANSFORMERS_MODEL_ID);
+        await this.textGenerationModelLoader.loadTextGenerationModel(
+          aiModelCatalog.TRANSLATEGEMMA_TRANSFORMERS_MODEL_ID,
+          {
+            onProgress: reportProgress,
+          },
+        );
+        await this.textGenerationModelLoader.releaseTextGenerationModel?.(
+          aiModelCatalog.TRANSLATEGEMMA_TRANSFORMERS_MODEL_ID,
+        );
         this.storage?.setItem(aiModelCatalog.TRANSLATEGEMMA_READY_KEY, 'true');
       }
       if (id === aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID) {
-        await this.languageDetectionModelLoader.loadLanguageDetectionModel(aiModelCatalog.LANGUAGE_DETECTION_TRANSFORMERS_MODEL_ID, {
-          onProgress: reportProgress,
-        });
+        await this.languageDetectionModelLoader.loadLanguageDetectionModel(
+          aiModelCatalog.LANGUAGE_DETECTION_TRANSFORMERS_MODEL_ID,
+          {
+            onProgress: reportProgress,
+          },
+        );
         this.storage?.setItem(aiModelCatalog.LANGUAGE_DETECTION_READY_KEY, 'true');
       }
       options?.onProgress?.(100);
       return this.setModelState(id, { status: 'ready', progress: 100, error: undefined });
     } catch (error) {
       if (id === IMAGE_EDITING_MODEL_ID) this.storage?.setItem(IMAGE_EDITING_READY_KEY, 'false');
-      if (id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID) this.storage?.setItem(imageGenerationModel.IMAGE_GENERATION_READY_KEY, 'false');
-      if (id === aiModelCatalog.GEMMA_LLM_MODEL_ID) this.storage?.setItem(aiModelCatalog.GEMMA_LLM_READY_KEY, 'false');
-      if (id === aiModelCatalog.TRANSLATEGEMMA_MODEL_ID) this.storage?.setItem(aiModelCatalog.TRANSLATEGEMMA_READY_KEY, 'false');
-      if (id === aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID) this.storage?.setItem(aiModelCatalog.LANGUAGE_DETECTION_READY_KEY, 'false');
+      if (id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID)
+        this.storage?.setItem(imageGenerationModel.IMAGE_GENERATION_READY_KEY, 'false');
+      if (id === aiModelCatalog.GEMMA_LLM_MODEL_ID)
+        this.storage?.setItem(aiModelCatalog.GEMMA_LLM_READY_KEY, 'false');
+      if (id === aiModelCatalog.TRANSLATEGEMMA_MODEL_ID)
+        this.storage?.setItem(aiModelCatalog.TRANSLATEGEMMA_READY_KEY, 'false');
+      if (id === aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID)
+        this.storage?.setItem(aiModelCatalog.LANGUAGE_DETECTION_READY_KEY, 'false');
       const message = error instanceof Error ? error.message : 'Model download failed.';
       return this.setModelState(id, { status: 'failed', progress: 0, error: message });
     }
@@ -267,26 +332,54 @@ class BrowserModelSetupService implements ModelSetupService {
     }
 
     if (id === aiModelCatalog.GEMMA_LLM_MODEL_ID) {
-      await this.textGenerationModelLoader.removeTextGenerationModel?.(aiModelCatalog.GEMMA_LLM_TRANSFORMERS_MODEL_ID);
-      await this.modelCacheStorage.deleteModelArtifacts(aiModelCatalog.GEMMA_LLM_TRANSFORMERS_MODEL_ID);
+      await this.textGenerationModelLoader.removeTextGenerationModel?.(
+        aiModelCatalog.GEMMA_LLM_TRANSFORMERS_MODEL_ID,
+      );
+      await this.modelCacheStorage.deleteModelArtifacts(
+        aiModelCatalog.GEMMA_LLM_TRANSFORMERS_MODEL_ID,
+      );
     }
     if (id === aiModelCatalog.TRANSLATEGEMMA_MODEL_ID) {
-      await this.textGenerationModelLoader.removeTextGenerationModel?.(aiModelCatalog.TRANSLATEGEMMA_TRANSFORMERS_MODEL_ID);
-      await this.modelCacheStorage.deleteModelArtifacts(aiModelCatalog.TRANSLATEGEMMA_TRANSFORMERS_MODEL_ID);
+      await this.textGenerationModelLoader.removeTextGenerationModel?.(
+        aiModelCatalog.TRANSLATEGEMMA_TRANSFORMERS_MODEL_ID,
+      );
+      await this.modelCacheStorage.deleteModelArtifacts(
+        aiModelCatalog.TRANSLATEGEMMA_TRANSFORMERS_MODEL_ID,
+      );
     }
     if (id === IMAGE_EDITING_MODEL_ID) {
       await this.modelCacheStorage.deleteModelArtifacts(IMAGE_EDITING_TRANSFORMERS_MODEL_ID);
     }
     if (id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID) {
-      await this.modelCacheStorage.deleteModelArtifacts(imageGenerationModel.IMAGE_GENERATION_TRANSFORMERS_MODEL_ID);
+      await this.modelCacheStorage.deleteModelArtifacts(
+        imageGenerationModel.IMAGE_GENERATION_TRANSFORMERS_MODEL_ID,
+      );
     }
 
     return this.setModelState(id, { status: 'needs-download', progress: 0, error: undefined });
   }
 
   private setModelState(id: string, patch: Partial<ModelState>) {
-    this.states = this.states.map((state) => (state.id === id ? { ...state, ...patch } : state));
+    this.states = this.states.map((state) =>
+      state.id === id ? { ...state, ...withoutProgressDetails(patch) } : state,
+    );
     return { ...this.states.find((state) => state.id === id)! };
+  }
+
+  private withRemainingTime(
+    startedAt: number,
+    details: ModelDownloadProgressDetails | undefined,
+  ): ModelDownloadProgressDetails | undefined {
+    if (!details) return undefined;
+    const estimatedRemainingMs = progress.estimateRemainingMs({
+      elapsedMs: Date.now() - startedAt,
+      loadedBytes: details.loadedBytes,
+      totalBytes: details.totalBytes,
+    });
+    return {
+      ...details,
+      estimatedRemainingMs,
+    };
   }
 }
 
@@ -304,7 +397,10 @@ class InMemoryModelSetupService implements ModelSetupService {
     return this.getModelStates();
   }
 
-  downloadModel(id: string, options?: { onProgress?: (progress: number) => void }): Promise<ModelState> {
+  downloadModel(
+    id: string,
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
+  ): Promise<ModelState> {
     const current = this.states.find((state) => state.id === id);
     if (!current) throw new Error(`Unknown model: ${id}`);
 
@@ -320,7 +416,9 @@ class InMemoryModelSetupService implements ModelSetupService {
     if (!current) throw new Error(`Unknown model: ${id}`);
 
     this.states = this.states.map((state) =>
-      state.id === id ? { ...state, status: 'needs-download', progress: 0, error: undefined } : state,
+      state.id === id
+        ? { ...state, status: 'needs-download', progress: 0, error: undefined }
+        : state,
     );
     return Promise.resolve({ ...this.states.find((state) => state.id === id)! });
   }

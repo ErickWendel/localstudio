@@ -1,7 +1,9 @@
+import type { ModelDownloadProgressDetails } from '../contracts/interfaces';
+
 export interface BonsaiImageRuntimeGenerateOptions {
   height: number;
   modelId: string;
-  onLoadProgress?: (progress: number) => void;
+  onLoadProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void;
   prompt: string;
   seed?: number;
   steps: number;
@@ -10,7 +12,10 @@ export interface BonsaiImageRuntimeGenerateOptions {
 }
 
 export interface BonsaiImageRuntime {
-  preload(modelId: string, options?: { onProgress?: (progress: number) => void }): Promise<void>;
+  preload(
+    modelId: string,
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
+  ): Promise<void>;
   generate(options: BonsaiImageRuntimeGenerateOptions): Promise<Blob>;
 }
 
@@ -72,6 +77,7 @@ export type BonsaiImageWorkerRequest =
 
 export type BonsaiImageWorkerResponse =
   | {
+      details?: ModelDownloadProgressDetails;
       id: string;
       progress: number;
       type: 'progress';
@@ -99,7 +105,7 @@ interface WorkerBackedBonsaiImageRuntimeOptions {
 }
 
 interface PendingWorkerRequest {
-  onLoadProgress?: ((progress: number) => void) | undefined;
+  onLoadProgress?: ((progress: number, details?: ModelDownloadProgressDetails) => void) | undefined;
   onStep?: ((step: number, totalSteps: number) => void) | undefined;
   reject: (error: Error) => void;
   resolve: (blob?: Blob) => void;
@@ -130,25 +136,30 @@ async function deleteLegacyBonsaiModelCache() {
   }
 }
 
-function createBonsaiRuntimeProgressController(onProgress: (progress: number) => void) {
+function createBonsaiRuntimeProgressController(
+  onProgress: (progress: number, details?: ModelDownloadProgressDetails) => void,
+) {
   const componentProgress = new Map<string, { loaded: number; total: number }>();
   let estimateTimer: ReturnType<typeof setInterval> | undefined;
   let lastProgress = -1;
 
-  const emitProgress = (progress: number) => {
+  const emitProgress = (progress: number, details?: ModelDownloadProgressDetails) => {
     const nextProgress = Math.max(0, Math.min(100, Math.round(progress)));
     if (nextProgress <= lastProgress) return;
     lastProgress = nextProgress;
-    onProgress(nextProgress);
+    onProgress(nextProgress, details);
   };
 
   const reportComponentProgress = () => {
     const total = Object.values(BONSAI_COMPONENT_TOTALS).reduce((sum, value) => sum + value, 0);
-    const loaded = Object.entries(BONSAI_COMPONENT_TOTALS).reduce((sum, [component, fallbackTotal]) => {
-      const progress = componentProgress.get(component);
-      return sum + Math.min(progress?.loaded ?? 0, progress?.total ?? fallbackTotal);
-    }, 0);
-    emitProgress((loaded / total) * 100);
+    const loaded = Object.entries(BONSAI_COMPONENT_TOTALS).reduce(
+      (sum, [component, fallbackTotal]) => {
+        const progress = componentProgress.get(component);
+        return sum + Math.min(progress?.loaded ?? 0, progress?.total ?? fallbackTotal);
+      },
+      0,
+    );
+    emitProgress((loaded / total) * 100, { loadedBytes: loaded, totalBytes: total });
   };
 
   const reportRuntimeProgress = (progress: BonsaiRuntimeProgress) => {
@@ -163,7 +174,12 @@ function createBonsaiRuntimeProgressController(onProgress: (progress: number) =>
       emitProgress(componentFloor[progress.component] ?? 10);
     }
 
-    if (progress.component) {
+    if (
+      progress.component &&
+      Number.isFinite(progress.loaded) &&
+      Number.isFinite(progress.total) &&
+      (progress.total ?? 0) > 0
+    ) {
       const fallbackTotal = BONSAI_COMPONENT_TOTALS[progress.component] ?? progress.total ?? 1;
       componentProgress.set(progress.component, {
         loaded: Math.max(0, progress.loaded ?? 0),
@@ -173,8 +189,15 @@ function createBonsaiRuntimeProgressController(onProgress: (progress: number) =>
       return;
     }
 
-    if (Number.isFinite(progress.loaded) && Number.isFinite(progress.total) && (progress.total ?? 0) > 0) {
-      emitProgress(((progress.loaded ?? 0) / (progress.total ?? 1)) * 100);
+    if (
+      Number.isFinite(progress.loaded) &&
+      Number.isFinite(progress.total) &&
+      (progress.total ?? 0) > 0
+    ) {
+      emitProgress(((progress.loaded ?? 0) / (progress.total ?? 1)) * 100, {
+        loadedBytes: Math.max(0, progress.loaded ?? 0),
+        totalBytes: Math.max(1, progress.total ?? 1),
+      });
     }
   };
 
@@ -209,7 +232,10 @@ class BrowserBonsaiImageRuntime implements BonsaiImageRuntime {
 
   constructor(private readonly options: BrowserBonsaiImageRuntimeOptions = {}) {}
 
-  async preload(modelId: string, options?: { onProgress?: (progress: number) => void }): Promise<void> {
+  async preload(
+    modelId: string,
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
+  ): Promise<void> {
     await this.loadPipeline(modelId, options?.onProgress ? { onProgress: options.onProgress } : {});
   }
 
@@ -234,10 +260,14 @@ class BrowserBonsaiImageRuntime implements BonsaiImageRuntime {
 
   private async loadPipeline(
     modelId: string,
-    options: { onProgress?: (progress: number) => void } = {},
+    options: {
+      onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void;
+    } = {},
   ): Promise<BonsaiPipeline> {
     this.pipelinePromise ??= this.importRuntimeModule().then(async (module) => {
-      const progressReporter = options.onProgress ? createBonsaiRuntimeProgressController(options.onProgress) : undefined;
+      const progressReporter = options.onProgress
+        ? createBonsaiRuntimeProgressController(options.onProgress)
+        : undefined;
       const preloadOptions: {
         cacheName: string;
         onProgress?: (progress: BonsaiRuntimeProgress) => void;
@@ -275,7 +305,10 @@ class WorkerBackedBonsaiImageRuntime implements BonsaiImageRuntime {
 
   constructor(private readonly options: WorkerBackedBonsaiImageRuntimeOptions = {}) {}
 
-  preload(modelId: string, options?: { onProgress?: (progress: number) => void }): Promise<void> {
+  preload(
+    modelId: string,
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
+  ): Promise<void> {
     if (this.fallbackRuntime) return this.fallbackRuntime.preload(modelId, options);
     return this.request(
       {
@@ -352,7 +385,7 @@ class WorkerBackedBonsaiImageRuntime implements BonsaiImageRuntime {
     const pending = this.pendingRequests.get(response.id);
     if (!pending) return;
     if (response.type === 'progress') {
-      pending.onLoadProgress?.(response.progress);
+      pending.onLoadProgress?.(response.progress, response.details);
       return;
     }
     if (response.type === 'step') {
@@ -380,10 +413,12 @@ class WorkerBackedBonsaiImageRuntime implements BonsaiImageRuntime {
   ): Promise<Blob | undefined> {
     const fallback = this.getFallbackRuntime();
     if (request.type === 'preload') {
-      return fallback.preload(
-        request.modelId,
-        handlers.onLoadProgress ? { onProgress: handlers.onLoadProgress } : undefined,
-      ).then(() => undefined);
+      return fallback
+        .preload(
+          request.modelId,
+          handlers.onLoadProgress ? { onProgress: handlers.onLoadProgress } : undefined,
+        )
+        .then(() => undefined);
     }
     return fallback.generate({
       ...request.options,

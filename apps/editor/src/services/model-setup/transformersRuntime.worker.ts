@@ -1,10 +1,31 @@
 import { transformersOperations } from './transformersOperations';
-import type { TransformersWorkerRequest, TransformersWorkerResponse } from './transformersRuntimeClient';
+import type {
+  TransformersWorkerRequest,
+  TransformersWorkerResponse,
+} from './transformersRuntimeClient';
 
 const operations = new transformersOperations.DirectTransformersOperations();
 
 function postResponse(response: TransformersWorkerResponse) {
   self.postMessage(response);
+}
+
+type TransformersProgressDetails = Extract<
+  TransformersWorkerResponse,
+  { type: 'progress' }
+>['details'];
+
+function postProgress(
+  id: string,
+  progress: number,
+  details: TransformersProgressDetails | undefined,
+) {
+  postResponse({
+    ...(details ? { details } : {}),
+    id,
+    progress,
+    type: 'progress',
+  });
 }
 
 self.onmessage = (event: MessageEvent<TransformersWorkerRequest>) => {
@@ -16,14 +37,18 @@ async function handleRequest(request: TransformersWorkerRequest) {
   try {
     if (request.type === 'preload-text-generation') {
       await operations.preloadTextGeneration(request.modelId, {
-        onProgress: (progress) => postResponse({ id: request.id, progress, type: 'progress' }),
+        onProgress: (progress, details) => postProgress(request.id, progress, details),
       });
       postResponse({ id: request.id, type: 'result' });
       return;
     }
 
     if (request.type === 'generate-text') {
-      const result = await operations.generateText(request.modelId, request.prompt, request.options);
+      const result = await operations.generateText(
+        request.modelId,
+        request.prompt,
+        request.options,
+      );
       postResponse({ id: request.id, result, type: 'result' });
       return;
     }
@@ -42,7 +67,7 @@ async function handleRequest(request: TransformersWorkerRequest) {
 
     if (request.type === 'preload-language-detection') {
       await operations.preloadLanguageDetection(request.modelId, {
-        onProgress: (progress) => postResponse({ id: request.id, progress, type: 'progress' }),
+        onProgress: (progress, details) => postProgress(request.id, progress, details),
       });
       postResponse({ id: request.id, type: 'result' });
       return;

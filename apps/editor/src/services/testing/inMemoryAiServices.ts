@@ -4,6 +4,7 @@ import type {
   ImageGenerationOptions,
   ImageGenerationService,
   MagicEraserService,
+  ModelDownloadProgressDetails,
   PaletteService,
   SmartGrabService,
   TranslatorService,
@@ -21,7 +22,7 @@ class MockTranslatorService implements TranslatorService {
   prepareTranslation(
     sourceLanguage: string,
     targetLanguage: string,
-    options?: { onProgress?: (progress: number) => void },
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
   ): Promise<void> {
     void sourceLanguage;
     void targetLanguage;
@@ -47,7 +48,12 @@ class MockImageGenerationService implements ImageGenerationService {
   generateImage(prompt: string, options?: ImageGenerationOptions): Promise<Asset> {
     void options;
     const safeName = prompt.trim() || 'Generated image';
-    const safeId = safeName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32) || 'image';
+    const safeId =
+      safeName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 32) || 'image';
     return Promise.resolve({
       id: `asset-generated-${safeId}`,
       type: 'image',

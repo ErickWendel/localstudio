@@ -1,3 +1,4 @@
+import type { ModelDownloadProgressDetails } from '../contracts/interfaces';
 import type {
   BackgroundSegmentationResult,
   LanguageDetectionResult,
@@ -53,6 +54,7 @@ export type TransformersWorkerRequest =
 
 export type TransformersWorkerResponse =
   | {
+      details?: ModelDownloadProgressDetails;
       id: string;
       progress: number;
       type: 'progress';
@@ -69,9 +71,11 @@ export type TransformersWorkerResponse =
     };
 
 interface PendingTransformersRequest {
-  onProgress?: ((progress: number) => void) | undefined;
+  onProgress?: ((progress: number, details?: ModelDownloadProgressDetails) => void) | undefined;
   reject: (error: Error) => void;
-  resolve: (result: BackgroundSegmentationResult | LanguageDetectionResult | string | undefined) => void;
+  resolve: (
+    result: BackgroundSegmentationResult | LanguageDetectionResult | string | undefined,
+  ) => void;
 }
 
 interface TransformersRuntimeClientOptions {
@@ -81,14 +85,32 @@ interface TransformersRuntimeClientOptions {
 
 interface TransformersOperationsFallback {
   detectLanguage(modelId: string, text: string): Promise<LanguageDetectionResult>;
-  generateText(modelId: string, prompt: TextGenerationInput, options?: TextGenerationOptions): Promise<string>;
-  preloadImageEditing(options?: { onProgress?: (progress: number) => void }): Promise<void>;
-  preloadLanguageDetection(modelId: string, options?: { onProgress?: (progress: number) => void }): Promise<void>;
-  preloadTextGeneration(modelId: string, options?: { onProgress?: (progress: number) => void }): Promise<void>;
-  prepareBackgroundRemoval(objectUrl: string, options?: { onProgress?: (progress: number) => void }): Promise<void>;
+  generateText(
+    modelId: string,
+    prompt: TextGenerationInput,
+    options?: TextGenerationOptions,
+  ): Promise<string>;
+  preloadImageEditing(options?: {
+    onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void;
+  }): Promise<void>;
+  preloadLanguageDetection(
+    modelId: string,
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
+  ): Promise<void>;
+  preloadTextGeneration(
+    modelId: string,
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
+  ): Promise<void>;
+  prepareBackgroundRemoval(
+    objectUrl: string,
+    options?: { onProgress?: (progress: number) => void },
+  ): Promise<void>;
   releaseTextGeneration(modelId: string): Promise<void>;
   removeTextGeneration(modelId: string): Promise<void>;
-  segmentBackgroundRemoval(objectUrl: string, points: SegmentationPoint[]): Promise<BackgroundSegmentationResult>;
+  segmentBackgroundRemoval(
+    objectUrl: string,
+    points: SegmentationPoint[],
+  ): Promise<BackgroundSegmentationResult>;
 }
 
 export class TransformersRuntimeClient {
@@ -98,7 +120,10 @@ export class TransformersRuntimeClient {
 
   constructor(private readonly options: TransformersRuntimeClientOptions = {}) {}
 
-  preloadTextGeneration(modelId: string, options?: { onProgress?: (progress: number) => void }) {
+  preloadTextGeneration(
+    modelId: string,
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
+  ) {
     return this.request(
       {
         id: createRequestId(),
@@ -109,7 +134,11 @@ export class TransformersRuntimeClient {
     ).then(() => undefined);
   }
 
-  async generateText(modelId: string, prompt: TextGenerationInput, options?: TextGenerationOptions) {
+  async generateText(
+    modelId: string,
+    prompt: TextGenerationInput,
+    options?: TextGenerationOptions,
+  ) {
     const result = await this.request({
       id: createRequestId(),
       modelId,
@@ -117,7 +146,8 @@ export class TransformersRuntimeClient {
       type: 'generate-text',
       ...(options ? { options } : {}),
     });
-    if (typeof result !== 'string') throw new Error('Transformers text worker did not return text.');
+    if (typeof result !== 'string')
+      throw new Error('Transformers text worker did not return text.');
     return result;
   }
 
@@ -137,7 +167,10 @@ export class TransformersRuntimeClient {
     }).then(() => undefined);
   }
 
-  preloadLanguageDetection(modelId: string, options?: { onProgress?: (progress: number) => void }) {
+  preloadLanguageDetection(
+    modelId: string,
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
+  ) {
     return this.request(
       {
         id: createRequestId(),
@@ -161,7 +194,9 @@ export class TransformersRuntimeClient {
     return result;
   }
 
-  preloadImageEditing(options?: { onProgress?: (progress: number) => void }) {
+  preloadImageEditing(options?: {
+    onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void;
+  }) {
     return this.request(
       {
         id: createRequestId(),
@@ -171,7 +206,10 @@ export class TransformersRuntimeClient {
     ).then(() => undefined);
   }
 
-  prepareBackgroundRemoval(objectUrl: string, options?: { onProgress?: (progress: number) => void }) {
+  prepareBackgroundRemoval(
+    objectUrl: string,
+    options?: { onProgress?: (progress: number) => void },
+  ) {
     return this.request(
       {
         id: createRequestId(),
@@ -195,18 +233,23 @@ export class TransformersRuntimeClient {
     return result;
   }
 
-  private request(request: TransformersWorkerRequest, options?: { onProgress?: (progress: number) => void }) {
+  private request(
+    request: TransformersWorkerRequest,
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
+  ) {
     const worker = this.getWorker();
     if (!worker) return this.executeFallbackRequest(request, options);
 
-    return new Promise<BackgroundSegmentationResult | LanguageDetectionResult | string | undefined>((resolve, reject) => {
-      this.pendingRequests.set(request.id, {
-        onProgress: options?.onProgress,
-        reject,
-        resolve,
-      });
-      worker.postMessage(request);
-    });
+    return new Promise<BackgroundSegmentationResult | LanguageDetectionResult | string | undefined>(
+      (resolve, reject) => {
+        this.pendingRequests.set(request.id, {
+          onProgress: options?.onProgress,
+          reject,
+          resolve,
+        });
+        worker.postMessage(request);
+      },
+    );
   }
 
   private getWorker() {
@@ -240,7 +283,7 @@ export class TransformersRuntimeClient {
     const pending = this.pendingRequests.get(response.id);
     if (!pending) return;
     if (response.type === 'progress') {
-      pending.onProgress?.(response.progress);
+      pending.onProgress?.(response.progress, response.details);
       return;
     }
     this.pendingRequests.delete(response.id);
@@ -260,7 +303,7 @@ export class TransformersRuntimeClient {
 
   private executeFallbackRequest(
     request: TransformersWorkerRequest,
-    options?: { onProgress?: (progress: number) => void },
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
   ) {
     const operations = this.getFallbackOperations();
     switch (request.type) {
@@ -279,7 +322,9 @@ export class TransformersRuntimeClient {
       case 'preload-image-editing':
         return operations.preloadImageEditing(options).then(() => undefined);
       case 'prepare-background-removal':
-        return operations.prepareBackgroundRemoval(request.objectUrl, options).then(() => undefined);
+        return operations
+          .prepareBackgroundRemoval(request.objectUrl, options)
+          .then(() => undefined);
       case 'segment-background-removal':
         return operations.segmentBackgroundRemoval(request.objectUrl, request.points);
     }
@@ -303,17 +348,14 @@ function createDefaultTransformersWorker() {
 function isLanguageDetectionResult(value: unknown): value is LanguageDetectionResult {
   return Boolean(
     value &&
-      typeof value === 'object' &&
-      'language' in value &&
-      typeof (value as { language?: unknown }).language === 'string',
+    typeof value === 'object' &&
+    'language' in value &&
+    typeof (value as { language?: unknown }).language === 'string',
   );
 }
 
 function isBackgroundSegmentationResult(value: unknown): value is BackgroundSegmentationResult {
   return Boolean(
-    value &&
-      typeof value === 'object' &&
-      'imageInput' in value &&
-      'subjectMask' in value,
+    value && typeof value === 'object' && 'imageInput' in value && 'subjectMask' in value,
   );
 }

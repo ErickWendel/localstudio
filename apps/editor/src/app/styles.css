@@ -4177,6 +4177,33 @@ button {
   color: var(--ew-muted);
   font-size: 10px;
   text-transform: uppercase;
+  gap: 8px;
+}
+
+.download-progress-copy {
+  display: inline-flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  line-height: 1.25;
+  text-align: right;
+  text-transform: none;
+}
+
+.download-progress-primary {
+  max-width: 100%;
+  color: var(--ew-text);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.download-progress-secondary {
+  color: var(--ew-muted);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 .model-progress {
