@@ -2029,10 +2029,19 @@ describe('EditorShell', () => {
     expect(screen.getByRole('button', { name: 'BG Remover' })).toBeInTheDocument();
   });
 
-  it('keeps Share disabled until the MinIO mirror is synced', () => {
+  it('opens Share before MinIO is synced and disables only public link creation', async () => {
+    const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
 
-    expect(screen.getByRole('button', { name: 'Share' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Share' }));
+
+    expect(screen.getByRole('heading', { name: 'Share design' })).toBeInTheDocument();
+    expect(
+      screen.getByText('Public links cannot be created without remote storage.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy link' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Download' })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Present' })).not.toBeDisabled();
   });
 
   it('exports the current slide as a PNG file', async () => {

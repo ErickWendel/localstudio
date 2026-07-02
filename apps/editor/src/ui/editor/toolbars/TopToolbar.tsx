@@ -12,8 +12,6 @@ interface TopToolbarProps {
   hasSelection?: boolean;
   persistenceEnabled?: boolean;
   persistenceAvailable?: boolean;
-  publicSharingAvailable?: boolean;
-  publicSharingUnavailableReason?: string;
   lastEditedAt?: string | undefined;
   mirrorState?: MirrorState;
   mirrorDisabledBySettings?: boolean;
@@ -115,8 +113,6 @@ export function TopToolbar({
   hasSelection = false,
   persistenceEnabled = false,
   persistenceAvailable = true,
-  publicSharingAvailable = true,
-  publicSharingUnavailableReason = 'Public sharing requires active external storage.',
   lastEditedAt,
   mirrorState = { enabled: false, status: 'disabled' },
   mirrorDisabledBySettings = false,
@@ -163,7 +159,6 @@ export function TopToolbar({
   }, [isEditingProjectName]);
 
   function triggerShare() {
-    if (!publicSharingAvailable) return;
     onShare?.();
   }
 
@@ -193,7 +188,7 @@ export function TopToolbar({
       { label: 'New Project', disabled: !onNewProject, onSelect: onNewProject },
       { label: 'Import Project', disabled: !onImportProject, onSelect: onImportProject },
       { label: 'Import Remote', disabled: !onImportRemoteMirror, onSelect: onImportRemoteMirror },
-      { label: 'Share', disabled: !publicSharingAvailable, onSelect: triggerShare },
+      { label: 'Share', disabled: !onShare, onSelect: triggerShare },
       { kind: 'separator', label: 'File storage actions' },
       { label: 'Save', disabled: !onSaveLocal, onSelect: onSaveLocal },
       { label: 'Save As...', disabled: !onSaveLocalAs, onSelect: onSaveLocalAs },
@@ -280,7 +275,7 @@ export function TopToolbar({
   ]
     .filter(Boolean)
     .join(' ');
-  const shareTitle = publicSharingAvailable ? 'Share' : publicSharingUnavailableReason;
+  const shareTitle = 'Share';
 
   return (
     <header className="top-toolbar">
@@ -544,7 +539,7 @@ export function TopToolbar({
         </a>
         <button
           className="export-button font-orbitron"
-          disabled={!publicSharingAvailable}
+          disabled={!onShare}
           title={shareTitle}
           type="button"
           onClick={triggerShare}

@@ -45,6 +45,38 @@ describe('SharePanel', () => {
     expect(screen.getByRole('button', { name: 'Embed code' })).toBeDisabled();
   });
 
+  it('disables only public link creation when remote storage is unavailable', async () => {
+    const user = userEvent.setup();
+    const onCopyLink = vi.fn();
+    const onDownload = vi.fn();
+    const onPresent = vi.fn();
+    const message = 'Public links cannot be created without remote storage.';
+
+    render(
+      <SharePanel
+        projectName="Untitled AI Deck"
+        publicLinkUnavailableReason={message}
+        onClose={vi.fn()}
+        onCopyLink={onCopyLink}
+        onDownload={onDownload}
+        onPresent={onPresent}
+      />,
+    );
+
+    expect(screen.getByText(message)).toBeInTheDocument();
+    const copyButton = screen.getByRole('button', { name: 'Copy link' });
+    expect(copyButton).toBeDisabled();
+    expect(copyButton).toHaveAttribute('title', message);
+    expect(copyButton).toHaveAttribute('data-loading', 'false');
+
+    await user.click(screen.getByRole('button', { name: 'Download' }));
+    await user.click(screen.getByRole('button', { name: 'Present' }));
+
+    expect(onCopyLink).not.toHaveBeenCalled();
+    expect(onDownload).toHaveBeenCalledTimes(1);
+    expect(onPresent).toHaveBeenCalledTimes(1);
+  });
+
   it('creates a share and copies the public URL', async () => {
     const user = userEvent.setup();
     const onCopyLink = vi.fn().mockResolvedValue(createShareMetadata({ status: 'copied' }));

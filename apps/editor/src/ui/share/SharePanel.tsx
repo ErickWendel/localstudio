@@ -4,6 +4,7 @@ import type { ShareMetadata } from '../../services/contracts/interfaces';
 interface SharePanelProps {
   projectName: string;
   share?: ShareMetadata | undefined;
+  publicLinkUnavailableReason?: string | undefined;
   onClose: () => void;
   onCopyLink: () => Promise<ShareMetadata>;
   onDownload: () => void;
@@ -22,6 +23,7 @@ function getStatusLabel(share: ShareMetadata | undefined, isCopying: boolean) {
 export function SharePanel({
   projectName,
   share,
+  publicLinkUnavailableReason,
   onClose,
   onCopyLink,
   onDownload,
@@ -30,9 +32,17 @@ export function SharePanel({
   const [currentShare, setCurrentShare] = useState<ShareMetadata | undefined>(share);
   const [isCopying, setIsCopying] = useState(false);
   const [copyError, setCopyError] = useState<string | undefined>();
+  const publicLinkUnavailable = Boolean(publicLinkUnavailableReason);
   const statusLabel = getStatusLabel(currentShare, isCopying);
+  const shareAccessDescription =
+    copyError ??
+    publicLinkUnavailableReason ??
+    (currentShare
+      ? 'Unlisted: anyone with the link can view.'
+      : 'Create a public view link for this deck.');
 
   async function handleCopyLink() {
+    if (publicLinkUnavailable) return;
     setIsCopying(true);
     setCopyError(undefined);
     try {
@@ -66,18 +76,15 @@ export function SharePanel({
 
       <section className="share-access-block" aria-label="Share access">
         <span className="share-status-pill">{copyError ? 'Share failed' : statusLabel}</span>
-        <p>
-          {copyError ??
-            (currentShare
-              ? 'Unlisted: anyone with the link can view.'
-              : 'Create a public view link for this deck.')}
-        </p>
+        <p>{shareAccessDescription}</p>
       </section>
 
       <button
         className="share-copy-link-button font-orbitron"
         type="button"
-        disabled={isCopying}
+        data-loading={isCopying ? 'true' : 'false'}
+        disabled={isCopying || publicLinkUnavailable}
+        title={publicLinkUnavailableReason}
         onClick={() => {
           void handleCopyLink();
         }}
