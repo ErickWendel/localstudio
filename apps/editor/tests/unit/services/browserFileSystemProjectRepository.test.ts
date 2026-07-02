@@ -164,8 +164,8 @@ describe('BrowserFileSystemProjectRepository', () => {
     const secondParentDirectory = new MockDirectoryHandle('Second Projects');
     const pickDirectory = vi
       .fn()
-      .mockResolvedValueOnce(firstParentDirectory as unknown as FileSystemDirectoryHandle)
-      .mockResolvedValueOnce(secondParentDirectory as unknown as FileSystemDirectoryHandle);
+      .mockResolvedValueOnce(firstParentDirectory)
+      .mockResolvedValueOnce(secondParentDirectory);
     const repository = new BrowserFileSystemProjectRepository({
       pickDirectory,
       recentProjectStore: new MemoryRecentProjectHandleStore(),

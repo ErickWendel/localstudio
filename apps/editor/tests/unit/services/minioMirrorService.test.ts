@@ -3,7 +3,10 @@ import type { ProjectDocument } from '../../../src/domain/documents/model';
 import { sampleProject } from '../../../src/domain/projects/sampleProject';
 import { minioMirrorService } from '../../../src/services/mirror/minioMirrorService';
 import type { MinioMirrorConfig } from '../../../src/services/mirror/minioMirrorService';
-import type { ProjectRepository, VersionHistoryEntry } from '../../../src/services/contracts/interfaces';
+import type {
+  ProjectRepository,
+  VersionHistoryEntry,
+} from '../../../src/services/contracts/interfaces';
 
 const config: MinioMirrorConfig = {
   accessKey: 'localstudio',
@@ -118,11 +121,9 @@ describe('minioMirrorService.MinioMirrorService', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     try {
-      await new minioMirrorService.MinioMirrorService({ now: () => new Date('2026-06-30T10:00:00.000Z') }).syncProject(
-        project,
-        new VersionedRepository([], project),
-        config,
-      );
+      await new minioMirrorService.MinioMirrorService({
+        now: () => new Date('2026-06-30T10:00:00.000Z'),
+      }).syncProject(project, new VersionedRepository([], project), config);
     } finally {
       vi.stubGlobal('fetch', originalFetch);
     }
@@ -174,6 +175,100 @@ describe('minioMirrorService.MinioMirrorService', () => {
       .map(([input]) => getRequestUrl(input));
     expect(putUrls.some((url) => url.endsWith('/project.json'))).toBe(false);
     expect(putUrls.some((url) => url.endsWith('/localstudio-mirror.json'))).toBe(true);
+  });
+
+  it('deletes every object under a mirrored project prefix', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = getRequestUrl(input);
+      if (init?.method === 'GET' && url.includes('list-type=2')) {
+        return Promise.resolve(
+          new Response(
+            `<ListBucketResult>
+              <Contents><Key>mirrors/Client Launch/project.json</Key></Contents>
+              <Contents><Key>mirrors/Client Launch/localstudio-mirror.json</Key></Contents>
+            </ListBucketResult>`,
+            { status: 200 },
+          ),
+        );
+      }
+      if (init?.method === 'DELETE') {
+        return Promise.resolve(new Response(null, { status: 204 }));
+      }
+      return Promise.resolve(new Response('', { status: 404 }));
+    });
+    const service = new minioMirrorService.MinioMirrorService({ fetch: fetchMock });
+
+    await service.deleteProject('Client Launch', config);
+
+    const deleteUrls = fetchMock.mock.calls
+      .filter(([, init]) => init?.method === 'DELETE')
+      .map(([input]) => getRequestUrl(input));
+    expect(deleteUrls).toHaveLength(2);
+    expect(deleteUrls.some((url) => url.endsWith('/mirrors/Client%20Launch/project.json'))).toBe(
+      true,
+    );
+    expect(
+      deleteUrls.some((url) => url.endsWith('/mirrors/Client%20Launch/localstudio-mirror.json')),
+    ).toBe(true);
+  });
+
+  it('deletes mirrored project objects across paginated listings', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = getRequestUrl(input);
+      if (
+        init?.method === 'GET' &&
+        url.includes('list-type=2') &&
+        !url.includes('continuation-token=')
+      ) {
+        return Promise.resolve(
+          new Response(
+            `<ListBucketResult>
+              <IsTruncated>true</IsTruncated>
+              <NextContinuationToken>page-2</NextContinuationToken>
+              <Contents><Key>mirrors/Client Launch/project.json</Key></Contents>
+            </ListBucketResult>`,
+            { status: 200 },
+          ),
+        );
+      }
+      if (
+        init?.method === 'GET' &&
+        url.includes('list-type=2') &&
+        url.includes('continuation-token=page-2')
+      ) {
+        return Promise.resolve(
+          new Response(
+            `<ListBucketResult>
+              <IsTruncated>false</IsTruncated>
+              <Contents><Key>mirrors/Client Launch/localstudio-mirror.json</Key></Contents>
+            </ListBucketResult>`,
+            { status: 200 },
+          ),
+        );
+      }
+      if (init?.method === 'DELETE') {
+        return Promise.resolve(new Response(null, { status: 204 }));
+      }
+      return Promise.resolve(new Response('', { status: 404 }));
+    });
+    const service = new minioMirrorService.MinioMirrorService({ fetch: fetchMock });
+
+    await service.deleteProject('Client Launch', config);
+
+    const listUrls = fetchMock.mock.calls
+      .filter(([, init]) => init?.method === 'GET')
+      .map(([input]) => getRequestUrl(input));
+    const deleteUrls = fetchMock.mock.calls
+      .filter(([, init]) => init?.method === 'DELETE')
+      .map(([input]) => getRequestUrl(input));
+    expect(listUrls).toHaveLength(2);
+    expect(deleteUrls).toHaveLength(2);
+    expect(deleteUrls.some((url) => url.endsWith('/mirrors/Client%20Launch/project.json'))).toBe(
+      true,
+    );
+    expect(
+      deleteUrls.some((url) => url.endsWith('/mirrors/Client%20Launch/localstudio-mirror.json')),
+    ).toBe(true);
   });
 
   it('stores mirrored objects under the readable project name prefix', async () => {
