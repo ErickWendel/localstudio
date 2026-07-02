@@ -115,13 +115,37 @@ describe('TopToolbar', () => {
     expect(persistenceButton).toBeDisabled();
     expect(persistenceButton).toHaveAttribute(
       'title',
-      'Local project persistence is not available in this browser. Use a browser with File System Access support.',
+      'Local project persistence is not available in this browser.',
     );
     expect(persistenceButton).toHaveTextContent('×');
 
     await user.click(screen.getByRole('button', { name: 'File' }));
     expect(screen.queryByRole('menuitem', { name: 'Save Local' })).not.toBeInTheDocument();
     expect(onPersistenceToggle).not.toHaveBeenCalled();
+  });
+
+  it('labels OPFS persistence as browser storage', async () => {
+    const user = userEvent.setup();
+    const onPersistenceToggle = vi.fn();
+
+    render(
+      <TopToolbar
+        project={sampleProject.createSampleProject()}
+        language="PT-BR"
+        persistenceMode="opfs"
+        onPersistenceToggle={onPersistenceToggle}
+      />,
+    );
+
+    const persistenceButton = screen.getByRole('button', { name: 'Browser storage disabled' });
+    expect(persistenceButton).toHaveAttribute(
+      'title',
+      'Save this deck in browser-private storage. Files are scoped to this browser profile and are not visible in Finder.',
+    );
+
+    await user.click(persistenceButton);
+
+    expect(onPersistenceToggle).toHaveBeenCalledWith(true);
   });
 
   it('shows mirror status beside persistence and syncs when clicked', async () => {

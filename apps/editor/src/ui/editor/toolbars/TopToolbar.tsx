@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ProjectDocument } from '../../../domain/documents/model';
-import type { MirrorState } from '../../../services/contracts/interfaces';
+import type { MirrorState, PersistenceStorageMode } from '../../../services/contracts/interfaces';
 
 interface TopToolbarProps {
   project: ProjectDocument;
@@ -12,6 +12,7 @@ interface TopToolbarProps {
   hasSelection?: boolean;
   persistenceEnabled?: boolean;
   persistenceAvailable?: boolean;
+  persistenceMode?: PersistenceStorageMode;
   lastEditedAt?: string | undefined;
   mirrorState?: MirrorState;
   mirrorDisabledBySettings?: boolean;
@@ -113,6 +114,7 @@ export function TopToolbar({
   hasSelection = false,
   persistenceEnabled = false,
   persistenceAvailable = true,
+  persistenceMode = persistenceAvailable ? 'directory' : 'none',
   lastEditedAt,
   mirrorState = { enabled: false, status: 'disabled' },
   mirrorDisabledBySettings = false,
@@ -234,14 +236,22 @@ export function TopToolbar({
     : 'No saved versions yet';
   const persistenceLabel = !persistenceAvailable
     ? 'Persistence unavailable'
+    : persistenceMode === 'opfs'
+      ? persistenceEnabled
+        ? 'Browser storage enabled'
+        : 'Browser storage disabled'
     : persistenceEnabled
       ? 'Persistence enabled'
       : 'Persistence disabled';
   const persistenceTitle = !persistenceAvailable
-    ? 'Local project persistence is not available in this browser. Use a browser with File System Access support.'
+    ? 'Local project persistence is not available in this browser.'
+    : persistenceMode === 'opfs'
+      ? persistenceEnabled
+        ? 'Browser-private project storage is enabled. Files are stored by this browser profile and are not visible in Finder.'
+        : 'Save this deck in browser-private storage. Files are scoped to this browser profile and are not visible in Finder.'
     : persistenceEnabled
-      ? 'Persistence enabled'
-      : 'Persistence disabled';
+      ? 'Local folder persistence is enabled'
+      : 'Save this deck to a local folder';
   const mirrorLabel = !persistenceEnabled
     ? 'Unsaved deck'
     : !mirrorState.enabled

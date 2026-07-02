@@ -9,6 +9,7 @@ import type {
   MirrorService,
   ModelSetupService,
   PaletteService,
+  PersistenceStorageMode,
   PromptService,
   ProjectRepository,
   SmartGrabService,
@@ -23,6 +24,7 @@ import { BrowserBackgroundRemovalService } from '../services/background-removal/
 import { BrowserImageGenerationService } from '../services/image-generation/browserImageGenerationService';
 import { BrowserFileSystemProjectRepository } from '../services/storage/browserFileSystemProjectRepository';
 import { DisabledProjectRepository } from '../services/storage/disabledProjectRepository';
+import { OpfsProjectRepository } from '../services/storage/opfsProjectRepository';
 import { localSetupService } from '../services/browser/localSetupService';
 import { modelSetupService } from '../services/model-setup/modelSetupService';
 import { BrowserShareService } from '../services/sharing/shareService';
@@ -36,6 +38,7 @@ export interface AppServices {
   skipStoredProjectLoad: boolean;
   storedProjectName?: string;
   persistenceAvailable: boolean;
+  persistenceMode: PersistenceStorageMode;
   projectRepository: ProjectRepository;
   exportService: ExportService;
   shareService: ShareService;
@@ -60,7 +63,8 @@ interface CreateAppServicesOptions {
 export function createAppServices(options: CreateAppServicesOptions = {}): AppServices {
   const textGenerationRuntime = new webGpuTextGenerationRuntime.TransformersTextGenerationRuntime();
   const languageDetectionRuntime = new webGpuLanguageDetectionRuntime.TransformersLanguageDetectionRuntime();
-  const persistenceAvailable = isFileSystemAccessAvailable();
+  const persistenceMode = getPersistenceStorageMode();
+  const persistenceAvailable = persistenceMode !== 'none';
   const mirrorService = new minioMirrorService.MinioMirrorService();
   const browserModelSetupService = new modelSetupService.BrowserModelSetupService(
     undefined,
@@ -75,7 +79,8 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     skipStoredProjectLoad: options.skipStoredProjectLoad ?? false,
     ...(options.storedProjectName ? { storedProjectName: options.storedProjectName } : {}),
     persistenceAvailable,
-    projectRepository: createProjectRepository(persistenceAvailable),
+    persistenceMode,
+    projectRepository: createProjectRepository(persistenceMode),
     exportService: new BrowserExportService(),
     shareService: new BrowserShareService({ mirrorService }),
     localSetupService: new localSetupService.BrowserLocalSetupService(),
@@ -102,16 +107,32 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
   };
 }
 
-function isFileSystemAccessAvailable() {
-  return (
+function getPersistenceStorageMode(): PersistenceStorageMode {
+  if (
     typeof window !== 'undefined' &&
     typeof (window as Window & { showDirectoryPicker?: unknown }).showDirectoryPicker === 'function'
-  );
+  ) {
+    return 'directory';
+  }
+  if (
+    typeof navigator !== 'undefined' &&
+    typeof (
+      navigator as Navigator & {
+        storage?: StorageManager & { getDirectory?: unknown };
+      }
+    ).storage?.getDirectory === 'function'
+  ) {
+    return 'opfs';
+  }
+  return 'none';
 }
 
-function createProjectRepository(persistenceAvailable: boolean): ProjectRepository {
-  if (persistenceAvailable) {
+function createProjectRepository(persistenceMode: PersistenceStorageMode): ProjectRepository {
+  if (persistenceMode === 'directory') {
     return new BrowserFileSystemProjectRepository();
+  }
+  if (persistenceMode === 'opfs') {
+    return new OpfsProjectRepository();
   }
   return new DisabledProjectRepository();
 }
