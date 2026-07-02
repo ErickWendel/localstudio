@@ -150,6 +150,22 @@ function createBonsaiRuntimeProgressController(
     onProgress(nextProgress, details);
   };
 
+  const getCompleteComponentDetails = () => {
+    const expectedComponents = Object.keys(BONSAI_COMPONENT_TOTALS);
+    if (!expectedComponents.every((component) => componentProgress.has(component))) return undefined;
+
+    const loadedBytes = expectedComponents.reduce((sum, component) => {
+      const progress = componentProgress.get(component);
+      return sum + Math.min(progress?.loaded ?? 0, progress?.total ?? 0);
+    }, 0);
+    const totalBytes = expectedComponents.reduce((sum, component) => {
+      const progress = componentProgress.get(component);
+      return sum + (progress?.total ?? 0);
+    }, 0);
+
+    return totalBytes > 0 ? { loadedBytes, totalBytes } : undefined;
+  };
+
   const reportComponentProgress = () => {
     const total = Object.values(BONSAI_COMPONENT_TOTALS).reduce((sum, value) => sum + value, 0);
     const loaded = Object.entries(BONSAI_COMPONENT_TOTALS).reduce(
@@ -159,7 +175,7 @@ function createBonsaiRuntimeProgressController(
       },
       0,
     );
-    emitProgress((loaded / total) * 100, { loadedBytes: loaded, totalBytes: total });
+    emitProgress((loaded / total) * 100, getCompleteComponentDetails());
   };
 
   const reportRuntimeProgress = (progress: BonsaiRuntimeProgress) => {

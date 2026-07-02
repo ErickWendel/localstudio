@@ -42,6 +42,10 @@ export type TransformersWorkerRequest =
     }
   | {
       id: string;
+      type: 'remove-image-editing';
+    }
+  | {
+      id: string;
       objectUrl: string;
       type: 'prepare-background-removal';
     }
@@ -93,6 +97,7 @@ interface TransformersOperationsFallback {
   preloadImageEditing(options?: {
     onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void;
   }): Promise<void>;
+  removeImageEditing(): Promise<void>;
   preloadLanguageDetection(
     modelId: string,
     options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
@@ -204,6 +209,13 @@ export class TransformersRuntimeClient {
       },
       options,
     ).then(() => undefined);
+  }
+
+  removeImageEditing() {
+    return this.request({
+      id: createRequestId(),
+      type: 'remove-image-editing',
+    }).then(() => undefined);
   }
 
   prepareBackgroundRemoval(
@@ -321,6 +333,8 @@ export class TransformersRuntimeClient {
         return operations.detectLanguage(request.modelId, request.text);
       case 'preload-image-editing':
         return operations.preloadImageEditing(options).then(() => undefined);
+      case 'remove-image-editing':
+        return operations.removeImageEditing().then(() => undefined);
       case 'prepare-background-removal':
         return operations
           .prepareBackgroundRemoval(request.objectUrl, options)

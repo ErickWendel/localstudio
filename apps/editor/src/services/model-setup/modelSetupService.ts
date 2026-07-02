@@ -18,7 +18,10 @@ const IMAGE_EDITING_DISPLAY_NAME = 'SlimSAM 77M';
 const IMAGE_EDITING_READY_KEY = 'ew-canvas-ai.model.image-editing-models.ready';
 
 export interface ImageEditingModelLoader {
-  loadImageEditingModel(): Promise<void>;
+  loadImageEditingModel(options?: {
+    onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void;
+  }): Promise<void>;
+  removeImageEditingModel?(): Promise<void>;
 }
 
 export interface ImageGenerationModelLoader {
@@ -113,8 +116,14 @@ function getReadyKey(id: string) {
 class TransformersImageEditingModelLoader implements ImageEditingModelLoader {
   constructor(private readonly runtimeClient = new TransformersRuntimeClient()) {}
 
-  async loadImageEditingModel(): Promise<void> {
-    await this.runtimeClient.preloadImageEditing();
+  async loadImageEditingModel(options?: {
+    onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void;
+  }): Promise<void> {
+    await this.runtimeClient.preloadImageEditing(options);
+  }
+
+  async removeImageEditingModel(): Promise<void> {
+    await this.runtimeClient.removeImageEditing();
   }
 }
 
@@ -262,7 +271,9 @@ class BrowserModelSetupService implements ModelSetupService {
 
     try {
       if (id === IMAGE_EDITING_MODEL_ID) {
-        await this.imageEditingModelLoader.loadImageEditingModel();
+        await this.imageEditingModelLoader.loadImageEditingModel({
+          onProgress: reportProgress,
+        });
         this.storage?.setItem(IMAGE_EDITING_READY_KEY, 'true');
       }
       if (id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID) {
@@ -348,6 +359,7 @@ class BrowserModelSetupService implements ModelSetupService {
       );
     }
     if (id === IMAGE_EDITING_MODEL_ID) {
+      await this.imageEditingModelLoader.removeImageEditingModel?.();
       await this.modelCacheStorage.deleteModelArtifacts(IMAGE_EDITING_TRANSFORMERS_MODEL_ID);
     }
     if (id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID) {

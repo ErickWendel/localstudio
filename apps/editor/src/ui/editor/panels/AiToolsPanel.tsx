@@ -321,6 +321,7 @@ export function AiToolsPanel({
     selectedLanguageDetectionProvider.readiness === 'ready';
   const selectedTranslationCanRemove =
     selectedTranslationProvider?.modelId && selectedTranslationProvider.readiness === 'ready';
+  const shouldShowTranslationLanguageProgress = !selectedTranslationProvider?.modelId;
   const visibleModelStates = modelStates.filter(
     (model) =>
       model.id !== aiModelCatalog.GEMMA_LLM_MODEL_ID &&
@@ -619,20 +620,27 @@ export function AiToolsPanel({
                 className="translation-preparation"
                 aria-label="Translation language preparation"
               >
-                <div className="translation-preparation-meta">
-                  <StatusPill
-                    label={getPreparationLabel(translationProviderStatus)}
-                    tone={getPreparationTone(translationProviderStatus)}
-                  />
-                  <DownloadProgressCopy
-                    details={{ ...translationPreparation, progress: translationProviderProgress }}
-                    status={translationProviderStatus}
-                  />
-                </div>
-                {translationProviderStatus === 'downloading' ? (
-                  <div className="model-progress">
-                    <span style={{ width: `${translationProviderProgress}%` }} />
-                  </div>
+                {shouldShowTranslationLanguageProgress ? (
+                  <>
+                    <div className="translation-preparation-meta">
+                      <StatusPill
+                        label={getPreparationLabel(translationProviderStatus)}
+                        tone={getPreparationTone(translationProviderStatus)}
+                      />
+                      <DownloadProgressCopy
+                        details={{
+                          ...translationPreparation,
+                          progress: translationProviderProgress,
+                        }}
+                        status={translationProviderStatus}
+                      />
+                    </div>
+                    {translationProviderStatus === 'downloading' ? (
+                      <div className="model-progress">
+                        <span style={{ width: `${translationProviderProgress}%` }} />
+                      </div>
+                    ) : null}
+                  </>
                 ) : null}
                 {displayedSourceLanguage ? (
                   <span className="translation-source-note">

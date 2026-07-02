@@ -75,6 +75,7 @@ type TextClassificationPipeline = ((
 };
 
 interface SamRuntimeModel {
+  dispose?: () => Promise<void> | void;
   get_image_embeddings(image: SamProcessedImage): Promise<Record<string, unknown>>;
   (inputs: Record<string, unknown>): Promise<{
     pred_masks: unknown;
@@ -228,8 +229,10 @@ class DirectTransformersOperations {
     return extractDetectedLanguage(result);
   }
 
-  async preloadImageEditing(options?: { onProgress?: (progress: number) => void }) {
-    await this.loadBackgroundModel();
+  async preloadImageEditing(options?: {
+    onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void;
+  }) {
+    await this.loadBackgroundModel(options);
     options?.onProgress?.(100);
   }
 
@@ -280,6 +283,15 @@ class DirectTransformersOperations {
         score: scoreTotal / segmentations.length,
       },
     };
+  }
+
+  async removeImageEditing() {
+    const backgroundModelPromise = this.backgroundModelPromise;
+    this.backgroundModelPromise = null;
+    this.encodedAssets.clear();
+
+    const backgroundModel = await backgroundModelPromise?.catch(() => undefined);
+    await backgroundModel?.model.dispose?.();
   }
 
   private loadTextGenerationPipeline(
@@ -389,14 +401,19 @@ class DirectTransformersOperations {
     return { imageInput, imageProcessed, imageEmbeddings };
   }
 
-  private async loadBackgroundModel() {
-    this.backgroundModelPromise ??= this.createBackgroundModel();
+  private async loadBackgroundModel(options?: {
+    onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void;
+  }) {
+    this.backgroundModelPromise ??= this.createBackgroundModel(options);
     return this.backgroundModelPromise;
   }
 
-  private async createBackgroundModel() {
+  private async createBackgroundModel(options?: {
+    onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void;
+  }) {
     const { AutoProcessor, RawImage, SamModel, Tensor, env } =
       await import('@huggingface/transformers');
+    const progressCallback = progress.createTransformersProgressCallback(options?.onProgress);
 
     env.useBrowserCache = true;
     env.cacheKey = imageGenerationModel.TRANSFORMERS_CACHE_KEY;
@@ -405,8 +422,11 @@ class DirectTransformersOperations {
       SamModel.from_pretrained(IMAGE_EDITING_TRANSFORMERS_MODEL_ID, {
         dtype: 'fp16',
         device: 'webgpu',
+        progress_callback: progressCallback,
       }),
-      AutoProcessor.from_pretrained(IMAGE_EDITING_TRANSFORMERS_MODEL_ID),
+      AutoProcessor.from_pretrained(IMAGE_EDITING_TRANSFORMERS_MODEL_ID, {
+        progress_callback: progressCallback,
+      }),
     ]);
 
     return {

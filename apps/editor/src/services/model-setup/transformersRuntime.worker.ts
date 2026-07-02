@@ -81,8 +81,14 @@ async function handleRequest(request: TransformersWorkerRequest) {
 
     if (request.type === 'preload-image-editing') {
       await operations.preloadImageEditing({
-        onProgress: (progress) => postResponse({ id: request.id, progress, type: 'progress' }),
+        onProgress: (progress, details) => postProgress(request.id, progress, details),
       });
+      postResponse({ id: request.id, type: 'result' });
+      return;
+    }
+
+    if (request.type === 'remove-image-editing') {
+      await operations.removeImageEditing();
       postResponse({ id: request.id, type: 'result' });
       return;
     }

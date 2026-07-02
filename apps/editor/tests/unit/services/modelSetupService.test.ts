@@ -72,16 +72,32 @@ describe('modelSetupService.BrowserModelSetupService', () => {
   }
 
   it('downloads and marks the image editing model as browser cached', async () => {
-    const loadImageEditingModel = vi.fn().mockResolvedValue(undefined);
+    const loadImageEditingModel = vi.fn(
+      (options?: {
+        onProgress?: (
+          progress: number,
+          details?: { loadedBytes?: number; totalBytes?: number },
+        ) => void;
+      }) => {
+        options?.onProgress?.(64, {
+          loadedBytes: 120_000_000,
+          totalBytes: 190_000_000,
+        });
+        return Promise.resolve();
+      },
+    );
     const loader: ImageEditingModelLoader = {
       loadImageEditingModel,
     };
     const storage = createStorage();
     const service = new modelSetupService.BrowserModelSetupService(loader, storage);
 
-    const state = await service.downloadModel('image-editing-models');
+    const progressDetails: Array<ModelDownloadProgressDetails | undefined> = [];
+    const state = await service.downloadModel('image-editing-models', {
+      onProgress: (_value, details) => progressDetails.push(details),
+    });
 
-    expect(loadImageEditingModel).toHaveBeenCalledTimes(1);
+    expect(loadImageEditingModel).toHaveBeenCalledWith(expect.any(Object));
     expect(state).toMatchObject({ status: 'ready', progress: 100 });
     const states = await service.getModelStates();
     expect(states.find((item) => item.id === 'image-editing-models')).toMatchObject({
@@ -93,6 +109,10 @@ describe('modelSetupService.BrowserModelSetupService', () => {
     ).toMatchObject({
       status: 'needs-download',
       progress: 0,
+    });
+    expect(progressDetails[0]).toMatchObject({
+      loadedBytes: 120_000_000,
+      totalBytes: 190_000_000,
     });
   });
 
@@ -350,6 +370,29 @@ describe('modelSetupService.BrowserModelSetupService', () => {
     expect(deleteModelArtifacts).toHaveBeenCalledWith(
       'onnx-community/translategemma-text-4b-it-ONNX',
     );
+  });
+
+  it('releases image editing runtime state when removing the image editing model', async () => {
+    const removeImageEditingModel = vi.fn().mockResolvedValue(undefined);
+    const deleteModelArtifacts = vi.fn().mockResolvedValue(undefined);
+    const imageEditingLoader: ImageEditingModelLoader & {
+      removeImageEditingModel: () => Promise<void>;
+    } = {
+      loadImageEditingModel: vi.fn().mockResolvedValue(undefined),
+      removeImageEditingModel,
+    };
+    const service = new modelSetupService.BrowserModelSetupService(
+      imageEditingLoader,
+      createStorage({ 'ew-canvas-ai.model.image-editing-models.ready': 'true' }),
+      undefined,
+      undefined,
+      { deleteModelArtifacts },
+    );
+
+    await service.removeModel('image-editing-models');
+
+    expect(removeImageEditingModel).toHaveBeenCalledTimes(1);
+    expect(deleteModelArtifacts).toHaveBeenCalledWith('Xenova/slimsam-77-uniform');
   });
 
   it('removes matching Transformers.js cache entries for a model id', async () => {
