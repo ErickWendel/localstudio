@@ -168,6 +168,7 @@ export interface ModelSetupService {
 }
 
 export type SetupCapabilityStatus = 'unavailable' | 'needs-setup' | 'ready';
+export type PersistenceStorageMode = 'directory' | 'opfs' | 'none';
 
 export interface SetupCapabilityState {
   label: string;

@@ -15,6 +15,12 @@ type SetupWindow = Window &
     Translator?: TranslatorApi;
   };
 
+type SetupNavigator = Navigator & {
+  storage?: StorageManager & {
+    getDirectory?: unknown;
+  };
+};
+
 class BrowserLocalSetupService implements LocalSetupService {
   async checkReadiness(): Promise<LocalSetupState> {
     return {
@@ -41,10 +47,19 @@ class BrowserLocalSetupService implements LocalSetupService {
       };
     }
 
+    const browserNavigator = navigator as SetupNavigator;
+    if (typeof browserNavigator.storage?.getDirectory === 'function') {
+      return {
+        label: 'Project Files',
+        status: 'ready',
+        detail: 'Browser-private project storage is supported.',
+      };
+    }
+
     return {
       label: 'Project Files',
       status: 'unavailable',
-      detail: 'Chrome File System Access API is required.',
+      detail: 'Local project persistence is not available in this browser.',
     };
   }
 
