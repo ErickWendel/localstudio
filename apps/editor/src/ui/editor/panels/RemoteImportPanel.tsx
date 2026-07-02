@@ -1,13 +1,21 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { MirrorProjectSummary } from '../../../services/contracts/interfaces';
+import { IconButton } from '../../components/IconButton';
 
-export type RemoteImportStatus = 'loading' | 'ready' | 'empty' | 'importing' | 'failed';
+export type RemoteImportStatus =
+  | 'loading'
+  | 'ready'
+  | 'empty'
+  | 'importing'
+  | 'deleting'
+  | 'failed';
 
 interface RemoteImportPanelProps {
   error?: string | undefined;
   projects: MirrorProjectSummary[];
   status: RemoteImportStatus;
   onClose: () => void;
+  onDeleteProject?: (projectId: string) => void;
   onImportProject: (projectId: string) => void;
 }
 
@@ -25,10 +33,13 @@ export function RemoteImportPanel({
   projects,
   status,
   onClose,
+  onDeleteProject,
   onImportProject,
 }: RemoteImportPanelProps) {
   const panelRef = useRef<HTMLElement>(null);
-  const busy = status === 'loading' || status === 'importing';
+  const [deleteProjectId, setDeleteProjectId] = useState<string | undefined>();
+  const busy = status === 'loading' || status === 'importing' || status === 'deleting';
+  const deleteProject = projects.find((project) => project.id === deleteProjectId);
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -78,24 +89,71 @@ export function RemoteImportPanel({
       ) : null}
 
       {projects.length > 0 ? (
-        <div className="remote-import-list">
+        <div className="remote-import-list" role="list" aria-label="Remote mirrored projects">
           {projects.map((project) => (
-            <button
-              className="remote-import-row"
-              disabled={busy}
-              key={project.id}
-              type="button"
-              aria-label={`Import ${project.name}`}
-              onClick={() => onImportProject(project.id)}
-            >
-              <span className="material-symbols-outlined" aria-hidden="true">
-                cloud_download
-              </span>
-              <span>
-                <strong>{project.name}</strong>
-                <small>{formatSyncedAt(project.syncedAt)}</small>
-              </span>
-            </button>
+            <div className="remote-import-list-item" role="listitem" key={project.id}>
+              {deleteProject?.id === project.id ? (
+                <div
+                  className="remote-import-confirm"
+                  role="alertdialog"
+                  aria-label="Delete remote project"
+                >
+                  <p>
+                    Remove <strong>{deleteProject.name}</strong> from the remote mirror?
+                  </p>
+                  <div className="remote-import-confirm-actions">
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      disabled={busy}
+                      onClick={() => setDeleteProjectId(undefined)}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className="danger-button"
+                      type="button"
+                      disabled={busy}
+                      onClick={() => {
+                        onDeleteProject?.(deleteProject.id);
+                        setDeleteProjectId(undefined);
+                      }}
+                    >
+                      Delete remote project
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+              <div className="remote-import-row-shell">
+                <button
+                  className="remote-import-row"
+                  disabled={busy}
+                  type="button"
+                  aria-label={`Import ${project.name}`}
+                  onClick={() => onImportProject(project.id)}
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    cloud_download
+                  </span>
+                  <span>
+                    <strong>{project.name}</strong>
+                    <small>{formatSyncedAt(project.syncedAt)}</small>
+                  </span>
+                </button>
+                {onDeleteProject ? (
+                  <IconButton
+                    label={`Delete ${project.name} from remote`}
+                    disabled={busy}
+                    tone="danger"
+                    onClick={() => setDeleteProjectId(project.id)}
+                  >
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      close
+                    </span>
+                  </IconButton>
+                ) : null}
+              </div>
+            </div>
           ))}
         </div>
       ) : null}

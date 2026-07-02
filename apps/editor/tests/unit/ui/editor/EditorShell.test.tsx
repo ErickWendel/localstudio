@@ -17,7 +17,10 @@ import type {
   TranslatorService,
 } from '../../../../src/services/contracts/interfaces';
 import type { MinioMirrorConfig } from '../../../../src/services/mirror/minioMirrorService';
-import type { WebMcpDemoWindow, WebMcpTool } from '../../../../src/services/webmcp/webMcpToolAdapter';
+import type {
+  WebMcpDemoWindow,
+  WebMcpTool,
+} from '../../../../src/services/webmcp/webMcpToolAdapter';
 import { modelSetupService } from '../../../../src/services/model-setup/modelSetupService';
 import { EditorShell } from '../../../../src/ui/editor/shell/EditorShell';
 
@@ -156,6 +159,8 @@ class RecordingMirrorService implements MirrorService<MinioMirrorConfig> {
   listProjects = vi.fn((): Promise<MirrorProjectSummary[]> => Promise.resolve([]));
 
   downloadProject = vi.fn((): Promise<MirrorFile[]> => Promise.resolve([]));
+
+  deleteProject = vi.fn((): Promise<void> => Promise.resolve());
 }
 
 class RecordingShareService implements ShareService {
@@ -176,8 +181,9 @@ class RecordingShareService implements ShareService {
     return Promise.resolve(this.createMetadata(shareId, now));
   });
 
-  getShare = vi.fn((shareId: string): Promise<ShareRecord | null> =>
-    Promise.resolve(this.records.get(shareId) ?? null),
+  getShare = vi.fn(
+    (shareId: string): Promise<ShareRecord | null> =>
+      Promise.resolve(this.records.get(shareId) ?? null),
   );
 
   getPublicUrl(shareId: string): string {
@@ -383,17 +389,19 @@ async function selectImageLayer(user: ReturnType<typeof userEvent.setup>) {
 
 function mockVideoMetadataLoad() {
   const createElement = document.createElement.bind(document);
-  return vi.spyOn(document, 'createElement').mockImplementation((tagName: string, options?: ElementCreationOptions) => {
-    const element = createElement(tagName, options);
-    if (tagName.toLowerCase() === 'video') {
-      Object.defineProperty(element, 'videoWidth', { configurable: true, value: 1280 });
-      Object.defineProperty(element, 'videoHeight', { configurable: true, value: 720 });
-      queueMicrotask(() => {
-        element.dispatchEvent(new Event('loadedmetadata'));
-      });
-    }
-    return element;
-  });
+  return vi
+    .spyOn(document, 'createElement')
+    .mockImplementation((tagName: string, options?: ElementCreationOptions) => {
+      const element = createElement(tagName, options);
+      if (tagName.toLowerCase() === 'video') {
+        Object.defineProperty(element, 'videoWidth', { configurable: true, value: 1280 });
+        Object.defineProperty(element, 'videoHeight', { configurable: true, value: 720 });
+        queueMicrotask(() => {
+          element.dispatchEvent(new Event('loadedmetadata'));
+        });
+      }
+      return element;
+    });
 }
 
 describe('EditorShell', () => {
@@ -475,7 +483,10 @@ describe('EditorShell', () => {
     expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-selected-elements', '');
 
     await openLeftTab(user, 'Layout');
-    expect(screen.getByRole('button', { name: 'Selected Image' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Selected Image' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
   });
 
   it('inserts and selects a shape from the Elements panel', async () => {
@@ -497,7 +508,10 @@ describe('EditorShell', () => {
     expect(screen.getByLabelText('Selected shape fill mode')).toBeInTheDocument();
 
     await openLeftTab(user, 'Layout');
-    expect(screen.getByRole('button', { name: 'Background Shape' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Background Shape' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 
   it('switches to the layout panel from the header view menu', async () => {
@@ -551,9 +565,15 @@ describe('EditorShell', () => {
       'data-selected-elements',
       'image-hero,text-subtitle,text-title',
     );
-    expect(screen.getByRole('button', { name: 'Selected Image' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Selected Image' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
     expect(screen.getByRole('button', { name: 'Title' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Subtitle' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Subtitle' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 
   it('renames the project from the toolbar', async () => {
@@ -564,7 +584,9 @@ describe('EditorShell', () => {
     await user.clear(screen.getByRole('textbox', { name: 'Project name' }));
     await user.type(screen.getByRole('textbox', { name: 'Project name' }), 'Browser Deck{Enter}');
 
-    expect(screen.getByRole('button', { name: 'Edit project name Browser Deck' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Edit project name Browser Deck' }),
+    ).toBeInTheDocument();
   });
 
   it('toggles persistence from disabled to enabled', async () => {
@@ -580,11 +602,16 @@ describe('EditorShell', () => {
       'persistence',
     );
     await user.clear(screen.getByRole('textbox', { name: 'Project folder name' }));
-    await user.type(screen.getByRole('textbox', { name: 'Project folder name' }), 'Mirror Debug Deck');
+    await user.type(
+      screen.getByRole('textbox', { name: 'Project folder name' }),
+      'Mirror Debug Deck',
+    );
     await user.click(screen.getByRole('button', { name: 'Choose folder' }));
 
     expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Edit project name Mirror Debug Deck' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Edit project name Mirror Debug Deck' }),
+    ).toBeInTheDocument();
   });
 
   it('re-enables persistence without opening the folder setup again', async () => {
@@ -704,9 +731,11 @@ describe('EditorShell', () => {
     await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
     await user.click(screen.getByRole('button', { name: 'Choose folder' }));
     await user.click(screen.getByRole('button', { name: 'Mirror settings' }));
-    await user.click(within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('button', {
-      name: 'Mirror settings',
-    }));
+    await user.click(
+      within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('button', {
+        name: 'Mirror settings',
+      }),
+    );
     await user.click(screen.getByRole('button', { name: 'Save settings' }));
 
     await waitFor(() => {
@@ -730,9 +759,11 @@ describe('EditorShell', () => {
     await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
     await user.click(screen.getByRole('button', { name: 'Choose folder' }));
     await user.click(screen.getByRole('button', { name: 'Mirror settings' }));
-    await user.click(within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('button', {
-      name: 'Mirror settings',
-    }));
+    await user.click(
+      within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('button', {
+        name: 'Mirror settings',
+      }),
+    );
     await user.click(screen.getByRole('button', { name: 'Save settings' }));
     await waitFor(() => {
       expect(mirrorService.syncProject).toHaveBeenCalledTimes(1);
@@ -741,7 +772,10 @@ describe('EditorShell', () => {
 
     await user.click(screen.getByRole('button', { name: 'Edit project name Untitled AI Deck' }));
     await user.clear(screen.getByRole('textbox', { name: 'Project name' }));
-    await user.type(screen.getByRole('textbox', { name: 'Project name' }), 'Renamed Mirror Deck{Enter}');
+    await user.type(
+      screen.getByRole('textbox', { name: 'Project name' }),
+      'Renamed Mirror Deck{Enter}',
+    );
 
     await waitFor(
       () => {
@@ -753,6 +787,9 @@ describe('EditorShell', () => {
       },
       { timeout: 2000 },
     );
+    await waitFor(() => {
+      expect(mirrorService.deleteProject).toHaveBeenCalledWith('Untitled AI Deck', mirrorConfig);
+    });
   });
 
   it('toggles mirroring from the mirror status icon when a saved config is available', async () => {
@@ -849,13 +886,23 @@ describe('EditorShell', () => {
     services.projectRepository = repository;
     services.mirrorService = mirrorService;
     mirrorService.listProjects.mockResolvedValue([
-      { id: 'Remote Mirror Deck', name: 'Remote Mirror Deck', syncedAt: '2026-06-30T10:00:00.000Z' },
+      {
+        id: 'Remote Mirror Deck',
+        name: 'Remote Mirror Deck',
+        syncedAt: '2026-06-30T10:00:00.000Z',
+      },
     ]);
     mirrorService.downloadProject.mockResolvedValue([
       {
         path: 'project.json',
         blob: new Blob(
-          [JSON.stringify({ ...services.initialProject, id: 'remote-project', name: 'Remote Mirror Deck' })],
+          [
+            JSON.stringify({
+              ...services.initialProject,
+              id: 'remote-project',
+              name: 'Remote Mirror Deck',
+            }),
+          ],
           { type: 'application/json' },
         ),
       },
@@ -1019,7 +1066,10 @@ describe('EditorShell', () => {
     expect(screen.getByRole('button', { name: 'Insert Media' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Insert Text' }));
     await openLeftTab(user, 'Layout');
-    expect(screen.getByRole('button', { name: 'Add a heading' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Add a heading' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 
   it('duplicates the active slide with copied elements and remapped animations', async () => {
@@ -1028,7 +1078,13 @@ describe('EditorShell', () => {
     project.pages[0] = {
       ...project.pages[0]!,
       animationBuilds: [
-        { id: 'build-image-hero', elementId: 'image-hero', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+        {
+          id: 'build-image-hero',
+          elementId: 'image-hero',
+          effect: 'reveal',
+          trigger: 'on-click',
+          delayMs: 0,
+        },
       ],
     };
 
@@ -1042,7 +1098,10 @@ describe('EditorShell', () => {
     expect(screen.getByRole('button', { name: 'Insert Media' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Insert Text' }));
     await openLeftTab(user, 'Layout');
-    expect(screen.getByRole('button', { name: 'Add a heading' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Add a heading' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
     await openLeftTab(user, 'Animate');
     expect(screen.getByRole('listitem', { name: 'Build 1: Image' })).toBeInTheDocument();
   });
@@ -1054,7 +1113,13 @@ describe('EditorShell', () => {
       ...project.pages[0]!,
       transition: { effect: 'reveal', delayMs: 0 },
       animationBuilds: [
-        { id: 'build-image-hero', elementId: 'image-hero', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+        {
+          id: 'build-image-hero',
+          elementId: 'image-hero',
+          effect: 'reveal',
+          trigger: 'on-click',
+          delayMs: 0,
+        },
       ],
     };
 
@@ -1063,8 +1128,14 @@ describe('EditorShell', () => {
     await user.click(screen.getByRole('button', { name: 'Play presentation' }));
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview', 'playing');
-      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview-mode', 'presenter');
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-animation-preview',
+        'playing',
+      );
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-animation-preview-mode',
+        'presenter',
+      );
     });
     expect(screen.queryByLabelText('Animation build 1 for Image')).not.toBeInTheDocument();
   });
@@ -1075,7 +1146,13 @@ describe('EditorShell', () => {
     project.pages[0] = {
       ...project.pages[0]!,
       animationBuilds: [
-        { id: 'build-image-hero', elementId: 'image-hero', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+        {
+          id: 'build-image-hero',
+          elementId: 'image-hero',
+          effect: 'reveal',
+          trigger: 'on-click',
+          delayMs: 0,
+        },
       ],
     };
 
@@ -1085,8 +1162,14 @@ describe('EditorShell', () => {
     await user.click(screen.getByRole('button', { name: 'Play animation preview' }));
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview', 'playing');
-      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview-mode', 'editor');
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-animation-preview',
+        'playing',
+      );
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-animation-preview-mode',
+        'editor',
+      );
       expect(screen.getByText('Click the slide to play the next animation.')).toBeInTheDocument();
     });
   });
@@ -1098,7 +1181,13 @@ describe('EditorShell', () => {
       ...project.pages[0]!,
       transition: { effect: 'reveal', delayMs: 0 },
       animationBuilds: [
-        { id: 'build-image-hero', elementId: 'image-hero', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+        {
+          id: 'build-image-hero',
+          elementId: 'image-hero',
+          effect: 'reveal',
+          trigger: 'on-click',
+          delayMs: 0,
+        },
       ],
     };
 
@@ -1107,14 +1196,22 @@ describe('EditorShell', () => {
     await user.click(screen.getByRole('button', { name: 'Play presentation' }));
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview-waiting', 'true');
-      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview-mode', 'presenter');
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-animation-preview-waiting',
+        'true',
+      );
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-animation-preview-mode',
+        'presenter',
+      );
     });
 
     fireEvent.keyDown(window, { key: 'ArrowRight' });
 
     await waitFor(() => {
-      expect(screen.queryByText('Click the slide to play the next animation.')).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('Click the slide to play the next animation.'),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -1126,7 +1223,13 @@ describe('EditorShell', () => {
         ...project.pages[0]!,
         transition: { effect: 'reveal', delayMs: 0 },
         animationBuilds: [
-          { id: 'build-image-hero', elementId: 'image-hero', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+          {
+            id: 'build-image-hero',
+            elementId: 'image-hero',
+            effect: 'reveal',
+            trigger: 'on-click',
+            delayMs: 0,
+          },
         ],
       },
       {
@@ -1146,17 +1249,25 @@ describe('EditorShell', () => {
     await user.click(screen.getByRole('button', { name: 'Play presentation' }));
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview-waiting', 'true');
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-animation-preview-waiting',
+        'true',
+      );
     });
 
     fireEvent.keyDown(window, { key: 'ArrowRight' });
 
     await waitFor(() => {
-      expect(screen.queryByText('Click the slide to play the next animation.')).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('Click the slide to play the next animation.'),
+      ).not.toBeInTheDocument();
     });
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview-phase', 'complete');
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-animation-preview-phase',
+        'complete',
+      );
     });
 
     fireEvent.keyDown(window, { key: 'ArrowRight' });
@@ -1193,7 +1304,13 @@ describe('EditorShell', () => {
         ...project.pages[0]!,
         transition: { effect: 'reveal', delayMs: 0 },
         animationBuilds: [
-          { id: 'build-image-hero', elementId: 'image-hero', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+          {
+            id: 'build-image-hero',
+            elementId: 'image-hero',
+            effect: 'reveal',
+            trigger: 'on-click',
+            delayMs: 0,
+          },
         ],
       },
       {
@@ -1206,7 +1323,9 @@ describe('EditorShell', () => {
         animationBuilds: [],
       },
     ];
-    const { container } = render(<EditorShell services={createAppServices({ initialProject: project })} />);
+    const { container } = render(
+      <EditorShell services={createAppServices({ initialProject: project })} />,
+    );
 
     await user.click(screen.getByRole('button', { name: 'Play presentation' }));
 
@@ -1215,13 +1334,19 @@ describe('EditorShell', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview-waiting', 'true');
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-animation-preview-waiting',
+        'true',
+      );
     });
 
     fireEvent.mouseDown(container.querySelector('canvas')!);
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview-phase', 'complete');
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-animation-preview-phase',
+        'complete',
+      );
     });
 
     fireEvent.mouseDown(container.querySelector('canvas')!);
@@ -1261,7 +1386,10 @@ describe('EditorShell', () => {
 
     await waitFor(() => {
       expect(screen.getByText('2 / 2')).toBeInTheDocument();
-      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview-mode', 'presenter');
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-animation-preview-mode',
+        'presenter',
+      );
     });
 
     await user.click(screen.getByRole('button', { name: 'Presentation play options' }));
@@ -1269,7 +1397,10 @@ describe('EditorShell', () => {
 
     await waitFor(() => {
       expect(screen.getByText('1 / 2')).toBeInTheDocument();
-      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview-mode', 'presenter');
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-animation-preview-mode',
+        'presenter',
+      );
     });
   });
 
@@ -1293,7 +1424,13 @@ describe('EditorShell', () => {
       {
         ...project.pages[0]!,
         animationBuilds: [
-          { id: 'build-image-hero', elementId: 'image-hero', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+          {
+            id: 'build-image-hero',
+            elementId: 'image-hero',
+            effect: 'reveal',
+            trigger: 'on-click',
+            delayMs: 0,
+          },
         ],
       },
       {
@@ -1310,14 +1447,19 @@ describe('EditorShell', () => {
     render(<EditorShell services={createAppServices({ initialProject: project })} />);
 
     await selectImageLayer(user);
-    expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-selected-elements', 'image-hero');
+    expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+      'data-selected-elements',
+      'image-hero',
+    );
     expect(screen.getByRole('button', { name: 'Add page after Slide 1' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Play presentation' }));
 
     await waitFor(() => {
       expect(document.fullscreenElement).toBe(screen.getByLabelText('Canvas workspace'));
-      expect(screen.queryByRole('button', { name: 'Add page after Slide 1' })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Add page after Slide 1' }),
+      ).not.toBeInTheDocument();
     });
 
     fullscreenElement = null;
@@ -1325,7 +1467,10 @@ describe('EditorShell', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Add page after Slide 1' })).toBeInTheDocument();
-      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview', 'idle');
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-animation-preview',
+        'idle',
+      );
       expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-selected-elements', '');
     });
   });
@@ -1453,7 +1598,9 @@ describe('EditorShell', () => {
       'aria-pressed',
       'true',
     );
-    expect(screen.queryByRole('button', { name: 'stale-system-image.png' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'stale-system-image.png' }),
+    ).not.toBeInTheDocument();
   });
 
   it('imports a newer system image paste instead of an older editor object copy', async () => {
@@ -1508,16 +1655,17 @@ describe('EditorShell', () => {
 
     await user.click(screen.getByRole('button', { name: 'Insert Text' }));
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Add a heading' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: 'Add a heading' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
     });
     await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
     await user.click(screen.getByRole('button', { name: 'Choose folder' }));
     await waitFor(() => {
       const insertedText = Object.values(repository.savedProjects.at(-1)?.elements ?? {}).find(
         (element) =>
-          element.type === 'text' &&
-          element.id !== 'text-title' &&
-          element.id !== 'text-subtitle',
+          element.type === 'text' && element.id !== 'text-title' && element.id !== 'text-subtitle',
       );
       expect(insertedText).toMatchObject({
         type: 'text',
@@ -1561,7 +1709,9 @@ describe('EditorShell', () => {
 
   it('opens the media settings panel when a video layer is selected', async () => {
     const user = userEvent.setup();
-    render(<EditorShell services={createAppServices({ initialProject: createProjectWithVideo() })} />);
+    render(
+      <EditorShell services={createAppServices({ initialProject: createProjectWithVideo() })} />,
+    );
 
     await openLeftTab(user, 'Layout');
     await user.click(screen.getByRole('button', { name: 'Demo clip' }));
@@ -1632,18 +1782,21 @@ describe('EditorShell', () => {
     services.translatorService = new RecordingTranslatorService();
     render(<EditorShell services={services} />);
 
-    expect(await screen.findByRole('button', { name: 'Current slide language English' })).toBeInTheDocument();
-    expect((services.translatorService as RecordingTranslatorService).detectLanguage).toHaveBeenCalledWith(
-      expect.any(String),
-      { allowModelPreparation: false },
-    );
+    expect(
+      await screen.findByRole('button', { name: 'Current slide language English' }),
+    ).toBeInTheDocument();
+    expect(
+      (services.translatorService as RecordingTranslatorService).detectLanguage,
+    ).toHaveBeenCalledWith(expect.any(String), { allowModelPreparation: false });
 
     await openLeftTab(user, 'AI Tools');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
     expect(await screen.findByText('Pair: en → pt')).toBeInTheDocument();
     await user.click(screen.getAllByRole('button', { name: 'Translate Slide 1' })[0]!);
 
-    expect(await screen.findByRole('button', { name: 'Current slide language Portuguese' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Current slide language Portuguese' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('Pair: pt → pt')).toBeInTheDocument();
   });
 
@@ -1676,7 +1829,9 @@ describe('EditorShell', () => {
     services.translatorService = {
       detectLanguage: vi.fn().mockResolvedValue('en'),
       prepareTranslation: createReadyPrepareTranslationMock(),
-      translate: vi.fn().mockRejectedValue(new Error('Chrome Built-in AI translation is not ready.')),
+      translate: vi
+        .fn()
+        .mockRejectedValue(new Error('Chrome Built-in AI translation is not ready.')),
     };
     render(<EditorShell services={services} />);
 
@@ -1685,14 +1840,18 @@ describe('EditorShell', () => {
     await selectTitleLayer(user);
     await user.click(screen.getByRole('button', { name: 'Translate Selected Text' }));
 
-    expect(await screen.findByText('Chrome Built-in AI translation is not ready.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Chrome Built-in AI translation is not ready.'),
+    ).toBeInTheDocument();
   });
 
   it('fits translated selected text back into the original text frame', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
     const repository = new SavingProjectRepository();
-    const translate = vi.fn().mockResolvedValue('Revolucion\n de diseno impulsada por inteligencia artificial');
+    const translate = vi
+      .fn()
+      .mockResolvedValue('Revolucion\n de diseno impulsada por inteligencia artificial');
     services.projectRepository = repository;
     services.translatorService = {
       detectLanguage: vi.fn().mockResolvedValue('en'),
@@ -1754,9 +1913,13 @@ describe('EditorShell', () => {
       expect(translator.translate).toHaveBeenCalledWith('AI Design Revolution', 'pt', {
         sourceLanguage: 'en',
       });
-      expect(translator.translate).toHaveBeenCalledWith('Browser-native creative automation', 'pt', {
-        sourceLanguage: 'en',
-      });
+      expect(translator.translate).toHaveBeenCalledWith(
+        'Browser-native creative automation',
+        'pt',
+        {
+          sourceLanguage: 'en',
+        },
+      );
     });
   });
 
@@ -1765,10 +1928,7 @@ describe('EditorShell', () => {
     const services = createAppServices();
     const translate = vi.fn().mockResolvedValue('AI Design Revolution');
     services.translatorService = {
-      detectLanguage: vi
-        .fn()
-        .mockResolvedValueOnce('es')
-        .mockResolvedValue('gl'),
+      detectLanguage: vi.fn().mockResolvedValueOnce('es').mockResolvedValue('gl'),
       prepareTranslation: createReadyPrepareTranslationMock(),
       translate,
     };
@@ -1802,9 +1962,13 @@ describe('EditorShell', () => {
       expect(translator.translate).toHaveBeenCalledWith('AI Design Revolution', 'pt', {
         sourceLanguage: 'en',
       });
-      expect(translator.translate).toHaveBeenCalledWith('Browser-native creative automation', 'pt', {
-        sourceLanguage: 'en',
-      });
+      expect(translator.translate).toHaveBeenCalledWith(
+        'Browser-native creative automation',
+        'pt',
+        {
+          sourceLanguage: 'en',
+        },
+      );
     });
   });
 
@@ -1815,9 +1979,13 @@ describe('EditorShell', () => {
 
     await user.click(screen.getByRole('button', { name: 'BG Remover' }));
 
-    expect(screen.getByText('You must download the image editing tools first.')).toBeInTheDocument();
     expect(
-      screen.queryByText('Right click adds areas to keep. Left click applies the background removal.'),
+      screen.getByText('You must download the image editing tools first.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        'Right click adds areas to keep. Left click applies the background removal.',
+      ),
     ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'BG Remover' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'AI Tools' })).toHaveAttribute('aria-selected', 'true');
@@ -1827,7 +1995,9 @@ describe('EditorShell', () => {
 
     await user.keyboard('{Escape}');
 
-    expect(screen.queryByText('You must download the image editing tools first.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('You must download the image editing tools first.'),
+    ).not.toBeInTheDocument();
   });
 
   it('enters and cancels background subject selection after image editing models are ready', async () => {
@@ -1843,14 +2013,18 @@ describe('EditorShell', () => {
     await user.click(screen.getByRole('button', { name: 'BG Remover' }));
 
     expect(
-      await screen.findByText('Right click adds areas to keep. Left click applies the background removal.'),
+      await screen.findByText(
+        'Right click adds areas to keep. Left click applies the background removal.',
+      ),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cancel BG Remover' })).toBeInTheDocument();
 
     await user.keyboard('{Escape}');
 
     expect(
-      screen.queryByText('Right click adds areas to keep. Left click applies the background removal.'),
+      screen.queryByText(
+        'Right click adds areas to keep. Left click applies the background removal.',
+      ),
     ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'BG Remover' })).toBeInTheDocument();
   });
@@ -1878,7 +2052,10 @@ describe('EditorShell', () => {
     await user.click(screen.getByRole('button', { name: 'Share' }));
     await user.click(screen.getByRole('button', { name: 'Download' }));
 
-    expect(downloadDataUrl).toHaveBeenCalledWith(expect.stringMatching(/^data:image\/png/), 'slide.png');
+    expect(downloadDataUrl).toHaveBeenCalledWith(
+      expect.stringMatching(/^data:image\/png/),
+      'slide.png',
+    );
   });
 
   it('creates and shows a public link from the share panel', async () => {
@@ -1905,9 +2082,7 @@ describe('EditorShell', () => {
     }/editor/s/00000000-0000-4000-8000-000000000301?src=${encodeURIComponent(
       'http://localhost:9000/localstudio/mirrors/public-shares/00000000-0000-4000-8000-000000000301/share.json',
     )}`;
-    expect(
-      await screen.findByDisplayValue(expectedPublicUrl),
-    ).toBeInTheDocument();
+    expect(await screen.findByDisplayValue(expectedPublicUrl)).toBeInTheDocument();
     expect(writeText).toHaveBeenCalledWith(expectedPublicUrl);
   });
 

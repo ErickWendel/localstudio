@@ -45,7 +45,8 @@ export function EditorShell({ services }: EditorShellProps) {
     vm.project.pages.findIndex((page) => page.id === vm.activePageId),
   );
   const publicSharingAvailable = vm.mirrorState.enabled && vm.mirrorState.status === 'synced';
-  const publicSharingUnavailableReason = vm.mirrorState.error ?? 'Public sharing requires active external storage.';
+  const publicSharingUnavailableReason =
+    vm.mirrorState.error ?? 'Public sharing requires active external storage.';
 
   function exportCurrentPageAsPng() {
     const dataUrl = stageRef.current?.toDataURL({ mimeType: 'image/png', pixelRatio: 2 });
@@ -138,15 +139,20 @@ export function EditorShell({ services }: EditorShellProps) {
       }
 
       const isPresenterPlayback = vm.animationPreview?.mode === 'presenter';
-      const isPreviewNavigationActive = vm.isFullscreen || Boolean(isPresenterPlayback && vm.animationPreview?.playing);
-      if (isPreviewNavigationActive && !editorShellBrowserUtils.isEditableInteractionTarget(event.target)) {
+      const isPreviewNavigationActive =
+        vm.isFullscreen || Boolean(isPresenterPlayback && vm.animationPreview?.playing);
+      if (
+        isPreviewNavigationActive &&
+        !editorShellBrowserUtils.isEditableInteractionTarget(event.target)
+      ) {
         const isNextPreviewKey =
           event.key === 'ArrowRight' ||
           event.key === 'ArrowDown' ||
           event.key === 'PageDown' ||
           event.key === ' ' ||
           event.key === 'Enter';
-        const isPreviousPreviewKey = event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'PageUp';
+        const isPreviousPreviewKey =
+          event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'PageUp';
         if (isNextPreviewKey || isPreviousPreviewKey) {
           event.preventDefault();
           if (isNextPreviewKey) vm.advancePresentationPreview();
@@ -179,7 +185,11 @@ export function EditorShell({ services }: EditorShellProps) {
   useEffect(() => {
     function handleCopy(event: ClipboardEvent) {
       if (isHistoryReadOnly) return;
-      if (editorShellBrowserUtils.isEditableInteractionTarget(event.target) || editorShellBrowserUtils.hasBrowserTextSelection() || !hasSelection)
+      if (
+        editorShellBrowserUtils.isEditableInteractionTarget(event.target) ||
+        editorShellBrowserUtils.hasBrowserTextSelection() ||
+        !hasSelection
+      )
         return;
       event.preventDefault();
       vm.copySelectedElements();
@@ -188,7 +198,11 @@ export function EditorShell({ services }: EditorShellProps) {
 
     function handleCut(event: ClipboardEvent) {
       if (isHistoryReadOnly) return;
-      if (editorShellBrowserUtils.isEditableInteractionTarget(event.target) || editorShellBrowserUtils.hasBrowserTextSelection() || !hasSelection)
+      if (
+        editorShellBrowserUtils.isEditableInteractionTarget(event.target) ||
+        editorShellBrowserUtils.hasBrowserTextSelection() ||
+        !hasSelection
+      )
         return;
       event.preventDefault();
       vm.cutSelectedElements();
@@ -199,7 +213,11 @@ export function EditorShell({ services }: EditorShellProps) {
       if (isHistoryReadOnly) return;
       if (editorShellBrowserUtils.isEditableInteractionTarget(event.target)) return;
       event.preventDefault();
-      if (editorShellBrowserUtils.hasEditorObjectClipboardMarker(event.clipboardData) && vm.pasteCopiedElements()) return;
+      if (
+        editorShellBrowserUtils.hasEditorObjectClipboardMarker(event.clipboardData) &&
+        vm.pasteCopiedElements()
+      )
+        return;
       const imageFile = editorShellBrowserUtils.getClipboardImageFile(event.clipboardData);
       if (imageFile) {
         void vm.importImageFile(imageFile);
@@ -227,7 +245,9 @@ export function EditorShell({ services }: EditorShellProps) {
       translateText: (input) => automationDelegateRef.current.translateText(input),
       getState: () => automationDelegateRef.current.getState(),
     };
-    const adapter = new WebMcpToolAdapter(new editorAutomationController.EditorAutomationController(delegate));
+    const adapter = new WebMcpToolAdapter(
+      new editorAutomationController.EditorAutomationController(delegate),
+    );
     const demoWindow = window as WebMcpDemoWindow;
     const modelContext = editorShellBrowserUtils.getWebMcpModelContext();
     demoWindow.localStudioWebMcpTools = adapter.createTools();
@@ -258,7 +278,9 @@ export function EditorShell({ services }: EditorShellProps) {
           setShareMetadata(nextShare);
         })
         .catch(() => {
-          setShareMetadata((current) => (current ? { ...current, status: 'sync-failed' } : current));
+          setShareMetadata((current) =>
+            current ? { ...current, status: 'sync-failed' } : current,
+          );
         });
     }, 1000);
 
@@ -627,10 +649,7 @@ export function EditorShell({ services }: EditorShellProps) {
         />
       ) : null}
       {vm.settingsOpen ? (
-        <SettingsPanel
-          onClose={vm.closeSettings}
-          onOpenMirrorSettings={vm.openMirrorSettings}
-        />
+        <SettingsPanel onClose={vm.closeSettings} onOpenMirrorSettings={vm.openMirrorSettings} />
       ) : null}
       {vm.mirrorSettingsOpen ? (
         <MirrorSettingsPanel
@@ -649,6 +668,9 @@ export function EditorShell({ services }: EditorShellProps) {
           projects={vm.remoteImportProjects}
           status={vm.remoteImportStatus}
           onClose={vm.closeRemoteImport}
+          onDeleteProject={(projectId) => {
+            void vm.deleteRemoteMirrorProject(projectId);
+          }}
           onImportProject={(projectId) => {
             void vm.importRemoteMirrorProject(projectId);
           }}

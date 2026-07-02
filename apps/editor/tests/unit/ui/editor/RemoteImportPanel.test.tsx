@@ -28,4 +28,38 @@ describe('RemoteImportPanel', () => {
 
     expect(onImportProject).toHaveBeenCalledWith('project-beta');
   });
+
+  it('confirms before deleting a remote project and keeps row import separate', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onImportProject = vi.fn();
+    const onDeleteProject = vi.fn();
+
+    render(
+      <RemoteImportPanel
+        projects={[
+          { id: 'project-alpha', name: 'Alpha Deck', syncedAt: '2026-06-30T12:00:00.000Z' },
+        ]}
+        status="ready"
+        onClose={onClose}
+        onDeleteProject={onDeleteProject}
+        onImportProject={onImportProject}
+      />,
+    );
+
+    const list = screen.getByRole('list', { name: 'Remote mirrored projects' });
+    expect(list).toHaveClass('remote-import-list');
+
+    await user.click(screen.getByRole('button', { name: 'Delete Alpha Deck from remote' }));
+
+    expect(onImportProject).not.toHaveBeenCalled();
+    const confirmation = screen.getByRole('alertdialog', { name: 'Delete remote project' });
+    expect(confirmation).toBeInTheDocument();
+    expect(confirmation.parentElement?.firstElementChild).toBe(confirmation);
+
+    await user.click(screen.getByRole('button', { name: 'Delete remote project' }));
+
+    expect(onDeleteProject).toHaveBeenCalledWith('project-alpha');
+    expect(onImportProject).not.toHaveBeenCalled();
+  });
 });

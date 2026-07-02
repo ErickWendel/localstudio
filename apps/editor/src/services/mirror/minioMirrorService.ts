@@ -43,6 +43,8 @@ const DEFAULT_MINIO_MIRROR_CONFIG: MinioMirrorConfig = {
   prefix: 'mirrors',
 };
 
+const DELETE_BATCH_SIZE = 25;
+
 function getProjectMirrorKey(projectName: string) {
   return projectName.trim().replace(/[\\/]+/g, '-');
 }
@@ -53,7 +55,10 @@ function getDefaultFetch() {
 }
 
 function getProjectRoot(config: MinioMirrorConfig, projectKey: string) {
-  return storageObjectUtils.joinObjectKey(storageObjectUtils.normalizeObjectKeyPart(config.prefix), projectKey);
+  return storageObjectUtils.joinObjectKey(
+    storageObjectUtils.normalizeObjectKeyPart(config.prefix),
+    projectKey,
+  );
 }
 
 function getProjectFileKey(config: MinioMirrorConfig, projectKey: string, path: string) {
@@ -65,6 +70,26 @@ function parseMirrorProjects(xml: string) {
   return Array.from(document.querySelectorAll('Contents Key'))
     .map((node) => node.textContent ?? '')
     .filter((key) => key.endsWith(`/${minioMirrorFiles.MIRROR_MANIFEST_FILE_NAME}`));
+}
+
+function parseObjectList(xml: string) {
+  const document = new DOMParser().parseFromString(xml, 'application/xml');
+  return {
+    keys: Array.from(document.querySelectorAll('Contents Key'))
+      .map((node) => node.textContent ?? '')
+      .filter(Boolean),
+    nextContinuationToken:
+      document.querySelector('NextContinuationToken')?.textContent?.trim() || undefined,
+    truncated: document.querySelector('IsTruncated')?.textContent?.trim() === 'true',
+  };
+}
+
+function chunkArray<T>(items: T[], size: number) {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
 }
 
 class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
@@ -119,14 +144,20 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
     const url = minioObjectUtils.createObjectUrl(config, '', {
       'list-type': '2',
       'max-keys': '1000',
-      prefix: storageObjectUtils.normalizeObjectKeyPart(config.prefix) ? `${storageObjectUtils.normalizeObjectKeyPart(config.prefix)}/` : '',
+      prefix: storageObjectUtils.normalizeObjectKeyPart(config.prefix)
+        ? `${storageObjectUtils.normalizeObjectKeyPart(config.prefix)}/`
+        : '',
     });
     const response = await this.signedFetch(url, 'GET', config);
     if (!response.ok) throw new Error(`Could not list MinIO mirrors (${response.status}).`);
     const manifestKeys = parseMirrorProjects(await response.text());
     const manifests = await Promise.all(
       manifestKeys.map(async (key) => {
-        const response = await this.signedFetch(minioObjectUtils.createObjectUrl(config, key), 'GET', config);
+        const response = await this.signedFetch(
+          minioObjectUtils.createObjectUrl(config, key),
+          'GET',
+          config,
+        );
         if (!response.ok) return undefined;
         const manifest = (await response.json()) as MirrorManifest;
         const keyParts = key.split('/');
@@ -142,7 +173,10 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
 
   async downloadProject(projectKey: string, config: MinioMirrorConfig): Promise<MirrorFile[]> {
     const manifestResponse = await this.signedFetch(
-      minioObjectUtils.createObjectUrl(config, getProjectFileKey(config, projectKey, minioMirrorFiles.MIRROR_MANIFEST_FILE_NAME)),
+      minioObjectUtils.createObjectUrl(
+        config,
+        getProjectFileKey(config, projectKey, minioMirrorFiles.MIRROR_MANIFEST_FILE_NAME),
+      ),
       'GET',
       config,
     );
@@ -161,8 +195,43 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
         return { path, blob: await response.blob() };
       }),
     );
-    files.push({ path: minioMirrorFiles.MIRROR_MANIFEST_FILE_NAME, blob: storageObjectUtils.jsonBlob(manifest) });
+    files.push({
+      path: minioMirrorFiles.MIRROR_MANIFEST_FILE_NAME,
+      blob: storageObjectUtils.jsonBlob(manifest),
+    });
     return files;
+  }
+
+  async deleteProject(projectKey: string, config: MinioMirrorConfig): Promise<void> {
+    const projectPrefix = `${getProjectRoot(config, projectKey)}/`;
+    let continuationToken: string | undefined;
+    do {
+      const url = minioObjectUtils.createObjectUrl(config, '', {
+        ...(continuationToken ? { 'continuation-token': continuationToken } : {}),
+        'list-type': '2',
+        'max-keys': '1000',
+        prefix: projectPrefix,
+      });
+      const listResponse = await this.signedFetch(url, 'GET', config);
+      if (!listResponse.ok)
+        throw new Error(`Could not list MinIO mirror objects (${listResponse.status}).`);
+
+      const objectList = parseObjectList(await listResponse.text());
+      for (const batch of chunkArray(objectList.keys, DELETE_BATCH_SIZE)) {
+        await Promise.all(
+          batch.map(async (key) => {
+            const response = await this.signedFetch(
+              minioObjectUtils.createObjectUrl(config, key),
+              'DELETE',
+              config,
+            );
+            if (!response.ok)
+              throw new Error(`Could not delete mirrored object ${key} (${response.status}).`);
+          }),
+        );
+      }
+      continuationToken = objectList.truncated ? objectList.nextContinuationToken : undefined;
+    } while (continuationToken);
   }
 
   getPublicObjectUrl(key: string, config: MinioMirrorConfig): string {
@@ -175,7 +244,10 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
 
   private async loadRemoteManifest(projectKey: string, config: MinioMirrorConfig) {
     const response = await this.signedFetch(
-      minioObjectUtils.createObjectUrl(config, getProjectFileKey(config, projectKey, minioMirrorFiles.MIRROR_MANIFEST_FILE_NAME)),
+      minioObjectUtils.createObjectUrl(
+        config,
+        getProjectFileKey(config, projectKey, minioMirrorFiles.MIRROR_MANIFEST_FILE_NAME),
+      ),
       'GET',
       config,
     );
