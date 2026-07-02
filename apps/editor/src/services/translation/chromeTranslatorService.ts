@@ -1,4 +1,4 @@
-import type { TranslatorService } from '../contracts/interfaces';
+import type { ModelDownloadProgressDetails, TranslatorService } from '../contracts/interfaces';
 
 type ChromeTranslationInstance = {
   ready?: Promise<void>;
@@ -15,7 +15,9 @@ type ChromeTranslatorApi = {
 };
 
 type ChromeLanguageDetectorApi = {
-  create?: () => Promise<{ detect: (text: string) => Promise<Array<{ detectedLanguage: string }>> }>;
+  create?: () => Promise<{
+    detect: (text: string) => Promise<Array<{ detectedLanguage: string }>>;
+  }>;
 };
 
 type ChromeAiWindow = Window &
@@ -60,7 +62,9 @@ function getTranslationKey(sourceLanguage: string, targetLanguage: string) {
 }
 
 function hasChromeLanguageDetector() {
-  return typeof window !== 'undefined' && Boolean((window as ChromeAiWindow).LanguageDetector?.create);
+  return (
+    typeof window !== 'undefined' && Boolean((window as ChromeAiWindow).LanguageDetector?.create)
+  );
 }
 
 function normalizeDetectedLanguageCode(language: string) {
@@ -83,7 +87,7 @@ class ChromeTranslatorService implements TranslatorService {
   async prepareTranslation(
     sourceLanguage: string,
     targetLanguage: string,
-    options?: { onProgress?: (progress: number) => void },
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
   ): Promise<void> {
     const normalizedSourceLanguage = normalizeLanguageCode(sourceLanguage);
     const normalizedTargetLanguage = normalizeLanguageCode(targetLanguage);
@@ -95,7 +99,11 @@ class ChromeTranslatorService implements TranslatorService {
     await this.getTranslator(normalizedSourceLanguage, normalizedTargetLanguage, options);
   }
 
-  async translate(text: string, targetLanguage: string, options?: { sourceLanguage?: string }): Promise<string> {
+  async translate(
+    text: string,
+    targetLanguage: string,
+    options?: { sourceLanguage?: string },
+  ): Promise<string> {
     const sourceLanguage = options?.sourceLanguage
       ? normalizeLanguageCode(options.sourceLanguage)
       : await this.detectLanguage(text);
@@ -109,7 +117,7 @@ class ChromeTranslatorService implements TranslatorService {
   private async getTranslator(
     sourceLanguage: string,
     targetLanguage: string,
-    options?: { onProgress?: (progress: number) => void },
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
   ) {
     const translatorApi = (window as ChromeAiWindow).Translator;
     if (!translatorApi?.create) {
@@ -141,7 +149,9 @@ class ChromeTranslatorService implements TranslatorService {
         monitor: (monitorTarget) => {
           monitorTarget.addEventListener('downloadprogress', (event) => {
             const progressEvent = event as ProgressEvent;
-            options?.onProgress?.(Math.max(0, Math.min(100, Math.round(progressEvent.loaded * 100))));
+            options?.onProgress?.(
+              Math.max(0, Math.min(100, Math.round(progressEvent.loaded * 100))),
+            );
           });
         },
       })

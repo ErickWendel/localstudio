@@ -7,6 +7,17 @@ function postResponse(response: BonsaiImageWorkerResponse) {
   self.postMessage(response);
 }
 
+type BonsaiProgressDetails = Extract<BonsaiImageWorkerResponse, { type: 'progress' }>['details'];
+
+function postProgress(id: string, progress: number, details: BonsaiProgressDetails | undefined) {
+  postResponse({
+    ...(details ? { details } : {}),
+    id,
+    progress,
+    type: 'progress',
+  });
+}
+
 self.onmessage = (event: MessageEvent<BonsaiImageWorkerRequest>) => {
   const request = event.data;
   void handleRequest(request);
@@ -16,8 +27,8 @@ async function handleRequest(request: BonsaiImageWorkerRequest) {
   try {
     if (request.type === 'preload') {
       await runtime.preload(request.modelId, {
-        onProgress: (progress) => {
-          postResponse({ id: request.id, progress, type: 'progress' });
+        onProgress: (progress, details) => {
+          postProgress(request.id, progress, details);
         },
       });
       postResponse({ id: request.id, type: 'result' });
@@ -26,8 +37,8 @@ async function handleRequest(request: BonsaiImageWorkerRequest) {
 
     const blob = await runtime.generate({
       ...request.options,
-      onLoadProgress: (progress) => {
-        postResponse({ id: request.id, progress, type: 'progress' });
+      onLoadProgress: (progress, details) => {
+        postProgress(request.id, progress, details);
       },
       onStep: (step, totalSteps) => {
         postResponse({ id: request.id, step, totalSteps, type: 'step' });

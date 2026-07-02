@@ -76,6 +76,7 @@ describe('bonsaiImageRuntime.BrowserBonsaiImageRuntime', () => {
       return Promise.resolve(pipeline);
     });
     const progress: number[] = [];
+    const progressDetails: Array<unknown> = [];
 
     await new bonsaiImageRuntime.BrowserBonsaiImageRuntime({
       cacheName: 'test-cache',
@@ -86,7 +87,10 @@ describe('bonsaiImageRuntime.BrowserBonsaiImageRuntime', () => {
           },
         }),
     }).preload('prism-ml/bonsai-image-ternary-4B-mlx-2bit', {
-      onProgress: (value) => progress.push(Math.round(value)),
+      onProgress: (value, details) => {
+        progress.push(Math.round(value));
+        progressDetails.push(details);
+      },
     });
 
     expect(fromPretrained).toHaveBeenCalledWith(
@@ -94,6 +98,11 @@ describe('bonsaiImageRuntime.BrowserBonsaiImageRuntime', () => {
       expect.objectContaining({ cacheName: 'test-cache' }),
     );
     expect(progress).toEqual([3, 27, 55, 97, 100]);
+    expect(progressDetails.slice(0, 4).every((details) => details === undefined)).toBe(true);
+    expect(progressDetails[4]).toEqual({
+      loadedBytes: 3_095_000_000,
+      totalBytes: 3_095_000_000,
+    });
   });
 
   it('imports the vendored runtime-only module without DOM side effects or cleanup hooks', async () => {

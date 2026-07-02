@@ -1,6 +1,14 @@
 import { generatedSlide } from '../../domain/generated-slides/generatedSlide';
-import type { GeneratedSlideElement, GeneratedSlideTask, GeneratedSlideTasksDocument } from '../../domain/generated-slides/generatedSlide';
-import type { PromptApiAvailability, PromptService } from '../contracts/interfaces';
+import type {
+  GeneratedSlideElement,
+  GeneratedSlideTask,
+  GeneratedSlideTasksDocument,
+} from '../../domain/generated-slides/generatedSlide';
+import type {
+  ModelDownloadProgressDetails,
+  PromptApiAvailability,
+  PromptService,
+} from '../contracts/interfaces';
 import { buildSlideElementPrompt } from './slideElementPrompt';
 import { slideLayoutPresets } from './slideLayoutPresets';
 import { slideTaskPrompt } from './slideTaskPrompt';
@@ -19,7 +27,9 @@ interface ChromePromptSession {
 
 interface ChromeLanguageModelApi {
   availability?: () => Promise<ChromePromptAvailability>;
-  create?: (options?: { monitor?: (monitorTarget: EventTarget) => void }) => Promise<ChromePromptSession>;
+  create?: (options?: {
+    monitor?: (monitorTarget: EventTarget) => void;
+  }) => Promise<ChromePromptSession>;
 }
 
 function getLanguageModelApi() {
@@ -31,7 +41,9 @@ function getLanguageModelApi() {
   return globalWindow.LanguageModel ?? globalWindow.ai?.languageModel;
 }
 
-function normalizePromptAvailability(availability: ChromePromptAvailability | undefined): PromptApiAvailability {
+function normalizePromptAvailability(
+  availability: ChromePromptAvailability | undefined,
+): PromptApiAvailability {
   if (availability === 'available' || availability === 'readily') return 'ready';
   if (availability === 'downloadable') return 'downloadable';
   if (availability === 'downloading') return 'downloading';
@@ -48,7 +60,9 @@ export class ChromePromptService implements PromptService {
     return normalizePromptAvailability(availability);
   }
 
-  async preparePromptApi(options?: { onProgress?: (progress: number) => void }): Promise<void> {
+  async preparePromptApi(options?: {
+    onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void;
+  }): Promise<void> {
     const languageModel = getLanguageModelApi();
     if (!languageModel?.create) throw new Error('Chrome Prompt API is unavailable.');
 
@@ -81,7 +95,10 @@ export class ChromePromptService implements PromptService {
       generatedSlide.GENERATED_SLIDE_TASKS_RESPONSE_SCHEMA,
     );
     this.ready = true;
-    return slideLayoutPresets.normalizeSlideTasksForLayout(generatedSlide.parseGeneratedSlideTasksJson(response), prompt);
+    return slideLayoutPresets.normalizeSlideTasksForLayout(
+      generatedSlide.parseGeneratedSlideTasksJson(response),
+      prompt,
+    );
   }
 
   async generateSlideElementFromTask(
@@ -104,11 +121,14 @@ export class ChromePromptService implements PromptService {
       generatedSlide.GENERATED_SLIDE_ELEMENT_RESPONSE_SCHEMA,
     );
     this.ready = true;
-    return slideLayoutPresets.applySlideElementLayoutPreset(generatedSlide.parseGeneratedSlideElementJson(response), {
-      task,
-      allTasks: context.allTasks,
-      page: context.page,
-    });
+    return slideLayoutPresets.applySlideElementLayoutPreset(
+      generatedSlide.parseGeneratedSlideElementJson(response),
+      {
+        task,
+        allTasks: context.allTasks,
+        page: context.page,
+      },
+    );
   }
 
   private async promptWithStructuredOutput(prompt: string, responseConstraint: unknown) {

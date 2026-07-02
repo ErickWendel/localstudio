@@ -1,8 +1,18 @@
 import { generatedSlide } from '../../domain/generated-slides/generatedSlide';
-import type { GeneratedSlideElement, GeneratedSlideTask, GeneratedSlideTasksDocument } from '../../domain/generated-slides/generatedSlide';
+import type {
+  GeneratedSlideElement,
+  GeneratedSlideTask,
+  GeneratedSlideTasksDocument,
+} from '../../domain/generated-slides/generatedSlide';
 import { aiModelCatalog } from '../model-setup/aiModelCatalog';
 import { ChromePromptService } from './chromePromptService';
-import type { AiProviderState, ModelSetupService, PromptApiAvailability, PromptService } from '../contracts/interfaces';
+import type {
+  AiProviderState,
+  ModelDownloadProgressDetails,
+  ModelSetupService,
+  PromptApiAvailability,
+  PromptService,
+} from '../contracts/interfaces';
 import { providerSelection } from '../model-setup/providerSelection';
 import { progress as progressUtils } from '../model-setup/progress';
 import { buildSlideElementPrompt } from './slideElementPrompt';
@@ -22,7 +32,10 @@ interface PromptProvider {
   runtime: AiProviderState['runtime'];
   modelId?: string | undefined;
   checkAvailability(modelSetupService: ModelSetupService): Promise<PromptApiAvailability>;
-  prepare(modelSetupService: ModelSetupService, options?: { onProgress?: (progress: number) => void }): Promise<void>;
+  prepare(
+    modelSetupService: ModelSetupService,
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
+  ): Promise<void>;
   generateSlideTasksFromPrompt(
     prompt: string,
     options?: { targetLanguageHint?: string },
@@ -50,7 +63,10 @@ class ChromePromptProvider implements PromptProvider {
     return this.chromePromptService.checkAvailability();
   }
 
-  prepare(_modelSetupService: ModelSetupService, options?: { onProgress?: (progress: number) => void }): Promise<void> {
+  prepare(
+    _modelSetupService: ModelSetupService,
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
+  ): Promise<void> {
     return this.chromePromptService.preparePromptApi(options);
   }
 
@@ -87,7 +103,10 @@ interface GemmaStructuredJsonOptions<T> {
   parse: (value: string) => T;
 }
 
-function createGemmaStructuredJsonMessages(prompt: string, responseSchema: unknown): TextGenerationInput {
+function createGemmaStructuredJsonMessages(
+  prompt: string,
+  responseSchema: unknown,
+): TextGenerationInput {
   return [
     {
       role: 'user',
@@ -141,11 +160,15 @@ class GemmaPromptProvider implements PromptProvider {
   runtime = 'webgpu-huggingface' as const;
   modelId = aiModelCatalog.GEMMA_LLM_MODEL_ID;
 
-  constructor(private readonly runtimeClient: TextGenerationRuntime = new webGpuTextGenerationRuntime.TransformersTextGenerationRuntime()) {}
+  constructor(
+    private readonly runtimeClient: TextGenerationRuntime = new webGpuTextGenerationRuntime.TransformersTextGenerationRuntime(),
+  ) {}
 
   async checkAvailability(modelSetupService: ModelSetupService): Promise<PromptApiAvailability> {
     if (!providerSelection.isWebGpuCompatible()) return 'unavailable';
-    const model = (await modelSetupService.getModelStates()).find((state) => state.id === aiModelCatalog.GEMMA_LLM_MODEL_ID);
+    const model = (await modelSetupService.getModelStates()).find(
+      (state) => state.id === aiModelCatalog.GEMMA_LLM_MODEL_ID,
+    );
     if (model?.status === 'ready') return 'ready';
     if (model?.status === 'downloading') return 'downloading';
     return 'downloadable';
@@ -153,11 +176,19 @@ class GemmaPromptProvider implements PromptProvider {
 
   async prepare(
     modelSetupService: ModelSetupService,
-    options?: { onProgress?: (progress: number) => void },
+    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
   ): Promise<void> {
-    const reportProgress = progressUtils.createMonotonicProgressReporter(options?.onProgress, { initial: 4, min: 4, max: 100 });
+    const reportProgress = progressUtils.createMonotonicProgressReporter(options?.onProgress, {
+      initial: 4,
+      min: 4,
+      max: 100,
+    });
     await modelSetupService.downloadModel(aiModelCatalog.GEMMA_LLM_MODEL_ID, {
-      onProgress: (nextProgress) => reportProgress(nextProgress >= 99 ? 99 : progressUtils.mapProgressToRange(nextProgress, 4, 99)),
+      onProgress: (nextProgress, details) =>
+        reportProgress(
+          nextProgress >= 99 ? 99 : progressUtils.mapProgressToRange(nextProgress, 4, 99),
+          details,
+        ),
     });
     reportProgress(100);
   }
@@ -243,7 +274,10 @@ class BrowserPromptService implements PromptService {
     private readonly storage = providerSelection.getBrowserProviderStorage(),
     textGenerationRuntime: TextGenerationRuntime = new webGpuTextGenerationRuntime.TransformersTextGenerationRuntime(),
   ) {
-    this.providers = providers ?? [new ChromePromptProvider(), new GemmaPromptProvider(textGenerationRuntime)];
+    this.providers = providers ?? [
+      new ChromePromptProvider(),
+      new GemmaPromptProvider(textGenerationRuntime),
+    ];
     this.selectedProviderId = storage?.getItem(PROMPT_PROVIDER_STORAGE_KEY) ?? undefined;
   }
 
@@ -265,9 +299,12 @@ class BrowserPromptService implements PromptService {
     const states = await Promise.all(
       this.providers.map(async (provider) => {
         const availability = await provider.checkAvailability(this.modelSetupService);
-        const chromeUnavailable = provider.runtime === 'chrome-built-in' && availability === 'unavailable';
-        const webGpuUnavailable = provider.runtime === 'webgpu-huggingface' && !providerSelection.isWebGpuCompatible();
-        const compatibility = chromeUnavailable || webGpuUnavailable ? 'incompatible' : 'compatible';
+        const chromeUnavailable =
+          provider.runtime === 'chrome-built-in' && availability === 'unavailable';
+        const webGpuUnavailable =
+          provider.runtime === 'webgpu-huggingface' && !providerSelection.isWebGpuCompatible();
+        const compatibility =
+          chromeUnavailable || webGpuUnavailable ? 'incompatible' : 'compatible';
         return {
           id: provider.id,
           label: provider.label,
@@ -288,8 +325,8 @@ class BrowserPromptService implements PromptService {
                 : availability === 'unavailable'
                   ? 'unavailable'
                   : availability === 'downloading'
-                  ? 'downloading'
-                  : 'needs-download'
+                    ? 'downloading'
+                    : 'needs-download'
               : providerSelection.getModelReadiness(modelStates, provider.modelId),
           selected: false,
         } satisfies AiProviderState;
@@ -306,7 +343,9 @@ class BrowserPromptService implements PromptService {
     return this.getSelectedProvider().checkAvailability(this.modelSetupService);
   }
 
-  async preparePromptApi(options?: { onProgress?: (progress: number) => void }): Promise<void> {
+  async preparePromptApi(options?: {
+    onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void;
+  }): Promise<void> {
     await this.getSelectedProvider().prepare(this.modelSetupService, options);
   }
 
