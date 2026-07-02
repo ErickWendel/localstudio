@@ -159,6 +159,34 @@ describe('BrowserFileSystemProjectRepository', () => {
     });
   });
 
+  it('prompts for a new parent folder when saving a project as another local folder', async () => {
+    const firstParentDirectory = new MockDirectoryHandle('First Projects');
+    const secondParentDirectory = new MockDirectoryHandle('Second Projects');
+    const pickDirectory = vi
+      .fn()
+      .mockResolvedValueOnce(firstParentDirectory as unknown as FileSystemDirectoryHandle)
+      .mockResolvedValueOnce(secondParentDirectory as unknown as FileSystemDirectoryHandle);
+    const repository = new BrowserFileSystemProjectRepository({
+      pickDirectory,
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
+    });
+    const project = { ...sampleProject.createSampleProject(), name: 'Launch Deck' };
+
+    await repository.saveProject(project, { projectDirectoryName: project.name });
+    await repository.saveProjectAs(project, { projectDirectoryName: project.name });
+
+    expect(pickDirectory).toHaveBeenCalledTimes(2);
+    expect(firstParentDirectory.directories.get('Launch Deck')).toBeDefined();
+    expect(secondParentDirectory.directories.get('Launch Deck')).toBeDefined();
+    expect(
+      JSON.parse(
+        await readMockText(
+          secondParentDirectory.directories.get('Launch Deck')!.files.get('project.json')!,
+        ),
+      ),
+    ).toMatchObject({ name: 'Launch Deck' });
+  });
+
   it('moves a persisted project into a renamed child folder when the project name changes', async () => {
     const parentDirectory = new MockDirectoryHandle('Projects');
     const repository = new BrowserFileSystemProjectRepository({

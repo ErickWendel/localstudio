@@ -2810,6 +2810,30 @@ button {
   gap: 8px;
 }
 
+.mirror-settings-toggle-danger {
+  border-color: rgba(255, 95, 86, 0.46);
+  background: rgba(255, 95, 86, 0.12);
+  color: #ff9a94;
+}
+
+.mirror-settings-toggle-danger:hover {
+  border-color: rgba(255, 95, 86, 0.72);
+  background: rgba(255, 95, 86, 0.2);
+  color: #ffc5c1;
+}
+
+.mirror-settings-toggle-success {
+  border-color: rgba(55, 253, 118, 0.42);
+  background: rgba(55, 253, 118, 0.12);
+  color: var(--ew-green);
+}
+
+.mirror-settings-toggle-success:hover {
+  border-color: rgba(55, 253, 118, 0.68);
+  background: rgba(55, 253, 118, 0.2);
+  color: var(--ew-green-fixed);
+}
+
 .remote-import-status {
   margin: 0;
   color: var(--ew-muted);
