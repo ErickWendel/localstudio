@@ -45,8 +45,7 @@ export function EditorShell({ services }: EditorShellProps) {
     vm.project.pages.findIndex((page) => page.id === vm.activePageId),
   );
   const publicSharingAvailable = vm.mirrorState.enabled && vm.mirrorState.status === 'synced';
-  const publicSharingUnavailableReason =
-    'Public links cannot be created without remote storage.';
+  const publicSharingUnavailableReason = 'Public links cannot be created without remote storage.';
 
   function exportCurrentPageAsPng() {
     const dataUrl = stageRef.current?.toDataURL({ mimeType: 'image/png', pixelRatio: 2 });
@@ -90,11 +89,29 @@ export function EditorShell({ services }: EditorShellProps) {
     return file.type === 'image/gif' || file.type.startsWith('video/');
   }
 
+  function openLeftPanel() {
+    if (vm.pagesPanelOpen) vm.togglePagesPanel();
+    setLeftPanelOpen(true);
+  }
+
+  function handleLeftPanelOpenChange(open: boolean) {
+    if (open) {
+      openLeftPanel();
+      return;
+    }
+    setLeftPanelOpen(false);
+  }
+
+  function togglePagesPanel() {
+    if (!vm.pagesPanelOpen) setLeftPanelOpen(false);
+    vm.togglePagesPanel();
+  }
+
   function revealMediaSettingsForElement(elementId: string) {
     const selectedElement = vm.project.elements[elementId];
     if (selectedElement?.type !== 'gif' && selectedElement?.type !== 'video') return;
     vm.setActiveTab('design');
-    setLeftPanelOpen(true);
+    openLeftPanel();
   }
 
   function selectElement(elementId: string, options?: { additive?: boolean }) {
@@ -105,7 +122,7 @@ export function EditorShell({ services }: EditorShellProps) {
   function importMediaFile(file: File) {
     if (isAnimatedMediaFile(file)) {
       vm.setActiveTab('design');
-      setLeftPanelOpen(true);
+      openLeftPanel();
     }
     void vm.importMediaFile(file);
   }
@@ -344,7 +361,7 @@ export function EditorShell({ services }: EditorShellProps) {
         onResetZoom={vm.resetZoom}
         onSelectLayers={() => {
           vm.setActiveTab('layout');
-          setLeftPanelOpen(true);
+          openLeftPanel();
         }}
         onShare={() => {
           setSharePanelOpen(true);
@@ -376,7 +393,7 @@ export function EditorShell({ services }: EditorShellProps) {
           activeSlideLanguage={vm.activeSlideLanguage}
           onTabChange={vm.setActiveTab}
           open={leftPanelOpen}
-          onOpenChange={setLeftPanelOpen}
+          onOpenChange={handleLeftPanelOpenChange}
           project={vm.project}
           activePageId={vm.activePageId}
           selection={vm.selection}
@@ -446,9 +463,13 @@ export function EditorShell({ services }: EditorShellProps) {
           }}
         />
         <section
-          className={
-            leftPanelOpen ? 'workspace-column workspace-column-left-panel-open' : 'workspace-column'
-          }
+          className={[
+            'workspace-column',
+            leftPanelOpen ? 'workspace-column-left-panel-open' : '',
+            vm.zoomPercent < 100 ? 'workspace-column-zoomed-out' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
           aria-label="Canvas workspace"
           ref={workspaceRef}
         >
@@ -528,7 +549,7 @@ export function EditorShell({ services }: EditorShellProps) {
                 ? undefined
                 : () => {
                     vm.setActiveTab('animations');
-                    setLeftPanelOpen(true);
+                    openLeftPanel();
                   }
             }
             onSelectElement={isHistoryReadOnly ? undefined : selectElement}
@@ -602,7 +623,7 @@ export function EditorShell({ services }: EditorShellProps) {
             activePageId={vm.activePageId}
             canTranslate={vm.canTranslateDeck}
             onAddPage={isHistoryReadOnly ? undefined : vm.addPage}
-            onClose={vm.togglePagesPanel}
+            onClose={togglePagesPanel}
             onDeletePage={isHistoryReadOnly ? undefined : vm.deletePage}
             onDuplicatePage={isHistoryReadOnly ? undefined : vm.duplicatePage}
             onRenamePage={isHistoryReadOnly ? undefined : vm.renamePage}
@@ -684,7 +705,7 @@ export function EditorShell({ services }: EditorShellProps) {
         zoomPercent={vm.zoomPercent}
         onResetZoom={vm.resetZoom}
         onOpenSettings={vm.openSettings}
-        onTogglePagesPanel={vm.togglePagesPanel}
+        onTogglePagesPanel={togglePagesPanel}
         onZoomIn={vm.zoomIn}
         onZoomOut={vm.zoomOut}
       />
