@@ -45,7 +45,8 @@ export function EditorShell({ services }: EditorShellProps) {
     vm.project.pages.findIndex((page) => page.id === vm.activePageId),
   );
   const publicSharingAvailable = vm.mirrorState.enabled && vm.mirrorState.status === 'synced';
-  const publicSharingUnavailableReason = vm.mirrorState.error ?? 'Public sharing requires active external storage.';
+  const publicSharingUnavailableReason =
+    'Public links cannot be created without remote storage.';
 
   function exportCurrentPageAsPng() {
     const dataUrl = stageRef.current?.toDataURL({ mimeType: 'image/png', pixelRatio: 2 });
@@ -278,8 +279,6 @@ export function EditorShell({ services }: EditorShellProps) {
         canUndo={!isHistoryReadOnly && vm.canUndo}
         hasSelection={!isHistoryReadOnly && hasSelection}
         persistenceEnabled={vm.persistenceEnabled}
-        publicSharingAvailable={publicSharingAvailable}
-        publicSharingUnavailableReason={publicSharingUnavailableReason}
         mirrorState={vm.mirrorState}
         mirrorDisabledBySettings={vm.mirrorDisabledBySettings}
         persistenceAttention={vm.persistenceAttention}
@@ -622,6 +621,9 @@ export function EditorShell({ services }: EditorShellProps) {
             setSharePanelOpen(false);
           }}
           onCopyLink={copyPublicShareLink}
+          publicLinkUnavailableReason={
+            publicSharingAvailable ? undefined : publicSharingUnavailableReason
+          }
           onDownload={exportCurrentPageAsPng}
           onPresent={presentFromSharePanel}
         />

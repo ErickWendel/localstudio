@@ -240,7 +240,7 @@ describe('TopToolbar', () => {
     expect(screen.getByText('Mirroring')).toBeInTheDocument();
   });
 
-  it('disables sharing until MinIO external storage is ready', async () => {
+  it('opens sharing even when MinIO external storage is not ready', async () => {
     const user = userEvent.setup();
     const onShare = vi.fn();
 
@@ -248,19 +248,19 @@ describe('TopToolbar', () => {
       <TopToolbar
         project={sampleProject.createSampleProject()}
         language="PT-BR"
-        publicSharingAvailable={false}
-        publicSharingUnavailableReason="Public sharing requires active external storage."
         onShare={onShare}
       />,
     );
 
     const shareButton = screen.getByRole('button', { name: 'Share' });
-    expect(shareButton).toBeDisabled();
-    expect(shareButton).toHaveAttribute('title', 'Public sharing requires active external storage.');
+    expect(shareButton).not.toBeDisabled();
+    expect(shareButton).toHaveAttribute('title', 'Share');
+    await user.click(shareButton);
+    expect(onShare).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole('button', { name: 'File' }));
-    expect(screen.getByRole('menuitem', { name: 'Share' })).toBeDisabled();
-    expect(onShare).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('menuitem', { name: 'Share' }));
+    expect(onShare).toHaveBeenCalledTimes(2);
   });
 
   it('does not show stale share fallback UI when no share handler is provided', async () => {
