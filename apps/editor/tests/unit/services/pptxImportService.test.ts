@@ -82,6 +82,30 @@ const slideXml = `<?xml version="1.0" encoding="UTF-8"?>
     </p:spTree>
   </p:cSld>
   <p:transition><p:fade/></p:transition>
+  <p:timing>
+    <p:tnLst>
+      <p:par>
+        <p:cTn id="1">
+          <p:childTnLst>
+            <p:par>
+              <p:cTn id="2" nodeType="afterEffect" presetClass="entr" dur="700">
+                <p:childTnLst><p:anim><p:cBhvr><p:tgtEl><p:spTgt spid="2"/></p:tgtEl></p:cBhvr></p:anim></p:childTnLst>
+              </p:cTn>
+            </p:par>
+            <p:par>
+              <p:cTn id="3" nodeType="clickEffect" presetClass="exit" dur="450">
+                <p:childTnLst><p:anim><p:cBhvr><p:tgtEl><p:spTgt spid="3"/></p:tgtEl></p:cBhvr></p:anim></p:childTnLst>
+              </p:cTn>
+            </p:par>
+          </p:childTnLst>
+        </p:cTn>
+      </p:par>
+    </p:tnLst>
+    <p:bldLst>
+      <p:bldP spid="2"/>
+      <p:bldP spid="3"/>
+    </p:bldLst>
+  </p:timing>
 </p:sld>`;
 
 function createPptxFixture() {
@@ -109,7 +133,22 @@ describe('BrowserPptxImportService', () => {
     expect(project.pages[0]?.width).toBe(1920);
     expect(project.pages[0]?.height).toBe(1080);
     expect(project.pages[0]?.transition?.effect).toBe('fade');
-    expect(project.pages[0]?.animationBuilds).toBeUndefined();
+    expect(project.pages[0]?.animationBuilds).toMatchObject([
+      {
+        elementId: 'pptx-page-1-slide-text-2',
+        effect: 'reveal',
+        trigger: 'after-transition',
+        durationMs: 700,
+        kind: 'build-in',
+      },
+      {
+        elementId: 'pptx-page-1-slide-image-3',
+        effect: 'reveal',
+        trigger: 'on-click',
+        durationMs: 450,
+        kind: 'build-out',
+      },
+    ]);
 
     const elements = Object.values(project.elements);
     const textElement = elements.find(

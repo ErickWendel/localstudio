@@ -1,9 +1,10 @@
 interface SettingsPanelProps {
   onClose: () => void;
+  onOpenMediaSettings: () => void;
   onOpenMirrorSettings: () => void;
 }
 
-export function SettingsPanel({ onClose, onOpenMirrorSettings }: SettingsPanelProps) {
+export function SettingsPanel({ onClose, onOpenMediaSettings, onOpenMirrorSettings }: SettingsPanelProps) {
   return (
     <aside className="settings-panel" role="dialog" aria-modal="false" aria-label="Settings">
       <div className="settings-panel-header">
@@ -19,6 +20,12 @@ export function SettingsPanel({ onClose, onOpenMirrorSettings }: SettingsPanelPr
           cloud_sync
         </span>
         <span>Mirror settings</span>
+      </button>
+      <button className="settings-panel-row" type="button" onClick={onOpenMediaSettings}>
+        <span className="material-symbols-outlined" aria-hidden="true">
+          image_search
+        </span>
+        <span>Media integrations</span>
       </button>
     </aside>
   );

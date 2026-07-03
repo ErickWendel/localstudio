@@ -33,11 +33,16 @@ describe('PowerPoint sample regression', () => {
     const authorLabel = project.pages[2]?.elementIds
       .map((elementId) => project.elements[elementId])
       .find((element) => element?.type === 'text' && element.text === 'Erick Wendel');
+    const animationBuildCount = project.pages.reduce(
+      (count, page) => count + (page.animationBuilds?.length ?? 0),
+      0,
+    );
 
     expect(project.pages).toHaveLength(66);
     expect(project.pages.filter((page) => page.elementIds.length > 0)).toHaveLength(66);
     expect(elements.filter((element) => element.type === 'text').length).toBeGreaterThan(0);
     expect(elements.filter((element) => element.type === 'video').length).toBeGreaterThan(0);
+    expect(animationBuildCount).toBeGreaterThan(0);
     expect(slide15?.background).toEqual({ type: 'color', color: '#3E3E3E' });
     expect(
       slide15TextElements
@@ -45,12 +50,9 @@ describe('PowerPoint sample regression', () => {
         .every((element) => element.height >= element.fontSize),
     ).toBe(true);
     expect(slide15ImageElements.length).toBeGreaterThan(0);
-    expect(authorLabel).toMatchObject({
-      height: expect.any(Number),
-      type: 'text',
-      width: expect.any(Number),
-    });
     if (!authorLabel || authorLabel.type !== 'text') throw new Error('Expected author text label.');
+    expect(authorLabel.height).toEqual(expect.any(Number));
+    expect(authorLabel.width).toEqual(expect.any(Number));
     expect(authorLabel.width).toBeGreaterThanOrEqual(300);
     expect(authorLabel.height).toBeGreaterThanOrEqual(authorLabel.fontSize * 1.35);
     expect(slide29Text).toContain('Por que uma LLM');

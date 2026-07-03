@@ -6,6 +6,7 @@ interface TextSelectionToolbarProps {
   disabled?: boolean;
   canTranslateSelection?: boolean;
   element: TextElement;
+  onOpenAnimations?: () => void;
   onTranslateSelectedText?: () => void;
   onUpdateElementStyle?: (elementId: string, patch: ElementStylePatch) => void;
 }
@@ -18,6 +19,7 @@ export function TextSelectionToolbar({
   disabled = false,
   canTranslateSelection = false,
   element,
+  onOpenAnimations,
   onTranslateSelectedText,
   onUpdateElementStyle,
 }: TextSelectionToolbarProps) {
@@ -97,7 +99,9 @@ export function TextSelectionToolbar({
       <button
         aria-pressed={isBold}
         aria-label="Bold text"
-        className={isBold ? 'text-toolbar-button text-toolbar-button-active' : 'text-toolbar-button'}
+        className={
+          isBold ? 'text-toolbar-button text-toolbar-button-active' : 'text-toolbar-button'
+        }
         disabled={disabled || element.locked}
         type="button"
         onClick={() => {
@@ -113,7 +117,11 @@ export function TextSelectionToolbar({
             key={align}
             aria-label={`Align text ${align}`}
             aria-pressed={element.align === align}
-            className={element.align === align ? 'text-toolbar-button text-toolbar-button-active' : 'text-toolbar-button'}
+            className={
+              element.align === align
+                ? 'text-toolbar-button text-toolbar-button-active'
+                : 'text-toolbar-button'
+            }
             disabled={disabled || element.locked}
             type="button"
             onClick={() => {
@@ -121,11 +129,28 @@ export function TextSelectionToolbar({
             }}
           >
             <span className="material-symbols-outlined" aria-hidden="true">
-              {align === 'left' ? 'format_align_left' : align === 'center' ? 'format_align_center' : 'format_align_right'}
+              {align === 'left'
+                ? 'format_align_left'
+                : align === 'center'
+                  ? 'format_align_center'
+                  : 'format_align_right'}
             </span>
           </button>
         ))}
       </div>
+
+      <button
+        aria-label="Animate"
+        className="text-toolbar-button"
+        disabled={disabled}
+        title="Animate"
+        type="button"
+        onClick={onOpenAnimations}
+      >
+        <span className="material-symbols-outlined" aria-hidden="true">
+          animation
+        </span>
+      </button>
 
       <button
         aria-label="Translate Selected Text"

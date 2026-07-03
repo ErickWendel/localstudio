@@ -14,6 +14,7 @@ import { EditorFooter } from './EditorFooter';
 import { PresentationImportProgressOverlay } from './PresentationImportProgressOverlay';
 import { LeftToolPanel } from '../panels/LeftToolPanel';
 import { LocalProjectSetupPanel } from '../panels/LocalProjectSetupPanel';
+import { MediaIntegrationSettingsPanel } from '../panels/MediaIntegrationSettingsPanel';
 import { MirrorSettingsPanel } from '../panels/MirrorSettingsPanel';
 import { PagesPanel } from '../panels/PagesPanel';
 import { ProjectVideoPreloader } from '../media/ProjectVideoPreloader';
@@ -446,10 +447,25 @@ export function EditorShell({ services }: EditorShellProps) {
                   void vm.importImageFile(file);
                 }
           }
+          stockGifResults={vm.stockGifResults}
+          stockImageResults={vm.stockImageResults}
+          stockMediaError={vm.stockMediaError}
+          stockMediaProviderState={vm.stockMediaProviderState}
+          stockMediaRecentItems={vm.stockMediaRecentItems}
+          stockMediaSearchingGifs={vm.stockMediaSearching.gifs}
+          stockMediaSearchingImages={vm.stockMediaSearching.images}
+          onConfigureStockMedia={vm.openMediaSettings}
           onRemoveAsset={isHistoryReadOnly ? undefined : vm.removeAsset}
           onImportMedia={isHistoryReadOnly ? undefined : importMediaFile}
+          onInsertStockMedia={isHistoryReadOnly ? undefined : vm.insertStockMedia}
           onInsertText={isHistoryReadOnly ? undefined : vm.insertTextElement}
           onInsertShape={isHistoryReadOnly ? undefined : vm.insertShapeElement}
+          onSearchStockGifs={(query) => {
+            void vm.searchStockGifs(query);
+          }}
+          onSearchStockImages={(query) => {
+            void vm.searchStockImages(query);
+          }}
           modelStates={vm.modelStates}
           attentionModelId={
             vm.aiToolsAttentionModelId ??
@@ -695,13 +711,33 @@ export function EditorShell({ services }: EditorShellProps) {
         />
       ) : null}
       {vm.settingsOpen ? (
-        <SettingsPanel onClose={vm.closeSettings} onOpenMirrorSettings={vm.openMirrorSettings} />
+        <SettingsPanel
+          onClose={vm.closeSettings}
+          onOpenMediaSettings={vm.openMediaSettings}
+          onOpenMirrorSettings={vm.openMirrorSettings}
+        />
+      ) : null}
+      {vm.mediaSettingsOpen ? (
+        <MediaIntegrationSettingsPanel
+          config={vm.stockMediaConfig}
+          onClear={vm.clearStockMediaConfig}
+          onBack={() => {
+            vm.closeMediaSettings();
+            vm.openSettings();
+          }}
+          onClose={vm.closeMediaSettings}
+          onSave={vm.saveStockMediaConfig}
+        />
       ) : null}
       {vm.mirrorSettingsOpen ? (
         <MirrorSettingsPanel
           config={vm.mirrorConfig}
           mirrorState={vm.mirrorState}
           mirrorDisabledBySettings={vm.mirrorDisabledBySettings}
+          onBack={() => {
+            vm.closeMirrorSettings();
+            vm.openSettings();
+          }}
           onClose={vm.closeMirrorSettings}
           onEnabledChange={vm.setMirrorEnabledFromSettings}
           onSave={vm.saveMirrorConfig}

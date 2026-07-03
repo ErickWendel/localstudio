@@ -3,8 +3,31 @@ name: CI
 on:
   push:
     branches: [main]
+    paths:
+      - '.github/workflows/ci.yml'
+      - 'apps/**'
+      - 'packages/**'
+      - 'scripts/**'
+      - 'eslint.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'prettier.config.cjs'
+      - 'tsconfig.json'
+      - '!**/*.md'
   pull_request:
     branches: [main]
+    paths:
+      - '.github/workflows/ci.yml'
+      - 'apps/**'
+      - 'packages/**'
+      - 'scripts/**'
+      - 'eslint.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'prettier.config.cjs'
+      - 'tsconfig.json'
+      - '!**/*.md'
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -14,6 +37,10 @@ jobs:
   checks:
     name: Lint, typecheck, test, and build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
 
     steps:
       - name: Checkout
@@ -37,5 +64,52 @@ jobs:
       - name: Test
         run: npm run test
 
+      - name: Setup Pages
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/configure-pages@v5
+
       - name: Build
         run: npm run build
+        env:
+          LOCALSTUDIO_BASE_PATH: /
+
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    name: Deploy site
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment_result.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment_attempt_1
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      - name: Wait before retry
+        if: steps.deployment_attempt_1.outcome == 'failure'
+        run: sleep 30
+
+      - name: Retry deploy to GitHub Pages
+        id: deployment_attempt_2
+        if: steps.deployment_attempt_1.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+
+      - name: Resolve deployment URL
+        id: deployment_result
+        if: always()
+        run: echo "page_url=${{ steps.deployment_attempt_1.outputs.page_url || steps.deployment_attempt_2.outputs.page_url }}" >> "$GITHUB_OUTPUT"

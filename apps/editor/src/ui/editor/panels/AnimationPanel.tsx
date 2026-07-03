@@ -1,5 +1,8 @@
 import { useState, type DragEvent } from 'react';
 import type {
+  AnimationEffect,
+  AnimationLineDrawDirection,
+  DesignElement,
   ElementAnimationBuild,
   ElementAnimationBuild as ElementAnimationPatchSource,
   ProjectDocument,
@@ -29,7 +32,9 @@ interface AnimationPanelProps {
   onClearPageTransition?: (() => void) | undefined;
   onPlayAnimationPreview?: (() => void) | undefined;
   onReorderElementAnimationBuild?: ((elementId: string, targetIndex: number) => void) | undefined;
-  onSetElementAnimationBuilds?: ((elementIds: string[], patch: ElementAnimationPatch) => void) | undefined;
+  onSetElementAnimationBuilds?:
+    | ((elementIds: string[], patch: ElementAnimationPatch) => void)
+    | undefined;
   onSetPageTransition?: ((transition: SlideTransition) => void) | undefined;
 }
 
@@ -54,6 +59,7 @@ const ANIMATION_EFFECT_OPTIONS = [
   { label: 'Push', value: 'push' },
   { label: 'Wipe', value: 'wipe' },
 ] as const;
+const DEFAULT_LINE_DRAW_DIRECTION: AnimationLineDrawDirection = 'start-to-end';
 
 function getElementLabel(project: ProjectDocument, elementId: string) {
   const element = project.elements[elementId];
@@ -67,8 +73,69 @@ function getElementLabel(project: ProjectDocument, elementId: string) {
 
 function getBuildPatch(build: ElementAnimationBuild | undefined): ElementAnimationPatch {
   return build
-    ? { effect: build.effect, trigger: build.trigger, delayMs: build.delayMs }
+    ? {
+        effect: build.effect,
+        trigger: build.trigger,
+        delayMs: build.delayMs,
+        ...(build.direction ? { direction: build.direction } : {}),
+        ...(build.durationMs !== undefined ? { durationMs: build.durationMs } : {}),
+        ...(build.kind ? { kind: build.kind } : {}),
+        ...(build.lineDrawDirection ? { lineDrawDirection: build.lineDrawDirection } : {}),
+      }
     : DEFAULT_ELEMENT_ANIMATION;
+}
+
+function getAvailableEffects(element: DesignElement | undefined) {
+  return {
+    canLineDraw: element?.type === 'shape',
+    canKeyboardType: element?.type === 'text',
+  };
+}
+
+function getAvailableEffectsForElements(elements: DesignElement[]) {
+  return {
+    canLineDraw: elements.length > 0 && elements.every((element) => element.type === 'shape'),
+    canKeyboardType: elements.length > 0 && elements.every((element) => element.type === 'text'),
+  };
+}
+
+function toAnimationEffect(
+  value: string,
+  availableEffects: ReturnType<typeof getAvailableEffects>,
+): AnimationEffect {
+  if (
+    value === 'dissolve' ||
+    value === 'fade' ||
+    value === 'push' ||
+    value === 'wipe'
+  ) {
+    return value;
+  }
+  if (value === 'line-draw' && availableEffects.canLineDraw) return 'line-draw';
+  if (value === 'keyboard-typing' && availableEffects.canKeyboardType) return 'keyboard-typing';
+  return 'reveal';
+}
+
+function toLineDrawDirection(value: string): AnimationLineDrawDirection {
+  if (value === 'end-to-start') return 'end-to-start';
+  if (value === 'middle-to-ends') return 'middle-to-ends';
+  return 'start-to-end';
+}
+
+function getAnimationEffectPatch(
+  effect: AnimationEffect,
+  patch: ElementAnimationPatch,
+): ElementAnimationPatch {
+  if (effect === 'line-draw') {
+    return {
+      ...patch,
+      effect,
+      lineDrawDirection: patch.lineDrawDirection ?? DEFAULT_LINE_DRAW_DIRECTION,
+    };
+  }
+  const { lineDrawDirection, ...nextPatch } = patch;
+  void lineDrawDirection;
+  return { ...nextPatch, effect };
 }
 
 function toDurationMs(value: string) {
@@ -136,10 +203,28 @@ export function AnimationPanel({
   onSetElementAnimationBuilds,
   onSetPageTransition,
 }: AnimationPanelProps) {
-  const [dropIndicator, setDropIndicator] = useState<{ elementId: string; position: DropPosition } | undefined>();
+  const [dropIndicator, setDropIndicator] = useState<
+    { elementId: string; position: DropPosition } | undefined
+  >();
+  const [newAnimationEffect, setNewAnimationEffect] = useState<AnimationEffect>('reveal');
+  const [newLineDrawDirection, setNewLineDrawDirection] = useState<AnimationLineDrawDirection>(
+    DEFAULT_LINE_DRAW_DIRECTION,
+  );
   const page = project.pages.find((item) => item.id === activePageId);
-  const selectedElementIds = selection.elementIds.filter((elementId) => page?.elementIds.includes(elementId));
-  const animationBuilds = (page?.animationBuilds ?? []).filter((build) => page?.elementIds.includes(build.elementId));
+  const selectedElementIds = selection.elementIds.filter((elementId) =>
+    page?.elementIds.includes(elementId),
+  );
+  const selectedElements = selectedElementIds
+    .map((elementId) => project.elements[elementId])
+    .filter((element): element is DesignElement => Boolean(element));
+  const selectedAvailableEffects = getAvailableEffectsForElements(selectedElements);
+  const selectedNewAnimationEffect = toAnimationEffect(
+    newAnimationEffect,
+    selectedAvailableEffects,
+  );
+  const animationBuilds = (page?.animationBuilds ?? []).filter((build) =>
+    page?.elementIds.includes(build.elementId),
+  );
   const transition = page?.transition;
   const activePreviewBuildElementId =
     animationPreview?.pageId === activePageId && animationPreview.playing
@@ -163,12 +248,20 @@ export function AnimationPanel({
     const position = getDropPosition(event);
     setDropIndicator(undefined);
     const draggedElementId =
-      event.dataTransfer.getData(ANIMATION_BUILD_DRAG_TYPE) || event.dataTransfer.getData('text/plain');
+      event.dataTransfer.getData(ANIMATION_BUILD_DRAG_TYPE) ||
+      event.dataTransfer.getData('text/plain');
     if (!draggedElementId || draggedElementId === targetElementId) return;
-    const buildsWithoutDragged = animationBuilds.filter((build) => build.elementId !== draggedElementId);
-    const targetIndex = buildsWithoutDragged.findIndex((build) => build.elementId === targetElementId);
+    const buildsWithoutDragged = animationBuilds.filter(
+      (build) => build.elementId !== draggedElementId,
+    );
+    const targetIndex = buildsWithoutDragged.findIndex(
+      (build) => build.elementId === targetElementId,
+    );
     if (targetIndex === -1) return;
-    onReorderElementAnimationBuild?.(draggedElementId, position === 'after' ? targetIndex + 1 : targetIndex);
+    onReorderElementAnimationBuild?.(
+      draggedElementId,
+      position === 'after' ? targetIndex + 1 : targetIndex,
+    );
   }
 
   return (
@@ -239,9 +332,12 @@ export function AnimationPanel({
           ) : null}
           {animationBuilds.map((build, index) => {
             const elementId = build.elementId;
+            const element = project.elements[elementId];
             const label = getElementLabel(project, elementId);
             const patch = getBuildPatch(build);
-            const dropPosition = dropIndicator?.elementId === elementId ? dropIndicator.position : undefined;
+            const availableEffects = getAvailableEffects(element);
+            const dropPosition =
+              dropIndicator?.elementId === elementId ? dropIndicator.position : undefined;
             const isActivePreviewBuild = activePreviewBuildElementId === elementId;
             const rowClassName = [
               'animation-build-row',
@@ -263,18 +359,26 @@ export function AnimationPanel({
                 onDragEnd={() => setDropIndicator(undefined)}
                 onDragLeave={(event) => {
                   if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
-                  setDropIndicator((current) => (current?.elementId === elementId ? undefined : current));
+                  setDropIndicator((current) =>
+                    current?.elementId === elementId ? undefined : current,
+                  );
                 }}
                 onDragOver={(event) => handleBuildDragOver(event, elementId)}
                 onDragStart={(event) => handleBuildDragStart(event, elementId)}
                 onDrop={(event) => handleBuildDrop(event, elementId)}
               >
                 {isActivePreviewBuild ? (
-                  <span className="animation-build-playhead" aria-label={`Current animation step ${index + 1}`} />
+                  <span
+                    className="animation-build-playhead"
+                    aria-label={`Current animation step ${index + 1}`}
+                  />
                 ) : null}
                 <div className="animation-build-title">
                   <span className="animation-build-name">
-                    <span className="material-symbols-outlined animation-build-drag-handle" aria-hidden="true">
+                    <span
+                      className="material-symbols-outlined animation-build-drag-handle"
+                      aria-hidden="true"
+                    >
                       drag_indicator
                     </span>
                     <span className="animation-build-number" aria-label={`Build ${index + 1}`}>
@@ -327,10 +431,13 @@ export function AnimationPanel({
                         onClearElementAnimationBuild?.(elementId);
                         return;
                       }
-                      onSetElementAnimationBuilds?.([elementId], {
-                        ...patch,
-                        effect: event.target.value as ElementAnimationPatch['effect'],
-                      });
+                      onSetElementAnimationBuilds?.(
+                        [elementId],
+                        getAnimationEffectPatch(
+                          toAnimationEffect(event.target.value, availableEffects),
+                          patch,
+                        ),
+                      );
                     }}
                   >
                     <option value="none">None</option>
@@ -339,8 +446,33 @@ export function AnimationPanel({
                         {option.label}
                       </option>
                     ))}
+                    {availableEffects.canLineDraw ? (
+                      <option value="line-draw">Line draw</option>
+                    ) : null}
+                    {availableEffects.canKeyboardType ? (
+                      <option value="keyboard-typing">Keyboard typing</option>
+                    ) : null}
                   </select>
                 </label>
+                {patch.effect === 'line-draw' ? (
+                  <label className="animation-field">
+                    <span>Direction</span>
+                    <select
+                      aria-label={`Line draw direction for ${label}`}
+                      value={patch.lineDrawDirection ?? DEFAULT_LINE_DRAW_DIRECTION}
+                      onChange={(event) => {
+                        onSetElementAnimationBuilds?.([elementId], {
+                          ...patch,
+                          lineDrawDirection: toLineDrawDirection(event.target.value),
+                        });
+                      }}
+                    >
+                      <option value="start-to-end">Start to end</option>
+                      <option value="end-to-start">End to start</option>
+                      <option value="middle-to-ends">Middle to ends</option>
+                    </select>
+                  </label>
+                ) : null}
                 <label className="animation-field">
                   <span>Start</span>
                   <select
@@ -378,11 +510,63 @@ export function AnimationPanel({
             );
           })}
         </div>
+        {selectedElementIds.length > 0 ? (
+          <>
+            <label className="animation-field">
+              <span>New effect</span>
+              <select
+                aria-label="New object animation effect"
+                value={selectedNewAnimationEffect}
+                onChange={(event) => {
+                  setNewAnimationEffect(
+                    toAnimationEffect(event.target.value, selectedAvailableEffects),
+                  );
+                }}
+              >
+                {ANIMATION_EFFECT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+                {selectedAvailableEffects.canLineDraw ? (
+                  <option value="line-draw">Line draw</option>
+                ) : null}
+                {selectedAvailableEffects.canKeyboardType ? (
+                  <option value="keyboard-typing">Keyboard typing</option>
+                ) : null}
+              </select>
+            </label>
+            {selectedNewAnimationEffect === 'line-draw' ? (
+              <label className="animation-field">
+                <span>Direction</span>
+                <select
+                  aria-label="New line draw direction"
+                  value={newLineDrawDirection}
+                  onChange={(event) => {
+                    setNewLineDrawDirection(toLineDrawDirection(event.target.value));
+                  }}
+                >
+                  <option value="start-to-end">Start to end</option>
+                  <option value="end-to-start">End to start</option>
+                  <option value="middle-to-ends">Middle to ends</option>
+                </select>
+              </label>
+            ) : null}
+          </>
+        ) : null}
         <button
           className="compact-action compact-action-full"
           disabled={selectedElementIds.length === 0}
           type="button"
-          onClick={() => onSetElementAnimationBuilds?.(selectedElementIds, DEFAULT_ELEMENT_ANIMATION)}
+          onClick={() =>
+            onSetElementAnimationBuilds?.(
+              selectedElementIds,
+              getAnimationEffectPatch(selectedNewAnimationEffect, {
+                ...DEFAULT_ELEMENT_ANIMATION,
+                lineDrawDirection: newLineDrawDirection,
+              }),
+            )
+          }
         >
           <span className="material-symbols-outlined" aria-hidden="true">
             add

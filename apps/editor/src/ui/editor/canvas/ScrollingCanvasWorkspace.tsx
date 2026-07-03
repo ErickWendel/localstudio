@@ -131,6 +131,9 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
               element={selectedElement}
               canTranslateSelection={Boolean(canvasProps.canTranslateSelection)}
               disabled={textToolbarDisabled}
+              {...(canvasProps.onOpenAnimations
+                ? { onOpenAnimations: canvasProps.onOpenAnimations }
+                : {})}
               {...(canvasProps.onTranslateSelectedText
                 ? { onTranslateSelectedText: canvasProps.onTranslateSelectedText }
                 : {})}

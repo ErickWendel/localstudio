@@ -1,4 +1,9 @@
-import type { AnimationEffect } from '../../../domain/documents/model';
+import type {
+  AnimationEffect,
+  AnimationTrigger,
+  ElementAnimationBuild,
+  ElementAnimationKind,
+} from '../../../domain/documents/model';
 import { pptxFileUtils } from './pptxFileUtils';
 import type { PptxPackageFile } from './pptxPackageTypes';
 import { pptxXml } from './pptxXml';
@@ -23,6 +28,7 @@ export type PptxSlideObject =
       frame: PptxRect;
       id: string;
       kind: 'text';
+      sourceShapeId: string;
       style: PptxTextStyle;
       text: string;
       zIndex: number;
@@ -32,6 +38,7 @@ export type PptxSlideObject =
       frame: PptxRect;
       id: string;
       kind: 'image' | 'gif' | 'video';
+      sourceShapeId: string;
       zIndex: number;
     };
 
@@ -39,6 +46,7 @@ export interface PptxSlide {
   backgroundColor: string;
   id: string;
   name: string;
+  animationBuilds: ElementAnimationBuild[];
   objects: PptxSlideObject[];
   transitionEffect: AnimationEffect;
 }
@@ -199,10 +207,12 @@ function parseTextObject(
   if (!text) return undefined;
   const frame = parseFrame(shape, scaleX, scaleY);
   if (!frame) return undefined;
+  const shapeId = localShapeId(shape, String(zIndex));
   return {
     frame,
-    id: `${slideId}-${idScope}-text-${localShapeId(shape, String(zIndex))}`,
+    id: `${slideId}-${idScope}-text-${shapeId}`,
     kind: 'text',
+    sourceShapeId: shapeId,
     style: getTextStyle(shape),
     text,
     zIndex,
@@ -236,11 +246,13 @@ function parsePictureObject(
   const mimeType = pptxFileUtils.getMimeType(assetPath);
   const assetType = pptxFileUtils.getAssetType(assetPath, mimeType);
   if (!assetType) return undefined;
+  const shapeId = localShapeId(picture, String(zIndex));
   return {
     assetPath,
     frame,
-    id: `${slideId}-${idScope}-${assetType}-${localShapeId(picture, String(zIndex))}`,
+    id: `${slideId}-${idScope}-${assetType}-${shapeId}`,
     kind: assetType,
+    sourceShapeId: shapeId,
     zIndex,
   };
 }
@@ -257,6 +269,74 @@ function getTransitionEffect(document: Document): AnimationEffect {
   if (pptxXml.firstDescendant(transition, 'push')) return 'push';
   if (pptxXml.firstDescendant(transition, 'wipe')) return 'wipe';
   return 'dissolve';
+}
+
+function toBuildKind(value: string | null): ElementAnimationKind {
+  if (value === 'exit') return 'build-out';
+  if (value === 'emph') return 'emphasis';
+  return 'build-in';
+}
+
+function toBuildTrigger(value: string | null, index: number): AnimationTrigger {
+  if (value === 'clickEffect') return 'on-click';
+  if (value === 'afterEffect') return index === 0 ? 'after-transition' : 'after-previous';
+  return index === 0 ? 'after-transition' : 'on-click';
+}
+
+function toMilliseconds(value: string | null, fallback: number) {
+  if (!value || value === 'indefinite') return fallback;
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) && numericValue >= 0 ? numericValue : fallback;
+}
+
+function findBuildTimingNode(document: Document, sourceShapeId: string) {
+  for (const behavior of pptxXml.descendants(document, 'cBhvr')) {
+    const targetShapeId = pptxXml.firstDescendant(behavior, 'spTgt')?.getAttribute('spid');
+    if (targetShapeId !== sourceShapeId) continue;
+    let current: Element | null = behavior;
+    while (current) {
+      if (current.localName === 'cTn' && current.hasAttribute('nodeType')) return current;
+      current = current.parentElement;
+    }
+  }
+  return undefined;
+}
+
+function getBuildDurationMs(timingNode: Element | undefined) {
+  const childDuration = timingNode
+    ? pptxXml.descendants(timingNode, 'cTn').find((item) => item.hasAttribute('dur'))?.getAttribute('dur')
+    : undefined;
+  return toMilliseconds(childDuration ?? timingNode?.getAttribute('dur') ?? null, 500);
+}
+
+function parseAnimationBuilds(
+  document: Document,
+  slideId: string,
+  objects: PptxSlideObject[],
+): ElementAnimationBuild[] {
+  const slideObjectsByShapeId = new Map(
+    objects
+      .filter((object) => object.id.includes('-slide-'))
+      .map((object) => [object.sourceShapeId, object]),
+  );
+  const builds: ElementAnimationBuild[] = [];
+  pptxXml.descendants(document, 'bldP').forEach((build, index) => {
+    const sourceShapeId = build.getAttribute('spid');
+    if (!sourceShapeId) return;
+    const object = slideObjectsByShapeId.get(sourceShapeId);
+    if (!object) return;
+    const timingNode = findBuildTimingNode(document, sourceShapeId);
+    builds.push({
+      id: `${slideId}-build-${index + 1}-${object.id}`,
+      elementId: object.id,
+      effect: 'reveal',
+      trigger: toBuildTrigger(timingNode?.getAttribute('nodeType') ?? null, index),
+      delayMs: 0,
+      durationMs: getBuildDurationMs(timingNode),
+      kind: toBuildKind(timingNode?.getAttribute('presetClass') ?? null),
+    });
+  });
+  return builds;
 }
 
 async function parseInheritedObjects(
@@ -337,6 +417,7 @@ async function parseSlide(
     backgroundColor: getBackgroundColor(document),
     id: slideId,
     name: `Slide ${slideIndex + 1}`,
+    animationBuilds: parseAnimationBuilds(document, slideId, objects),
     objects,
     transitionEffect: getTransitionEffect(document),
   };

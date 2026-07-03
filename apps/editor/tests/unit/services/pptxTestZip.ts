@@ -1,17 +1,14 @@
 interface StoredZipInput {
-  contents: BlobPart;
+  contents: ArrayBuffer | ArrayBufferView | string;
   path: string;
 }
 
 const textEncoder = new TextEncoder();
 
-function toBytes(contents: BlobPart) {
+function toBytes(contents: StoredZipInput['contents']) {
   if (typeof contents === 'string') return textEncoder.encode(contents);
   if (contents instanceof ArrayBuffer) return new Uint8Array(contents);
-  if (ArrayBuffer.isView(contents)) {
-    return new Uint8Array(contents.buffer, contents.byteOffset, contents.byteLength);
-  }
-  return textEncoder.encode(String(contents));
+  return new Uint8Array(contents.buffer, contents.byteOffset, contents.byteLength);
 }
 
 function uint16(value: number) {

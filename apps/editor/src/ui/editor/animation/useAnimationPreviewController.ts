@@ -2,7 +2,9 @@ import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { ElementAnimationBuild, ProjectDocument } from '../../../domain/documents/model';
 
 export interface AnimationPreviewState {
+  activeBuild: ElementAnimationBuild | undefined;
   activeBuildElementId: string | undefined;
+  animationProgress: number;
   hiddenElementIds: string[];
   mode: 'editor' | 'presenter';
   pageId: string;
@@ -18,6 +20,10 @@ interface AnimationPreviewControllerOptions {
   setSelectedElementIds: (elementIds: string[]) => void;
 }
 
+function getBuildPlaybackDurationMs(build: ElementAnimationBuild) {
+  return Math.max(0, build.durationMs ?? build.delayMs);
+}
+
 export function useAnimationPreviewController({
   activePageIdRef,
   projectRef,
@@ -27,12 +33,17 @@ export function useAnimationPreviewController({
   const [animationPreview, setAnimationPreview] = useState<AnimationPreviewState | undefined>();
   const animationPreviewQueueRef = useRef<ElementAnimationBuild[]>([]);
   const animationPreviewTimeoutsRef = useRef<number[]>([]);
+  const animationPreviewFrameRef = useRef<number | undefined>(undefined);
 
   function clearAnimationPreviewTimers() {
     for (const timeoutId of animationPreviewTimeoutsRef.current) {
       window.clearTimeout(timeoutId);
     }
     animationPreviewTimeoutsRef.current = [];
+    if (animationPreviewFrameRef.current !== undefined) {
+      window.cancelAnimationFrame(animationPreviewFrameRef.current);
+      animationPreviewFrameRef.current = undefined;
+    }
   }
 
   function scheduleAnimationPreview(callback: () => void, delayMs: number) {
@@ -53,7 +64,9 @@ export function useAnimationPreviewController({
       current
         ? {
             ...current,
+            activeBuild: undefined,
             activeBuildElementId: undefined,
+            animationProgress: 1,
             hiddenElementIds: [],
             phase: 'complete',
             waitingForClick: false,
@@ -67,12 +80,59 @@ export function useAnimationPreviewController({
       current
         ? {
             ...current,
+            activeBuild: undefined,
             activeBuildElementId: undefined,
-            hiddenElementIds: current.hiddenElementIds.filter((elementId) => elementId !== build.elementId),
+            animationProgress: 1,
+            hiddenElementIds: current.hiddenElementIds.filter(
+              (elementId) => elementId !== build.elementId,
+            ),
             waitingForClick: false,
           }
         : current,
     );
+  }
+
+  function animateActiveBuild(build: ElementAnimationBuild) {
+    const durationMs = getBuildPlaybackDurationMs(build);
+    const startMs = window.performance.now();
+    if (animationPreviewFrameRef.current !== undefined) {
+      window.cancelAnimationFrame(animationPreviewFrameRef.current);
+      animationPreviewFrameRef.current = undefined;
+    }
+
+    setAnimationPreview((current) =>
+      current
+        ? {
+            ...current,
+            activeBuild: build,
+            activeBuildElementId: build.elementId,
+            animationProgress: durationMs === 0 ? 1 : 0,
+            phase: 'animation',
+            waitingForClick: false,
+          }
+        : current,
+    );
+
+    if (durationMs === 0) return;
+
+    function tick(nowMs: number) {
+      const progress = Math.min(1, Math.max(0, (nowMs - startMs) / durationMs));
+      setAnimationPreview((current) =>
+        current?.activeBuild?.id === build.id
+          ? {
+              ...current,
+              animationProgress: progress,
+            }
+          : current,
+      );
+      if (progress < 1) {
+        animationPreviewFrameRef.current = window.requestAnimationFrame(tick);
+      } else {
+        animationPreviewFrameRef.current = undefined;
+      }
+    }
+
+    animationPreviewFrameRef.current = window.requestAnimationFrame(tick);
   }
 
   function runNextAnimationBuild() {
@@ -87,7 +147,9 @@ export function useAnimationPreviewController({
         current
           ? {
               ...current,
+              activeBuild: undefined,
               activeBuildElementId: nextBuild.elementId,
+              animationProgress: 0,
               phase: 'waiting',
               waitingForClick: true,
             }
@@ -97,20 +159,11 @@ export function useAnimationPreviewController({
     }
 
     animationPreviewQueueRef.current = animationPreviewQueueRef.current.slice(1);
-    setAnimationPreview((current) =>
-      current
-        ? {
-            ...current,
-            activeBuildElementId: nextBuild.elementId,
-            phase: 'animation',
-            waitingForClick: false,
-          }
-        : current,
-    );
+    animateActiveBuild(nextBuild);
     scheduleAnimationPreview(() => {
       revealAnimationBuild(nextBuild);
       runNextAnimationBuild();
-    }, nextBuild.delayMs);
+    }, getBuildPlaybackDurationMs(nextBuild));
   }
 
   function advanceAnimationPreview() {
@@ -120,31 +173,29 @@ export function useAnimationPreviewController({
       return;
     }
     animationPreviewQueueRef.current = animationPreviewQueueRef.current.slice(1);
-    setAnimationPreview((current) =>
-      current
-        ? {
-            ...current,
-            activeBuildElementId: nextBuild.elementId,
-            phase: 'animation',
-            waitingForClick: false,
-          }
-        : current,
-    );
+    animateActiveBuild(nextBuild);
     scheduleAnimationPreview(() => {
       revealAnimationBuild(nextBuild);
       runNextAnimationBuild();
-    }, nextBuild.delayMs);
+    }, getBuildPlaybackDurationMs(nextBuild));
   }
 
-  function playAnimationPreview(pageId = activePageIdRef.current, mode: AnimationPreviewState['mode'] = 'editor') {
+  function playAnimationPreview(
+    pageId = activePageIdRef.current,
+    mode: AnimationPreviewState['mode'] = 'editor',
+  ) {
     const page = projectRef.current.pages.find((item) => item.id === pageId);
     if (!page) return;
-    const builds = (page.animationBuilds ?? []).filter((build) => page.elementIds.includes(build.elementId));
+    const builds = (page.animationBuilds ?? []).filter((build) =>
+      page.elementIds.includes(build.elementId),
+    );
     clearAnimationPreviewTimers();
     animationPreviewQueueRef.current = builds;
     const transitionDelay = page.transition?.delayMs ?? 0;
     setAnimationPreview({
+      activeBuild: undefined,
       activeBuildElementId: undefined,
+      animationProgress: 0,
       hiddenElementIds: builds.map((build) => build.elementId),
       mode,
       pageId: page.id,

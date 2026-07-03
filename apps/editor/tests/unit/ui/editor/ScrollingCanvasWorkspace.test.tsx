@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
@@ -100,6 +100,7 @@ describe('ScrollingCanvasWorkspace', () => {
 
   it('keeps text editing controls in the sticky slide toolbar and wires translation', async () => {
     const user = userEvent.setup();
+    const onOpenAnimations = vi.fn();
     const onTranslateSelectedText = vi.fn();
     const onUpdateElementStyle = vi.fn();
 
@@ -109,6 +110,7 @@ describe('ScrollingCanvasWorkspace', () => {
         project={sampleProject.createSampleProject()}
         selection={{ pageId: 'page-1', elementIds: ['text-subtitle'] }}
         canTranslateSelection
+        onOpenAnimations={onOpenAnimations}
         onTranslateSelectedText={onTranslateSelectedText}
         onUpdateElementStyle={onUpdateElementStyle}
       />,
@@ -118,7 +120,18 @@ describe('ScrollingCanvasWorkspace', () => {
       screen.getByRole('toolbar', { name: 'Text editing controls' }),
     );
 
-    await user.click(screen.getByRole('button', { name: 'Translate Selected Text' }));
+    await user.click(
+      within(screen.getByTestId('sticky-text-selection-toolbar')).getByRole('button', {
+        name: 'Animate',
+      }),
+    );
+    expect(onOpenAnimations).toHaveBeenCalledTimes(1);
+
+    await user.click(
+      within(screen.getByTestId('sticky-text-selection-toolbar')).getByRole('button', {
+        name: 'Translate Selected Text',
+      }),
+    );
     expect(onTranslateSelectedText).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole('button', { name: 'Align text left' }));

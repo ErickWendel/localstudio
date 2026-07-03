@@ -200,6 +200,13 @@ function map(deck: PptxDeck, files: PptxPackageFile[]): ProjectDocument {
       background: { type: 'color', color: slide.backgroundColor },
       elementIds,
       transition: { effect: slide.transitionEffect, delayMs: 0, durationMs: 500 },
+      ...(slide.animationBuilds.length > 0
+        ? {
+            animationBuilds: slide.animationBuilds.filter((build) =>
+              elementIds.includes(build.elementId),
+            ),
+          }
+        : {}),
       visible: true,
     };
   });
