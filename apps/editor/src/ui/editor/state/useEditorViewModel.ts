@@ -32,6 +32,9 @@ import type {
   ModelDownloadProgressDetails,
   ModelState,
   PromptApiAvailability,
+  StockMediaConfig,
+  StockMediaItem,
+  StockMediaProviderState,
   VersionHistoryEntry,
 } from '../../../services/contracts/interfaces';
 import { minioMirrorService } from '../../../services/mirror/minioMirrorService';
@@ -99,6 +102,16 @@ interface ElementClipboardState {
   elements: DesignElement[];
 }
 
+interface StockMediaSearchState {
+  gifs: boolean;
+  images: boolean;
+}
+
+interface StockMediaErrorState {
+  gifs?: string | undefined;
+  images?: string | undefined;
+}
+
 function getDownloadProgressPatch(
   progress: number,
   details: ModelDownloadProgressDetails | undefined,
@@ -127,6 +140,7 @@ const IMAGE_PROMPT_MODE_REQUIRED_MESSAGE = 'Use Create image from the + menu to 
 const IMAGE_GENERATION_DIMENSION_MULTIPLE = 16;
 const BACKGROUND_PREVIEW_DEBOUNCE_MS = 120;
 const PASTED_ELEMENT_OFFSET = 32;
+const STOCK_MEDIA_RECENT_LIMIT = 12;
 
 function normalizeImageGenerationDimension(value: number) {
   return Math.max(
@@ -462,6 +476,21 @@ export function useEditorViewModel(services: AppServices) {
   }));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mirrorSettingsOpen, setMirrorSettingsOpen] = useState(false);
+  const [mediaSettingsOpen, setMediaSettingsOpen] = useState(false);
+  const [stockMediaConfig, setStockMediaConfig] = useState<StockMediaConfig | null>(() =>
+    services.stockMediaService.loadConfig(),
+  );
+  const [stockMediaProviderState, setStockMediaProviderState] = useState<StockMediaProviderState>(
+    () => services.stockMediaService.getProviderState(),
+  );
+  const [stockImageResults, setStockImageResults] = useState<StockMediaItem[]>([]);
+  const [stockGifResults, setStockGifResults] = useState<StockMediaItem[]>([]);
+  const [stockMediaRecentItems, setStockMediaRecentItems] = useState<StockMediaItem[]>([]);
+  const [stockMediaSearching, setStockMediaSearching] = useState<StockMediaSearchState>({
+    gifs: false,
+    images: false,
+  });
+  const [stockMediaError, setStockMediaError] = useState<StockMediaErrorState>({});
   const [mirrorDisabledBySettings, setMirrorDisabledBySettings] = useState(false);
   const [remoteImportOpen, setRemoteImportOpen] = useState(false);
   const [localProjectSetupOpen, setLocalProjectSetupOpen] = useState(false);
@@ -507,6 +536,19 @@ export function useEditorViewModel(services: AppServices) {
     const element = project.elements[selectedElementIds[0] ?? ''];
     return element?.type === 'image' ? element : undefined;
   }, [project.elements, selectedElementIds]);
+  useEffect(() => {
+    if (stockMediaProviderState.images.configured && stockImageResults.length === 0) {
+      void searchStockImages('');
+    }
+    if (stockMediaProviderState.gifs.configured && stockGifResults.length === 0) {
+      void searchStockGifs('');
+    }
+  }, [
+    stockGifResults.length,
+    stockImageResults.length,
+    stockMediaProviderState.gifs.configured,
+    stockMediaProviderState.images.configured,
+  ]);
   const activeSlideLanguage = useMemo(() => {
     const option = translationLanguageUtils.getLanguageOption(pageLanguageCodes[activePageId]);
     return {
@@ -1591,6 +1633,15 @@ export function useEditorViewModel(services: AppServices) {
     setSettingsOpen(false);
   }
 
+  function openMediaSettings() {
+    setSettingsOpen(false);
+    setMediaSettingsOpen(true);
+  }
+
+  function closeMediaSettings() {
+    setMediaSettingsOpen(false);
+  }
+
   function openMirrorSettings() {
     setSettingsOpen(false);
     setMirrorSettingsOpen(true);
@@ -1613,6 +1664,27 @@ export function useEditorViewModel(services: AppServices) {
     setMirrorState({ enabled: true, status: 'idle' });
     setMirrorSettingsOpen(false);
     void syncMirrorNow();
+  }
+
+  function refreshStockMediaConfig() {
+    setStockMediaConfig(services.stockMediaService.loadConfig());
+    setStockMediaProviderState(services.stockMediaService.getProviderState());
+  }
+
+  function saveStockMediaConfig(config: StockMediaConfig) {
+    services.stockMediaService.saveConfig(config);
+    refreshStockMediaConfig();
+    setMediaSettingsOpen(false);
+    void searchStockImages('');
+    void searchStockGifs('');
+  }
+
+  function clearStockMediaConfig() {
+    services.stockMediaService.clearConfig();
+    refreshStockMediaConfig();
+    setStockImageResults([]);
+    setStockGifResults([]);
+    setStockMediaError({});
   }
 
   function setMirrorEnabled(enabled: boolean, options?: { fromSettings?: boolean }) {
@@ -3154,6 +3226,149 @@ export function useEditorViewModel(services: AppServices) {
     );
   }
 
+  function addRecentStockMedia(item: StockMediaItem) {
+    setStockMediaRecentItems((currentItems) => [
+      item,
+      ...currentItems.filter(
+        (currentItem) => currentItem.provider !== item.provider || currentItem.id !== item.id,
+      ),
+    ].slice(0, STOCK_MEDIA_RECENT_LIMIT));
+  }
+
+  async function searchStockImages(query: string) {
+    setStockMediaSearching((current) => ({ ...current, images: true }));
+    setStockMediaError((current) => ({ ...current, images: undefined }));
+    try {
+      const results = await services.stockMediaService.searchImages(query);
+      setStockImageResults(results);
+      setStockMediaError((current) => ({ ...current, images: undefined }));
+    } catch (error) {
+      setStockImageResults([]);
+      setStockMediaError((current) => ({
+        ...current,
+        images: error instanceof Error ? error.message : 'Unsplash search failed.',
+      }));
+    } finally {
+      setStockMediaSearching((current) => ({ ...current, images: false }));
+    }
+  }
+
+  async function searchStockGifs(query: string) {
+    setStockMediaSearching((current) => ({ ...current, gifs: true }));
+    setStockMediaError((current) => ({ ...current, gifs: undefined }));
+    try {
+      const results = await services.stockMediaService.searchGifs(query);
+      setStockGifResults(results);
+      setStockMediaError((current) => ({ ...current, gifs: undefined }));
+    } catch (error) {
+      setStockGifResults([]);
+      setStockMediaError((current) => ({
+        ...current,
+        gifs: error instanceof Error ? error.message : 'GIPHY search failed.',
+      }));
+    } finally {
+      setStockMediaSearching((current) => ({ ...current, gifs: false }));
+    }
+  }
+
+  async function insertRemoteImage(item: StockMediaItem) {
+    if (item.kind !== 'image') return;
+    const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
+    if (!page) return;
+    await services.stockMediaService.trackImageDownload(item).catch(() => undefined);
+
+    const assetId = createPrefixedId('asset');
+    const elementId = createPrefixedId('image');
+    const fittedMedia = fitImageWithinPage({
+      imageWidth: item.width,
+      imageHeight: item.height,
+      pageWidth: page.width,
+      pageHeight: page.height,
+    });
+
+    commitProject(
+      (currentProject) =>
+        new basicCommands.AddImageElementCommand(activePageId, {
+          asset: {
+            id: assetId,
+            type: 'image',
+            name: item.title,
+            mimeType: 'image/jpeg',
+            objectUrl: item.mediaUrl,
+            storage: 'remote',
+          },
+          element: {
+            id: elementId,
+            type: 'image',
+            assetId,
+            x: fittedMedia.x,
+            y: fittedMedia.y,
+            width: fittedMedia.width,
+            height: fittedMedia.height,
+            rotation: 0,
+            locked: false,
+            visible: true,
+            opacity: 1,
+          },
+        }).execute(currentProject),
+      { selectedElementIds: [elementId] },
+    );
+    addRecentStockMedia(item);
+  }
+
+  async function insertRemoteGif(item: StockMediaItem) {
+    if (item.kind !== 'gif') return;
+    const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
+    if (!page) return;
+
+    const assetId = createPrefixedId('asset');
+    const elementId = createPrefixedId('gif');
+    const fittedMedia = fitImageWithinPage({
+      imageWidth: item.width,
+      imageHeight: item.height,
+      pageWidth: page.width,
+      pageHeight: page.height,
+    });
+
+    commitProject(
+      (currentProject) =>
+        new basicCommands.AddMediaElementCommand(activePageId, {
+          asset: {
+            id: assetId,
+            type: 'gif',
+            name: item.title,
+            mimeType: 'image/gif',
+            objectUrl: item.mediaUrl,
+            storage: 'remote',
+          },
+          element: {
+            id: elementId,
+            type: 'gif',
+            assetId,
+            x: fittedMedia.x,
+            y: fittedMedia.y,
+            width: fittedMedia.width,
+            height: fittedMedia.height,
+            rotation: 0,
+            locked: false,
+            visible: true,
+            opacity: 1,
+            playing: true,
+          },
+        }).execute(currentProject),
+      { selectedElementIds: [elementId] },
+    );
+    addRecentStockMedia(item);
+  }
+
+  function insertStockMedia(item: StockMediaItem) {
+    if (item.kind === 'gif') {
+      void insertRemoteGif(item);
+      return;
+    }
+    void insertRemoteImage(item);
+  }
+
   function updateMediaPlayback(elementId: string, patch: MediaPlaybackPatch) {
     commitProject((currentProject) =>
       new basicCommands.UpdateMediaPlaybackCommand(elementId, patch).execute(currentProject),
@@ -3175,6 +3390,14 @@ export function useEditorViewModel(services: AppServices) {
     mirrorConfig,
     settingsOpen,
     mirrorSettingsOpen,
+    mediaSettingsOpen,
+    stockMediaConfig,
+    stockMediaProviderState,
+    stockImageResults,
+    stockGifResults,
+    stockMediaRecentItems,
+    stockMediaSearching,
+    stockMediaError,
     localProjectSetupOpen,
     remoteImportOpen,
     remoteImportStatus,
@@ -3208,8 +3431,15 @@ export function useEditorViewModel(services: AppServices) {
     confirmLocalProjectSetup,
     openSettings,
     closeSettings,
+    openMediaSettings,
+    closeMediaSettings,
     openMirrorSettings,
     closeMirrorSettings,
+    saveStockMediaConfig,
+    clearStockMediaConfig,
+    searchStockImages,
+    searchStockGifs,
+    insertStockMedia,
     saveMirrorConfig,
     testMirrorConnection,
     syncMirrorNow,

@@ -14,6 +14,7 @@ import type {
   ProjectRepository,
   SmartGrabService,
   ShareService,
+  StockMediaService,
   TranslatorService,
 } from '../services/contracts/interfaces';
 import { inMemoryAiServices } from '../services/testing/inMemoryAiServices';
@@ -28,6 +29,7 @@ import { OpfsProjectRepository } from '../services/storage/opfsProjectRepository
 import { localSetupService } from '../services/browser/localSetupService';
 import { modelSetupService } from '../services/model-setup/modelSetupService';
 import { BrowserShareService } from '../services/sharing/shareService';
+import { BrowserStockMediaService } from '../services/stock-media/stockMediaService';
 import { webGpuLanguageDetectionRuntime } from '../services/translation/webGpuLanguageDetectionRuntime';
 import { webGpuTextGenerationRuntime } from '../services/prompting/webGpuTextGenerationRuntime';
 import { minioMirrorService } from '../services/mirror/minioMirrorService';
@@ -42,6 +44,7 @@ export interface AppServices {
   projectRepository: ProjectRepository;
   exportService: ExportService;
   shareService: ShareService;
+  stockMediaService: StockMediaService;
   localSetupService: LocalSetupService;
   modelSetupService: ModelSetupService;
   translatorService: TranslatorService;
@@ -83,6 +86,7 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     projectRepository: createProjectRepository(persistenceMode),
     exportService: new BrowserExportService(),
     shareService: new BrowserShareService({ mirrorService }),
+    stockMediaService: new BrowserStockMediaService(),
     localSetupService: new localSetupService.BrowserLocalSetupService(),
     modelSetupService: browserModelSetupService,
     translatorService: new browserTranslatorService.BrowserTranslatorService(

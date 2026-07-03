@@ -4,6 +4,7 @@ import { BrowserFileSystemProjectRepository } from '../../../src/services/storag
 import { BrowserImageGenerationService } from '../../../src/services/image-generation/browserImageGenerationService';
 import { DisabledProjectRepository } from '../../../src/services/storage/disabledProjectRepository';
 import { OpfsProjectRepository } from '../../../src/services/storage/opfsProjectRepository';
+import { BrowserStockMediaService } from '../../../src/services/stock-media/stockMediaService';
 
 describe('createAppServices', () => {
   const testWindow = window as Window & { showDirectoryPicker?: unknown };
@@ -67,6 +68,10 @@ describe('createAppServices', () => {
 
   it('wires the browser image generation service', () => {
     expect(createAppServices().imageGenerationService).toBeInstanceOf(BrowserImageGenerationService);
+  });
+
+  it('wires the browser stock media service', () => {
+    expect(createAppServices().stockMediaService).toBeInstanceOf(BrowserStockMediaService);
   });
 
   it('starts new app services with a blank project by default', () => {

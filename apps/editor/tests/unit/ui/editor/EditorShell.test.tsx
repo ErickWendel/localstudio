@@ -14,6 +14,10 @@ import type {
   ShareMetadata,
   ShareRecord,
   ShareService,
+  StockMediaConfig,
+  StockMediaItem,
+  StockMediaProviderState,
+  StockMediaService,
   TranslatorService,
 } from '../../../../src/services/contracts/interfaces';
 import type { MinioMirrorConfig } from '../../../../src/services/mirror/minioMirrorService';
@@ -62,6 +66,67 @@ class InstantBackgroundRemovalService implements BackgroundRemovalService {
 
   removeBackground(asset: Asset): Promise<{ asset: Asset }> {
     return Promise.resolve({ asset });
+  }
+}
+
+const stockImage: StockMediaItem = {
+  id: 'photo-1',
+  provider: 'unsplash',
+  kind: 'image',
+  title: 'Mountain sunset',
+  authorName: 'Ada Photo',
+  thumbnailUrl: 'https://images.unsplash.com/photo-1?w=400',
+  mediaUrl: 'https://images.unsplash.com/photo-1?w=1080',
+  width: 1200,
+  height: 800,
+  downloadLocation: 'https://api.unsplash.com/photos/photo-1/download',
+};
+
+const stockGif: StockMediaItem = {
+  id: 'gif-1',
+  provider: 'giphy',
+  kind: 'gif',
+  title: 'Launch GIF',
+  authorName: 'Motion Studio',
+  thumbnailUrl: 'https://media.giphy.com/media/gif-1/200w.gif',
+  mediaUrl: 'https://media.giphy.com/media/gif-1/giphy.gif',
+  width: 480,
+  height: 270,
+};
+
+class ReadyStockMediaService implements StockMediaService {
+  trackedItems: StockMediaItem[] = [];
+
+  loadConfig(): StockMediaConfig {
+    return { giphyApiKey: 'giphy-key', unsplashAccessKey: 'unsplash-key' };
+  }
+
+  saveConfig(): void {
+    return undefined;
+  }
+
+  clearConfig(): void {
+    return undefined;
+  }
+
+  getProviderState(): StockMediaProviderState {
+    return {
+      gifs: { configured: true, provider: 'giphy' },
+      images: { configured: true, provider: 'unsplash' },
+    };
+  }
+
+  searchImages(): Promise<StockMediaItem[]> {
+    return Promise.resolve([stockImage]);
+  }
+
+  searchGifs(): Promise<StockMediaItem[]> {
+    return Promise.resolve([stockGif]);
+  }
+
+  trackImageDownload(item: StockMediaItem): Promise<void> {
+    this.trackedItems.push(item);
+    return Promise.resolve();
   }
 }
 
@@ -512,6 +577,68 @@ describe('EditorShell', () => {
       'aria-pressed',
       'true',
     );
+  });
+
+  it('inserts and selects an Unsplash image from the Elements panel', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const stockMediaService = new ReadyStockMediaService();
+    services.stockMediaService = stockMediaService;
+
+    render(<EditorShell services={services} />);
+
+    await openLeftTab(user, 'Elements');
+    await user.click(await screen.findByRole('button', { name: 'Insert image by Ada Photo' }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-selected-elements',
+        expect.stringMatching(/^image-/),
+      );
+    });
+    expect(stockMediaService.trackedItems).toEqual([stockImage]);
+  });
+
+  it('inserts and selects a GIPHY GIF from the Elements panel', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    services.stockMediaService = new ReadyStockMediaService();
+
+    render(<EditorShell services={services} />);
+
+    await openLeftTab(user, 'Elements');
+    await user.click(await screen.findByRole('button', { name: 'Insert GIF Launch GIF' }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-selected-elements',
+        expect.stringMatching(/^gif-/),
+      );
+    });
+  });
+
+  it('keeps the Animations panel open after media integration settings are saved', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    services.stockMediaService = new ReadyStockMediaService();
+
+    render(<EditorShell services={services} />);
+
+    await openLeftTab(user, 'Animate');
+    expect(screen.getByRole('tab', { name: 'Animate' })).toHaveAttribute('aria-selected', 'true');
+
+    await user.click(screen.getByRole('button', { name: 'Mirror settings' }));
+    await user.click(
+      within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('button', {
+        name: 'Media integrations',
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Save media integrations' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Media integrations' })).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole('tab', { name: 'Animate' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('switches to the layout panel from the header view menu', async () => {

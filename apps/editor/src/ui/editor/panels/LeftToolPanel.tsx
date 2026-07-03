@@ -11,7 +11,12 @@ import type {
   SlideTransition,
 } from '../../../domain/documents/model';
 import type { ElementStylePatch, MediaPlaybackPatch } from '../../../domain/commands/elements/basicCommands';
-import type { AiProviderState, ModelState } from '../../../services/contracts/interfaces';
+import type {
+  AiProviderState,
+  ModelState,
+  StockMediaItem,
+  StockMediaProviderState,
+} from '../../../services/contracts/interfaces';
 import { AiToolsPanel } from './AiToolsPanel';
 import { AnimationPanel } from './AnimationPanel';
 import { DesignPanel } from './DesignPanel';
@@ -54,11 +59,22 @@ interface LeftToolPanelProps {
   onDownloadModel?: ((id: string) => Promise<void>) | undefined;
   onRemoveModel?: ((id: string) => Promise<void>) | undefined;
   onCreateImageOptionsChange?: ((options: CreateImagePromptOptions) => void) | undefined;
+  stockGifResults?: StockMediaItem[];
+  stockImageResults?: StockMediaItem[];
+  stockMediaError?: StockMediaErrorState | undefined;
+  stockMediaProviderState?: StockMediaProviderState;
+  stockMediaRecentItems?: StockMediaItem[];
+  stockMediaSearchingGifs?: boolean;
+  stockMediaSearchingImages?: boolean;
+  onConfigureStockMedia?: (() => void) | undefined;
   onImportImage?: ((file: File) => void) | undefined;
   onRemoveAsset?: ((assetId: string) => void) | undefined;
   onImportMedia?: ((file: File) => void) | undefined;
+  onInsertStockMedia?: ((item: StockMediaItem) => void) | undefined;
   onInsertText?: ((preset: TextPreset) => void) | undefined;
   onInsertShape?: ((shape: ShapeKind) => void) | undefined;
+  onSearchStockGifs?: ((query: string) => void) | undefined;
+  onSearchStockImages?: ((query: string) => void) | undefined;
   onPreparePromptApi?: (() => Promise<void>) | undefined;
   onPrepareLanguageDetectionProvider?: (() => Promise<void>) | undefined;
   onPrepareTranslationProvider?: (() => Promise<void>) | undefined;
@@ -83,6 +99,11 @@ interface LeftToolPanelProps {
   onClearElementAnimationBuild?: ((elementId: string) => void) | undefined;
   onReorderElementAnimationBuild?: ((elementId: string, targetIndex: number) => void) | undefined;
   onPlayAnimationPreview?: (() => void) | undefined;
+}
+
+interface StockMediaErrorState {
+  gifs?: string | undefined;
+  images?: string | undefined;
 }
 
 const menuItems: Array<{ id: RightPanelTab; label: string; icon: typeof Layers3 }> = [
@@ -119,11 +140,22 @@ export function LeftToolPanel({
   onDownloadModel,
   onRemoveModel,
   onCreateImageOptionsChange,
+  stockGifResults,
+  stockImageResults,
+  stockMediaError,
+  stockMediaProviderState,
+  stockMediaRecentItems,
+  stockMediaSearchingGifs,
+  stockMediaSearchingImages,
+  onConfigureStockMedia,
   onImportImage,
   onRemoveAsset,
   onImportMedia,
+  onInsertStockMedia,
   onInsertText,
   onInsertShape,
+  onSearchStockGifs,
+  onSearchStockImages,
   onPreparePromptApi,
   onPrepareLanguageDetectionProvider,
   onPrepareTranslationProvider,
@@ -220,7 +252,20 @@ export function LeftToolPanel({
           <TextPanel {...(onInsertText ? { onInsertText } : {})} />
         ) : null}
         {panelOpen && activeTab === 'elements' ? (
-          <ElementsPanel {...(onInsertShape ? { onInsertShape } : {})} />
+          <ElementsPanel
+            {...(onInsertShape ? { onInsertShape } : {})}
+            {...(onConfigureStockMedia ? { onConfigureStockMedia } : {})}
+            {...(onInsertStockMedia ? { onInsertStockMedia } : {})}
+            {...(onSearchStockGifs ? { onSearchStockGifs } : {})}
+            {...(onSearchStockImages ? { onSearchStockImages } : {})}
+            gifResults={stockGifResults}
+            imageResults={stockImageResults}
+            loadingGifs={stockMediaSearchingGifs}
+            loadingImages={stockMediaSearchingImages}
+            recentStockMedia={stockMediaRecentItems}
+            stockMediaError={stockMediaError}
+            stockMediaProviderState={stockMediaProviderState}
+          />
         ) : null}
         {panelOpen && activeTab === 'animations' ? (
           <AnimationPanel
