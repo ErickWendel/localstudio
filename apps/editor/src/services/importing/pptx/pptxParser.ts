@@ -73,6 +73,7 @@ const DEFAULT_TEXT_STYLE: PptxTextStyle = {
   fontSize: 32,
   fontWeight: 400,
 };
+const EMUS_PER_POINT = 12700;
 
 async function readText(file: PptxPackageFile | undefined) {
   if (!file) return undefined;
@@ -156,32 +157,91 @@ function hasPlaceholder(shape: Element) {
   return Boolean(pptxXml.firstDescendant(shape, 'ph'));
 }
 
-function getTypeface(runProperties: Element | undefined, defaultRunProperties: Element | undefined) {
-  return (
-    (runProperties ? pptxXml.firstDescendant(runProperties, 'latin')?.getAttribute('typeface') : undefined) ??
-    (defaultRunProperties
-      ? pptxXml.firstDescendant(defaultRunProperties, 'latin')?.getAttribute('typeface')
-      : undefined)
-  );
+function getTypeface(...runProperties: Array<Element | undefined>) {
+  for (const properties of runProperties) {
+    const typeface = properties
+      ? pptxXml.firstDescendant(properties, 'latin')?.getAttribute('typeface')
+      : undefined;
+    if (typeface) return typeface;
+  }
+  return undefined;
 }
 
-function getTextStyle(shape: Element): PptxTextStyle {
-  const paragraphProperties = pptxXml.firstDescendant(shape, 'pPr');
-  const runProperties = pptxXml.firstDescendant(shape, 'rPr');
-  const defaultRunProperties = pptxXml.firstDescendant(shape, 'defRPr');
+function getFirstParagraph(shape: Element) {
+  const body = pptxXml.firstDescendant(shape, 'txBody');
+  return body ? pptxXml.firstDescendant(body, 'p') : undefined;
+}
+
+function getFirstRunProperties(paragraph: Element | undefined) {
+  const run = paragraph ? pptxXml.firstDescendant(paragraph, 'r') : undefined;
+  return run ? pptxXml.firstDescendant(run, 'rPr') : undefined;
+}
+
+function getParagraphDefaultRunProperties(paragraphProperties: Element | undefined) {
+  return paragraphProperties ? pptxXml.firstDescendant(paragraphProperties, 'defRPr') : undefined;
+}
+
+function getListDefaultRunProperties(shape: Element) {
+  const listStyle = pptxXml.firstDescendant(shape, 'lstStyle');
+  return listStyle ? pptxXml.firstDescendant(listStyle, 'defRPr') : undefined;
+}
+
+function getFirstAttribute(name: string, ...elements: Array<Element | undefined>) {
+  for (const element of elements) {
+    const value = element?.getAttribute(name);
+    if (value !== undefined && value !== null) return value;
+  }
+  return undefined;
+}
+
+function hasEnabledBold(...elements: Array<Element | undefined>) {
+  for (const element of elements) {
+    const value = element?.getAttribute('b');
+    if (value === '1') return true;
+    if (value === '0') return false;
+  }
+  return false;
+}
+
+function getFontSize(rawSize: number, scaleY: number) {
+  return Number.isFinite(rawSize) && rawSize > 0
+    ? Math.max(8, Math.round((rawSize / 100) * EMUS_PER_POINT * scaleY))
+    : DEFAULT_TEXT_STYLE.fontSize;
+}
+
+function getTextStyle(shape: Element, scaleY: number): PptxTextStyle {
+  const paragraph = getFirstParagraph(shape);
+  const paragraphProperties = paragraph ? pptxXml.firstDescendant(paragraph, 'pPr') : undefined;
+  const runProperties = getFirstRunProperties(paragraph);
+  const paragraphDefaultRunProperties = getParagraphDefaultRunProperties(paragraphProperties);
+  const listDefaultRunProperties = getListDefaultRunProperties(shape);
   const align = paragraphProperties?.getAttribute('algn');
   const size = Number(
-    runProperties?.getAttribute('sz') ??
-      (!runProperties ? defaultRunProperties?.getAttribute('sz') : undefined),
+    getFirstAttribute(
+      'sz',
+      runProperties,
+      paragraphDefaultRunProperties,
+      listDefaultRunProperties,
+    ),
   );
-  const font = getTypeface(runProperties, defaultRunProperties);
-  const bold =
-    runProperties?.getAttribute('b') === '1' || defaultRunProperties?.getAttribute('b') === '1';
+  const font = getTypeface(
+    runProperties,
+    paragraphDefaultRunProperties,
+    listDefaultRunProperties,
+  );
+  const bold = hasEnabledBold(
+    runProperties,
+    paragraphDefaultRunProperties,
+    listDefaultRunProperties,
+  );
   return {
     align: align === 'ctr' ? 'center' : align === 'r' ? 'right' : 'left',
-    fill: getHexColor(runProperties ?? defaultRunProperties ?? shape, DEFAULT_TEXT_STYLE.fill),
+    fill: getHexColor(
+      runProperties ?? paragraphDefaultRunProperties ?? listDefaultRunProperties ?? shape,
+      DEFAULT_TEXT_STYLE.fill,
+    ),
     fontFamily: font && !font.startsWith('+') ? font : DEFAULT_TEXT_STYLE.fontFamily,
-    fontSize: Number.isFinite(size) && size > 0 ? Math.max(8, Math.round((size / 100) * 1.333)) : DEFAULT_TEXT_STYLE.fontSize,
+    fontSize: getFontSize(size, scaleY),
     fontWeight: bold ? 700 : DEFAULT_TEXT_STYLE.fontWeight,
   };
 }
@@ -213,7 +273,7 @@ function parseTextObject(
     id: `${slideId}-${idScope}-text-${shapeId}`,
     kind: 'text',
     sourceShapeId: shapeId,
-    style: getTextStyle(shape),
+    style: getTextStyle(shape, scaleY),
     text,
     zIndex,
   };
@@ -289,15 +349,15 @@ function toMilliseconds(value: string | null, fallback: number) {
   return Number.isFinite(numericValue) && numericValue >= 0 ? numericValue : fallback;
 }
 
-function findBuildTimingNode(document: Document, sourceShapeId: string) {
-  for (const behavior of pptxXml.descendants(document, 'cBhvr')) {
-    const targetShapeId = pptxXml.firstDescendant(behavior, 'spTgt')?.getAttribute('spid');
-    if (targetShapeId !== sourceShapeId) continue;
-    let current: Element | null = behavior;
-    while (current) {
-      if (current.localName === 'cTn' && current.hasAttribute('nodeType')) return current;
-      current = current.parentElement;
-    }
+function findBuildSourceShapeId(behavior: Element) {
+  return pptxXml.firstDescendant(behavior, 'spTgt')?.getAttribute('spid');
+}
+
+function findNearestAnimationTimingNode(behavior: Element) {
+  let current: Element | null = behavior;
+  while (current) {
+    if (current.localName === 'cTn' && current.hasAttribute('nodeType')) return current;
+    current = current.parentElement;
   }
   return undefined;
 }
@@ -320,21 +380,42 @@ function parseAnimationBuilds(
       .map((object) => [object.sourceShapeId, object]),
   );
   const builds: ElementAnimationBuild[] = [];
-  pptxXml.descendants(document, 'bldP').forEach((build, index) => {
-    const sourceShapeId = build.getAttribute('spid');
+  const seenShapeIds = new Set<string>();
+  pptxXml.descendants(document, 'cBhvr').forEach((behavior) => {
+    const sourceShapeId = findBuildSourceShapeId(behavior);
     if (!sourceShapeId) return;
+    if (seenShapeIds.has(sourceShapeId)) return;
     const object = slideObjectsByShapeId.get(sourceShapeId);
     if (!object) return;
-    const timingNode = findBuildTimingNode(document, sourceShapeId);
+    const timingNode = findNearestAnimationTimingNode(behavior);
+    const buildIndex = builds.length;
     builds.push({
-      id: `${slideId}-build-${index + 1}-${object.id}`,
+      id: `${slideId}-build-${buildIndex + 1}-${object.id}`,
       elementId: object.id,
       effect: 'reveal',
-      trigger: toBuildTrigger(timingNode?.getAttribute('nodeType') ?? null, index),
+      trigger: toBuildTrigger(timingNode?.getAttribute('nodeType') ?? null, buildIndex),
       delayMs: 0,
       durationMs: getBuildDurationMs(timingNode),
       kind: toBuildKind(timingNode?.getAttribute('presetClass') ?? null),
     });
+    seenShapeIds.add(sourceShapeId);
+  });
+  pptxXml.descendants(document, 'bldP').forEach((build) => {
+    const sourceShapeId = build.getAttribute('spid');
+    if (!sourceShapeId || seenShapeIds.has(sourceShapeId)) return;
+    const object = slideObjectsByShapeId.get(sourceShapeId);
+    if (!object) return;
+    const buildIndex = builds.length;
+    builds.push({
+      id: `${slideId}-build-${buildIndex + 1}-${object.id}`,
+      elementId: object.id,
+      effect: 'reveal',
+      trigger: toBuildTrigger(null, buildIndex),
+      delayMs: 0,
+      durationMs: 500,
+      kind: 'build-in',
+    });
+    seenShapeIds.add(sourceShapeId);
   });
   return builds;
 }

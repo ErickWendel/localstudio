@@ -69,6 +69,11 @@ const slideXml = `<?xml version="1.0" encoding="UTF-8"?>
         <p:spPr><a:xfrm><a:off x="914400" y="914400"/><a:ext cx="3657600" cy="914400"/></a:xfrm></p:spPr>
         <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:pPr algn="ctr"/><a:r><a:rPr sz="2400" b="1"><a:solidFill><a:srgbClr val="ffcc00"/></a:solidFill><a:latin typeface="Arial"/></a:rPr><a:t>Editable title</a:t></a:r></a:p></p:txBody>
       </p:sp>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="5" name="Default-sized text"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr><a:xfrm><a:off x="914400" y="2133600"/><a:ext cx="3657600" cy="914400"/></a:xfrm></p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="6000"><a:solidFill><a:srgbClr val="ffffff"/></a:solidFill><a:latin typeface="Arial"/></a:defRPr></a:pPr><a:r><a:rPr b="1"/><a:t>Default sized</a:t></a:r></a:p></p:txBody>
+      </p:sp>
       <p:pic>
         <p:nvPicPr><p:cNvPr id="3" name="Hero image"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>
         <p:blipFill><a:blip r:embed="rIdImage"/></p:blipFill>
@@ -102,8 +107,8 @@ const slideXml = `<?xml version="1.0" encoding="UTF-8"?>
       </p:par>
     </p:tnLst>
     <p:bldLst>
-      <p:bldP spid="2"/>
       <p:bldP spid="3"/>
+      <p:bldP spid="2"/>
     </p:bldLst>
   </p:timing>
 </p:sld>`;
@@ -157,6 +162,9 @@ describe('BrowserPptxImportService', () => {
     const authorElement = elements.find(
       (element) => element.type === 'text' && element.text === 'Erick Wendel',
     );
+    const defaultSizedElement = elements.find(
+      (element) => element.type === 'text' && element.text === 'Default sized',
+    );
     const imageElements = elements.filter((element) => element.type === 'image');
     const videoElement = elements.find((element) => element.type === 'video');
     const imageAsset = Object.values(project.assets).find((asset) => asset.fileName === 'image1.png');
@@ -170,9 +178,10 @@ describe('BrowserPptxImportService', () => {
       x: 192,
       y: 192,
       width: 768,
-      height: 56,
+      height: 192,
       align: 'center',
       fontFamily: 'Arial',
+      fontSize: 64,
       fontWeight: 700,
     });
     expect(authorElement).toMatchObject({
@@ -181,8 +190,14 @@ describe('BrowserPptxImportService', () => {
       type: 'text',
       x: 134,
       y: 19,
-      width: 302,
-      height: 70,
+      width: 603,
+      height: 140,
+    });
+    expect(defaultSizedElement).toMatchObject({
+      fontSize: 160,
+      fontWeight: 700,
+      text: 'Default sized',
+      type: 'text',
     });
     expect(project.pages[0]?.elementIds.some((elementId) => elementId.includes('placeholder'))).toBe(false);
     expect(imageElements).toHaveLength(2);

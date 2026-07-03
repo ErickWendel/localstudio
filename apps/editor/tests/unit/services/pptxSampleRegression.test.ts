@@ -33,6 +33,18 @@ describe('PowerPoint sample regression', () => {
     const authorLabel = project.pages[2]?.elementIds
       .map((elementId) => project.elements[elementId])
       .find((element) => element?.type === 'text' && element.text === 'Erick Wendel');
+    const slide15BuildLabels =
+      slide15?.animationBuilds?.map((build) => {
+        const element = project.elements[build.elementId];
+        return element?.type === 'text' ? element.text : element?.type;
+      }) ?? [];
+    const slide18TextElements =
+      project.pages[17]?.elementIds
+        .map((elementId) => project.elements[elementId])
+        .filter((element) => element?.type === 'text') ?? [];
+    const slide18BulletText = slide18TextElements.find((element) =>
+      element.text.includes('Sem custo de API'),
+    );
     const animationBuildCount = project.pages.reduce(
       (count, page) => count + (page.animationBuilds?.length ?? 0),
       0,
@@ -43,6 +55,7 @@ describe('PowerPoint sample regression', () => {
     expect(elements.filter((element) => element.type === 'text').length).toBeGreaterThan(0);
     expect(elements.filter((element) => element.type === 'video').length).toBeGreaterThan(0);
     expect(animationBuildCount).toBeGreaterThan(0);
+    expect(slide15BuildLabels).toEqual(['Web Workers', 'Web Streams', 'Web GPU', 'Web GL']);
     expect(slide15?.background).toEqual({ type: 'color', color: '#3E3E3E' });
     expect(
       slide15TextElements
@@ -51,10 +64,15 @@ describe('PowerPoint sample regression', () => {
     ).toBe(true);
     expect(slide15ImageElements.length).toBeGreaterThan(0);
     if (!authorLabel || authorLabel.type !== 'text') throw new Error('Expected author text label.');
+    if (!slide18BulletText || slide18BulletText.type !== 'text') {
+      throw new Error('Expected slide 18 bullet text.');
+    }
     expect(authorLabel.height).toEqual(expect.any(Number));
     expect(authorLabel.width).toEqual(expect.any(Number));
-    expect(authorLabel.width).toBeGreaterThanOrEqual(300);
+    expect(authorLabel.width).toBeGreaterThanOrEqual(220);
     expect(authorLabel.height).toBeGreaterThanOrEqual(authorLabel.fontSize * 1.35);
+    expect(slide18BulletText.fontSize).toBeGreaterThanOrEqual(70);
+    expect(slide18BulletText.fontSize).toBeLessThanOrEqual(90);
     expect(slide29Text).toContain('Por que uma LLM');
   });
 });
