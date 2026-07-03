@@ -1215,9 +1215,10 @@ export function CanvasWorkspace({
                     fontStyle={element.fontWeight >= 700 ? 'bold' : 'normal'}
                     fill={element.fill}
                     align={element.align}
-                    lineHeight={1.05}
+                    lineHeight={element.lineHeight ?? 1.05}
                     padding={TEXT_FRAME_PADDING * scaleY}
                     ref={nodeRef}
+                    verticalAlign={element.verticalAlign ?? 'top'}
                     visible={editingTextId !== element.id}
                   />
                 );
@@ -1368,6 +1369,7 @@ export function CanvasWorkspace({
                       fontWeight: element.fontWeight,
                       height: `${element.height * scaleY}px`,
                       left: `${element.x * scaleX}px`,
+                      lineHeight: element.lineHeight ?? 1.05,
                       padding: `${TEXT_FRAME_PADDING * scaleY}px`,
                       textAlign: element.align,
                       top: `${element.y * scaleY}px`,

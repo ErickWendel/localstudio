@@ -22,6 +22,12 @@ describe('PowerPoint sample regression', () => {
       .map((element) => element.text)
       .join(' ');
     const slide15 = project.pages[14];
+    const slide6Text = project.pages[5]?.elementIds
+      .map((elementId) => project.elements[elementId])
+      .find((element) =>
+        element?.type === 'text' &&
+        element.text.includes('Inteligência artificial é muito mais'),
+      );
     const slide15TextElements =
       slide15?.elementIds
         .map((elementId) => project.elements[elementId])
@@ -55,6 +61,12 @@ describe('PowerPoint sample regression', () => {
     expect(elements.filter((element) => element.type === 'text').length).toBeGreaterThan(0);
     expect(elements.filter((element) => element.type === 'video').length).toBeGreaterThan(0);
     expect(animationBuildCount).toBeGreaterThan(0);
+    if (!slide6Text || slide6Text.type !== 'text') throw new Error('Expected slide 6 title text.');
+    expect(slide6Text.align).toBe('center');
+    expect(slide6Text.verticalAlign).toBe('middle');
+    expect(slide6Text.lineHeight).toBeCloseTo(0.8, 2);
+    expect(slide6Text.fontSize).toBeGreaterThanOrEqual(120);
+    expect(slide6Text.fontSize).toBeLessThanOrEqual(135);
     expect(slide15BuildLabels).toEqual(['Web Workers', 'Web Streams', 'Web GPU', 'Web GL']);
     expect(slide15?.background).toEqual({ type: 'color', color: '#3E3E3E' });
     expect(

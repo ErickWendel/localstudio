@@ -186,11 +186,12 @@ describe('BrowserPptxImportService', () => {
       x: 205,
       y: 196,
       width: 742,
-      height: 184,
+      height: 93,
       align: 'center',
       fontFamily: 'Arial',
       fontSize: 64,
       fontWeight: 700,
+      lineHeight: 1.05,
     });
     expect(authorElement).toMatchObject({
       locked: false,
@@ -199,7 +200,7 @@ describe('BrowserPptxImportService', () => {
       x: 147,
       y: 23,
       width: 603,
-      height: 140,
+      height: 116,
     });
     expect(defaultSizedElement).toMatchObject({
       fontSize: 160,

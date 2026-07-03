@@ -120,6 +120,8 @@ export interface TextElement extends BaseElement {
   fontWeight: number;
   fill: string;
   align: 'left' | 'center' | 'right';
+  lineHeight?: number;
+  verticalAlign?: 'bottom' | 'middle' | 'top';
 }
 
 export interface ImageElement extends BaseElement {

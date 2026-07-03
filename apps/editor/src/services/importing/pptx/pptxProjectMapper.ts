@@ -144,7 +144,7 @@ function getFittedTextFrame(
     0,
   );
   const fittedHeight = Math.ceil(
-    visualLineCount * object.style.fontSize * TEXT_FRAME_FIT.lineHeightRatio +
+    visualLineCount * object.style.fontSize * object.style.lineHeight +
       object.style.fontSize * TEXT_FRAME_FIT.heightPaddingRatio,
   );
   let height =

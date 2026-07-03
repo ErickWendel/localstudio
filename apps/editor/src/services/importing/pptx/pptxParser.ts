@@ -21,6 +21,8 @@ export interface PptxTextStyle {
   fontFamily: string;
   fontSize: number;
   fontWeight: number;
+  lineHeight: number;
+  verticalAlign: 'bottom' | 'middle' | 'top';
 }
 
 export interface PptxTextInsets {
@@ -85,6 +87,8 @@ const DEFAULT_TEXT_STYLE: PptxTextStyle = {
   fontFamily: 'Open Sans',
   fontSize: 32,
   fontWeight: 400,
+  lineHeight: 1.05,
+  verticalAlign: 'top',
 };
 const EMUS_PER_POINT = 12700;
 const DEFAULT_TEXT_INSETS_EMU = {
@@ -200,9 +204,14 @@ function getParagraphDefaultRunProperties(paragraphProperties: Element | undefin
   return paragraphProperties ? pptxXml.firstDescendant(paragraphProperties, 'defRPr') : undefined;
 }
 
-function getListDefaultRunProperties(shape: Element) {
+function getListParagraphProperties(shape: Element) {
   const listStyle = pptxXml.firstDescendant(shape, 'lstStyle');
-  return listStyle ? pptxXml.firstDescendant(listStyle, 'defRPr') : undefined;
+  return listStyle ? pptxXml.firstDescendant(listStyle, 'lvl1pPr') : undefined;
+}
+
+function getListDefaultRunProperties(shape: Element) {
+  const listParagraphProperties = getListParagraphProperties(shape);
+  return listParagraphProperties ? pptxXml.firstDescendant(listParagraphProperties, 'defRPr') : undefined;
 }
 
 function getFirstAttribute(name: string, ...elements: Array<Element | undefined>) {
@@ -228,13 +237,48 @@ function getFontSize(rawSize: number, scaleY: number) {
     : DEFAULT_TEXT_STYLE.fontSize;
 }
 
+function getVerticalAlign(shape: Element): PptxTextStyle['verticalAlign'] {
+  const bodyProperties = pptxXml.firstDescendant(shape, 'bodyPr');
+  const anchor = bodyProperties?.getAttribute('anchor');
+  if (anchor === 'b') return 'bottom';
+  if (anchor === 'ctr') return 'middle';
+  return 'top';
+}
+
+function getLineHeight(...paragraphProperties: Array<Element | undefined>) {
+  for (const properties of paragraphProperties) {
+    const lineSpacing = properties ? pptxXml.firstDescendant(properties, 'lnSpc') : undefined;
+    const percentage = Number(
+      lineSpacing ? pptxXml.firstDescendant(lineSpacing, 'spcPct')?.getAttribute('val') : undefined,
+    );
+    if (Number.isFinite(percentage) && percentage > 0) {
+      return Math.max(0.7, Math.min(2, percentage / 100000));
+    }
+  }
+  return DEFAULT_TEXT_STYLE.lineHeight;
+}
+
+function getTextAlign(
+  paragraphProperties: Element | undefined,
+  listParagraphProperties: Element | undefined,
+  fontSize: number,
+  verticalAlign: PptxTextStyle['verticalAlign'],
+): PptxTextStyle['align'] {
+  const align = getFirstAttribute('algn', paragraphProperties, listParagraphProperties);
+  if (align === 'ctr') return 'center';
+  if (align === 'r') return 'right';
+  if (align === 'l') return 'left';
+  if (verticalAlign === 'middle' && fontSize >= 80) return 'center';
+  return DEFAULT_TEXT_STYLE.align;
+}
+
 function getTextStyle(shape: Element, scaleY: number): PptxTextStyle {
   const paragraph = getFirstParagraph(shape);
   const paragraphProperties = paragraph ? pptxXml.firstDescendant(paragraph, 'pPr') : undefined;
   const runProperties = getFirstRunProperties(paragraph);
   const paragraphDefaultRunProperties = getParagraphDefaultRunProperties(paragraphProperties);
+  const listParagraphProperties = getListParagraphProperties(shape);
   const listDefaultRunProperties = getListDefaultRunProperties(shape);
-  const align = paragraphProperties?.getAttribute('algn');
   const size = Number(
     getFirstAttribute(
       'sz',
@@ -253,15 +297,19 @@ function getTextStyle(shape: Element, scaleY: number): PptxTextStyle {
     paragraphDefaultRunProperties,
     listDefaultRunProperties,
   );
+  const fontSize = getFontSize(size, scaleY);
+  const verticalAlign = getVerticalAlign(shape);
   return {
-    align: align === 'ctr' ? 'center' : align === 'r' ? 'right' : 'left',
+    align: getTextAlign(paragraphProperties, listParagraphProperties, fontSize, verticalAlign),
     fill: getHexColor(
       runProperties ?? paragraphDefaultRunProperties ?? listDefaultRunProperties ?? shape,
       DEFAULT_TEXT_STYLE.fill,
     ),
     fontFamily: font && !font.startsWith('+') ? font : DEFAULT_TEXT_STYLE.fontFamily,
-    fontSize: getFontSize(size, scaleY),
+    fontSize,
     fontWeight: bold ? 700 : DEFAULT_TEXT_STYLE.fontWeight,
+    lineHeight: getLineHeight(paragraphProperties, listParagraphProperties),
+    verticalAlign,
   };
 }
 
