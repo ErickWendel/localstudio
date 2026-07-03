@@ -473,7 +473,10 @@ describe('LeftToolPanel', () => {
   it('scrolls the shape strip from the Shapes see all action', async () => {
     const user = userEvent.setup();
     const scrollBy = vi.fn();
-    const originalScrollBy = HTMLElement.prototype.scrollBy;
+    const originalScrollByDescriptor = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      'scrollBy',
+    );
     Object.defineProperty(HTMLElement.prototype, 'scrollBy', {
       configurable: true,
       value: scrollBy,
@@ -494,12 +497,14 @@ describe('LeftToolPanel', () => {
 
       await user.click(screen.getByRole('button', { name: 'See all Shapes' }));
 
-      expect(scrollBy).toHaveBeenCalledWith({ behavior: 'smooth', left: expect.any(Number) });
+      const firstScrollCall = scrollBy.mock.calls.at(0) as [ScrollToOptions] | undefined;
+      const scrollOptions = firstScrollCall?.[0];
+      expect(scrollOptions).toMatchObject({ behavior: 'smooth' });
+      expect(typeof scrollOptions?.left).toBe('number');
     } finally {
-      Object.defineProperty(HTMLElement.prototype, 'scrollBy', {
-        configurable: true,
-        value: originalScrollBy,
-      });
+      if (originalScrollByDescriptor) {
+        Object.defineProperty(HTMLElement.prototype, 'scrollBy', originalScrollByDescriptor);
+      }
     }
   });
 
@@ -543,7 +548,7 @@ describe('LeftToolPanel', () => {
         activePageId="page-1"
         selection={{ pageId: 'page-1', elementIds: [] }}
         modelStates={modelStates}
-        stockMediaError={{ images: 'Unsplash image search failed.' }}
+        stockMediaError={{ images: 'API Key is invalid' }}
         stockMediaProviderState={{
           gifs: { configured: true, provider: 'giphy' },
           images: { configured: true, provider: 'unsplash' },
@@ -552,7 +557,7 @@ describe('LeftToolPanel', () => {
       />,
     );
 
-    expect(screen.getByText('Unsplash image search failed.')).toBeInTheDocument();
+    expect(screen.getByText('API Key is invalid')).toBeInTheDocument();
     expect(screen.queryByText('No images found.')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Configure media integrations' }));
@@ -586,6 +591,9 @@ describe('LeftToolPanel', () => {
         onSearchStockImages={onSearchStockImages}
       />,
     );
+
+    expect(screen.getByPlaceholderText('search images')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('search gifs')).toBeInTheDocument();
 
     await user.type(screen.getByLabelText('Search Unsplash images'), 'mountain{Enter}');
     await user.type(screen.getByLabelText('Search GIPHY GIFs'), 'launch{Enter}');

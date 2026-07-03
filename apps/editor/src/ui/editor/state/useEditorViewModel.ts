@@ -107,7 +107,7 @@ interface StockMediaSearchState {
   images: boolean;
 }
 
-interface StockMediaErrorState {
+export interface StockMediaErrorState {
   gifs?: string | undefined;
   images?: string | undefined;
 }
@@ -989,7 +989,7 @@ export function useEditorViewModel(services: AppServices) {
         setPromptProviderStates(await services.promptService.getProviderStates());
       }
       setPromptApiNotice('Prompt API ready');
-    } catch (error) {
+    } catch (error: unknown) {
       const selectedProvider = promptProviderStates.find((provider) => provider.selected);
       if (selectedProvider?.modelId) {
         await services.modelSetupService.removeModel?.(selectedProvider.modelId);
@@ -1085,7 +1085,7 @@ export function useEditorViewModel(services: AppServices) {
           await services.translatorService.getLanguageDetectionProviderStates(),
         );
       }
-    } catch (error) {
+    } catch (error: unknown) {
       setLanguageDetectionPreparation({ progress: 0, status: 'failed' });
       setTranslationNotice(
         error instanceof Error ? error.message : 'Language detection model could not be prepared.',
@@ -1225,7 +1225,7 @@ export function useEditorViewModel(services: AppServices) {
         ...current,
         [pageId]: translationLanguageUtils.normalizeLanguageCode(generatedTasks.language),
       }));
-    } catch (error) {
+    } catch (error: unknown) {
       if (!isCurrentRun()) return;
       setPromptGenerationNotice(
         error instanceof Error ? error.message : 'Prompt API could not generate the slide.',
@@ -1317,7 +1317,7 @@ export function useEditorViewModel(services: AppServices) {
           }).execute(currentProject),
         { selectedElementIds: [elementId] },
       );
-    } catch (error) {
+    } catch (error: unknown) {
       if (!isCurrentRun()) return;
       setCreateImageNotice(error instanceof Error ? error.message : 'Image generation failed.');
     } finally {
@@ -1711,7 +1711,7 @@ export function useEditorViewModel(services: AppServices) {
     try {
       await services.mirrorService.listProjects(config);
       setMirrorState({ enabled: true, status: 'idle' });
-    } catch (error) {
+    } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'MinIO connection failed.';
       setMirrorState({
         enabled: true,
@@ -1768,7 +1768,7 @@ export function useEditorViewModel(services: AppServices) {
       }
       lastMirroredProjectNameRef.current = projectToSync.name;
       setMirrorState(nextState);
-    } catch (error) {
+    } catch (error: unknown) {
       setMirrorState({
         enabled: true,
         status: 'failed',
@@ -1818,7 +1818,7 @@ export function useEditorViewModel(services: AppServices) {
       }
       setRemoteImportProjects(mirrors);
       setRemoteImportStatus('ready');
-    } catch (error) {
+    } catch (error: unknown) {
       setRemoteImportStatus('failed');
       setRemoteImportError(
         error instanceof Error ? error.message : 'Could not list mirrored projects.',
@@ -1865,7 +1865,7 @@ export function useEditorViewModel(services: AppServices) {
       editorPreferences.writePersistencePreference(true);
       setMirrorState({ enabled: true, status: 'synced', lastSyncedAt: new Date().toISOString() });
       setRemoteImportOpen(false);
-    } catch (error) {
+    } catch (error: unknown) {
       setRemoteImportStatus('failed');
       setRemoteImportError(error instanceof Error ? error.message : 'MinIO mirror import failed.');
       setMirrorState({
@@ -3242,11 +3242,11 @@ export function useEditorViewModel(services: AppServices) {
       const results = await services.stockMediaService.searchImages(query);
       setStockImageResults(results);
       setStockMediaError((current) => ({ ...current, images: undefined }));
-    } catch (error) {
+    } catch {
       setStockImageResults([]);
       setStockMediaError((current) => ({
         ...current,
-        images: error instanceof Error ? error.message : 'Unsplash search failed.',
+        images: 'API Key is invalid',
       }));
     } finally {
       setStockMediaSearching((current) => ({ ...current, images: false }));
@@ -3260,11 +3260,11 @@ export function useEditorViewModel(services: AppServices) {
       const results = await services.stockMediaService.searchGifs(query);
       setStockGifResults(results);
       setStockMediaError((current) => ({ ...current, gifs: undefined }));
-    } catch (error) {
+    } catch {
       setStockGifResults([]);
       setStockMediaError((current) => ({
         ...current,
-        gifs: error instanceof Error ? error.message : 'GIPHY search failed.',
+        gifs: 'API Key is invalid',
       }));
     } finally {
       setStockMediaSearching((current) => ({ ...current, gifs: false }));
@@ -3316,7 +3316,7 @@ export function useEditorViewModel(services: AppServices) {
     addRecentStockMedia(item);
   }
 
-  async function insertRemoteGif(item: StockMediaItem) {
+  function insertRemoteGif(item: StockMediaItem) {
     if (item.kind !== 'gif') return;
     const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
     if (!page) return;
@@ -3363,7 +3363,7 @@ export function useEditorViewModel(services: AppServices) {
 
   function insertStockMedia(item: StockMediaItem) {
     if (item.kind === 'gif') {
-      void insertRemoteGif(item);
+      insertRemoteGif(item);
       return;
     }
     void insertRemoteImage(item);

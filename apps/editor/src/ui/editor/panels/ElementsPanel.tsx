@@ -10,12 +10,13 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { RefObject } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { ShapeKind } from '../../../domain/documents/model';
 import type {
   StockMediaItem,
   StockMediaProviderState,
 } from '../../../services/contracts/interfaces';
+import type { StockMediaErrorState } from '../state/useEditorViewModel';
 
 const elementShapeCatalog: Array<{
   icon?: LucideIcon;
@@ -47,11 +48,6 @@ interface ElementsPanelProps {
   recentStockMedia?: StockMediaItem[] | undefined;
   stockMediaError?: StockMediaErrorState | undefined;
   stockMediaProviderState?: StockMediaProviderState | undefined;
-}
-
-interface StockMediaErrorState {
-  gifs?: string | undefined;
-  images?: string | undefined;
 }
 
 const defaultProviderState: StockMediaProviderState = {
@@ -91,6 +87,7 @@ export function ElementsPanel({
       <ShapeGrid gridRef={shapeGridRef} onInsertShape={onInsertShape} />
       {recentStockMedia.length > 0 ? (
         <MediaSection
+          key={getMediaItemsKey(recentStockMedia)}
           items={recentStockMedia}
           title="Recently used"
           onInsertStockMedia={onInsertStockMedia}
@@ -103,6 +100,7 @@ export function ElementsPanel({
         items={imageResults}
         loading={loadingImages}
         providerLabel="Unsplash"
+        searchPlaceholder="search images"
         title="Images"
         typeLabel="image"
         onConfigureStockMedia={onConfigureStockMedia}
@@ -116,6 +114,7 @@ export function ElementsPanel({
         items={gifResults}
         loading={loadingGifs}
         providerLabel="GIPHY"
+        searchPlaceholder="search gifs"
         title="GIFs"
         typeLabel="GIF"
         onConfigureStockMedia={onConfigureStockMedia}
@@ -189,6 +188,7 @@ function MediaProviderSection({
   items,
   loading,
   providerLabel,
+  searchPlaceholder,
   title,
   typeLabel,
   onConfigureStockMedia,
@@ -201,6 +201,7 @@ function MediaProviderSection({
   items: StockMediaItem[];
   loading: boolean;
   providerLabel: string;
+  searchPlaceholder: string;
   title: string;
   typeLabel: 'GIF' | 'image';
   onConfigureStockMedia?: (() => void) | undefined;
@@ -235,7 +236,7 @@ function MediaProviderSection({
         <input
           aria-label={inputLabel}
           value={query}
-          placeholder={`Search ${providerLabel}`}
+          placeholder={searchPlaceholder}
           onChange={(event) => {
             setQuery(event.target.value);
           }}
@@ -254,6 +255,7 @@ function MediaProviderSection({
         />
       ) : (
         <MediaSection
+          key={getMediaItemsKey(items)}
           emptyLabel={loading ? `Loading ${title.toLowerCase()}...` : `No ${title.toLowerCase()} found.`}
           items={items}
           title={title}
@@ -306,10 +308,6 @@ function MediaSection({
     pageIndex * MEDIA_PAGE_SIZE,
     pageIndex * MEDIA_PAGE_SIZE + MEDIA_PAGE_SIZE,
   );
-
-  useEffect(() => {
-    setPageIndex(0);
-  }, [items]);
 
   if (items.length === 0) return <p className="panel-muted">{emptyLabel}</p>;
   return (
@@ -365,6 +363,10 @@ function MediaSection({
       ) : null}
     </>
   );
+}
+
+function getMediaItemsKey(items: StockMediaItem[]) {
+  return items.map((item) => `${item.provider}:${item.id}`).join('|');
 }
 function getMediaButtonLabel(item: StockMediaItem, typeLabel?: 'GIF' | 'image') {
   if (item.kind === 'gif' || typeLabel === 'GIF') return `Insert GIF ${item.title}`;

@@ -130,6 +130,12 @@ class ReadyStockMediaService implements StockMediaService {
   }
 }
 
+class InvalidImageStockMediaService extends ReadyStockMediaService {
+  override searchImages(): Promise<StockMediaItem[]> {
+    return Promise.reject(new Error('Unsplash image search failed with 401 Unauthorized.'));
+  }
+}
+
 class RejectingProjectRepository implements ProjectRepository {
   loadProject(): Promise<ProjectDocument | null> {
     return Promise.resolve(null);
@@ -615,6 +621,23 @@ describe('EditorShell', () => {
         expect.stringMatching(/^gif-/),
       );
     });
+  });
+
+  it('shows a generic API key error when stock image search is rejected', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    services.stockMediaService = new InvalidImageStockMediaService();
+
+    render(<EditorShell services={services} />);
+
+    await openLeftTab(user, 'Elements');
+
+    expect(await screen.findByText('API Key is invalid')).toBeInTheDocument();
+    expect(screen.queryByText('Unsplash image search failed with 401 Unauthorized.')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Configure media integrations' }));
+
+    expect(screen.getByRole('dialog', { name: 'Media integrations' })).toBeInTheDocument();
   });
 
   it('keeps the Animations panel open after media integration settings are saved', async () => {

@@ -24,7 +24,7 @@ import { ElementsPanel } from './ElementsPanel';
 import type { CreateImagePromptOptions } from '../media/imagePromptOptions';
 import { LayersPanel } from './LayersPanel';
 import { TextPanel } from './TextPanel';
-import type { RightPanelTab, TextPreset } from '../state/useEditorViewModel';
+import type { RightPanelTab, StockMediaErrorState, TextPreset } from '../state/useEditorViewModel';
 
 interface LeftToolPanelProps {
   activeTab: RightPanelTab;
@@ -99,11 +99,6 @@ interface LeftToolPanelProps {
   onClearElementAnimationBuild?: ((elementId: string) => void) | undefined;
   onReorderElementAnimationBuild?: ((elementId: string, targetIndex: number) => void) | undefined;
   onPlayAnimationPreview?: (() => void) | undefined;
-}
-
-interface StockMediaErrorState {
-  gifs?: string | undefined;
-  images?: string | undefined;
 }
 
 const menuItems: Array<{ id: RightPanelTab; label: string; icon: typeof Layers3 }> = [
