@@ -9,6 +9,7 @@ import type {
   MirrorService,
   ModelSetupService,
   PaletteService,
+  PresentationImportService,
   PersistenceStorageMode,
   PromptService,
   ProjectRepository,
@@ -29,6 +30,7 @@ import { OpfsProjectRepository } from '../services/storage/opfsProjectRepository
 import { localSetupService } from '../services/browser/localSetupService';
 import { modelSetupService } from '../services/model-setup/modelSetupService';
 import { BrowserShareService } from '../services/sharing/shareService';
+import { BrowserPptxImportService } from '../services/importing/pptx/pptxImportService';
 import { BrowserStockMediaService } from '../services/stock-media/stockMediaService';
 import { webGpuLanguageDetectionRuntime } from '../services/translation/webGpuLanguageDetectionRuntime';
 import { webGpuTextGenerationRuntime } from '../services/prompting/webGpuTextGenerationRuntime';
@@ -43,6 +45,7 @@ export interface AppServices {
   persistenceMode: PersistenceStorageMode;
   projectRepository: ProjectRepository;
   exportService: ExportService;
+  presentationImportService: PresentationImportService;
   shareService: ShareService;
   stockMediaService: StockMediaService;
   localSetupService: LocalSetupService;
@@ -85,6 +88,7 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     persistenceMode,
     projectRepository: createProjectRepository(persistenceMode),
     exportService: new BrowserExportService(),
+    presentationImportService: new BrowserPptxImportService(),
     shareService: new BrowserShareService({ mirrorService }),
     stockMediaService: new BrowserStockMediaService(),
     localSetupService: new localSetupService.BrowserLocalSetupService(),

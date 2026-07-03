@@ -29,6 +29,7 @@ export interface ProjectDocument {
   elements: Record<string, DesignElement>;
   createdAt: string;
   updatedAt: string;
+  importWarnings?: ImportWarning[];
 }
 
 export interface Page {
@@ -47,13 +48,24 @@ export type PageBackground =
   | { type: 'color'; color: string }
   | { type: 'asset'; assetId: string; colorFallback: string };
 
-export type AnimationEffect = 'dissolve' | 'keyboard-typing' | 'line-draw' | 'reveal';
+export type AnimationEffect =
+  | 'dissolve'
+  | 'fade'
+  | 'keyboard-typing'
+  | 'line-draw'
+  | 'push'
+  | 'reveal'
+  | 'wipe';
+export type AnimationDirection = 'down' | 'left' | 'right' | 'up';
 export type AnimationLineDrawDirection = 'start-to-end' | 'end-to-start' | 'middle-to-ends';
+export type ElementAnimationKind = 'build-in' | 'build-out' | 'emphasis';
 export type AnimationTrigger = 'on-click' | 'after-transition' | 'after-previous';
 
 export interface SlideTransition {
   effect: AnimationEffect;
   delayMs: number;
+  direction?: AnimationDirection;
+  durationMs?: number;
 }
 
 export interface ElementAnimationBuild {
@@ -62,7 +74,17 @@ export interface ElementAnimationBuild {
   effect: AnimationEffect;
   trigger: AnimationTrigger;
   delayMs: number;
+  direction?: AnimationDirection;
+  durationMs?: number;
+  kind?: ElementAnimationKind;
   lineDrawDirection?: AnimationLineDrawDirection;
+}
+
+export interface ImportWarning {
+  code: string;
+  message: string;
+  pageId?: string;
+  severity: 'info' | 'warning';
 }
 
 export interface Asset {
@@ -98,6 +120,8 @@ export interface TextElement extends BaseElement {
   fontWeight: number;
   fill: string;
   align: 'left' | 'center' | 'right';
+  lineHeight?: number;
+  verticalAlign?: 'bottom' | 'middle' | 'top';
 }
 
 export interface ImageElement extends BaseElement {

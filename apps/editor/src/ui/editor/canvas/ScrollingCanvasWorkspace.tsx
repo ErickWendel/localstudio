@@ -25,6 +25,7 @@ interface ScrollingCanvasWorkspaceProps extends CanvasWorkspaceProps {
   onSetPageVisibility?: ((pageId: string, visible: boolean) => void) | undefined;
   onTranslatePage?: ((pageId: string) => void) | undefined;
   onUpdateElementStyle?: ((elementId: string, patch: ElementStylePatch) => void) | undefined;
+  translatingPageIds?: string[] | undefined;
 }
 
 export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanvasWorkspaceProps>(
@@ -43,11 +44,13 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
       onTranslatePage,
       onUpdateElementStyle,
       project,
+      translatingPageIds = [],
       ...canvasProps
     },
     ref,
   ) {
     const pageRefs = useRef(new Map<string, HTMLElement>());
+    const ignoreNextActiveScrollRef = useRef(false);
     const programmaticScrollReleaseRef = useRef<number | undefined>(undefined);
     const programmaticScrollRef = useRef(false);
     const scrollerRef = useRef<HTMLDivElement>(null);
@@ -63,9 +66,16 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
         canvasProps.processingElementIds?.includes(selectedElement.id),
       );
     const showPageControls = !canvasProps.presentationMode;
+    const activePageIndex = project.pages.findIndex((page) => page.id === activePageId);
+    const preloadedPageIndex =
+      activePageIndex === project.pages.length - 1 ? activePageIndex - 1 : activePageIndex + 1;
     useImperativeHandle(ref, () => scrollerRef.current as HTMLDivElement, []);
 
     useEffect(() => {
+      if (ignoreNextActiveScrollRef.current) {
+        ignoreNextActiveScrollRef.current = false;
+        return;
+      }
       const activePageElement = pageRefs.current.get(activePageId);
       if (!activePageElement?.scrollIntoView) return;
       programmaticScrollRef.current = true;
@@ -103,7 +113,10 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
           return { pageId, distance: Math.abs(rect.top + rect.height / 2 - viewportCenter) };
         })
         .sort((a, b) => a.distance - b.distance)[0];
-      if (closest && closest.pageId !== activePageId) onActivePageFromScroll(closest.pageId);
+      if (closest && closest.pageId !== activePageId) {
+        ignoreNextActiveScrollRef.current = true;
+        onActivePageFromScroll(closest.pageId);
+      }
     }
 
     return (
@@ -132,10 +145,19 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
         ) : null}
         {project.pages.map((page, index) => {
           const isActive = page.id === activePageId;
+          const isTranslatingPage = translatingPageIds.includes(page.id);
+          const shouldRenderCanvas = isActive || index === preloadedPageIndex;
           const visible = page.visible ?? true;
+          const pageClassName = [
+            'scroll-page',
+            isActive ? 'scroll-page-active' : '',
+            isTranslatingPage ? 'scroll-page-translating' : '',
+          ]
+            .filter(Boolean)
+            .join(' ');
           return (
             <section
-              className={isActive ? 'scroll-page scroll-page-active' : 'scroll-page'}
+              className={pageClassName}
               data-page-id={page.id}
               key={page.id}
               ref={(element) => {
@@ -163,8 +185,19 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
                 {...(onSetPageVisibility ? { onSetPageVisibility } : {})}
                 {...(onTranslatePage ? { onTranslatePage } : {})}
               />
-              {isActive ? (
-                <CanvasWorkspace {...canvasProps} activePageId={activePageId} project={project} />
+              {shouldRenderCanvas ? (
+                <div
+                  className={isActive ? 'scroll-page-canvas-shell' : 'scroll-page-canvas-shell scroll-page-canvas-shell-preloaded'}
+                  {...(!isActive ? { 'aria-hidden': true, inert: true } : {})}
+                >
+                  <CanvasWorkspace
+                    {...canvasProps}
+                    activePageId={page.id}
+                    canvasLabel={isActive ? 'Slide canvas' : `Preloaded ${page.name} canvas`}
+                    project={project}
+                    readOnly={Boolean(canvasProps.readOnly || !isActive)}
+                  />
+                </div>
               ) : (
                 <button
                   className={

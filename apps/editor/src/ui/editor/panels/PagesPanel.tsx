@@ -35,6 +35,7 @@ export function PagesPanel({
   const [editingPageId, setEditingPageId] = useState<string | undefined>();
   const [dropIndicator, setDropIndicator] = useState<{ pageId: string; position: DropPosition } | undefined>();
   const [draftName, setDraftName] = useState('');
+  const pageCardRefs = useRef(new Map<string, HTMLElement>());
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -42,6 +43,15 @@ export function PagesPanel({
     inputRef.current?.focus();
     inputRef.current?.select();
   }, [editingPageId]);
+
+  useEffect(() => {
+    const activePageCard = pageCardRefs.current.get(activePageId);
+    if (typeof activePageCard?.scrollIntoView !== 'function') return;
+    activePageCard.scrollIntoView({
+      block: 'nearest',
+      behavior: 'auto',
+    });
+  }, [activePageId]);
 
   function startRename(pageId: string, name: string) {
     setEditingPageId(pageId);
@@ -124,6 +134,13 @@ export function PagesPanel({
               data-drop-position={dropPosition}
               draggable
               key={page.id}
+              ref={(element) => {
+                if (element) {
+                  pageCardRefs.current.set(page.id, element);
+                } else {
+                  pageCardRefs.current.delete(page.id);
+                }
+              }}
               onDragEnd={() => setDropIndicator(undefined)}
               onDragLeave={(event) => {
                 if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
@@ -144,6 +161,7 @@ export function PagesPanel({
               </span>
               <button
                 className="page-card-preview"
+                style={{ aspectRatio: `${page.width} / ${page.height}` }}
                 type="button"
                 aria-label={`Select ${page.name}`}
                 onClick={() => {
@@ -333,9 +351,12 @@ function MiniElement({
           ...style,
           color: element.fill,
           fontFamily: element.fontFamily,
-          fontSize: `${Math.max(4, (element.fontSize / page.height) * 100)}cqw`,
+          fontSize: `${Math.max(4, (element.fontSize / page.width) * 100)}cqw`,
           fontWeight: element.fontWeight,
+          lineHeight: 0.9,
+          overflow: 'visible',
           textAlign: element.align,
+          whiteSpace: 'pre-wrap',
         }}
       >
         {element.text}

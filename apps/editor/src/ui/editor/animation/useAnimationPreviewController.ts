@@ -15,13 +15,19 @@ export interface AnimationPreviewState {
 
 interface AnimationPreviewControllerOptions {
   activePageIdRef: MutableRefObject<string>;
+  onPresenterPageChange?: ((pageId: string) => void) | undefined;
   projectRef: MutableRefObject<ProjectDocument>;
   setActivePageId: (pageId: string) => void;
   setSelectedElementIds: (elementIds: string[]) => void;
 }
 
+function getBuildPlaybackDurationMs(build: ElementAnimationBuild) {
+  return Math.max(0, build.durationMs ?? build.delayMs);
+}
+
 export function useAnimationPreviewController({
   activePageIdRef,
+  onPresenterPageChange,
   projectRef,
   setActivePageId,
   setSelectedElementIds,
@@ -89,7 +95,7 @@ export function useAnimationPreviewController({
   }
 
   function animateActiveBuild(build: ElementAnimationBuild) {
-    const durationMs = Math.max(0, build.delayMs);
+    const durationMs = getBuildPlaybackDurationMs(build);
     const startMs = window.performance.now();
     if (animationPreviewFrameRef.current !== undefined) {
       window.cancelAnimationFrame(animationPreviewFrameRef.current);
@@ -159,7 +165,7 @@ export function useAnimationPreviewController({
     scheduleAnimationPreview(() => {
       revealAnimationBuild(nextBuild);
       runNextAnimationBuild();
-    }, nextBuild.delayMs);
+    }, getBuildPlaybackDurationMs(nextBuild));
   }
 
   function advanceAnimationPreview() {
@@ -173,7 +179,7 @@ export function useAnimationPreviewController({
     scheduleAnimationPreview(() => {
       revealAnimationBuild(nextBuild);
       runNextAnimationBuild();
-    }, nextBuild.delayMs);
+    }, getBuildPlaybackDurationMs(nextBuild));
   }
 
   function playAnimationPreview(
@@ -188,6 +194,7 @@ export function useAnimationPreviewController({
     clearAnimationPreviewTimers();
     animationPreviewQueueRef.current = builds;
     const transitionDelay = page.transition?.delayMs ?? 0;
+    if (mode === 'presenter') onPresenterPageChange?.(page.id);
     setAnimationPreview({
       activeBuild: undefined,
       activeBuildElementId: undefined,

@@ -852,6 +852,135 @@ button {
   transform: none;
 }
 
+.deck-translate-button-active,
+.deck-translate-button-active:disabled {
+  color: var(--ew-green-fixed);
+  opacity: 1;
+  cursor: progress;
+  animation: deckTranslatePulse 900ms ease-in-out infinite;
+}
+
+.deck-translation-shell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(236, 255, 233, 0.2);
+  border-radius: 4px;
+  background: var(--ew-panel);
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.deck-translation-shell:hover,
+.deck-translation-shell:focus-within {
+  border-color: rgba(236, 255, 233, 0.5);
+  box-shadow: 0 0 12px rgba(55, 253, 118, 0.12);
+}
+
+.deck-translation-main {
+  width: 32px;
+  min-width: 32px;
+  justify-content: center;
+  padding: 0;
+  border-radius: 4px 0 0 4px;
+}
+
+.deck-translation-main:disabled {
+  opacity: 0.62;
+}
+
+.deck-translation-menu-button {
+  width: 24px;
+  border-left: 1px solid rgba(236, 255, 233, 0.2);
+  border-radius: 0 4px 4px 0;
+}
+
+.deck-translation-menu-button .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.translation-path-dropdown {
+  position: absolute;
+  top: 38px;
+  left: 0;
+  z-index: 152;
+  width: 230px;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(55, 253, 118, 0.28);
+  border-radius: 6px;
+  background: rgba(6, 18, 11, 0.98);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.45),
+    0 0 20px rgba(55, 253, 118, 0.1);
+}
+
+.translation-path-field {
+  display: grid;
+  gap: 5px;
+  color: var(--ew-muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.translation-path-field select {
+  width: 100%;
+  min-height: 30px;
+  border: 1px solid rgba(55, 253, 118, 0.26);
+  border-radius: 4px;
+  background: #050d10;
+  color: var(--ew-text);
+  font: inherit;
+  letter-spacing: 0;
+  outline: 0;
+  padding: 0 8px;
+  text-transform: none;
+}
+
+.translation-path-field select:focus-visible {
+  border-color: var(--ew-green-fixed);
+  box-shadow: 0 0 0 2px rgba(55, 253, 118, 0.18);
+}
+
+.deck-translation-status {
+  min-width: 0;
+  max-width: min(280px, 24vw);
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid rgba(55, 253, 118, 0.34);
+  border-radius: 5px;
+  background: rgba(6, 18, 11, 0.92);
+  color: var(--ew-green-fixed);
+  box-shadow: 0 0 18px rgba(55, 253, 118, 0.1);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+.deck-translation-status span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.deck-translation-status-orbit {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--ew-green-fixed);
+  box-shadow: 0 0 10px rgba(55, 253, 118, 0.72);
+  animation: deckTranslateDot 900ms ease-in-out infinite;
+}
+
 .persistence-off {
   color: var(--ew-dim);
 }
@@ -882,6 +1011,141 @@ button {
   box-shadow: 0 16px 42px rgba(0, 0, 0, 0.42);
 }
 
+.presentation-import-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 420;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    linear-gradient(135deg, rgba(5, 7, 12, 0.86), rgba(5, 10, 18, 0.74)),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.035) 0,
+      rgba(255, 255, 255, 0.035) 1px,
+      transparent 1px,
+      transparent 96px
+    );
+  backdrop-filter: blur(10px);
+}
+
+.presentation-import-panel {
+  width: min(520px, 100%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(16, 18, 23, 0.96);
+  color: var(--ew-text);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.52);
+  padding: 24px;
+}
+
+.presentation-import-orbit {
+  position: relative;
+  width: 74px;
+  height: 74px;
+  margin-bottom: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.presentation-import-orbit::before {
+  content: '';
+  position: absolute;
+  inset: 16px;
+  border-radius: 4px;
+  border: 1px solid rgba(55, 253, 118, 0.5);
+  background: rgba(55, 253, 118, 0.08);
+}
+
+.presentation-import-orbit span {
+  position: absolute;
+  top: 33px;
+  left: 33px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #37fd76;
+  transform-origin: 4px 4px;
+  animation: presentationImportOrbit 1300ms linear infinite;
+}
+
+.presentation-import-orbit span:nth-child(2) {
+  background: #f6c453;
+  animation-delay: -430ms;
+}
+
+.presentation-import-orbit span:nth-child(3) {
+  background: #7dd3fc;
+  animation-delay: -860ms;
+}
+
+.presentation-import-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.presentation-import-stage {
+  color: #7dd3fc;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.presentation-import-copy h2 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+
+.presentation-import-copy p {
+  margin: 0;
+  color: var(--ew-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.presentation-import-progress {
+  height: 10px;
+  margin-top: 22px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.presentation-import-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #37fd76, #f6c453 58%, #7dd3fc);
+  transition: width 220ms ease;
+}
+
+.presentation-import-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 10px;
+  color: var(--ew-dim);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+@keyframes presentationImportOrbit {
+  from {
+    transform: rotate(0deg) translateX(35px);
+  }
+
+  to {
+    transform: rotate(360deg) translateX(35px);
+  }
+}
+
 @keyframes persistencePulse {
   0%,
   100% {
@@ -890,6 +1154,30 @@ button {
 
   50% {
     box-shadow: 0 0 0 5px rgba(246, 196, 83, 0.18);
+  }
+}
+
+@keyframes deckTranslatePulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(55, 253, 118, 0);
+  }
+
+  50% {
+    box-shadow: 0 0 0 5px rgba(55, 253, 118, 0.2);
+  }
+}
+
+@keyframes deckTranslateDot {
+  0%,
+  100% {
+    opacity: 0.52;
+    transform: scale(0.82);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.18);
   }
 }
 
@@ -1524,7 +1812,9 @@ button {
   overflow-x: hidden;
   overflow-y: auto;
   padding: 12px 54px 18px;
-  scroll-snap-type: y proximity;
+  overscroll-behavior: contain;
+  scroll-behavior: auto;
+  scroll-snap-type: none;
 }
 
 .scroll-page {
@@ -1535,7 +1825,23 @@ button {
   align-content: start;
   gap: 8px;
   justify-items: center;
-  scroll-snap-align: start;
+}
+
+.scroll-page-translating {
+  border-radius: 8px;
+  outline: 2px solid rgba(55, 253, 118, 0.72);
+  outline-offset: 8px;
+  box-shadow: 0 0 28px rgba(55, 253, 118, 0.16);
+}
+
+.scroll-page-canvas-shell {
+  width: 100%;
+  display: grid;
+  justify-items: center;
+}
+
+.scroll-page-canvas-shell-preloaded {
+  pointer-events: none;
 }
 
 .scroll-page-insert {
@@ -1672,6 +1978,20 @@ button {
   border-radius: 6px;
   object-fit: fill;
   transform-origin: top left;
+}
+
+.project-video-preloader {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.project-video-preloader video {
+  width: 1px;
+  height: 1px;
 }
 
 .background-selection-hint {
@@ -2451,7 +2771,6 @@ button {
 .page-card-preview {
   grid-area: preview;
   width: 100%;
-  aspect-ratio: 16 / 9;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 3px;
   background: #050d10;
@@ -2467,9 +2786,7 @@ button {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 24% 42%, rgba(55, 253, 118, 0.22), transparent 24%),
-    linear-gradient(135deg, rgba(55, 253, 118, 0.12), transparent 52%), #050d10;
+  background: #050d10;
 }
 
 .page-card-canvas-hidden {

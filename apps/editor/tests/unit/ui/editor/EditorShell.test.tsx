@@ -11,6 +11,7 @@ import type {
   MirrorService,
   MirrorState,
   ProjectRepository,
+  PresentationImportService,
   ShareMetadata,
   ShareRecord,
   ShareService,
@@ -20,6 +21,7 @@ import type {
   StockMediaService,
   TranslatorService,
 } from '../../../../src/services/contracts/interfaces';
+import type { PptxImportInput } from '../../../../src/services/importing/pptx/pptxImportService';
 import type { MinioMirrorConfig } from '../../../../src/services/mirror/minioMirrorService';
 import type {
   WebMcpDemoWindow,
@@ -48,6 +50,46 @@ function enableSyncedSharing(services: ReturnType<typeof createAppServices>) {
   services.projectRepository = new LoadingProjectRepository(sampleProject.createSampleProject());
   services.persistenceAvailable = true;
   services.skipStoredProjectLoad = false;
+}
+
+function createMultiTextProject(textCount: number) {
+  const project = sampleProject.createSampleProject();
+  const elementIds = Array.from({ length: textCount }, (_, index) => `bulk-text-${index + 1}`);
+  return {
+    ...project,
+    elements: {
+      ...project.elements,
+      ...Object.fromEntries(
+        elementIds.map((elementId, index) => [
+          elementId,
+          {
+            id: elementId,
+            type: 'text' as const,
+            text: `Deck text ${index + 1}`,
+            x: 100,
+            y: 100 + index * 20,
+            width: 300,
+            height: 60,
+            rotation: 0,
+            opacity: 1,
+            visible: true,
+            locked: false,
+            fontFamily: 'Inter',
+            fontSize: 24,
+            fontWeight: 600,
+            fill: '#ffffff',
+            align: 'left' as const,
+          },
+        ]),
+      ),
+    },
+    pages: elementIds.map((elementId, index) => ({
+      ...project.pages[0]!,
+      id: `bulk-page-${index + 1}`,
+      name: `Slide ${index + 1}`,
+      elementIds: [elementId],
+    })),
+  };
 }
 
 class InstantBackgroundRemovalService implements BackgroundRemovalService {
@@ -309,6 +351,30 @@ class RecordingTranslatorService implements TranslatorService {
   });
 }
 
+class ConcurrentRecordingTranslatorService extends RecordingTranslatorService {
+  activeTranslations = 0;
+  private releaseTranslationGate: (() => void) | undefined;
+  private readonly translationGate = new Promise<void>((resolve) => {
+    this.releaseTranslationGate = resolve;
+  });
+  maxConcurrentTranslations = 0;
+
+  finishTranslations() {
+    this.releaseTranslationGate?.();
+  }
+
+  override translate = vi.fn(async (text: string, targetLanguage: string) => {
+    this.activeTranslations += 1;
+    this.maxConcurrentTranslations = Math.max(
+      this.maxConcurrentTranslations,
+      this.activeTranslations,
+    );
+    await this.translationGate;
+    this.activeTranslations -= 1;
+    return `${targetLanguage}:${text}`;
+  });
+}
+
 class ImportingProjectRepository implements ProjectRepository {
   savedProjects: ProjectDocument[] = [];
 
@@ -326,6 +392,29 @@ class ImportingProjectRepository implements ProjectRepository {
     this.savedProjects.push(project);
     return Promise.resolve();
   }
+}
+
+class PendingPresentationImportService implements PresentationImportService {
+  importCalls: PptxImportInput[] = [];
+  resolveImport: ((project: ProjectDocument) => void) | undefined;
+
+  importPowerPoint(input: PptxImportInput): Promise<ProjectDocument> {
+    this.importCalls.push(input);
+    return new Promise((resolve) => {
+      this.resolveImport = resolve;
+    });
+  }
+}
+
+function createPowerPointFileHandle(file: File | Error) {
+  return {
+    getFile: () => {
+      if (file instanceof File) return Promise.resolve(file);
+      return Promise.reject(file);
+    },
+    kind: 'file',
+    name: 'deck.pptx',
+  };
 }
 
 class RemoteMirrorImportingProjectRepository implements ProjectRepository {
@@ -558,6 +647,34 @@ describe('EditorShell', () => {
       'aria-pressed',
       'false',
     );
+  });
+
+  it('clears element selection when selecting a page from the pages panel', async () => {
+    const user = userEvent.setup();
+    const project = sampleProject.createSampleProject();
+    project.pages = [
+      project.pages[0]!,
+      {
+        ...project.pages[0]!,
+        id: 'page-2',
+        name: 'Slide 2',
+      },
+    ];
+    render(<EditorShell services={createAppServices({ initialProject: project })} />);
+
+    await selectImageLayer(user);
+    expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+      'data-selected-elements',
+      'image-hero',
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Toggle pages panel' }));
+    await user.click(screen.getByRole('button', { name: 'Select Slide 2' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('2 / 2')).toBeInTheDocument();
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-selected-elements', '');
+    });
   });
 
   it('inserts and selects a shape from the Elements panel', async () => {
@@ -1057,6 +1174,91 @@ describe('EditorShell', () => {
     expect(window.location.search).toBe('?project=Imported+LocalStudio+Project');
   });
 
+  it('shows PowerPoint import progress only after a source is selected', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const importService = new PendingPresentationImportService();
+    services.presentationImportService = importService;
+    let resolvePicker: ((handles: Array<{ getFile: () => Promise<File> }>) => void) | undefined;
+    vi.stubGlobal(
+      'showOpenFilePicker',
+      vi.fn(
+        () =>
+          new Promise<Array<{ getFile: () => Promise<File> }>>((resolve) => {
+            resolvePicker = resolve;
+          }),
+      ),
+    );
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Import PowerPoint...' }));
+
+    expect(screen.queryByRole('progressbar', { name: 'PowerPoint import progress' })).toBeNull();
+
+    act(() => {
+      resolvePicker?.([
+        {
+          getFile: () =>
+            Promise.resolve(
+              new File(['pptx'], 'deck.pptx', {
+                type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+              }),
+            ),
+        },
+      ]);
+    });
+
+    expect(
+      await screen.findByRole('progressbar', { name: 'PowerPoint import progress' }),
+    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(importService.importCalls).toHaveLength(1);
+    });
+    expect(importService.importCalls[0]?.file.name).toBe('deck.pptx');
+
+    act(() => {
+      importService.resolveImport?.({ ...services.initialProject, name: 'Imported PowerPoint Deck' });
+    });
+
+    expect(
+      await screen.findByRole('button', { name: 'Edit project name Imported PowerPoint Deck' }),
+    ).toBeInTheDocument();
+  });
+
+  it('reports PowerPoint picker failures without starting import progress', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const importService = new PendingPresentationImportService();
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    services.presentationImportService = importService;
+    vi.stubGlobal(
+      'showOpenFilePicker',
+      vi.fn(() =>
+        Promise.resolve([
+          createPowerPointFileHandle(
+            new DOMException(
+              'A requested file or directory could not be found at the time an operation was processed.',
+              'NotFoundError',
+            ),
+          ),
+        ] as FileSystemFileHandle[]),
+      ),
+    );
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Import PowerPoint...' }));
+
+    await waitFor(() => {
+      expect(consoleError).toHaveBeenCalled();
+    });
+    expect(importService.importCalls).toHaveLength(0);
+    expect(screen.queryByRole('progressbar', { name: 'PowerPoint import progress' })).toBeNull();
+    expect(consoleError.mock.calls[0]?.[0]).toBe('[LocalStudio PPTX Import]');
+    consoleError.mockRestore();
+  });
+
   it('displays the remote project name after importing a mirrored project', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
@@ -1554,17 +1756,26 @@ describe('EditorShell', () => {
         elementIds: [],
         animationBuilds: [],
       },
+      {
+        id: 'page-3',
+        name: 'Slide 3',
+        width: 1920,
+        height: 1080,
+        background: { type: 'color', color: '#050D10' },
+        elementIds: [],
+        animationBuilds: [],
+      },
     ];
 
     render(<EditorShell services={createAppServices({ initialProject: project })} />);
 
-    await user.click(screen.getByRole('button', { name: 'Activate Slide 2' }));
-    expect(screen.getByText('2 / 2')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Activate Slide 3' }));
+    expect(screen.getByText('3 / 3')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Play presentation' }));
 
     await waitFor(() => {
-      expect(screen.getByText('2 / 2')).toBeInTheDocument();
+      expect(screen.getByText('3 / 3')).toBeInTheDocument();
       expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
         'data-animation-preview-mode',
         'presenter',
@@ -1575,7 +1786,7 @@ describe('EditorShell', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Play from beginning' }));
 
     await waitFor(() => {
-      expect(screen.getByText('1 / 2')).toBeInTheDocument();
+      expect(screen.getByText('1 / 3')).toBeInTheDocument();
       expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
         'data-animation-preview-mode',
         'presenter',
@@ -1646,6 +1857,67 @@ describe('EditorShell', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Add page after Slide 1' })).toBeInTheDocument();
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-animation-preview',
+        'idle',
+      );
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-selected-elements', '');
+    });
+  });
+
+  it('keeps the stopped presentation slide active after exiting fullscreen', async () => {
+    const user = userEvent.setup();
+    let fullscreenElement: Element | null = null;
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      get: () => fullscreenElement,
+    });
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+      configurable: true,
+      value: vi.fn(() => {
+        fullscreenElement = document.querySelector('[aria-label="Canvas workspace"]');
+        document.dispatchEvent(new Event('fullscreenchange'));
+        return Promise.resolve();
+      }),
+    });
+    const project = sampleProject.createSampleProject();
+    project.pages = [
+      {
+        ...project.pages[0]!,
+        transition: { effect: 'reveal', delayMs: 0 },
+        animationBuilds: [],
+      },
+      {
+        id: 'page-2',
+        name: 'Slide 2',
+        width: 1920,
+        height: 1080,
+        background: { type: 'color', color: '#050D10' },
+        elementIds: [],
+        animationBuilds: [],
+      },
+    ];
+
+    render(<EditorShell services={createAppServices({ initialProject: project })} />);
+
+    await user.click(screen.getByRole('button', { name: 'Play presentation' }));
+
+    await waitFor(() => {
+      expect(document.fullscreenElement).toBe(screen.getByLabelText('Canvas workspace'));
+      expect(screen.getByText('1 / 2')).toBeInTheDocument();
+    });
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+
+    await waitFor(() => {
+      expect(screen.getByText('2 / 2')).toBeInTheDocument();
+    });
+
+    fullscreenElement = null;
+    document.dispatchEvent(new Event('fullscreenchange'));
+
+    await waitFor(() => {
+      expect(screen.getByText('2 / 2')).toBeInTheDocument();
       expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
         'data-animation-preview',
         'idle',
@@ -2132,6 +2404,11 @@ describe('EditorShell', () => {
     services.translatorService = translator;
     render(<EditorShell services={services} />);
 
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Current slide language English' }),
+      ).toBeInTheDocument();
+    });
     await openLeftTab(user, 'AI Tools');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
     await user.click(screen.getByRole('button', { name: 'Edit' }));
@@ -2149,6 +2426,99 @@ describe('EditorShell', () => {
         },
       );
     });
+  });
+
+  it('uses the active slide language as the full-deck translation source', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const translator = new RecordingTranslatorService();
+    translator.detectLanguage
+      .mockResolvedValueOnce('en')
+      .mockResolvedValueOnce('cy');
+    translator.prepareTranslation.mockRejectedValueOnce(
+      new Error('Chrome Built-in AI translation is not ready for cy to pt.'),
+    );
+    services.translatorService = translator;
+    render(<EditorShell services={services} />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Current slide language English' }),
+      ).toBeInTheDocument();
+    });
+    await openLeftTab(user, 'AI Tools');
+    await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
+    await waitFor(() => {
+      expect(translator.prepareTranslation).toHaveBeenCalled();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Translate deck' }));
+
+    await waitFor(() => {
+      expect(translator.prepareTranslation).toHaveBeenCalledWith('en', 'pt');
+      expect(translator.translate).toHaveBeenCalledWith('AI Design Revolution', 'pt', {
+        sourceLanguage: 'en',
+      });
+    });
+  });
+
+  it('translates the full deck with the toolbar-selected language path', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const translator = new RecordingTranslatorService();
+    services.translatorService = translator;
+    render(<EditorShell services={services} />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Current slide language English' }),
+      ).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: 'Translation path options' }));
+    await user.selectOptions(screen.getByLabelText('Translate from'), 'es');
+    await user.selectOptions(screen.getByLabelText('Translate to'), 'en');
+    await user.click(screen.getByRole('button', { name: 'Translate deck' }));
+
+    await waitFor(() => {
+      expect(translator.prepareTranslation).toHaveBeenCalledWith('es', 'en');
+      expect(translator.translate).toHaveBeenCalledWith('AI Design Revolution', 'en', {
+        sourceLanguage: 'es',
+      });
+    });
+  });
+
+  it('translates the full deck from the toolbar icon with bounded concurrency', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices({ initialProject: createMultiTextProject(8) });
+    const translator = new ConcurrentRecordingTranslatorService();
+    services.translatorService = translator;
+    const { container } = render(<EditorShell services={services} />);
+
+    await openLeftTab(user, 'AI Tools');
+    await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
+    await waitFor(() => {
+      expect(translator.prepareTranslation).toHaveBeenCalled();
+    });
+    const translateDeckButton = screen.getByRole('button', { name: 'Translate deck' });
+    await waitFor(() => {
+      expect(translateDeckButton).not.toBeDisabled();
+    });
+    await user.click(translateDeckButton);
+
+    await waitFor(() => {
+      expect(translator.translate).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/^Translating Slide [1-3] · 0\/8$/)).toBeInTheDocument();
+    });
+    expect(translateDeckButton).toHaveClass('deck-translate-button-active');
+    expect(container.querySelector('.scroll-page-translating')).toBeInTheDocument();
+
+    translator.finishTranslations();
+    await waitFor(() => {
+      expect(translator.translate).toHaveBeenCalledTimes(8);
+    });
+    expect(translator.maxConcurrentTranslations).toBeLessThanOrEqual(3);
   });
 
   it('blocks background subject selection until image editing models are downloaded', async () => {

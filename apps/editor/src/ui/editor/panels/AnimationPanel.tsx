@@ -52,6 +52,13 @@ const DEFAULT_SLIDE_TRANSITION: SlideTransition = {
 };
 
 const ANIMATION_BUILD_DRAG_TYPE = 'application/x-localstudio-animation-build-element-id';
+const ANIMATION_EFFECT_OPTIONS = [
+  { label: 'Reveal', value: 'reveal' },
+  { label: 'Fade', value: 'fade' },
+  { label: 'Dissolve', value: 'dissolve' },
+  { label: 'Push', value: 'push' },
+  { label: 'Wipe', value: 'wipe' },
+] as const;
 const DEFAULT_LINE_DRAW_DIRECTION: AnimationLineDrawDirection = 'start-to-end';
 
 function getElementLabel(project: ProjectDocument, elementId: string) {
@@ -70,6 +77,9 @@ function getBuildPatch(build: ElementAnimationBuild | undefined): ElementAnimati
         effect: build.effect,
         trigger: build.trigger,
         delayMs: build.delayMs,
+        ...(build.direction ? { direction: build.direction } : {}),
+        ...(build.durationMs !== undefined ? { durationMs: build.durationMs } : {}),
+        ...(build.kind ? { kind: build.kind } : {}),
         ...(build.lineDrawDirection ? { lineDrawDirection: build.lineDrawDirection } : {}),
       }
     : DEFAULT_ELEMENT_ANIMATION;
@@ -93,7 +103,14 @@ function toAnimationEffect(
   value: string,
   availableEffects: ReturnType<typeof getAvailableEffects>,
 ): AnimationEffect {
-  if (value === 'dissolve') return 'dissolve';
+  if (
+    value === 'dissolve' ||
+    value === 'fade' ||
+    value === 'push' ||
+    value === 'wipe'
+  ) {
+    return value;
+  }
   if (value === 'line-draw' && availableEffects.canLineDraw) return 'line-draw';
   if (value === 'keyboard-typing' && availableEffects.canKeyboardType) return 'keyboard-typing';
   return 'reveal';
@@ -278,11 +295,18 @@ export function AnimationPanel({
                 onClearPageTransition?.();
                 return;
               }
-              onSetPageTransition?.(DEFAULT_SLIDE_TRANSITION);
+              onSetPageTransition?.({
+                ...DEFAULT_SLIDE_TRANSITION,
+                effect: event.target.value as SlideTransition['effect'],
+              });
             }}
           >
             <option value="none">None</option>
-            <option value="reveal">Reveal</option>
+            {ANIMATION_EFFECT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </label>
         <DurationField
@@ -291,8 +315,10 @@ export function AnimationPanel({
           valueMs={transition?.delayMs ?? DEFAULT_ANIMATION_DURATION_MS}
           onChange={(durationMs) => {
             onSetPageTransition?.({
-              effect: 'reveal',
+              effect: transition?.effect ?? 'reveal',
+              ...(transition?.direction ? { direction: transition.direction } : {}),
               delayMs: durationMs,
+              ...(transition?.durationMs !== undefined ? { durationMs: durationMs } : {}),
             });
           }}
         />
@@ -415,8 +441,11 @@ export function AnimationPanel({
                     }}
                   >
                     <option value="none">None</option>
-                    <option value="reveal">Reveal</option>
-                    <option value="dissolve">Dissolve</option>
+                    {ANIMATION_EFFECT_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                     {availableEffects.canLineDraw ? (
                       <option value="line-draw">Line draw</option>
                     ) : null}
@@ -494,8 +523,11 @@ export function AnimationPanel({
                   );
                 }}
               >
-                <option value="reveal">Reveal</option>
-                <option value="dissolve">Dissolve</option>
+                {ANIMATION_EFFECT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
                 {selectedAvailableEffects.canLineDraw ? (
                   <option value="line-draw">Line draw</option>
                 ) : null}

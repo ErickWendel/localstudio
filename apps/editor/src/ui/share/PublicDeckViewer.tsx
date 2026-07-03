@@ -30,6 +30,10 @@ interface AnimationPreviewState {
   waitingForClick: boolean;
 }
 
+function getBuildPlaybackDurationMs(build: ElementAnimationBuild) {
+  return Math.max(0, build.durationMs ?? build.delayMs);
+}
+
 export function PublicDeckViewer({ shareId, shareService, embed = false }: PublicDeckViewerProps) {
   const [viewerState, setViewerState] = useState<ViewerState>({ status: 'loading' });
   const [activePageIndex, setActivePageIndex] = useState(0);
@@ -95,7 +99,7 @@ export function PublicDeckViewer({ shareId, shareService, embed = false }: Publi
   }, []);
 
   const animateActiveBuild = useCallback((build: ElementAnimationBuild) => {
-    const durationMs = Math.max(0, build.delayMs);
+    const durationMs = getBuildPlaybackDurationMs(build);
     const startMs = window.performance.now();
     if (animationFrameRef.current !== undefined) {
       window.cancelAnimationFrame(animationFrameRef.current);
@@ -165,7 +169,7 @@ export function PublicDeckViewer({ shareId, shareService, embed = false }: Publi
     scheduleAnimation(() => {
       revealAnimationBuild(nextBuild);
       runNextAnimationBuildRef.current();
-    }, nextBuild.delayMs);
+    }, getBuildPlaybackDurationMs(nextBuild));
   }, [animateActiveBuild, completeAnimationSlide, revealAnimationBuild, scheduleAnimation]);
   useEffect(() => {
     runNextAnimationBuildRef.current = runNextAnimationBuild;
@@ -182,7 +186,7 @@ export function PublicDeckViewer({ shareId, shareService, embed = false }: Publi
     scheduleAnimation(() => {
       revealAnimationBuild(nextBuild);
       runNextAnimationBuild();
-    }, nextBuild.delayMs);
+    }, getBuildPlaybackDurationMs(nextBuild));
   }, [
     animateActiveBuild,
     completeAnimationSlide,

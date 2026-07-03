@@ -488,6 +488,7 @@ describe('CanvasWorkspace', () => {
     expect(editorVideo.loop).toBe(true);
     expect(editorVideo.controls).toBe(true);
     expect(editorVideo.muted).toBe(true);
+    expect(editorVideo.preload).toBe('auto');
 
     rerender(
       <CanvasWorkspace
@@ -503,6 +504,8 @@ describe('CanvasWorkspace', () => {
       'video[aria-label="Demo clip"]',
     ) as HTMLVideoElement;
     expect(previewVideo.autoplay).toBe(true);
+    expect(previewVideo.controls).toBe(true);
+    expect(previewVideo.preload).toBe('auto');
     expect(previewVideo.dataset.trimStart).toBe('2');
     expect(previewVideo.dataset.trimEnd).toBe('6');
   });

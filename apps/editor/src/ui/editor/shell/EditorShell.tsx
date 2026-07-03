@@ -10,11 +10,13 @@ import {
   type WebMcpDemoWindow,
 } from '../../../services/webmcp/webMcpToolAdapter';
 import { EditorFooter } from './EditorFooter';
+import { PresentationImportProgressOverlay } from './PresentationImportProgressOverlay';
 import { LeftToolPanel } from '../panels/LeftToolPanel';
 import { LocalProjectSetupPanel } from '../panels/LocalProjectSetupPanel';
 import { MediaIntegrationSettingsPanel } from '../panels/MediaIntegrationSettingsPanel';
 import { MirrorSettingsPanel } from '../panels/MirrorSettingsPanel';
 import { PagesPanel } from '../panels/PagesPanel';
+import { ProjectVideoPreloader } from '../media/ProjectVideoPreloader';
 import { PromptBar } from '../prompting/PromptBar';
 import { RemoteImportPanel } from '../panels/RemoteImportPanel';
 import { ScrollingCanvasWorkspace } from '../canvas/ScrollingCanvasWorkspace';
@@ -45,6 +47,9 @@ export function EditorShell({ services }: EditorShellProps) {
     0,
     vm.project.pages.findIndex((page) => page.id === vm.activePageId),
   );
+  const deckTranslationStatus = vm.deckTranslationProgress
+    ? `Translating ${vm.deckTranslationProgress.currentPageName} · ${vm.deckTranslationProgress.completedPages}/${vm.deckTranslationProgress.totalPages}`
+    : undefined;
   const publicSharingAvailable = vm.mirrorState.enabled && vm.mirrorState.status === 'synced';
   const publicSharingUnavailableReason = 'Public links cannot be created without remote storage.';
   const hasDirectoryPersistence = services.persistenceMode === 'directory';
@@ -337,6 +342,11 @@ export function EditorShell({ services }: EditorShellProps) {
         lastEditedAt={vm.lastEditedAt}
         saveAnimationKey={vm.saveAnimationKey}
         canTranslateDeck={vm.canTranslateDeck}
+        deckTranslationStatus={deckTranslationStatus}
+        isTranslatingDeck={Boolean(vm.deckTranslationProgress)}
+        translationLanguageOptions={vm.translationLanguageOptions}
+        translationSourceLanguage={vm.activeSlideLanguage.code}
+        translationTargetLanguage={vm.translationTargetLanguage}
         persistenceAvailable={services.persistenceAvailable}
         persistenceMode={services.persistenceMode}
         onDelete={isHistoryReadOnly ? undefined : vm.deleteSelectedElement}
@@ -351,6 +361,9 @@ export function EditorShell({ services }: EditorShellProps) {
               }
             : undefined
         }
+        onImportPowerPoint={() => {
+          void vm.importPowerPoint();
+        }}
         onMirrorNow={() => {
           vm.requestMirrorNow();
         }}
@@ -384,6 +397,12 @@ export function EditorShell({ services }: EditorShellProps) {
               }
             : undefined
         }
+        onTranslationSourceLanguageChange={vm.setActiveSlideLanguage}
+        onTranslationTargetLanguageChange={(languageCode) => {
+          void vm.setTranslationTargetLanguageForSource(languageCode, {
+            sourceLanguage: vm.activeSlideLanguage.code,
+          });
+        }}
         onTranslateDeck={
           isHistoryReadOnly
             ? undefined
@@ -515,6 +534,7 @@ export function EditorShell({ services }: EditorShellProps) {
             animationPreview={vm.animationPreview}
             backgroundPreparation={vm.backgroundPreparation}
             canTranslateCurrentSlide={vm.canTranslateCurrentSlide}
+            translatingPageIds={vm.deckTranslationProgress?.activePageIds}
             canTranslateSelection={vm.canTranslateSelection}
             isTranslating={vm.isTranslating}
             translationNotice={vm.translationNotice}
@@ -744,6 +764,10 @@ export function EditorShell({ services }: EditorShellProps) {
           }}
         />
       ) : null}
+      {vm.presentationImportProgress ? (
+        <PresentationImportProgressOverlay progress={vm.presentationImportProgress} />
+      ) : null}
+      <ProjectVideoPreloader project={vm.project} />
       <EditorFooter
         activePageIndex={activePageIndex}
         pageCount={vm.project.pages.length}

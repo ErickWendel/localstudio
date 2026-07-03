@@ -5,6 +5,67 @@ import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 import { PagesPanel } from '../../../../src/ui/editor/panels/PagesPanel';
 
 describe('PagesPanel', () => {
+  it('keeps the active page card in view as the active slide changes', () => {
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    const project = sampleProject.createSampleProject();
+    project.pages.push({
+      ...project.pages[0]!,
+      id: 'page-2',
+      name: 'Second Slide',
+      elementIds: [],
+    });
+
+    const { rerender } = render(<PagesPanel activePageId="page-1" project={project} />);
+    scrollIntoView.mockClear();
+
+    rerender(<PagesPanel activePageId="page-2" project={project} />);
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', behavior: 'auto' });
+  });
+
+  it('scales page previews from the full slide dimensions', () => {
+    const project = sampleProject.createSampleProject();
+    project.pages[0] = {
+      ...project.pages[0]!,
+      width: 2000,
+      height: 1000,
+      elementIds: ['text-title'],
+    };
+    project.elements['text-title'] = {
+      id: 'text-title',
+      type: 'text',
+      text: 'Scaled preview text',
+      fontSize: 100,
+      fontFamily: 'Open Sans',
+      fontWeight: 700,
+      fill: '#ffffff',
+      align: 'left',
+      height: 200,
+      locked: false,
+      opacity: 1,
+      rotation: 0,
+      visible: true,
+      width: 1000,
+      x: 0,
+      y: 0,
+    };
+
+    const { container } = render(<PagesPanel activePageId="page-1" project={project} />);
+
+    const preview = screen.getByRole('button', { name: 'Select Slide 1' });
+    expect(preview).toHaveStyle({ aspectRatio: '2000 / 1000' });
+    const miniText = container.querySelector('.page-card-mini-text');
+    expect(miniText).toHaveStyle({
+      fontSize: '5cqw',
+      overflow: 'visible',
+      whiteSpace: 'pre-wrap',
+    });
+  });
+
   it('selects, adds, duplicates, hides, deletes, reorders, renames, and translates pages', async () => {
     const user = userEvent.setup();
     const project = sampleProject.createSampleProject();
