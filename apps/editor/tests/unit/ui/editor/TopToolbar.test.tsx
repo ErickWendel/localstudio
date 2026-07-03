@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
@@ -91,6 +91,125 @@ describe('TopToolbar', () => {
     await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
 
     expect(onPersistenceToggle).toHaveBeenCalledWith(true);
+  });
+
+  it('translates the deck from the toolbar icon beside persistence', async () => {
+    const user = userEvent.setup();
+    const onTranslateDeck = vi.fn();
+
+    render(
+      <TopToolbar
+        project={sampleProject.createSampleProject()}
+        language="PT-BR"
+        canTranslateDeck
+        onTranslateDeck={onTranslateDeck}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Translate deck' }));
+
+    expect(onTranslateDeck).toHaveBeenCalledTimes(1);
+    const editingActionLabels = within(screen.getByLabelText('Editing actions'))
+      .getAllByRole('button')
+      .map((button) => button.getAttribute('aria-label'));
+    expect(editingActionLabels).toEqual([
+      'Persistence disabled',
+      'Mirror disabled',
+      'Version history',
+      'Undo',
+      'Redo',
+      'Translate deck',
+      'Translation path options',
+    ]);
+  });
+
+  it('lets users choose the deck translation path from the toolbar', async () => {
+    const user = userEvent.setup();
+    const onTranslationSourceLanguageChange = vi.fn();
+    const onTranslationTargetLanguageChange = vi.fn();
+
+    render(
+      <TopToolbar
+        project={sampleProject.createSampleProject()}
+        language="EN"
+        canTranslateDeck
+        translationLanguageOptions={[
+          { code: 'en', flag: '🇺🇸', label: 'English' },
+          { code: 'pt', flag: '🇧🇷', label: 'Portuguese' },
+          { code: 'es', flag: '🇪🇸', label: 'Spanish' },
+        ]}
+        translationSourceLanguage="en"
+        translationTargetLanguage="pt"
+        onTranslationSourceLanguageChange={onTranslationSourceLanguageChange}
+        onTranslationTargetLanguageChange={onTranslationTargetLanguageChange}
+        onTranslateDeck={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Translation path options' }));
+    expect(screen.getAllByRole('option', { name: 'Spanish (es) 🇪🇸' }).length).toBeGreaterThan(0);
+    await user.selectOptions(screen.getByLabelText('Translate from'), 'es');
+    await user.selectOptions(screen.getByLabelText('Translate to'), 'en');
+
+    expect(onTranslationSourceLanguageChange).toHaveBeenCalledWith('es');
+    expect(onTranslationTargetLanguageChange).toHaveBeenCalledWith('en');
+  });
+
+  it('closes the deck translation path menu when users click outside', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <TopToolbar
+        project={sampleProject.createSampleProject()}
+        language="EN"
+        canTranslateDeck
+        translationLanguageOptions={[
+          { code: 'en', flag: '🇺🇸', label: 'English' },
+          { code: 'pt', flag: '🇧🇷', label: 'Portuguese' },
+        ]}
+        translationSourceLanguage="en"
+        translationTargetLanguage="pt"
+        onTranslateDeck={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Translation path options' }));
+    expect(screen.getByRole('group', { name: 'Translation path' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Current slide language/ }));
+
+    expect(screen.queryByRole('group', { name: 'Translation path' })).not.toBeInTheDocument();
+  });
+
+  it('disables the toolbar deck translation icon when no deck text can be translated', () => {
+    render(
+      <TopToolbar
+        project={sampleProject.createSampleProject()}
+        language="PT-BR"
+        canTranslateDeck={false}
+        onTranslateDeck={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Translate deck' })).toBeDisabled();
+  });
+
+  it('pulses the deck translation icon and shows the active slide status', () => {
+    render(
+      <TopToolbar
+        project={sampleProject.createSampleProject()}
+        language="PT-BR"
+        canTranslateDeck={false}
+        deckTranslationStatus="Translating Slide 3 · 2/8"
+        isTranslatingDeck
+        onTranslateDeck={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Translate deck' })).toHaveClass(
+      'deck-translate-button-active',
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('Translating Slide 3 · 2/8');
   });
 
   it('links to the public GitHub repository from the editor toolbar', () => {

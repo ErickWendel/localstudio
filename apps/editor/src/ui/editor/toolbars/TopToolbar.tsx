@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ProjectDocument } from '../../../domain/documents/model';
 import type { MirrorState, PersistenceStorageMode } from '../../../services/contracts/interfaces';
+import type { TranslationLanguageOption } from '../translation/translationLanguages';
 
 interface TopToolbarProps {
   project: ProjectDocument;
@@ -21,6 +22,11 @@ interface TopToolbarProps {
   persistenceNotice?: string | undefined;
   saveAnimationKey?: number;
   canTranslateDeck?: boolean;
+  deckTranslationStatus?: string | undefined;
+  isTranslatingDeck?: boolean;
+  translationLanguageOptions?: TranslationLanguageOption[];
+  translationSourceLanguage?: string;
+  translationTargetLanguage?: string;
   onDelete?: (() => void) | undefined;
   onDuplicate?: (() => void) | undefined;
   onImportPowerPoint?: (() => void) | undefined;
@@ -40,6 +46,8 @@ interface TopToolbarProps {
   onSelectLayers?: (() => void) | undefined;
   onShare?: (() => void) | undefined;
   onStartPresenterMode?: ((options?: { fromBeginning?: boolean }) => void) | undefined;
+  onTranslationSourceLanguageChange?: ((languageCode: string) => void) | undefined;
+  onTranslationTargetLanguageChange?: ((languageCode: string) => void) | undefined;
   onTranslateDeck?: (() => void) | undefined;
   onUndo?: (() => void) | undefined;
   onZoomIn?: (() => void) | undefined;
@@ -124,6 +132,11 @@ export function TopToolbar({
   persistenceNotice,
   saveAnimationKey = 0,
   canTranslateDeck = false,
+  deckTranslationStatus,
+  isTranslatingDeck = false,
+  translationLanguageOptions = [],
+  translationSourceLanguage = language.toLowerCase(),
+  translationTargetLanguage = '',
   onDelete,
   onDuplicate,
   onImportPowerPoint,
@@ -143,6 +156,8 @@ export function TopToolbar({
   onStartPresenterMode,
   onSaveLocal,
   onSaveLocalAs,
+  onTranslationSourceLanguageChange,
+  onTranslationTargetLanguageChange,
   onTranslateDeck,
   onUndo,
   onZoomIn,
@@ -150,9 +165,11 @@ export function TopToolbar({
 }: TopToolbarProps) {
   const [openMenu, setOpenMenu] = useState<HeaderMenu | null>(null);
   const [playMenuOpen, setPlayMenuOpen] = useState(false);
+  const [translationMenuOpen, setTranslationMenuOpen] = useState(false);
   const [isEditingProjectName, setIsEditingProjectName] = useState(false);
   const [projectNameDraft, setProjectNameDraft] = useState(project.name);
   const projectNameInputRef = useRef<HTMLInputElement>(null);
+  const translationMenuRef = useRef<HTMLDivElement>(null);
   const stars = useAnimatedStarCount(githubStarCount);
 
   useEffect(() => {
@@ -161,6 +178,24 @@ export function TopToolbar({
     projectNameInputRef.current?.focus();
     projectNameInputRef.current?.select();
   }, [isEditingProjectName]);
+
+  useEffect(() => {
+    if (!translationMenuOpen) return;
+
+    const closeTranslationMenuOnOutsidePointer = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (translationMenuRef.current?.contains(target)) return;
+
+      setTranslationMenuOpen(false);
+    };
+
+    document.addEventListener('pointerdown', closeTranslationMenuOnOutsidePointer);
+
+    return () => {
+      document.removeEventListener('pointerdown', closeTranslationMenuOnOutsidePointer);
+    };
+  }, [translationMenuOpen]);
 
   function triggerShare() {
     onShare?.();
@@ -177,6 +212,7 @@ export function TopToolbar({
       onStartPresenterMode?.();
     }
     setPlayMenuOpen(false);
+    setTranslationMenuOpen(false);
   }
 
   function commitProjectName() {
@@ -289,6 +325,13 @@ export function TopToolbar({
     .filter(Boolean)
     .join(' ');
   const shareTitle = 'Share';
+  const deckTranslateButtonClassName = [
+    'stitch-icon-button',
+    'deck-translate-button',
+    isTranslatingDeck ? 'deck-translate-button-active' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <header className="top-toolbar">
@@ -307,6 +350,7 @@ export function TopToolbar({
                 type="button"
                 onClick={() => {
                   setPlayMenuOpen(false);
+                  setTranslationMenuOpen(false);
                   setOpenMenu((current) => (current === item ? null : item));
                 }}
               >
@@ -400,6 +444,7 @@ export function TopToolbar({
               title="Presentation play options"
               onClick={() => {
                 setOpenMenu(null);
+                setTranslationMenuOpen(false);
                 setPlayMenuOpen((current) => !current);
               }}
             >
@@ -526,6 +571,75 @@ export function TopToolbar({
               redo
             </span>
           </button>
+          <div className="deck-translation-shell" ref={translationMenuRef}>
+            <button
+              className={`${deckTranslateButtonClassName} deck-translation-main`}
+              disabled={!canTranslateDeck || !onTranslateDeck}
+              title={deckTranslationStatus ?? 'Translate deck using the selected target language'}
+              type="button"
+              aria-label="Translate deck"
+              onClick={onTranslateDeck}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">
+                translate
+              </span>
+            </button>
+            <button
+              className="stitch-icon-button deck-translation-menu-button"
+              type="button"
+              aria-expanded={translationMenuOpen}
+              aria-label="Translation path options"
+              title="Translation path options"
+              onClick={() => {
+                setOpenMenu(null);
+                setPlayMenuOpen(false);
+                setTranslationMenuOpen((current) => !current);
+              }}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">
+                keyboard_arrow_down
+              </span>
+            </button>
+            {translationMenuOpen ? (
+              <div className="translation-path-dropdown" role="group" aria-label="Translation path">
+                <label className="translation-path-field">
+                  <span>From</span>
+                  <select
+                    value={translationSourceLanguage}
+                    aria-label="Translate from"
+                    onChange={(event) => onTranslationSourceLanguageChange?.(event.target.value)}
+                  >
+                    {translationLanguageOptions.map((option) => (
+                      <option value={option.code} key={option.code}>
+                        {option.label} ({option.code}) {option.flag}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="translation-path-field">
+                  <span>To</span>
+                  <select
+                    value={translationTargetLanguage}
+                    aria-label="Translate to"
+                    onChange={(event) => onTranslationTargetLanguageChange?.(event.target.value)}
+                  >
+                    <option value="">Choose language</option>
+                    {translationLanguageOptions.map((option) => (
+                      <option value={option.code} key={option.code}>
+                        {option.label} ({option.code}) {option.flag}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            ) : null}
+          </div>
+          {deckTranslationStatus ? (
+            <div className="deck-translation-status" role="status" aria-live="polite">
+              <span className="deck-translation-status-orbit" aria-hidden="true" />
+              <span>{deckTranslationStatus}</span>
+            </div>
+          ) : null}
         </div>
         <button
           className="language-chip"

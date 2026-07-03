@@ -52,6 +52,46 @@ function enableSyncedSharing(services: ReturnType<typeof createAppServices>) {
   services.skipStoredProjectLoad = false;
 }
 
+function createMultiTextProject(textCount: number) {
+  const project = sampleProject.createSampleProject();
+  const elementIds = Array.from({ length: textCount }, (_, index) => `bulk-text-${index + 1}`);
+  return {
+    ...project,
+    elements: {
+      ...project.elements,
+      ...Object.fromEntries(
+        elementIds.map((elementId, index) => [
+          elementId,
+          {
+            id: elementId,
+            type: 'text' as const,
+            text: `Deck text ${index + 1}`,
+            x: 100,
+            y: 100 + index * 20,
+            width: 300,
+            height: 60,
+            rotation: 0,
+            opacity: 1,
+            visible: true,
+            locked: false,
+            fontFamily: 'Inter',
+            fontSize: 24,
+            fontWeight: 600,
+            fill: '#ffffff',
+            align: 'left' as const,
+          },
+        ]),
+      ),
+    },
+    pages: elementIds.map((elementId, index) => ({
+      ...project.pages[0]!,
+      id: `bulk-page-${index + 1}`,
+      name: `Slide ${index + 1}`,
+      elementIds: [elementId],
+    })),
+  };
+}
+
 class InstantBackgroundRemovalService implements BackgroundRemovalService {
   prepareBackgroundRemoval(
     asset: Asset,
@@ -308,6 +348,30 @@ class RecordingTranslatorService implements TranslatorService {
 
   detectLanguage = vi.fn(() => {
     return Promise.resolve('en');
+  });
+}
+
+class ConcurrentRecordingTranslatorService extends RecordingTranslatorService {
+  activeTranslations = 0;
+  private releaseTranslationGate: (() => void) | undefined;
+  private readonly translationGate = new Promise<void>((resolve) => {
+    this.releaseTranslationGate = resolve;
+  });
+  maxConcurrentTranslations = 0;
+
+  finishTranslations() {
+    this.releaseTranslationGate?.();
+  }
+
+  override translate = vi.fn(async (text: string, targetLanguage: string) => {
+    this.activeTranslations += 1;
+    this.maxConcurrentTranslations = Math.max(
+      this.maxConcurrentTranslations,
+      this.activeTranslations,
+    );
+    await this.translationGate;
+    this.activeTranslations -= 1;
+    return `${targetLanguage}:${text}`;
   });
 }
 
@@ -2340,6 +2404,11 @@ describe('EditorShell', () => {
     services.translatorService = translator;
     render(<EditorShell services={services} />);
 
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Current slide language English' }),
+      ).toBeInTheDocument();
+    });
     await openLeftTab(user, 'AI Tools');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
     await user.click(screen.getByRole('button', { name: 'Edit' }));
@@ -2357,6 +2426,99 @@ describe('EditorShell', () => {
         },
       );
     });
+  });
+
+  it('uses the active slide language as the full-deck translation source', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const translator = new RecordingTranslatorService();
+    translator.detectLanguage
+      .mockResolvedValueOnce('en')
+      .mockResolvedValueOnce('cy');
+    translator.prepareTranslation.mockRejectedValueOnce(
+      new Error('Chrome Built-in AI translation is not ready for cy to pt.'),
+    );
+    services.translatorService = translator;
+    render(<EditorShell services={services} />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Current slide language English' }),
+      ).toBeInTheDocument();
+    });
+    await openLeftTab(user, 'AI Tools');
+    await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
+    await waitFor(() => {
+      expect(translator.prepareTranslation).toHaveBeenCalled();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Translate deck' }));
+
+    await waitFor(() => {
+      expect(translator.prepareTranslation).toHaveBeenCalledWith('en', 'pt');
+      expect(translator.translate).toHaveBeenCalledWith('AI Design Revolution', 'pt', {
+        sourceLanguage: 'en',
+      });
+    });
+  });
+
+  it('translates the full deck with the toolbar-selected language path', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const translator = new RecordingTranslatorService();
+    services.translatorService = translator;
+    render(<EditorShell services={services} />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Current slide language English' }),
+      ).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: 'Translation path options' }));
+    await user.selectOptions(screen.getByLabelText('Translate from'), 'es');
+    await user.selectOptions(screen.getByLabelText('Translate to'), 'en');
+    await user.click(screen.getByRole('button', { name: 'Translate deck' }));
+
+    await waitFor(() => {
+      expect(translator.prepareTranslation).toHaveBeenCalledWith('es', 'en');
+      expect(translator.translate).toHaveBeenCalledWith('AI Design Revolution', 'en', {
+        sourceLanguage: 'es',
+      });
+    });
+  });
+
+  it('translates the full deck from the toolbar icon with bounded concurrency', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices({ initialProject: createMultiTextProject(8) });
+    const translator = new ConcurrentRecordingTranslatorService();
+    services.translatorService = translator;
+    const { container } = render(<EditorShell services={services} />);
+
+    await openLeftTab(user, 'AI Tools');
+    await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
+    await waitFor(() => {
+      expect(translator.prepareTranslation).toHaveBeenCalled();
+    });
+    const translateDeckButton = screen.getByRole('button', { name: 'Translate deck' });
+    await waitFor(() => {
+      expect(translateDeckButton).not.toBeDisabled();
+    });
+    await user.click(translateDeckButton);
+
+    await waitFor(() => {
+      expect(translator.translate).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/^Translating Slide [1-3] · 0\/8$/)).toBeInTheDocument();
+    });
+    expect(translateDeckButton).toHaveClass('deck-translate-button-active');
+    expect(container.querySelector('.scroll-page-translating')).toBeInTheDocument();
+
+    translator.finishTranslations();
+    await waitFor(() => {
+      expect(translator.translate).toHaveBeenCalledTimes(8);
+    });
+    expect(translator.maxConcurrentTranslations).toBeLessThanOrEqual(3);
   });
 
   it('blocks background subject selection until image editing models are downloaded', async () => {

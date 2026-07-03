@@ -25,6 +25,7 @@ interface ScrollingCanvasWorkspaceProps extends CanvasWorkspaceProps {
   onSetPageVisibility?: ((pageId: string, visible: boolean) => void) | undefined;
   onTranslatePage?: ((pageId: string) => void) | undefined;
   onUpdateElementStyle?: ((elementId: string, patch: ElementStylePatch) => void) | undefined;
+  translatingPageIds?: string[] | undefined;
 }
 
 export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanvasWorkspaceProps>(
@@ -43,6 +44,7 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
       onTranslatePage,
       onUpdateElementStyle,
       project,
+      translatingPageIds = [],
       ...canvasProps
     },
     ref,
@@ -143,11 +145,19 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
         ) : null}
         {project.pages.map((page, index) => {
           const isActive = page.id === activePageId;
+          const isTranslatingPage = translatingPageIds.includes(page.id);
           const shouldRenderCanvas = isActive || index === preloadedPageIndex;
           const visible = page.visible ?? true;
+          const pageClassName = [
+            'scroll-page',
+            isActive ? 'scroll-page-active' : '',
+            isTranslatingPage ? 'scroll-page-translating' : '',
+          ]
+            .filter(Boolean)
+            .join(' ');
           return (
             <section
-              className={isActive ? 'scroll-page scroll-page-active' : 'scroll-page'}
+              className={pageClassName}
               data-page-id={page.id}
               key={page.id}
               ref={(element) => {

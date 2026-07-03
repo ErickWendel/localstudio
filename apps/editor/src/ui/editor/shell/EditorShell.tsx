@@ -3,7 +3,6 @@ import type Konva from 'konva';
 import type { AppServices } from '../../../app/composition';
 import type { ShareMetadata } from '../../../services/contracts/interfaces';
 import { editorAutomationController } from '../../../services/automation/editorAutomationController';
-import { loadPptxSampleImportInput } from '../../../services/importing/pptx/pptxSampleImport';
 import type { EditorAutomationDelegate } from '../../../services/automation/editorAutomationController';
 import { modelSetupService } from '../../../services/model-setup/modelSetupService';
 import {
@@ -48,6 +47,9 @@ export function EditorShell({ services }: EditorShellProps) {
     0,
     vm.project.pages.findIndex((page) => page.id === vm.activePageId),
   );
+  const deckTranslationStatus = vm.deckTranslationProgress
+    ? `Translating ${vm.deckTranslationProgress.currentPageName} · ${vm.deckTranslationProgress.completedPages}/${vm.deckTranslationProgress.totalPages}`
+    : undefined;
   const publicSharingAvailable = vm.mirrorState.enabled && vm.mirrorState.status === 'synced';
   const publicSharingUnavailableReason = 'Public links cannot be created without remote storage.';
   const hasDirectoryPersistence = services.persistenceMode === 'directory';
@@ -205,14 +207,6 @@ export function EditorShell({ services }: EditorShellProps) {
   }, [vm.automation]);
 
   useEffect(() => {
-    const url = new URL(window.location.href);
-    if (url.searchParams.get('pptxSample') !== '1') return;
-    url.searchParams.delete('pptxSample');
-    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
-    void loadPptxSampleImportInput().then((input) => vm.importPowerPoint(input));
-  }, [vm]);
-
-  useEffect(() => {
     function handleCopy(event: ClipboardEvent) {
       if (isHistoryReadOnly) return;
       if (
@@ -348,6 +342,11 @@ export function EditorShell({ services }: EditorShellProps) {
         lastEditedAt={vm.lastEditedAt}
         saveAnimationKey={vm.saveAnimationKey}
         canTranslateDeck={vm.canTranslateDeck}
+        deckTranslationStatus={deckTranslationStatus}
+        isTranslatingDeck={Boolean(vm.deckTranslationProgress)}
+        translationLanguageOptions={vm.translationLanguageOptions}
+        translationSourceLanguage={vm.activeSlideLanguage.code}
+        translationTargetLanguage={vm.translationTargetLanguage}
         persistenceAvailable={services.persistenceAvailable}
         persistenceMode={services.persistenceMode}
         onDelete={isHistoryReadOnly ? undefined : vm.deleteSelectedElement}
@@ -398,6 +397,12 @@ export function EditorShell({ services }: EditorShellProps) {
               }
             : undefined
         }
+        onTranslationSourceLanguageChange={vm.setActiveSlideLanguage}
+        onTranslationTargetLanguageChange={(languageCode) => {
+          void vm.setTranslationTargetLanguageForSource(languageCode, {
+            sourceLanguage: vm.activeSlideLanguage.code,
+          });
+        }}
         onTranslateDeck={
           isHistoryReadOnly
             ? undefined
@@ -529,6 +534,7 @@ export function EditorShell({ services }: EditorShellProps) {
             animationPreview={vm.animationPreview}
             backgroundPreparation={vm.backgroundPreparation}
             canTranslateCurrentSlide={vm.canTranslateCurrentSlide}
+            translatingPageIds={vm.deckTranslationProgress?.activePageIds}
             canTranslateSelection={vm.canTranslateSelection}
             isTranslating={vm.isTranslating}
             translationNotice={vm.translationNotice}

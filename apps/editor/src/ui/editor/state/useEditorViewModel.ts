@@ -398,6 +398,44 @@ type TranslationPatch = {
   x?: number;
 };
 
+const DECK_TRANSLATION_CONCURRENCY = 3;
+
+interface DeckTranslationProgressState {
+  activePageIds: string[];
+  completedPages: number;
+  currentPageName: string;
+  totalPages: number;
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>,
+) {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  let firstError: unknown;
+  const workerCount = Math.max(1, Math.min(concurrency, items.length));
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      try {
+        results[currentIndex] = await mapper(items[currentIndex]!, currentIndex);
+      } catch (error) {
+        firstError ??= error;
+        nextIndex = items.length;
+      }
+    }
+  });
+
+  await Promise.all(workers);
+  if (firstError !== undefined) {
+    throw firstError instanceof Error ? firstError : new Error('Concurrent task failed.');
+  }
+  return results;
+}
+
 function normalizeTranslatedText(originalText: string, translatedText: string) {
   if (originalText.includes('\n')) return translatedText.trim();
   return translatedText.replace(/\s+/g, ' ').trim();
@@ -542,6 +580,8 @@ export function useEditorViewModel(services: AppServices) {
     elements: [],
   });
   const [isTranslating, setIsTranslating] = useState(false);
+  const [deckTranslationProgress, setDeckTranslationProgress] =
+    useState<DeckTranslationProgressState | undefined>();
   const [translationNotice, setTranslationNotice] = useState<string | undefined>();
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [versionHistoryEntries, setVersionHistoryEntries] = useState<VersionHistoryEntry[]>([]);
@@ -2290,21 +2330,84 @@ export function useEditorViewModel(services: AppServices) {
     );
     if (elementIds.length === 0) return [];
 
-    const translatedEntries = await Promise.all(
-      elementIds.map(async (elementId) => {
+    const pageIdsByElementId = new Map(
+      project.pages.flatMap((page) => page.elementIds.map((elementId) => [elementId, page.id] as const)),
+    );
+    const pageById = new Map(project.pages.map((page) => [page.id, page]));
+    const concurrency = scope === 'deck' ? DECK_TRANSLATION_CONCURRENCY : elementIds.length;
+    const shouldTrackDeckProgress = scope === 'deck';
+    const pendingElementCountByPageId = new Map<string, number>();
+    const activeElementCountByPageId = new Map<string, number>();
+    let completedPageCount = 0;
+    let totalPageCount = 0;
+
+    if (shouldTrackDeckProgress) {
+      for (const elementId of elementIds) {
+        const pageId = pageIdsByElementId.get(elementId);
+        if (!pageId) continue;
+        pendingElementCountByPageId.set(pageId, (pendingElementCountByPageId.get(pageId) ?? 0) + 1);
+      }
+      totalPageCount = pendingElementCountByPageId.size;
+      setDeckTranslationProgress({
+        activePageIds: [],
+        completedPages: 0,
+        currentPageName: 'Preparing slides',
+        totalPages: totalPageCount,
+      });
+    }
+
+    const updateDeckTranslationProgress = (currentPageId: string | undefined) => {
+      if (!shouldTrackDeckProgress) return;
+      const currentPage = currentPageId ? pageById.get(currentPageId) : undefined;
+      setDeckTranslationProgress({
+        activePageIds: Array.from(activeElementCountByPageId.keys()),
+        completedPages: completedPageCount,
+        currentPageName: currentPage?.name ?? 'slides',
+        totalPages: totalPageCount,
+      });
+    };
+
+    const translatedEntries = await mapWithConcurrency(
+      elementIds,
+      concurrency,
+      async (elementId) => {
         const element = project.elements[elementId];
         if (!element || element.type !== 'text') return undefined;
+        const pageId = pageIdsByElementId.get(elementId);
+        if (shouldTrackDeckProgress && pageId) {
+          activeElementCountByPageId.set(
+            pageId,
+            (activeElementCountByPageId.get(pageId) ?? 0) + 1,
+          );
+          updateDeckTranslationProgress(pageId);
+        }
         const translatedText = await services.translatorService.translate(
           element.text,
           targetLanguage,
           options?.sourceLanguage ? { sourceLanguage: options.sourceLanguage } : undefined,
         );
-        const page = project.pages.find((item) => item.elementIds.includes(elementId));
+        if (shouldTrackDeckProgress && pageId) {
+          const activeElementCount = (activeElementCountByPageId.get(pageId) ?? 1) - 1;
+          if (activeElementCount > 0) {
+            activeElementCountByPageId.set(pageId, activeElementCount);
+          } else {
+            activeElementCountByPageId.delete(pageId);
+          }
+          const pendingElementCount = (pendingElementCountByPageId.get(pageId) ?? 1) - 1;
+          if (pendingElementCount > 0) {
+            pendingElementCountByPageId.set(pageId, pendingElementCount);
+          } else {
+            pendingElementCountByPageId.delete(pageId);
+            completedPageCount += 1;
+          }
+          updateDeckTranslationProgress(pageId);
+        }
+        const page = pageById.get(pageId ?? '');
         return [
           elementId,
           fitTranslatedTextToOriginalFrame(element, translatedText, page),
         ] as const;
-      }),
+      },
     );
     const translations = Object.fromEntries(
       translatedEntries.filter((entry): entry is readonly [string, TranslationPatch] =>
@@ -2318,7 +2421,7 @@ export function useEditorViewModel(services: AppServices) {
     return Array.from(
       new Set(
         elementIds
-          .map((elementId) => project.pages.find((page) => page.elementIds.includes(elementId))?.id)
+          .map((elementId) => pageIdsByElementId.get(elementId))
           .filter((pageId): pageId is string => Boolean(pageId)),
       ),
     );
@@ -2338,6 +2441,13 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   async function setTranslationTargetLanguage(languageCode: string) {
+    await setTranslationTargetLanguageForSource(languageCode);
+  }
+
+  async function setTranslationTargetLanguageForSource(
+    languageCode: string,
+    options?: { sourceLanguage?: string },
+  ) {
     const nextLanguage = translationLanguageUtils.isSupportedTranslationLanguageCode(languageCode)
       ? languageCode
       : '';
@@ -2365,19 +2475,21 @@ export function useEditorViewModel(services: AppServices) {
 
     setTranslationPreparation({ progress: 4, status: 'downloading' });
     try {
-      const sourceLanguage = translationLanguageUtils.normalizeLanguageCode(
-        await services.translatorService.detectLanguage(sampleText, {
-          onProgress: (progress, details) => {
-            setTranslationPreparation((current) => ({
-              ...getDownloadProgressPatch(
-                Math.max(current.progress, 4, Math.min(45, Math.round(progress * 0.45))),
-                details,
-              ),
-              status: 'downloading',
-            }));
-          },
-        }),
-      );
+      const sourceLanguage = options?.sourceLanguage
+        ? translationLanguageUtils.normalizeLanguageCode(options.sourceLanguage)
+        : translationLanguageUtils.normalizeLanguageCode(
+            await services.translatorService.detectLanguage(sampleText, {
+              onProgress: (progress, details) => {
+                setTranslationPreparation((current) => ({
+                  ...getDownloadProgressPatch(
+                    Math.max(current.progress, 4, Math.min(45, Math.round(progress * 0.45))),
+                    details,
+                  ),
+                  status: 'downloading',
+                }));
+              },
+            }),
+          );
       const selectedTranslationProvider = translationProviderStates.find(
         (provider) => provider.selected,
       );
@@ -2408,6 +2520,28 @@ export function useEditorViewModel(services: AppServices) {
     }
   }
 
+  function setActiveSlideLanguage(languageCode: string) {
+    const normalizedLanguageCode = translationLanguageUtils.normalizeLanguageCode(languageCode);
+    setPageLanguageCodes((current) => ({
+      ...current,
+      [activePageId]: normalizedLanguageCode,
+    }));
+    setTranslationNotice(undefined);
+    if (translationTargetLanguage) {
+      void setTranslationTargetLanguageForSource(translationTargetLanguage, {
+        sourceLanguage: normalizedLanguageCode,
+      });
+    }
+  }
+
+  function getTranslationSourceLanguage(scope: TranslationScope, options?: { pageId?: string }) {
+    if (scope === 'deck') {
+      return translationLanguageUtils.normalizeLanguageCode(activeSlideLanguage.code);
+    }
+    const pageId = options?.pageId ?? activePageId;
+    return translationLanguageUtils.normalizeLanguageCode(pageLanguageCodes[pageId]);
+  }
+
   async function requestTranslation(scope: TranslationScope, options?: { pageId?: string }) {
     if (isTranslating) return;
 
@@ -2428,12 +2562,37 @@ export function useEditorViewModel(services: AppServices) {
     setTranslationNotice(undefined);
     setIsTranslating(true);
     try {
+      const sourceLanguage = getTranslationSourceLanguage(scope, options);
+      if (scope === 'deck') {
+        const normalizedTargetLanguage =
+          translationLanguageUtils.normalizeLanguageCode(translationTargetLanguage);
+        if (sourceLanguage !== normalizedTargetLanguage) {
+          await services.translatorService.prepareTranslation(
+            sourceLanguage,
+            normalizedTargetLanguage,
+          );
+        }
+        const deckElementIds = getTranslatableTextElementIds('deck');
+        const deckElementIdSet = new Set(deckElementIds);
+        const deckPageIds = project.pages
+          .filter((page) => page.elementIds.some((elementId) => deckElementIdSet.has(elementId)))
+          .map((page) => page.id);
+        const firstDeckPage = project.pages.find((page) => page.id === deckPageIds[0]);
+        setDeckTranslationProgress({
+          activePageIds: firstDeckPage ? [firstDeckPage.id] : [],
+          completedPages: 0,
+          currentPageName: firstDeckPage?.name ?? 'slides',
+          totalPages: deckPageIds.length,
+        });
+      }
       const translationOptions =
-        translationPreparation.sourceLanguage || options?.pageId
+        sourceLanguage || translationPreparation.sourceLanguage || options?.pageId
           ? {
               ...(options?.pageId ? { pageId: options.pageId } : {}),
-              ...(translationPreparation.sourceLanguage
-                ? { sourceLanguage: translationPreparation.sourceLanguage }
+              ...(sourceLanguage || translationPreparation.sourceLanguage
+                ? {
+                    sourceLanguage: sourceLanguage ?? translationPreparation.sourceLanguage,
+                  }
                 : {}),
             }
           : undefined;
@@ -2457,6 +2616,7 @@ export function useEditorViewModel(services: AppServices) {
         error instanceof Error ? error.message : 'Translation could not be completed.',
       );
     } finally {
+      setDeckTranslationProgress(undefined);
       setIsTranslating(false);
     }
   }
@@ -3634,6 +3794,7 @@ export function useEditorViewModel(services: AppServices) {
     translationPreparation,
     languageDetectionPreparation,
     isTranslating,
+    deckTranslationProgress,
     translationNotice,
     promptPreparation,
     promptApiAttention,
@@ -3659,7 +3820,9 @@ export function useEditorViewModel(services: AppServices) {
     setPromptProvider,
     setTranslationProvider,
     setLanguageDetectionProvider,
+    setActiveSlideLanguage,
     setTranslationTargetLanguage,
+    setTranslationTargetLanguageForSource,
     canTranslateSelection: !isTranslating && getTranslatableTextElementIds('selection').length > 0,
     canTranslateCurrentSlide: !isTranslating && getTranslatableTextElementIds('slide').length > 0,
     canTranslateDeck: !isTranslating && getTranslatableTextElementIds('deck').length > 0,
