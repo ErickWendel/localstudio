@@ -9,7 +9,7 @@ interface ToolbarAction {
 }
 
 interface FloatingSelectionToolbarProps {
-  elementType?: 'image' | 'shape' | undefined;
+  elementType?: 'gif' | 'image' | 'shape' | 'text' | 'video' | undefined;
   onAlignCenter?: (() => void) | undefined;
   onBringForward?: (() => void) | undefined;
   onBackgroundSelectionToggle?: (() => void) | undefined;
@@ -118,7 +118,9 @@ export function FloatingSelectionToolbar({
               onClick={action.onClick}
             >
               <span className="material-symbols-outlined">{action.icon}</span>
-              {action.display === 'label' ? <span className="floating-toolbar-label">{action.label}</span> : null}
+              {action.display === 'label' ? (
+                <span className="floating-toolbar-label">{action.label}</span>
+              ) : null}
             </button>
           ))}
         </div>

@@ -4,13 +4,29 @@ import type {
   PageBackground,
   ProjectDocument,
   SelectionState,
+  ShapeElement,
+  ShapeLineEndpoint,
   VideoElement,
 } from '../../../domain/documents/model';
-import type { ElementStylePatch, MediaPlaybackPatch } from '../../../domain/commands/elements/basicCommands';
+import type {
+  ElementStylePatch,
+  MediaPlaybackPatch,
+} from '../../../domain/commands/elements/basicCommands';
 import { PanelSection } from '../../components/PanelSection';
 import { textStyleOptions } from '../text/textStyleOptions';
 
 const palette = ['#37FD76', '#050D10', '#FFFFFF', '#91999D', '#00779A'];
+const shapeLineEndpointOptions: Array<{ value: ShapeLineEndpoint; label: string }> = [
+  { value: 'none', label: 'None' },
+  { value: 'arrow', label: 'Arrow' },
+  { value: 'open-arrow', label: 'Open arrow' },
+  { value: 'circle', label: 'Circle' },
+  { value: 'open-circle', label: 'Open circle' },
+  { value: 'square', label: 'Square' },
+  { value: 'open-square', label: 'Open square' },
+  { value: 'diamond', label: 'Diamond' },
+  { value: 'bar', label: 'Bar' },
+];
 
 interface DesignPanelProps {
   project: ProjectDocument;
@@ -21,12 +37,19 @@ interface DesignPanelProps {
   onUpdatePageBackground?: (background: PageBackground) => void;
 }
 
-function getSelectedElement(project: ProjectDocument, selection: SelectionState): DesignElement | undefined {
+function getSelectedElement(
+  project: ProjectDocument,
+  selection: SelectionState,
+): DesignElement | undefined {
   return project.elements[selection.elementIds[0] ?? ''];
 }
 
 function getBackgroundColor(background: PageBackground) {
   return background.type === 'color' ? background.color : background.colorFallback;
+}
+
+function supportsLineEndpoints(element: ShapeElement) {
+  return element.shape === 'arc' || element.shape === 'arrow' || element.shape === 'line';
 }
 
 export function DesignPanel({
@@ -105,7 +128,9 @@ export function DesignPanel({
           {selectedElement?.type === 'video' ? <Video size={16} /> : null}
           {selectedElement?.type === 'shape' ? <Square size={16} /> : null}
           {!selectedElement ? <CaseSensitive size={16} /> : null}
-          <span>{selectedElement ? `Selected ${selectedElement.type}` : 'No selected element'}</span>
+          <span>
+            {selectedElement ? `Selected ${selectedElement.type}` : 'No selected element'}
+          </span>
         </div>
         {selectedElement ? (
           <label className="design-control">
@@ -215,7 +240,7 @@ export function DesignPanel({
               value={selectedElement.fill ? 'color' : 'none'}
               onChange={(event) => {
                 updateSelectedStyle({
-                  fill: event.target.value === 'color' ? selectedElement.fill ?? '#37FD76' : null,
+                  fill: event.target.value === 'color' ? (selectedElement.fill ?? '#37FD76') : null,
                 });
               }}
             >
@@ -240,13 +265,18 @@ export function DesignPanel({
             <span>Border</span>
             <select
               aria-label="Selected shape border mode"
-              value={selectedElement.stroke && (selectedElement.strokeWidth ?? 0) > 0 ? 'color' : 'none'}
+              value={
+                selectedElement.stroke && (selectedElement.strokeWidth ?? 0) > 0 ? 'color' : 'none'
+              }
               onChange={(event) => {
                 updateSelectedStyle(
                   event.target.value === 'color'
                     ? {
                         stroke: selectedElement.stroke ?? '#37FD76',
-                        strokeWidth: selectedElement.strokeWidth && selectedElement.strokeWidth > 0 ? selectedElement.strokeWidth : 2,
+                        strokeWidth:
+                          selectedElement.strokeWidth && selectedElement.strokeWidth > 0
+                            ? selectedElement.strokeWidth
+                            : 2,
                       }
                     : { stroke: null, strokeWidth: 0 },
                 );
@@ -281,6 +311,49 @@ export function DesignPanel({
                   }}
                 />
               </label>
+              {supportsLineEndpoints(selectedElement) ? (
+                <>
+                  <label className="design-control">
+                    <span>Start endpoint</span>
+                    <select
+                      aria-label="Selected shape start endpoint"
+                      value={selectedElement.startEndpoint ?? 'none'}
+                      onChange={(event) => {
+                        updateSelectedStyle({
+                          startEndpoint: event.target.value as ShapeLineEndpoint,
+                        });
+                      }}
+                    >
+                      {shapeLineEndpointOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="design-control">
+                    <span>End endpoint</span>
+                    <select
+                      aria-label="Selected shape end endpoint"
+                      value={
+                        selectedElement.endEndpoint ??
+                        (selectedElement.shape === 'arrow' ? 'arrow' : 'none')
+                      }
+                      onChange={(event) => {
+                        updateSelectedStyle({
+                          endEndpoint: event.target.value as ShapeLineEndpoint,
+                        });
+                      }}
+                    >
+                      {shapeLineEndpointOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </>
+              ) : null}
             </>
           ) : null}
         </PanelSection>

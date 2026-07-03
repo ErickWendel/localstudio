@@ -8,6 +8,7 @@ import type {
   Page,
   PageBackground,
   ProjectDocument,
+  ShapeElement,
   SlideTransition,
   VideoElement,
 } from '../../documents/model';
@@ -19,7 +20,9 @@ import { applyGeneratedSlideCommand } from '../generated-slides/applyGeneratedSl
 
 export type AlignMode = 'horizontal-center' | 'vertical-center' | 'page-center';
 export type ZOrderMode = 'front' | 'back' | 'forward' | 'backward';
-export type ElementFramePatch = Partial<Pick<BaseElement, 'height' | 'rotation' | 'width' | 'x' | 'y'>>;
+export type ElementFramePatch = Partial<
+  Pick<BaseElement, 'height' | 'rotation' | 'width' | 'x' | 'y'>
+>;
 export type ImageCropPatch = ElementFramePatch & { crop: NonNullable<ImageElement['crop']> };
 export type GifPlaybackPatch = Partial<Pick<GifElement, 'playing'>>;
 export type VideoPlaybackPatch = Partial<
@@ -37,6 +40,8 @@ export type ElementStylePatch = Partial<{
   opacity: number;
   stroke: string | null;
   strokeWidth: number;
+  startEndpoint: ShapeElement['startEndpoint'];
+  endEndpoint: ShapeElement['endEndpoint'];
 }>;
 export type ElementAnimationPatch = Omit<ElementAnimationBuild, 'elementId' | 'id'>;
 
@@ -56,7 +61,8 @@ class RemoveAssetCommand implements EditorCommand {
   constructor(private readonly assetId: string) {}
 
   execute(project: ProjectDocument): ProjectDocument {
-    if (!project.assets[this.assetId] || collectReferencedAssetIds(project).has(this.assetId)) return project;
+    if (!project.assets[this.assetId] || collectReferencedAssetIds(project).has(this.assetId))
+      return project;
 
     const { [this.assetId]: removedAsset, ...assets } = project.assets;
     void removedAsset;
@@ -225,13 +231,17 @@ class DuplicatePageCommand implements EditorCommand {
     const page = project.pages.find((item) => item.id === this.pageId);
     if (!page) return project;
 
-    const elementIdPairs = page.elementIds.map((elementId) => [elementId, this.createElementId(elementId)] as const);
+    const elementIdPairs = page.elementIds.map(
+      (elementId) => [elementId, this.createElementId(elementId)] as const,
+    );
     const elementIdMap = new Map(elementIdPairs);
     const duplicatedElements = Object.fromEntries(
       elementIdPairs
         .map(([sourceElementId, nextElementId]) => {
           const element = project.elements[sourceElementId];
-          return element ? [nextElementId, { ...element, id: nextElementId, locked: false }] : undefined;
+          return element
+            ? [nextElementId, { ...element, id: nextElementId, locked: false }]
+            : undefined;
         })
         .filter((entry): entry is [string, DesignElement] => Boolean(entry)),
     );
@@ -306,7 +316,11 @@ class ReorderPageCommand implements EditorCommand {
     const currentIndex = project.pages.findIndex((page) => page.id === this.pageId);
     if (currentIndex < 0) return project;
     const pages = project.pages.filter((page) => page.id !== this.pageId);
-    pages.splice(Math.max(0, Math.min(this.targetIndex, pages.length)), 0, project.pages[currentIndex]!);
+    pages.splice(
+      Math.max(0, Math.min(this.targetIndex, pages.length)),
+      0,
+      project.pages[currentIndex]!,
+    );
     return {
       ...project,
       pages,
@@ -328,7 +342,9 @@ class RenamePageCommand implements EditorCommand {
     if (!nextName) return project;
     return {
       ...project,
-      pages: project.pages.map((page) => (page.id === this.pageId ? { ...page, name: nextName } : page)),
+      pages: project.pages.map((page) =>
+        page.id === this.pageId ? { ...page, name: nextName } : page,
+      ),
       updatedAt: projectMutationUtils.getProjectUpdatedAt(),
     };
   }
@@ -572,7 +588,10 @@ class AddElementsCommand implements EditorCommand {
       },
       pages: project.pages.map((page) =>
         page.id === this.pageId
-          ? { ...page, elementIds: [...page.elementIds, ...this.elements.map((element) => element.id)] }
+          ? {
+              ...page,
+              elementIds: [...page.elementIds, ...this.elements.map((element) => element.id)],
+            }
           : page,
       ),
       updatedAt: projectMutationUtils.getProjectUpdatedAt(),
@@ -678,7 +697,9 @@ class UpdateElementStyleCommand implements EditorCommand {
     if (!element || element.locked) return project;
 
     const opacity =
-      this.patch.opacity === undefined ? element.opacity : Math.max(0, Math.min(1, this.patch.opacity));
+      this.patch.opacity === undefined
+        ? element.opacity
+        : Math.max(0, Math.min(1, this.patch.opacity));
     let nextElement: DesignElement = { ...element, opacity };
 
     if (element.type === 'text') {
@@ -687,18 +708,22 @@ class UpdateElementStyleCommand implements EditorCommand {
         ...(this.patch.align ? { align: this.patch.align } : {}),
         ...(typeof this.patch.fill === 'string' ? { fill: this.patch.fill } : {}),
         ...(this.patch.fontFamily ? { fontFamily: this.patch.fontFamily } : {}),
-        ...(this.patch.fontSize !== undefined ? { fontSize: Math.max(1, this.patch.fontSize) } : {}),
+        ...(this.patch.fontSize !== undefined
+          ? { fontSize: Math.max(1, this.patch.fontSize) }
+          : {}),
         ...(this.patch.fontWeight !== undefined ? { fontWeight: this.patch.fontWeight } : {}),
       };
     }
 
     if (element.type === 'shape') {
-      const { fill, stroke, strokeWidth } = this.patch;
+      const { endEndpoint, fill, startEndpoint, stroke, strokeWidth } = this.patch;
       const nextShapeElement = {
         ...nextElement,
         ...(typeof fill === 'string' ? { fill } : {}),
         ...(typeof stroke === 'string' ? { stroke } : {}),
         ...(strokeWidth !== undefined ? { strokeWidth: Math.max(0, strokeWidth) } : {}),
+        ...(startEndpoint !== undefined ? { startEndpoint } : {}),
+        ...(endEndpoint !== undefined ? { endEndpoint } : {}),
       };
       if (fill === null) {
         delete nextShapeElement.fill;
@@ -803,7 +828,10 @@ class SetPageTransitionCommand implements EditorCommand {
       ...project,
       pages: project.pages.map((page) =>
         page.id === this.pageId
-          ? { ...page, transition: { ...this.transition, delayMs: Math.max(0, this.transition.delayMs) } }
+          ? {
+              ...page,
+              transition: { ...this.transition, delayMs: Math.max(0, this.transition.delayMs) },
+            }
           : page,
       ),
       updatedAt: projectMutationUtils.getProjectUpdatedAt(),
@@ -848,9 +876,13 @@ class SetElementAnimationBuildsCommand implements EditorCommand {
       pages: project.pages.map((page) => {
         if (page.id !== this.pageId) return page;
         const pageElementIds = new Set(page.elementIds);
-        const orderedSelectedIds = page.elementIds.filter((elementId) => selectedIds.has(elementId));
+        const orderedSelectedIds = page.elementIds.filter((elementId) =>
+          selectedIds.has(elementId),
+        );
         if (orderedSelectedIds.length === 0) return page;
-        const existingByElementId = new Map(getPageAnimationBuilds(page).map((build) => [build.elementId, build]));
+        const existingByElementId = new Map(
+          getPageAnimationBuilds(page).map((build) => [build.elementId, build]),
+        );
         const retainedBuilds = getPageAnimationBuilds(page).filter(
           (build) => !selectedIds.has(build.elementId) && pageElementIds.has(build.elementId),
         );
@@ -862,6 +894,9 @@ class SetElementAnimationBuildsCommand implements EditorCommand {
             effect: this.patch.effect,
             trigger: this.patch.trigger,
             delayMs: Math.max(0, this.patch.delayMs),
+            ...(this.patch.lineDrawDirection
+              ? { lineDrawDirection: this.patch.lineDrawDirection }
+              : {}),
           };
         });
         return { ...page, animationBuilds: [...retainedBuilds, ...nextBuilds] };
@@ -883,7 +918,9 @@ class ClearElementAnimationBuildCommand implements EditorCommand {
     return {
       ...project,
       pages: project.pages.map((page) =>
-        page.id === this.pageId ? removeElementAnimationBuilds(page, new Set([this.elementId])) : page,
+        page.id === this.pageId
+          ? removeElementAnimationBuilds(page, new Set([this.elementId]))
+          : page,
       ),
       updatedAt: projectMutationUtils.getProjectUpdatedAt(),
     };
@@ -908,7 +945,11 @@ class ReorderElementAnimationBuildCommand implements EditorCommand {
         const currentIndex = builds.findIndex((build) => build.elementId === this.elementId);
         if (currentIndex < 0) return page;
         const nextBuilds = builds.filter((build) => build.elementId !== this.elementId);
-        nextBuilds.splice(Math.max(0, Math.min(this.targetIndex, nextBuilds.length)), 0, builds[currentIndex]!);
+        nextBuilds.splice(
+          Math.max(0, Math.min(this.targetIndex, nextBuilds.length)),
+          0,
+          builds[currentIndex]!,
+        );
         return { ...page, animationBuilds: nextBuilds };
       }),
       updatedAt: projectMutationUtils.getProjectUpdatedAt(),

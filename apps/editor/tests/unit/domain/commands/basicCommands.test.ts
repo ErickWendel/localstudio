@@ -36,7 +36,11 @@ function createShapeFixture(overrides: Partial<ShapeElement> = {}) {
 describe('editor commands', () => {
   it('aligns an element to page horizontal center immutably', () => {
     const project = sampleProject.createSampleProject();
-    const command = new basicCommands.AlignElementCommand('page-1', 'image-hero', 'horizontal-center');
+    const command = new basicCommands.AlignElementCommand(
+      'page-1',
+      'image-hero',
+      'horizontal-center',
+    );
     const next = command.execute(project);
 
     expect(next).not.toBe(project);
@@ -54,7 +58,11 @@ describe('editor commands', () => {
 
   it('duplicates an element as the topmost unlocked copy', () => {
     const project = sampleProject.createSampleProject();
-    const command = new basicCommands.DuplicateElementCommand('page-1', 'text-title', 'text-title-copy');
+    const command = new basicCommands.DuplicateElementCommand(
+      'page-1',
+      'text-title',
+      'text-title-copy',
+    );
     const next = command.execute(project);
 
     expect(next).not.toBe(project);
@@ -289,6 +297,22 @@ describe('editor commands', () => {
     });
   });
 
+  it('updates shape line endpoint style immutably', () => {
+    const project = createShapeFixture({ shape: 'line' });
+    const next = new basicCommands.UpdateElementStyleCommand('shape-test', {
+      startEndpoint: 'circle',
+      endEndpoint: 'open-arrow',
+    }).execute(project);
+
+    expect(next).not.toBe(project);
+    expect(next.elements['shape-test']).toMatchObject({
+      startEndpoint: 'circle',
+      endEndpoint: 'open-arrow',
+    });
+    expect(project.elements['shape-test']).not.toHaveProperty('startEndpoint');
+    expect(project.elements['shape-test']).not.toHaveProperty('endEndpoint');
+  });
+
   it('does not update locked shape style', () => {
     const project = createShapeFixture({ locked: true });
     const next = new basicCommands.UpdateElementStyleCommand('shape-test', {
@@ -319,7 +343,10 @@ describe('editor commands', () => {
 
   it('sets the active page reveal transition immutably', () => {
     const project = sampleProject.createSampleProject();
-    const next = new basicCommands.SetPageTransitionCommand('page-1', { effect: 'reveal', delayMs: 250 }).execute(project);
+    const next = new basicCommands.SetPageTransitionCommand('page-1', {
+      effect: 'reveal',
+      delayMs: 250,
+    }).execute(project);
 
     expect(next).not.toBe(project);
     expect(next.pages[0]?.transition).toEqual({ effect: 'reveal', delayMs: 250 });
@@ -328,7 +355,10 @@ describe('editor commands', () => {
 
   it('clears the active page transition immutably', () => {
     const project = sampleProject.createSampleProject();
-    const withTransition = new basicCommands.SetPageTransitionCommand('page-1', { effect: 'reveal', delayMs: 250 }).execute(project);
+    const withTransition = new basicCommands.SetPageTransitionCommand('page-1', {
+      effect: 'reveal',
+      delayMs: 250,
+    }).execute(project);
     const next = new basicCommands.ClearPageTransitionCommand('page-1').execute(withTransition);
 
     expect(next).not.toBe(withTransition);
@@ -346,8 +376,20 @@ describe('editor commands', () => {
     ).execute(project);
 
     expect(next.pages[0]?.animationBuilds).toEqual([
-      { id: 'build-image-hero', elementId: 'image-hero', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
-      { id: 'build-text-title', elementId: 'text-title', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+      {
+        id: 'build-image-hero',
+        elementId: 'image-hero',
+        effect: 'reveal',
+        trigger: 'on-click',
+        delayMs: 0,
+      },
+      {
+        id: 'build-text-title',
+        elementId: 'text-title',
+        effect: 'reveal',
+        trigger: 'on-click',
+        delayMs: 0,
+      },
     ]);
     expect(project.pages[0]?.animationBuilds).toBeUndefined();
   });
@@ -359,10 +401,19 @@ describe('editor commands', () => {
       (elementId) => `build-${elementId}`,
       { effect: 'reveal', trigger: 'on-click', delayMs: 0 },
     ).execute(sampleProject.createSampleProject());
-    const next = new basicCommands.ClearElementAnimationBuildCommand('page-1', 'image-hero').execute(project);
+    const next = new basicCommands.ClearElementAnimationBuildCommand(
+      'page-1',
+      'image-hero',
+    ).execute(project);
 
     expect(next.pages[0]?.animationBuilds).toEqual([
-      { id: 'build-text-title', elementId: 'text-title', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+      {
+        id: 'build-text-title',
+        elementId: 'text-title',
+        effect: 'reveal',
+        trigger: 'on-click',
+        delayMs: 0,
+      },
     ]);
   });
 
@@ -373,7 +424,11 @@ describe('editor commands', () => {
       (elementId) => `build-${elementId}`,
       { effect: 'reveal', trigger: 'on-click', delayMs: 0 },
     ).execute(sampleProject.createSampleProject());
-    const next = new basicCommands.ReorderElementAnimationBuildCommand('page-1', 'text-title', 0).execute(project);
+    const next = new basicCommands.ReorderElementAnimationBuildCommand(
+      'page-1',
+      'text-title',
+      0,
+    ).execute(project);
 
     expect(next.pages[0]?.animationBuilds?.map((build) => build.elementId)).toEqual([
       'text-title',
@@ -449,22 +504,18 @@ describe('editor commands', () => {
     const next = command.execute(project);
 
     expect(next).not.toBe(project);
-    expect(next.pages[0]?.elementIds).toEqual([
-      'text-subtitle',
-      'text-title',
-      'image-hero',
-    ]);
-    expect(project.pages[0]?.elementIds).toEqual([
-      'image-hero',
-      'text-subtitle',
-      'text-title',
-    ]);
+    expect(next.pages[0]?.elementIds).toEqual(['text-subtitle', 'text-title', 'image-hero']);
+    expect(project.pages[0]?.elementIds).toEqual(['image-hero', 'text-subtitle', 'text-title']);
   });
 
   it('moves an element forward and backward in z-order immutably', () => {
     const project = sampleProject.createSampleProject();
-    const forward = new basicCommands.SetZOrderCommand('page-1', 'image-hero', 'forward').execute(project);
-    const backward = new basicCommands.SetZOrderCommand('page-1', 'text-title', 'backward').execute(project);
+    const forward = new basicCommands.SetZOrderCommand('page-1', 'image-hero', 'forward').execute(
+      project,
+    );
+    const backward = new basicCommands.SetZOrderCommand('page-1', 'text-title', 'backward').execute(
+      project,
+    );
 
     expect(forward.pages[0]?.elementIds).toEqual(['text-subtitle', 'image-hero', 'text-title']);
     expect(backward.pages[0]?.elementIds).toEqual(['image-hero', 'text-title', 'text-subtitle']);
@@ -473,7 +524,9 @@ describe('editor commands', () => {
 
   it('sets element visibility and lock state immutably', () => {
     const project = sampleProject.createSampleProject();
-    const hidden = new basicCommands.SetElementVisibilityCommand('image-hero', false).execute(project);
+    const hidden = new basicCommands.SetElementVisibilityCommand('image-hero', false).execute(
+      project,
+    );
     const locked = new basicCommands.SetElementLockCommand('image-hero', true).execute(hidden);
 
     expect(hidden.elements['image-hero']).toMatchObject({ visible: false });
@@ -650,8 +703,14 @@ describe('editor commands', () => {
     const next = command.execute(project);
 
     expect(next.elements['text-title-pasted']).toMatchObject({ x: title.x + 32, y: title.y + 32 });
-    expect(next.elements['text-subtitle-pasted']).toMatchObject({ x: subtitle.x + 32, y: subtitle.y + 32 });
-    expect(next.pages[0]?.elementIds.slice(-2)).toEqual(['text-title-pasted', 'text-subtitle-pasted']);
+    expect(next.elements['text-subtitle-pasted']).toMatchObject({
+      x: subtitle.x + 32,
+      y: subtitle.y + 32,
+    });
+    expect(next.pages[0]?.elementIds.slice(-2)).toEqual([
+      'text-title-pasted',
+      'text-subtitle-pasted',
+    ]);
     expect(project.elements['text-title-pasted']).toBeUndefined();
   });
 
@@ -662,7 +721,11 @@ describe('editor commands', () => {
       (elementId) => `build-${elementId}`,
       { effect: 'reveal', trigger: 'on-click', delayMs: 0 },
     ).execute(sampleProject.createSampleProject());
-    const next = new basicCommands.DuplicatePageCommand('page-1', 'page-copy', (elementId) => `${elementId}-page-copy`).execute(project);
+    const next = new basicCommands.DuplicatePageCommand(
+      'page-1',
+      'page-copy',
+      (elementId) => `${elementId}-page-copy`,
+    ).execute(project);
 
     expect(next.pages).toHaveLength(2);
     expect(next.pages[1]).toMatchObject({
@@ -681,15 +744,31 @@ describe('editor commands', () => {
       locked: false,
     });
     expect(next.pages[1]?.animationBuilds).toEqual([
-      { id: 'build-image-hero-page-copy', elementId: 'image-hero-page-copy', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
-      { id: 'build-text-title-page-copy', elementId: 'text-title-page-copy', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+      {
+        id: 'build-image-hero-page-copy',
+        elementId: 'image-hero-page-copy',
+        effect: 'reveal',
+        trigger: 'on-click',
+        delayMs: 0,
+      },
+      {
+        id: 'build-text-title-page-copy',
+        elementId: 'text-title-page-copy',
+        effect: 'reveal',
+        trigger: 'on-click',
+        delayMs: 0,
+      },
     ]);
     expect(project.pages).toHaveLength(1);
   });
 
   it('deletes a page, its elements, and orphaned assets while preserving other pages', () => {
     const project = sampleProject.createSampleProject();
-    const duplicate = new basicCommands.DuplicatePageCommand('page-1', 'page-copy', (elementId) => `${elementId}-copy`).execute(project);
+    const duplicate = new basicCommands.DuplicatePageCommand(
+      'page-1',
+      'page-copy',
+      (elementId) => `${elementId}-copy`,
+    ).execute(project);
     const next = new basicCommands.DeletePageCommand('page-1').execute(duplicate);
 
     expect(next.pages).toHaveLength(1);
@@ -706,11 +785,15 @@ describe('editor commands', () => {
   });
 
   it('reorders, renames, and hides pages immutably', () => {
-    const project = new basicCommands.DuplicatePageCommand('page-1', 'page-copy', (elementId) => `${elementId}-copy`).execute(
-      sampleProject.createSampleProject(),
-    );
+    const project = new basicCommands.DuplicatePageCommand(
+      'page-1',
+      'page-copy',
+      (elementId) => `${elementId}-copy`,
+    ).execute(sampleProject.createSampleProject());
     const reordered = new basicCommands.ReorderPageCommand('page-copy', 0).execute(project);
-    const renamed = new basicCommands.RenamePageCommand('page-copy', 'Launch Slide').execute(reordered);
+    const renamed = new basicCommands.RenamePageCommand('page-copy', 'Launch Slide').execute(
+      reordered,
+    );
     const hidden = new basicCommands.SetPageVisibilityCommand('page-copy', false).execute(renamed);
 
     expect(reordered.pages.map((page) => page.id)).toEqual(['page-copy', 'page-1']);

@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ElementAnimationBuild, ProjectDocument, SelectionState } from '../../domain/documents/model';
+import type {
+  ElementAnimationBuild,
+  ProjectDocument,
+  SelectionState,
+} from '../../domain/documents/model';
 import type { ShareService } from '../../services/contracts/interfaces';
 import { CanvasWorkspace } from '../editor/canvas/CanvasWorkspace';
 
@@ -15,7 +19,9 @@ type ViewerState =
   | { status: 'ready'; project: ProjectDocument };
 
 interface AnimationPreviewState {
+  activeBuild: ElementAnimationBuild | undefined;
   activeBuildElementId: string | undefined;
+  animationProgress: number;
   hiddenElementIds: string[];
   mode: 'presenter';
   pageId: string;
@@ -30,6 +36,7 @@ export function PublicDeckViewer({ shareId, shareService, embed = false }: Publi
   const [animationPreview, setAnimationPreview] = useState<AnimationPreviewState | undefined>();
   const animationQueueRef = useRef<ElementAnimationBuild[]>([]);
   const animationTimeoutsRef = useRef<number[]>([]);
+  const animationFrameRef = useRef<number | undefined>(undefined);
   const runNextAnimationBuildRef = useRef<() => void>(() => undefined);
   const emptySelection = useMemo<SelectionState>(() => ({ pageId: '', elementIds: [] }), []);
   const viewerClassName = embed
@@ -41,6 +48,10 @@ export function PublicDeckViewer({ shareId, shareService, embed = false }: Publi
       window.clearTimeout(timeoutId);
     }
     animationTimeoutsRef.current = [];
+    if (animationFrameRef.current !== undefined) {
+      window.cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = undefined;
+    }
   }, []);
 
   const scheduleAnimation = useCallback((callback: () => void, delayMs: number) => {
@@ -55,7 +66,9 @@ export function PublicDeckViewer({ shareId, shareService, embed = false }: Publi
       current
         ? {
             ...current,
+            activeBuild: undefined,
             activeBuildElementId: undefined,
+            animationProgress: 1,
             hiddenElementIds: [],
             phase: 'complete',
             waitingForClick: false,
@@ -69,12 +82,59 @@ export function PublicDeckViewer({ shareId, shareService, embed = false }: Publi
       current
         ? {
             ...current,
+            activeBuild: undefined,
             activeBuildElementId: undefined,
-            hiddenElementIds: current.hiddenElementIds.filter((elementId) => elementId !== build.elementId),
+            animationProgress: 1,
+            hiddenElementIds: current.hiddenElementIds.filter(
+              (elementId) => elementId !== build.elementId,
+            ),
             waitingForClick: false,
           }
         : current,
     );
+  }, []);
+
+  const animateActiveBuild = useCallback((build: ElementAnimationBuild) => {
+    const durationMs = Math.max(0, build.delayMs);
+    const startMs = window.performance.now();
+    if (animationFrameRef.current !== undefined) {
+      window.cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = undefined;
+    }
+
+    setAnimationPreview((current) =>
+      current
+        ? {
+            ...current,
+            activeBuild: build,
+            activeBuildElementId: build.elementId,
+            animationProgress: durationMs === 0 ? 1 : 0,
+            phase: 'animation',
+            waitingForClick: false,
+          }
+        : current,
+    );
+
+    if (durationMs === 0) return;
+
+    function tick(nowMs: number) {
+      const progress = Math.min(1, Math.max(0, (nowMs - startMs) / durationMs));
+      setAnimationPreview((current) =>
+        current?.activeBuild?.id === build.id
+          ? {
+              ...current,
+              animationProgress: progress,
+            }
+          : current,
+      );
+      if (progress < 1) {
+        animationFrameRef.current = window.requestAnimationFrame(tick);
+      } else {
+        animationFrameRef.current = undefined;
+      }
+    }
+
+    animationFrameRef.current = window.requestAnimationFrame(tick);
   }, []);
 
   const runNextAnimationBuild = useCallback(() => {
@@ -89,7 +149,9 @@ export function PublicDeckViewer({ shareId, shareService, embed = false }: Publi
         current
           ? {
               ...current,
+              activeBuild: undefined,
               activeBuildElementId: nextBuild.elementId,
+              animationProgress: 0,
               phase: 'waiting',
               waitingForClick: true,
             }
@@ -99,21 +161,12 @@ export function PublicDeckViewer({ shareId, shareService, embed = false }: Publi
     }
 
     animationQueueRef.current = animationQueueRef.current.slice(1);
-    setAnimationPreview((current) =>
-      current
-        ? {
-            ...current,
-            activeBuildElementId: nextBuild.elementId,
-            phase: 'animation',
-            waitingForClick: false,
-          }
-        : current,
-    );
+    animateActiveBuild(nextBuild);
     scheduleAnimation(() => {
       revealAnimationBuild(nextBuild);
       runNextAnimationBuildRef.current();
     }, nextBuild.delayMs);
-  }, [completeAnimationSlide, revealAnimationBuild, scheduleAnimation]);
+  }, [animateActiveBuild, completeAnimationSlide, revealAnimationBuild, scheduleAnimation]);
   useEffect(() => {
     runNextAnimationBuildRef.current = runNextAnimationBuild;
   }, [runNextAnimationBuild]);
@@ -125,46 +178,50 @@ export function PublicDeckViewer({ shareId, shareService, embed = false }: Publi
       return;
     }
     animationQueueRef.current = animationQueueRef.current.slice(1);
-    setAnimationPreview((current) =>
-      current
-        ? {
-            ...current,
-            activeBuildElementId: nextBuild.elementId,
-            phase: 'animation',
-            waitingForClick: false,
-          }
-        : current,
-    );
+    animateActiveBuild(nextBuild);
     scheduleAnimation(() => {
       revealAnimationBuild(nextBuild);
       runNextAnimationBuild();
     }, nextBuild.delayMs);
-  }, [completeAnimationSlide, revealAnimationBuild, runNextAnimationBuild, scheduleAnimation]);
+  }, [
+    animateActiveBuild,
+    completeAnimationSlide,
+    revealAnimationBuild,
+    runNextAnimationBuild,
+    scheduleAnimation,
+  ]);
 
-  const playPresentationPage = useCallback((project: ProjectDocument, pageIndex: number) => {
-    const page = project.pages[pageIndex];
-    if (!page) return;
-    const builds = (page.animationBuilds ?? []).filter((build) => page.elementIds.includes(build.elementId));
-    clearAnimationTimers();
-    animationQueueRef.current = builds;
-    setActivePageIndex(pageIndex);
-    const transitionDelay = page.transition?.delayMs ?? 0;
-    setAnimationPreview({
-      activeBuildElementId: undefined,
-      hiddenElementIds: builds.map((build) => build.elementId),
-      mode: 'presenter',
-      pageId: page.id,
-      phase: transitionDelay > 0 ? 'transition' : builds.length > 0 ? 'animation' : 'complete',
-      playing: true,
-      waitingForClick: false,
-    });
+  const playPresentationPage = useCallback(
+    (project: ProjectDocument, pageIndex: number) => {
+      const page = project.pages[pageIndex];
+      if (!page) return;
+      const builds = (page.animationBuilds ?? []).filter((build) =>
+        page.elementIds.includes(build.elementId),
+      );
+      clearAnimationTimers();
+      animationQueueRef.current = builds;
+      setActivePageIndex(pageIndex);
+      const transitionDelay = page.transition?.delayMs ?? 0;
+      setAnimationPreview({
+        activeBuild: undefined,
+        activeBuildElementId: undefined,
+        animationProgress: 0,
+        hiddenElementIds: builds.map((build) => build.elementId),
+        mode: 'presenter',
+        pageId: page.id,
+        phase: transitionDelay > 0 ? 'transition' : builds.length > 0 ? 'animation' : 'complete',
+        playing: true,
+        waitingForClick: false,
+      });
 
-    if (builds.length === 0) {
-      if (transitionDelay > 0) scheduleAnimation(completeAnimationSlide, transitionDelay);
-      return;
-    }
-    scheduleAnimation(runNextAnimationBuild, transitionDelay);
-  }, [clearAnimationTimers, completeAnimationSlide, runNextAnimationBuild, scheduleAnimation]);
+      if (builds.length === 0) {
+        if (transitionDelay > 0) scheduleAnimation(completeAnimationSlide, transitionDelay);
+        return;
+      }
+      scheduleAnimation(runNextAnimationBuild, transitionDelay);
+    },
+    [clearAnimationTimers, completeAnimationSlide, runNextAnimationBuild, scheduleAnimation],
+  );
 
   const advancePresentation = useCallback(() => {
     if (viewerState.status !== 'ready') return;
@@ -174,7 +231,13 @@ export function PublicDeckViewer({ shareId, shareService, embed = false }: Publi
     }
     if (animationPreview?.phase !== 'complete') return;
     playPresentationPage(viewerState.project, activePageIndex + 1);
-  }, [activePageIndex, advanceAnimationPreview, animationPreview, playPresentationPage, viewerState]);
+  }, [
+    activePageIndex,
+    advanceAnimationPreview,
+    animationPreview,
+    playPresentationPage,
+    viewerState,
+  ]);
 
   const rewindPresentation = useCallback(() => {
     if (viewerState.status !== 'ready') return;

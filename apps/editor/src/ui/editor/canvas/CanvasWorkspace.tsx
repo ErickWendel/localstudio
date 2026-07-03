@@ -1,15 +1,38 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type RefObject,
+} from 'react';
 import type Konva from 'konva';
-import { Arrow, Circle, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transformer } from 'react-konva';
-import type { ElementFramePatch, ImageCropPatch } from '../../../domain/commands/elements/basicCommands';
+import {
+  Circle,
+  Group,
+  Image as KonvaImage,
+  Layer,
+  Line,
+  Rect,
+  Stage,
+  Text,
+  Transformer,
+} from 'react-konva';
+import type {
+  ElementFramePatch,
+  ImageCropPatch,
+} from '../../../domain/commands/elements/basicCommands';
 import type {
   CropRect,
   DesignElement,
   ElementAnimationBuild,
+  ElementAnimationBuild as ElementAnimationPreviewBuild,
   GifElement,
   ImageElement,
   ProjectDocument,
   SelectionState,
+  ShapeElement,
+  ShapeLineEndpoint,
   VideoElement,
 } from '../../../domain/documents/model';
 import { getNormalizedElementPoint } from '../background-selection/backgroundSelection';
@@ -32,10 +55,14 @@ interface CanvasWorkspaceProps {
   backgroundSelectionMode?: boolean;
   backgroundSelectionNotice?: string | undefined;
   processingElementIds?: string[];
-  backgroundPreview?: { elementId: string; maskUrl?: string; pending: boolean; score?: number } | undefined;
+  backgroundPreview?:
+    | { elementId: string; maskUrl?: string; pending: boolean; score?: number }
+    | undefined;
   animationPreview?:
     | {
         activeBuildElementId: string | undefined;
+        activeBuild?: ElementAnimationPreviewBuild | undefined;
+        animationProgress?: number;
         hiddenElementIds: string[];
         mode?: 'editor' | 'presenter';
         pageId: string;
@@ -53,10 +80,16 @@ interface CanvasWorkspaceProps {
   onAlignSelectedElement?: (() => void) | undefined;
   onAnimationPreviewAdvance?: (() => void) | undefined;
   onBringSelectedElementForward?: (() => void) | undefined;
-  onBackgroundPreviewPoint?: ((elementId: string, point: { x: number; y: number }) => void) | undefined;
-  onBackgroundRefinePoint?: ((elementId: string, point: { x: number; y: number }) => void) | undefined;
+  onBackgroundPreviewPoint?:
+    | ((elementId: string, point: { x: number; y: number }) => void)
+    | undefined;
+  onBackgroundRefinePoint?:
+    | ((elementId: string, point: { x: number; y: number }) => void)
+    | undefined;
   onBackgroundSelectionToggle?: (() => void) | undefined;
-  onBackgroundSubjectPick?: ((elementId: string, point: { x: number; y: number }) => void) | undefined;
+  onBackgroundSubjectPick?:
+    | ((elementId: string, point: { x: number; y: number }) => void)
+    | undefined;
   onCancelBackgroundSelection?: (() => void) | undefined;
   onClearSelection?: (() => void) | undefined;
   onDeleteSelectedElement?: (() => void) | undefined;
@@ -93,6 +126,313 @@ interface CommonElementProps {
   onMouseMove: (event: Konva.KonvaEventObject<MouseEvent>) => void;
   onTap: () => void;
   onTransformEnd: (event: Konva.KonvaEventObject<Event>) => void;
+}
+
+interface ElementAnimationRenderState {
+  activeBuild: ElementAnimationPreviewBuild | undefined;
+  hidden: boolean;
+  progress: number;
+}
+
+function clampAnimationProgress(value: number | undefined) {
+  return Math.max(0, Math.min(1, value ?? 0));
+}
+
+function easeOutCubic(value: number) {
+  return 1 - Math.pow(1 - value, 3);
+}
+
+function getAnimationOpacity(baseOpacity: number, state: ElementAnimationRenderState) {
+  if (state.activeBuild?.effect === 'dissolve') return baseOpacity * easeOutCubic(state.progress);
+  if (state.activeBuild?.effect === 'keyboard-typing') return baseOpacity;
+  if (state.activeBuild?.effect === 'line-draw') return baseOpacity;
+  return state.hidden ? 0 : baseOpacity;
+}
+
+function getTypedText(text: string, state: ElementAnimationRenderState) {
+  if (state.activeBuild?.effect !== 'keyboard-typing') return text;
+  return text.slice(0, Math.ceil(text.length * state.progress));
+}
+
+function getLineDrawPoints(
+  points: number[],
+  progress: number,
+  direction: ElementAnimationPreviewBuild['lineDrawDirection'],
+) {
+  if (points.length < 4) return points;
+  const startX = points[0] ?? 0;
+  const startY = points[1] ?? 0;
+  const endX = points[points.length - 2] ?? startX;
+  const endY = points[points.length - 1] ?? startY;
+  const lerp = (start: number, end: number, ratio = progress) => start + (end - start) * ratio;
+
+  if (direction === 'end-to-start') {
+    return [endX, endY, lerp(endX, startX), lerp(endY, startY)];
+  }
+  if (direction === 'middle-to-ends') {
+    const middleX = (startX + endX) / 2;
+    const middleY = (startY + endY) / 2;
+    return [
+      lerp(middleX, startX, progress),
+      lerp(middleY, startY, progress),
+      lerp(middleX, endX, progress),
+      lerp(middleY, endY, progress),
+    ];
+  }
+  return [startX, startY, lerp(startX, endX, progress), lerp(startY, endY, progress)];
+}
+
+function getLineDrawDash(
+  length: number,
+  progress: number,
+  direction: ElementAnimationPreviewBuild['lineDrawDirection'],
+) {
+  const safeLength = Math.max(1, length);
+  if (direction === 'middle-to-ends') {
+    return {
+      dash: [safeLength * progress, safeLength],
+      dashOffset: (safeLength * progress) / 2,
+    };
+  }
+  return {
+    dash: [safeLength, safeLength],
+    dashOffset:
+      direction === 'end-to-start' ? -safeLength * (1 - progress) : safeLength * (1 - progress),
+  };
+}
+
+function getLineDrawPerimeter(width: number, height: number) {
+  return Math.max(1, width * 2 + height * 2);
+}
+
+function getShapeLineDrawState(element: ShapeElement, state: ElementAnimationRenderState) {
+  if (state.activeBuild?.effect !== 'line-draw') {
+    return {
+      direction: undefined,
+      progress: 1,
+    };
+  }
+  return {
+    direction: state.activeBuild.lineDrawDirection ?? 'start-to-end',
+    progress: easeOutCubic(state.progress),
+  };
+}
+
+function getShapeEndpoint(element: ShapeElement, position: 'end' | 'start') {
+  if (position === 'end' && element.shape === 'arrow') return element.endEndpoint ?? 'arrow';
+  return (position === 'start' ? element.startEndpoint : element.endEndpoint) ?? 'none';
+}
+
+function getEndpointStrokeWidth(element: ShapeElement) {
+  return Math.max(1, element.strokeWidth ?? 4);
+}
+
+function getEndpointColor(element: ShapeElement) {
+  return element.stroke ?? element.fill ?? '#37FD76';
+}
+
+function getEndpointAngle(start: { x: number; y: number }, end: { x: number; y: number }) {
+  return Math.atan2(end.y - start.y, end.x - start.x);
+}
+
+function EndpointMarker({
+  color,
+  endpoint,
+  point,
+  angle,
+  strokeWidth,
+}: {
+  color: string;
+  endpoint: ShapeLineEndpoint;
+  point: { x: number; y: number };
+  angle: number;
+  strokeWidth: number;
+}) {
+  if (endpoint === 'none') return null;
+
+  const size = Math.max(12, strokeWidth * 3.2);
+  const unitX = Math.cos(angle);
+  const unitY = Math.sin(angle);
+  const perpendicularX = -unitY;
+  const perpendicularY = unitX;
+  const back = {
+    x: point.x - unitX * size,
+    y: point.y - unitY * size,
+  };
+  const sideA = {
+    x: back.x + perpendicularX * size * 0.42,
+    y: back.y + perpendicularY * size * 0.42,
+  };
+  const sideB = {
+    x: back.x - perpendicularX * size * 0.42,
+    y: back.y - perpendicularY * size * 0.42,
+  };
+
+  if (endpoint === 'arrow') {
+    return (
+      <Line
+        closed
+        fill={color}
+        listening={false}
+        points={[point.x, point.y, sideA.x, sideA.y, sideB.x, sideB.y]}
+      />
+    );
+  }
+
+  if (endpoint === 'open-arrow') {
+    return (
+      <Line
+        listening={false}
+        points={[sideA.x, sideA.y, point.x, point.y, sideB.x, sideB.y]}
+        stroke={color}
+        strokeWidth={strokeWidth}
+      />
+    );
+  }
+
+  if (endpoint === 'circle' || endpoint === 'open-circle') {
+    return (
+      <Circle
+        {...(endpoint === 'circle' ? { fill: color } : {})}
+        listening={false}
+        radius={size * 0.42}
+        stroke={color}
+        strokeWidth={endpoint === 'open-circle' ? Math.max(1, strokeWidth * 0.72) : 0}
+        x={point.x}
+        y={point.y}
+      />
+    );
+  }
+
+  if (endpoint === 'square' || endpoint === 'open-square') {
+    return (
+      <Rect
+        {...(endpoint === 'square' ? { fill: color } : {})}
+        height={size * 0.74}
+        listening={false}
+        offsetX={(size * 0.74) / 2}
+        offsetY={(size * 0.74) / 2}
+        rotation={(angle * 180) / Math.PI}
+        stroke={color}
+        strokeWidth={endpoint === 'open-square' ? Math.max(1, strokeWidth * 0.72) : 0}
+        width={size * 0.74}
+        x={point.x}
+        y={point.y}
+      />
+    );
+  }
+
+  if (endpoint === 'diamond') {
+    return (
+      <Line
+        closed
+        fill={color}
+        listening={false}
+        points={[
+          point.x + unitX * size * 0.54,
+          point.y + unitY * size * 0.54,
+          point.x + perpendicularX * size * 0.42,
+          point.y + perpendicularY * size * 0.42,
+          point.x - unitX * size * 0.54,
+          point.y - unitY * size * 0.54,
+          point.x - perpendicularX * size * 0.42,
+          point.y - perpendicularY * size * 0.42,
+        ]}
+      />
+    );
+  }
+
+  return (
+    <Line
+      listening={false}
+      points={[
+        point.x + perpendicularX * size * 0.48,
+        point.y + perpendicularY * size * 0.48,
+        point.x - perpendicularX * size * 0.48,
+        point.y - perpendicularY * size * 0.48,
+      ]}
+      stroke={color}
+      strokeWidth={strokeWidth}
+    />
+  );
+}
+
+function LinearShapeElement({
+  commonProps,
+  element,
+  lineDrawState,
+  nodeRef,
+}: {
+  commonProps: CommonElementProps;
+  element: ShapeElement;
+  lineDrawState: { direction: ElementAnimationPreviewBuild['lineDrawDirection']; progress: number };
+  nodeRef: (node: Konva.Node | null) => void;
+}) {
+  const stroke = getEndpointColor(element);
+  const strokeWidth = getEndpointStrokeWidth(element);
+  const fullPoints =
+    element.shape === 'arc'
+      ? [
+          0,
+          commonProps.height,
+          commonProps.width * 0.12,
+          0,
+          commonProps.width * 0.88,
+          0,
+          commonProps.width,
+          commonProps.height,
+        ]
+      : element.shape === 'line'
+        ? [0, commonProps.height, commonProps.width, 0]
+        : [0, commonProps.height / 2, commonProps.width, commonProps.height / 2];
+  const points =
+    lineDrawState.direction && element.shape !== 'arc'
+      ? getLineDrawPoints(fullPoints, lineDrawState.progress, lineDrawState.direction)
+      : fullPoints;
+  const startPoint = { x: points[0] ?? 0, y: points[1] ?? 0 };
+  const endPoint = {
+    x: points[points.length - 2] ?? startPoint.x,
+    y: points[points.length - 1] ?? startPoint.y,
+  };
+  const fullStartPoint = { x: fullPoints[0] ?? 0, y: fullPoints[1] ?? 0 };
+  const fullEndPoint = {
+    x: fullPoints[fullPoints.length - 2] ?? fullStartPoint.x,
+    y: fullPoints[fullPoints.length - 1] ?? fullStartPoint.y,
+  };
+  const startAngle = getEndpointAngle(fullEndPoint, fullStartPoint);
+  const endAngle = getEndpointAngle(fullStartPoint, fullEndPoint);
+
+  return (
+    <Group {...commonProps} key={element.id} ref={nodeRef}>
+      <Line
+        bezier={element.shape === 'arc'}
+        points={points}
+        {...(lineDrawState.direction && element.shape === 'arc'
+          ? getLineDrawDash(
+              commonProps.width * 2 + commonProps.height,
+              lineDrawState.progress,
+              lineDrawState.direction,
+            )
+          : {})}
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+      />
+      <EndpointMarker
+        angle={startAngle}
+        color={stroke}
+        endpoint={getShapeEndpoint(element, 'start')}
+        point={startPoint}
+        strokeWidth={strokeWidth}
+      />
+      <EndpointMarker
+        angle={endAngle}
+        color={stroke}
+        endpoint={getShapeEndpoint(element, 'end')}
+        point={endPoint}
+        strokeWidth={strokeWidth}
+      />
+    </Group>
+  );
 }
 
 export function CanvasWorkspace({
@@ -145,7 +485,10 @@ export function CanvasWorkspace({
   const [editingTextValue, setEditingTextValue] = useState('');
   const [fontRenderVersion, setFontRenderVersion] = useState(0);
   const [processingBlinkOn, setProcessingBlinkOn] = useState(false);
-  const [backgroundPreviewPoint, setBackgroundPreviewPoint] = useState<{ x: number; y: number } | null>(null);
+  const [backgroundPreviewPoint, setBackgroundPreviewPoint] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const [dragGuide, setDragGuide] = useState<{ x: number; y: number } | null>(null);
   const [cropModeElementId, setCropModeElementId] = useState<string | null>(null);
   const [cropDraft, setCropDraft] = useState<
@@ -170,13 +513,15 @@ export function CanvasWorkspace({
     .map((element) => getDraftedElement(element))
     .filter(canvasWorkspaceUtils.isDesignElement);
   const visibleMediaElements = visibleElements.filter(
-    (element): element is GifElement | VideoElement => element.type === 'gif' || element.type === 'video',
+    (element): element is GifElement | VideoElement =>
+      element.type === 'gif' || element.type === 'video',
   );
   const hasSelection = selection.elementIds.length > 0;
   const isPresenterPlayback = presentationMode || animationPreview?.mode === 'presenter';
   const showEditorOverlays = !isPresenterPlayback && !readOnly;
   const selectedElement = getDraftedElement(project.elements[selection.elementIds[0] ?? '']);
-  const isCropModeActive = selectedElement?.type === 'image' && cropModeElementId === selectedElement.id;
+  const isCropModeActive =
+    selectedElement?.type === 'image' && cropModeElementId === selectedElement.id;
   const backgroundSelectionTargetId =
     backgroundSelectionMode && selectedElement?.type === 'image' ? selectedElement.id : undefined;
   const activeBackgroundPreparation =
@@ -189,6 +534,10 @@ export function CanvasWorkspace({
   const activeProcessingBlink = hasProcessingElements && processingBlinkOn;
   const animationPreviewHiddenElementIds =
     animationPreview?.pageId === activePageId ? animationPreview.hiddenElementIds : [];
+  const activeAnimationBuild =
+    animationPreview?.pageId === activePageId && animationPreview.phase === 'animation'
+      ? animationPreview.activeBuild
+      : undefined;
   const isAnimationPreviewRunning =
     animationPreview?.pageId === activePageId &&
     animationPreview.playing &&
@@ -197,7 +546,11 @@ export function CanvasWorkspace({
     animationPreview?.pageId === activePageId &&
     (animationPreview.waitingForClick ||
       (isPresenterPlayback && animationPreview.playing && animationPreview.phase === 'complete'));
-  const animationBuildBadges: Array<{ build: ElementAnimationBuild; element: DesignElement; index: number }> = [];
+  const animationBuildBadges: Array<{
+    build: ElementAnimationBuild;
+    element: DesignElement;
+    index: number;
+  }> = [];
   for (const [index, build] of (page?.animationBuilds ?? []).entries()) {
     const element = getDraftedElement(project.elements[build.elementId]);
     if (element && element.visible !== false) {
@@ -215,7 +568,7 @@ export function CanvasWorkspace({
   const pageBackground =
     page?.background.type === 'color'
       ? page.background.color
-      : page?.background.colorFallback ?? '#050D10';
+      : (page?.background.colorFallback ?? '#050D10');
   const setElementNodeRef = useCallback((elementId: string, node: Konva.Node | null) => {
     nodeRefs.current[elementId] = node;
   }, []);
@@ -383,7 +736,11 @@ export function CanvasWorkspace({
     setCropModeElementId(null);
   }
 
-  function beginCropDrag(element: ImageElement, handle: ImageCropHandle, event: ReactPointerEvent<HTMLButtonElement>) {
+  function beginCropDrag(
+    element: ImageElement,
+    handle: ImageCropHandle,
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) {
     event.preventDefault();
     event.stopPropagation();
     const start = { x: event.clientX, y: event.clientY };
@@ -439,7 +796,10 @@ export function CanvasWorkspace({
     setEditingTextValue('');
   }
 
-  function pickBackgroundSubject(element: DesignElement, event: Konva.KonvaEventObject<MouseEvent>) {
+  function pickBackgroundSubject(
+    element: DesignElement,
+    event: Konva.KonvaEventObject<MouseEvent>,
+  ) {
     if (element.id !== backgroundSelectionTargetId || element.type !== 'image') return;
     if (!backgroundSelectionReady) return;
     const stage = event.target.getStage();
@@ -460,7 +820,10 @@ export function CanvasWorkspace({
     onBackgroundSubjectPick?.(element.id, normalizedPoint);
   }
 
-  function getBackgroundPreviewPoint(element: DesignElement, event: Konva.KonvaEventObject<MouseEvent>) {
+  function getBackgroundPreviewPoint(
+    element: DesignElement,
+    event: Konva.KonvaEventObject<MouseEvent>,
+  ) {
     const stage = event.target.getStage();
     const pointer = stage?.getPointerPosition();
     if (!pointer) return null;
@@ -478,15 +841,17 @@ export function CanvasWorkspace({
   function getCommonElementProps(element: DesignElement): CommonElementProps {
     const isBackgroundSelectionTarget = element.id === backgroundSelectionTargetId;
     const isProcessing = processingElementIds.includes(element.id);
+    const animationState = getElementAnimationState(element);
 
     return {
       draggable: !readOnly && !element.locked && !backgroundSelectionMode && !isProcessing,
       height: element.height * scaleY,
-      opacity: animationPreviewHiddenElementIds.includes(element.id)
-        ? 0
-        : isProcessing && activeProcessingBlink
-          ? 0.38
-          : element.opacity,
+      opacity:
+        animationPreviewHiddenElementIds.includes(element.id) || animationState.activeBuild
+          ? getAnimationOpacity(element.opacity, animationState)
+          : isProcessing && activeProcessingBlink
+            ? 0.38
+            : element.opacity,
       rotation: element.rotation,
       width: element.width * scaleX,
       x: element.x * scaleX,
@@ -561,6 +926,16 @@ export function CanvasWorkspace({
     };
   }
 
+  function getElementAnimationState(element: DesignElement): ElementAnimationRenderState {
+    const activeBuild =
+      activeAnimationBuild?.elementId === element.id ? activeAnimationBuild : undefined;
+    return {
+      activeBuild,
+      hidden: animationPreviewHiddenElementIds.includes(element.id),
+      progress: activeBuild ? clampAnimationProgress(animationPreview?.animationProgress) : 1,
+    };
+  }
+
   function handleStagePointerDown(event: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     if (canAdvanceAnimationPreviewByClick) {
       onAnimationPreviewAdvance?.();
@@ -594,9 +969,15 @@ export function CanvasWorkspace({
           : {})}
         data-selected-elements={selection.elementIds.join(',')}
         data-drag-guide={dragGuide ? 'active' : 'idle'}
-        data-animation-preview={animationPreview?.playing && animationPreview.pageId === activePageId ? 'playing' : 'idle'}
-        data-animation-preview-mode={animationPreview?.pageId === activePageId ? (animationPreview.mode ?? 'editor') : 'idle'}
-        data-animation-preview-phase={animationPreview?.pageId === activePageId ? animationPreview.phase : 'idle'}
+        data-animation-preview={
+          animationPreview?.playing && animationPreview.pageId === activePageId ? 'playing' : 'idle'
+        }
+        data-animation-preview-mode={
+          animationPreview?.pageId === activePageId ? (animationPreview.mode ?? 'editor') : 'idle'
+        }
+        data-animation-preview-phase={
+          animationPreview?.pageId === activePageId ? animationPreview.phase : 'idle'
+        }
         data-animation-preview-waiting={animationPreview?.waitingForClick ? 'true' : 'false'}
         style={{
           transform: `scale(${zoomPercent / 100})`,
@@ -604,7 +985,11 @@ export function CanvasWorkspace({
       >
         <div className="canvas-artboard" ref={artboardRef} style={{ background: pageBackground }}>
           {showEditorOverlays &&
-          (backgroundSelectionMode || backgroundSelectionNotice || processingSelectedImageId || isTranslating || translationNotice) ? (
+          (backgroundSelectionMode ||
+            backgroundSelectionNotice ||
+            processingSelectedImageId ||
+            isTranslating ||
+            translationNotice) ? (
             <div
               className={`background-selection-hint ${
                 isTranslating || translationNotice ? 'background-selection-hint-translation' : ''
@@ -623,14 +1008,14 @@ export function CanvasWorkspace({
               <span>
                 {isTranslating
                   ? 'Translating text...'
-                  : translationNotice ??
+                  : (translationNotice ??
                     getBackgroundSelectionMessage({
                       backgroundPreparation: activeBackgroundPreparation,
                       backgroundPreview,
                       backgroundSelectionTargetId,
                       backgroundSelectionNotice,
                       processingSelectedImageId,
-                    })}
+                    }))}
               </span>
               {activeBackgroundPreparation?.status === 'preparing' && !isTranslating ? (
                 <span
@@ -659,8 +1044,16 @@ export function CanvasWorkspace({
             onTouchStart={handleStagePointerDown}
           >
             <Layer>
-              <Rect fill={pageBackground} height={stageHeight} listening={false} width={stageWidth} x={0} y={0} />
+              <Rect
+                fill={pageBackground}
+                height={stageHeight}
+                listening={false}
+                width={stageWidth}
+                x={0}
+                y={0}
+              />
               {visibleElements.map((element) => {
+                const animationState = getElementAnimationState(element);
                 const commonProps = getCommonElementProps(element);
                 const nodeRef = (node: Konva.Node | null) => {
                   setElementNodeRef(element.id, node);
@@ -668,6 +1061,7 @@ export function CanvasWorkspace({
 
                 if (element.type === 'shape') {
                   const paint = canvasWorkspaceUtils.getShapePaint(element);
+                  const lineDrawState = getShapeLineDrawState(element, animationState);
                   if (element.shape === 'ellipse') {
                     return (
                       <Rect
@@ -675,6 +1069,13 @@ export function CanvasWorkspace({
                         {...paint}
                         key={element.id}
                         cornerRadius={Math.min(commonProps.width, commonProps.height) / 2}
+                        {...(lineDrawState.direction
+                          ? getLineDrawDash(
+                              getLineDrawPerimeter(commonProps.width, commonProps.height),
+                              lineDrawState.progress,
+                              lineDrawState.direction,
+                            )
+                          : {})}
                         ref={nodeRef}
                       />
                     );
@@ -686,56 +1087,47 @@ export function CanvasWorkspace({
                         {...paint}
                         key={element.id}
                         cornerRadius={Math.min(commonProps.width, commonProps.height) * 0.18}
+                        {...(lineDrawState.direction
+                          ? getLineDrawDash(
+                              getLineDrawPerimeter(commonProps.width, commonProps.height),
+                              lineDrawState.progress,
+                              lineDrawState.direction,
+                            )
+                          : {})}
                         ref={nodeRef}
                       />
                     );
                   }
                   if (element.shape === 'line') {
                     return (
-                      <Line
-                        {...commonProps}
+                      <LinearShapeElement
+                        commonProps={commonProps}
+                        element={element}
                         key={element.id}
-                        points={[0, commonProps.height, commonProps.width, 0]}
-                        ref={nodeRef}
-                        stroke={element.stroke ?? element.fill ?? '#37FD76'}
-                        strokeWidth={Math.max(1, element.strokeWidth ?? 4)}
+                        lineDrawState={lineDrawState}
+                        nodeRef={nodeRef}
                       />
                     );
                   }
                   if (element.shape === 'arrow') {
                     return (
-                      <Arrow
-                        {...commonProps}
+                      <LinearShapeElement
+                        commonProps={commonProps}
+                        element={element}
                         key={element.id}
-                        fill={element.stroke ?? element.fill ?? '#37FD76'}
-                        points={[0, commonProps.height / 2, commonProps.width, commonProps.height / 2]}
-                        pointerLength={Math.min(42, commonProps.width * 0.22)}
-                        pointerWidth={Math.min(46, commonProps.height * 0.48)}
-                        ref={nodeRef}
-                        stroke={element.stroke ?? element.fill ?? '#37FD76'}
-                        strokeWidth={Math.max(1, element.strokeWidth ?? 10)}
+                        lineDrawState={lineDrawState}
+                        nodeRef={nodeRef}
                       />
                     );
                   }
                   if (element.shape === 'arc') {
                     return (
-                      <Line
-                        {...commonProps}
+                      <LinearShapeElement
+                        commonProps={commonProps}
+                        element={element}
                         key={element.id}
-                        bezier
-                        ref={nodeRef}
-                        points={[
-                          0,
-                          commonProps.height,
-                          commonProps.width * 0.12,
-                          0,
-                          commonProps.width * 0.88,
-                          0,
-                          commonProps.width,
-                          commonProps.height,
-                        ]}
-                        stroke={element.stroke ?? element.fill ?? '#37FD76'}
-                        strokeWidth={Math.max(1, element.strokeWidth ?? 4)}
+                        lineDrawState={lineDrawState}
+                        nodeRef={nodeRef}
                       />
                     );
                   }
@@ -751,12 +1143,37 @@ export function CanvasWorkspace({
                         {...paint}
                         closed
                         key={element.id}
-                        points={canvasWorkspaceUtils.getPolygonPoints(element.shape, commonProps.width, commonProps.height)}
+                        points={canvasWorkspaceUtils.getPolygonPoints(
+                          element.shape,
+                          commonProps.width,
+                          commonProps.height,
+                        )}
+                        {...(lineDrawState.direction
+                          ? getLineDrawDash(
+                              getLineDrawPerimeter(commonProps.width, commonProps.height),
+                              lineDrawState.progress,
+                              lineDrawState.direction,
+                            )
+                          : {})}
                         ref={nodeRef}
                       />
                     );
                   }
-                  return <Rect {...commonProps} {...paint} key={element.id} ref={nodeRef} />;
+                  return (
+                    <Rect
+                      {...commonProps}
+                      {...paint}
+                      key={element.id}
+                      {...(lineDrawState.direction
+                        ? getLineDrawDash(
+                            getLineDrawPerimeter(commonProps.width, commonProps.height),
+                            lineDrawState.progress,
+                            lineDrawState.direction,
+                          )
+                        : {})}
+                      ref={nodeRef}
+                    />
+                  );
                 }
 
                 if (element.type === 'image') {
@@ -791,7 +1208,7 @@ export function CanvasWorkspace({
                   <Text
                     {...commonProps}
                     key={`${element.id}-font-${fontRenderVersion}`}
-                    text={element.text}
+                    text={getTypedText(element.text, animationState)}
                     fontFamily={element.fontFamily}
                     fontSize={element.fontSize * scaleY}
                     fontStyle={element.fontWeight >= 700 ? 'bold' : 'normal'}
@@ -804,14 +1221,21 @@ export function CanvasWorkspace({
                   />
                 );
               })}
-              {showEditorOverlays && backgroundSelectionTargetId && selectedElement?.type === 'image' ? (
+              {showEditorOverlays &&
+              backgroundSelectionTargetId &&
+              selectedElement?.type === 'image' ? (
                 <>
                   <BackgroundSelectionPreview
                     element={selectedElement}
                     maskUrl={
-                      backgroundPreview?.elementId === selectedElement.id ? backgroundPreview.maskUrl : undefined
+                      backgroundPreview?.elementId === selectedElement.id
+                        ? backgroundPreview.maskUrl
+                        : undefined
                     }
-                    pending={backgroundPreview?.elementId === selectedElement.id && backgroundPreview.pending}
+                    pending={
+                      backgroundPreview?.elementId === selectedElement.id &&
+                      backgroundPreview.pending
+                    }
                     point={backgroundPreviewPoint}
                     scale={{ x: scaleX, y: scaleY }}
                   />
@@ -859,7 +1283,10 @@ export function CanvasWorkspace({
                   ) : null}
                 </>
               ) : null}
-              {showEditorOverlays && !backgroundSelectionMode && !processingSelectedImageId && !isCropModeActive ? (
+              {showEditorOverlays &&
+              !backgroundSelectionMode &&
+              !processingSelectedImageId &&
+              !isCropModeActive ? (
                 <Transformer
                   ref={transformerRef}
                   anchorFill="#37FD76"
@@ -888,13 +1315,19 @@ export function CanvasWorkspace({
               ) : null}
             </Layer>
           </Stage>
-          <div className="canvas-media-layer" aria-hidden={visibleMediaElements.length === 0 ? true : undefined}>
+          <div
+            className="canvas-media-layer"
+            aria-hidden={visibleMediaElements.length === 0 ? true : undefined}
+          >
             {visibleMediaElements.map((element) => {
               const asset = project.assets[element.assetId];
+              const animationState = getElementAnimationState(element);
               return (
                 <CanvasMediaElement
                   key={element.id}
-                  assetName={asset?.name ?? (element.type === 'video' ? 'Imported video' : 'Imported GIF')}
+                  assetName={
+                    asset?.name ?? (element.type === 'video' ? 'Imported video' : 'Imported GIF')
+                  }
                   assetUrl={asset?.objectUrl}
                   element={element}
                   interactive={
@@ -902,6 +1335,7 @@ export function CanvasWorkspace({
                     readOnly ||
                     (element.type === 'video' && selection.elementIds.includes(element.id))
                   }
+                  opacity={getAnimationOpacity(element.opacity, animationState)}
                   previewMode={presentationMode || readOnly}
                   scale={{ x: scaleX, y: scaleY }}
                 />
@@ -915,46 +1349,48 @@ export function CanvasWorkspace({
               onHandlePointerDown={beginCropDrag}
             />
           ) : null}
-          {showEditorOverlays ? visibleElements.map((element) => {
-            if (element.type !== 'text' || editingTextId !== element.id) return null;
+          {showEditorOverlays
+            ? visibleElements.map((element) => {
+                if (element.type !== 'text' || editingTextId !== element.id) return null;
 
-            return (
-              <textarea
-                aria-label="Edit text"
-                className="canvas-text-editor"
-                key={element.id}
-                ref={textInputRef}
-                value={editingTextValue}
-                style={{
-                  color: element.fill,
-                  fontFamily: element.fontFamily,
-                  fontSize: `${element.fontSize * scaleY}px`,
-                  fontWeight: element.fontWeight,
-                  height: `${element.height * scaleY}px`,
-                  left: `${element.x * scaleX}px`,
-                  padding: `${TEXT_FRAME_PADDING * scaleY}px`,
-                  textAlign: element.align,
-                  top: `${element.y * scaleY}px`,
-                  transform: `rotate(${element.rotation}deg)`,
-                  width: `${element.width * scaleX}px`,
-                }}
-                onBlur={commitTextEditing}
-                onChange={(event) => {
-                  setEditingTextValue(event.target.value);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'Escape') {
-                    event.preventDefault();
-                    cancelTextEditing();
-                  }
-                  if (event.key === 'Enter' && !event.shiftKey) {
-                    event.preventDefault();
-                    commitTextEditing();
-                  }
-                }}
-              />
-            );
-          }) : null}
+                return (
+                  <textarea
+                    aria-label="Edit text"
+                    className="canvas-text-editor"
+                    key={element.id}
+                    ref={textInputRef}
+                    value={editingTextValue}
+                    style={{
+                      color: element.fill,
+                      fontFamily: element.fontFamily,
+                      fontSize: `${element.fontSize * scaleY}px`,
+                      fontWeight: element.fontWeight,
+                      height: `${element.height * scaleY}px`,
+                      left: `${element.x * scaleX}px`,
+                      padding: `${TEXT_FRAME_PADDING * scaleY}px`,
+                      textAlign: element.align,
+                      top: `${element.y * scaleY}px`,
+                      transform: `rotate(${element.rotation}deg)`,
+                      width: `${element.width * scaleX}px`,
+                    }}
+                    onBlur={commitTextEditing}
+                    onChange={(event) => {
+                      setEditingTextValue(event.target.value);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape') {
+                        event.preventDefault();
+                        cancelTextEditing();
+                      }
+                      if (event.key === 'Enter' && !event.shiftKey) {
+                        event.preventDefault();
+                        commitTextEditing();
+                      }
+                    }}
+                  />
+                );
+              })
+            : null}
           {showEditorOverlays ? (
             <div className="animation-build-badges" aria-label="Animation build badges">
               {animationBuildBadges.map(({ build, element, index }) => (
@@ -979,7 +1415,9 @@ export function CanvasWorkspace({
           ) : null}
           <span className="canvas-fallback-label">Selected Image</span>
         </div>
-        {showEditorOverlays && animationPreview?.pageId === activePageId && animationPreview.waitingForClick ? (
+        {showEditorOverlays &&
+        animationPreview?.pageId === activePageId &&
+        animationPreview.waitingForClick ? (
           <div className="animation-preview-hint" role="status">
             <span className="material-symbols-outlined" aria-hidden="true">
               ads_click
@@ -987,19 +1425,32 @@ export function CanvasWorkspace({
             Click the slide to play the next animation.
           </div>
         ) : null}
-        {showEditorOverlays && !backgroundSelectionMode && !processingSelectedImageId && !isAnimationPreviewRunning ? (
+        {showEditorOverlays &&
+        !backgroundSelectionMode &&
+        !processingSelectedImageId &&
+        !isAnimationPreviewRunning ? (
           <div className="canvas-quick-actions" aria-label="Canvas insert actions">
-            <button type="button" aria-label="Insert Text" title="Insert Text" onClick={onInsertText}>
+            <button
+              type="button"
+              aria-label="Insert Text"
+              title="Insert Text"
+              onClick={onInsertText}
+            >
               <span className="material-symbols-outlined">title</span>
             </button>
-            <button type="button" aria-label="Insert Media" title="Insert Media" onClick={onInsertMedia}>
+            <button
+              type="button"
+              aria-label="Insert Media"
+              title="Insert Media"
+              onClick={onInsertMedia}
+            >
               <span className="material-symbols-outlined">add_photo_alternate</span>
             </button>
           </div>
         ) : null}
-        {showEditorOverlays && hasSelection && (selectedElement?.type === 'image' || selectedElement?.type === 'shape') ? (
+        {showEditorOverlays && hasSelection && selectedElement ? (
           <FloatingSelectionToolbar
-            elementType={selectedElement?.type === 'image' ? 'image' : 'shape'}
+            elementType={selectedElement.type}
             onAlignCenter={onAlignSelectedElement}
             onBringForward={onBringSelectedElementForward}
             onDelete={onDeleteSelectedElement}
@@ -1029,7 +1480,13 @@ interface BackgroundSelectionPreviewProps {
   scale: { x: number; y: number };
 }
 
-function BackgroundSelectionPreview({ element, maskUrl, pending = false, point, scale }: BackgroundSelectionPreviewProps) {
+function BackgroundSelectionPreview({
+  element,
+  maskUrl,
+  pending = false,
+  point,
+  scale,
+}: BackgroundSelectionPreviewProps) {
   const maskImage = canvasWorkspaceUtils.useCanvasImage(maskUrl);
   const x = element.x * scale.x;
   const y = element.y * scale.y;
@@ -1071,7 +1528,9 @@ interface BackgroundSelectionMessageOptions {
   backgroundPreparation:
     | { elementId: string; progress: number; status: 'preparing' | 'ready' | 'failed' }
     | undefined;
-  backgroundPreview: { elementId: string; maskUrl?: string; pending: boolean; score?: number } | undefined;
+  backgroundPreview:
+    | { elementId: string; maskUrl?: string; pending: boolean; score?: number }
+    | undefined;
   backgroundSelectionNotice: string | undefined;
   backgroundSelectionTargetId: string | undefined;
   processingSelectedImageId: string | undefined;
@@ -1086,7 +1545,8 @@ function getBackgroundSelectionMessage({
 }: BackgroundSelectionMessageOptions) {
   if (processingSelectedImageId) return 'Removing background...';
   if (backgroundSelectionNotice) return backgroundSelectionNotice;
-  if (backgroundPreparation?.status === 'failed') return 'Image extraction failed. Try background removal again.';
+  if (backgroundPreparation?.status === 'failed')
+    return 'Image extraction failed. Try background removal again.';
   if (backgroundPreparation?.status === 'preparing') return 'Extracting image embedding...';
   const previewScore =
     backgroundPreview && backgroundPreview.elementId === backgroundSelectionTargetId
@@ -1110,15 +1570,21 @@ interface CanvasMediaElementProps {
   assetUrl: string | undefined;
   element: GifElement | VideoElement;
   interactive: boolean;
+  opacity: number;
   previewMode: boolean;
   scale: { x: number; y: number };
 }
 
-function getMediaStyle(element: GifElement | VideoElement, scale: { x: number; y: number }, interactive: boolean) {
+function getMediaStyle(
+  element: GifElement | VideoElement,
+  scale: { x: number; y: number },
+  interactive: boolean,
+  opacity: number,
+) {
   return {
     height: `${element.height * scale.y}px`,
     left: `${element.x * scale.x}px`,
-    opacity: element.opacity,
+    opacity,
     pointerEvents: interactive ? 'auto' : 'none',
     top: `${element.y * scale.y}px`,
     transform: `rotate(${element.rotation}deg)`,
@@ -1126,14 +1592,22 @@ function getMediaStyle(element: GifElement | VideoElement, scale: { x: number; y
   } as const;
 }
 
-function CanvasMediaElement({ assetName, assetUrl, element, interactive, previewMode, scale }: CanvasMediaElementProps) {
+function CanvasMediaElement({
+  assetName,
+  assetUrl,
+  element,
+  interactive,
+  opacity,
+  previewMode,
+  scale,
+}: CanvasMediaElementProps) {
   if (element.type === 'gif') {
     return (
       <img
         aria-label={assetName}
         className="canvas-media-element"
         src={element.playing ? assetUrl : undefined}
-        style={getMediaStyle(element, scale, interactive)}
+        style={getMediaStyle(element, scale, interactive, opacity)}
       />
     );
   }
@@ -1144,6 +1618,7 @@ function CanvasMediaElement({ assetName, assetUrl, element, interactive, preview
       assetUrl={assetUrl}
       element={element}
       interactive={interactive}
+      opacity={opacity}
       previewMode={previewMode}
       scale={scale}
     />
@@ -1155,22 +1630,34 @@ interface CanvasVideoElementProps {
   assetUrl: string | undefined;
   element: VideoElement;
   interactive: boolean;
+  opacity: number;
   previewMode: boolean;
   scale: { x: number; y: number };
 }
 
-function CanvasVideoElement({ assetName, assetUrl, element, interactive, previewMode, scale }: CanvasVideoElementProps) {
+function CanvasVideoElement({
+  assetName,
+  assetUrl,
+  element,
+  interactive,
+  opacity,
+  previewMode,
+  scale,
+}: CanvasVideoElementProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const previousTrimRef = useRef<{ assetUrl: string | undefined; end: number | undefined; start: number } | undefined>(undefined);
+  const previousTrimRef = useRef<
+    { assetUrl: string | undefined; end: number | undefined; start: number } | undefined
+  >(undefined);
   const autoplay = previewMode && element.autoplayInPreview;
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
     const start = Math.max(0, element.trimStartSeconds);
-    const end = element.trimEndSeconds !== undefined && element.trimEndSeconds > 0
-      ? Math.max(0, element.trimEndSeconds)
-      : undefined;
+    const end =
+      element.trimEndSeconds !== undefined && element.trimEndSeconds > 0
+        ? Math.max(0, element.trimEndSeconds)
+        : undefined;
     const previousTrim = previousTrimRef.current;
     const assetChanged = previousTrim?.assetUrl !== assetUrl;
     if (assetChanged || previousTrim?.start !== start) {
@@ -1206,7 +1693,7 @@ function CanvasVideoElement({ assetName, assetUrl, element, interactive, preview
       preload="metadata"
       ref={videoRef}
       src={assetUrl}
-      style={getMediaStyle(element, scale, interactive)}
+      style={getMediaStyle(element, scale, interactive, opacity)}
       onLoadedMetadata={(event) => {
         event.currentTarget.currentTime = Math.max(0, element.trimStartSeconds);
       }}
@@ -1219,14 +1706,15 @@ function CanvasVideoElement({ assetName, assetUrl, element, interactive, preview
 
 function CanvasImageElement({ assetUrl, commonProps, element, nodeRef }: CanvasImageElementProps) {
   const image = canvasWorkspaceUtils.useCanvasImage(assetUrl);
-  const crop = element.crop && image
-    ? {
-        x: element.crop.x * image.naturalWidth,
-        y: element.crop.y * image.naturalHeight,
-        width: element.crop.width * image.naturalWidth,
-        height: element.crop.height * image.naturalHeight,
-      }
-    : undefined;
+  const crop =
+    element.crop && image
+      ? {
+          x: element.crop.x * image.naturalWidth,
+          y: element.crop.y * image.naturalHeight,
+          width: element.crop.width * image.naturalWidth,
+          height: element.crop.height * image.naturalHeight,
+        }
+      : undefined;
   const imageProps = element.flipX
     ? {
         ...commonProps,
@@ -1248,7 +1736,15 @@ function CanvasImageElement({ assetUrl, commonProps, element, nodeRef }: CanvasI
     );
   }
 
-  return <KonvaImage {...imageProps} image={image} {...(crop ? { crop } : {})} cornerRadius={6} ref={nodeRef} />;
+  return (
+    <KonvaImage
+      {...imageProps}
+      image={image}
+      {...(crop ? { crop } : {})}
+      cornerRadius={6}
+      ref={nodeRef}
+    />
+  );
 }
 
 interface CropFrameOverlayProps {

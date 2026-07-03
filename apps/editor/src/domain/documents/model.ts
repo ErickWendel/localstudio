@@ -10,6 +10,16 @@ export type ShapeKind =
   | 'rect'
   | 'rounded-rect'
   | 'triangle';
+export type ShapeLineEndpoint =
+  | 'arrow'
+  | 'bar'
+  | 'circle'
+  | 'diamond'
+  | 'none'
+  | 'open-arrow'
+  | 'open-circle'
+  | 'open-square'
+  | 'square';
 
 export interface ProjectDocument {
   id: string;
@@ -37,7 +47,8 @@ export type PageBackground =
   | { type: 'color'; color: string }
   | { type: 'asset'; assetId: string; colorFallback: string };
 
-export type AnimationEffect = 'reveal';
+export type AnimationEffect = 'dissolve' | 'keyboard-typing' | 'line-draw' | 'reveal';
+export type AnimationLineDrawDirection = 'start-to-end' | 'end-to-start' | 'middle-to-ends';
 export type AnimationTrigger = 'on-click' | 'after-transition' | 'after-previous';
 
 export interface SlideTransition {
@@ -51,6 +62,7 @@ export interface ElementAnimationBuild {
   effect: AnimationEffect;
   trigger: AnimationTrigger;
   delayMs: number;
+  lineDrawDirection?: AnimationLineDrawDirection;
 }
 
 export interface Asset {
@@ -118,6 +130,8 @@ export interface ShapeElement extends BaseElement {
   fill?: string;
   stroke?: string;
   strokeWidth?: number;
+  startEndpoint?: ShapeLineEndpoint;
+  endEndpoint?: ShapeLineEndpoint;
 }
 
 export interface CropRect {
