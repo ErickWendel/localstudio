@@ -1,8 +1,13 @@
 import react from '@vitejs/plugin-react';
+import { createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
 import { defineConfig, type Connect } from 'vite';
 
 const siteBase = process.env.LOCALSTUDIO_BASE_PATH ?? '/';
 const editorBase = new URL('editor/', `https://localstudio.invalid${siteBase}`).pathname;
+const pptxSamplePath =
+  '/Users/erickwendel/Downloads/web-ai-beyond-chat-codecon-meetup-26052026.pptx';
+const pptxSampleRoute = '/__localstudio/pptx-sample';
 
 function rewriteWebMcpRoute(req: Connect.IncomingMessage) {
   if (!req.url) return;
@@ -33,6 +38,40 @@ function webMcpRouteAlias() {
   };
 }
 
+function pptxSampleImportRoute() {
+  return {
+    name: 'pptx-sample-import-route',
+    configureServer(server: { middlewares: Connect.Server }) {
+      server.middlewares.use((req, res, next) => {
+        void (async () => {
+        if (!req.url?.startsWith(pptxSampleRoute)) {
+          next();
+          return;
+        }
+
+        const requestUrl = new URL(req.url, 'http://localstudio.invalid');
+        if (requestUrl.pathname === `${pptxSampleRoute}/file`) {
+          const fileStat = await stat(pptxSamplePath).catch(() => undefined);
+          if (!fileStat?.isFile()) {
+            res.statusCode = 404;
+            res.end('Sample file not found.');
+            return;
+          }
+          res.setHeader(
+            'content-type',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          );
+          createReadStream(pptxSamplePath).pipe(res);
+          return;
+        }
+
+        next();
+        })().catch(next);
+      });
+    },
+  };
+}
+
 function editorManualChunks(id: string) {
   if (id.includes('@huggingface/transformers') || id.includes('onnxruntime-web')) {
     return 'ml-transformers';
@@ -48,7 +87,7 @@ function editorManualChunks(id: string) {
 
 export default defineConfig({
   base: editorBase,
-  plugins: [webMcpRouteAlias(), react()],
+  plugins: [webMcpRouteAlias(), pptxSampleImportRoute(), react()],
   build: {
     chunkSizeWarningLimit: 1200,
     emptyOutDir: false,

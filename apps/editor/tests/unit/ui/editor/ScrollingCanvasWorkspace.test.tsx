@@ -48,6 +48,12 @@ describe('ScrollingCanvasWorkspace', () => {
       name: 'Second Slide',
       elementIds: [],
     });
+    project.pages.push({
+      ...project.pages[0]!,
+      id: 'page-3',
+      name: 'Third Slide',
+      elementIds: [],
+    });
     const handlers = {
       onActivePageFromScroll: vi.fn(),
       onAddPage: vi.fn(),
@@ -58,7 +64,7 @@ describe('ScrollingCanvasWorkspace', () => {
       onTranslatePage: vi.fn(),
     };
 
-    render(
+    const { container } = render(
       <ScrollingCanvasWorkspace
         activePageId="page-1"
         project={project}
@@ -67,8 +73,11 @@ describe('ScrollingCanvasWorkspace', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Activate Second Slide' }));
-    expect(handlers.onActivePageFromScroll).toHaveBeenCalledWith('page-2');
+    expect(container.querySelectorAll('.canvas-frame')).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: 'Activate Second Slide' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Activate Third Slide' }));
+    expect(handlers.onActivePageFromScroll).toHaveBeenCalledWith('page-3');
 
     await user.click(screen.getByRole('button', { name: 'Move Slide 1 down' }));
     expect(handlers.onReorderPage).toHaveBeenCalledWith('page-1', 1);

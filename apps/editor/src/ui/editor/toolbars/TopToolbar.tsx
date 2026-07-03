@@ -23,6 +23,7 @@ interface TopToolbarProps {
   canTranslateDeck?: boolean;
   onDelete?: (() => void) | undefined;
   onDuplicate?: (() => void) | undefined;
+  onImportPowerPoint?: (() => void) | undefined;
   onImportProject?: (() => void) | undefined;
   onImportRemoteMirror?: (() => void) | undefined;
   onMirrorNow?: (() => void) | undefined;
@@ -125,6 +126,7 @@ export function TopToolbar({
   canTranslateDeck = false,
   onDelete,
   onDuplicate,
+  onImportPowerPoint,
   onImportProject,
   onImportRemoteMirror,
   onMirrorNow,
@@ -189,6 +191,7 @@ export function TopToolbar({
     File: [
       { label: 'New Project', disabled: !onNewProject, onSelect: onNewProject },
       { label: 'Import Project', disabled: !onImportProject, onSelect: onImportProject },
+      { label: 'Import PowerPoint...', disabled: !onImportPowerPoint, onSelect: onImportPowerPoint },
       { label: 'Import Remote', disabled: !onImportRemoteMirror, onSelect: onImportRemoteMirror },
       { label: 'Share', disabled: !onShare, onSelect: triggerShare },
       { kind: 'separator', label: 'File storage actions' },

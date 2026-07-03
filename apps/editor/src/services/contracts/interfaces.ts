@@ -1,4 +1,5 @@
 import type { Asset, ProjectDocument } from '../../domain/documents/model';
+import type { PptxImportInput } from '../importing/pptx/pptxImportService';
 import type {
   GeneratedSlideElement,
   GeneratedSlideTask,
@@ -127,6 +128,10 @@ export interface ExportService {
   getPageImageFileName(project: ProjectDocument, pageId: string, extension: 'png' | 'jpeg'): string;
   getPdfFileName(project: ProjectDocument): string;
   downloadDataUrl(dataUrl: string, fileName: string): void;
+}
+
+export interface PresentationImportService {
+  importPowerPoint(input: PptxImportInput): Promise<ProjectDocument>;
 }
 
 export type ShareStatus = 'published' | 'copied' | 'syncing' | 'sync-failed';

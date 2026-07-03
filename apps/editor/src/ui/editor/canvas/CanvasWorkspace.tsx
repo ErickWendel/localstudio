@@ -45,6 +45,7 @@ interface CanvasWorkspaceProps {
   project: ProjectDocument;
   activePageId: string;
   selection: SelectionState;
+  canvasLabel?: string;
   slideFrameRef?: RefObject<HTMLDivElement | null>;
   stageRef?: RefObject<Konva.Stage | null>;
   presentationMode?: boolean;
@@ -128,6 +129,7 @@ export function CanvasWorkspace({
   project,
   activePageId,
   selection,
+  canvasLabel = 'Slide canvas',
   slideFrameRef,
   stageRef,
   presentationMode = false,
@@ -630,7 +632,7 @@ export function CanvasWorkspace({
     <div className="canvas-workspace">
       <div
         className="canvas-frame neon-border"
-        aria-label="Slide canvas"
+        aria-label={canvasLabel}
         ref={slideFrameRef}
         onPointerDown={(event) => {
           if (!isCropModeActive) return;
@@ -869,7 +871,7 @@ export function CanvasWorkspace({
                     fontStyle={element.fontWeight >= 700 ? 'bold' : 'normal'}
                     fill={element.fill}
                     align={element.align}
-                    lineHeight={0.9}
+                    lineHeight={1.05}
                     padding={TEXT_FRAME_PADDING * scaleY}
                     ref={nodeRef}
                     visible={editingTextId !== element.id}
@@ -1333,13 +1335,13 @@ function CanvasVideoElement({
       aria-label={assetName}
       autoPlay={autoplay}
       className="canvas-media-element"
-      controls={element.controls}
+      controls={interactive && element.controls}
       data-trim-end={element.trimEndSeconds ?? ''}
       data-trim-start={element.trimStartSeconds}
       loop={element.loop}
       muted={element.muted}
       playsInline
-      preload="metadata"
+      preload="auto"
       ref={videoRef}
       src={assetUrl}
       style={getMediaStyle(element, scale, interactive)}

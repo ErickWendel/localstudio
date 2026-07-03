@@ -3,6 +3,7 @@ import type Konva from 'konva';
 import type { AppServices } from '../../../app/composition';
 import type { ShareMetadata } from '../../../services/contracts/interfaces';
 import { editorAutomationController } from '../../../services/automation/editorAutomationController';
+import { loadPptxSampleImportInput } from '../../../services/importing/pptx/pptxSampleImport';
 import type { EditorAutomationDelegate } from '../../../services/automation/editorAutomationController';
 import { modelSetupService } from '../../../services/model-setup/modelSetupService';
 import {
@@ -10,10 +11,12 @@ import {
   type WebMcpDemoWindow,
 } from '../../../services/webmcp/webMcpToolAdapter';
 import { EditorFooter } from './EditorFooter';
+import { PresentationImportProgressOverlay } from './PresentationImportProgressOverlay';
 import { LeftToolPanel } from '../panels/LeftToolPanel';
 import { LocalProjectSetupPanel } from '../panels/LocalProjectSetupPanel';
 import { MirrorSettingsPanel } from '../panels/MirrorSettingsPanel';
 import { PagesPanel } from '../panels/PagesPanel';
+import { ProjectVideoPreloader } from '../media/ProjectVideoPreloader';
 import { PromptBar } from '../prompting/PromptBar';
 import { RemoteImportPanel } from '../panels/RemoteImportPanel';
 import { ScrollingCanvasWorkspace } from '../canvas/ScrollingCanvasWorkspace';
@@ -201,6 +204,14 @@ export function EditorShell({ services }: EditorShellProps) {
   }, [vm.automation]);
 
   useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('pptxSample') !== '1') return;
+    url.searchParams.delete('pptxSample');
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    void loadPptxSampleImportInput().then((input) => vm.importPowerPoint(input));
+  }, [vm]);
+
+  useEffect(() => {
     function handleCopy(event: ClipboardEvent) {
       if (isHistoryReadOnly) return;
       if (
@@ -350,6 +361,9 @@ export function EditorShell({ services }: EditorShellProps) {
               }
             : undefined
         }
+        onImportPowerPoint={() => {
+          void vm.importPowerPoint();
+        }}
         onMirrorNow={() => {
           vm.requestMirrorNow();
         }}
@@ -708,6 +722,10 @@ export function EditorShell({ services }: EditorShellProps) {
           }}
         />
       ) : null}
+      {vm.presentationImportProgress ? (
+        <PresentationImportProgressOverlay progress={vm.presentationImportProgress} />
+      ) : null}
+      <ProjectVideoPreloader project={vm.project} />
       <EditorFooter
         activePageIndex={activePageIndex}
         pageCount={vm.project.pages.length}

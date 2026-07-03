@@ -19,6 +19,7 @@ export interface ProjectDocument {
   elements: Record<string, DesignElement>;
   createdAt: string;
   updatedAt: string;
+  importWarnings?: ImportWarning[];
 }
 
 export interface Page {
@@ -37,12 +38,16 @@ export type PageBackground =
   | { type: 'color'; color: string }
   | { type: 'asset'; assetId: string; colorFallback: string };
 
-export type AnimationEffect = 'reveal';
+export type AnimationEffect = 'dissolve' | 'fade' | 'push' | 'reveal' | 'wipe';
+export type AnimationDirection = 'down' | 'left' | 'right' | 'up';
+export type ElementAnimationKind = 'build-in' | 'build-out' | 'emphasis';
 export type AnimationTrigger = 'on-click' | 'after-transition' | 'after-previous';
 
 export interface SlideTransition {
   effect: AnimationEffect;
   delayMs: number;
+  direction?: AnimationDirection;
+  durationMs?: number;
 }
 
 export interface ElementAnimationBuild {
@@ -51,6 +56,16 @@ export interface ElementAnimationBuild {
   effect: AnimationEffect;
   trigger: AnimationTrigger;
   delayMs: number;
+  direction?: AnimationDirection;
+  durationMs?: number;
+  kind?: ElementAnimationKind;
+}
+
+export interface ImportWarning {
+  code: string;
+  message: string;
+  pageId?: string;
+  severity: 'info' | 'warning';
 }
 
 export interface Asset {

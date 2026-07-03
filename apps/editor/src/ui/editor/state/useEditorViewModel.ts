@@ -34,6 +34,8 @@ import type {
   PromptApiAvailability,
   VersionHistoryEntry,
 } from '../../../services/contracts/interfaces';
+import type { PptxImportInput } from '../../../services/importing/pptx/pptxImportService';
+import { pptxImportLogger } from '../../../services/importing/pptx/pptxImportLogger';
 import { minioMirrorService } from '../../../services/mirror/minioMirrorService';
 import type { MinioMirrorConfig } from '../../../services/mirror/minioMirrorService';
 import { aiModelCatalog } from '../../../services/model-setup/aiModelCatalog';
@@ -94,6 +96,13 @@ interface PromptPreparationState extends ModelDownloadProgressDetails {
   status: 'idle' | 'downloading' | 'ready' | 'failed';
 }
 
+export interface PresentationImportProgressState {
+  detail: string;
+  progress: number;
+  stage: 'reading' | 'inspecting' | 'extracting-objects' | 'extracting-media' | 'mapping-animations' | 'opening';
+  title: string;
+}
+
 interface ElementClipboardState {
   assets: ProjectDocument['assets'];
   elements: DesignElement[];
@@ -118,6 +127,18 @@ export type RemoteImportStatus =
   | 'importing'
   | 'deleting'
   | 'failed';
+
+type WindowWithPowerPointPicker = Window &
+  typeof globalThis & {
+    showOpenFilePicker?: (options?: {
+      excludeAcceptAllOption?: boolean;
+      multiple?: boolean;
+      types?: Array<{
+        description: string;
+        accept: Record<string, string[]>;
+      }>;
+    }) => Promise<FileSystemFileHandle[]>;
+  };
 
 const IMAGE_EDITING_MODEL_REQUIRED_MESSAGE = 'You must download the image editing tools first.';
 const PROMPT_API_REQUIRED_MESSAGE = 'LLM model must be prepared before using prompt-to-slides.';
@@ -280,6 +301,62 @@ function waitForNextPaint() {
   });
 }
 
+function isDomError(error: unknown, name: string) {
+  return (
+    (error instanceof DOMException && error.name === name) ||
+    (typeof error === 'object' && error !== null && 'name' in error && error.name === name)
+  );
+}
+
+async function pickPowerPointImportInput(): Promise<PptxImportInput | null> {
+  if (typeof window === 'undefined') return null;
+  const pickerWindow = window as WindowWithPowerPointPicker;
+  if (pickerWindow.showOpenFilePicker) {
+    try {
+      pptxImportLogger.info('Opening PowerPoint file picker.');
+      const handles = await pickerWindow.showOpenFilePicker({
+        excludeAcceptAllOption: false,
+        multiple: false,
+        types: [
+          {
+            description: 'PowerPoint presentation',
+            accept: {
+              'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
+              'application/zip': ['.pptx'],
+            },
+          },
+        ],
+      });
+      const handle = handles[0];
+      if (!handle) return null;
+      pptxImportLogger.info('PowerPoint file handle selected.', { name: handle.name });
+      const file = await handle.getFile();
+      pptxImportLogger.info('PowerPoint file handle read.', {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+      });
+      return { file };
+    } catch (error) {
+      if (isDomError(error, 'AbortError')) {
+        pptxImportLogger.info('PowerPoint file picker was cancelled.');
+        return null;
+      }
+      pptxImportLogger.error('PowerPoint file picker failed.', error);
+      throw error;
+    }
+  }
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation';
+  const file = await new Promise<File | undefined>((resolve) => {
+    input.addEventListener('change', () => resolve(input.files?.[0]));
+    input.click();
+  });
+  if (file) return { file };
+  return null;
+}
+
 function getMinimumTextHeight(text: string, fontSize: number) {
   const lineCount = Math.max(1, text.split('\n').length);
   return Math.ceil(lineCount * fontSize * 1.08 + Math.max(12, fontSize * 0.18));
@@ -386,6 +463,9 @@ export function useEditorViewModel(services: AppServices) {
   const [modelStates, setModelStates] = useState<ModelState[]>([]);
   const [hasLoadedProject, setHasLoadedProject] = useState(!shouldRestoreStoredProject);
   const [persistenceEnabled, setPersistenceEnabled] = useState(shouldRestoreStoredProject);
+  const [presentationImportProgress, setPresentationImportProgress] = useState<
+    PresentationImportProgressState | undefined
+  >();
   const [hasPersistedLocalProject, setHasPersistedLocalProject] = useState(
     shouldRestoreStoredProject,
   );
@@ -530,6 +610,8 @@ export function useEditorViewModel(services: AppServices) {
     setActivePageId,
     setSelectedElementIds,
   });
+  const animationPreviewRef = useRef(animationPreview);
+  animationPreviewRef.current = animationPreview;
 
   useEffect(() => {
     async function refreshAiReadiness() {
@@ -557,6 +639,10 @@ export function useEditorViewModel(services: AppServices) {
       const isFullscreenActive = Boolean(document.fullscreenElement);
       setIsFullscreen(isFullscreenActive);
       if (wasFullscreenRef.current && !isFullscreenActive) {
+        const previewPageId = animationPreviewRef.current?.pageId ?? activePageIdRef.current;
+        if (previewPageId && projectRef.current.pages.some((page) => page.id === previewPageId)) {
+          setActivePageId(previewPageId);
+        }
         clearAnimationPreview();
         setSelectedElementIds([]);
       }
@@ -1583,6 +1669,82 @@ export function useEditorViewModel(services: AppServices) {
     }
   }
 
+  async function importPowerPoint(input?: PptxImportInput) {
+    try {
+      setPersistenceNotice(undefined);
+      const pptxInput = input ?? (await pickPowerPointImportInput());
+      if (!pptxInput) return;
+      setPresentationImportProgress({
+        detail: `Reading ${pptxInput.file.name}.`,
+        progress: 18,
+        stage: 'reading',
+        title: 'Reading PowerPoint package',
+      });
+      await waitForNextPaint();
+      setPresentationImportProgress({
+        detail: 'Inspecting slide order, dimensions, and package relationships.',
+        progress: 34,
+        stage: 'inspecting',
+        title: 'Inspecting PPTX structure',
+      });
+      await waitForNextPaint();
+      const importedProject = await services.presentationImportService.importPowerPoint(pptxInput);
+      setPresentationImportProgress({
+        detail: `Extracting text and image objects for ${importedProject.pages.length.toLocaleString()} slides.`,
+        progress: 58,
+        stage: 'extracting-objects',
+        title: 'Extracting text and images',
+      });
+      await waitForNextPaint();
+      setPresentationImportProgress({
+        detail: 'Linking original videos and GIFs from the PowerPoint package.',
+        progress: 72,
+        stage: 'extracting-media',
+        title: 'Extracting videos',
+      });
+      await waitForNextPaint();
+      setPresentationImportProgress({
+        detail: 'Mapping imported transitions and object builds into preview playback.',
+        progress: 84,
+        stage: 'mapping-animations',
+        title: 'Mapping animations',
+      });
+      await waitForNextPaint();
+      const normalizedProject = normalizeProjectDocument(importedProject);
+      setPresentationImportProgress({
+        detail: 'Opening the imported project in the editor.',
+        progress: 94,
+        stage: 'opening',
+        title: 'Opening deck',
+      });
+      await waitForNextPaint();
+      setProject(normalizedProject);
+      setActivePageId(normalizedProject.pages[0]?.id ?? '');
+      setPageLanguageCodes({});
+      const nextSelectedId = normalizedProject.pages[0]?.elementIds.at(-1);
+      setSelectedElementIds(nextSelectedId ? [nextSelectedId] : []);
+      setHistory({ past: [], future: [] });
+      setBackgroundSelectionMode(false);
+      setBackgroundSelectionNotice(undefined);
+      clearBackgroundPreview();
+      clearBackgroundPreparation();
+      clearBackgroundSelectionPoints();
+      skipNextProjectSaveRef.current = true;
+      setHasPersistedLocalProject(false);
+      setPersistenceEnabled(false);
+      lastVersionProjectRef.current = normalizedProject;
+      setLastEditedAt(normalizedProject.updatedAt);
+      setVersionHistoryEntries([]);
+      writeProjectNameToUrl(normalizedProject.name);
+      setPresentationImportProgress(undefined);
+    } catch (error) {
+      setPresentationImportProgress(undefined);
+      pptxImportLogger.error('PowerPoint import failed.', error);
+      const message = pptxImportLogger.describeError(error).message;
+      setPersistenceNotice(`PowerPoint import failed: ${message}`);
+    }
+  }
+
   function openSettings() {
     setSettingsOpen(true);
   }
@@ -1901,8 +2063,7 @@ export function useEditorViewModel(services: AppServices) {
     clearBackgroundPreparation();
     clearBackgroundSelectionPoints();
     setActivePageId(page.id);
-    const nextSelectedId = page.elementIds.at(-1);
-    setSelectedElementIds(nextSelectedId ? [nextSelectedId] : []);
+    setSelectedElementIds([]);
   }
 
   function updateElementFrame(elementId: string, patch: ElementFramePatch) {
@@ -3168,6 +3329,7 @@ export function useEditorViewModel(services: AppServices) {
     pagesPanelOpen,
     isFullscreen,
     persistenceEnabled,
+    presentationImportProgress,
     persistenceAttention,
     persistenceNotice,
     mirrorState,
@@ -3221,6 +3383,7 @@ export function useEditorViewModel(services: AppServices) {
     deleteRemoteMirrorProject,
     closeRemoteImport,
     importProject,
+    importPowerPoint,
     openVersionHistory,
     closeVersionHistory,
     selectVersion,

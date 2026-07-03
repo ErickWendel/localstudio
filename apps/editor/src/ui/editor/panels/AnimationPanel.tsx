@@ -47,6 +47,13 @@ const DEFAULT_SLIDE_TRANSITION: SlideTransition = {
 };
 
 const ANIMATION_BUILD_DRAG_TYPE = 'application/x-localstudio-animation-build-element-id';
+const ANIMATION_EFFECT_OPTIONS = [
+  { label: 'Reveal', value: 'reveal' },
+  { label: 'Fade', value: 'fade' },
+  { label: 'Dissolve', value: 'dissolve' },
+  { label: 'Push', value: 'push' },
+  { label: 'Wipe', value: 'wipe' },
+] as const;
 
 function getElementLabel(project: ProjectDocument, elementId: string) {
   const element = project.elements[elementId];
@@ -195,11 +202,18 @@ export function AnimationPanel({
                 onClearPageTransition?.();
                 return;
               }
-              onSetPageTransition?.(DEFAULT_SLIDE_TRANSITION);
+              onSetPageTransition?.({
+                ...DEFAULT_SLIDE_TRANSITION,
+                effect: event.target.value as SlideTransition['effect'],
+              });
             }}
           >
             <option value="none">None</option>
-            <option value="reveal">Reveal</option>
+            {ANIMATION_EFFECT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </label>
         <DurationField
@@ -208,8 +222,10 @@ export function AnimationPanel({
           valueMs={transition?.delayMs ?? DEFAULT_ANIMATION_DURATION_MS}
           onChange={(durationMs) => {
             onSetPageTransition?.({
-              effect: 'reveal',
+              effect: transition?.effect ?? 'reveal',
+              ...(transition?.direction ? { direction: transition.direction } : {}),
               delayMs: durationMs,
+              ...(transition?.durationMs !== undefined ? { durationMs: durationMs } : {}),
             });
           }}
         />
@@ -311,11 +327,18 @@ export function AnimationPanel({
                         onClearElementAnimationBuild?.(elementId);
                         return;
                       }
-                      onSetElementAnimationBuilds?.([elementId], { ...patch, effect: 'reveal' });
+                      onSetElementAnimationBuilds?.([elementId], {
+                        ...patch,
+                        effect: event.target.value as ElementAnimationPatch['effect'],
+                      });
                     }}
                   >
                     <option value="none">None</option>
-                    <option value="reveal">Reveal</option>
+                    {ANIMATION_EFFECT_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <label className="animation-field">

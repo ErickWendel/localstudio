@@ -862,6 +862,11 @@ class SetElementAnimationBuildsCommand implements EditorCommand {
             effect: this.patch.effect,
             trigger: this.patch.trigger,
             delayMs: Math.max(0, this.patch.delayMs),
+            ...(this.patch.direction ? { direction: this.patch.direction } : {}),
+            ...(this.patch.durationMs !== undefined
+              ? { durationMs: Math.max(0, this.patch.durationMs) }
+              : {}),
+            ...(this.patch.kind ? { kind: this.patch.kind } : {}),
           };
         });
         return { ...page, animationBuilds: [...retainedBuilds, ...nextBuilds] };

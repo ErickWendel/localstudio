@@ -8,6 +8,7 @@ describe('TopToolbar', () => {
   it('opens Stitch header menus and wires available actions', async () => {
     const user = userEvent.setup();
     const onShare = vi.fn();
+    const onImportPowerPoint = vi.fn();
     const onImportProject = vi.fn();
     const onImportRemoteMirror = vi.fn();
     const onMirrorNow = vi.fn();
@@ -22,6 +23,7 @@ describe('TopToolbar', () => {
         project={sampleProject.createSampleProject()}
         language="PT-BR"
         onShare={onShare}
+        onImportPowerPoint={onImportPowerPoint}
         onImportProject={onImportProject}
         onImportRemoteMirror={onImportRemoteMirror}
         onMirrorNow={onMirrorNow}
@@ -40,6 +42,9 @@ describe('TopToolbar', () => {
     await user.click(screen.getByRole('button', { name: 'File' }));
     await user.click(screen.getByRole('menuitem', { name: 'Import Project' }));
     expect(onImportProject).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Import PowerPoint...' }));
+    expect(onImportPowerPoint).toHaveBeenCalledTimes(1);
     await user.click(screen.getByRole('button', { name: 'File' }));
     await user.click(screen.getByRole('menuitem', { name: 'Import Remote' }));
     expect(onImportRemoteMirror).toHaveBeenCalledTimes(1);
