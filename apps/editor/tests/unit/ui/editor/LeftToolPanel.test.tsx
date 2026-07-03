@@ -157,11 +157,47 @@ describe('LeftToolPanel', () => {
     const project = sampleProject.createSampleProject();
     project.pages[0] = {
       ...project.pages[0]!,
+      elementIds: [...project.pages[0]!.elementIds, 'shape-line'],
       transition: { effect: 'reveal', delayMs: 0 },
       animationBuilds: [
-        { id: 'build-image-hero', elementId: 'image-hero', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
-        { id: 'build-text-title', elementId: 'text-title', effect: 'reveal', trigger: 'after-transition', delayMs: 0 },
+        {
+          id: 'build-image-hero',
+          elementId: 'image-hero',
+          effect: 'reveal',
+          trigger: 'on-click',
+          delayMs: 0,
+        },
+        {
+          id: 'build-text-title',
+          elementId: 'text-title',
+          effect: 'reveal',
+          trigger: 'after-transition',
+          delayMs: 0,
+        },
+        {
+          id: 'build-shape-line',
+          elementId: 'shape-line',
+          effect: 'line-draw',
+          trigger: 'after-previous',
+          delayMs: 0,
+          lineDrawDirection: 'start-to-end',
+        },
       ],
+    };
+    project.elements['shape-line'] = {
+      id: 'shape-line',
+      type: 'shape',
+      shape: 'line',
+      x: 120,
+      y: 120,
+      width: 500,
+      height: 140,
+      rotation: 0,
+      locked: false,
+      visible: true,
+      opacity: 1,
+      stroke: '#37FD76',
+      strokeWidth: 8,
     };
 
     render(
@@ -194,8 +230,10 @@ describe('LeftToolPanel', () => {
     expect(screen.getByText('Object Animations')).toBeInTheDocument();
     expect(screen.getByText('Image')).toBeInTheDocument();
     expect(screen.getByText('AI Design Revolution')).toBeInTheDocument();
+    expect(screen.getByText('Rectangle')).toBeInTheDocument();
     expect(screen.getByLabelText('Build 1')).toBeInTheDocument();
     expect(screen.getByLabelText('Build 2')).toBeInTheDocument();
+    expect(screen.getByLabelText('Build 3')).toBeInTheDocument();
     expect(screen.getByRole('listitem', { name: 'Build 2: AI Design Revolution' })).toHaveAttribute(
       'aria-current',
       'step',
@@ -232,20 +270,70 @@ describe('LeftToolPanel', () => {
     );
     expect(onReorderElementAnimationBuild).toHaveBeenCalledWith('text-title', 1);
 
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Slide transition effect' }), 'reveal');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Slide transition effect' }), 'none');
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Slide transition effect' }),
+      'reveal',
+    );
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Slide transition effect' }),
+      'none',
+    );
     await user.selectOptions(screen.getByRole('combobox', { name: 'Effect for Image' }), 'none');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Start for AI Design Revolution' }), 'after-previous');
-    await user.click(screen.getByRole('button', { name: 'Move AI Design Revolution animation up' }));
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Effect for AI Design Revolution' }),
+      'keyboard-typing',
+    );
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Effect for Rectangle' }),
+      'dissolve',
+    );
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Effect for Rectangle' }),
+      'line-draw',
+    );
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Line draw direction for Rectangle' }),
+      'middle-to-ends',
+    );
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Start for AI Design Revolution' }),
+      'after-previous',
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Move AI Design Revolution animation up' }),
+    );
     await user.click(screen.getByRole('button', { name: 'Play animation preview' }));
 
     expect(onSetPageTransition).toHaveBeenCalledWith({ effect: 'reveal', delayMs: 500 });
     expect(onClearPageTransition).toHaveBeenCalledTimes(1);
     expect(onClearElementAnimationBuild).toHaveBeenCalledWith('image-hero');
-    expect(onSetElementAnimationBuilds).toHaveBeenCalledWith(
-      ['text-title'],
-      { effect: 'reveal', trigger: 'after-previous', delayMs: 0 },
-    );
+    expect(onSetElementAnimationBuilds).toHaveBeenCalledWith(['text-title'], {
+      effect: 'keyboard-typing',
+      trigger: 'after-transition',
+      delayMs: 0,
+    });
+    expect(onSetElementAnimationBuilds).toHaveBeenCalledWith(['shape-line'], {
+      effect: 'dissolve',
+      trigger: 'after-previous',
+      delayMs: 0,
+    });
+    expect(onSetElementAnimationBuilds).toHaveBeenCalledWith(['shape-line'], {
+      effect: 'line-draw',
+      trigger: 'after-previous',
+      delayMs: 0,
+      lineDrawDirection: 'start-to-end',
+    });
+    expect(onSetElementAnimationBuilds).toHaveBeenCalledWith(['shape-line'], {
+      effect: 'line-draw',
+      trigger: 'after-previous',
+      delayMs: 0,
+      lineDrawDirection: 'middle-to-ends',
+    });
+    expect(onSetElementAnimationBuilds).toHaveBeenCalledWith(['text-title'], {
+      effect: 'reveal',
+      trigger: 'after-previous',
+      delayMs: 0,
+    });
     expect(onReorderElementAnimationBuild).toHaveBeenCalledWith('text-title', 0);
     expect(onPlayAnimationPreview).toHaveBeenCalledTimes(1);
   });
@@ -273,11 +361,43 @@ describe('LeftToolPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Add animation' }));
     await user.click(screen.getByRole('button', { name: 'Play animation preview' }));
 
-    expect(onSetElementAnimationBuilds).toHaveBeenCalledWith(
-      ['text-title', 'image-hero'],
-      { effect: 'reveal', trigger: 'on-click', delayMs: 500 },
-    );
+    expect(onSetElementAnimationBuilds).toHaveBeenCalledWith(['text-title', 'image-hero'], {
+      effect: 'reveal',
+      trigger: 'on-click',
+      delayMs: 500,
+    });
     expect(onPlayAnimationPreview).toHaveBeenCalledTimes(1);
+  });
+
+  it('chooses keyboard typing before adding a selected text animation', async () => {
+    const user = userEvent.setup();
+    const onSetElementAnimationBuilds = vi.fn();
+
+    render(
+      <LeftToolPanel
+        activeTab="animations"
+        open
+        onTabChange={vi.fn()}
+        project={sampleProject.createSampleProject()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['text-title'] }}
+        modelStates={modelStates}
+        onSetElementAnimationBuilds={onSetElementAnimationBuilds}
+      />,
+    );
+
+    expect(screen.getByText('No object animations on this slide.')).toBeInTheDocument();
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'New object animation effect' }),
+      'keyboard-typing',
+    );
+    await user.click(screen.getByRole('button', { name: 'Add animation' }));
+
+    expect(onSetElementAnimationBuilds).toHaveBeenCalledWith(['text-title'], {
+      effect: 'keyboard-typing',
+      trigger: 'on-click',
+      delayMs: 500,
+    });
   });
 
   it('opens the Elements menu and inserts a selected shape', async () => {

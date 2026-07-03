@@ -33,6 +33,26 @@ function createProjectWithSelectedShape(): ProjectDocument {
   };
 }
 
+function createProjectWithSelectedLine(): ProjectDocument {
+  const project = createProjectWithSelectedShape();
+  const shape = project.elements['shape-test'];
+  if (shape?.type !== 'shape') return project;
+  const { fill, ...lineShape } = shape;
+  void fill;
+  return {
+    ...project,
+    elements: {
+      ...project.elements,
+      'shape-test': {
+        ...lineShape,
+        shape: 'line',
+        stroke: '#37FD76',
+        strokeWidth: 4,
+      },
+    },
+  };
+}
+
 describe('DesignPanel', () => {
   it('updates selected shape fill and border modes', async () => {
     const user = userEvent.setup();
@@ -56,6 +76,30 @@ describe('DesignPanel', () => {
     expect(onUpdateElementStyle).toHaveBeenCalledWith('shape-test', {
       stroke: '#37FD76',
       strokeWidth: 2,
+    });
+  });
+
+  it('updates selected line endpoint styles', async () => {
+    const user = userEvent.setup();
+    const onUpdateElementStyle = vi.fn();
+
+    render(
+      <DesignPanel
+        project={createProjectWithSelectedLine()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['shape-test'] }}
+        onUpdateElementStyle={onUpdateElementStyle}
+      />,
+    );
+
+    await user.selectOptions(screen.getByLabelText('Selected shape start endpoint'), 'circle');
+    await user.selectOptions(screen.getByLabelText('Selected shape end endpoint'), 'open-arrow');
+
+    expect(onUpdateElementStyle).toHaveBeenCalledWith('shape-test', {
+      startEndpoint: 'circle',
+    });
+    expect(onUpdateElementStyle).toHaveBeenCalledWith('shape-test', {
+      endEndpoint: 'open-arrow',
     });
   });
 });

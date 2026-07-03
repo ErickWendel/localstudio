@@ -584,6 +584,19 @@ describe('CanvasWorkspace', () => {
     expect(container.querySelector('img[aria-label="Animated loop"]')).toBeInTheDocument();
   });
 
+  it('shows the object animation toolbar action for selected media elements', () => {
+    const project = createMediaProject();
+    render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['video-demo'] }}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Animate' })).toBeInTheDocument();
+  });
+
   it('keeps selected GIF overlays transparent to pointer input so the canvas object can move', () => {
     const project = createMediaProject();
     const { container } = render(
