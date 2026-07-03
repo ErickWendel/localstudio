@@ -3,8 +3,30 @@ name: CI
 on:
   push:
     branches: [main]
+    paths:
+      - '.github/workflows/ci.yml'
+      - 'apps/**'
+      - 'packages/**'
+      - 'scripts/**'
+      - 'eslint.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'prettier.config.cjs'
+      - 'tsconfig.json'
+      - '!**/*.md'
   pull_request:
     branches: [main]
+    paths:
+      - '.github/workflows/ci.yml'
+      - 'apps/**'
+      - 'packages/**'
+      - 'scripts/**'
+      - 'eslint.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'prettier.config.cjs'
+      - 'tsconfig.json'
+      - '!**/*.md'
   workflow_dispatch:
 
 concurrency:
