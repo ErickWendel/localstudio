@@ -1406,6 +1406,11 @@ export function useEditorViewModel(services: AppServices) {
       return;
     }
 
+    if (services.persistenceMode === 'opfs') {
+      void reenablePersistence();
+      return;
+    }
+
     setLocalProjectSetupOpen(true);
   }
 

@@ -46,6 +46,7 @@ export function EditorShell({ services }: EditorShellProps) {
   );
   const publicSharingAvailable = vm.mirrorState.enabled && vm.mirrorState.status === 'synced';
   const publicSharingUnavailableReason = 'Public links cannot be created without remote storage.';
+  const hasDirectoryPersistence = services.persistenceMode === 'directory';
 
   function exportCurrentPageAsPng() {
     const dataUrl = stageRef.current?.toDataURL({ mimeType: 'image/png', pixelRatio: 2 });
@@ -336,14 +337,19 @@ export function EditorShell({ services }: EditorShellProps) {
         saveAnimationKey={vm.saveAnimationKey}
         canTranslateDeck={vm.canTranslateDeck}
         persistenceAvailable={services.persistenceAvailable}
+        persistenceMode={services.persistenceMode}
         onDelete={isHistoryReadOnly ? undefined : vm.deleteSelectedElement}
         onDuplicate={isHistoryReadOnly ? undefined : vm.duplicateSelectedElement}
         onImportRemoteMirror={() => {
           void vm.importRemoteMirror();
         }}
-        onImportProject={() => {
-          void vm.importProject();
-        }}
+        onImportProject={
+          hasDirectoryPersistence
+            ? () => {
+                void vm.importProject();
+              }
+            : undefined
+        }
         onMirrorNow={() => {
           vm.requestMirrorNow();
         }}
@@ -370,9 +376,13 @@ export function EditorShell({ services }: EditorShellProps) {
         onSaveLocal={() => {
           void vm.saveLocalNow();
         }}
-        onSaveLocalAs={() => {
-          void vm.saveLocalAs();
-        }}
+        onSaveLocalAs={
+          hasDirectoryPersistence
+            ? () => {
+                void vm.saveLocalAs();
+              }
+            : undefined
+        }
         onTranslateDeck={
           isHistoryReadOnly
             ? undefined

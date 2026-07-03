@@ -2,8 +2,14 @@ import { vi } from 'vitest';
 import { localSetupService } from '../../../src/services/browser/localSetupService';
 
 describe('localSetupService.BrowserLocalSetupService', () => {
+  const originalStorage = navigator.storage;
+
   afterEach(() => {
     vi.unstubAllGlobals();
+    Object.defineProperty(navigator, 'storage', {
+      configurable: true,
+      value: originalStorage,
+    });
     Object.defineProperty(navigator, 'gpu', {
       configurable: true,
       value: undefined,
@@ -29,6 +35,10 @@ describe('localSetupService.BrowserLocalSetupService', () => {
   it('reports missing browser capabilities as unavailable', async () => {
     vi.stubGlobal('showDirectoryPicker', undefined);
     vi.stubGlobal('Translator', undefined);
+    Object.defineProperty(navigator, 'storage', {
+      configurable: true,
+      value: undefined,
+    });
     const service = new localSetupService.BrowserLocalSetupService();
 
     const state = await service.checkReadiness();
@@ -36,6 +46,21 @@ describe('localSetupService.BrowserLocalSetupService', () => {
     expect(state.fileSystem.status).toBe('unavailable');
     expect(state.chromeTranslation.status).toBe('unavailable');
     expect(state.chromeTranslation.detail).toBe('No compatible local AI provider was found in this browser.');
+  });
+
+  it('reports OPFS browser storage as ready when folder picking is unavailable', async () => {
+    vi.stubGlobal('showDirectoryPicker', undefined);
+    vi.stubGlobal('Translator', undefined);
+    Object.defineProperty(navigator, 'storage', {
+      configurable: true,
+      value: { getDirectory: vi.fn() },
+    });
+    const service = new localSetupService.BrowserLocalSetupService();
+
+    const state = await service.checkReadiness();
+
+    expect(state.fileSystem.status).toBe('ready');
+    expect(state.fileSystem.detail).toBe('Browser-private project storage is supported.');
   });
 
   it('uses WebGPU provider compatibility when Chrome AI needs setup', async () => {
