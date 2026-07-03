@@ -1,4 +1,11 @@
-import { forwardRef, type ComponentProps, type ReactNode, useEffect, useImperativeHandle, useRef } from 'react';
+import {
+  forwardRef,
+  type ComponentProps,
+  type ReactNode,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+} from 'react';
 import type { ElementStylePatch } from '../../../domain/commands/elements/basicCommands';
 import { CanvasWorkspace } from './CanvasWorkspace';
 import { TextSelectionToolbar } from '../toolbars/TextSelectionToolbar';
@@ -19,167 +26,179 @@ interface ScrollingCanvasWorkspaceProps extends CanvasWorkspaceProps {
   onUpdateElementStyle?: ((elementId: string, patch: ElementStylePatch) => void) | undefined;
 }
 
-export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanvasWorkspaceProps>(function ScrollingCanvasWorkspace(
-  {
-    activePageId,
-    canTranslateCurrentSlide,
-    children,
-    onActivePageFromScroll,
-    onAddPage,
-    onDeletePage,
-    onDuplicatePage,
-    onRenamePage,
-    onReorderPage,
-    onSetPageVisibility,
-    onTranslatePage,
-    onUpdateElementStyle,
-    project,
-    ...canvasProps
-  },
-  ref,
-) {
-  const pageRefs = useRef(new Map<string, HTMLElement>());
-  const programmaticScrollReleaseRef = useRef<number | undefined>(undefined);
-  const programmaticScrollRef = useRef(false);
-  const scrollerRef = useRef<HTMLDivElement>(null);
-  const selectedElement = project.elements[canvasProps.selection.elementIds[0] ?? ''];
-  const showTextToolbar =
-    !canvasProps.presentationMode &&
-    selectedElement?.type === 'text' &&
-    canvasProps.selection.elementIds.length === 1;
-  const textToolbarDisabled =
-    Boolean(canvasProps.isTranslating) ||
-    Boolean(selectedElement?.type === 'text' && canvasProps.processingElementIds?.includes(selectedElement.id));
-  const showPageControls = !canvasProps.presentationMode;
-  useImperativeHandle(ref, () => scrollerRef.current as HTMLDivElement, []);
+export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanvasWorkspaceProps>(
+  function ScrollingCanvasWorkspace(
+    {
+      activePageId,
+      canTranslateCurrentSlide,
+      children,
+      onActivePageFromScroll,
+      onAddPage,
+      onDeletePage,
+      onDuplicatePage,
+      onRenamePage,
+      onReorderPage,
+      onSetPageVisibility,
+      onTranslatePage,
+      onUpdateElementStyle,
+      project,
+      ...canvasProps
+    },
+    ref,
+  ) {
+    const pageRefs = useRef(new Map<string, HTMLElement>());
+    const programmaticScrollReleaseRef = useRef<number | undefined>(undefined);
+    const programmaticScrollRef = useRef(false);
+    const scrollerRef = useRef<HTMLDivElement>(null);
+    const selectedElement = project.elements[canvasProps.selection.elementIds[0] ?? ''];
+    const showTextToolbar =
+      !canvasProps.presentationMode &&
+      selectedElement?.type === 'text' &&
+      canvasProps.selection.elementIds.length === 1;
+    const textToolbarDisabled =
+      Boolean(canvasProps.isTranslating) ||
+      Boolean(
+        selectedElement?.type === 'text' &&
+        canvasProps.processingElementIds?.includes(selectedElement.id),
+      );
+    const showPageControls = !canvasProps.presentationMode;
+    useImperativeHandle(ref, () => scrollerRef.current as HTMLDivElement, []);
 
-  useEffect(() => {
-    const activePageElement = pageRefs.current.get(activePageId);
-    if (!activePageElement?.scrollIntoView) return;
-    programmaticScrollRef.current = true;
-    if (programmaticScrollReleaseRef.current !== undefined) {
-      window.clearTimeout(programmaticScrollReleaseRef.current);
-    }
-    activePageElement.scrollIntoView({ block: 'start', behavior: 'auto' });
-    programmaticScrollReleaseRef.current = window.setTimeout(() => {
-      programmaticScrollRef.current = false;
-      programmaticScrollReleaseRef.current = undefined;
-    }, 120);
-  }, [activePageId, project.pages.length]);
-
-  useEffect(
-    () => () => {
+    useEffect(() => {
+      const activePageElement = pageRefs.current.get(activePageId);
+      if (!activePageElement?.scrollIntoView) return;
+      programmaticScrollRef.current = true;
       if (programmaticScrollReleaseRef.current !== undefined) {
         window.clearTimeout(programmaticScrollReleaseRef.current);
       }
-    },
-    [],
-  );
+      activePageElement.scrollIntoView({ block: 'start', behavior: 'auto' });
+      programmaticScrollReleaseRef.current = window.setTimeout(() => {
+        programmaticScrollRef.current = false;
+        programmaticScrollReleaseRef.current = undefined;
+      }, 120);
+    }, [activePageId, project.pages.length]);
 
-  function updateActivePageFromScroll() {
-    if (!onActivePageFromScroll) return;
-    if (programmaticScrollRef.current) return;
-    const scrollerRect = scrollerRef.current?.getBoundingClientRect();
-    const entries = Array.from(pageRefs.current.entries());
-    if (entries.length === 0) return;
-    const viewportCenter = scrollerRect ? scrollerRect.top + scrollerRect.height / 2 : window.innerHeight / 2;
-    const closest = entries
-      .map(([pageId, element]) => {
-        const rect = element.getBoundingClientRect();
-        return { pageId, distance: Math.abs(rect.top + rect.height / 2 - viewportCenter) };
-      })
-      .sort((a, b) => a.distance - b.distance)[0];
-    if (closest && closest.pageId !== activePageId) onActivePageFromScroll(closest.pageId);
-  }
+    useEffect(
+      () => () => {
+        if (programmaticScrollReleaseRef.current !== undefined) {
+          window.clearTimeout(programmaticScrollReleaseRef.current);
+        }
+      },
+      [],
+    );
 
-  return (
-    <div
-      className="scrolling-canvas-workspace"
-      aria-label="Scrollable slide canvases"
-      ref={scrollerRef}
-      onScroll={updateActivePageFromScroll}
-    >
-      {showTextToolbar && selectedElement?.type === 'text' ? (
-        <div className="scrolling-text-toolbar-shell" data-testid="sticky-text-selection-toolbar">
-          <TextSelectionToolbar
-            element={selectedElement}
-            canTranslateSelection={Boolean(canvasProps.canTranslateSelection)}
-            disabled={textToolbarDisabled}
-            {...(canvasProps.onTranslateSelectedText ? { onTranslateSelectedText: canvasProps.onTranslateSelectedText } : {})}
-            {...(onUpdateElementStyle ? { onUpdateElementStyle } : {})}
-          />
-        </div>
-      ) : null}
-      {project.pages.map((page, index) => {
-        const isActive = page.id === activePageId;
-        const visible = page.visible ?? true;
-        return (
-          <section
-            className={isActive ? 'scroll-page scroll-page-active' : 'scroll-page'}
-            data-page-id={page.id}
-            key={page.id}
-            ref={(element) => {
-              if (element) {
-                pageRefs.current.set(page.id, element);
-              } else {
-                pageRefs.current.delete(page.id);
-              }
-            }}
-          >
-            <PageHeader
-              canDelete={project.pages.length > 1}
-              canMoveDown={index < project.pages.length - 1}
-              canMoveUp={index > 0}
-              canTranslate={Boolean(canTranslateCurrentSlide)}
-              index={index}
-              name={page.name}
-              pageId={page.id}
-              visible={visible}
-              {...(onAddPage ? { onAddPage } : {})}
-              {...(onDeletePage ? { onDeletePage } : {})}
-              {...(onDuplicatePage ? { onDuplicatePage } : {})}
-              {...(onRenamePage ? { onRenamePage } : {})}
-              {...(onReorderPage ? { onReorderPage } : {})}
-              {...(onSetPageVisibility ? { onSetPageVisibility } : {})}
-              {...(onTranslatePage ? { onTranslatePage } : {})}
+    function updateActivePageFromScroll() {
+      if (!onActivePageFromScroll) return;
+      if (programmaticScrollRef.current) return;
+      const scrollerRect = scrollerRef.current?.getBoundingClientRect();
+      const entries = Array.from(pageRefs.current.entries());
+      if (entries.length === 0) return;
+      const viewportCenter = scrollerRect
+        ? scrollerRect.top + scrollerRect.height / 2
+        : window.innerHeight / 2;
+      const closest = entries
+        .map(([pageId, element]) => {
+          const rect = element.getBoundingClientRect();
+          return { pageId, distance: Math.abs(rect.top + rect.height / 2 - viewportCenter) };
+        })
+        .sort((a, b) => a.distance - b.distance)[0];
+      if (closest && closest.pageId !== activePageId) onActivePageFromScroll(closest.pageId);
+    }
+
+    return (
+      <div
+        className="scrolling-canvas-workspace"
+        aria-label="Scrollable slide canvases"
+        ref={scrollerRef}
+        onScroll={updateActivePageFromScroll}
+      >
+        {showTextToolbar && selectedElement?.type === 'text' ? (
+          <div className="scrolling-text-toolbar-shell" data-testid="sticky-text-selection-toolbar">
+            <TextSelectionToolbar
+              element={selectedElement}
+              canTranslateSelection={Boolean(canvasProps.canTranslateSelection)}
+              disabled={textToolbarDisabled}
+              {...(canvasProps.onOpenAnimations
+                ? { onOpenAnimations: canvasProps.onOpenAnimations }
+                : {})}
+              {...(canvasProps.onTranslateSelectedText
+                ? { onTranslateSelectedText: canvasProps.onTranslateSelectedText }
+                : {})}
+              {...(onUpdateElementStyle ? { onUpdateElementStyle } : {})}
             />
-            {isActive ? (
-              <CanvasWorkspace
-                {...canvasProps}
-                activePageId={activePageId}
-                project={project}
+          </div>
+        ) : null}
+        {project.pages.map((page, index) => {
+          const isActive = page.id === activePageId;
+          const visible = page.visible ?? true;
+          return (
+            <section
+              className={isActive ? 'scroll-page scroll-page-active' : 'scroll-page'}
+              data-page-id={page.id}
+              key={page.id}
+              ref={(element) => {
+                if (element) {
+                  pageRefs.current.set(page.id, element);
+                } else {
+                  pageRefs.current.delete(page.id);
+                }
+              }}
+            >
+              <PageHeader
+                canDelete={project.pages.length > 1}
+                canMoveDown={index < project.pages.length - 1}
+                canMoveUp={index > 0}
+                canTranslate={Boolean(canTranslateCurrentSlide)}
+                index={index}
+                name={page.name}
+                pageId={page.id}
+                visible={visible}
+                {...(onAddPage ? { onAddPage } : {})}
+                {...(onDeletePage ? { onDeletePage } : {})}
+                {...(onDuplicatePage ? { onDuplicatePage } : {})}
+                {...(onRenamePage ? { onRenamePage } : {})}
+                {...(onReorderPage ? { onReorderPage } : {})}
+                {...(onSetPageVisibility ? { onSetPageVisibility } : {})}
+                {...(onTranslatePage ? { onTranslatePage } : {})}
               />
-            ) : (
-              <button
-                className={visible ? 'scroll-page-placeholder' : 'scroll-page-placeholder scroll-page-placeholder-hidden'}
-                type="button"
-                aria-label={`Activate ${page.name}`}
-                onClick={() => {
-                  onActivePageFromScroll?.(page.id);
-                }}
-              >
-                <span>{visible ? page.name : `${page.name} hidden`}</span>
-              </button>
-            )}
-            {showPageControls && onAddPage ? (
-              <button
-                aria-label={`Add page after ${page.name}`}
-                className="scroll-page-insert"
-                type="button"
-                onClick={() => onAddPage(page.id)}
-              >
-                <span className="material-symbols-outlined" aria-hidden="true">
-                  add
-                </span>
-              </button>
-            ) : null}
-          </section>
-        );
-      })}
-      {children}
-    </div>
-  );
-});
+              {isActive ? (
+                <CanvasWorkspace {...canvasProps} activePageId={activePageId} project={project} />
+              ) : (
+                <button
+                  className={
+                    visible
+                      ? 'scroll-page-placeholder'
+                      : 'scroll-page-placeholder scroll-page-placeholder-hidden'
+                  }
+                  type="button"
+                  aria-label={`Activate ${page.name}`}
+                  onClick={() => {
+                    onActivePageFromScroll?.(page.id);
+                  }}
+                >
+                  <span>{visible ? page.name : `${page.name} hidden`}</span>
+                </button>
+              )}
+              {showPageControls && onAddPage ? (
+                <button
+                  aria-label={`Add page after ${page.name}`}
+                  className="scroll-page-insert"
+                  type="button"
+                  onClick={() => onAddPage(page.id)}
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    add
+                  </span>
+                </button>
+              ) : null}
+            </section>
+          );
+        })}
+        {children}
+      </div>
+    );
+  },
+);
 
 interface PageHeaderProps {
   canDelete: boolean;
@@ -230,13 +249,46 @@ function PageHeader({
         Page {index + 1} - {name}
       </button>
       <div className="scroll-page-actions" aria-label={`${name} page actions`}>
-        <IconAction disabled={!canMoveUp} label={`Move ${name} up`} icon="keyboard_arrow_up" onClick={() => onReorderPage?.(pageId, index - 1)} />
-        <IconAction disabled={!canMoveDown} label={`Move ${name} down`} icon="keyboard_arrow_down" onClick={() => onReorderPage?.(pageId, index + 1)} />
-        <IconAction label={visible ? `Hide ${name}` : `Show ${name}`} icon={visible ? 'visibility_off' : 'visibility'} onClick={() => onSetPageVisibility?.(pageId, !visible)} />
-        <IconAction label={`Duplicate ${name}`} icon="content_copy" onClick={() => onDuplicatePage?.(pageId)} />
-        <IconAction disabled={!canTranslate} label={`Translate ${name}`} icon="translate" onClick={() => onTranslatePage?.(pageId)} />
-        <IconAction disabled={!canDelete} label={`Delete ${name}`} icon="delete" danger onClick={() => onDeletePage?.(pageId)} />
-        <IconAction label="Add page" icon="add" {...(onAddPage ? { onClick: () => onAddPage(pageId) } : {})} />
+        <IconAction
+          disabled={!canMoveUp}
+          label={`Move ${name} up`}
+          icon="keyboard_arrow_up"
+          onClick={() => onReorderPage?.(pageId, index - 1)}
+        />
+        <IconAction
+          disabled={!canMoveDown}
+          label={`Move ${name} down`}
+          icon="keyboard_arrow_down"
+          onClick={() => onReorderPage?.(pageId, index + 1)}
+        />
+        <IconAction
+          label={visible ? `Hide ${name}` : `Show ${name}`}
+          icon={visible ? 'visibility_off' : 'visibility'}
+          onClick={() => onSetPageVisibility?.(pageId, !visible)}
+        />
+        <IconAction
+          label={`Duplicate ${name}`}
+          icon="content_copy"
+          onClick={() => onDuplicatePage?.(pageId)}
+        />
+        <IconAction
+          disabled={!canTranslate}
+          label={`Translate ${name}`}
+          icon="translate"
+          onClick={() => onTranslatePage?.(pageId)}
+        />
+        <IconAction
+          disabled={!canDelete}
+          label={`Delete ${name}`}
+          icon="delete"
+          danger
+          onClick={() => onDeletePage?.(pageId)}
+        />
+        <IconAction
+          label="Add page"
+          icon="add"
+          {...(onAddPage ? { onClick: () => onAddPage(pageId) } : {})}
+        />
       </div>
     </header>
   );
