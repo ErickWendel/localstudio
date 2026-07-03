@@ -3,6 +3,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react';
@@ -979,9 +980,7 @@ export function CanvasWorkspace({
           animationPreview?.pageId === activePageId ? animationPreview.phase : 'idle'
         }
         data-animation-preview-waiting={animationPreview?.waitingForClick ? 'true' : 'false'}
-        style={{
-          transform: `scale(${zoomPercent / 100})`,
-        }}
+        style={{ '--canvas-zoom': `${zoomPercent / 100}` } as CSSProperties}
       >
         <div className="canvas-artboard" ref={artboardRef} style={{ background: pageBackground }}>
           {showEditorOverlays &&
@@ -1448,7 +1447,10 @@ export function CanvasWorkspace({
             </button>
           </div>
         ) : null}
-        {showEditorOverlays && hasSelection && selectedElement ? (
+        {showEditorOverlays &&
+        hasSelection &&
+        selectedElement &&
+        selectedElement.type !== 'text' ? (
           <FloatingSelectionToolbar
             elementType={selectedElement.type}
             onAlignCenter={onAlignSelectedElement}

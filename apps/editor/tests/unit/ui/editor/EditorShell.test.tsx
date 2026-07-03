@@ -524,6 +524,33 @@ describe('EditorShell', () => {
     expect(screen.getByRole('tab', { name: 'Layout' })).toHaveAttribute('aria-selected', 'true');
   });
 
+  it('keeps pages and tool panels mutually exclusive', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Toggle pages panel' }));
+    expect(screen.getByLabelText('Pages')).toBeInTheDocument();
+
+    await openLeftTab(user, 'Layout');
+
+    expect(screen.getByText('4 layers on current page')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Pages')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Toggle pages panel' }));
+
+    expect(screen.getByLabelText('Pages')).toBeInTheDocument();
+    expect(screen.queryByText('4 layers on current page')).not.toBeInTheDocument();
+  });
+
+  it('marks the workspace as zoomed out when the user scales below 100%', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Zoom Out' }));
+
+    expect(screen.getByLabelText('Canvas workspace')).toHaveClass('workspace-column-zoomed-out');
+  });
+
   it('undoes and redoes editor mutations from the toolbar', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
@@ -840,9 +867,11 @@ describe('EditorShell', () => {
     });
 
     await user.click(await screen.findByRole('button', { name: 'Mirror settings' }));
-    await user.click(within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('button', {
-      name: 'Mirror settings',
-    }));
+    await user.click(
+      within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('button', {
+        name: 'Mirror settings',
+      }),
+    );
     await user.click(screen.getByRole('button', { name: 'Disable mirroring' }));
 
     expect(screen.getByRole('button', { name: 'Mirror disabled' })).toHaveClass('mirror-disabled');

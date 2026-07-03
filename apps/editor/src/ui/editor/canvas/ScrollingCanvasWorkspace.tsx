@@ -1,6 +1,7 @@
 import {
   forwardRef,
   type ComponentProps,
+  type CSSProperties,
   type ReactNode,
   useEffect,
   useImperativeHandle,
@@ -110,6 +111,7 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
         className="scrolling-canvas-workspace"
         aria-label="Scrollable slide canvases"
         ref={scrollerRef}
+        style={{ '--canvas-zoom': `${(canvasProps.zoomPercent ?? 100) / 100}` } as CSSProperties}
         onScroll={updateActivePageFromScroll}
       >
         {showTextToolbar && selectedElement?.type === 'text' ? (

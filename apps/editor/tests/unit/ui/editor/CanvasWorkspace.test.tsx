@@ -115,6 +115,22 @@ describe('CanvasWorkspace', () => {
     expect(screen.getByRole('button', { name: 'Animate' })).toBeInTheDocument();
   });
 
+  it('uses layout sizing instead of transform scaling for zoom', () => {
+    render(
+      <CanvasWorkspace
+        project={sampleProject.createSampleProject()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        zoomPercent={50}
+      />,
+    );
+
+    const canvasFrame = screen.getByLabelText('Slide canvas');
+
+    expect(canvasFrame).not.toHaveStyle({ transform: 'scale(0.5)' });
+    expect(canvasFrame).toHaveStyle({ '--canvas-zoom': '0.5' });
+  });
+
   it('renders every supported shape catalog item without crashing', () => {
     const project = sampleProject.createSampleProject();
     const shapes = Object.fromEntries(
@@ -568,19 +584,9 @@ describe('CanvasWorkspace', () => {
     expect(container.querySelector('img[aria-label="Animated loop"]')).toBeInTheDocument();
   });
 
-  it('shows the object animation toolbar action for selected text and media elements', () => {
+  it('shows the object animation toolbar action for selected media elements', () => {
     const project = createMediaProject();
-    const { rerender } = render(
-      <CanvasWorkspace
-        project={project}
-        activePageId="page-1"
-        selection={{ pageId: 'page-1', elementIds: ['text-title'] }}
-      />,
-    );
-
-    expect(screen.getByRole('button', { name: 'Animate' })).toBeInTheDocument();
-
-    rerender(
+    render(
       <CanvasWorkspace
         project={project}
         activePageId="page-1"
