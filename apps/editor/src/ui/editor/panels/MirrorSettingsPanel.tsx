@@ -6,6 +6,7 @@ interface MirrorSettingsPanelProps {
   config: MinioMirrorConfig;
   mirrorState: MirrorState;
   mirrorDisabledBySettings?: boolean;
+  onBack?: () => void;
   onClose: () => void;
   onEnabledChange: (enabled: boolean) => void;
   onSave: (config: MinioMirrorConfig) => void;
@@ -16,6 +17,7 @@ export function MirrorSettingsPanel({
   config,
   mirrorState,
   mirrorDisabledBySettings = false,
+  onBack,
   onClose,
   onEnabledChange,
   onSave,
@@ -81,9 +83,23 @@ export function MirrorSettingsPanel({
       aria-label="Mirror settings"
     >
       <div className="mirror-settings-header">
-        <div>
-          <h2>Mirror settings</h2>
-          <p>Sync this local project folder to MinIO.</p>
+        <div className="settings-panel-title-row">
+          {onBack ? (
+            <button
+              className="stitch-icon-button settings-panel-back-button"
+              type="button"
+              aria-label="Back to settings"
+              onClick={onBack}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">
+                arrow_back
+              </span>
+            </button>
+          ) : null}
+          <div>
+            <h2>Mirror settings</h2>
+            <p>Sync this local project folder to MinIO.</p>
+          </div>
         </div>
         <button
           className="stitch-icon-button"

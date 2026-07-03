@@ -157,6 +157,48 @@ export interface ShareService {
   getEmbedHtml(shareId: string): string;
 }
 
+export type StockMediaProvider = 'giphy' | 'unsplash';
+export type StockMediaKind = 'gif' | 'image';
+
+export interface StockMediaConfig {
+  giphyApiKey: string;
+  unsplashAccessKey: string;
+}
+
+export interface StockMediaProviderStatus {
+  configured: boolean;
+  provider: StockMediaProvider;
+}
+
+export interface StockMediaProviderState {
+  gifs: StockMediaProviderStatus;
+  images: StockMediaProviderStatus;
+}
+
+export interface StockMediaItem {
+  id: string;
+  provider: StockMediaProvider;
+  kind: StockMediaKind;
+  title: string;
+  authorName?: string | undefined;
+  authorUrl?: string | undefined;
+  thumbnailUrl: string;
+  mediaUrl: string;
+  width: number;
+  height: number;
+  downloadLocation?: string | undefined;
+}
+
+export interface StockMediaService {
+  loadConfig(): StockMediaConfig | null;
+  saveConfig(config: StockMediaConfig): void;
+  clearConfig(): void;
+  getProviderState(): StockMediaProviderState;
+  searchImages(query: string): Promise<StockMediaItem[]>;
+  searchGifs(query: string): Promise<StockMediaItem[]>;
+  trackImageDownload(item: StockMediaItem): Promise<void>;
+}
+
 export interface ModelSetupService {
   getModelStates(): Promise<ModelState[]>;
   downloadRequiredModels(): Promise<ModelState[]>;

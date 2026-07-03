@@ -91,6 +91,27 @@ describe('MirrorSettingsPanel', () => {
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ prefix: 'public-projects' }));
   });
 
+  it('returns to the settings list from the back button', async () => {
+    const user = userEvent.setup();
+    const onBack = vi.fn();
+
+    render(
+      <MirrorSettingsPanel
+        config={config}
+        mirrorState={{ enabled: true, status: 'idle' }}
+        onBack={onBack}
+        onClose={vi.fn()}
+        onEnabledChange={vi.fn()}
+        onSave={vi.fn()}
+        onTestConnection={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Back to settings' }));
+
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
   it('lets users disable mirroring from settings and keeps saving settings disabled while off', async () => {
     const user = userEvent.setup();
     const onEnabledChange = vi.fn();
