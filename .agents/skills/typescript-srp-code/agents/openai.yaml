@@ -1,4 +1,0 @@
-interface:
-  display_name: "TypeScript SRP Code"
-  short_description: "TypeScript SRP, context folders, and direct imports."
-  default_prompt: "Use $typescript-srp-code to create or refactor JavaScript/TypeScript code with one value export per file, context folders, and direct imports."

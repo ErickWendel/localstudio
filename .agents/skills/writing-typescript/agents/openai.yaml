@@ -1,0 +1,4 @@
+interface:
+  display_name: "Writing TypeScript"
+  short_description: "JavaScript/TypeScript source organization and maintainable code."
+  default_prompt: "Use $writing-typescript to create or refactor JavaScript/TypeScript code with SRP, direct imports, reusable components/styles, and shared constants."
