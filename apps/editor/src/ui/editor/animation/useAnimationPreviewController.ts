@@ -15,6 +15,7 @@ export interface AnimationPreviewState {
 
 interface AnimationPreviewControllerOptions {
   activePageIdRef: MutableRefObject<string>;
+  onPresenterPageChange?: ((pageId: string) => void) | undefined;
   projectRef: MutableRefObject<ProjectDocument>;
   setActivePageId: (pageId: string) => void;
   setSelectedElementIds: (elementIds: string[]) => void;
@@ -26,6 +27,7 @@ function getBuildPlaybackDurationMs(build: ElementAnimationBuild) {
 
 export function useAnimationPreviewController({
   activePageIdRef,
+  onPresenterPageChange,
   projectRef,
   setActivePageId,
   setSelectedElementIds,
@@ -192,6 +194,7 @@ export function useAnimationPreviewController({
     clearAnimationPreviewTimers();
     animationPreviewQueueRef.current = builds;
     const transitionDelay = page.transition?.delayMs ?? 0;
+    if (mode === 'presenter') onPresenterPageChange?.(page.id);
     setAnimationPreview({
       activeBuild: undefined,
       activeBuildElementId: undefined,

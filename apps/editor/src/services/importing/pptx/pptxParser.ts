@@ -79,6 +79,13 @@ interface Relationship {
   type: string;
 }
 
+interface PptxTextDefaults {
+  defaultParagraphProperties: Element | undefined;
+  defaultRunProperties: Element | undefined;
+  listParagraphProperties: Element | undefined;
+  listRunProperties: Element | undefined;
+}
+
 const DEFAULT_PAGE_WIDTH = 1920;
 const DEFAULT_PAGE_HEIGHT = 1080;
 const DEFAULT_TEXT_STYLE: PptxTextStyle = {
@@ -145,6 +152,22 @@ function getPresentationSize(document: Document) {
     height,
     scaleX: width / cx,
     scaleY: height / cy,
+  };
+}
+
+function getPresentationTextDefaults(document: Document): PptxTextDefaults {
+  const defaultTextStyle = pptxXml.firstDescendant(document, 'defaultTextStyle');
+  const defaultParagraphProperties = defaultTextStyle
+    ? pptxXml.firstDescendant(defaultTextStyle, 'defPPr')
+    : undefined;
+  const listParagraphProperties = defaultTextStyle
+    ? pptxXml.firstDescendant(defaultTextStyle, 'lvl1pPr')
+    : undefined;
+  return {
+    defaultParagraphProperties,
+    defaultRunProperties: getParagraphDefaultRunProperties(defaultParagraphProperties),
+    listParagraphProperties,
+    listRunProperties: getParagraphDefaultRunProperties(listParagraphProperties),
   };
 }
 
@@ -261,10 +284,21 @@ function getLineHeight(...paragraphProperties: Array<Element | undefined>) {
 function getTextAlign(
   paragraphProperties: Element | undefined,
   listParagraphProperties: Element | undefined,
+  textDefaults: PptxTextDefaults,
   fontSize: number,
   verticalAlign: PptxTextStyle['verticalAlign'],
 ): PptxTextStyle['align'] {
-  const align = getFirstAttribute('algn', paragraphProperties, listParagraphProperties);
+  const inheritedParagraphProperties =
+    verticalAlign === 'middle'
+      ? textDefaults.listParagraphProperties
+      : textDefaults.defaultParagraphProperties;
+  const align = getFirstAttribute(
+    'algn',
+    paragraphProperties,
+    listParagraphProperties,
+    inheritedParagraphProperties,
+    textDefaults.defaultParagraphProperties,
+  );
   if (align === 'ctr') return 'center';
   if (align === 'r') return 'right';
   if (align === 'l') return 'left';
@@ -272,43 +306,59 @@ function getTextAlign(
   return DEFAULT_TEXT_STYLE.align;
 }
 
-function getTextStyle(shape: Element, scaleY: number): PptxTextStyle {
+function getTextStyle(shape: Element, scaleY: number, textDefaults: PptxTextDefaults): PptxTextStyle {
   const paragraph = getFirstParagraph(shape);
   const paragraphProperties = paragraph ? pptxXml.firstDescendant(paragraph, 'pPr') : undefined;
   const runProperties = getFirstRunProperties(paragraph);
   const paragraphDefaultRunProperties = getParagraphDefaultRunProperties(paragraphProperties);
   const listParagraphProperties = getListParagraphProperties(shape);
   const listDefaultRunProperties = getListDefaultRunProperties(shape);
+  const verticalAlign = getVerticalAlign(shape);
+  const inheritedRunProperties =
+    verticalAlign === 'middle' ? textDefaults.listRunProperties : textDefaults.defaultRunProperties;
+  const inheritedParagraphProperties =
+    verticalAlign === 'middle'
+      ? textDefaults.listParagraphProperties
+      : textDefaults.defaultParagraphProperties;
   const size = Number(
     getFirstAttribute(
       'sz',
       runProperties,
       paragraphDefaultRunProperties,
       listDefaultRunProperties,
+      inheritedRunProperties,
+      textDefaults.defaultRunProperties,
     ),
   );
   const font = getTypeface(
     runProperties,
     paragraphDefaultRunProperties,
     listDefaultRunProperties,
+    inheritedRunProperties,
+    textDefaults.defaultRunProperties,
   );
   const bold = hasEnabledBold(
     runProperties,
     paragraphDefaultRunProperties,
     listDefaultRunProperties,
+    inheritedRunProperties,
+    textDefaults.defaultRunProperties,
   );
   const fontSize = getFontSize(size, scaleY);
-  const verticalAlign = getVerticalAlign(shape);
   return {
-    align: getTextAlign(paragraphProperties, listParagraphProperties, fontSize, verticalAlign),
+    align: getTextAlign(paragraphProperties, listParagraphProperties, textDefaults, fontSize, verticalAlign),
     fill: getHexColor(
-      runProperties ?? paragraphDefaultRunProperties ?? listDefaultRunProperties ?? shape,
+      runProperties ??
+        paragraphDefaultRunProperties ??
+        listDefaultRunProperties ??
+        inheritedRunProperties ??
+        shape,
       DEFAULT_TEXT_STYLE.fill,
     ),
     fontFamily: font && !font.startsWith('+') ? font : DEFAULT_TEXT_STYLE.fontFamily,
     fontSize,
     fontWeight: bold ? 700 : DEFAULT_TEXT_STYLE.fontWeight,
-    lineHeight: getLineHeight(paragraphProperties, listParagraphProperties),
+    lineHeight: getLineHeight(paragraphProperties, listParagraphProperties, inheritedParagraphProperties),
     verticalAlign,
   };
 }
@@ -354,6 +404,7 @@ function parseTextObject(
   zIndex: number,
   scaleX: number,
   scaleY: number,
+  textDefaults: PptxTextDefaults,
   idScope = 'slide',
 ): PptxSlideObject | undefined {
   const text = getTextParagraphs(shape);
@@ -366,7 +417,7 @@ function parseTextObject(
     id: `${slideId}-${idScope}-text-${shapeId}`,
     kind: 'text',
     sourceShapeId: shapeId,
-    style: getTextStyle(shape, scaleY),
+    style: getTextStyle(shape, scaleY, textDefaults),
     text,
     textBox: getTextBox(shape, scaleX, scaleY),
     zIndex,
@@ -463,6 +514,10 @@ function getBuildDurationMs(timingNode: Element | undefined) {
   return toMilliseconds(childDuration ?? timingNode?.getAttribute('dur') ?? null, 500);
 }
 
+function isMediaControlTiming(timingNode: Element | undefined) {
+  return timingNode?.getAttribute('presetClass') === 'mediacall';
+}
+
 function parseAnimationBuilds(
   document: Document,
   slideId: string,
@@ -482,6 +537,7 @@ function parseAnimationBuilds(
     const object = slideObjectsByShapeId.get(sourceShapeId);
     if (!object) return;
     const timingNode = findNearestAnimationTimingNode(behavior);
+    if (isMediaControlTiming(timingNode)) return;
     const buildIndex = builds.length;
     builds.push({
       id: `${slideId}-build-${buildIndex + 1}-${object.id}`,
@@ -520,6 +576,7 @@ async function parseInheritedObjects(
   slideId: string,
   scaleX: number,
   scaleY: number,
+  textDefaults: PptxTextDefaults,
   idScope: 'layout' | 'master',
 ) {
   if (!sourcePath) return [];
@@ -532,7 +589,7 @@ async function parseInheritedObjects(
   if (tree) {
     for (const child of pptxXml.childElements(tree)) {
       if (child.localName === 'sp' && !hasPlaceholder(child)) {
-        const object = parseTextObject(child, slideId, objects.length, scaleX, scaleY, idScope);
+        const object = parseTextObject(child, slideId, objects.length, scaleX, scaleY, textDefaults, idScope);
         if (object) objects.push(object);
       }
       if (child.localName === 'pic') {
@@ -556,6 +613,7 @@ async function parseSlide(
   slideIndex: number,
   scaleX: number,
   scaleY: number,
+  textDefaults: PptxTextDefaults,
 ) {
   const xml = await readText(findFile(files, slidePath));
   if (!xml) throw new Error(`PowerPoint slide is missing: ${slidePath}`);
@@ -568,8 +626,8 @@ async function parseSlide(
     layoutPath ?? slidePath,
   );
   const masterPath = findRelationshipByType(layoutRels, '/slideMaster')?.target;
-  const masterObjects = await parseInheritedObjects(files, masterPath, slideId, scaleX, scaleY, 'master');
-  const layoutObjects = await parseInheritedObjects(files, layoutPath, slideId, scaleX, scaleY, 'layout');
+  const masterObjects = await parseInheritedObjects(files, masterPath, slideId, scaleX, scaleY, textDefaults, 'master');
+  const layoutObjects = await parseInheritedObjects(files, layoutPath, slideId, scaleX, scaleY, textDefaults, 'layout');
   const tree = pptxXml.firstDescendant(document, 'spTree');
   const inheritedObjects = [...masterObjects, ...layoutObjects];
   const objects: PptxSlideObject[] = inheritedObjects.map((object, index) => ({
@@ -579,7 +637,7 @@ async function parseSlide(
   if (tree) {
     for (const child of pptxXml.childElements(tree)) {
       if (child.localName === 'sp') {
-        const object = parseTextObject(child, slideId, objects.length, scaleX, scaleY);
+        const object = parseTextObject(child, slideId, objects.length, scaleX, scaleY, textDefaults);
         if (object) objects.push(object);
       }
       if (child.localName === 'pic') {
@@ -611,6 +669,7 @@ async function parse(files: PptxPackageFile[], name: string): Promise<PptxDeck> 
     'ppt/presentation.xml',
   );
   const size = getPresentationSize(presentation);
+  const textDefaults = getPresentationTextDefaults(presentation);
   const slidePaths = pptxXml
     .descendants(presentation, 'sldId')
     .map((slide) => presentationRelationships.get(slide.getAttribute('r:id') ?? '')?.target)
@@ -620,7 +679,9 @@ async function parse(files: PptxPackageFile[], name: string): Promise<PptxDeck> 
     height: size.height,
     name: normalizeName(name),
     slides: await Promise.all(
-      slidePaths.map((slidePath, index) => parseSlide(files, slidePath, index, size.scaleX, size.scaleY)),
+      slidePaths.map((slidePath, index) =>
+        parseSlide(files, slidePath, index, size.scaleX, size.scaleY, textDefaults),
+      ),
     ),
     width: size.width,
   };

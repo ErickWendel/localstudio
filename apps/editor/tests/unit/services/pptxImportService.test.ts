@@ -12,6 +12,14 @@ const presentationXml = `<?xml version="1.0" encoding="UTF-8"?>
   <p:sldIdLst>
     <p:sldId id="256" r:id="rId1"/>
   </p:sldIdLst>
+  <p:defaultTextStyle>
+    <a:defPPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" algn="l">
+      <a:defRPr sz="1800"/>
+    </a:defPPr>
+    <a:lvl1pPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" algn="ctr">
+      <a:defRPr sz="2400"/>
+    </a:lvl1pPr>
+  </p:defaultTextStyle>
 </p:presentation>`;
 
 const presentationRels = `<?xml version="1.0" encoding="UTF-8"?>
@@ -46,7 +54,7 @@ const layoutXml = `<?xml version="1.0" encoding="UTF-8"?>
       <p:sp>
         <p:nvSpPr><p:cNvPr id="22" name="Author label"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
         <p:spPr><a:xfrm><a:off x="640080" y="91440"/><a:ext cx="457200" cy="228600"/></a:xfrm></p:spPr>
-        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="3000"><a:solidFill><a:srgbClr val="ffffff"/></a:solidFill><a:latin typeface="Arial"/></a:defRPr></a:pPr><a:r><a:t>Erick Wendel</a:t></a:r></a:p></p:txBody>
+        <p:txBody><a:bodyPr/><a:lstStyle><a:lvl1pPr algn="l"/></a:lstStyle><a:p><a:pPr><a:defRPr sz="3000"><a:solidFill><a:srgbClr val="ffffff"/></a:solidFill><a:latin typeface="Arial"/></a:defRPr></a:pPr><a:r><a:t>Erick Wendel</a:t></a:r></a:p></p:txBody>
       </p:sp>
       <p:sp>
         <p:nvSpPr><p:cNvPr id="21" name="Title placeholder"/><p:cNvSpPr/><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr>
@@ -78,6 +86,11 @@ const slideXml = `<?xml version="1.0" encoding="UTF-8"?>
         <p:nvSpPr><p:cNvPr id="6" name="Centered text"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
         <p:spPr><a:xfrm><a:off x="2743200" y="3657600"/><a:ext cx="914400" cy="914400"/></a:xfrm></p:spPr>
         <p:txBody><a:bodyPr lIns="91440" rIns="91440" tIns="45720" bIns="45720" anchor="ctr"/><a:lstStyle/><a:p><a:pPr algn="ctr"/><a:r><a:rPr sz="2400" b="1"><a:solidFill><a:srgbClr val="ffffff"/></a:solidFill><a:latin typeface="Arial"/></a:rPr><a:t>Centered expansion</a:t></a:r></a:p></p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="7" name="Inherited centered caption"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr><a:xfrm><a:off x="2743200" y="4572000"/><a:ext cx="1828800" cy="457200"/></a:xfrm></p:spPr>
+        <p:txBody><a:bodyPr anchor="ctr"/><a:lstStyle/><a:p><a:pPr/><a:r><a:rPr sz="2400"><a:solidFill><a:srgbClr val="ffffff"/></a:solidFill><a:latin typeface="Arial"/></a:rPr><a:t>Inherited centered</a:t></a:r></a:p></p:txBody>
       </p:sp>
       <p:pic>
         <p:nvPicPr><p:cNvPr id="3" name="Hero image"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>
@@ -173,6 +186,9 @@ describe('BrowserPptxImportService', () => {
     const centeredElement = elements.find(
       (element) => element.type === 'text' && element.text === 'Centered expansion',
     );
+    const inheritedCenteredElement = elements.find(
+      (element) => element.type === 'text' && element.text === 'Inherited centered',
+    );
     const imageElements = elements.filter((element) => element.type === 'image');
     const videoElement = elements.find((element) => element.type === 'video');
     const imageAsset = Object.values(project.assets).find((asset) => asset.fileName === 'image1.png');
@@ -212,6 +228,10 @@ describe('BrowserPptxImportService', () => {
     expect(centeredElement.align).toBe('center');
     expect(centeredElement.x + centeredElement.width / 2).toBeCloseTo(672, 0);
     expect(centeredElement.y + centeredElement.height / 2).toBeCloseTo(864, 0);
+    if (!inheritedCenteredElement || inheritedCenteredElement.type !== 'text') {
+      throw new Error('Expected inherited centered text.');
+    }
+    expect(inheritedCenteredElement.align).toBe('center');
     expect(project.pages[0]?.elementIds.some((elementId) => elementId.includes('placeholder'))).toBe(false);
     expect(imageElements).toHaveLength(2);
     expect(imageElement).toMatchObject({ locked: false, type: 'image' });

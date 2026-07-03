@@ -602,6 +602,7 @@ export function useEditorViewModel(services: AppServices) {
   const backgroundSelectionPointsRef = useRef<Record<string, BackgroundSelectionPoint[]>>({});
   const backgroundPreviewTimeoutRef = useRef<number | undefined>(undefined);
   const wasFullscreenRef = useRef(false);
+  const presenterPageIdRef = useRef<string | undefined>(undefined);
   const backgroundPreviewSequenceRef = useRef(0);
   const backgroundPreparationSequenceRef = useRef(0);
   const languageDetectionSequenceRef = useRef(0);
@@ -648,6 +649,9 @@ export function useEditorViewModel(services: AppServices) {
     rewindPresentationPreview,
   } = useAnimationPreviewController({
     activePageIdRef,
+    onPresenterPageChange: (pageId) => {
+      presenterPageIdRef.current = pageId;
+    },
     projectRef,
     setActivePageId,
     setSelectedElementIds,
@@ -681,11 +685,13 @@ export function useEditorViewModel(services: AppServices) {
       const isFullscreenActive = Boolean(document.fullscreenElement);
       setIsFullscreen(isFullscreenActive);
       if (wasFullscreenRef.current && !isFullscreenActive) {
-        const previewPageId = animationPreviewRef.current?.pageId ?? activePageIdRef.current;
+        const previewPageId =
+          presenterPageIdRef.current ?? animationPreviewRef.current?.pageId ?? activePageIdRef.current;
         if (previewPageId && projectRef.current.pages.some((page) => page.id === previewPageId)) {
           setActivePageId(previewPageId);
         }
         clearAnimationPreview();
+        presenterPageIdRef.current = undefined;
         setSelectedElementIds([]);
       }
       wasFullscreenRef.current = isFullscreenActive;

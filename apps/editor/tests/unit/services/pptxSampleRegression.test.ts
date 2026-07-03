@@ -51,6 +51,23 @@ describe('PowerPoint sample regression', () => {
     const slide18BulletText = slide18TextElements.find((element) =>
       element.text.includes('Sem custo de API'),
     );
+    const slide21TextElements =
+      project.pages[20]?.elementIds
+        .map((elementId) => project.elements[elementId])
+        .filter((element) => element?.type === 'text') ?? [];
+    const slide21TitleText = slide21TextElements.find((element) =>
+      element.text.includes('A IA não é nova:'),
+    );
+    const slide21LinkText = slide21TextElements.find((element) =>
+      element.text.includes('home.dartmouth.edu/about/artificial-intelligence-ai-coined-dartmouth'),
+    );
+    const slide26 = project.pages[25];
+    const slide26VideoIds =
+      slide26?.elementIds.filter((elementId) => project.elements[elementId]?.type === 'video') ?? [];
+    const slide26AnimatedVideoIds =
+      slide26?.animationBuilds
+        ?.filter((build) => slide26VideoIds.includes(build.elementId))
+        .map((build) => build.elementId) ?? [];
     const animationBuildCount = project.pages.reduce(
       (count, page) => count + (page.animationBuilds?.length ?? 0),
       0,
@@ -79,12 +96,28 @@ describe('PowerPoint sample regression', () => {
     if (!slide18BulletText || slide18BulletText.type !== 'text') {
       throw new Error('Expected slide 18 bullet text.');
     }
+    if (!slide21TitleText || slide21TitleText.type !== 'text') {
+      throw new Error('Expected slide 21 title text.');
+    }
+    if (!slide21LinkText || slide21LinkText.type !== 'text') {
+      throw new Error('Expected slide 21 link text.');
+    }
     expect(authorLabel.height).toEqual(expect.any(Number));
     expect(authorLabel.width).toEqual(expect.any(Number));
     expect(authorLabel.width).toBeGreaterThanOrEqual(220);
     expect(authorLabel.height).toBeGreaterThanOrEqual(authorLabel.fontSize * 1.35);
     expect(slide18BulletText.fontSize).toBeGreaterThanOrEqual(70);
     expect(slide18BulletText.fontSize).toBeLessThanOrEqual(90);
+    expect(slide21TitleText.align).toBe('center');
+    expect(
+      Math.abs(slide21TitleText.x + slide21TitleText.width / 2 - project.pages[20]!.width / 2),
+    ).toBeLessThanOrEqual(1);
+    expect(slide21LinkText.align).toBe('center');
+    expect(
+      Math.abs(slide21LinkText.x + slide21LinkText.width / 2 - project.pages[20]!.width / 2),
+    ).toBeLessThanOrEqual(1);
+    expect(slide26VideoIds.length).toBeGreaterThan(0);
+    expect(slide26AnimatedVideoIds).toEqual([]);
     expect(slide29Text).toContain('Por que uma LLM');
   });
 });

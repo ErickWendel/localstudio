@@ -48,6 +48,15 @@ function createProject(): ProjectDocument {
           },
         ],
       },
+      {
+        id: 'page-2',
+        name: 'Slide 2',
+        width: 1280,
+        height: 720,
+        background: { type: 'color', color: '#ffffff' },
+        elementIds: [],
+        animationBuilds: [],
+      },
     ],
   };
 }
@@ -116,5 +125,46 @@ describe('useAnimationPreviewController', () => {
       phase: 'complete',
       waitingForClick: false,
     });
+  });
+
+  it('reports the current presenter page synchronously during presentation navigation', () => {
+    const projectRef = { current: createProject() };
+    const activePageIdRef = { current: 'page-1' };
+    const setActivePageId = vi.fn();
+    const setSelectedElementIds = vi.fn();
+    const onPresenterPageChange = vi.fn();
+    const { result } = renderHook(() =>
+      useAnimationPreviewController({
+        activePageIdRef,
+        onPresenterPageChange,
+        projectRef,
+        setActivePageId,
+        setSelectedElementIds,
+      }),
+    );
+
+    act(() => {
+      result.current.playPresentationPreview('page-1');
+    });
+
+    act(() => {
+      vi.runOnlyPendingTimers();
+    });
+
+    act(() => {
+      result.current.advanceAnimationPreview();
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+
+    act(() => {
+      result.current.advancePresentationPreview();
+    });
+
+    expect(onPresenterPageChange).toHaveBeenCalledWith('page-1');
+    expect(onPresenterPageChange).toHaveBeenLastCalledWith('page-2');
+    expect(activePageIdRef.current).toBe('page-2');
   });
 });
