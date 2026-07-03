@@ -72,6 +72,7 @@ class MockDirectoryHandle {
   }
 
   async *entries(): AsyncIterableIterator<[string, { kind: 'file' | 'directory'; name: string }]> {
+    await Promise.resolve();
     for (const name of this.files.keys()) yield [name, { kind: 'file', name }];
     for (const name of this.directories.keys()) yield [name, { kind: 'directory', name }];
   }
@@ -98,6 +99,7 @@ async function readMockText(value: string | Blob) {
 }
 
 async function getProjectDirectory(root: MockDirectoryHandle, projectName: string) {
+  await Promise.resolve();
   const projects = root.directories.get('projects');
   if (!projects) throw new Error('Missing projects directory.');
   const projectDirectory = projects.directories.get(encodeURIComponent(projectName));
@@ -121,7 +123,9 @@ describe('OpfsProjectRepository', () => {
     expect(projectDirectory.directories.has('assets')).toBe(true);
     expect(projectDirectory.directories.has('cache')).toBe(true);
     expect(projectDirectory.directories.has('config')).toBe(true);
-    expect(JSON.parse(await readMockText(projectDirectory.files.get('project.json')!))).toMatchObject({
+    expect(
+      JSON.parse(await readMockText(projectDirectory.files.get('project.json')!)),
+    ).toMatchObject({
       id: project.id,
       name: project.name,
     });
@@ -159,7 +163,9 @@ describe('OpfsProjectRepository', () => {
 
     await repository.saveProject(project);
     const projectDirectory = await getProjectDirectory(root, project.name);
-    projectDirectory.directories.get('assets')!.files.set('hero.png', new Blob(['image'], { type: 'image/png' }));
+    projectDirectory.directories
+      .get('assets')!
+      .files.set('hero.png', new Blob(['image'], { type: 'image/png' }));
 
     const loaded = await new OpfsProjectRepository({
       getRootDirectory: () => Promise.resolve(root as unknown as FileSystemDirectoryHandle),
@@ -182,7 +188,9 @@ describe('OpfsProjectRepository', () => {
     await repository.saveProject({ ...project, name: 'Renamed Deck' });
 
     const projectDirectory = await getProjectDirectory(root, 'Renamed Deck');
-    expect(JSON.parse(await readMockText(projectDirectory.files.get('project.json')!))).toMatchObject({
+    expect(
+      JSON.parse(await readMockText(projectDirectory.files.get('project.json')!)),
+    ).toMatchObject({
       name: 'Renamed Deck',
     });
   });
@@ -207,7 +215,9 @@ describe('OpfsProjectRepository', () => {
     const historyDirectory = projectDirectory.directories.get('history')!;
 
     expect(history).toHaveLength(1);
-    expect(JSON.parse(await readMockText(historyDirectory.files.get('manifest.json')!))).toMatchObject({
+    expect(
+      JSON.parse(await readMockText(historyDirectory.files.get('manifest.json')!)),
+    ).toMatchObject({
       latestVersionId: version.id,
     });
     expect(loadedVersion?.name).toBe('Versioned Deck');
@@ -219,8 +229,10 @@ describe('OpfsProjectRepository', () => {
       storage: new MemoryStorage(),
     });
 
-    await expect(repository.saveProject(sampleProject.createSampleProject())).rejects.toMatchObject({
-      name: 'SecurityError',
-    });
+    await expect(repository.saveProject(sampleProject.createSampleProject())).rejects.toMatchObject(
+      {
+        name: 'SecurityError',
+      },
+    );
   });
 });

@@ -2,7 +2,11 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
-import type { ProjectDocument, ShapeElement, VideoElement } from '../../../../src/domain/documents/model';
+import type {
+  ProjectDocument,
+  ShapeElement,
+  VideoElement,
+} from '../../../../src/domain/documents/model';
 import { CanvasWorkspace } from '../../../../src/ui/editor/canvas/CanvasWorkspace';
 
 describe('CanvasWorkspace', () => {
@@ -72,7 +76,10 @@ describe('CanvasWorkspace', () => {
     return project;
   }
 
-  function updateVideoElement(project: ProjectDocument, patch: Partial<VideoElement>): ProjectDocument {
+  function updateVideoElement(
+    project: ProjectDocument,
+    patch: Partial<VideoElement>,
+  ): ProjectDocument {
     const videoElement = project.elements['video-demo'];
     if (videoElement?.type !== 'video') {
       throw new Error('Expected video-demo test fixture to be a video element.');
@@ -106,6 +113,22 @@ describe('CanvasWorkspace', () => {
     expect(screen.getByRole('button', { name: 'Flip' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Crop' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Animate' })).toBeInTheDocument();
+  });
+
+  it('uses layout sizing instead of transform scaling for zoom', () => {
+    render(
+      <CanvasWorkspace
+        project={sampleProject.createSampleProject()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        zoomPercent={50}
+      />,
+    );
+
+    const canvasFrame = screen.getByLabelText('Slide canvas');
+
+    expect(canvasFrame).not.toHaveStyle({ transform: 'scale(0.5)' });
+    expect(canvasFrame).toHaveStyle({ '--canvas-zoom': '0.5' });
   });
 
   it('renders every supported shape catalog item without crashing', () => {
@@ -153,7 +176,10 @@ describe('CanvasWorkspace', () => {
     );
 
     expect(container.querySelector('canvas')).toBeInTheDocument();
-    expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-selected-elements', 'shape-arrow');
+    expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+      'data-selected-elements',
+      'shape-arrow',
+    );
   });
 
   it('toggles crop mode for selected images', async () => {
@@ -246,8 +272,14 @@ describe('CanvasWorkspace', () => {
       />,
     );
 
-    expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview', 'playing');
-    expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-animation-preview-waiting', 'true');
+    expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+      'data-animation-preview',
+      'playing',
+    );
+    expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+      'data-animation-preview-waiting',
+      'true',
+    );
     expect(screen.getByText('Click the slide to play the next animation.')).toBeInTheDocument();
 
     fireEvent.mouseDown(container.querySelector('canvas')!);
@@ -331,8 +363,20 @@ describe('CanvasWorkspace', () => {
     project.pages[0] = {
       ...project.pages[0]!,
       animationBuilds: [
-        { id: 'build-image-hero', elementId: 'image-hero', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
-        { id: 'build-text-title', elementId: 'text-title', effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+        {
+          id: 'build-image-hero',
+          elementId: 'image-hero',
+          effect: 'reveal',
+          trigger: 'on-click',
+          delayMs: 0,
+        },
+        {
+          id: 'build-text-title',
+          elementId: 'text-title',
+          effect: 'reveal',
+          trigger: 'on-click',
+          delayMs: 0,
+        },
       ],
     };
 
@@ -366,10 +410,15 @@ describe('CanvasWorkspace', () => {
     );
 
     expect(
-      screen.getByText('Right click adds areas to keep. Left click applies the background removal.'),
+      screen.getByText(
+        'Right click adds areas to keep. Left click applies the background removal.',
+      ),
     ).toBeInTheDocument();
     expect(screen.getByLabelText('Slide canvas')).not.toHaveClass('canvas-frame-bg-selection');
-    expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-background-selection-target', 'image-hero');
+    expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+      'data-background-selection-target',
+      'image-hero',
+    );
 
     await user.click(screen.getByRole('button', { name: 'Cancel BG Remover' }));
   });
@@ -431,7 +480,9 @@ describe('CanvasWorkspace', () => {
       />,
     );
 
-    const editorVideo = container.querySelector('video[aria-label="Demo clip"]') as HTMLVideoElement;
+    const editorVideo = container.querySelector(
+      'video[aria-label="Demo clip"]',
+    ) as HTMLVideoElement;
     expect(editorVideo).toBeInTheDocument();
     expect(editorVideo.autoplay).toBe(false);
     expect(editorVideo.loop).toBe(true);
@@ -448,7 +499,9 @@ describe('CanvasWorkspace', () => {
       />,
     );
 
-    const previewVideo = container.querySelector('video[aria-label="Demo clip"]') as HTMLVideoElement;
+    const previewVideo = container.querySelector(
+      'video[aria-label="Demo clip"]',
+    ) as HTMLVideoElement;
     expect(previewVideo.autoplay).toBe(true);
     expect(previewVideo.dataset.trimStart).toBe('2');
     expect(previewVideo.dataset.trimEnd).toBe('6');
@@ -464,7 +517,9 @@ describe('CanvasWorkspace', () => {
       />,
     );
 
-    const unselectedVideo = container.querySelector('video[aria-label="Demo clip"]') as HTMLVideoElement;
+    const unselectedVideo = container.querySelector(
+      'video[aria-label="Demo clip"]',
+    ) as HTMLVideoElement;
     expect(unselectedVideo.style.pointerEvents).toBe('none');
 
     rerender(
@@ -475,7 +530,9 @@ describe('CanvasWorkspace', () => {
       />,
     );
 
-    const selectedVideo = container.querySelector('video[aria-label="Demo clip"]') as HTMLVideoElement;
+    const selectedVideo = container.querySelector(
+      'video[aria-label="Demo clip"]',
+    ) as HTMLVideoElement;
     expect(selectedVideo.style.pointerEvents).toBe('auto');
   });
 
@@ -537,7 +594,9 @@ describe('CanvasWorkspace', () => {
       />,
     );
 
-    const selectedGif = container.querySelector('img[aria-label="Animated loop"]') as HTMLImageElement;
+    const selectedGif = container.querySelector(
+      'img[aria-label="Animated loop"]',
+    ) as HTMLImageElement;
     expect(selectedGif.style.pointerEvents).toBe('none');
   });
 
