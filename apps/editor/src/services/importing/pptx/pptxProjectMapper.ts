@@ -5,6 +5,7 @@ import type { PptxDeck, PptxSlideObject } from './pptxParser';
 
 const TEXT_FRAME_FIT = {
   averageCharacterWidth: 0.9,
+  canvasPadding: 6,
   heightPaddingRatio: 0.4,
   horizontalPaddingRatio: 1.2,
   lineHeightRatio: 1.35,
@@ -65,25 +66,70 @@ function getTextLines(text: string) {
   return lines.length > 0 ? lines : [''];
 }
 
+function clampFrameStart(start: number, size: number, pageSize: number) {
+  if (size >= pageSize) return 0;
+  return Math.min(Math.max(0, start), pageSize - size);
+}
+
+function getInsetTextFrame(object: Extract<PptxSlideObject, { kind: 'text' }>) {
+  const horizontalInsets = object.textBox.insets.left + object.textBox.insets.right;
+  const verticalInsets = object.textBox.insets.top + object.textBox.insets.bottom;
+  const x = object.frame.x + object.textBox.insets.left - TEXT_FRAME_FIT.canvasPadding;
+  const y = object.frame.y + object.textBox.insets.top - TEXT_FRAME_FIT.canvasPadding;
+  const width = object.frame.width - horizontalInsets + TEXT_FRAME_FIT.canvasPadding * 2;
+  const height = object.frame.height - verticalInsets + TEXT_FRAME_FIT.canvasPadding * 2;
+  return {
+    x,
+    y,
+    width: Math.max(1, width),
+    height: Math.max(1, height),
+  };
+}
+
+function getHorizontallyAnchoredX(
+  object: Extract<PptxSlideObject, { kind: 'text' }>,
+  frame: ReturnType<typeof getInsetTextFrame>,
+  width: number,
+  pageWidth: number,
+) {
+  if (object.style.align === 'center') {
+    return clampFrameStart(frame.x + frame.width / 2 - width / 2, width, pageWidth);
+  }
+  if (object.style.align === 'right') {
+    return clampFrameStart(frame.x + frame.width - width, width, pageWidth);
+  }
+  return clampFrameStart(frame.x, width, pageWidth);
+}
+
+function getVerticallyAnchoredY(
+  object: Extract<PptxSlideObject, { kind: 'text' }>,
+  frame: ReturnType<typeof getInsetTextFrame>,
+  height: number,
+  pageHeight: number,
+) {
+  if (object.textBox.verticalAlign === 'middle') {
+    return clampFrameStart(frame.y + frame.height / 2 - height / 2, height, pageHeight);
+  }
+  if (object.textBox.verticalAlign === 'bottom') {
+    return clampFrameStart(frame.y + frame.height - height, height, pageHeight);
+  }
+  return clampFrameStart(frame.y, height, pageHeight);
+}
+
 function getFittedTextFrame(
   object: Extract<PptxSlideObject, { kind: 'text' }>,
   pageWidth: number,
   pageHeight: number,
 ) {
+  const frame = getInsetTextFrame(object);
   const lines = getTextLines(object.text);
   const longestLineUnits = Math.max(...lines.map(getTextLineUnits), 1);
   const preferredWidth = Math.ceil(
     longestLineUnits * object.style.fontSize * TEXT_FRAME_FIT.averageCharacterWidth +
       object.style.fontSize * TEXT_FRAME_FIT.horizontalPaddingRatio,
   );
-  let width = Math.max(object.frame.width, preferredWidth);
-  let x = object.frame.x;
-  if (width > pageWidth) {
-    width = pageWidth;
-    x = 0;
-  } else if (x + width > pageWidth) {
-    x = Math.max(0, pageWidth - width);
-  }
+  const width = Math.min(pageWidth, Math.max(frame.width, preferredWidth));
+  const x = getHorizontallyAnchoredX(object, frame, width, pageWidth);
 
   const contentWidth = Math.max(
     object.style.fontSize,
@@ -102,19 +148,13 @@ function getFittedTextFrame(
       object.style.fontSize * TEXT_FRAME_FIT.heightPaddingRatio,
   );
   let height =
-    object.frame.height > fittedHeight * TEXT_FRAME_FIT.shrinkOversizedHeightRatio
+    frame.height > fittedHeight * TEXT_FRAME_FIT.shrinkOversizedHeightRatio
       ? fittedHeight
-      : Math.max(object.frame.height, fittedHeight);
-  let y = object.frame.y;
-  if (height > pageHeight) {
-    height = pageHeight;
-    y = 0;
-  } else if (y + height > pageHeight) {
-    y = Math.max(0, pageHeight - height);
-  }
+      : Math.max(frame.height, fittedHeight);
+  height = Math.min(pageHeight, height);
+  const y = getVerticallyAnchoredY(object, frame, height, pageHeight);
 
   return {
-    ...object.frame,
     height,
     width,
     x,

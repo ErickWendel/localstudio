@@ -74,6 +74,11 @@ const slideXml = `<?xml version="1.0" encoding="UTF-8"?>
         <p:spPr><a:xfrm><a:off x="914400" y="2133600"/><a:ext cx="3657600" cy="914400"/></a:xfrm></p:spPr>
         <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="6000"><a:solidFill><a:srgbClr val="ffffff"/></a:solidFill><a:latin typeface="Arial"/></a:defRPr></a:pPr><a:r><a:rPr b="1"/><a:t>Default sized</a:t></a:r></a:p></p:txBody>
       </p:sp>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="6" name="Centered text"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr><a:xfrm><a:off x="2743200" y="3657600"/><a:ext cx="914400" cy="914400"/></a:xfrm></p:spPr>
+        <p:txBody><a:bodyPr lIns="91440" rIns="91440" tIns="45720" bIns="45720" anchor="ctr"/><a:lstStyle/><a:p><a:pPr algn="ctr"/><a:r><a:rPr sz="2400" b="1"><a:solidFill><a:srgbClr val="ffffff"/></a:solidFill><a:latin typeface="Arial"/></a:rPr><a:t>Centered expansion</a:t></a:r></a:p></p:txBody>
+      </p:sp>
       <p:pic>
         <p:nvPicPr><p:cNvPr id="3" name="Hero image"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>
         <p:blipFill><a:blip r:embed="rIdImage"/></p:blipFill>
@@ -165,6 +170,9 @@ describe('BrowserPptxImportService', () => {
     const defaultSizedElement = elements.find(
       (element) => element.type === 'text' && element.text === 'Default sized',
     );
+    const centeredElement = elements.find(
+      (element) => element.type === 'text' && element.text === 'Centered expansion',
+    );
     const imageElements = elements.filter((element) => element.type === 'image');
     const videoElement = elements.find((element) => element.type === 'video');
     const imageAsset = Object.values(project.assets).find((asset) => asset.fileName === 'image1.png');
@@ -175,10 +183,10 @@ describe('BrowserPptxImportService', () => {
       locked: false,
       text: 'Editable title',
       type: 'text',
-      x: 192,
-      y: 192,
-      width: 768,
-      height: 192,
+      x: 205,
+      y: 196,
+      width: 742,
+      height: 184,
       align: 'center',
       fontFamily: 'Arial',
       fontSize: 64,
@@ -188,8 +196,8 @@ describe('BrowserPptxImportService', () => {
       locked: false,
       text: 'Erick Wendel',
       type: 'text',
-      x: 134,
-      y: 19,
+      x: 147,
+      y: 23,
       width: 603,
       height: 140,
     });
@@ -199,6 +207,10 @@ describe('BrowserPptxImportService', () => {
       text: 'Default sized',
       type: 'text',
     });
+    if (!centeredElement || centeredElement.type !== 'text') throw new Error('Expected centered text.');
+    expect(centeredElement.align).toBe('center');
+    expect(centeredElement.x + centeredElement.width / 2).toBeCloseTo(672, 0);
+    expect(centeredElement.y + centeredElement.height / 2).toBeCloseTo(864, 0);
     expect(project.pages[0]?.elementIds.some((elementId) => elementId.includes('placeholder'))).toBe(false);
     expect(imageElements).toHaveLength(2);
     expect(imageElement).toMatchObject({ locked: false, type: 'image' });

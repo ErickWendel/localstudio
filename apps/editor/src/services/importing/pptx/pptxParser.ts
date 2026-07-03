@@ -23,6 +23,18 @@ export interface PptxTextStyle {
   fontWeight: number;
 }
 
+export interface PptxTextInsets {
+  bottom: number;
+  left: number;
+  right: number;
+  top: number;
+}
+
+export interface PptxTextBox {
+  insets: PptxTextInsets;
+  verticalAlign: 'bottom' | 'middle' | 'top';
+}
+
 export type PptxSlideObject =
   | {
       frame: PptxRect;
@@ -31,6 +43,7 @@ export type PptxSlideObject =
       sourceShapeId: string;
       style: PptxTextStyle;
       text: string;
+      textBox: PptxTextBox;
       zIndex: number;
     }
   | {
@@ -74,6 +87,12 @@ const DEFAULT_TEXT_STYLE: PptxTextStyle = {
   fontWeight: 400,
 };
 const EMUS_PER_POINT = 12700;
+const DEFAULT_TEXT_INSETS_EMU = {
+  bottom: 45720,
+  left: 91440,
+  right: 91440,
+  top: 45720,
+};
 
 async function readText(file: PptxPackageFile | undefined) {
   if (!file) return undefined;
@@ -255,6 +274,32 @@ function getTextParagraphs(shape: Element) {
     .join('\n');
 }
 
+function getTextInset(
+  bodyProperties: Element | undefined,
+  attributeName: string,
+  fallbackEmu: number,
+  scale: number,
+) {
+  const rawValue = bodyProperties?.getAttribute(attributeName);
+  const value = rawValue === undefined || rawValue === null ? Number.NaN : Number(rawValue);
+  const emu = Number.isFinite(value) ? value : fallbackEmu;
+  return Math.max(0, Math.round(emu * scale));
+}
+
+function getTextBox(shape: Element, scaleX: number, scaleY: number): PptxTextBox {
+  const bodyProperties = pptxXml.firstDescendant(shape, 'bodyPr');
+  const anchor = bodyProperties?.getAttribute('anchor');
+  return {
+    insets: {
+      bottom: getTextInset(bodyProperties, 'bIns', DEFAULT_TEXT_INSETS_EMU.bottom, scaleY),
+      left: getTextInset(bodyProperties, 'lIns', DEFAULT_TEXT_INSETS_EMU.left, scaleX),
+      right: getTextInset(bodyProperties, 'rIns', DEFAULT_TEXT_INSETS_EMU.right, scaleX),
+      top: getTextInset(bodyProperties, 'tIns', DEFAULT_TEXT_INSETS_EMU.top, scaleY),
+    },
+    verticalAlign: anchor === 'b' ? 'bottom' : anchor === 'ctr' ? 'middle' : 'top',
+  };
+}
+
 function parseTextObject(
   shape: Element,
   slideId: string,
@@ -275,6 +320,7 @@ function parseTextObject(
     sourceShapeId: shapeId,
     style: getTextStyle(shape, scaleY),
     text,
+    textBox: getTextBox(shape, scaleX, scaleY),
     zIndex,
   };
 }

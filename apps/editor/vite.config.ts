@@ -88,6 +88,9 @@ function editorManualChunks(id: string) {
 export default defineConfig({
   base: editorBase,
   plugins: [webMcpRouteAlias(), pptxSampleImportRoute(), react()],
+  optimizeDeps: {
+    include: ['@giphy/js-fetch-api', 'unsplash-js'],
+  },
   build: {
     chunkSizeWarningLimit: 1200,
     emptyOutDir: false,
