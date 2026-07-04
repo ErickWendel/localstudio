@@ -299,7 +299,7 @@ export function DesignPanel({
                             void downloadFont(font.family);
                           }}
                         >
-                          <span>{font.family}</span>
+                          <span className="ew-ellipsis">{font.family}</span>
                           <Download size={15} />
                         </button>
                       ))
@@ -621,7 +621,7 @@ function ElementDesignInspector({
             <h3>File Info</h3>
             <div className="movie-file-row">
               <FileVideo size={18} aria-hidden="true" />
-              <span>{assetName}</span>
+              <span className="ew-ellipsis">{assetName}</span>
               <button
                 className="stitch-icon-button"
                 type="button"
@@ -694,6 +694,7 @@ function ElementDesignInspector({
               <VolumeX size={18} aria-hidden="true" />
               <input
                 aria-label="Selected video volume"
+                className="ew-range-input"
                 max="100"
                 min="0"
                 step="1"
@@ -715,6 +716,7 @@ function ElementDesignInspector({
               <div className="movie-trim-track">
                 <input
                   aria-label="Selected video trim start"
+                  className="ew-range-input"
                   max={trimSliderMax}
                   min="0"
                   step="0.1"
@@ -727,6 +729,7 @@ function ElementDesignInspector({
                 />
                 <input
                   aria-label="Selected video trim end"
+                  className="ew-range-input"
                   max={trimSliderMax}
                   min="0"
                   step="0.1"
@@ -751,6 +754,7 @@ function ElementDesignInspector({
               <span>Poster Frame</span>
               <input
                 aria-label="Selected video poster frame"
+                className="ew-range-input"
                 max={trimSliderMax}
                 min="0"
                 step="0.1"
@@ -885,7 +889,7 @@ function ElementDesignInspector({
               <h3>Movie</h3>
               <div className="movie-file-row">
                 <Film size={18} aria-hidden="true" />
-                <span>{assetName ?? 'Animated GIF'}</span>
+                <span className="ew-ellipsis">{assetName ?? 'Animated GIF'}</span>
               </div>
               <label className="movie-checkbox-row">
                 <input
@@ -904,7 +908,7 @@ function ElementDesignInspector({
               <h3>Image</h3>
               <div className="movie-file-row">
                 <Image size={18} aria-hidden="true" />
-                <span>{assetName ?? 'Imported image'}</span>
+                <span className="ew-ellipsis">{assetName ?? 'Imported image'}</span>
               </div>
             </section>
           ) : null}

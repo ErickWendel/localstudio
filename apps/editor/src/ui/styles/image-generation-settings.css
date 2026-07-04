@@ -25,12 +25,6 @@
   grid-column: 1 / 3;
 }
 
-.image-generation-range input {
-  width: 100%;
-  min-width: 0;
-  accent-color: var(--ew-green);
-}
-
 .image-generation-range strong {
   min-width: 22px;
   color: var(--ew-text);

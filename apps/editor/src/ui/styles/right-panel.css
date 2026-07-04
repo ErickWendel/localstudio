@@ -69,12 +69,6 @@
   min-width: 0;
 }
 
-.panel-section {
-  display: grid;
-  gap: 10px;
-  min-width: 0;
-}
-
 .panel-section-title {
   margin: 0;
   color: var(--ew-muted);

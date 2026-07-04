@@ -91,13 +91,6 @@
   text-align: left;
 }
 
-.font-download-result span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .font-download-result:disabled {
   cursor: progress;
   opacity: 0.65;

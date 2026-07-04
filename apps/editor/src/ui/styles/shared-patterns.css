@@ -58,6 +58,12 @@
   box-shadow: 0 0 0 2px rgba(55, 253, 118, 0.14);
 }
 
+.ew-range-input {
+  width: 100%;
+  min-width: 0;
+  accent-color: var(--ew-green);
+}
+
 .ew-status-success {
   color: var(--ew-green);
 }

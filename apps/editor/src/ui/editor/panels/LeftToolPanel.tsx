@@ -372,7 +372,7 @@ export function LeftToolPanel({
         ) : null}
         {panelOpen && activeTab === 'assets' ? (
           <section className="panel-stack">
-            <div className="panel-section">
+            <div className="panel-section ew-panel-card">
               <h2 className="panel-heading">Assets</h2>
               <p className="panel-muted">Imported assets in this project.</p>
             </div>
@@ -405,7 +405,7 @@ export function LeftToolPanel({
                 event.target.value = '';
               }}
             />
-            <div className="asset-list" aria-label="Project assets">
+            <div className="asset-list ew-panel-card" aria-label="Project assets">
               {assetRows.length > 0 ? (
                 assetRows.map(({ asset, used }) => (
                   <AssetRow

@@ -79,7 +79,7 @@ export function ElementsPanel({
 
   return (
     <section className="panel-stack" aria-label="Elements tools">
-      <div className="panel-section element-section">
+      <div className="panel-section ew-panel-card element-section">
         <h2 className="panel-heading">Elements</h2>
         <p className="panel-muted">Add shapes, images, and GIFs to the current slide.</p>
       </div>

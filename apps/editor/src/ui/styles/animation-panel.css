@@ -5,59 +5,16 @@
   gap: 10px;
 }
 
-.animation-choice,
-.animation-build-row {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  background: #000;
-}
-
-.animation-choice {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 46px;
-  padding: 10px;
-  color: var(--ew-text);
-  cursor: pointer;
-}
-
-.animation-choice .material-symbols-outlined {
-  color: var(--ew-green);
-}
-
-.animation-choice-active {
-  border-color: rgba(55, 253, 118, 0.34);
-  box-shadow: 0 0 18px rgba(55, 253, 118, 0.1);
-}
-
-.animation-build-list {
-  display: grid;
-  gap: 10px;
-  min-width: 0;
-}
-
 .animation-build-row {
   position: relative;
   display: grid;
   gap: 9px;
   padding: 10px;
   cursor: grab;
-  transition:
-    border-color 140ms ease,
-    box-shadow 140ms ease,
-    transform 140ms ease;
 }
 
 .animation-build-row:active {
   cursor: grabbing;
-}
-
-.animation-build-row:hover,
-.animation-build-row:focus-within {
-  border-color: rgba(55, 253, 118, 0.3);
-  box-shadow: 0 0 16px rgba(55, 253, 118, 0.08);
 }
 
 .animation-build-row-active {

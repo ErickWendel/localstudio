@@ -331,12 +331,16 @@ export function AiToolsPanel({
 
   return (
     <div className="panel-stack">
-      <div className="tool-card-list">
+      <div className="tool-card-list ew-panel-card">
         <article
-          className={promptApiAttention ? 'tool-card tool-card-attention' : 'tool-card'}
+          className={
+            promptApiAttention
+              ? 'tool-card ew-surface ew-surface-hover tool-card-attention'
+              : 'tool-card ew-surface ew-surface-hover'
+          }
           aria-label="LLM Model"
         >
-          <div className="tool-card-heading">
+          <div className="tool-card-heading ew-compact-row">
             <ImagePlus size={18} />
             <strong>LLM Model</strong>
             <StatusPill
@@ -418,8 +422,8 @@ export function AiToolsPanel({
           </div>
         </article>
 
-        <article className="tool-card" aria-label="Language Detection">
-          <div className="tool-card-heading">
+        <article className="tool-card ew-surface ew-surface-hover" aria-label="Language Detection">
+          <div className="tool-card-heading ew-compact-row">
             <ScanSearch size={18} />
             <strong>Language Detection</strong>
             <StatusPill
@@ -506,10 +510,14 @@ export function AiToolsPanel({
         </article>
 
         <article
-          className={translationTargetAttention ? 'tool-card tool-card-attention' : 'tool-card'}
+          className={
+            translationTargetAttention
+              ? 'tool-card ew-surface ew-surface-hover tool-card-attention'
+              : 'tool-card ew-surface ew-surface-hover'
+          }
           aria-label="Translate Design"
         >
-          <div className="tool-card-heading">
+          <div className="tool-card-heading ew-compact-row">
             <Languages size={18} />
             <strong>Translate Design</strong>
             <StatusPill
@@ -657,10 +665,14 @@ export function AiToolsPanel({
           return (
             <article
               aria-label={model.label}
-              className={needsAttention ? 'model-row model-row-attention' : 'model-row'}
+              className={
+                needsAttention
+                  ? 'model-row ew-surface ew-surface-hover model-row-attention'
+                  : 'model-row ew-surface ew-surface-hover'
+              }
               key={model.id}
             >
-              <div className="model-row-main">
+              <div className="model-row-main ew-compact-row">
                 <ScanSearch size={17} />
                 <div className="model-row-title">
                   <strong>{model.label}</strong>
@@ -705,7 +717,7 @@ export function AiToolsPanel({
                   </option>
                 </select>
               </label>
-              <div className="model-row-meta">
+              <div className="model-row-meta ew-compact-row">
                 <StatusPill label={formatStatus(model.status)} tone={statusTone(model.status)} />
                 <DownloadProgressCopy
                   details={model}
@@ -752,6 +764,7 @@ export function AiToolsPanel({
                       />
                     </span>
                     <input
+                      className="ew-range-input"
                       type="range"
                       min={1}
                       max={8}

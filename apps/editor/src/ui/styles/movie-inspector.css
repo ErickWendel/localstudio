@@ -49,13 +49,6 @@
   font-weight: 800;
 }
 
-.movie-file-row span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .movie-controls-row {
   display: flex;
   justify-content: center;
@@ -99,14 +92,6 @@
 .movie-volume-row {
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-}
-
-.movie-volume-row input,
-.movie-poster-control input,
-.movie-trim-track input {
-  width: 100%;
-  min-width: 0;
-  accent-color: var(--ew-green);
 }
 
 .movie-trim-track {

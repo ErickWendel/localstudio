@@ -88,7 +88,7 @@ export function LayersPanel({
       </div>
       <PanelSection title="Stack">
         <p className="panel-muted">{layers.length + 1} layers on current page</p>
-        <div className="layer-list">
+        <div className="layer-list ew-panel-card">
           {layers.map((layer) => {
             const Icon = layer.icon;
             const dropPosition = dropIndicator?.layerId === layer.id ? dropIndicator.position : undefined;

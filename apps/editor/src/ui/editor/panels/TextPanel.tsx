@@ -50,7 +50,7 @@ export function TextPanel({ onInsertText }: TextPanelProps) {
         </button>
       </div>
 
-      <div className="panel-section">
+      <div className="panel-section ew-panel-card">
         <h2 className="panel-heading text-panel-heading">Default text styles</h2>
         <div className="text-preset-list">
           {textPresets.map((item) => (

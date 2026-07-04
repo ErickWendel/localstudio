@@ -1,9 +1,3 @@
-.asset-list {
-  display: grid;
-  gap: 10px;
-  min-width: 0;
-}
-
 .asset-row {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr) 32px;
