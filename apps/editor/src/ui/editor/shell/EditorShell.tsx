@@ -38,6 +38,8 @@ import {
 } from '../../components/KeyboardShortcutsDialog';
 import { editorShellBrowserUtils } from '../browser/editorShellBrowserUtils';
 import { BrowserPresenterSessionService } from '../../../services/presenter/presenterSessionService';
+import type { PresenterRemoteSessionMetadata } from '../../../services/presenter/presenterSessionTypes';
+import { PresenterRemotePanel } from '../../presenter/PresenterRemotePanel';
 
 interface EditorShellProps {
   services: AppServices;
@@ -85,6 +87,9 @@ export function EditorShell({ services }: EditorShellProps) {
   const [presentationCursorHidden, setPresentationCursorHidden] = useState(false);
   const [slideNumberVisible, setSlideNumberVisible] = useState(false);
   const [presenterSessionId, setPresenterSessionId] = useState<string | undefined>();
+  const [presenterRemoteSession, setPresenterRemoteSession] = useState<PresenterRemoteSessionMetadata | undefined>();
+  const [presenterRemotePanelOpen, setPresenterRemotePanelOpen] = useState(false);
+  const [remotePresenterActive, setRemotePresenterActive] = useState(false);
   const [presenterViewError, setPresenterViewError] = useState<string | undefined>();
   const [sharePanelOpen, setSharePanelOpen] = useState(false);
   const [shareMetadata, setShareMetadata] = useState<ShareMetadata | undefined>();
@@ -92,6 +97,7 @@ export function EditorShell({ services }: EditorShellProps) {
   const workspaceRef = useRef<HTMLElement>(null);
   const slideFrameRef = useRef<HTMLDivElement>(null);
   const presenterSessionServiceRef = useRef<BrowserPresenterSessionService | undefined>(undefined);
+  const presenterRemotePanelRef = useRef<HTMLDivElement>(null);
   const presenterFullscreenEnteredRef = useRef(false);
   const toolbarImageInputRef = useRef<HTMLInputElement>(null);
   const hasSelection = vm.selection.elementIds.length > 0;
@@ -155,10 +161,14 @@ export function EditorShell({ services }: EditorShellProps) {
     presenterSessionServiceRef.current?.closePresenterWindow();
     presenterFullscreenEnteredRef.current = false;
     setAudienceFullscreenPromptOpen(false);
+    setPresenterRemoteSession(undefined);
+    setPresenterRemotePanelOpen(false);
+    setRemotePresenterActive(false);
     setPresenterSessionId(undefined);
   }
 
-  function openPresenterView() {
+  const openPresenterView = useCallback(() => {
+    if (presenterSessionId) return;
     const pageId = vm.activePageId;
     if (!pageId) return;
     const service = getPresenterSessionService();
@@ -168,7 +178,23 @@ export function EditorShell({ services }: EditorShellProps) {
       return;
     }
     setPresenterViewError(undefined);
+    setRemotePresenterActive(true);
     setPresenterSessionId(result.sessionId);
+    setPresenterRemotePanelOpen(true);
+    void service
+      .openRemoteControlSession({
+        presenterLabel: navigator.platform || 'Presenter device',
+        ttlMs: 16 * 60 * 60 * 1000,
+      })
+      .then((remoteSession) => {
+        setPresenterRemoteSession(remoteSession);
+        service.publishState({
+          activePageId: pageId,
+          animationPreview: vm.animationPreview,
+          presenterMode: 'presenting',
+          project: vm.project,
+        });
+      });
     presenterFullscreenEnteredRef.current = false;
     setAudienceFullscreenPromptOpen(true);
     vm.playPresentationPreview(pageId);
@@ -176,10 +202,11 @@ export function EditorShell({ services }: EditorShellProps) {
       service.publishState({
         activePageId: pageId,
         animationPreview: vm.animationPreview,
+        presenterMode: 'presenting',
         project: vm.project,
       });
     }, 0);
-  }
+  }, [presenterSessionId, vm]);
 
   function enterAudienceFullscreen() {
     setAudienceFullscreenPromptOpen(false);
@@ -602,17 +629,60 @@ export function EditorShell({ services }: EditorShellProps) {
   }, [vm.automation]);
 
   useEffect(() => {
-    if (!presenterSessionId) return undefined;
+    const pageId = vm.activePageId;
+    if (!pageId) return undefined;
+    let cancelled = false;
+    const service = getPresenterSessionService();
+    void service
+      .openRemoteControlSession({
+        presenterLabel: navigator.platform || 'Presenter device',
+        ttlMs: 16 * 60 * 60 * 1000,
+      })
+      .then((remoteSession) => {
+        if (cancelled) return;
+        setPresenterRemoteSession(remoteSession);
+        service.publishState({
+          activePageId: pageId,
+          animationPreview: vm.animationPreview,
+          presenterMode: presenterSessionId || remotePresenterActive ? 'presenting' : 'ready',
+          project: vm.project,
+        });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [presenterSessionId, remotePresenterActive, vm.activePageId, vm.animationPreview, vm.project]);
+
+  useEffect(() => {
+    if (!presenterRemoteSession) return undefined;
     return getPresenterSessionService().subscribeToCommands((message) => {
+      if (message.command === 'start-presenting') {
+        const firstPageId = vm.project.pages[0]?.id ?? vm.activePageId;
+        setRemotePresenterActive(true);
+        if (firstPageId) {
+          vm.playPresentationPreview(firstPageId);
+          void vm.toggleFullscreen(workspaceRef.current);
+        }
+        getPresenterSessionService().publishState({
+          activePageId: firstPageId,
+          animationPreview: vm.animationPreview,
+          presenterMode: 'presenting',
+          project: vm.project,
+        });
+        return;
+      }
       if (message.command === 'next') {
+        if (!presenterSessionId && !remotePresenterActive) return;
         advancePresentationPreviewFromUserAction();
         return;
       }
       if (message.command === 'previous') {
+        if (!presenterSessionId && !remotePresenterActive) return;
         vm.rewindPresentationPreview();
         return;
       }
       if (message.command === 'go-to-page') {
+        if (!presenterSessionId && !remotePresenterActive) return;
         vm.playPresentationPreview(message.pageId);
         return;
       }
@@ -624,6 +694,7 @@ export function EditorShell({ services }: EditorShellProps) {
         getPresenterSessionService().publishState({
           activePageId: vm.activePageId,
           animationPreview: vm.animationPreview,
+          presenterMode: presenterSessionId || remotePresenterActive ? 'presenting' : 'ready',
           project: vm.project,
         });
         return;
@@ -632,7 +703,7 @@ export function EditorShell({ services }: EditorShellProps) {
         closePresenterViewSession();
       }
     });
-  }, [advancePresentationPreviewFromUserAction, presenterSessionId, vm]);
+  }, [advancePresentationPreviewFromUserAction, presenterRemoteSession, presenterSessionId, remotePresenterActive, vm]);
 
   useEffect(() => {
     if (!presenterSessionId) {
@@ -647,13 +718,32 @@ export function EditorShell({ services }: EditorShellProps) {
   }, [presenterSessionId, vm.isFullscreen]);
 
   useEffect(() => {
-    if (!presenterSessionId) return;
+    if (!presenterRemoteSession) return;
     getPresenterSessionService().publishState({
       activePageId: vm.activePageId,
       animationPreview: vm.animationPreview,
+      presenterMode: presenterSessionId || remotePresenterActive ? 'presenting' : 'ready',
       project: vm.project,
     });
-  }, [presenterSessionId, vm.activePageId, vm.animationPreview, vm.project]);
+  }, [presenterRemoteSession, presenterSessionId, remotePresenterActive, vm.activePageId, vm.animationPreview, vm.project]);
+
+  useEffect(() => {
+    if (!presenterRemotePanelOpen) return;
+
+    function handleOutsidePointer(event: PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (presenterRemotePanelRef.current?.contains(target)) return;
+
+      setPresenterRemotePanelOpen(false);
+    }
+
+    document.addEventListener('pointerdown', handleOutsidePointer);
+
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsidePointer);
+    };
+  }, [presenterRemotePanelOpen]);
 
   useEffect(() => {
     function handleCopy(event: ClipboardEvent) {
@@ -1204,6 +1294,11 @@ export function EditorShell({ services }: EditorShellProps) {
             <p className="presenter-view-error" role="alert">
               {presenterViewError}
             </p>
+          ) : null}
+          {presenterRemoteSession && presenterRemotePanelOpen ? (
+            <div ref={presenterRemotePanelRef}>
+              <PresenterRemotePanel session={presenterRemoteSession} />
+            </div>
           ) : null}
           {audienceFullscreenPromptOpen ? (
             <div className="audience-fullscreen-backdrop" role="presentation">

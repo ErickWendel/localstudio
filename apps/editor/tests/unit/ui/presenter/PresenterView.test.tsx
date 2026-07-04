@@ -1,8 +1,46 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type {
+  PresenterRemoteCommand,
+  PresenterRemoteStreamPreference,
+} from '@localstudio/presenter-remote/protocol';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 import { PresenterView } from '../../../../src/ui/presenter/PresenterView';
+
+const remoteStreamPublisherMock = vi.hoisted(() => {
+  let onCommand: ((command: PresenterRemoteCommand) => void) | undefined;
+  let onStreamPreference: ((preference: PresenterRemoteStreamPreference) => void) | undefined;
+  const publisher = {
+    start: vi.fn(),
+    stop: vi.fn(),
+  };
+  return {
+    create: vi.fn((options: {
+      onCommand: (command: PresenterRemoteCommand) => void;
+      onStreamPreference?: (preference: PresenterRemoteStreamPreference) => void;
+    }) => {
+      onCommand = options.onCommand;
+      onStreamPreference = options.onStreamPreference;
+      return publisher;
+    }),
+    getOnCommand: () => onCommand,
+    getOnStreamPreference: () => onStreamPreference,
+    publisher,
+  };
+});
+
+vi.mock('qrcode', () => ({
+  default: {
+    toDataURL: vi.fn().mockResolvedValue('data:image/png;base64,remote-qr'),
+  },
+}));
+
+vi.mock('../../../../src/ui/presenter/presenterRemoteStreamPublisher', () => ({
+  presenterRemoteStreamPublisher: {
+    create: remoteStreamPublisherMock.create,
+  },
+}));
 
 describe('PresenterView', () => {
   beforeEach(() => {
@@ -56,6 +94,26 @@ describe('PresenterView', () => {
       elementIds: [],
       speakerNotes: 'Second slide notes',
     });
+    project.pages.push(
+      {
+        id: 'page-3',
+        name: 'Slide 3',
+        width: 1920,
+        height: 1080,
+        background: { type: 'color', color: '#222222' },
+        elementIds: [],
+        speakerNotes: 'Third slide notes',
+      },
+      {
+        id: 'page-4',
+        name: 'Slide 4',
+        width: 1920,
+        height: 1080,
+        background: { type: 'color', color: '#333333' },
+        elementIds: [],
+        speakerNotes: 'Fourth slide notes',
+      },
+    );
     act(() => {
       window.dispatchEvent(
         new MessageEvent('message', {
@@ -86,17 +144,92 @@ describe('PresenterView', () => {
 
     expect(screen.getByLabelText('Presenter view')).toBeInTheDocument();
     expect(screen.getByText(/00:00/)).toBeInTheDocument();
-    expect(screen.getByText('Current: Slide 1 of 2')).toBeInTheDocument();
+    expect(screen.getByText('Current: Slide 1 of 4')).toBeInTheDocument();
     expect(screen.getByText('Builds remaining: 1')).toBeInTheDocument();
     expect(screen.getByLabelText('Speaker notes')).toHaveValue(
       'Open with the Web AI timing story.',
     );
     expect(screen.getByRole('button', { name: 'Slide 2' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Slide 3' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Slide 4' })).not.toBeInTheDocument();
 
     const notes = screen.getByLabelText('Speaker notes');
     const initialSize = notes.style.fontSize;
     fireEvent.click(screen.getByRole('button', { name: 'Increase notes size' }));
     expect(notes.style.fontSize).not.toBe(initialSize);
+  });
+
+  it('resizes presenter notes with the divider drag handle', () => {
+    window.localStorage.setItem('localstudio.presenterWindowIntroDismissed', '1');
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: 1280,
+    });
+    render(<PresenterView sessionId="session-1" />);
+    const project = sampleProject.createSampleProject();
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          origin: window.location.origin,
+          data: {
+            payload: {
+              activePageId: 'page-1',
+              animationPreview: undefined,
+              project,
+            },
+            sessionId: 'session-1',
+            source: 'localstudio-presenter-main',
+            type: 'state',
+          },
+        }),
+      );
+    });
+
+    const divider = screen.getByRole('separator', { name: 'Resize presenter notes' });
+    const presenterView = screen.getByLabelText('Presenter view');
+    expect(presenterView).toHaveStyle({ '--presenter-notes-width': '364px' });
+
+    fireEvent.pointerDown(divider, { clientX: 900, pointerId: 1 });
+    fireEvent.pointerMove(window, { clientX: 780 });
+    fireEvent.pointerUp(window);
+
+    expect(presenterView).toHaveStyle({ '--presenter-notes-width': '484px' });
+    expect(window.localStorage.getItem('localstudio.presenterNotesWidth')).toBe('484');
+  });
+
+  it('resizes presenter notes with keyboard arrows', () => {
+    window.localStorage.setItem('localstudio.presenterWindowIntroDismissed', '1');
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: 1280,
+    });
+    render(<PresenterView sessionId="session-1" />);
+    const project = sampleProject.createSampleProject();
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          origin: window.location.origin,
+          data: {
+            payload: {
+              activePageId: 'page-1',
+              animationPreview: undefined,
+              project,
+            },
+            sessionId: 'session-1',
+            source: 'localstudio-presenter-main',
+            type: 'state',
+          },
+        }),
+      );
+    });
+
+    fireEvent.keyDown(screen.getByRole('separator', { name: 'Resize presenter notes' }), {
+      key: 'ArrowLeft',
+    });
+
+    expect(screen.getByLabelText('Presenter view')).toHaveStyle({
+      '--presenter-notes-width': '396px',
+    });
   });
 
   it('posts presenter commands and note updates to the opener', () => {
@@ -128,6 +261,7 @@ describe('PresenterView', () => {
 
     expect(screen.getByRole('button', { name: 'Next slide' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Next slide' }));
+    fireEvent.click(screen.getByLabelText('Current slide'));
     fireEvent.change(screen.getByLabelText('Speaker notes'), { target: { value: 'New note' } });
 
     expect(opener.postMessage).toHaveBeenCalledWith(
@@ -139,6 +273,12 @@ describe('PresenterView', () => {
       }),
       window.location.origin,
     );
+    const postedNextCommandCount = opener.postMessage.mock.calls.filter((call: unknown[]) => {
+      const message = call[0];
+      if (!message || typeof message !== 'object') return false;
+      return (message as { command?: unknown }).command === 'next';
+    }).length;
+    expect(postedNextCommandCount).toBe(2);
     expect(opener.postMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         command: 'update-notes',
@@ -147,6 +287,226 @@ describe('PresenterView', () => {
       }),
       window.location.origin,
     );
+  });
+
+  it('accepts timer commands from the editor session and publishes timer state', () => {
+    const opener = { postMessage: vi.fn() };
+    Object.defineProperty(window, 'opener', {
+      configurable: true,
+      value: opener,
+    });
+    window.localStorage.setItem('localstudio.presenterWindowIntroDismissed', '1');
+    render(<PresenterView sessionId="session-1" />);
+    const project = sampleProject.createSampleProject();
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          origin: window.location.origin,
+          data: {
+            payload: {
+              activePageId: 'page-1',
+              animationPreview: undefined,
+              project,
+            },
+            sessionId: 'session-1',
+            source: 'localstudio-presenter-main',
+            type: 'state',
+          },
+        }),
+      );
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(79_000);
+    });
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          origin: window.location.origin,
+          data: {
+            command: 'pause-timer',
+            sessionId: 'session-1',
+            source: 'localstudio-presenter-main',
+            type: 'command',
+          },
+        }),
+      );
+    });
+
+    expect(screen.getByText('01:19')).toBeInTheDocument();
+    expect(opener.postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        command: 'update-timer',
+        timer: { elapsedMs: 79_000, paused: true, updatedAtEpochMs: Date.now() },
+      }),
+      window.location.origin,
+    );
+
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          origin: window.location.origin,
+          data: {
+            command: 'reset-timer',
+            sessionId: 'session-1',
+            source: 'localstudio-presenter-main',
+            type: 'command',
+          },
+        }),
+      );
+    });
+
+    expect(screen.getByText('00:00')).toBeInTheDocument();
+    expect(opener.postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        command: 'update-timer',
+        timer: { elapsedMs: 0, paused: false, updatedAtEpochMs: Date.now() },
+      }),
+      window.location.origin,
+    );
+  });
+
+  it('applies timer commands received through the remote stream channel', () => {
+    const opener = { postMessage: vi.fn() };
+    Object.defineProperty(window, 'opener', {
+      configurable: true,
+      value: opener,
+    });
+    window.localStorage.setItem('localstudio.presenterWindowIntroDismissed', '1');
+    render(<PresenterView sessionId="session-1" />);
+    const project = sampleProject.createSampleProject();
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          origin: window.location.origin,
+          data: {
+            payload: {
+              activePageId: 'page-1',
+              animationPreview: undefined,
+              project,
+              remoteSession: {
+                code: 'ABCD-1234',
+                connectedControllerCount: 1,
+                expiresAt: '2026-07-04T12:00:00.000Z',
+                presenterLabel: 'MacBook Pro',
+                qrUrl: 'https://localstudio.test/joystick',
+                sessionId: 'remote-session-1',
+              },
+            },
+            sessionId: 'session-1',
+            source: 'localstudio-presenter-main',
+            type: 'state',
+          },
+        }),
+      );
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(79_000);
+    });
+    const onCommand = remoteStreamPublisherMock.getOnCommand();
+    expect(onCommand).toBeDefined();
+    act(() => {
+      onCommand?.({ command: 'pause-timer', type: 'command' });
+    });
+
+    expect(screen.getByText('01:19')).toBeInTheDocument();
+    expect(opener.postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        command: 'update-timer',
+        timer: { elapsedMs: 79_000, paused: true, updatedAtEpochMs: Date.now() },
+      }),
+      window.location.origin,
+    );
+
+    act(() => {
+      onCommand?.({ command: 'reset-timer', type: 'command' });
+    });
+
+    expect(screen.getByText('00:00')).toBeInTheDocument();
+    expect(opener.postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        command: 'update-timer',
+        timer: { elapsedMs: 0, paused: false, updatedAtEpochMs: Date.now() },
+      }),
+      window.location.origin,
+    );
+  });
+
+  it('applies remote stream quality preferences to the mirror canvas', () => {
+    window.localStorage.setItem('localstudio.presenterWindowIntroDismissed', '1');
+    render(<PresenterView sessionId="session-1" />);
+    const project = sampleProject.createSampleProject();
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          origin: window.location.origin,
+          data: {
+            payload: {
+              activePageId: 'page-1',
+              animationPreview: undefined,
+              project,
+              remoteSession: {
+                code: 'ABCD-1234',
+                connectedControllerCount: 1,
+                expiresAt: '2026-07-04T12:00:00.000Z',
+                presenterLabel: 'MacBook Pro',
+                qrUrl: 'https://localstudio.test/joystick',
+                sessionId: 'remote-session-1',
+              },
+            },
+            sessionId: 'session-1',
+            source: 'localstudio-presenter-main',
+            type: 'state',
+          },
+        }),
+      );
+    });
+
+    const onStreamPreference = remoteStreamPublisherMock.getOnStreamPreference();
+    expect(onStreamPreference).toBeDefined();
+    act(() => {
+      onStreamPreference?.({
+        fps: 12,
+        height: 1020,
+        quality: 'high',
+        type: 'stream-preference',
+        width: 1170,
+      });
+    });
+
+    const canvas = document.querySelector<HTMLCanvasElement>('.presenter-remote-mirror-canvas');
+    expect(canvas?.width).toBe(1170);
+    expect(canvas?.height).toBe(1020);
+  });
+
+  it('formats presenter timer with hours after sixty minutes', () => {
+    window.localStorage.setItem('localstudio.presenterWindowIntroDismissed', '1');
+    render(<PresenterView sessionId="session-1" />);
+    const project = sampleProject.createSampleProject();
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          origin: window.location.origin,
+          data: {
+            payload: {
+              activePageId: 'page-1',
+              animationPreview: undefined,
+              project,
+            },
+            sessionId: 'session-1',
+            source: 'localstudio-presenter-main',
+            type: 'state',
+          },
+        }),
+      );
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(3_721_000);
+    });
+
+    expect(screen.getByText('01:02:01')).toBeInTheDocument();
   });
 
   it('opens shortcuts from the presenter toolbar and sends keyboard page jumps', () => {
@@ -214,6 +574,50 @@ describe('PresenterView', () => {
       }),
       window.location.origin,
     );
+  });
+
+  it('opens the remote control QR panel from the presenter toolbar', async () => {
+    window.localStorage.setItem('localstudio.presenterWindowIntroDismissed', '1');
+    render(<PresenterView sessionId="session-1" />);
+    const project = sampleProject.createSampleProject();
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          origin: window.location.origin,
+          data: {
+            payload: {
+              activePageId: 'page-1',
+              animationPreview: undefined,
+              project,
+              remoteSession: {
+                code: 'LS-1234',
+                connectedControllerCount: 0,
+                expiresAt: '2026-07-04T14:47:00.000Z',
+                id: 'remote-session-1',
+                presenterLabel: 'MacBook Pro',
+                qrUrl: 'http://localhost:4176/joystick',
+              },
+            },
+            sessionId: 'session-1',
+            source: 'localstudio-presenter-main',
+            type: 'state',
+          },
+        }),
+      );
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show remote control QR code' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole('region', { name: 'Remote control this presentation' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Remote control QR code' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /copy remote link/i })).toBeInTheDocument();
+
+    fireEvent.pointerDown(screen.getByLabelText('Current slide'));
+
+    expect(screen.queryByRole('region', { name: 'Remote control this presentation' })).not.toBeInTheDocument();
   });
 
   it('does not run presenter shortcuts while typing in speaker notes', () => {

@@ -104,6 +104,14 @@ describe('editor responsive styles', () => {
     }
   });
 
+  it('keeps presenter next-slide thumbnails bounded by the strip height', () => {
+    expect(styles).toMatch(/\.presenter-slide-strip\s*\{[\s\S]*--presenter-thumb-preview-height:/s);
+    expect(styles).toMatch(/\.presenter-slide-strip\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*var\(--presenter-thumb-preview-width\)\)\)/s);
+    expect(styles).toMatch(/\.presenter-thumb\s*\{[\s\S]*grid-template-rows:\s*auto minmax\(0,\s*var\(--presenter-thumb-preview-height\)\)/s);
+    expect(styles).toMatch(/\.presenter-thumb-canvas\s*\{[\s\S]*height:\s*var\(--presenter-thumb-preview-height\)/s);
+    expect(styles).toMatch(/\.presenter-thumb-canvas\s*\{[\s\S]*width:\s*var\(--presenter-thumb-preview-width\)/s);
+  });
+
   it('keeps editor styles split into a manifest and small owned files', () => {
     const manifest = readFileSync(stylesPath, 'utf8');
     const manifestViolations = manifest

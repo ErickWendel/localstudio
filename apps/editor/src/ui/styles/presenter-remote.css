@@ -1,0 +1,92 @@
+.presenter-remote-panel {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 45;
+  width: min(360px, calc(100vw - 48px));
+  overflow: hidden;
+  border: 1px solid var(--ew-border);
+  border-radius: 8px;
+  background: var(--ew-panel);
+  color: var(--ew-text);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
+}
+
+.presenter-remote-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--ew-border);
+  color: var(--ew-muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.presenter-remote-connected {
+  color: var(--ew-green);
+}
+
+.presenter-remote-expiry {
+  color: var(--ew-dim);
+}
+
+.presenter-remote-body {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 18px;
+  text-align: center;
+}
+
+.presenter-remote-body h2,
+.presenter-remote-body p {
+  margin: 0;
+}
+
+.presenter-remote-body h2 {
+  font-size: 21px;
+  line-height: 1.2;
+}
+
+.presenter-remote-body p {
+  margin-top: 6px;
+  color: var(--ew-muted);
+  line-height: 1.35;
+}
+
+.presenter-remote-qr {
+  width: 184px;
+  height: 184px;
+  border: 8px solid #ffffff;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.presenter-remote-qr-loading {
+  background:
+    linear-gradient(90deg, #ffffff 25%, #d8d8d8 50%, #ffffff 75%),
+    #ffffff;
+}
+
+.presenter-remote-copy {
+  width: 100%;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(55, 253, 118, 0.3);
+  border-radius: 6px;
+  background: var(--ew-raised);
+  color: var(--ew-text);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.presenter-remote-copy:hover,
+.presenter-remote-copy:focus-visible {
+  border-color: var(--ew-green);
+  outline: 0;
+}

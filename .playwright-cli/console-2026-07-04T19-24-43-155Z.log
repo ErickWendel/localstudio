@@ -1,0 +1,4 @@
+[     228ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:4174/favicon.ico:0
+[     552ms] [WARNING] No output language was specified in a LanguageModel API request. An output language should be specified to ensure optimal output quality and properly attest to output safety. Please specify a supported output language code: [de, en, es, fr, ja] @ http://localhost:4174/editor/:0
+[     552ms] [WARNING] Unable to create a text session because the service is not running. @ http://localhost:4174/editor/:0
+[     557ms] [WARNING] Unable to create a text session because the service is not running. @ http://localhost:4174/editor/:0

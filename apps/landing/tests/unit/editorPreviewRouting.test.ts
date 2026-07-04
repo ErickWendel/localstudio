@@ -32,4 +32,15 @@ describe('editor preview routing', () => {
     expect(editorRequest.url).toBe('/editor/?project=Demo');
     expect(landingRequest.url).toBe('/pricing');
   });
+
+  it('rewrites no-slash app routes to their app directories', () => {
+    const editorRequest = { url: '/editor?project=Demo' };
+    const joystickRequest = { url: '/joystick?code=ABCD-1234' };
+
+    rewriteEditorPreviewRoute(editorRequest);
+    rewriteEditorPreviewRoute(joystickRequest);
+
+    expect(editorRequest.url).toBe('/editor/?project=Demo');
+    expect(joystickRequest.url).toBe('/joystick/?code=ABCD-1234');
+  });
 });

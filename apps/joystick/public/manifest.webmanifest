@@ -1,0 +1,17 @@
+{
+  "name": "localstudio 🕹️",
+  "short_name": "localstudio 🕹️",
+  "start_url": "/joystick",
+  "scope": "/joystick",
+  "display": "standalone",
+  "background_color": "#0c160d",
+  "theme_color": "#0c160d",
+  "icons": [
+    {
+      "src": "/joystick/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

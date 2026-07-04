@@ -85,8 +85,11 @@ describe('test organization', () => {
       join(repositoryRoot, 'apps/editor/src'),
       join(repositoryRoot, 'apps/landing/src'),
       join(repositoryRoot, 'packages/brand/src'),
+      join(repositoryRoot, 'packages/presenter-remote/src'),
+      join(repositoryRoot, 'apps/joystick/src'),
       join(repositoryRoot, 'apps/editor/vite.config.ts'),
       join(repositoryRoot, 'apps/landing/vite.config.ts'),
+      join(repositoryRoot, 'apps/joystick/vite.config.ts'),
     ];
     const sourceFiles = (
       await Promise.all(
