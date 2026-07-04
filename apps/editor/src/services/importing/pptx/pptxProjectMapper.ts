@@ -247,6 +247,7 @@ function map(deck: PptxDeck, files: PptxPackageFile[]): ProjectDocument {
             ),
           }
         : {}),
+      ...(slide.speakerNotes ? { speakerNotes: slide.speakerNotes } : {}),
       visible: true,
     };
   });
