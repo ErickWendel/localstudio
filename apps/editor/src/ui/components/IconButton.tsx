@@ -21,6 +21,8 @@ export function IconButton({
 }: IconButtonProps) {
   const className = [
     'icon-button',
+    'ew-icon-control',
+    'ew-focus-ring',
     active ? 'icon-button-active' : '',
     attention ? 'icon-button-attention' : '',
     tone === 'danger' ? 'icon-button-danger' : '',

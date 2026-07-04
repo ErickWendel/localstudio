@@ -1,0 +1,321 @@
+.webmcp-page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(380px, 520px) minmax(720px, 1fr);
+  background:
+    linear-gradient(90deg, rgba(46, 167, 255, 0.14), transparent 42%),
+    linear-gradient(180deg, rgba(55, 253, 118, 0.08), transparent 36%), #05090a;
+  color: #eefaf5;
+}
+
+.webmcp-control-plane {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+  padding: 28px;
+  border-right: 1px solid rgba(122, 255, 199, 0.18);
+  background: rgba(5, 12, 13, 0.9);
+}
+
+.webmcp-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #9fffd2;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 18px;
+  text-transform: uppercase;
+}
+
+.webmcp-signal {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(159, 255, 210, 0.34);
+  border-radius: 6px;
+  color: #9fffd2;
+  background: rgba(159, 255, 210, 0.08);
+}
+
+.webmcp-hero {
+  display: grid;
+  gap: 10px;
+}
+
+.webmcp-kicker {
+  margin: 0;
+  color: #64b7ff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  line-height: 16px;
+  text-transform: uppercase;
+}
+
+.webmcp-hero h1 {
+  margin: 0;
+  max-width: 420px;
+  color: #ffffff;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 48px;
+}
+
+.webmcp-hero p {
+  margin: 0;
+  max-width: 460px;
+  color: rgba(238, 250, 245, 0.72);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.webmcp-action-row {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.webmcp-primary-action,
+.webmcp-step-button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid rgba(159, 255, 210, 0.36);
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    opacity 140ms ease;
+}
+
+.webmcp-primary-action {
+  padding: 0 14px;
+  background: #37fd76;
+  color: #07100b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.webmcp-primary-action:hover:not(:disabled) {
+  background: #9fffd2;
+  border-color: #9fffd2;
+}
+
+.webmcp-primary-action:disabled,
+.webmcp-step-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.webmcp-status {
+  min-width: 0;
+  color: rgba(238, 250, 245, 0.72);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.webmcp-tool-list {
+  min-height: 74px;
+  display: flex;
+  align-content: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(122, 255, 199, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.webmcp-tool-pill,
+.webmcp-empty-tools {
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 9px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+}
+
+.webmcp-tool-pill {
+  border: 1px solid rgba(100, 183, 255, 0.28);
+  color: #bfe5ff;
+  background: rgba(100, 183, 255, 0.1);
+}
+
+.webmcp-empty-tools {
+  color: rgba(238, 250, 245, 0.52);
+}
+
+.webmcp-workflow {
+  display: grid;
+  gap: 9px;
+}
+
+.webmcp-step {
+  display: grid;
+  gap: 7px;
+}
+
+.webmcp-step-button {
+  justify-content: flex-start;
+  width: 100%;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.045);
+  color: #eefaf5;
+  font-size: 13px;
+  font-weight: 750;
+  text-align: left;
+}
+
+.webmcp-step-button:hover:not(:disabled),
+.webmcp-step-button-active {
+  border-color: rgba(159, 255, 210, 0.62);
+  background: rgba(159, 255, 210, 0.1);
+}
+
+.webmcp-step-button-focused {
+  animation: webmcp-step-pulse 900ms ease-in-out 3;
+  border-color: #9fffd2;
+  box-shadow: 0 0 0 2px rgba(159, 255, 210, 0.14);
+}
+
+.webmcp-step-index {
+  width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 4px;
+  background: rgba(100, 183, 255, 0.16);
+  color: #bfe5ff;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.webmcp-step-command {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 38px;
+  gap: 8px;
+  padding-left: 30px;
+}
+
+.webmcp-step-command input,
+.webmcp-step-command select {
+  min-width: 0;
+  height: 38px;
+  padding: 0 11px;
+  border: 1px solid rgba(122, 255, 199, 0.2);
+  border-radius: 6px;
+  outline: none;
+  background: rgba(0, 0, 0, 0.24);
+  color: #eefaf5;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.webmcp-step-command select {
+  cursor: pointer;
+}
+
+.webmcp-step-command input:focus,
+.webmcp-step-command select:focus {
+  border-color: rgba(159, 255, 210, 0.66);
+  box-shadow: 0 0 0 2px rgba(159, 255, 210, 0.12);
+}
+
+.webmcp-step-command button {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(159, 255, 210, 0.42);
+  border-radius: 6px;
+  cursor: pointer;
+  background: rgba(55, 253, 118, 0.12);
+  color: #9fffd2;
+}
+
+.webmcp-step-command button:hover:not(:disabled) {
+  background: rgba(55, 253, 118, 0.2);
+}
+
+.webmcp-step-command button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+@keyframes webmcp-step-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(159, 255, 210, 0);
+  }
+
+  50% {
+    box-shadow: 0 0 0 4px rgba(159, 255, 210, 0.22);
+  }
+}
+
+.webmcp-result-panel {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 34px minmax(160px, 1fr);
+  border: 1px solid rgba(122, 255, 199, 0.16);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.26);
+  overflow: hidden;
+}
+
+.webmcp-result-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-bottom: 1px solid rgba(122, 255, 199, 0.12);
+  color: #9fffd2;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.webmcp-result-panel pre {
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  color: rgba(238, 250, 245, 0.82);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: pre-wrap;
+}
+
+.webmcp-editor-frame {
+  min-width: 0;
+  min-height: 100vh;
+  padding: 18px;
+  background:
+    linear-gradient(135deg, rgba(159, 255, 210, 0.08), transparent 30%), rgba(3, 5, 6, 0.88);
+}
+
+.webmcp-editor-frame iframe {
+  width: 100%;
+  height: calc(100vh - 36px);
+  display: block;
+  border: 1px solid rgba(159, 255, 210, 0.2);
+  border-radius: 8px;
+  background: #050d10;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.45);
+}

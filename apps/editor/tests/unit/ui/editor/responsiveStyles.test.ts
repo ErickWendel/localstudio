@@ -1,11 +1,22 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const stylesPath = resolve(__dirname, '../../../../src/app/styles.css');
 
+function readComposedStyles(filePath: string, visited = new Set<string>()): string {
+  if (visited.has(filePath)) return '';
+  visited.add(filePath);
+
+  const styles = readFileSync(filePath, 'utf8');
+  return styles.replace(/@import\s+['"]([^'"]+)['"];\s*/g, (statement, importPath: string) => {
+    if (!importPath.startsWith('.')) return statement;
+    return readComposedStyles(resolve(dirname(filePath), importPath), visited);
+  });
+}
+
 describe('editor responsive styles', () => {
-  const styles = readFileSync(stylesPath, 'utf8');
+  const styles = readComposedStyles(stylesPath);
 
   it('does not force the editor viewport to desktop width on mobile', () => {
     expect(styles).not.toMatch(/body\s*\{[^}]*min-width:\s*1024px/s);

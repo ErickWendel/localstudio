@@ -26,7 +26,11 @@ export function SegmentedTabs<T extends string>({
             key={tab.id}
             role="tab"
             aria-selected={activeTab === tab.id}
-            className={activeTab === tab.id ? 'panel-tab panel-tab-active' : 'panel-tab'}
+            className={
+              activeTab === tab.id
+                ? 'panel-tab panel-tab-active ew-focus-ring'
+                : 'panel-tab ew-focus-ring'
+            }
             type="button"
             onClick={() => onTabChange(tab.id)}
           >
