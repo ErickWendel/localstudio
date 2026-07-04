@@ -7,6 +7,10 @@ import type {
   PresenterStatePayload,
   PresenterWindowCommand,
 } from '../../services/presenter/presenterSessionTypes';
+import {
+  KeyboardShortcutsDialog,
+  type KeyboardShortcutAction,
+} from '../components/KeyboardShortcutsDialog';
 import { CanvasWorkspace } from '../editor/canvas/CanvasWorkspace';
 
 interface PresenterViewProps {
@@ -15,6 +19,30 @@ interface PresenterViewProps {
 
 const introStorageKey = 'localstudio.presenterWindowIntroDismissed';
 const notesZoomStepPx = 2;
+const presenterShortcutActions = [
+  'next-build',
+  'previous-build',
+  'next-slide',
+  'previous-slide',
+  'first-slide',
+  'last-slide',
+  'shortcut-toggle',
+  'open-slide-navigator',
+  'next-navigator-slide',
+  'previous-navigator-slide',
+  'select-navigator-slide',
+  'close-slide-navigator',
+  'reset-timer',
+  'scroll-notes-up',
+  'scroll-notes-down',
+  'increase-notes',
+  'decrease-notes',
+  'play-pause-movie',
+  'rewind-movie',
+  'fast-forward-movie',
+  'jump-movie-start',
+  'jump-movie-end',
+] satisfies KeyboardShortcutAction[];
 
 function isPresenterStateMessage(value: unknown): value is PresenterStateMessage {
   if (!value || typeof value !== 'object') return false;
@@ -40,6 +68,15 @@ function getPresenterOpener() {
   if (!candidate || typeof candidate !== 'object') return null;
   if (!('postMessage' in candidate)) return null;
   return candidate as Window;
+}
+
+function isEditablePresenterTarget(target: EventTarget | null) {
+  const isEditableElement = (value: Element | EventTarget | null) =>
+    value instanceof HTMLInputElement ||
+    value instanceof HTMLTextAreaElement ||
+    value instanceof HTMLSelectElement ||
+    (value instanceof HTMLElement && value.isContentEditable);
+  return isEditableElement(target) || isEditableElement(document.activeElement);
 }
 
 function formatElapsed(ms: number) {
@@ -92,10 +129,15 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
   const [timerBaseMs, setTimerBaseMs] = useState(0);
   const [timerPaused, setTimerPaused] = useState(false);
   const [notesFontSize, setNotesFontSize] = useState(34);
+  const [keyboardShortcutsMode, setKeyboardShortcutsMode] = useState<'dialog' | 'popover' | undefined>();
+  const [slideNavigatorOpen, setSlideNavigatorOpen] = useState(false);
+  const [slideNavigatorIndex, setSlideNavigatorIndex] = useState(0);
   const [introDismissed, setIntroDismissed] = useState(getInitialIntroDismissed);
   const [dismissIntroForever, setDismissIntroForever] = useState(false);
   const emptySelection = useMemo<SelectionState>(() => ({ elementIds: [], pageId: '' }), []);
   const openerRef = useRef<Window | null>(getPresenterOpener());
+  const presenterStageRef = useRef<HTMLElement>(null);
+  const notesRef = useRef<HTMLTextAreaElement>(null);
   const resolvedSessionId = sessionId ?? 'presenter';
 
   const postCommand = useCallback((command: PresenterWindowCommand) => {
@@ -169,19 +211,285 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     postCommand({ command: 'pause-timer' });
   }
 
-  function resetTimer() {
+  const resetTimer = useCallback(() => {
     const now = Date.now();
     setTimerBaseMs(0);
     setTimerNow(now);
     setTimerStartedAt(now);
     setTimerPaused(false);
     postCommand({ command: 'reset-timer' });
+  }, [postCommand]);
+
+  function getPresenterVideos() {
+    return Array.from(presenterStageRef.current?.querySelectorAll('video') ?? []);
   }
+
+  function getVideoTrimStart(video: HTMLVideoElement) {
+    const trimStart = Number(video.dataset.trimStart);
+    return Number.isFinite(trimStart) ? Math.max(0, trimStart) : 0;
+  }
+
+  function getVideoTrimEnd(video: HTMLVideoElement) {
+    const trimEnd = Number(video.dataset.trimEnd);
+    if (Number.isFinite(trimEnd) && trimEnd > 0) return trimEnd;
+    return Number.isFinite(video.duration) ? video.duration : video.currentTime;
+  }
+
+  const controlPresenterMovies = useCallback((action: 'end' | 'forward' | 'play-toggle' | 'rewind' | 'start') => {
+    const videos = getPresenterVideos();
+    if (videos.length === 0) return false;
+    const frameStepSeconds = 1 / 30;
+    for (const video of videos) {
+      if (action === 'play-toggle') {
+        if (video.paused) void video.play();
+        else video.pause();
+        continue;
+      }
+      const trimStart = getVideoTrimStart(video);
+      const trimEnd = getVideoTrimEnd(video);
+      if (action === 'start') video.currentTime = trimStart;
+      if (action === 'end') video.currentTime = trimEnd;
+      if (action === 'rewind') video.currentTime = Math.max(trimStart, video.currentTime - frameStepSeconds);
+      if (action === 'forward') video.currentTime = Math.min(trimEnd, video.currentTime + frameStepSeconds);
+    }
+    return true;
+  }, []);
+
+  const goToPage = useCallback((index: number) => {
+    const page = snapshot?.project.pages[index];
+    if (!page) return false;
+    setSlideNavigatorIndex(index);
+    postCommand({ command: 'go-to-page', pageId: page.id });
+    return true;
+  }, [postCommand, snapshot]);
+
+  const executePresenterShortcut = useCallback((action: KeyboardShortcutAction) => {
+    if (action === 'shortcut-toggle') {
+      setKeyboardShortcutsMode((current) => (current === 'dialog' ? undefined : 'dialog'));
+      return;
+    }
+    if (action === 'open-slide-navigator') {
+      setSlideNavigatorIndex(activePageIndex);
+      setSlideNavigatorOpen(true);
+      return;
+    }
+    if (action === 'close-slide-navigator') {
+      setSlideNavigatorOpen(false);
+      return;
+    }
+    if (action === 'next-navigator-slide') {
+      setSlideNavigatorIndex((current) =>
+        Math.min((snapshot?.project.pages.length ?? 1) - 1, current + 1),
+      );
+      return;
+    }
+    if (action === 'previous-navigator-slide') {
+      setSlideNavigatorIndex((current) => Math.max(0, current - 1));
+      return;
+    }
+    if (action === 'select-navigator-slide') {
+      goToPage(slideNavigatorIndex);
+      setSlideNavigatorOpen(false);
+      return;
+    }
+    if (action === 'first-slide') {
+      goToPage(0);
+      return;
+    }
+    if (action === 'last-slide') {
+      goToPage((snapshot?.project.pages.length ?? 1) - 1);
+      return;
+    }
+    if (action === 'next-slide') {
+      goToPage(activePageIndex + 1);
+      return;
+    }
+    if (action === 'previous-slide') {
+      goToPage(activePageIndex - 1);
+      return;
+    }
+    if (action === 'previous-build') {
+      postCommand({ command: 'previous' });
+      return;
+    }
+    if (action === 'next-build') {
+      postCommand({ command: 'next' });
+      return;
+    }
+    if (action === 'reset-timer') {
+      resetTimer();
+      return;
+    }
+    if (action === 'scroll-notes-up' || action === 'scroll-notes-down') {
+      notesRef.current?.scrollBy({ top: action === 'scroll-notes-up' ? -96 : 96, behavior: 'smooth' });
+      return;
+    }
+    if (action === 'increase-notes') {
+      setNotesFontSize((current) => Math.min(56, current + notesZoomStepPx));
+      return;
+    }
+    if (action === 'decrease-notes') {
+      setNotesFontSize((current) => Math.max(18, current - notesZoomStepPx));
+      return;
+    }
+    if (action === 'play-pause-movie') controlPresenterMovies('play-toggle');
+    if (action === 'rewind-movie') controlPresenterMovies('rewind');
+    if (action === 'fast-forward-movie') controlPresenterMovies('forward');
+    if (action === 'jump-movie-start') controlPresenterMovies('start');
+    if (action === 'jump-movie-end') controlPresenterMovies('end');
+    if (action === 'quit-presentation') window.close();
+  }, [
+    activePageIndex,
+    controlPresenterMovies,
+    goToPage,
+    postCommand,
+    resetTimer,
+    slideNavigatorIndex,
+    snapshot,
+  ]);
 
   function dismissIntro() {
     if (dismissIntroForever) window.localStorage.setItem(introStorageKey, '1');
     setIntroDismissed(true);
   }
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (isEditablePresenterTarget(event.target)) return;
+
+      if (keyboardShortcutsMode && event.key === 'Escape') {
+        event.preventDefault();
+        setKeyboardShortcutsMode(undefined);
+        return;
+      }
+      if (slideNavigatorOpen) {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          setSlideNavigatorOpen(false);
+          return;
+        }
+        if (event.key === '+' || event.key === '=') {
+          event.preventDefault();
+          setSlideNavigatorIndex((current) =>
+            Math.min((snapshot?.project.pages.length ?? 1) - 1, current + 1),
+          );
+          return;
+        }
+        if (event.key === '-') {
+          event.preventDefault();
+          setSlideNavigatorIndex((current) => Math.max(0, current - 1));
+          return;
+        }
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          goToPage(slideNavigatorIndex);
+          setSlideNavigatorOpen(false);
+          return;
+        }
+      }
+
+      const lowerKey = event.key.toLowerCase();
+      if (event.key === '?' || (event.key === '/' && event.shiftKey)) {
+        event.preventDefault();
+        executePresenterShortcut('shortcut-toggle');
+        return;
+      }
+      if (!snapshot) return;
+      if (event.key === '#') {
+        event.preventDefault();
+        executePresenterShortcut('open-slide-navigator');
+        return;
+      }
+      if (event.key === 'Home') {
+        event.preventDefault();
+        executePresenterShortcut('first-slide');
+        return;
+      }
+      if (event.key === 'End') {
+        event.preventDefault();
+        executePresenterShortcut('last-slide');
+        return;
+      }
+      if (event.key === 'ArrowDown' && event.shiftKey) {
+        event.preventDefault();
+        executePresenterShortcut('next-slide');
+        return;
+      }
+      if (event.key === 'ArrowRight' || event.key === 'ArrowDown' || event.key === 'PageDown' || event.key === ' ' || event.key === 'Enter' || event.key === ']') {
+        event.preventDefault();
+        executePresenterShortcut('next-build');
+        return;
+      }
+      if (event.key === '[') {
+        event.preventDefault();
+        executePresenterShortcut('previous-build');
+        return;
+      }
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'PageUp') {
+        event.preventDefault();
+        executePresenterShortcut('previous-slide');
+        return;
+      }
+      if (lowerKey === 'r') {
+        event.preventDefault();
+        executePresenterShortcut('reset-timer');
+        return;
+      }
+      if (lowerKey === 'u' || lowerKey === 'd') {
+        event.preventDefault();
+        executePresenterShortcut(lowerKey === 'u' ? 'scroll-notes-up' : 'scroll-notes-down');
+        return;
+      }
+      if ((event.metaKey || event.ctrlKey) && (event.key === '+' || event.key === '=')) {
+        event.preventDefault();
+        executePresenterShortcut('increase-notes');
+        return;
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key === '-') {
+        event.preventDefault();
+        executePresenterShortcut('decrease-notes');
+        return;
+      }
+      if (lowerKey === 'k') {
+        event.preventDefault();
+        executePresenterShortcut('play-pause-movie');
+        return;
+      }
+      if (lowerKey === 'j') {
+        event.preventDefault();
+        executePresenterShortcut('rewind-movie');
+        return;
+      }
+      if (lowerKey === 'l') {
+        event.preventDefault();
+        executePresenterShortcut('fast-forward-movie');
+        return;
+      }
+      if (lowerKey === 'i') {
+        event.preventDefault();
+        executePresenterShortcut('jump-movie-start');
+        return;
+      }
+      if (lowerKey === 'o') {
+        event.preventDefault();
+        executePresenterShortcut('jump-movie-end');
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    activePageIndex,
+    controlPresenterMovies,
+    executePresenterShortcut,
+    goToPage,
+    keyboardShortcutsMode,
+    postCommand,
+    resetTimer,
+    slideNavigatorIndex,
+    slideNavigatorOpen,
+    snapshot,
+  ]);
 
   const introOverlay = !introDismissed ? (
     <div className="presenter-intro-backdrop" role="presentation">
@@ -258,6 +566,19 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
             <button
               className="stitch-icon-button presenter-control-button"
               type="button"
+              aria-label="Show keyboard shortcuts"
+              aria-expanded={keyboardShortcutsMode === 'popover'}
+              onClick={() =>
+                setKeyboardShortcutsMode((current) => (current === 'popover' ? undefined : 'popover'))
+              }
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">
+                keyboard
+              </span>
+            </button>
+            <button
+              className="stitch-icon-button presenter-control-button"
+              type="button"
               aria-label="Next slide"
               onClick={() => postCommand({ command: 'next' })}
             >
@@ -273,7 +594,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
           </span>
           <span className="presenter-status-item">Builds remaining: {buildsRemaining}</span>
         </div>
-        <section className="presenter-stage" aria-label="Current slide">
+        <section className="presenter-stage" aria-label="Current slide" ref={presenterStageRef}>
           <CanvasWorkspace
             project={snapshot.project}
             activePageId={activePage.id}
@@ -307,6 +628,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
           <span className="presenter-notes-tab-active">Notes</span>
         </div>
         <textarea
+          ref={notesRef}
           aria-label="Speaker notes"
           className={speakerNotes ? 'presenter-notes-textarea' : 'presenter-notes-textarea presenter-notes-empty'}
           placeholder="Add notes to your design"
@@ -336,6 +658,55 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
           </button>
         </div>
       </aside>
+      {keyboardShortcutsMode ? (
+        <KeyboardShortcutsDialog
+          title={keyboardShortcutsMode === 'popover' ? 'Magic Shortcuts' : 'Keyboard Shortcuts'}
+          variant={keyboardShortcutsMode}
+          onClose={() => setKeyboardShortcutsMode(undefined)}
+          onShortcutAction={executePresenterShortcut}
+          supportedActions={presenterShortcutActions}
+        />
+      ) : null}
+      {slideNavigatorOpen && snapshot ? (
+        <div className="presentation-slide-navigator" role="dialog" aria-modal="true" aria-label="Slide navigator">
+          <div className="presentation-slide-navigator-header">
+            <h2>Slide Navigator</h2>
+            <button
+              className="stitch-icon-button"
+              type="button"
+              aria-label="Close slide navigator"
+              onClick={() => setSlideNavigatorOpen(false)}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">
+                close
+              </span>
+            </button>
+          </div>
+          <div className="presentation-slide-navigator-list" role="listbox" aria-label="Slides">
+            {snapshot.project.pages.map((page, index) => (
+              <button
+                aria-selected={index === slideNavigatorIndex}
+                className={
+                  index === slideNavigatorIndex
+                    ? 'presentation-slide-navigator-item presentation-slide-navigator-item-active'
+                    : 'presentation-slide-navigator-item'
+                }
+                key={page.id}
+                type="button"
+                role="option"
+                onClick={() => setSlideNavigatorIndex(index)}
+                onDoubleClick={() => {
+                  goToPage(index);
+                  setSlideNavigatorOpen(false);
+                }}
+              >
+                <span>Slide {index + 1}</span>
+                <strong>{page.name}</strong>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {introOverlay}
     </main>
   );

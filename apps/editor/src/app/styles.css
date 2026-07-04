@@ -6522,6 +6522,318 @@ button {
   display: none;
 }
 
+.workspace-column-cursor-hidden,
+.workspace-column-cursor-hidden * {
+  cursor: none !important;
+}
+
+.keyboard-shortcuts-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(5, 13, 16, 0.78);
+  backdrop-filter: blur(8px);
+}
+
+.keyboard-shortcuts-dialog {
+  position: relative;
+  width: min(980px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  display: grid;
+  gap: 22px;
+  padding: 28px 34px 34px;
+  border: 1px solid var(--ew-border);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(55, 253, 118, 0.05), transparent 38%),
+    var(--ew-black);
+  color: var(--ew-text);
+  box-shadow:
+    0 28px 80px rgba(0, 0, 0, 0.56),
+    0 0 24px rgba(55, 253, 118, 0.1);
+}
+
+.keyboard-shortcuts-popover {
+  position: fixed;
+  top: 70px;
+  right: 18px;
+  z-index: 120;
+  width: min(360px, calc(100vw - 36px));
+  max-height: min(640px, calc(100vh - 92px));
+  overflow: auto;
+  display: grid;
+  gap: 14px;
+  padding: 14px 0 16px;
+  border: 1px solid var(--ew-border);
+  border-radius: 8px;
+  background: var(--ew-black);
+  color: var(--ew-text);
+  box-shadow:
+    0 22px 64px rgba(0, 0, 0, 0.54),
+    0 0 18px rgba(55, 253, 118, 0.1);
+}
+
+.keyboard-shortcuts-close {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+}
+
+.keyboard-shortcuts-popover .keyboard-shortcuts-close {
+  top: 10px;
+  right: 10px;
+  left: auto;
+}
+
+.keyboard-shortcuts-dialog h2,
+.keyboard-shortcuts-popover h2 {
+  margin: 0;
+  font-family: var(--ls-font-display);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 30px;
+  text-align: center;
+}
+
+.keyboard-shortcuts-popover h2 {
+  padding: 0 44px 0 16px;
+  font-size: 14px;
+  line-height: 24px;
+  text-align: left;
+}
+
+.keyboard-shortcuts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 54px;
+  row-gap: 22px;
+}
+
+.keyboard-shortcuts-popover .keyboard-shortcuts-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
+.keyboard-shortcuts-group {
+  min-width: 0;
+}
+
+.keyboard-shortcuts-popover .keyboard-shortcuts-group {
+  padding: 12px 14px 0;
+  border-top: 1px solid var(--ew-border);
+}
+
+.keyboard-shortcuts-popover .keyboard-shortcuts-group:first-child {
+  border-top: 0;
+}
+
+.keyboard-shortcuts-group h3 {
+  margin: 0 0 12px;
+  color: var(--ew-green-fixed);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 20px;
+}
+
+.keyboard-shortcuts-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.keyboard-shortcuts-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  padding: 2px 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.keyboard-shortcuts-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.keyboard-shortcuts-row:focus-visible {
+  outline: 2px solid var(--ew-green-fixed);
+  outline-offset: 2px;
+}
+
+.keyboard-shortcuts-popover .keyboard-shortcuts-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 32px;
+}
+
+.keyboard-shortcuts-popover .keyboard-shortcuts-keys {
+  order: 2;
+  justify-content: flex-end;
+}
+
+.keyboard-shortcuts-popover .keyboard-shortcuts-label {
+  order: 1;
+  font-size: 13px;
+}
+
+.keyboard-shortcuts-keys {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.keyboard-shortcuts-label {
+  margin: 0;
+  color: var(--ew-text);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 19px;
+}
+
+.keyboard-shortcuts-row kbd {
+  min-width: 24px;
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 7px;
+  border: 1px solid rgba(193, 201, 189, 0.22);
+  border-radius: 4px;
+  background: var(--ew-raised);
+  color: var(--ew-text);
+  font-family: var(--ls-font-body);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.32);
+}
+
+.presentation-slide-navigator {
+  position: absolute;
+  top: 72px;
+  right: 24px;
+  z-index: 115;
+  width: min(340px, calc(100vw - 48px));
+  max-height: min(560px, calc(100vh - 120px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  border: 1px solid var(--ew-border);
+  border-radius: 8px;
+  background: var(--ew-black);
+  color: var(--ew-text);
+  box-shadow:
+    0 22px 64px rgba(0, 0, 0, 0.52),
+    0 0 18px rgba(55, 253, 118, 0.1);
+}
+
+.presentation-slide-navigator-header {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px 0 16px;
+  border-bottom: 1px solid var(--ew-border);
+}
+
+.presentation-slide-navigator-header h2 {
+  margin: 0;
+  font-family: var(--ls-font-display);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 20px;
+}
+
+.presentation-slide-navigator-list {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+}
+
+.presentation-slide-navigator-item {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ew-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.presentation-slide-navigator-item span {
+  color: var(--ew-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.presentation-slide-navigator-item strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.presentation-slide-navigator-item-active {
+  border-color: rgba(55, 253, 118, 0.38);
+  background: rgba(55, 253, 118, 0.12);
+}
+
+.presentation-blank-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 112;
+}
+
+.presentation-blank-screen-black {
+  background: #000000;
+}
+
+.presentation-blank-screen-white {
+  background: #ffffff;
+}
+
+.presentation-slide-number {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  z-index: 113;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+  border: 1px solid var(--ew-border);
+  border-radius: 6px;
+  background: var(--ew-black);
+  color: var(--ew-green-fixed);
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.42);
+}
+
 .presenter-view {
   min-height: 100vh;
   display: grid;

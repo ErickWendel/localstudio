@@ -149,6 +149,121 @@ describe('PresenterView', () => {
     );
   });
 
+  it('opens shortcuts from the presenter toolbar and sends keyboard page jumps', () => {
+    const opener = { postMessage: vi.fn() };
+    Object.defineProperty(window, 'opener', {
+      configurable: true,
+      value: opener,
+    });
+    window.localStorage.setItem('localstudio.presenterWindowIntroDismissed', '1');
+    render(<PresenterView sessionId="session-1" />);
+    const project = sampleProject.createSampleProject();
+    project.pages.push({
+      background: { type: 'color', color: '#111111' },
+      elementIds: [],
+      height: 1080,
+      id: 'page-2',
+      name: 'Slide 2',
+      width: 1920,
+    });
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          origin: window.location.origin,
+          data: {
+            payload: {
+              activePageId: 'page-1',
+              animationPreview: undefined,
+              project,
+            },
+            sessionId: 'session-1',
+            source: 'localstudio-presenter-main',
+            type: 'state',
+          },
+        }),
+      );
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show keyboard shortcuts' }));
+    expect(screen.getByRole('dialog', { name: 'Magic Shortcuts' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Switch the slideshow/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Hide presentation/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /black screen/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Go to first slide/ }));
+    expect(opener.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: 'go-to-page',
+        pageId: 'page-1',
+        sessionId: 'session-1',
+        source: 'localstudio-presenter-window',
+        type: 'command',
+      }),
+      window.location.origin,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Close keyboard shortcuts' }));
+
+    fireEvent.keyDown(window, { key: 'End' });
+
+    expect(opener.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: 'go-to-page',
+        pageId: 'page-2',
+        sessionId: 'session-1',
+        source: 'localstudio-presenter-window',
+        type: 'command',
+      }),
+      window.location.origin,
+    );
+  });
+
+  it('does not run presenter shortcuts while typing in speaker notes', () => {
+    const opener = { postMessage: vi.fn() };
+    Object.defineProperty(window, 'opener', {
+      configurable: true,
+      value: opener,
+    });
+    window.localStorage.setItem('localstudio.presenterWindowIntroDismissed', '1');
+    render(<PresenterView sessionId="session-1" />);
+    const project = sampleProject.createSampleProject();
+    project.pages.push({
+      background: { type: 'color', color: '#111111' },
+      elementIds: [],
+      height: 1080,
+      id: 'page-2',
+      name: 'Slide 2',
+      speakerNotes: '',
+      width: 1920,
+    });
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          origin: window.location.origin,
+          data: {
+            payload: {
+              activePageId: 'page-1',
+              animationPreview: undefined,
+              project,
+            },
+            sessionId: 'session-1',
+            source: 'localstudio-presenter-main',
+            type: 'state',
+          },
+        }),
+      );
+    });
+
+    const notes = screen.getByLabelText('Speaker notes');
+    notes.focus();
+    fireEvent.keyDown(notes, { key: '?' });
+    fireEvent.keyDown(notes, { key: 'End' });
+
+    expect(screen.queryByRole('dialog', { name: 'Keyboard Shortcuts' })).not.toBeInTheDocument();
+    expect(opener.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ command: 'go-to-page', pageId: 'page-2' }),
+      window.location.origin,
+    );
+  });
+
   it('does not post close during StrictMode effect remounts', () => {
     const opener = { postMessage: vi.fn() };
     Object.defineProperty(window, 'opener', {

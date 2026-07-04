@@ -93,6 +93,24 @@ describe('TopToolbar', () => {
     expect(onPersistenceToggle).toHaveBeenCalledWith(true);
   });
 
+  it('opens keyboard shortcuts from the Help menu', async () => {
+    const user = userEvent.setup();
+    const onOpenKeyboardShortcuts = vi.fn();
+
+    render(
+      <TopToolbar
+        project={sampleProject.createSampleProject()}
+        language="PT-BR"
+        onOpenKeyboardShortcuts={onOpenKeyboardShortcuts}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Help' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Keyboard Shortcuts' }));
+
+    expect(onOpenKeyboardShortcuts).toHaveBeenCalledTimes(1);
+  });
+
   it('translates the deck from the toolbar icon beside persistence', async () => {
     const user = userEvent.setup();
     const onTranslateDeck = vi.fn();

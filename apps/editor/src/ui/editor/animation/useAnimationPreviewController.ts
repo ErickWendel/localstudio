@@ -245,7 +245,55 @@ export function useAnimationPreviewController({
     return goToPresentationPage(1);
   }
 
+  function getPreviewBuilds(pageId: string) {
+    const page = projectRef.current.pages.find((item) => item.id === pageId);
+    if (!page) return [];
+    return (page.animationBuilds ?? []).filter((build) => page.elementIds.includes(build.elementId));
+  }
+
+  function getCurrentBuildIndex(builds: ElementAnimationBuild[]) {
+    if (!animationPreview) return -1;
+    if (animationPreview.phase === 'complete') return builds.length;
+    if (animationPreview.activeBuild) {
+      const activeBuildIndex = builds.findIndex((build) => build.id === animationPreview.activeBuild?.id);
+      if (activeBuildIndex >= 0) return activeBuildIndex;
+    }
+    const nextBuild = animationPreviewQueueRef.current[0];
+    if (!nextBuild) return builds.length;
+    return builds.findIndex((build) => build.id === nextBuild.id);
+  }
+
+  function rewindAnimationPreviewBuild() {
+    if (!animationPreview) return false;
+    const builds = getPreviewBuilds(animationPreview.pageId);
+    if (builds.length === 0) return false;
+    const currentBuildIndex = getCurrentBuildIndex(builds);
+    const targetBuildIndex = currentBuildIndex - 1;
+    if (targetBuildIndex < 0) return false;
+    const targetBuild = builds[targetBuildIndex];
+    if (!targetBuild) return false;
+    clearAnimationPreviewTimers();
+    animationPreviewQueueRef.current = builds.slice(targetBuildIndex);
+    setAnimationPreview((current) =>
+      current
+        ? {
+            ...current,
+            activeBuild: undefined,
+            activeBuildElementId: targetBuild.elementId,
+            animationProgress: 0,
+            hiddenElementIds: builds
+              .slice(targetBuildIndex)
+              .map((build) => build.elementId),
+            phase: 'waiting',
+            waitingForClick: true,
+          }
+        : current,
+    );
+    return true;
+  }
+
   function rewindPresentationPreview() {
+    if (rewindAnimationPreviewBuild()) return true;
     return goToPresentationPage(-1);
   }
 

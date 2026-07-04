@@ -9,6 +9,7 @@ export interface PresenterStatePayload {
 
 export type PresenterWindowCommand =
   | { command: 'close' }
+  | { command: 'go-to-page'; pageId: string }
   | { command: 'next' }
   | { command: 'pause-timer' }
   | { command: 'previous' }

@@ -35,6 +35,7 @@ interface TopToolbarProps {
   onMirrorNow?: (() => void) | undefined;
   onMirrorToggle?: ((enabled: boolean) => void) | undefined;
   onOpenMirrorSettings?: (() => void) | undefined;
+  onOpenKeyboardShortcuts?: (() => void) | undefined;
   onOpenVersionHistory?: (() => void) | undefined;
   onNewProject?: (() => void) | undefined;
   onPersistenceToggle?: ((enabled: boolean) => void) | undefined;
@@ -146,6 +147,7 @@ export function TopToolbar({
   onMirrorNow,
   onMirrorToggle,
   onOpenMirrorSettings,
+  onOpenKeyboardShortcuts,
   onOpenVersionHistory,
   onNewProject,
   onPersistenceToggle,
@@ -267,7 +269,7 @@ export function TopToolbar({
         : { label: 'Toggle Layers Panel', disabled: true },
     ],
     Help: [
-      { label: 'Keyboard Shortcuts', disabled: true },
+      { label: 'Keyboard Shortcuts', disabled: !onOpenKeyboardShortcuts, onSelect: onOpenKeyboardShortcuts },
       { label: 'Local AI Setup', disabled: true },
     ],
   };

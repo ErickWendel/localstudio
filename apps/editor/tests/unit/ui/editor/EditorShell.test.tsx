@@ -47,6 +47,11 @@ async function waitForShareButtonReady() {
   });
 }
 
+async function startFullscreenPresentation(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Presentation play options' }));
+  await user.click(screen.getByRole('menuitem', { name: 'Present in fullscreen' }));
+}
+
 function enableSyncedSharing(services: ReturnType<typeof createAppServices>) {
   services.mirrorService = new RecordingMirrorService();
   services.shareService = new RecordingShareService();
@@ -1645,7 +1650,7 @@ describe('EditorShell', () => {
 
     render(<EditorShell services={createAppServices({ initialProject: project })} />);
 
-    await user.click(screen.getByRole('button', { name: 'Play presentation' }));
+    await startFullscreenPresentation(user);
 
     await waitFor(() => {
       expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
@@ -1658,6 +1663,25 @@ describe('EditorShell', () => {
       );
     });
     expect(screen.queryByLabelText('Animation build 1 for Image')).not.toBeInTheDocument();
+  });
+
+  it('opens keyboard shortcuts with question mark while presenting fullscreen', async () => {
+    const user = userEvent.setup();
+    const project = sampleProject.createSampleProject();
+
+    render(<EditorShell services={createAppServices({ initialProject: project })} />);
+
+    await startFullscreenPresentation(user);
+    await waitFor(() => {
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-animation-preview-mode',
+        'presenter',
+      );
+    });
+
+    fireEvent.keyDown(window, { key: '?' });
+
+    expect(screen.getByRole('dialog', { name: 'Keyboard Shortcuts' })).toBeInTheDocument();
   });
 
   it('starts animation preview from the Animate panel play button', async () => {
@@ -1713,7 +1737,7 @@ describe('EditorShell', () => {
 
     render(<EditorShell services={createAppServices({ initialProject: project })} />);
 
-    await user.click(screen.getByRole('button', { name: 'Play presentation' }));
+    await startFullscreenPresentation(user);
 
     await waitFor(() => {
       expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
@@ -1766,7 +1790,7 @@ describe('EditorShell', () => {
     render(<EditorShell services={createAppServices({ initialProject: project })} />);
 
     expect(screen.getByText('1 / 2')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Play presentation' }));
+    await startFullscreenPresentation(user);
 
     await waitFor(() => {
       expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
@@ -1847,7 +1871,7 @@ describe('EditorShell', () => {
       <EditorShell services={createAppServices({ initialProject: project })} />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Play presentation' }));
+    await startFullscreenPresentation(user);
 
     await waitFor(() => {
       expect(document.fullscreenElement).toBe(screen.getByLabelText('Canvas workspace'));
@@ -1911,7 +1935,7 @@ describe('EditorShell', () => {
     await user.click(screen.getByRole('button', { name: 'Activate Slide 3' }));
     expect(screen.getByText('3 / 3')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Play presentation' }));
+    await startFullscreenPresentation(user);
 
     await waitFor(() => {
       expect(screen.getByText('3 / 3')).toBeInTheDocument();
@@ -2038,7 +2062,7 @@ describe('EditorShell', () => {
     );
     expect(screen.getByRole('button', { name: 'Add page after Slide 1' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Play presentation' }));
+    await startFullscreenPresentation(user);
 
     await waitFor(() => {
       expect(document.fullscreenElement).toBe(screen.getByLabelText('Canvas workspace'));
@@ -2095,7 +2119,7 @@ describe('EditorShell', () => {
 
     render(<EditorShell services={createAppServices({ initialProject: project })} />);
 
-    await user.click(screen.getByRole('button', { name: 'Play presentation' }));
+    await startFullscreenPresentation(user);
 
     await waitFor(() => {
       expect(document.fullscreenElement).toBe(screen.getByLabelText('Canvas workspace'));
