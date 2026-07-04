@@ -3884,7 +3884,7 @@ export function useEditorViewModel(services: AppServices) {
     addRecentStockMedia(item);
   }
 
-  function insertRemoteGif(item: StockMediaItem) {
+  function commitRemoteGifElement(item: StockMediaItem) {
     if (item.kind !== 'gif') return;
     const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
     if (!page) return;
@@ -3929,9 +3929,75 @@ export function useEditorViewModel(services: AppServices) {
     addRecentStockMedia(item);
   }
 
+  async function insertRemoteGif(item: StockMediaItem) {
+    if (item.kind !== 'gif') return;
+    if (!item.videoUrl) {
+      commitRemoteGifElement(item);
+      return;
+    }
+    const videoUrl = item.videoUrl;
+    const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
+    if (!page) return;
+
+    try {
+      const mediaSize = await readVideoSize(videoUrl);
+      const assetId = createPrefixedId('asset');
+      const elementId = createPrefixedId('video');
+      const fittedMedia = fitImageWithinPage({
+        imageWidth: item.width || mediaSize.width,
+        imageHeight: item.height || mediaSize.height,
+        pageWidth: page.width,
+        pageHeight: page.height,
+      });
+
+      commitProject(
+        (currentProject) =>
+          new basicCommands.AddMediaElementCommand(activePageId, {
+            asset: {
+              id: assetId,
+              type: 'video',
+              name: item.title,
+              mimeType: 'video/mp4',
+              objectUrl: videoUrl,
+              storage: 'remote',
+            },
+            element: {
+              id: elementId,
+              type: 'video',
+              assetId,
+              x: fittedMedia.x,
+              y: fittedMedia.y,
+              width: fittedMedia.width,
+              height: fittedMedia.height,
+              rotation: 0,
+              locked: false,
+              visible: true,
+              opacity: 1,
+              loop: true,
+              controls: true,
+              muted: true,
+              autoplayInPreview: true,
+              trimStartSeconds: 0,
+              repeatMode: 'loop',
+              ...(mediaSize.durationSeconds !== undefined
+                ? {
+                    durationSeconds: mediaSize.durationSeconds,
+                    trimEndSeconds: mediaSize.durationSeconds,
+                  }
+                : {}),
+            },
+          }).execute(currentProject),
+        { selectedElementIds: [elementId] },
+      );
+      addRecentStockMedia(item);
+    } catch {
+      commitRemoteGifElement(item);
+    }
+  }
+
   function insertStockMedia(item: StockMediaItem) {
     if (item.kind === 'gif') {
-      insertRemoteGif(item);
+      void insertRemoteGif(item);
       return;
     }
     void insertRemoteImage(item);

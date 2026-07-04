@@ -140,6 +140,7 @@ const stockGif: StockMediaItem = {
   authorName: 'Motion Studio',
   thumbnailUrl: 'https://media.giphy.com/media/gif-1/200w.gif',
   mediaUrl: 'https://media.giphy.com/media/gif-1/giphy.gif',
+  videoUrl: 'https://media.giphy.com/media/gif-1/giphy.mp4',
   width: 480,
   height: 270,
 };
@@ -788,9 +789,10 @@ describe('EditorShell', () => {
     expect(stockMediaService.trackedItems).toEqual([stockImage]);
   });
 
-  it('inserts and selects a GIPHY GIF from the Elements panel', async () => {
+  it('inserts and selects a GIPHY GIF movie from the Elements panel', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
+    mockVideoMetadataLoad();
     services.stockMediaService = new ReadyStockMediaService();
 
     render(<EditorShell services={services} />);
@@ -801,9 +803,14 @@ describe('EditorShell', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
         'data-selected-elements',
-        expect.stringMatching(/^gif-/),
+        expect.stringMatching(/^video-/),
       );
     });
+    expect(screen.getByLabelText('Launch GIF').tagName.toLowerCase()).toBe('video');
+    expect(screen.getByLabelText('Launch GIF')).toHaveAttribute(
+      'src',
+      'https://media.giphy.com/media/gif-1/giphy.mp4',
+    );
   });
 
   it('shows a generic API key error when stock image search is rejected', async () => {

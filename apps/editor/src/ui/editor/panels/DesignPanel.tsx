@@ -836,17 +836,6 @@ function ElementDesignInspector({
                 }}
               />
             </label>
-            {element.type === 'video' ? (
-              <label className="design-control ew-field-scope">
-                <span>Controls</span>
-                <input
-                  aria-label="Show selected video controls"
-                  checked={element.controls}
-                  type="checkbox"
-                  onChange={(event) => onUpdateMedia({ controls: event.target.checked })}
-                />
-              </label>
-            ) : null}
           </section>
         </>
       ) : null}

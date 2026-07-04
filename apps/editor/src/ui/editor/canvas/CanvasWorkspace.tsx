@@ -1829,7 +1829,7 @@ function CanvasVideoElement({
       aria-label={assetName}
       autoPlay={autoplay}
       className="canvas-media-element"
-      controls={interactive && element.controls}
+      controls={false}
       data-element-id={element.id}
       data-trim-end={element.trimEndSeconds ?? ''}
       data-trim-start={element.trimStartSeconds}
