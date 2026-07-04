@@ -890,6 +890,7 @@ export function EditorShell({ services }: EditorShellProps) {
           onSetSelectedElementZOrder={isHistoryReadOnly ? undefined : vm.setSelectedElementZOrder}
           onUpdateElementFrame={isHistoryReadOnly ? undefined : vm.updateElementFrame}
           onUpdateElementStyle={isHistoryReadOnly ? undefined : vm.updateElementStyle}
+          onUpdateTextContent={isHistoryReadOnly ? undefined : vm.updateTextContent}
           onUpdateMediaPlayback={isHistoryReadOnly ? undefined : vm.updateMediaPlayback}
           onUpdatePageBackground={isHistoryReadOnly ? undefined : vm.updatePageBackground}
           onReplaceVideoAsset={

@@ -57,6 +57,7 @@ interface RightPanelProps {
   onAlignSelectedElement?: (mode: AlignMode) => void;
   onUpdateElementStyle?: (elementId: string, patch: ElementStylePatch) => void;
   onUpdateElementFrame?: (elementId: string, patch: ElementFramePatch) => void;
+  onUpdateTextContent?: (elementId: string, text: string) => void;
   onUpdateMediaPlayback?: (elementId: string, patch: MediaPlaybackPatch) => void;
   onUpdatePageBackground?: (background: PageBackground) => void;
   onSetSelectedElementZOrder?: (mode: ZOrderMode) => void;
@@ -104,6 +105,7 @@ export function RightPanel({
   onAlignSelectedElement,
   onUpdateElementStyle,
   onUpdateElementFrame,
+  onUpdateTextContent,
   onUpdateMediaPlayback,
   onUpdatePageBackground,
   onSetSelectedElementZOrder,
@@ -160,6 +162,7 @@ export function RightPanel({
             {...(onSetSelectedElementZOrder ? { onSetSelectedElementZOrder } : {})}
             {...(onUpdateElementFrame ? { onUpdateElementFrame } : {})}
             {...(onUpdateElementStyle ? { onUpdateElementStyle } : {})}
+            {...(onUpdateTextContent ? { onUpdateTextContent } : {})}
             {...(onUpdateMediaPlayback ? { onUpdateMediaPlayback } : {})}
             {...(onUpdatePageBackground ? { onUpdatePageBackground } : {})}
             {...(onReplaceVideoAsset ? { onReplaceVideoAsset } : {})}
