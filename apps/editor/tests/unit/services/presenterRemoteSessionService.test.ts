@@ -18,7 +18,11 @@ function isMediaPreviewElement(
 
 describe('BrowserPresenterSessionService remote control', () => {
   it('registers a remote control session with QR metadata', async () => {
-    const popup = { location: { href: '' }, postMessage: vi.fn(), closed: false } as unknown as Window;
+    const popup = {
+      location: { href: '' },
+      postMessage: vi.fn(),
+      closed: false,
+    } as unknown as Window;
     const signalingService = new InMemoryPresenterRemoteSignalingService({
       now: () => new Date('2026-07-04T12:00:00.000Z').getTime(),
       randomCode: () => 'ABCD-1234',
@@ -48,7 +52,11 @@ describe('BrowserPresenterSessionService remote control', () => {
   });
 
   it('uses the network origin for localhost QR metadata', async () => {
-    const popup = { location: { href: '' }, postMessage: vi.fn(), closed: false } as unknown as Window;
+    const popup = {
+      location: { href: '' },
+      postMessage: vi.fn(),
+      closed: false,
+    } as unknown as Window;
     const signalingService = new InMemoryPresenterRemoteSignalingService({
       now: () => new Date('2026-07-04T12:00:00.000Z').getTime(),
       randomCode: () => 'ABCD-1234',
@@ -72,7 +80,11 @@ describe('BrowserPresenterSessionService remote control', () => {
   });
 
   it('publishes remote state snapshots derived from presenter payloads', async () => {
-    const popup = { location: { href: '' }, postMessage: vi.fn(), closed: false } as unknown as Window;
+    const popup = {
+      location: { href: '' },
+      postMessage: vi.fn(),
+      closed: false,
+    } as unknown as Window;
     const signalingService = new InMemoryPresenterRemoteSignalingService({
       randomCode: () => 'ABCD-1234',
       randomId: () => 'remote-session-1',
@@ -100,9 +112,10 @@ describe('BrowserPresenterSessionService remote control', () => {
         notes: project.pages[0]!.speakerNotes ?? '',
         pageCount: project.pages.length,
         slidePreview: {
-          backgroundColor: project.pages[0]!.background.type === 'color'
-            ? project.pages[0]!.background.color
-            : project.pages[0]!.background.colorFallback,
+          backgroundColor:
+            project.pages[0]!.background.type === 'color'
+              ? project.pages[0]!.background.color
+              : project.pages[0]!.background.colorFallback,
           height: project.pages[0]!.height,
           width: project.pages[0]!.width,
         },
@@ -111,11 +124,19 @@ describe('BrowserPresenterSessionService remote control', () => {
     });
     const publishedState = signalingService.getPublishedState('ABCD-1234');
     expect(publishedState?.slidePreview?.elements.length).toBeGreaterThan(0);
-    expect(publishedState?.upcomingSlidePreviews).toHaveLength(Math.min(3, project.pages.length - 1));
+    expect(publishedState?.pages?.[0]?.preview?.elements.length).toBeGreaterThan(0);
+    expect(publishedState?.pages).toHaveLength(project.pages.length);
+    expect(publishedState?.upcomingSlidePreviews).toHaveLength(
+      Math.min(3, project.pages.length - 1),
+    );
   });
 
   it('publishes portable slide preview asset URLs for remote devices', async () => {
-    const popup = { location: { href: '' }, postMessage: vi.fn(), closed: false } as unknown as Window;
+    const popup = {
+      location: { href: '' },
+      postMessage: vi.fn(),
+      closed: false,
+    } as unknown as Window;
     const signalingService = new InMemoryPresenterRemoteSignalingService({
       randomCode: () => 'ABCD-1234',
       randomId: () => 'remote-session-1',
@@ -153,7 +174,11 @@ describe('BrowserPresenterSessionService remote control', () => {
   });
 
   it('publishes build-aware remote previews and media metadata', async () => {
-    const popup = { location: { href: '' }, postMessage: vi.fn(), closed: false } as unknown as Window;
+    const popup = {
+      location: { href: '' },
+      postMessage: vi.fn(),
+      closed: false,
+    } as unknown as Window;
     const signalingService = new InMemoryPresenterRemoteSignalingService({
       randomCode: () => 'ABCD-1234',
       randomId: () => 'remote-session-1',
@@ -232,7 +257,9 @@ describe('BrowserPresenterSessionService remote control', () => {
       previewMode: 'stream',
       stream: { enabled: true, fps: 8, height: 340, width: 390 },
     });
-    expect(publishedPreview?.elements.some((element) => element.id === hiddenElementId)).toBe(false);
+    expect(publishedPreview?.elements.some((element) => element.id === hiddenElementId)).toBe(
+      false,
+    );
     expect(publishedPreview?.elements.find(isMediaPreviewElement)).toMatchObject({
       assetUrl: 'https://cdn.localstudio.test/demo.mp4',
       autoplay: true,
@@ -245,7 +272,11 @@ describe('BrowserPresenterSessionService remote control', () => {
   });
 
   it('publishes the presenter timer state received from the presenter window', async () => {
-    const popup = { location: { href: '' }, postMessage: vi.fn(), closed: false } as unknown as Window;
+    const popup = {
+      location: { href: '' },
+      postMessage: vi.fn(),
+      closed: false,
+    } as unknown as Window;
     const signalingService = new InMemoryPresenterRemoteSignalingService({
       randomCode: () => 'ABCD-1234',
       randomId: () => 'remote-session-1',
@@ -291,7 +322,11 @@ describe('BrowserPresenterSessionService remote control', () => {
   it('keeps running presenter timer state current when later slide state is published', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-04T12:00:00.000Z'));
-    const popup = { location: { href: '' }, postMessage: vi.fn(), closed: false } as unknown as Window;
+    const popup = {
+      location: { href: '' },
+      postMessage: vi.fn(),
+      closed: false,
+    } as unknown as Window;
     const signalingService = new InMemoryPresenterRemoteSignalingService({
       randomCode: () => 'ABCD-1234',
       randomId: () => 'remote-session-1',
@@ -343,7 +378,11 @@ describe('BrowserPresenterSessionService remote control', () => {
 
   it('routes remote commands through the existing presenter command subscription', async () => {
     vi.useFakeTimers();
-    const popup = { location: { href: '' }, postMessage: vi.fn(), closed: false } as unknown as Window;
+    const popup = {
+      location: { href: '' },
+      postMessage: vi.fn(),
+      closed: false,
+    } as unknown as Window;
     const signalingService = new InMemoryPresenterRemoteSignalingService({
       randomCode: () => 'ABCD-1234',
       randomId: () => 'remote-session-1',

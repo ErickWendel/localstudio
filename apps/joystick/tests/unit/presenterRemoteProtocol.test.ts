@@ -5,7 +5,9 @@ import { presenterRemoteSessionCode } from '@localstudio/presenter-remote/sessio
 describe('presenter remote protocol', () => {
   it('accepts known remote commands and rejects malformed commands', () => {
     expect(presenterRemoteProtocol.isCommand({ type: 'command', command: 'next' })).toBe(true);
-    expect(presenterRemoteProtocol.isCommand({ type: 'command', command: 'start-presenting' })).toBe(true);
+    expect(
+      presenterRemoteProtocol.isCommand({ type: 'command', command: 'start-presenting' }),
+    ).toBe(true);
     expect(
       presenterRemoteProtocol.isCommand({
         type: 'command',
@@ -22,8 +24,12 @@ describe('presenter remote protocol', () => {
       }),
     ).toBe(true);
 
-    expect(presenterRemoteProtocol.isCommand({ type: 'command', command: 'delete-page' })).toBe(false);
-    expect(presenterRemoteProtocol.isCommand({ type: 'command', command: 'go-to-page' })).toBe(false);
+    expect(presenterRemoteProtocol.isCommand({ type: 'command', command: 'delete-page' })).toBe(
+      false,
+    );
+    expect(presenterRemoteProtocol.isCommand({ type: 'command', command: 'go-to-page' })).toBe(
+      false,
+    );
     expect(presenterRemoteProtocol.isCommand(null)).toBe(false);
   });
 
@@ -37,6 +43,18 @@ describe('presenter remote protocol', () => {
         deckName: 'Demo deck',
         notes: '',
         pageCount: 24,
+        pages: [
+          {
+            id: 'page-1',
+            name: 'Intro',
+            preview: {
+              backgroundColor: '#050D10',
+              elements: [],
+              height: 1080,
+              width: 1920,
+            },
+          },
+        ],
         presenterMode: 'presenting',
         slidePreview: {
           backgroundColor: '#050D10',

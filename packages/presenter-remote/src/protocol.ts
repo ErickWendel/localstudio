@@ -85,6 +85,7 @@ export interface PresenterRemoteSlidePreview {
 export interface PresenterRemotePageSummary {
   id: string;
   name: string;
+  preview?: PresenterRemoteSlidePreview | undefined;
 }
 
 export interface PresenterRemoteUpcomingSlidePreview {
@@ -110,12 +111,14 @@ export interface PresenterRemoteState {
   presenterMode: 'presenting' | 'ready';
   slidePreview?: PresenterRemoteSlidePreview | undefined;
   shortcuts: string[];
-  stream?: {
-    enabled: boolean;
-    fps: number;
-    height: number;
-    width: number;
-  } | undefined;
+  stream?:
+    | {
+        enabled: boolean;
+        fps: number;
+        height: number;
+        width: number;
+      }
+    | undefined;
   timer: PresenterRemoteTimerState;
   type: 'state';
   upcomingSlidePreviews?: PresenterRemoteUpcomingSlidePreview[] | undefined;
@@ -148,7 +151,12 @@ function isStreamMetadata(value: unknown) {
 }
 
 function isPageSummary(value: unknown): value is PresenterRemotePageSummary {
-  return isRecord(value) && typeof value.id === 'string' && typeof value.name === 'string';
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.name === 'string' &&
+    (value.preview === undefined || isSlidePreview(value.preview))
+  );
 }
 
 function isUpcomingSlidePreview(value: unknown): value is PresenterRemoteUpcomingSlidePreview {
@@ -208,7 +216,8 @@ function isSlidePreview(value: unknown): value is PresenterRemoteSlidePreview {
 }
 
 function isCommand(value: unknown): value is PresenterRemoteCommand {
-  if (!isRecord(value) || value.type !== 'command' || typeof value.command !== 'string') return false;
+  if (!isRecord(value) || value.type !== 'command' || typeof value.command !== 'string')
+    return false;
   if (
     value.command === 'close' ||
     value.command === 'next' ||
@@ -240,7 +249,10 @@ function isStreamPreference(value: unknown): value is PresenterRemoteStreamPrefe
     typeof value.fps === 'number' &&
     Number.isFinite(value.fps) &&
     value.fps > 0 &&
-    (value.quality === 'auto' || value.quality === 'high' || value.quality === 'low' || value.quality === 'medium')
+    (value.quality === 'auto' ||
+      value.quality === 'high' ||
+      value.quality === 'low' ||
+      value.quality === 'medium')
   );
 }
 
@@ -259,7 +271,8 @@ function isState(value: unknown): value is PresenterRemoteState {
     (value.nextSlidePreview === undefined || isSlidePreview(value.nextSlidePreview)) &&
     typeof value.notes === 'string' &&
     typeof value.pageCount === 'number' &&
-    (value.pages === undefined || (Array.isArray(value.pages) && value.pages.every(isPageSummary))) &&
+    (value.pages === undefined ||
+      (Array.isArray(value.pages) && value.pages.every(isPageSummary))) &&
     (value.previewMode === undefined ||
       value.previewMode === 'stream' ||
       value.previewMode === 'structured-fallback') &&
@@ -269,7 +282,8 @@ function isState(value: unknown): value is PresenterRemoteState {
     (value.stream === undefined || isStreamMetadata(value.stream)) &&
     typeof value.timer.elapsedMs === 'number' &&
     typeof value.timer.paused === 'boolean' &&
-    (value.timer.updatedAtEpochMs === undefined || typeof value.timer.updatedAtEpochMs === 'number') &&
+    (value.timer.updatedAtEpochMs === undefined ||
+      typeof value.timer.updatedAtEpochMs === 'number') &&
     (value.upcomingSlidePreviews === undefined ||
       (Array.isArray(value.upcomingSlidePreviews) &&
         value.upcomingSlidePreviews.every(isUpcomingSlidePreview)))
