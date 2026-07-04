@@ -82,10 +82,10 @@ export class PresenterRemoteSignalingClient {
     return presenterRemoteProtocol.isSession(value) ? value : undefined;
   }
 
-  async publishCommand(code: string, command: PresenterRemoteCommand) {
+  async publishCommand(code: string, command: PresenterRemoteCommand, controllerId?: string) {
     await readJson(
       await this.fetcher(`${this.endpoint}/sessions/${encodeURIComponent(code)}/commands`, {
-        body: JSON.stringify(command),
+        body: JSON.stringify(controllerId ? { command, controllerId } : command),
         headers: { 'content-type': 'application/json' },
         method: 'POST',
       }),

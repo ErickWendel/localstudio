@@ -1,0 +1,75 @@
+[   50213ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:4174/__localstudio/presenter-remote/sessions/9JUF-4CST/state:0
+[   50217ms] TypeError: Failed to fetch
+    at be.getPublishedState (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:48263)
+    at n (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61512)
+    at http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61577
+[   51212ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:4174/__localstudio/presenter-remote/sessions/9JUF-4CST/state:0
+[   51213ms] TypeError: Failed to fetch
+    at be.getPublishedState (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:48263)
+    at n (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61512)
+    at http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61577
+[   52210ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:4174/__localstudio/presenter-remote/sessions/9JUF-4CST/state:0
+[   52213ms] TypeError: Failed to fetch
+    at be.getPublishedState (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:48263)
+    at n (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61512)
+    at http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61577
+[   53210ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:4174/__localstudio/presenter-remote/sessions/9JUF-4CST/state:0
+[   53212ms] TypeError: Failed to fetch
+    at be.getPublishedState (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:48263)
+    at n (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61512)
+    at http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61577
+[   54211ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:4174/__localstudio/presenter-remote/sessions/9JUF-4CST/state:0
+[   54213ms] TypeError: Failed to fetch
+    at be.getPublishedState (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:48263)
+    at n (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61512)
+    at http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61577
+[   55211ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:4174/__localstudio/presenter-remote/sessions/9JUF-4CST/state:0
+[   55213ms] TypeError: Failed to fetch
+    at be.getPublishedState (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:48263)
+    at n (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61512)
+    at http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61577
+[   56209ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:4174/__localstudio/presenter-remote/sessions/9JUF-4CST/state:0
+[   56209ms] TypeError: Failed to fetch
+    at be.getPublishedState (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:48263)
+    at n (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61512)
+    at http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61577
+[   57210ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:4174/__localstudio/presenter-remote/sessions/9JUF-4CST/state:0
+[   57210ms] TypeError: Failed to fetch
+    at be.getPublishedState (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:48263)
+    at n (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61512)
+    at http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61577
+[   58210ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:4174/__localstudio/presenter-remote/sessions/9JUF-4CST/state:0
+[   58211ms] TypeError: Failed to fetch
+    at be.getPublishedState (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:48263)
+    at n (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61512)
+    at http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61577
+[   59211ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:4174/__localstudio/presenter-remote/sessions/9JUF-4CST/state:0
+[   59212ms] TypeError: Failed to fetch
+    at be.getPublishedState (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:48263)
+    at n (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61512)
+    at http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61577
+[   60210ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:4174/__localstudio/presenter-remote/sessions/9JUF-4CST/state:0
+[   60211ms] TypeError: Failed to fetch
+    at be.getPublishedState (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:48263)
+    at n (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61512)
+    at http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61577
+[   61211ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:4174/__localstudio/presenter-remote/sessions/9JUF-4CST/state:0
+[   61212ms] TypeError: Failed to fetch
+    at be.getPublishedState (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:48263)
+    at n (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61512)
+    at http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61577
+[   62210ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:4174/__localstudio/presenter-remote/sessions/9JUF-4CST/state:0
+[   62212ms] TypeError: Failed to fetch
+    at be.getPublishedState (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:48263)
+    at n (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61512)
+    at http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61577
+[   63211ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:4174/__localstudio/presenter-remote/sessions/9JUF-4CST/state:0
+[   63212ms] TypeError: Failed to fetch
+    at be.getPublishedState (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:48263)
+    at n (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61512)
+    at http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61577
+[   64209ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:4174/__localstudio/presenter-remote/sessions/9JUF-4CST/state:0
+[   64209ms] TypeError: Failed to fetch
+    at be.getPublishedState (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:48263)
+    at n (http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61512)
+    at http://localhost:4174/joystick/assets/index-D5m5WYZ1.js:9:61577

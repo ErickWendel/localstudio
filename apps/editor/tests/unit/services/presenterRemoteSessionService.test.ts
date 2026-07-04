@@ -42,7 +42,7 @@ describe('BrowserPresenterSessionService remote control', () => {
       connectedControllerCount: 0,
       expiresAt: '2026-07-04T12:01:00.000Z',
       presenterLabel: 'MacBook Pro',
-      qrUrl: 'https://localstudio.test/joystick',
+      qrUrl: 'https://localstudio.test/joystick?code=ABCD-1234',
       sessionId: 'remote-session-1',
     });
   });
@@ -68,7 +68,7 @@ describe('BrowserPresenterSessionService remote control', () => {
       ttlMs: 60_000,
     });
 
-    expect(remoteSession.qrUrl).toBe('http://192.168.0.33:4176/joystick');
+    expect(remoteSession.qrUrl).toBe('http://192.168.0.33:4176/joystick?code=ABCD-1234');
   });
 
   it('publishes remote state snapshots derived from presenter payloads', async () => {

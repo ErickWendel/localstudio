@@ -158,6 +158,7 @@ export class BrowserPresenterSessionService {
     const session = await this.remoteSignalingService.registerSession(input);
     const remoteOrigin = (await this.resolveRemoteControlOrigin(this.origin)) ?? this.origin;
     const qrUrl = new URL('/joystick', remoteOrigin);
+    qrUrl.searchParams.set('code', session.code);
     this.remoteSession = {
       ...session,
       qrUrl: qrUrl.toString(),

@@ -22,12 +22,10 @@ import {
 } from './presenterRemoteStreamReceiver';
 
 interface JoystickSignalingService {
-  connectController?: ((code: string, controllerId: string) => Promise<PresenterRemoteSession | undefined>) | undefined;
+  connectController?: ((code: string, controllerId: string) => PresenterRemoteSession | Promise<PresenterRemoteSession | undefined> | undefined) | undefined;
   getPublishedState?: ((code: string) => PresenterRemoteState | undefined | Promise<PresenterRemoteState | undefined>) | undefined;
-  listActiveSessions?: (() => PresenterRemoteSession[] | Promise<PresenterRemoteSession[]>) | undefined;
-  listSessions?: (() => Promise<PresenterRemoteSession[]>) | undefined;
   lookupSession: (code: string) => PresenterRemoteSession | undefined | Promise<PresenterRemoteSession | undefined>;
-  publishCommand: (code: string, command: PresenterRemoteCommand) => boolean | Promise<unknown>;
+  publishCommand: (code: string, command: PresenterRemoteCommand, controllerId?: string) => boolean | Promise<unknown>;
 }
 
 interface JoystickAppProps {
@@ -56,12 +54,6 @@ function createDefaultSignalingService(): JoystickSignalingService {
     service.registerSession(seedSession);
   }
   return service;
-}
-
-function listActiveSessions(signalingService: JoystickSignalingService) {
-  if (signalingService.listSessions) return signalingService.listSessions();
-  if (signalingService.listActiveSessions) return signalingService.listActiveSessions();
-  return [];
 }
 
 function createStreamSignalingAdapter(signalingService: JoystickSignalingService): PresenterRemoteStreamSignaling {
@@ -146,6 +138,47 @@ function createStreamPreference(element: HTMLElement): PresenterRemoteStreamPref
     quality,
     type: 'stream-preference',
     width,
+  };
+}
+
+function useHorizontalSwipeNavigation(onNavigate: (direction: 'next' | 'previous') => void) {
+  const touchStartX = useRef<number | undefined>(undefined);
+  const pointerStartX = useRef<number | undefined>(undefined);
+
+  function handleTouchStart(event: TouchEvent<HTMLButtonElement>) {
+    touchStartX.current = event.changedTouches[0]?.clientX;
+  }
+
+  function handleTouchEnd(event: TouchEvent<HTMLButtonElement>) {
+    const startX = touchStartX.current;
+    touchStartX.current = undefined;
+    const endX = event.changedTouches[0]?.clientX;
+    if (startX === undefined || endX === undefined) return;
+    const deltaX = endX - startX;
+    if (Math.abs(deltaX) < swipeThresholdPx) return;
+    onNavigate(deltaX < 0 ? 'next' : 'previous');
+  }
+
+  function handlePointerDown(event: PointerEvent<HTMLButtonElement>) {
+    if (event.pointerType === 'mouse') return;
+    pointerStartX.current = event.clientX;
+  }
+
+  function handlePointerUp(event: PointerEvent<HTMLButtonElement>) {
+    if (event.pointerType === 'mouse') return;
+    const startX = pointerStartX.current;
+    pointerStartX.current = undefined;
+    if (startX === undefined) return;
+    const deltaX = event.clientX - startX;
+    if (Math.abs(deltaX) < swipeThresholdPx) return;
+    onNavigate(deltaX < 0 ? 'next' : 'previous');
+  }
+
+  return {
+    onPointerDown: handlePointerDown,
+    onPointerUp: handlePointerUp,
+    onTouchEnd: handleTouchEnd,
+    onTouchStart: handleTouchStart,
   };
 }
 
@@ -280,8 +313,7 @@ function StreamPreview({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLButtonElement>(null);
-  const touchStartX = useRef<number | undefined>(undefined);
-  const pointerStartX = useRef<number | undefined>(undefined);
+  const swipeHandlers = useHorizontalSwipeNavigation(onNavigate);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -315,35 +347,6 @@ function StreamPreview({
     onNavigate('next');
   }
 
-  function handleTouchStart(event: TouchEvent<HTMLButtonElement>) {
-    touchStartX.current = event.changedTouches[0]?.clientX;
-  }
-
-  function handleTouchEnd(event: TouchEvent<HTMLButtonElement>) {
-    const startX = touchStartX.current;
-    touchStartX.current = undefined;
-    const endX = event.changedTouches[0]?.clientX;
-    if (startX === undefined || endX === undefined) return;
-    const deltaX = endX - startX;
-    if (Math.abs(deltaX) < swipeThresholdPx) return;
-    onNavigate(deltaX < 0 ? 'next' : 'previous');
-  }
-
-  function handlePointerDown(event: PointerEvent<HTMLButtonElement>) {
-    if (event.pointerType === 'mouse') return;
-    pointerStartX.current = event.clientX;
-  }
-
-  function handlePointerUp(event: PointerEvent<HTMLButtonElement>) {
-    if (event.pointerType === 'mouse') return;
-    const startX = pointerStartX.current;
-    pointerStartX.current = undefined;
-    if (startX === undefined) return;
-    const deltaX = event.clientX - startX;
-    if (Math.abs(deltaX) < swipeThresholdPx) return;
-    onNavigate(deltaX < 0 ? 'next' : 'previous');
-  }
-
   return (
     <button
       type="button"
@@ -351,10 +354,7 @@ function StreamPreview({
       className="joystick-stream-hit-target"
       aria-label="Presenter stream preview"
       onClick={handleClick}
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
-      onTouchEnd={handleTouchEnd}
-      onTouchStart={handleTouchStart}
+      {...swipeHandlers}
     >
       <video ref={videoRef} autoPlay className="joystick-stream-video" muted playsInline />
     </button>
@@ -370,41 +370,11 @@ function SlidePreview({
   onNavigate: (direction: 'next' | 'previous') => void;
   preview: PresenterRemoteSlidePreview | undefined;
 }) {
-  const touchStartX = useRef<number | undefined>(undefined);
-  const pointerStartX = useRef<number | undefined>(undefined);
+  const swipeHandlers = useHorizontalSwipeNavigation(onNavigate);
 
   function handleStageClick(event: MouseEvent<HTMLButtonElement>) {
     const bounds = event.currentTarget.getBoundingClientRect();
     onNavigate(event.clientX - bounds.left < bounds.width / 2 ? 'previous' : 'next');
-  }
-
-  function handleTouchStart(event: TouchEvent<HTMLButtonElement>) {
-    touchStartX.current = event.changedTouches[0]?.clientX;
-  }
-
-  function handleTouchEnd(event: TouchEvent<HTMLButtonElement>) {
-    const startX = touchStartX.current;
-    touchStartX.current = undefined;
-    const endX = event.changedTouches[0]?.clientX;
-    if (startX === undefined || endX === undefined) return;
-    const deltaX = endX - startX;
-    if (Math.abs(deltaX) < swipeThresholdPx) return;
-    onNavigate(deltaX < 0 ? 'next' : 'previous');
-  }
-
-  function handlePointerDown(event: PointerEvent<HTMLButtonElement>) {
-    if (event.pointerType === 'mouse') return;
-    pointerStartX.current = event.clientX;
-  }
-
-  function handlePointerUp(event: PointerEvent<HTMLButtonElement>) {
-    if (event.pointerType === 'mouse') return;
-    const startX = pointerStartX.current;
-    pointerStartX.current = undefined;
-    if (startX === undefined) return;
-    const deltaX = event.clientX - startX;
-    if (Math.abs(deltaX) < swipeThresholdPx) return;
-    onNavigate(deltaX < 0 ? 'next' : 'previous');
   }
 
   return (
@@ -413,10 +383,7 @@ function SlidePreview({
       className="joystick-stage-button"
       aria-label="Current slide preview"
       onClick={handleStageClick}
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
-      onTouchEnd={handleTouchEnd}
-      onTouchStart={handleTouchStart}
+      {...swipeHandlers}
     >
       <SlideCanvas preview={preview} renderMediaAssets={renderMediaAssets} />
     </button>
@@ -483,32 +450,17 @@ export function JoystickApp({
     let cancelled = false;
     async function resolveSession() {
       setResolvingSession(true);
-      if (code && presenterRemoteSessionCode.isValid(code)) {
-        const foundSession = await signalingService.lookupSession(code);
+      const rememberedCode = presenterRemoteSessionCode.normalize(getStoredValue(rememberedCodeKey) ?? '');
+      const requestedCode = presenterRemoteSessionCode.isValid(code) ? code : rememberedCode;
+      if (requestedCode && presenterRemoteSessionCode.isValid(requestedCode)) {
+        const foundSession = await signalingService.lookupSession(requestedCode);
+        const connectedSession =
+          foundSession && signalingService.connectController
+            ? await signalingService.connectController(requestedCode, controllerId)
+            : foundSession;
         if (!cancelled) {
-          setSession(foundSession);
-          setResolvingSession(false);
-        }
-        return;
-      }
-
-      const activeSessions = await listActiveSessions(signalingService);
-      const singleSession = activeSessions.length === 1 ? activeSessions[0] : undefined;
-      if (singleSession) {
-        if (!cancelled) {
-          setSession(singleSession);
-          setResolvingSession(false);
-        }
-        return;
-      }
-
-      if (activeSessions.length === 0) {
-        const rememberedCode = presenterRemoteSessionCode.normalize(
-          getStoredValue(rememberedCodeKey) ?? '',
-        );
-        const rememberedSession = rememberedCode ? await signalingService.lookupSession(rememberedCode) : undefined;
-        if (!cancelled) {
-          setSession(rememberedSession);
+          setCode(requestedCode);
+          setSession(connectedSession);
           setResolvingSession(false);
         }
         return;
@@ -524,7 +476,7 @@ export function JoystickApp({
     return () => {
       cancelled = true;
     };
-  }, [code, signalingService]);
+  }, [code, controllerId, signalingService]);
 
   const status: 'connected' | 'needs-code' = session ? 'connected' : 'needs-code';
   const displayedCode = code || session?.code || '';
@@ -532,21 +484,6 @@ export function JoystickApp({
   useEffect(() => {
     if (session) setStoredValue(rememberedCodeKey, session.code);
   }, [session]);
-
-  useEffect(() => {
-    if (!sessionCode) return;
-    const currentSessionCode = sessionCode;
-    let cancelled = false;
-    async function connectController() {
-      if (!signalingService.connectController) return;
-      const connectedSession = await signalingService.connectController(currentSessionCode, controllerId);
-      if (!cancelled && connectedSession) setSession(connectedSession);
-    }
-    void connectController();
-    return () => {
-      cancelled = true;
-    };
-  }, [controllerId, sessionCode, signalingService]);
 
   useEffect(() => {
     if (!sessionCode || !signalingService.getPublishedState) return;
@@ -618,8 +555,9 @@ export function JoystickApp({
     const sentByStream = Boolean(remoteStreamReceiverRef.current?.sendCommand(command));
     if (sentByStream) {
       setLastCommand(command.command);
+      return;
     }
-    void Promise.resolve(signalingService.publishCommand(session.code, command))
+    void Promise.resolve(signalingService.publishCommand(session.code, command, controllerId))
       .then(() => setLastCommand(command.command));
   }
 

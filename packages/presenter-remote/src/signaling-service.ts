@@ -1,5 +1,5 @@
 import type { PresenterRemoteCommand, PresenterRemoteState, PresenterRemoteSession } from './protocol';
-import { presenterRemoteSessionCode } from './session-code';
+import { presenterRemoteSessionCode } from './session-code.ts';
 import type {
   PresenterRemoteControllerOffer,
   PresenterRemoteIceCandidateMessage,
@@ -33,8 +33,10 @@ interface StoredControllerConnection {
 
 interface StoredSession {
   commands: PresenterRemoteCommand[];
+  connectedControllers: Set<string>;
   publishedState?: PresenterRemoteState | undefined;
   session: PresenterRemoteSession;
+  trustedControllers: Set<string>;
   webRtcControllers: Map<string, StoredControllerConnection>;
 }
 
@@ -68,7 +70,13 @@ export class InMemoryPresenterRemoteSignalingService {
       presenterLabel: input.presenterLabel,
       sessionId: this.randomId(),
     };
-    this.sessions.set(code, { commands: [], session, webRtcControllers: new Map() });
+    this.sessions.set(code, {
+      commands: [],
+      connectedControllers: new Set(),
+      session,
+      trustedControllers: new Set(),
+      webRtcControllers: new Map(),
+    });
     return session;
   }
 
@@ -88,11 +96,22 @@ export class InMemoryPresenterRemoteSignalingService {
     return this.sessions.get(code)?.session;
   }
 
+  connectController(sessionCode: string, controllerId: string) {
+    this.pruneExpiredSessions();
+    const storedSession = this.sessions.get(presenterRemoteSessionCode.normalize(sessionCode));
+    if (!storedSession || !controllerId) return undefined;
+    storedSession.connectedControllers.add(controllerId);
+    storedSession.trustedControllers.add(controllerId);
+    storedSession.session.connectedControllerCount = storedSession.connectedControllers.size;
+    return { ...storedSession.session };
+  }
+
   createControllerOffer(input: ControllerOfferInput): ControllerOfferResult {
     this.pruneExpiredSessions();
     const code = presenterRemoteSessionCode.normalize(input.sessionCode);
     const storedSession = this.sessions.get(code);
     if (!storedSession) return { status: 'not-found' };
+    if (!storedSession.trustedControllers.has(input.controllerId)) return { status: 'not-found' };
     storedSession.webRtcControllers.set(input.controllerId, {
       controllerIceCandidates: [],
       offerSdp: input.offerSdp,
@@ -156,7 +175,8 @@ export class InMemoryPresenterRemoteSignalingService {
     const storedSession = this.sessions.get(presenterRemoteSessionCode.normalize(sessionCode));
     if (!storedSession) return false;
     const deleted = storedSession.webRtcControllers.delete(controllerId);
-    storedSession.session.connectedControllerCount = Math.max(0, storedSession.session.connectedControllerCount - 1);
+    storedSession.connectedControllers.delete(controllerId);
+    storedSession.session.connectedControllerCount = storedSession.connectedControllers.size;
     return deleted;
   }
 
@@ -176,10 +196,11 @@ export class InMemoryPresenterRemoteSignalingService {
     return this.sessions.get(presenterRemoteSessionCode.normalize(sessionCode))?.publishedState;
   }
 
-  publishCommand(sessionCode: string, command: PresenterRemoteCommand) {
+  publishCommand(sessionCode: string, command: PresenterRemoteCommand, controllerId?: string) {
     this.pruneExpiredSessions();
     const storedSession = this.sessions.get(presenterRemoteSessionCode.normalize(sessionCode));
     if (!storedSession) return false;
+    if (controllerId !== undefined && !storedSession.trustedControllers.has(controllerId)) return false;
     storedSession.commands.push(command);
     return true;
   }

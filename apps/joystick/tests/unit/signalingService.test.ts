@@ -45,6 +45,7 @@ describe('InMemoryPresenterRemoteSignalingService', () => {
       randomId: () => 'session-1',
     });
     const session = service.registerSession({ presenterLabel: 'MacBook Pro', ttlMs: 60_000 });
+    service.connectController(session.code, 'controller-1');
 
     expect(
       service.createControllerOffer({
@@ -67,5 +68,36 @@ describe('InMemoryPresenterRemoteSignalingService', () => {
         sessionCode: session.code,
       }),
     ).toEqual({ status: 'not-found' });
+  });
+
+  it('trusts controllers only after pairing with the session code', () => {
+    const service = new InMemoryPresenterRemoteSignalingService({
+      randomCode: () => 'ABCD-1234',
+      randomId: () => 'session-1',
+    });
+    const session = service.registerSession({ presenterLabel: 'MacBook Pro', ttlMs: 60_000 });
+
+    expect(
+      service.createControllerOffer({
+        controllerId: 'controller-1',
+        offerSdp: 'controller-offer',
+        sessionCode: session.code,
+      }),
+    ).toEqual({ status: 'not-found' });
+    expect(service.publishCommand(session.code, { command: 'next', type: 'command' }, 'controller-1')).toBe(false);
+
+    expect(service.connectController(session.code, 'controller-1')).toMatchObject({
+      connectedControllerCount: 1,
+      code: 'ABCD-1234',
+    });
+    expect(
+      service.createControllerOffer({
+        controllerId: 'controller-1',
+        offerSdp: 'controller-offer',
+        sessionCode: session.code,
+      }),
+    ).toEqual({ status: 'pending' });
+    expect(service.publishCommand(session.code, { command: 'next', type: 'command' }, 'controller-1')).toBe(true);
+    expect(service.takeCommands(session.code)).toEqual([{ command: 'next', type: 'command' }]);
   });
 });

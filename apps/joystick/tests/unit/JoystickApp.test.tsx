@@ -1,10 +1,14 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { JoystickApp } from '../../src/app/JoystickApp';
 import { InMemoryPresenterRemoteSignalingService } from '@localstudio/presenter-remote/signaling-service';
 
 describe('JoystickApp', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   it('renders the installable remote shell and starts with the query code', async () => {
     const service = new InMemoryPresenterRemoteSignalingService({
       randomCode: () => 'ABCD-1234',
@@ -43,7 +47,7 @@ describe('JoystickApp', () => {
     }
   });
 
-  it('auto-selects only when there is one active presentation', async () => {
+  it('uses the remembered code when the app opens without a query code', async () => {
     const service = new InMemoryPresenterRemoteSignalingService({
       randomCode: () => 'ABCD-1234',
       randomId: () => 'session-1',
@@ -62,11 +66,25 @@ describe('JoystickApp', () => {
       timer: { elapsedMs: 0, paused: false },
       type: 'state',
     });
+    window.localStorage.setItem('localstudio.joystick.lastCode', 'ABCD-1234');
 
     render(<JoystickApp initialUrl="https://localstudio.test/joystick" signalingService={service} />);
 
     expect(await screen.findByText('Current: Slide 1 of 1')).toBeInTheDocument();
     expect(screen.getByLabelText('Slide position')).toHaveTextContent('1 / 1');
+  });
+
+  it('requires a code even when one presentation is active if the phone is not paired', async () => {
+    const service = new InMemoryPresenterRemoteSignalingService({
+      randomCode: () => 'ABCD-1234',
+      randomId: () => 'session-1',
+    });
+    service.registerSession({ presenterLabel: 'MacBook Pro', ttlMs: 60_000 });
+
+    render(<JoystickApp initialUrl="https://localstudio.test/joystick" signalingService={service} />);
+
+    expect(await screen.findByText('Enter the code shown on the presenter screen.')).toBeInTheDocument();
+    expect(screen.queryByText('MacBook Pro')).not.toBeInTheDocument();
   });
 
   it('requires a code when multiple presentations are active', async () => {
@@ -110,7 +128,7 @@ describe('JoystickApp', () => {
       type: 'state',
     });
 
-    render(<JoystickApp initialUrl="https://localstudio.test/joystick" signalingService={service} />);
+    render(<JoystickApp initialUrl="https://localstudio.test/joystick?code=ABCD-1234" signalingService={service} />);
 
     const preview = await screen.findByRole('button', { name: 'Current slide preview' });
     await user.click(preview);
@@ -146,7 +164,7 @@ describe('JoystickApp', () => {
       type: 'state',
     });
 
-    render(<JoystickApp initialUrl="https://localstudio.test/joystick" signalingService={service} />);
+    render(<JoystickApp initialUrl="https://localstudio.test/joystick?code=ABCD-1234" signalingService={service} />);
 
     const preview = await screen.findByRole('button', { name: 'Current slide preview' });
     await waitFor(() => expect(screen.getByLabelText('Slide position')).toHaveTextContent('2 / 3'));
