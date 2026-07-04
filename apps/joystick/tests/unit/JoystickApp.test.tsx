@@ -276,7 +276,7 @@ describe('JoystickApp', () => {
     ]);
   });
 
-  it('sends slide jump commands through the streamed data channel', async () => {
+  it('sends slide jump commands through the streamed data channel with signaling backup', async () => {
     const user = userEvent.setup();
     const service = new InMemoryPresenterRemoteSignalingService({
       randomCode: () => 'ABCD-1234',
@@ -316,7 +316,9 @@ describe('JoystickApp', () => {
     expect(streamReceiverMock.latestReceiver?.sendCommand).toHaveBeenCalledWith(
       { command: 'go-to-page', pageId: 'page-2', type: 'command' },
     );
-    expect(service.takeCommands('ABCD-1234')).toEqual([]);
+    expect(service.takeCommands('ABCD-1234')).toEqual([
+      { command: 'go-to-page', pageId: 'page-2', type: 'command' },
+    ]);
   });
 
   it('falls back to signaling commands when the streamed data channel is unavailable', async () => {

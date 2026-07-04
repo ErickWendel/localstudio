@@ -761,12 +761,15 @@ export function JoystickApp({
 
   function sendRemoteCommand(command: PresenterRemoteCommand) {
     if (!session) return;
-    if (remoteStreamReceiverRef.current?.sendCommand(command)) {
+    const sentOverStream = remoteStreamReceiverRef.current?.sendCommand(command) ?? false;
+    if (sentOverStream) {
       setLastCommand(command.command);
-      return;
+      if (command.command !== 'go-to-page') return;
     }
     void Promise.resolve(signalingService.publishCommand(session.code, command, controllerId)).then(
-      () => setLastCommand(command.command),
+      () => {
+        if (!sentOverStream) setLastCommand(command.command);
+      },
     );
   }
 

@@ -107,8 +107,8 @@ describe('BrowserPresenterSessionService remote control', () => {
       });
     });
     const publishedState = signalingService.getPublishedState('ABCD-1234');
-    expect(publishedState?.slidePreview).toBeUndefined();
-    expect(publishedState?.nextSlidePreview).toBeUndefined();
+    expect(publishedState?.slidePreview?.elements.length).toBeGreaterThan(0);
+    expect(publishedState?.upcomingSlidePreviews?.every((page) => page.preview)).toBe(true);
     expect(publishedState?.pages).toHaveLength(project.pages.length);
     expect(publishedState?.pages?.[0]).toEqual({
       id: project.pages[0]!.id,
@@ -158,11 +158,11 @@ describe('BrowserPresenterSessionService remote control', () => {
     });
     const publishedState = signalingService.getPublishedState('ABCD-1234');
 
-    expect(publishedState?.slidePreview).toBeUndefined();
+    expect(publishedState?.slidePreview).toBeDefined();
     expect(JSON.stringify(publishedState)).not.toContain('data:image/png;base64');
   });
 
-  it('keeps stream-mode remote state metadata-only for mobile polling', async () => {
+  it('keeps stream-mode remote state previews bounded for mobile polling', async () => {
     const popup = {
       location: { href: '' },
       postMessage: vi.fn(),
@@ -203,6 +203,12 @@ describe('BrowserPresenterSessionService remote control', () => {
       y: 0,
     };
     project.pages[0]!.elementIds = ['heavy-image', ...project.pages[0]!.elementIds];
+    project.pages.push({
+      ...project.pages[0]!,
+      id: 'page-next',
+      name: 'Next',
+      speakerNotes: '',
+    });
 
     service.publishState({
       activePageId: project.pages[0]!.id,
@@ -214,12 +220,14 @@ describe('BrowserPresenterSessionService remote control', () => {
       expect(signalingService.getPublishedState('ABCD-1234')?.previewMode).toBe('stream');
     });
     const publishedState = signalingService.getPublishedState('ABCD-1234');
+    const serializedState = JSON.stringify(publishedState);
 
-    expect(publishedState?.slidePreview).toBeUndefined();
-    expect(publishedState?.nextSlidePreview).toBeUndefined();
+    expect(publishedState?.slidePreview).toBeDefined();
+    expect(publishedState?.nextSlidePreview).toBeDefined();
     expect(publishedState?.pages?.some((page) => page.preview)).toBe(false);
-    expect(publishedState?.upcomingSlidePreviews?.some((page) => page.preview)).toBe(false);
-    expect(JSON.stringify(publishedState)).not.toContain('data:image/png;base64');
+    expect(publishedState?.upcomingSlidePreviews?.some((page) => page.preview)).toBe(true);
+    expect(serializedState).not.toContain('data:image/png;base64,'.concat('a'.repeat(500_000)));
+    expect(serializedState.length).toBeLessThan(100_000);
   });
 
   it('publishes build-aware stream metadata without media previews', async () => {
@@ -306,7 +314,7 @@ describe('BrowserPresenterSessionService remote control', () => {
       previewMode: 'stream',
       stream: { enabled: true, fps: 8, height: 340, width: 390 },
     });
-    expect(signalingService.getPublishedState('ABCD-1234')?.slidePreview).toBeUndefined();
+    expect(signalingService.getPublishedState('ABCD-1234')?.slidePreview).toBeDefined();
     expect(JSON.stringify(signalingService.getPublishedState('ABCD-1234'))).not.toContain(
       'https://cdn.localstudio.test/demo.mp4',
     );

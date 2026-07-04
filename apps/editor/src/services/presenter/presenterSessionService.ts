@@ -1,4 +1,4 @@
-import type { Page } from '../../domain/documents/model';
+import type { DesignElement, Page, ProjectDocument } from '../../domain/documents/model';
 import type {
   PresenterCommandMessage,
   PresenterRemoteSessionMetadata,
@@ -13,6 +13,8 @@ import {
 import { PresenterRemoteSignalingClient } from '@localstudio/presenter-remote/signaling-client';
 import type {
   PresenterRemoteCommand,
+  PresenterRemoteSlidePreview,
+  PresenterRemoteSlidePreviewElement,
   PresenterRemoteUpcomingSlidePreview,
   PresenterRemoteSession,
   PresenterRemoteState,
@@ -50,6 +52,9 @@ function createSessionId() {
 }
 
 const presenterDeviceIdKey = 'localstudio.presenter.deviceId';
+const remotePreviewMaxInlineAssetLength = 80_000;
+const remotePreviewThumbnailMaxEdge = 240;
+const remotePreviewThumbnailQuality = 0.55;
 
 function getOrCreatePresenterDeviceId(targetWindow: Window) {
   try {
@@ -146,13 +151,14 @@ export class BrowserPresenterSessionService {
     if (this.remoteSession) {
       const publishSequence = ++this.remoteStatePublishSequence;
       const sessionCode = this.remoteSession.code;
-      const remoteState = this.createRemoteState(
+      void this.createRemoteState(
         payload,
         this.remoteSession.connectedControllerCount,
         this.remoteSessionStartedAt ? Date.now() - this.remoteSessionStartedAt : 0,
-      );
-      if (publishSequence !== this.remoteStatePublishSequence) return;
-      void Promise.resolve(this.remoteSignalingService.publishState(sessionCode, remoteState));
+      ).then((remoteState) => {
+        if (publishSequence !== this.remoteStatePublishSequence) return;
+        void Promise.resolve(this.remoteSignalingService.publishState(sessionCode, remoteState));
+      });
     }
   }
 
@@ -326,51 +332,59 @@ function createRemoteState(
   payload: PresenterStatePayload,
   connectedControllerCount: number,
   timer: PresenterRemoteTimerState,
-): PresenterRemoteState {
+): Promise<PresenterRemoteState> {
   const activePageIndex = Math.max(
     0,
     payload.project.pages.findIndex((page) => page.id === payload.activePageId),
   );
   const activePage = payload.project.pages[activePageIndex] ?? payload.project.pages[0];
   const nextPage = payload.project.pages[activePageIndex + 1];
+  const hiddenElementIds =
+    activePage && payload.animationPreview?.pageId === activePage.id
+      ? new Set(payload.animationPreview.hiddenElementIds)
+      : undefined;
   const pages = payload.project.pages.map((page) => ({
     id: page.id,
     name: page.name,
   }));
-  const upcomingSlidePreviews: PresenterRemoteUpcomingSlidePreview[] = payload.project.pages
-    .slice(activePageIndex + 1, activePageIndex + 4)
-    .map((page) => ({
-      pageId: page.id,
-      pageName: page.name,
+  return Promise.all([
+    activePage
+      ? createSlidePreview(payload.project, activePage, hiddenElementIds)
+      : Promise.resolve(undefined),
+    createUpcomingSlidePreviews(
+      payload.project,
+      payload.project.pages.slice(activePageIndex + 1, activePageIndex + 4),
+    ),
+  ]).then(([slidePreview, upcomingSlidePreviews]) => ({
+      activePageId: activePage?.id ?? payload.activePageId,
+      activePageIndex,
+      activePageName: activePage?.name,
+      buildsRemaining: activePage ? getRemoteBuildsRemaining(payload, activePage) : 0,
+      connectedControllerCount,
+      deckName: payload.project.name,
+      nextPageName: nextPage?.name,
+      nextSlidePreview: upcomingSlidePreviews[0]?.preview,
+      notes: activePage?.speakerNotes ?? '',
+      pageCount: payload.project.pages.length,
+      pages,
+      presenterMode: payload.presenterMode ?? 'presenting',
+      commandAvailability: [
+        'previous',
+        'next',
+        'go-to-page',
+        'pause-timer',
+        'resume-timer',
+        'reset-timer',
+        'play-pause-movie',
+      ],
+      previewMode: 'stream',
+      shortcuts: ['previous', 'next', 'pause-timer', 'reset-timer'],
+      slidePreview,
+      stream: { enabled: true, fps: 8, height: 340, width: 390 },
+      timer,
+      type: 'state',
+      upcomingSlidePreviews,
     }));
-  return {
-    activePageId: activePage?.id ?? payload.activePageId,
-    activePageIndex,
-    activePageName: activePage?.name,
-    buildsRemaining: activePage ? getRemoteBuildsRemaining(payload, activePage) : 0,
-    connectedControllerCount,
-    deckName: payload.project.name,
-    nextPageName: nextPage?.name,
-    notes: activePage?.speakerNotes ?? '',
-    pageCount: payload.project.pages.length,
-    pages,
-    presenterMode: payload.presenterMode ?? 'presenting',
-    commandAvailability: [
-      'previous',
-      'next',
-      'go-to-page',
-      'pause-timer',
-      'resume-timer',
-      'reset-timer',
-      'play-pause-movie',
-    ],
-    previewMode: 'stream',
-    shortcuts: ['previous', 'next', 'pause-timer', 'reset-timer'],
-    stream: { enabled: true, fps: 8, height: 340, width: 390 },
-    timer,
-    type: 'state',
-    upcomingSlidePreviews,
-  };
 }
 
 function getRemoteBuildsRemaining(payload: PresenterStatePayload, page: Page) {
@@ -382,6 +396,154 @@ function getRemoteBuildsRemaining(payload: PresenterStatePayload, page: Page) {
   if (payload.animationPreview.phase === 'complete') return 0;
   const hiddenElementIds = new Set(payload.animationPreview.hiddenElementIds);
   return validBuilds.filter((build) => hiddenElementIds.has(build.elementId)).length;
+}
+
+function createUpcomingSlidePreviews(
+  project: ProjectDocument,
+  pages: Page[],
+): Promise<PresenterRemoteUpcomingSlidePreview[]> {
+  return Promise.all(
+    pages.map((page) =>
+      createSlidePreview(project, page).then((preview) => ({
+        pageId: page.id,
+        pageName: page.name,
+        preview,
+      })),
+    ),
+  );
+}
+
+async function createSlidePreview(
+  project: ProjectDocument,
+  page: Page,
+  hiddenElementIds = new Set<string>(),
+): Promise<PresenterRemoteSlidePreview> {
+  const backgroundAsset =
+    page.background.type === 'asset' ? project.assets[page.background.assetId] : undefined;
+  const elements: PresenterRemoteSlidePreviewElement[] = [];
+  for (const elementId of page.elementIds) {
+    if (hiddenElementIds.has(elementId)) continue;
+    const element = project.elements[elementId];
+    if (!element || element.visible === false) continue;
+    elements.push(await createSlidePreviewElement(project, element));
+  }
+  return {
+    backgroundColor:
+      page.background.type === 'color' ? page.background.color : page.background.colorFallback,
+    backgroundImageUrl: await createPreviewAssetUrl(backgroundAsset?.objectUrl),
+    elements,
+    height: page.height,
+    width: page.width,
+  };
+}
+
+function createElementFrame(element: DesignElement) {
+  return {
+    height: element.height,
+    id: element.id,
+    opacity: element.opacity,
+    rotation: element.rotation,
+    width: element.width,
+    x: element.x,
+    y: element.y,
+  };
+}
+
+function createSlidePreviewElement(
+  project: ProjectDocument,
+  element: DesignElement,
+): Promise<PresenterRemoteSlidePreviewElement> {
+  const frame = createElementFrame(element);
+  if (element.type === 'text') {
+    return Promise.resolve({
+      ...frame,
+      align: element.align,
+      fill: element.fill,
+      fontFamily: element.fontFamily,
+      fontSize: element.fontSize,
+      fontWeight: element.fontWeight,
+      kind: 'text',
+      lineHeight: element.lineHeight,
+      text: element.text,
+      verticalAlign: element.verticalAlign,
+    });
+  }
+  if (element.type === 'image') {
+    return createPreviewAssetUrl(project.assets[element.assetId]?.objectUrl).then((assetUrl) => ({
+      ...frame,
+      assetUrl,
+      kind: 'image',
+    }));
+  }
+  if (element.type === 'gif' || element.type === 'video') {
+    return Promise.resolve({
+      ...frame,
+      autoplay:
+        element.type === 'gif' ? element.playing : element.autoplayInPreview || element.playing,
+      controls: element.type === 'video' ? element.controls : false,
+      kind: 'media',
+      loop: element.type === 'gif' ? element.playing : element.loop,
+      mediaType: element.type,
+      muted: element.type === 'video' ? element.muted : true,
+    });
+  }
+  return Promise.resolve({
+    ...frame,
+    fill: element.fill,
+    kind: 'shape',
+    shape: element.shape,
+    stroke: element.stroke,
+    strokeWidth: element.strokeWidth,
+  });
+}
+
+async function createPreviewAssetUrl(assetUrl: string | undefined) {
+  if (!assetUrl) return undefined;
+  if (isTestRuntime() && (assetUrl.startsWith('blob:') || assetUrl.startsWith('data:'))) {
+    return undefined;
+  }
+  if (assetUrl.startsWith('data:image/')) {
+    if (assetUrl.length <= remotePreviewMaxInlineAssetLength) return assetUrl;
+    return createThumbnailDataUrl(assetUrl).catch(() => undefined);
+  }
+  if (assetUrl.startsWith('data:')) return undefined;
+  if (assetUrl.startsWith('blob:')) {
+    return createThumbnailDataUrl(assetUrl).catch(() => undefined);
+  }
+  return assetUrl;
+}
+
+function createThumbnailDataUrl(assetUrl: string) {
+  if (typeof document === 'undefined') return Promise.resolve(undefined);
+  return new Promise<string | undefined>((resolve) => {
+    const image = new Image();
+    const timeoutId = window.setTimeout(() => resolve(undefined), 250);
+    image.onload = () => {
+      window.clearTimeout(timeoutId);
+      const sourceWidth = image.naturalWidth || image.width;
+      const sourceHeight = image.naturalHeight || image.height;
+      if (!sourceWidth || !sourceHeight) {
+        resolve(undefined);
+        return;
+      }
+      const scale = Math.min(1, remotePreviewThumbnailMaxEdge / Math.max(sourceWidth, sourceHeight));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+      canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+      const context = canvas.getContext('2d');
+      if (!context) {
+        resolve(undefined);
+        return;
+      }
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', remotePreviewThumbnailQuality));
+    };
+    image.onerror = () => {
+      window.clearTimeout(timeoutId);
+      resolve(undefined);
+    };
+    image.src = assetUrl;
+  });
 }
 
 function isLoopbackOrigin(origin: string) {
