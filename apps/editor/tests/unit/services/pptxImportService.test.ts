@@ -30,6 +30,7 @@ const presentationRels = `<?xml version="1.0" encoding="UTF-8"?>
 const slideRels = `<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rIdLayout" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>
+  <Relationship Id="rIdNotes" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide" Target="../notesSlides/notesSlide1.xml"/>
   <Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/>
   <Relationship Id="rIdPoster" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/poster1.png"/>
   <Relationship Id="rIdVideo" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/video" Target="../media/media1.mp4"/>
@@ -131,12 +132,35 @@ const slideXml = `<?xml version="1.0" encoding="UTF-8"?>
   </p:timing>
 </p:sld>`;
 
+const notesSlideXml = `<?xml version="1.0" encoding="UTF-8"?>
+<p:notes xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+      <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm></p:grpSpPr>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="2" name="Slide image placeholder"/><p:cNvSpPr/><p:nvPr><p:ph type="sldImg"/></p:nvPr></p:nvSpPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Do not import slide thumbnail text</a:t></a:r></a:p></p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="3" name="Notes Placeholder"/><p:cNvSpPr/><p:nvPr><p:ph type="body"/></p:nvPr></p:nvSpPr>
+        <p:txBody>
+          <a:bodyPr/><a:lstStyle/>
+          <a:p><a:r><a:t>Open with the PowerPoint import story.</a:t></a:r></a:p>
+          <a:p><a:r><a:t>Then demo editable speaker notes.</a:t></a:r></a:p>
+        </p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+</p:notes>`;
+
 function createPptxFixture() {
   return createStoredPptxFile([
     { path: 'ppt/presentation.xml', contents: presentationXml },
     { path: 'ppt/_rels/presentation.xml.rels', contents: presentationRels },
     { path: 'ppt/slides/slide1.xml', contents: slideXml },
     { path: 'ppt/slides/_rels/slide1.xml.rels', contents: slideRels },
+    { path: 'ppt/notesSlides/notesSlide1.xml', contents: notesSlideXml },
     { path: 'ppt/slideLayouts/slideLayout1.xml', contents: layoutXml },
     { path: 'ppt/slideLayouts/_rels/slideLayout1.xml.rels', contents: layoutRels },
     { path: 'ppt/media/image1.png', contents: new Uint8Array([137, 80, 78, 71]) },
@@ -155,6 +179,9 @@ describe('BrowserPptxImportService', () => {
     expect(project.pages).toHaveLength(1);
     expect(project.pages[0]?.width).toBe(1920);
     expect(project.pages[0]?.height).toBe(1080);
+    expect(project.pages[0]?.speakerNotes).toBe(
+      'Open with the PowerPoint import story.\nThen demo editable speaker notes.',
+    );
     expect(project.pages[0]?.transition?.effect).toBe('fade');
     expect(project.pages[0]?.animationBuilds).toMatchObject([
       {

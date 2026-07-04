@@ -63,6 +63,7 @@ export interface PptxSlide {
   name: string;
   animationBuilds: ElementAnimationBuild[];
   objects: PptxSlideObject[];
+  speakerNotes?: string;
   transitionEffect: AnimationEffect;
 }
 
@@ -199,8 +200,12 @@ function getHexColor(element: ParentNode | undefined, fallback: string) {
   return color ? `#${color}` : fallback;
 }
 
+function getPlaceholderType(shape: Element) {
+  return pptxXml.firstDescendant(shape, 'ph')?.getAttribute('type');
+}
+
 function hasPlaceholder(shape: Element) {
-  return Boolean(pptxXml.firstDescendant(shape, 'ph'));
+  return Boolean(getPlaceholderType(shape));
 }
 
 function getTypeface(...runProperties: Array<Element | undefined>) {
@@ -370,6 +375,21 @@ function getTextParagraphs(shape: Element) {
     .map((paragraph) => pptxXml.textContent(paragraph, 't').replace(/[ \t\r\f\v]+/g, ' ').trim())
     .filter(Boolean)
     .join('\n');
+}
+
+async function parseSpeakerNotes(files: PptxPackageFile[], notesPath: string | undefined) {
+  if (!notesPath) return undefined;
+  const xml = await readText(findFile(files, notesPath));
+  if (!xml) return undefined;
+  const document = pptxXml.parseXml(xml);
+  const notesText = pptxXml
+    .descendants(document, 'sp')
+    .filter((shape) => getPlaceholderType(shape) === 'body')
+    .map(getTextParagraphs)
+    .filter(Boolean)
+    .join('\n')
+    .trim();
+  return notesText || undefined;
 }
 
 function getTextInset(
@@ -621,11 +641,13 @@ async function parseSlide(
   const rels = parseRelationships(await readText(findFile(files, relsPathFor(slidePath))), slidePath);
   const slideId = `pptx-page-${slideIndex + 1}`;
   const layoutPath = findRelationshipByType(rels, '/slideLayout')?.target;
+  const notesPath = findRelationshipByType(rels, '/notesSlide')?.target;
   const layoutRels = parseRelationships(
     await readText(findFile(files, layoutPath ? relsPathFor(layoutPath) : '')),
     layoutPath ?? slidePath,
   );
   const masterPath = findRelationshipByType(layoutRels, '/slideMaster')?.target;
+  const speakerNotes = await parseSpeakerNotes(files, notesPath);
   const masterObjects = await parseInheritedObjects(files, masterPath, slideId, scaleX, scaleY, textDefaults, 'master');
   const layoutObjects = await parseInheritedObjects(files, layoutPath, slideId, scaleX, scaleY, textDefaults, 'layout');
   const tree = pptxXml.firstDescendant(document, 'spTree');
@@ -652,6 +674,7 @@ async function parseSlide(
     name: `Slide ${slideIndex + 1}`,
     animationBuilds: parseAnimationBuilds(document, slideId, objects),
     objects,
+    ...(speakerNotes ? { speakerNotes } : {}),
     transitionEffect: getTransitionEffect(document),
   };
 }
