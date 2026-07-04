@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JoystickApp } from '../../src/app/JoystickApp';
 import { InMemoryPresenterRemoteSignalingService } from '@localstudio/presenter-remote/signaling-service';
 
@@ -35,11 +35,24 @@ vi.mock('../../src/app/presenterRemoteStreamReceiver', () => ({
   presenterRemoteStreamReceiver: streamReceiverMock,
 }));
 
+const localStorageDescriptor = Object.getOwnPropertyDescriptor(window, 'localStorage');
+
+function restoreLocalStorage() {
+  if (localStorageDescriptor) {
+    Object.defineProperty(window, 'localStorage', localStorageDescriptor);
+  }
+}
+
 describe('JoystickApp', () => {
   beforeEach(() => {
-    window.localStorage.clear();
+    restoreLocalStorage();
+    window.localStorage?.clear();
     streamReceiverMock.create.mockClear();
     streamReceiverMock.latestReceiver = undefined;
+  });
+
+  afterEach(() => {
+    restoreLocalStorage();
   });
 
   it('renders the installable remote shell and starts with the query code', async () => {
@@ -61,7 +74,6 @@ describe('JoystickApp', () => {
   });
 
   it('renders when browser storage is unavailable', async () => {
-    const originalLocalStorage = window.localStorage;
     Object.defineProperty(window, 'localStorage', {
       configurable: true,
       value: undefined,
@@ -83,10 +95,7 @@ describe('JoystickApp', () => {
       expect(await screen.findByLabelText('Presentation remote control')).toBeInTheDocument();
       expect(screen.getByLabelText('Connected (1)')).toBeInTheDocument();
     } finally {
-      Object.defineProperty(window, 'localStorage', {
-        configurable: true,
-        value: originalLocalStorage,
-      });
+      restoreLocalStorage();
     }
   });
 
