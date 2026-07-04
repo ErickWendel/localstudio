@@ -545,9 +545,9 @@ export function JoystickApp({
 
   function sendRemoteCommand(command: PresenterRemoteCommand) {
     if (!session) return;
-    if (remoteStreamReceiverRef.current?.sendCommand(command)) {
+    const sentByStream = Boolean(remoteStreamReceiverRef.current?.sendCommand(command));
+    if (sentByStream) {
       setLastCommand(command.command);
-      return;
     }
     void Promise.resolve(signalingService.publishCommand(session.code, command))
       .then(() => setLastCommand(command.command));
@@ -630,7 +630,7 @@ export function JoystickApp({
         <div className="joystick-stream-overlay" aria-label="Remote controls">
           <span className={`joystick-status-dot joystick-status-dot-${status}`} aria-label={connectionLabel} />
           <span>{connectionLabel}</span>
-          <button type="button" onClick={() => sendCommand('previous')} aria-label="Previous slide">
+          <button type="button" onClick={() => navigateSlide('previous')} aria-label="Previous slide">
             <ChevronLeft size={19} />
           </button>
           <button
