@@ -41,6 +41,33 @@ const localStoragePrototypeDescriptor = Object.getOwnPropertyDescriptor(
   'localStorage',
 );
 
+function createTestStorage(): Storage {
+  const values = new Map<string, string>();
+  return {
+    get length() {
+      return values.size;
+    },
+    clear: vi.fn(() => values.clear()),
+    getItem: vi.fn((key: string) => values.get(key) ?? null),
+    key: vi.fn((index: number) => Array.from(values.keys())[index] ?? null),
+    removeItem: vi.fn((key: string) => {
+      values.delete(key);
+    }),
+    setItem: vi.fn((key: string, value: string) => {
+      values.set(key, String(value));
+    }),
+  };
+}
+
+function installTestLocalStorage() {
+  const storage = createTestStorage();
+  Object.defineProperty(window, 'localStorage', {
+    configurable: true,
+    value: storage,
+  });
+  return storage;
+}
+
 function restoreLocalStorage() {
   if (localStorageDescriptor) {
     Object.defineProperty(window, 'localStorage', localStorageDescriptor);
@@ -53,9 +80,7 @@ function restoreLocalStorage() {
 
 function getTestLocalStorage() {
   restoreLocalStorage();
-  const storage = window.localStorage;
-  if (!storage) throw new Error('Expected jsdom localStorage to be available for this test');
-  return storage;
+  return window.localStorage ?? installTestLocalStorage();
 }
 
 describe('JoystickApp', () => {
