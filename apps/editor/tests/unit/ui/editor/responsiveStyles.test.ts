@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const stylesPath = resolve(__dirname, '../../../../src/app/styles.css');
-const stylesDirectory = resolve(__dirname, '../../../../src/app/styles');
+const stylesDirectory = resolve(__dirname, '../../../../src/ui/styles');
 const maxOwnedStylesheetLines = 420;
 
 function readComposedStyles(filePath: string, visited = new Set<string>()): string {
