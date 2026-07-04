@@ -5,17 +5,30 @@ import { JoystickApp } from '../../src/app/JoystickApp';
 import { InMemoryPresenterRemoteSignalingService } from '@localstudio/presenter-remote/signaling-service';
 
 const streamReceiverMock = vi.hoisted(() => ({
+  latestReceiver: undefined as
+    | {
+        sendCommand: ReturnType<typeof vi.fn>;
+        sendStreamPreference: ReturnType<typeof vi.fn>;
+        start: ReturnType<typeof vi.fn>;
+        stop: ReturnType<typeof vi.fn>;
+      }
+    | undefined,
   create: vi.fn((options: {
     onStatusChange: (status: 'connected') => void;
     onStream: (stream: MediaStream | undefined) => void;
-  }) => ({
-    sendStreamPreference: vi.fn(() => true),
-    start: vi.fn(() => {
-      options.onStream({} as MediaStream);
-      options.onStatusChange('connected');
-    }),
-    stop: vi.fn(),
-  })),
+  }) => {
+    const receiver = {
+      sendCommand: vi.fn(() => true),
+      sendStreamPreference: vi.fn(() => true),
+      start: vi.fn(() => {
+        options.onStream({} as MediaStream);
+        options.onStatusChange('connected');
+      }),
+      stop: vi.fn(),
+    };
+    streamReceiverMock.latestReceiver = receiver;
+    return receiver;
+  }),
 }));
 
 vi.mock('../../src/app/presenterRemoteStreamReceiver', () => ({
@@ -26,6 +39,7 @@ describe('JoystickApp', () => {
   beforeEach(() => {
     window.localStorage.clear();
     streamReceiverMock.create.mockClear();
+    streamReceiverMock.latestReceiver = undefined;
   });
 
   it('renders the installable remote shell and starts with the query code', async () => {
@@ -158,7 +172,7 @@ describe('JoystickApp', () => {
     ]);
   });
 
-  it('sends slide jump commands from the streamed presenter preview', async () => {
+  it('sends slide jump commands through the streamed data channel', async () => {
     const user = userEvent.setup();
     const service = new InMemoryPresenterRemoteSignalingService({
       randomCode: () => 'ABCD-1234',
@@ -190,6 +204,48 @@ describe('JoystickApp', () => {
     const preview = await screen.findByRole('button', { name: 'Presenter stream preview' });
     await user.click(preview);
 
+    expect(streamReceiverMock.latestReceiver?.sendCommand).toHaveBeenCalledWith(
+      { command: 'go-to-page', pageId: 'page-2', type: 'command' },
+    );
+    expect(service.takeCommands('ABCD-1234')).toEqual([]);
+  });
+
+  it('falls back to signaling commands when the streamed data channel is unavailable', async () => {
+    const user = userEvent.setup();
+    const service = new InMemoryPresenterRemoteSignalingService({
+      randomCode: () => 'ABCD-1234',
+      randomId: () => 'session-1',
+    });
+    service.registerSession({ presenterLabel: 'MacBook Pro', ttlMs: 60_000 });
+    service.publishState('ABCD-1234', {
+      activePageId: 'page-1',
+      activePageIndex: 0,
+      buildsRemaining: 0,
+      connectedControllerCount: 1,
+      deckName: 'Launch Deck',
+      notes: '',
+      pageCount: 2,
+      pages: [
+        { id: 'page-1', name: 'Intro' },
+        { id: 'page-2', name: 'Roadmap' },
+      ],
+      presenterMode: 'presenting',
+      previewMode: 'stream',
+      shortcuts: ['previous', 'next'],
+      stream: { enabled: true, fps: 8, height: 340, width: 390 },
+      timer: { elapsedMs: 0, paused: false },
+      type: 'state',
+    });
+
+    render(<JoystickApp initialUrl="https://localstudio.test/joystick?code=ABCD-1234" signalingService={service} />);
+
+    const preview = await screen.findByRole('button', { name: 'Presenter stream preview' });
+    streamReceiverMock.latestReceiver?.sendCommand.mockReturnValue(false);
+    await user.click(preview);
+
+    expect(streamReceiverMock.latestReceiver?.sendCommand).toHaveBeenCalledWith(
+      { command: 'go-to-page', pageId: 'page-2', type: 'command' },
+    );
     expect(service.takeCommands('ABCD-1234')).toEqual([
       { command: 'go-to-page', pageId: 'page-2', type: 'command' },
     ]);
