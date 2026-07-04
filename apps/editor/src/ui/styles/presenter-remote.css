@@ -70,17 +70,6 @@
     #ffffff;
 }
 
-.presenter-remote-code {
-  border: 1px solid rgba(55, 253, 118, 0.32);
-  border-radius: 6px;
-  padding: 8px 12px;
-  background: #050d10;
-  color: var(--ew-green-fixed);
-  font-family: var(--ls-font-display);
-  font-weight: 800;
-  letter-spacing: 0;
-}
-
 .presenter-remote-copy {
   width: 100%;
   min-height: 44px;

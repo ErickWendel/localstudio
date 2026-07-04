@@ -63,9 +63,6 @@ export function PresenterRemotePanel({ session }: PresenterRemotePanelProps) {
         ) : (
           <div className="presenter-remote-qr presenter-remote-qr-loading" aria-hidden="true" />
         )}
-        <div className="presenter-remote-code" aria-label="Remote session code">
-          {session.code}
-        </div>
         <button type="button" className="presenter-remote-copy" onClick={() => void copyRemoteLink()}>
           <span className="material-symbols-outlined" aria-hidden="true">
             link

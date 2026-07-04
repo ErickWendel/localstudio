@@ -431,8 +431,7 @@ describe('JoystickApp', () => {
     expect(notes).toHaveStyle({ fontSize: '28px' });
   });
 
-  it('shows a start button when the desktop editor is ready but not presenting', async () => {
-    const user = userEvent.setup();
+  it('asks the desktop to enter presenter mode before showing controls', async () => {
     const service = new InMemoryPresenterRemoteSignalingService({
       randomCode: () => 'ABCD-1234',
       randomId: () => 'session-1',
@@ -454,9 +453,10 @@ describe('JoystickApp', () => {
 
     render(<JoystickApp initialUrl="https://localstudio.test/joystick?code=ABCD-1234" signalingService={service} />);
 
-    await user.click(await screen.findByRole('button', { name: 'Start presenter mode' }));
+    expect(await screen.findByLabelText('Presenter mode required')).toBeInTheDocument();
+    expect(screen.getByText(/Open presenter mode on/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start presenter mode' })).not.toBeInTheDocument();
 
-    expect(screen.getByText('Starting...')).toBeInTheDocument();
-    expect(service.takeCommands('ABCD-1234')).toEqual([{ command: 'start-presenting', type: 'command' }]);
+    expect(service.takeCommands('ABCD-1234')).toEqual([]);
   });
 });

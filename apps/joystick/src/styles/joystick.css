@@ -171,7 +171,6 @@ input {
 }
 
 .joystick-stage-button:focus-visible,
-.joystick-play-button:focus-visible,
 .joystick-code-row button:focus-visible,
 .joystick-code-row input:focus-visible {
   outline: 2px solid var(--ls-green);
@@ -544,20 +543,17 @@ input {
   font-weight: 900;
 }
 
-.joystick-play-button {
-  width: 168px;
-  height: 168px;
-  display: grid;
-  place-items: center;
-  border: 0;
+.joystick-start-indicator {
+  width: 136px;
+  height: 136px;
   border-radius: 999px;
-  background: #48d846;
-  color: var(--ls-text);
-  box-shadow: 0 0 0 18px rgba(72, 216, 70, 0.08);
-}
-
-.joystick-play-button:active {
-  transform: scale(0.98);
+  border: 2px solid rgba(55, 253, 118, 0.42);
+  background:
+    radial-gradient(circle at center, rgba(55, 253, 118, 0.3) 0 9px, transparent 10px),
+    rgba(55, 253, 118, 0.07);
+  box-shadow:
+    0 0 0 16px rgba(55, 253, 118, 0.04),
+    inset 0 0 32px rgba(55, 253, 118, 0.08);
 }
 
 .joystick-start-status {

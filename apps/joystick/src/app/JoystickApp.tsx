@@ -32,7 +32,7 @@ interface JoystickAppProps {
 
 const rememberedCodeKey = 'localstudio.joystick.lastCode';
 const controllerIdKey = 'localstudio.joystick.controllerId';
-type JoystickSimpleCommand = 'next' | 'pause-timer' | 'previous' | 'reset-timer' | 'start-presenting';
+type JoystickSimpleCommand = 'next' | 'pause-timer' | 'previous' | 'reset-timer';
 const swipeThresholdPx = 44;
 
 function getInitialCode(initialUrl: string) {
@@ -479,20 +479,13 @@ export function JoystickApp({
           <span>{session?.presenterLabel ?? 'Presenter device'}</span>
           <span className={`joystick-status joystick-status-${status}`}>{connectionLabel}</span>
         </header>
-        <section className="joystick-start-screen" aria-label="Start presentation">
+        <section className="joystick-start-screen" aria-label="Presenter mode required">
           <p>
-            Ready to control <strong>{displayedRemoteState?.deckName ?? 'this presentation'}</strong> on{' '}
-            <strong>{session?.presenterLabel ?? 'this computer'}</strong>.
+            Open presenter mode on <strong>{session?.presenterLabel ?? 'this computer'}</strong> to control{' '}
+            <strong>{displayedRemoteState?.deckName ?? 'this presentation'}</strong> from this phone.
           </p>
-          <button
-            type="button"
-            className="joystick-play-button"
-            aria-label="Start presenter mode"
-            onClick={() => sendCommand('start-presenting')}
-          >
-            <Play size={86} fill="currentColor" />
-          </button>
-          {lastCommand ? <span className="joystick-start-status">{lastCommand === 'start-presenting' ? 'Starting...' : `Command sent: ${lastCommand}`}</span> : null}
+          <span className="joystick-start-indicator" aria-hidden="true" />
+          {lastCommand ? <span className="joystick-start-status">Command sent: {lastCommand}</span> : null}
         </section>
       </main>
     );
