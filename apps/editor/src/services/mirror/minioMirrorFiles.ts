@@ -39,11 +39,22 @@ function cloneProjectWithoutObjectUrls(project: ProjectDocument): ProjectDocumen
         return [assetId, nextAsset];
       }),
     ),
+    ...(project.fonts
+      ? {
+          fonts: Object.fromEntries(
+            Object.entries(project.fonts).map(([fontId, font]) => {
+              const nextFont = { ...font };
+              delete nextFont.objectUrl;
+              return [fontId, nextFont];
+            }),
+          ),
+        }
+      : {}),
   };
 }
 
-async function assetToBlob(asset: Asset, requestFetch: typeof fetch) {
-  return assetFileUtils.objectUrlToBlobIfReadable(asset.objectUrl, requestFetch);
+async function objectUrlToBlob(value: { objectUrl?: string }, requestFetch: typeof fetch) {
+  return assetFileUtils.objectUrlToBlobIfReadable(value.objectUrl, requestFetch);
 }
 
 async function createFileEntry(path: string, blob: Blob): Promise<MirrorFile & MirrorManifestFile> {
@@ -67,13 +78,14 @@ async function createMirrorFiles(
   const projectForMirror: ProjectDocument = {
     ...project,
     assets: {},
+    ...(project.fonts ? { fonts: {} } : {}),
   };
   const files: Array<MirrorFile & MirrorManifestFile> = [];
 
   for (const [assetId, asset] of Object.entries(project.assets)) {
     if (!referencedAssetIds.has(assetId)) continue;
     const fileName = asset.fileName ?? `${asset.id}.${assetFileUtils.getAssetFileExtension(asset.mimeType)}`;
-    const blob = await assetToBlob(asset, requestFetch);
+    const blob = await objectUrlToBlob(asset, requestFetch);
     if (blob) {
       const assetForMirror: Asset = {
         ...asset,
@@ -85,6 +97,21 @@ async function createMirrorFiles(
       files.push(await createFileEntry(`assets/${fileName}`, blob));
     } else {
       projectForMirror.assets[assetId] = { ...asset };
+    }
+  }
+
+  for (const [fontId, font] of Object.entries(project.fonts ?? {})) {
+    const blob = await objectUrlToBlob(font, requestFetch);
+    if (blob) {
+      const fontForMirror = {
+        ...font,
+        storage: 'file' as const,
+      };
+      delete fontForMirror.objectUrl;
+      projectForMirror.fonts![fontId] = fontForMirror;
+      files.push(await createFileEntry(`fonts/${font.fileName}`, blob));
+    } else {
+      projectForMirror.fonts![fontId] = { ...font };
     }
   }
 

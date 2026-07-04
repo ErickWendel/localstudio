@@ -298,7 +298,7 @@ describe('RightPanel', () => {
     });
     expect(onUpdateElementStyle).toHaveBeenCalledWith('text-title', { fill: '#ffffff' });
 
-    await user.selectOptions(screen.getByLabelText('Selected text alignment'), 'left');
+    await user.click(screen.getByRole('button', { name: 'Align selected text left' }));
     expect(onUpdateElementStyle).toHaveBeenCalledWith('text-title', { align: 'left' });
   });
 

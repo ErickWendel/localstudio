@@ -37,6 +37,7 @@ export function EditorShell({ services }: EditorShellProps) {
   const vm = useEditorViewModel(services);
   const automationDelegateRef = useRef(vm.automation);
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
+  const [designFontFocusKey, setDesignFontFocusKey] = useState(0);
   const [sharePanelOpen, setSharePanelOpen] = useState(false);
   const [shareMetadata, setShareMetadata] = useState<ShareMetadata | undefined>();
   const stageRef = useRef<Konva.Stage>(null);
@@ -121,6 +122,12 @@ export function EditorShell({ services }: EditorShellProps) {
     if (selectedElement?.type !== 'gif' && selectedElement?.type !== 'video') return;
     vm.setActiveTab('design');
     openLeftPanel();
+  }
+
+  function openDesignFontList() {
+    vm.setActiveTab('design');
+    openLeftPanel();
+    setDesignFontFocusKey((current) => current + 1);
   }
 
   function selectElement(elementId: string, options?: { additive?: boolean }) {
@@ -423,12 +430,15 @@ export function EditorShell({ services }: EditorShellProps) {
           activeTab={vm.activeTab}
           animationPreview={vm.animationPreview}
           activeSlideLanguage={vm.activeSlideLanguage}
+          focusFontControlKey={designFontFocusKey}
           onTabChange={vm.setActiveTab}
           open={leftPanelOpen}
           onOpenChange={handleLeftPanelOpenChange}
           project={vm.project}
           activePageId={vm.activePageId}
           selection={vm.selection}
+          availableFonts={vm.availableFonts}
+          onDownloadFont={isHistoryReadOnly ? undefined : vm.downloadFontForSelection}
           onSelectElement={isHistoryReadOnly ? undefined : selectElement}
           onSetElementVisibility={isHistoryReadOnly ? undefined : vm.setElementVisibility}
           onSetElementLock={isHistoryReadOnly ? undefined : vm.setElementLock}
@@ -600,6 +610,7 @@ export function EditorShell({ services }: EditorShellProps) {
                     openLeftPanel();
                   }
             }
+            onOpenFontPanel={isHistoryReadOnly ? undefined : openDesignFontList}
             onSelectElement={isHistoryReadOnly ? undefined : selectElement}
             onSendSelectedElementBackward={
               isHistoryReadOnly

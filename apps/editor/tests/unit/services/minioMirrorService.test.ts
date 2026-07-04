@@ -101,6 +101,41 @@ describe('minioMirrorService.createMirrorFiles', () => {
       publicBaseUrl: config.publicBaseUrl,
     });
   });
+
+  it('includes project font files in mirror payloads', async () => {
+    const project: ProjectDocument = {
+      ...sampleProject.createSampleProject(),
+      fonts: {
+        montserrat: {
+          id: 'montserrat',
+          family: 'Montserrat',
+          requestedFamily: 'Montserrat',
+          source: 'google-fonts',
+          fontStyle: 'normal',
+          fontWeight: 700,
+          mimeType: 'font/woff2',
+          fileName: 'montserrat-700.woff2',
+          storage: 'inline',
+          objectUrl: 'data:font/woff2;base64,Zm9udA==',
+        },
+      },
+    };
+
+    const files = await minioMirrorService.createMirrorFiles(
+      project,
+      new VersionedRepository([], project),
+      config,
+    );
+
+    expect(files.map((file) => file.path)).toContain('fonts/montserrat-700.woff2');
+    const projectJson = JSON.parse(
+      await files.find((file) => file.path === 'project.json')!.blob.text(),
+    ) as ProjectDocument;
+    expect(projectJson.fonts?.montserrat).toMatchObject({
+      fileName: 'montserrat-700.woff2',
+      storage: 'file',
+    });
+  });
 });
 
 describe('minioMirrorService.MinioMirrorService', () => {

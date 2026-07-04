@@ -26,6 +26,7 @@ export interface ProjectDocument {
   name: string;
   pages: Page[];
   assets: Record<string, Asset>;
+  fonts?: Record<string, ProjectFont>;
   elements: Record<string, DesignElement>;
   createdAt: string;
   updatedAt: string;
@@ -95,6 +96,20 @@ export interface Asset {
   objectUrl?: string;
   fileName?: string;
   storage?: 'inline' | 'file' | 'remote';
+}
+
+export interface ProjectFont {
+  id: string;
+  family: string;
+  source: 'google-fonts';
+  requestedFamily: string;
+  fontStyle: 'normal' | 'italic';
+  fontWeight: number;
+  mimeType: 'font/woff2';
+  fileName: string;
+  storage: 'inline' | 'file' | 'remote';
+  objectUrl?: string;
+  sourceUrl?: string;
 }
 
 export type DesignElement = TextElement | ImageElement | GifElement | VideoElement | ShapeElement;

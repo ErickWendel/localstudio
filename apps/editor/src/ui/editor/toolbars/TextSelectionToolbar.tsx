@@ -1,12 +1,12 @@
 import type { ElementStylePatch } from '../../../domain/commands/elements/basicCommands';
 import type { TextElement } from '../../../domain/documents/model';
-import { textStyleOptions } from '../text/textStyleOptions';
 
 interface TextSelectionToolbarProps {
   disabled?: boolean;
   canTranslateSelection?: boolean;
   element: TextElement;
   onOpenAnimations?: () => void;
+  onOpenFontPanel?: () => void;
   onTranslateSelectedText?: () => void;
   onUpdateElementStyle?: (elementId: string, patch: ElementStylePatch) => void;
 }
@@ -20,6 +20,7 @@ export function TextSelectionToolbar({
   canTranslateSelection = false,
   element,
   onOpenAnimations,
+  onOpenFontPanel,
   onTranslateSelectedText,
   onUpdateElementStyle,
 }: TextSelectionToolbarProps) {
@@ -32,21 +33,19 @@ export function TextSelectionToolbar({
 
   return (
     <div className="text-selection-toolbar" role="toolbar" aria-label="Text editing controls">
-      <select
+      <button
         aria-label="Text font family"
         className="text-toolbar-font"
         disabled={disabled || element.locked}
-        value={element.fontFamily}
-        onChange={(event) => {
-          updateStyle({ fontFamily: event.target.value });
+        title="Open font list"
+        type="button"
+        onClick={() => {
+          if (disabled || element.locked) return;
+          onOpenFontPanel?.();
         }}
       >
-        {textStyleOptions.TEXT_FONT_FAMILIES.map((fontFamily) => (
-          <option key={fontFamily} value={fontFamily}>
-            {fontFamily}
-          </option>
-        ))}
-      </select>
+        {element.fontFamily}
+      </button>
 
       <div className="text-toolbar-size" aria-label="Text size">
         <button

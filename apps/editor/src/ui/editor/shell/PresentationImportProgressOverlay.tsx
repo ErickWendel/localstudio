@@ -8,6 +8,7 @@ const stageLabels: Record<PresentationImportProgressState['stage'], string> = {
   reading: 'Reading package',
   inspecting: 'Inspecting PPTX structure',
   'extracting-objects': 'Extracting text and images',
+  'downloading-fonts': 'Downloading fonts',
   'extracting-media': 'Extracting videos',
   'mapping-animations': 'Mapping animations',
   opening: 'Opening editor',

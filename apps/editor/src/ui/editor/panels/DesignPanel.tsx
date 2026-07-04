@@ -1,4 +1,20 @@
-import { AlignCenter, CaseSensitive, Film, Image, Square, Type, Video } from 'lucide-react';
+import {
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Bold,
+  CaseSensitive,
+  Download,
+  Film,
+  Image,
+  Plus,
+  Search,
+  Square,
+  Type,
+  Video,
+} from 'lucide-react';
+import type { FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   DesignElement,
   PageBackground,
@@ -12,10 +28,13 @@ import type {
   ElementStylePatch,
   MediaPlaybackPatch,
 } from '../../../domain/commands/elements/basicCommands';
+import type { FontCatalogItem } from '../../../services/contracts/interfaces';
 import { PanelSection } from '../../components/PanelSection';
 import { textStyleOptions } from '../text/textStyleOptions';
 
 const palette = ['#37FD76', '#050D10', '#FFFFFF', '#91999D', '#00779A'];
+const regularTextWeight = 400;
+const boldTextWeight = 800;
 const shapeLineEndpointOptions: Array<{ value: ShapeLineEndpoint; label: string }> = [
   { value: 'none', label: 'None' },
   { value: 'arrow', label: 'Arrow' },
@@ -32,6 +51,9 @@ interface DesignPanelProps {
   project: ProjectDocument;
   activePageId: string;
   selection: SelectionState;
+  availableFonts?: FontCatalogItem[];
+  focusFontControlKey?: number | undefined;
+  onDownloadFont?: (family: string) => Promise<void>;
   onUpdateElementStyle?: (elementId: string, patch: ElementStylePatch) => void;
   onUpdateMediaPlayback?: (elementId: string, patch: MediaPlaybackPatch) => void;
   onUpdatePageBackground?: (background: PageBackground) => void;
@@ -52,6 +74,15 @@ function supportsLineEndpoints(element: ShapeElement) {
   return element.shape === 'arc' || element.shape === 'arrow' || element.shape === 'line';
 }
 
+function fontMatchesQuery(font: FontCatalogItem, query: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return false;
+  return (
+    font.family.toLowerCase().includes(normalizedQuery) ||
+    (font.aliases ?? []).some((alias) => alias.toLowerCase().includes(normalizedQuery))
+  );
+}
+
 export function DesignPanel({
   project,
   activePageId,
@@ -59,10 +90,43 @@ export function DesignPanel({
   onUpdateElementStyle,
   onUpdateMediaPlayback,
   onUpdatePageBackground,
+  availableFonts = [],
+  focusFontControlKey,
+  onDownloadFont,
 }: DesignPanelProps) {
+  const fontSelectRef = useRef<HTMLSelectElement>(null);
+  const [fontDownloadOpen, setFontDownloadOpen] = useState(false);
+  const [fontSearchInput, setFontSearchInput] = useState('');
+  const [fontSearchQuery, setFontSearchQuery] = useState('');
+  const [downloadingFontFamily, setDownloadingFontFamily] = useState<string | undefined>();
+  const [fontDownloadStatus, setFontDownloadStatus] = useState<string | undefined>();
   const page = project.pages.find((item) => item.id === activePageId);
   const selectedElement = getSelectedElement(project, selection);
   const backgroundColor = page ? getBackgroundColor(page.background) : '#050D10';
+  const projectFontFamilies = useMemo(
+    () => Array.from(new Set(Object.values(project.fonts ?? {}).map((font) => font.family))).sort(),
+    [project.fonts],
+  );
+  const fontFamilyOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([...textStyleOptions.TEXT_FONT_FAMILIES, ...projectFontFamilies]),
+      ).sort((left, right) => left.localeCompare(right)),
+    [projectFontFamilies],
+  );
+  const filteredDownloadableFonts = useMemo(() => {
+    const query = fontSearchQuery.trim();
+    return availableFonts
+      .filter((font) => fontMatchesQuery(font, query))
+      .slice(0, 12);
+  }, [availableFonts, fontSearchQuery]);
+  const selectedTextIsBold =
+    selectedElement?.type === 'text' && selectedElement.fontWeight >= boldTextWeight;
+
+  useEffect(() => {
+    if (!focusFontControlKey || selectedElement?.type !== 'text') return;
+    fontSelectRef.current?.focus();
+  }, [focusFontControlKey, selectedElement?.type]);
 
   function updateSelectedStyle(patch: Parameters<NonNullable<typeof onUpdateElementStyle>>[1]) {
     if (!selectedElement || selectedElement.locked) return;
@@ -81,6 +145,25 @@ export function DesignPanel({
       return;
     }
     onUpdatePageBackground?.({ type: 'color', color });
+  }
+
+  async function downloadFont(family: string) {
+    if (!family || !onDownloadFont) return;
+    setDownloadingFontFamily(family);
+    setFontDownloadStatus(`Downloading ${family}...`);
+    try {
+      await onDownloadFont(family);
+      setFontDownloadStatus(`${family} downloaded and applied`);
+    } catch (error) {
+      setFontDownloadStatus(error instanceof Error ? error.message : 'Font download failed.');
+    } finally {
+      setDownloadingFontFamily(undefined);
+    }
+  }
+
+  function submitFontSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFontSearchQuery(fontSearchInput.trim());
   }
 
   return (
@@ -120,6 +203,187 @@ export function DesignPanel({
         </div>
       </PanelSection>
 
+      {selectedElement?.type === 'text' ? (
+        <PanelSection title="Font">
+          <div className="text-inspector-stack">
+            <div className="font-control-row">
+              <label className="text-inspector-field text-inspector-field-full">
+                <span className="text-inspector-label">Font</span>
+                <select
+                  aria-label="Selected text font"
+                  ref={fontSelectRef}
+                  value={selectedElement.fontFamily}
+                  onChange={(event) => {
+                    updateSelectedStyle({ fontFamily: event.target.value });
+                  }}
+                >
+                  {fontFamilyOptions.map((fontFamily) => (
+                    <option key={fontFamily} value={fontFamily}>
+                      {fontFamily}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                aria-expanded={fontDownloadOpen}
+                aria-label="Download additional font"
+                className="font-add-button"
+                title="Download additional font"
+                type="button"
+                onClick={() => {
+                  setFontDownloadOpen((current) => !current);
+                }}
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+            {fontDownloadOpen ? (
+              <div className="font-download-panel">
+                <form className="font-download-search" onSubmit={submitFontSearch}>
+                  <label className="layer-search font-download-search-box">
+                    <Search size={16} aria-hidden="true" />
+                    <input
+                      aria-label="Search downloadable fonts"
+                      placeholder="Search Google Fonts"
+                      type="search"
+                      value={fontSearchInput}
+                      onChange={(event) => {
+                        const nextSearch = event.target.value;
+                        setFontSearchInput(nextSearch);
+                        setFontSearchQuery(nextSearch.trim());
+                      }}
+                    />
+                  </label>
+                  <button className="font-search-submit" type="submit" aria-label="Search fonts">
+                    <Search size={16} />
+                  </button>
+                </form>
+                {fontSearchQuery ? (
+                  <div className="font-download-results" aria-label="Downloadable font results">
+                    {filteredDownloadableFonts.length > 0 ? (
+                      filteredDownloadableFonts.map((font) => (
+                        <button
+                          aria-label={`Download ${font.family}`}
+                          className="font-download-result"
+                          disabled={!onDownloadFont || downloadingFontFamily === font.family}
+                          key={font.family}
+                          type="button"
+                          onClick={() => {
+                            void downloadFont(font.family);
+                          }}
+                        >
+                          <span>{font.family}</span>
+                          <Download size={15} />
+                        </button>
+                      ))
+                    ) : (
+                      <p className="panel-muted">No Google Fonts match that search.</p>
+                    )}
+                  </div>
+                ) : null}
+                {fontDownloadStatus ? (
+                  <div className="panel-muted" role="status">
+                    {fontDownloadStatus}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            <div className="text-inspector-pair">
+              <label className="text-inspector-field">
+                <span className="text-inspector-label">Weight</span>
+              <select
+                aria-label="Selected text font weight"
+                value={selectedElement.fontWeight}
+                onChange={(event) => {
+                  updateSelectedStyle({ fontWeight: Number(event.target.value) });
+                }}
+              >
+                {textStyleOptions.TEXT_FONT_WEIGHTS.map((fontWeight) => (
+                  <option key={fontWeight} value={fontWeight}>
+                    {fontWeight}
+                  </option>
+                ))}
+              </select>
+              </label>
+              <label className="text-inspector-field">
+                <span className="text-inspector-label">Size</span>
+                <input
+                  aria-label="Selected text font size"
+                  min="1"
+                  type="number"
+                  value={selectedElement.fontSize}
+                  onChange={(event) => {
+                    updateSelectedStyle({ fontSize: Number(event.target.value) });
+                  }}
+                />
+              </label>
+            </div>
+            <div className="text-style-row" aria-label="Text style controls">
+              <button
+                aria-label="Bold selected text"
+                aria-pressed={selectedTextIsBold}
+                className={selectedTextIsBold ? 'text-style-toggle active' : 'text-style-toggle'}
+                type="button"
+                onClick={() => {
+                  updateSelectedStyle({
+                    fontWeight: selectedTextIsBold ? regularTextWeight : boldTextWeight,
+                  });
+                }}
+              >
+                <Bold size={16} />
+              </button>
+              <button className="text-style-toggle" disabled type="button" aria-label="Italic unavailable">
+                <span>I</span>
+              </button>
+              <button className="text-style-toggle" disabled type="button" aria-label="Underline unavailable">
+                <span>U</span>
+              </button>
+              <button className="text-style-toggle" disabled type="button" aria-label="Strikethrough unavailable">
+                <span>S</span>
+              </button>
+            </div>
+            <label className="text-color-row">
+              <span>Text Color</span>
+              <input
+                aria-label="Selected text color"
+                type="color"
+                value={selectedElement.fill}
+                onChange={(event) => {
+                  updateSelectedStyle({ fill: event.target.value });
+                }}
+              />
+            </label>
+            <div className="text-align-grid" aria-label="Selected text alignment">
+              {([
+                { align: 'left' as const, icon: AlignLeft, label: 'Align selected text left' },
+                { align: 'center' as const, icon: AlignCenter, label: 'Align selected text center' },
+                { align: 'right' as const, icon: AlignRight, label: 'Align selected text right' },
+              ]).map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    aria-label={item.label}
+                    aria-pressed={selectedElement.align === item.align}
+                    className={
+                      selectedElement.align === item.align
+                        ? 'text-align-button active'
+                        : 'text-align-button'
+                    }
+                    key={item.align}
+                    type="button"
+                    onClick={() => {
+                      updateSelectedStyle({ align: item.align });
+                    }}
+                  >
+                    <Icon size={18} />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </PanelSection>
+      ) : null}
+
       <PanelSection title="Selection">
         <div className="compact-action design-selection-summary">
           {selectedElement?.type === 'text' ? <Type size={16} /> : null}
@@ -148,84 +412,6 @@ export function DesignPanel({
           </label>
         ) : null}
       </PanelSection>
-
-      {selectedElement?.type === 'text' ? (
-        <PanelSection title="Typography">
-          <label className="design-control">
-            <span>Font</span>
-            <select
-              aria-label="Selected text font"
-              value={selectedElement.fontFamily}
-              onChange={(event) => {
-                updateSelectedStyle({ fontFamily: event.target.value });
-              }}
-            >
-              {textStyleOptions.TEXT_FONT_FAMILIES.map((fontFamily) => (
-                <option key={fontFamily} value={fontFamily}>
-                  {fontFamily}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="design-control">
-            <span>Size</span>
-            <input
-              aria-label="Selected text font size"
-              min="1"
-              type="number"
-              value={selectedElement.fontSize}
-              onChange={(event) => {
-                updateSelectedStyle({ fontSize: Number(event.target.value) });
-              }}
-            />
-          </label>
-          <label className="design-control">
-            <span>Weight</span>
-            <select
-              aria-label="Selected text font weight"
-              value={selectedElement.fontWeight}
-              onChange={(event) => {
-                updateSelectedStyle({ fontWeight: Number(event.target.value) });
-              }}
-            >
-              {textStyleOptions.TEXT_FONT_WEIGHTS.map((fontWeight) => (
-                <option key={fontWeight} value={fontWeight}>
-                  {fontWeight}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="design-control">
-            <span>Color</span>
-            <input
-              aria-label="Selected text color"
-              type="color"
-              value={selectedElement.fill}
-              onChange={(event) => {
-                updateSelectedStyle({ fill: event.target.value });
-              }}
-            />
-          </label>
-          <label className="design-control">
-            <span>Align</span>
-            <select
-              aria-label="Selected text alignment"
-              value={selectedElement.align}
-              onChange={(event) => {
-                updateSelectedStyle({ align: event.target.value as 'left' | 'center' | 'right' });
-              }}
-            >
-              <option value="left">Left</option>
-              <option value="center">Center</option>
-              <option value="right">Right</option>
-            </select>
-          </label>
-          <div className="compact-action">
-            <AlignCenter size={16} />
-            <span>Text frame stays editable on canvas</span>
-          </div>
-        </PanelSection>
-      ) : null}
 
       {selectedElement?.type === 'video' ? (
         <VideoPlaybackPanel element={selectedElement} onUpdate={updateSelectedMediaPlayback} />

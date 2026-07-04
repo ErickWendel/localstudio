@@ -28,6 +28,7 @@ export function App() {
       <Suspense fallback={null}>
         <PublicDeckViewer
           shareId={shareRoute.shareId}
+          fontImportService={services.fontImportService}
           shareService={services.shareService}
           embed={shareRoute.embed}
         />

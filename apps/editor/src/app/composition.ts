@@ -3,6 +3,7 @@ import type { ProjectDocument } from '../domain/documents/model';
 import type {
   BackgroundRemovalService,
   ExportService,
+  FontImportService,
   ImageGenerationService,
   LocalSetupService,
   MagicEraserService,
@@ -32,6 +33,7 @@ import { modelSetupService } from '../services/model-setup/modelSetupService';
 import { BrowserShareService } from '../services/sharing/shareService';
 import { BrowserPptxImportService } from '../services/importing/pptx/pptxImportService';
 import { BrowserStockMediaService } from '../services/stock-media/stockMediaService';
+import { BrowserGoogleFontsImportService } from '../services/fonts/googleFontsImportService';
 import { webGpuLanguageDetectionRuntime } from '../services/translation/webGpuLanguageDetectionRuntime';
 import { webGpuTextGenerationRuntime } from '../services/prompting/webGpuTextGenerationRuntime';
 import { minioMirrorService } from '../services/mirror/minioMirrorService';
@@ -45,6 +47,7 @@ export interface AppServices {
   persistenceMode: PersistenceStorageMode;
   projectRepository: ProjectRepository;
   exportService: ExportService;
+  fontImportService: FontImportService;
   presentationImportService: PresentationImportService;
   shareService: ShareService;
   stockMediaService: StockMediaService;
@@ -88,6 +91,7 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     persistenceMode,
     projectRepository: createProjectRepository(persistenceMode),
     exportService: new BrowserExportService(),
+    fontImportService: new BrowserGoogleFontsImportService(),
     presentationImportService: new BrowserPptxImportService(),
     shareService: new BrowserShareService({ mirrorService }),
     stockMediaService: new BrowserStockMediaService(),

@@ -176,6 +176,55 @@ describe('OpfsProjectRepository', () => {
     expect(createObjectUrl).toHaveBeenCalled();
   });
 
+  it('persists project fonts under fonts and hydrates object URLs on load', async () => {
+    const root = new MockDirectoryHandle();
+    const storage = new MemoryStorage();
+    const createObjectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:font');
+    const repository = new OpfsProjectRepository({
+      getRootDirectory: () => Promise.resolve(root as unknown as FileSystemDirectoryHandle),
+      storage,
+    });
+    const project: ProjectDocument = {
+      ...sampleProject.createSampleProject(),
+      fonts: {
+        montserrat: {
+          id: 'montserrat',
+          family: 'Montserrat',
+          requestedFamily: 'Montserrat',
+          source: 'google-fonts',
+          fontStyle: 'normal',
+          fontWeight: 700,
+          mimeType: 'font/woff2',
+          fileName: 'montserrat-700.woff2',
+          storage: 'inline',
+          objectUrl: 'data:font/woff2;base64,Zm9udA==',
+        },
+      },
+    };
+
+    await repository.saveProject(project);
+
+    const projectDirectory = await getProjectDirectory(root, project.name);
+    const fontsDirectory = projectDirectory.directories.get('fonts');
+    const projectJson = JSON.parse(
+      await readMockText(projectDirectory.files.get('project.json')!),
+    ) as ProjectDocument;
+    expect(fontsDirectory?.files.has('montserrat-700.woff2')).toBe(true);
+    expect(projectJson.fonts?.montserrat).toMatchObject({
+      fileName: 'montserrat-700.woff2',
+      storage: 'file',
+    });
+    expect(projectJson.fonts?.montserrat?.objectUrl).toBeUndefined();
+
+    const loaded = await new OpfsProjectRepository({
+      getRootDirectory: () => Promise.resolve(root as unknown as FileSystemDirectoryHandle),
+      storage,
+    }).loadProject();
+
+    expect(loaded?.fonts?.montserrat?.objectUrl).toBe('blob:font');
+    expect(createObjectUrl).toHaveBeenCalled();
+  });
+
   it('updates project JSON during autosave', async () => {
     const root = new MockDirectoryHandle();
     const repository = new OpfsProjectRepository({

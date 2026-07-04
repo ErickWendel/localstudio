@@ -2,11 +2,27 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
-import type { ShareRecord } from '../../../../src/services/contracts/interfaces';
+import type {
+  FontImportResult,
+  FontImportService,
+  ShareRecord,
+} from '../../../../src/services/contracts/interfaces';
 import { BrowserShareService } from '../../../../src/services/sharing/shareService';
 import { PublicDeckViewer } from '../../../../src/ui/share/PublicDeckViewer';
 
 describe('PublicDeckViewer', () => {
+  const fontImportService: FontImportService = {
+    listDownloadableFonts() {
+      return [];
+    },
+    resolveAndDownloadFonts(): Promise<FontImportResult> {
+      return Promise.resolve({ fonts: {}, warnings: [] });
+    },
+    loadProjectFonts(): Promise<void> {
+      return Promise.resolve();
+    },
+  };
+
   beforeEach(() => {
     window.history.replaceState({}, '', '/');
   });
@@ -43,7 +59,13 @@ describe('PublicDeckViewer', () => {
 
   it('renders a shared deck in read-only mode', async () => {
     const { share, shareService } = createRemoteShare('00000000-0000-4000-8000-000000000201');
-    render(<PublicDeckViewer shareId={share.shareId} shareService={shareService} />);
+    render(
+      <PublicDeckViewer
+        shareId={share.shareId}
+        fontImportService={fontImportService}
+        shareService={shareService}
+      />,
+    );
 
     expect(await screen.findByLabelText('Public presentation')).toHaveClass('public-deck-viewer-present');
     expect(screen.queryByRole('heading', { name: 'Untitled AI Deck' })).not.toBeInTheDocument();
@@ -55,7 +77,14 @@ describe('PublicDeckViewer', () => {
   it('keeps embeds in a compact shared deck layout', async () => {
     const { share, shareService } = createRemoteShare('00000000-0000-4000-8000-000000000202');
 
-    render(<PublicDeckViewer shareId={share.shareId} shareService={shareService} embed />);
+    render(
+      <PublicDeckViewer
+        shareId={share.shareId}
+        fontImportService={fontImportService}
+        shareService={shareService}
+        embed
+      />,
+    );
 
     expect(await screen.findByLabelText('Embedded shared deck')).toHaveClass('public-deck-viewer-embed');
     expect(screen.getByLabelText('Embedded shared deck')).not.toHaveClass('public-deck-viewer-present');
@@ -77,7 +106,13 @@ describe('PublicDeckViewer', () => {
       project,
     );
 
-    render(<PublicDeckViewer shareId={share.shareId} shareService={shareService} />);
+    render(
+      <PublicDeckViewer
+        shareId={share.shareId}
+        fontImportService={fontImportService}
+        shareService={shareService}
+      />,
+    );
 
     expect(await screen.findByText('1 / 2')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Next slide' }));
@@ -103,7 +138,13 @@ describe('PublicDeckViewer', () => {
       project,
     );
 
-    render(<PublicDeckViewer shareId={share.shareId} shareService={shareService} />);
+    render(
+      <PublicDeckViewer
+        shareId={share.shareId}
+        fontImportService={fontImportService}
+        shareService={shareService}
+      />,
+    );
 
     expect(await screen.findByText('1 / 2')).toBeInTheDocument();
     await userEvent.keyboard('{ArrowRight}');
@@ -129,7 +170,13 @@ describe('PublicDeckViewer', () => {
       project,
     );
 
-    render(<PublicDeckViewer shareId={share.shareId} shareService={shareService} />);
+    render(
+      <PublicDeckViewer
+        shareId={share.shareId}
+        fontImportService={fontImportService}
+        shareService={shareService}
+      />,
+    );
 
     const slideCanvas = await screen.findByLabelText('Slide canvas');
     expect(slideCanvas).toHaveAttribute('data-animation-preview', 'playing');
@@ -150,7 +197,13 @@ describe('PublicDeckViewer', () => {
       fetch: vi.fn(() => Promise.resolve(new Response(null, { status: 404 }))),
     });
 
-    render(<PublicDeckViewer shareId="missing-share" shareService={shareService} />);
+    render(
+      <PublicDeckViewer
+        shareId="missing-share"
+        fontImportService={fontImportService}
+        shareService={shareService}
+      />,
+    );
 
     expect(await screen.findByRole('heading', { name: 'Deck not found' })).toBeInTheDocument();
   });

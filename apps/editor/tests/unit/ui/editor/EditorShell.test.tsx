@@ -6,6 +6,9 @@ import type { Asset, ProjectDocument } from '../../../../src/domain/documents/mo
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 import type {
   BackgroundRemovalService,
+  FontImportResult,
+  FontImportService,
+  FontImportRequest,
   MirrorFile,
   MirrorProjectSummary,
   MirrorService,
@@ -403,6 +406,37 @@ class PendingPresentationImportService implements PresentationImportService {
     return new Promise((resolve) => {
       this.resolveImport = resolve;
     });
+  }
+}
+
+class FailingFontImportService implements FontImportService {
+  requests: FontImportRequest[] = [];
+  resolveFonts: (() => void) | undefined;
+
+  listDownloadableFonts() {
+    return [];
+  }
+
+  resolveAndDownloadFonts(requests: FontImportRequest[]): Promise<FontImportResult> {
+    this.requests = requests;
+    return new Promise((resolve) => {
+      this.resolveFonts = () => {
+        resolve({
+          fonts: {},
+          warnings: [
+            {
+              code: 'font-download-failed',
+              message: 'Could not download Montserrat.',
+              severity: 'warning',
+            },
+          ],
+        });
+      };
+    });
+  }
+
+  loadProjectFonts(): Promise<void> {
+    return Promise.resolve();
   }
 }
 
@@ -1250,6 +1284,85 @@ describe('EditorShell', () => {
     expect(
       await screen.findByRole('button', { name: 'Edit project name Imported PowerPoint Deck' }),
     ).toBeInTheDocument();
+  });
+
+  it('downloads PPTX fonts during import without blocking the deck when fonts fail', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const fontImportService = new FailingFontImportService();
+    services.fontImportService = fontImportService;
+    services.presentationImportService = {
+      importPowerPoint: () =>
+        Promise.resolve({
+          ...services.initialProject,
+          name: 'Imported Font Deck',
+          elements: {
+            title: {
+              id: 'title',
+              type: 'text',
+              text: 'Custom font',
+              x: 0,
+              y: 0,
+              width: 400,
+              height: 100,
+              rotation: 0,
+              locked: false,
+              visible: true,
+              opacity: 1,
+              align: 'left',
+              fill: '#111111',
+              fontFamily: 'Montserrat',
+              fontSize: 48,
+              fontWeight: 700,
+            },
+          },
+          pages: [
+            {
+              ...services.initialProject.pages[0]!,
+              elementIds: ['title'],
+            },
+          ],
+        }),
+    };
+    vi.stubGlobal(
+      'showOpenFilePicker',
+      vi.fn(() =>
+        Promise.resolve([
+          createPowerPointFileHandle(
+            new File(['pptx'], 'deck.pptx', {
+              type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            }),
+          ),
+        ] as FileSystemFileHandle[]),
+      ),
+    );
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Import PowerPoint...' }));
+
+    expect(await screen.findAllByText('Downloading fonts')).toHaveLength(2);
+    await waitFor(() => {
+      expect(fontImportService.resolveFonts).toBeDefined();
+    });
+    await act(async () => {
+      fontImportService.resolveFonts?.();
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+              window.requestAnimationFrame(() => resolve());
+            });
+          });
+        });
+      });
+    });
+    expect(
+      await screen.findByRole('button', { name: 'Edit project name Imported Font Deck' }),
+    ).toBeInTheDocument();
+    expect(fontImportService.requests).toEqual([
+      { family: 'Montserrat', fontStyle: 'normal', fontWeight: 700 },
+    ]);
   });
 
   it('reports PowerPoint picker failures without starting import progress', async () => {
