@@ -1,12 +1,31 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { JoystickApp } from '../../src/app/JoystickApp';
 import { InMemoryPresenterRemoteSignalingService } from '@localstudio/presenter-remote/signaling-service';
+
+const streamReceiverMock = vi.hoisted(() => ({
+  create: vi.fn((options: {
+    onStatusChange: (status: 'connected') => void;
+    onStream: (stream: MediaStream | undefined) => void;
+  }) => ({
+    sendStreamPreference: vi.fn(() => true),
+    start: vi.fn(() => {
+      options.onStream({} as MediaStream);
+      options.onStatusChange('connected');
+    }),
+    stop: vi.fn(),
+  })),
+}));
+
+vi.mock('../../src/app/presenterRemoteStreamReceiver', () => ({
+  presenterRemoteStreamReceiver: streamReceiverMock,
+}));
 
 describe('JoystickApp', () => {
   beforeEach(() => {
     window.localStorage.clear();
+    streamReceiverMock.create.mockClear();
   });
 
   it('renders the installable remote shell and starts with the query code', async () => {
@@ -134,6 +153,43 @@ describe('JoystickApp', () => {
     await user.click(preview);
 
     expect(screen.getByText('Command sent: go-to-page')).toBeInTheDocument();
+    expect(service.takeCommands('ABCD-1234')).toEqual([
+      { command: 'go-to-page', pageId: 'page-2', type: 'command' },
+    ]);
+  });
+
+  it('sends slide jump commands from the streamed presenter preview', async () => {
+    const user = userEvent.setup();
+    const service = new InMemoryPresenterRemoteSignalingService({
+      randomCode: () => 'ABCD-1234',
+      randomId: () => 'session-1',
+    });
+    service.registerSession({ presenterLabel: 'MacBook Pro', ttlMs: 60_000 });
+    service.publishState('ABCD-1234', {
+      activePageId: 'page-1',
+      activePageIndex: 0,
+      buildsRemaining: 0,
+      connectedControllerCount: 1,
+      deckName: 'Launch Deck',
+      notes: '',
+      pageCount: 2,
+      pages: [
+        { id: 'page-1', name: 'Intro' },
+        { id: 'page-2', name: 'Roadmap' },
+      ],
+      presenterMode: 'presenting',
+      previewMode: 'stream',
+      shortcuts: ['previous', 'next'],
+      stream: { enabled: true, fps: 8, height: 340, width: 390 },
+      timer: { elapsedMs: 0, paused: false },
+      type: 'state',
+    });
+
+    render(<JoystickApp initialUrl="https://localstudio.test/joystick?code=ABCD-1234" signalingService={service} />);
+
+    const preview = await screen.findByRole('button', { name: 'Presenter stream preview' });
+    await user.click(preview);
+
     expect(service.takeCommands('ABCD-1234')).toEqual([
       { command: 'go-to-page', pageId: 'page-2', type: 'command' },
     ]);

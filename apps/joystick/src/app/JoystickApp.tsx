@@ -319,7 +319,8 @@ function StreamPreview({
     const video = videoRef.current;
     if (!video) return;
     video.srcObject = stream;
-    void video.play().catch(() => undefined);
+    const playPromise = video.play();
+    void playPromise?.catch(() => undefined);
     return () => {
       if (video.srcObject === stream) video.srcObject = null;
     };
@@ -552,11 +553,6 @@ export function JoystickApp({
 
   function sendRemoteCommand(command: PresenterRemoteCommand) {
     if (!session) return;
-    const sentByStream = Boolean(remoteStreamReceiverRef.current?.sendCommand(command));
-    if (sentByStream) {
-      setLastCommand(command.command);
-      return;
-    }
     void Promise.resolve(signalingService.publishCommand(session.code, command, controllerId))
       .then(() => setLastCommand(command.command));
   }
