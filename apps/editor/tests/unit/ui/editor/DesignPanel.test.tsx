@@ -89,6 +89,22 @@ function createProjectWithSelectedText(): ProjectDocument {
   };
 }
 
+function createProjectWithImportedTextFont(): ProjectDocument {
+  const project = createProjectWithSelectedText();
+  const text = project.elements['text-test'];
+  if (text?.type !== 'text') return project;
+  return {
+    ...project,
+    elements: {
+      ...project.elements,
+      [text.id]: {
+        ...text,
+        fontFamily: 'American Typewriter',
+      },
+    },
+  };
+}
+
 describe('DesignPanel', () => {
   it('updates selected shape fill and border modes', async () => {
     const user = userEvent.setup();
@@ -204,6 +220,19 @@ describe('DesignPanel', () => {
     expect(headings).toContain('Typography');
     expect(headings).toContain('Selection');
     expect(headings.indexOf('Typography')).toBeLessThan(headings.indexOf('Selection'));
+  });
+
+  it('includes the selected imported font in the font dropdown options', () => {
+    render(
+      <DesignPanel
+        project={createProjectWithImportedTextFont()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['text-test'] }}
+      />,
+    );
+
+    expect(screen.getByLabelText('Selected text font')).toHaveValue('American Typewriter');
+    expect(screen.getByRole('option', { name: 'American Typewriter' })).toBeInTheDocument();
   });
 
   it('keeps selected text style controls in the Style tab only', async () => {

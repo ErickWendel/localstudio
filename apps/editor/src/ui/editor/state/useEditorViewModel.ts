@@ -1893,6 +1893,7 @@ export function useEditorViewModel(services: AppServices) {
         fontRequests.length > 0
           ? await services.fontImportService.resolveAndDownloadFonts(fontRequests).catch(() => ({
               fonts: {},
+              resolutions: [],
               warnings: [
                 {
                   code: 'font-download-failed',
@@ -1960,6 +1961,25 @@ export function useEditorViewModel(services: AppServices) {
       setVersionHistoryEntries([]);
       writeProjectNameToUrl(normalizedProject.name);
       setPresentationImportProgress(undefined);
+      const missingFontCount = fontImportResult.warnings.filter(
+        (warning) => warning.code === 'font-missing',
+      ).length;
+      const substitutedFontCount = fontImportResult.warnings.filter(
+        (warning) => warning.code === 'font-substituted',
+      ).length;
+      if (missingFontCount > 0 || substitutedFontCount > 0) {
+        const parts = [
+          missingFontCount > 0
+            ? `${missingFontCount.toLocaleString()} missing font${missingFontCount === 1 ? '' : 's'}`
+            : undefined,
+          substitutedFontCount > 0
+            ? `${substitutedFontCount.toLocaleString()} substituted font${
+                substitutedFontCount === 1 ? '' : 's'
+              }`
+            : undefined,
+        ].filter(Boolean);
+        setPersistenceNotice(`PowerPoint imported with ${parts.join(' and ')}.`);
+      }
     } catch (error) {
       setPresentationImportProgress(undefined);
       pptxImportLogger.error('PowerPoint import failed.', error);

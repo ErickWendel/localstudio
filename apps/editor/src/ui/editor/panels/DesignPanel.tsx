@@ -112,6 +112,12 @@ function fontMatchesQuery(font: FontCatalogItem, query: string) {
   );
 }
 
+function collectDocumentTextFontFamilies(project: ProjectDocument) {
+  return Object.values(project.elements)
+    .filter((element) => element.type === 'text')
+    .map((element) => element.fontFamily);
+}
+
 export function DesignPanel({
   project,
   activePageId,
@@ -140,8 +146,14 @@ export function DesignPanel({
   const selectedElement = getSelectedElement(project, selection);
   const backgroundColor = page ? getBackgroundColor(page.background) : '#050D10';
   const projectFontFamilies = useMemo(
-    () => Array.from(new Set(Object.values(project.fonts ?? {}).map((font) => font.family))).sort(),
-    [project.fonts],
+    () =>
+      Array.from(
+        new Set([
+          ...Object.values(project.fonts ?? {}).map((font) => font.family),
+          ...collectDocumentTextFontFamilies(project),
+        ]),
+      ).sort(),
+    [project],
   );
   const fontFamilyOptions = useMemo(
     () =>
