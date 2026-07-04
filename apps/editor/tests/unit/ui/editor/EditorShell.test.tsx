@@ -2230,10 +2230,15 @@ describe('EditorShell', () => {
 
     const video = new File(['video-bytes'], 'phone-video.mov', { type: 'video/quicktime' });
     await user.click(screen.getByRole('button', { name: 'Insert Media' }));
-    fireEvent.change(screen.getByLabelText('Insert media file'), { target: { files: [video] } });
+    const input = screen.getByLabelText('Insert media file');
+    expect(input).toHaveAttribute('accept', 'image/*,video/*');
+    await user.upload(input, video);
 
     expect(await screen.findByText('Unsupported video format')).toBeInTheDocument();
-    expect(screen.getByText(/Convert the clip to MP4 or WebM/)).toBeInTheDocument();
+    expect(screen.getByText('Supported formats')).toBeInTheDocument();
+    expect(screen.getByText('info')).toHaveClass('media-import-info-icon');
+    expect(screen.getByText(/Video import supports MP4 and WebM files/)).toBeInTheDocument();
+    expect(screen.queryByRole('progressbar', { name: 'Media import progress' })).not.toBeInTheDocument();
     expect(createObjectUrl).not.toHaveBeenCalled();
     expect(
       Object.values(repository.savedProjects.at(-1)?.assets ?? {}).some(

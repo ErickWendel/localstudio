@@ -10,23 +10,30 @@ export function MediaImportProgressOverlay({
   progress,
 }: MediaImportProgressOverlayProps) {
   const progressValue = progress.tone === 'loading' ? 62 : 100;
+  const isLoading = progress.tone === 'loading';
 
   return (
     <div className="presentation-import-backdrop" role="status" aria-live="polite">
       <div className="presentation-import-panel">
-        <div className="presentation-import-orbit" aria-hidden="true">
-          <span />
-          <span />
-          <span />
-        </div>
+        {isLoading ? (
+          <div className="presentation-import-orbit" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
+        ) : (
+          <span className="media-import-info-icon material-symbols-outlined" aria-hidden="true">
+            info
+          </span>
+        )}
         <div className="presentation-import-copy">
           <span className="presentation-import-stage">
-            {progress.tone === 'loading' ? 'Importing media' : 'Import blocked'}
+            {isLoading ? 'Importing media' : 'Supported formats'}
           </span>
           <h2>{progress.title}</h2>
           <p>{progress.detail}</p>
         </div>
-        {progress.tone === 'loading' ? (
+        {isLoading ? (
           <>
             <div
               className="presentation-import-progress"

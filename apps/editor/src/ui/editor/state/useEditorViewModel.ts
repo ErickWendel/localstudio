@@ -3473,7 +3473,7 @@ export function useEditorViewModel(services: AppServices) {
     if (assetType === 'video' && !isSupportedLocalVideoFile(file)) {
       setMediaImportProgress({
         detail:
-          'MOV and other non-MP4/WebM videos are not reliably supported in browser playback. Convert the clip to MP4 or WebM and import it again.',
+          'Video import supports MP4 and WebM files. Convert this clip to MP4 or WebM and import it again.',
         title: 'Unsupported video format',
         tone: 'error',
       });

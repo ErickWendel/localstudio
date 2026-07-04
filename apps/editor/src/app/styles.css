@@ -1136,6 +1136,19 @@ button {
   line-height: 1.4;
 }
 
+.media-import-info-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 18px;
+  border: 1px solid rgba(125, 211, 252, 0.42);
+  border-radius: 50%;
+  background: rgba(125, 211, 252, 0.1);
+  color: #7dd3fc;
+  font-size: 28px;
+}
+
 .presentation-import-dismiss {
   margin-top: 22px;
   border: 1px solid rgba(255, 255, 255, 0.18);
