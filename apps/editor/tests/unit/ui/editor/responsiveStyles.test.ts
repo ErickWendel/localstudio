@@ -65,4 +65,13 @@ describe('editor responsive styles', () => {
     expect(styles).toMatch(/\.canvas-quick-actions button\s*\{[\s\S]*width:\s*36px/s);
     expect(styles).toMatch(/\.zoom-value\s*\{[\s\S]*min-height:\s*32px/s);
   });
+
+  it('keeps import progress overlays styled after stylesheet composition', () => {
+    expect(styles).toMatch(/\.presentation-import-backdrop\s*\{[\s\S]*position:\s*fixed/s);
+    expect(styles).toMatch(/\.presentation-import-backdrop\s*\{[\s\S]*z-index:\s*420/s);
+    expect(styles).toMatch(/\.presentation-import-panel\s*\{[\s\S]*width:\s*min\(520px,\s*100%\)/s);
+    expect(styles).toMatch(/\.presentation-import-orbit span\s*\{[\s\S]*animation:\s*presentationImportOrbit/s);
+    expect(styles).toMatch(/@keyframes\s+presentationImportOrbit/s);
+    expect(styles).toMatch(/\.media-import-info-icon\s*\{[\s\S]*display:\s*grid/s);
+  });
 });

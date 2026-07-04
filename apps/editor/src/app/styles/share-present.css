@@ -885,13 +885,6 @@
   line-height: 26px;
 }
 
-.presenter-status-item {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .presenter-stage {
   min-height: 0;
   padding: 0 44px;

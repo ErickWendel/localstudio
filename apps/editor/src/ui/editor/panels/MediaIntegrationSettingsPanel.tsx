@@ -145,7 +145,7 @@ export function MediaIntegrationSettingsPanel({
             Save media integrations
           </button>
           <button
-            className="compact-action compact-action-secondary"
+            className="compact-action compact-action-secondary ew-surface ew-surface-hover ew-compact-row"
             type="button"
             disabled={!config || (!unsplashConfigured && !giphyConfigured)}
             onClick={() => {

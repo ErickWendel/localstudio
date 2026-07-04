@@ -196,7 +196,7 @@ export function DesignPanel({
   return (
     <div className="panel-stack">
       <PanelSection title="Canvas">
-        <div className="property-row">
+        <div className="property-row ew-surface ew-surface-hover ew-compact-row">
           <span>Format</span>
           <strong>{page ? `${page.width} x ${page.height}` : 'No page'}</strong>
         </div>
@@ -267,7 +267,7 @@ export function DesignPanel({
             {fontDownloadOpen ? (
               <div className="font-download-panel">
                 <form className="font-download-search" onSubmit={submitFontSearch}>
-                  <label className="layer-search font-download-search-box">
+                  <label className="layer-search font-download-search-box ew-surface ew-compact-row">
                     <Search size={16} aria-hidden="true" />
                     <input
                       aria-label="Search downloadable fonts"
@@ -432,7 +432,7 @@ export function DesignPanel({
         />
       ) : (
         <PanelSection title="Selection">
-          <div className="compact-action design-selection-summary">
+          <div className="compact-action design-selection-summary ew-surface ew-surface-hover ew-compact-row">
             <CaseSensitive size={16} />
             <span>No selected element</span>
           </div>
@@ -581,7 +581,7 @@ function ElementDesignInspector({
         <>
           <section className="movie-panel-section" aria-label="Selected element style">
             <h3>Selection</h3>
-            <div className="compact-action design-selection-summary">
+            <div className="compact-action design-selection-summary ew-surface ew-surface-hover ew-compact-row">
               {getElementIcon(element)}
               <span>Selected {element.type}</span>
             </div>
@@ -873,7 +873,7 @@ function ElementDesignInspector({
                   <option value="right">Right</option>
                 </select>
               </label>
-              <div className="compact-action">
+              <div className="compact-action ew-surface ew-surface-hover ew-compact-row">
                 <AlignCenter size={16} />
                 <span>Text frame stays editable on canvas</span>
               </div>
@@ -1038,7 +1038,7 @@ function ElementDesignInspector({
       {activeTab === 'arrange' ? (
         <>
           <section className="movie-panel-section" aria-label="Arrange selected element order">
-            <div className="movie-arrange-grid">
+            <div className="movie-arrange-grid ew-two-column-grid">
               <button type="button" onClick={() => onZOrderChange?.('back')}>
                 <span className="material-symbols-outlined" aria-hidden="true">
                   flip_to_back
@@ -1064,7 +1064,7 @@ function ElementDesignInspector({
                 Forward
               </button>
             </div>
-            <div className="movie-arrange-select-row">
+            <div className="movie-arrange-select-row ew-two-column-grid">
               <select
                 aria-label="Align selected element"
                 defaultValue=""
@@ -1089,7 +1089,7 @@ function ElementDesignInspector({
 
           <section className="movie-panel-section" aria-label="Selected element size">
             <h3>Size</h3>
-            <div className="movie-number-grid">
+            <div className="movie-number-grid ew-two-column-grid">
               <label>
                 <input
                   aria-label="Selected element width"
@@ -1130,7 +1130,7 @@ function ElementDesignInspector({
 
           <section className="movie-panel-section" aria-label="Selected element position">
             <h3>Position</h3>
-            <div className="movie-number-grid">
+            <div className="movie-number-grid ew-two-column-grid">
               <label>
                 <input
                   aria-label="Selected element x position"
@@ -1162,7 +1162,7 @@ function ElementDesignInspector({
 
           <section className="movie-panel-section" aria-label="Selected element rotation">
             <h3>Rotate</h3>
-            <div className="movie-number-grid">
+            <div className="movie-number-grid ew-two-column-grid">
               <label>
                 <input
                   aria-label="Selected element rotation"
@@ -1183,7 +1183,7 @@ function ElementDesignInspector({
           </section>
 
           <section className="movie-panel-section" aria-label="Selected element lock and grouping">
-            <div className="movie-lock-grid">
+            <div className="movie-lock-grid ew-two-column-grid">
               <button type="button" disabled={locked} onClick={() => onLockChange?.(true)}>
                 Lock
               </button>

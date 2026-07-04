@@ -10,6 +10,12 @@
 @import './styles/canvas.css';
 @import './styles/left-panel.css';
 @import './styles/right-panel.css';
+@import './styles/text-panel.css';
+@import './styles/elements-panel.css';
+@import './styles/media-panel.css';
+@import './styles/animation-panel.css';
+@import './styles/design-panel.css';
+@import './styles/layers-panel.css';
 @import './styles/ai-tools.css';
 @import './styles/settings.css';
 @import './styles/share-present.css';

@@ -82,7 +82,7 @@ export function LayersPanel({
 
   return (
     <div className="panel-stack">
-      <div className="layer-search">
+      <div className="layer-search ew-surface ew-compact-row">
         <Search size={15} />
         <input aria-label="Search layers" placeholder="Search layers" type="search" />
       </div>
@@ -94,6 +94,9 @@ export function LayersPanel({
             const dropPosition = dropIndicator?.layerId === layer.id ? dropIndicator.position : undefined;
             const rowClassName = [
               'layer-row',
+              'ew-surface',
+              'ew-surface-hover',
+              'ew-compact-row',
               layer.selected ? 'layer-row-selected' : '',
               dropPosition === 'before' ? 'drop-indicator-before' : '',
               dropPosition === 'after' ? 'drop-indicator-after' : '',
@@ -153,7 +156,7 @@ export function LayersPanel({
                 >
                   <GripVertical size={15} />
                   <Icon size={16} />
-                <span className="layer-row-name">{layer.name}</span>
+                <span className="layer-row-name ew-ellipsis">{layer.name}</span>
                 <span
                   className="layer-row-actions"
                   onClick={(event) => {
@@ -190,19 +193,19 @@ export function LayersPanel({
               </article>
             );
           })}
-          <article className="layer-row layer-row-static">
+          <article className="layer-row layer-row-static ew-surface ew-compact-row">
             <GripVertical size={15} />
             <Square size={16} />
-            <span className="layer-row-name">Page Background</span>
+            <span className="layer-row-name ew-ellipsis">Page Background</span>
           </article>
         </div>
       </PanelSection>
       <PanelSection title="Selected Layer">
-        <div className="property-row">
+        <div className="property-row ew-surface ew-surface-hover ew-compact-row">
           <span>Type</span>
           <strong>{selectedLayer?.type ?? (selectedElementId ? 'Missing' : 'None')}</strong>
         </div>
-        <div className="property-row">
+        <div className="property-row ew-surface ew-surface-hover ew-compact-row">
           <span>Z-order</span>
           <strong>
             {selectedLayer

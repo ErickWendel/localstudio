@@ -279,7 +279,11 @@ function ProviderConfigurationCallout({
   return (
     <div className="provider-disabled-callout">
       <p>{message}</p>
-      <button className="compact-action compact-action-full" type="button" onClick={onConfigureStockMedia}>
+      <button
+        className="compact-action compact-action-full ew-surface ew-surface-hover ew-compact-row"
+        type="button"
+        onClick={onConfigureStockMedia}
+      >
         <span className="material-symbols-outlined" aria-hidden="true">
           key
         </span>

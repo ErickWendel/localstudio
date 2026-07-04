@@ -45,7 +45,7 @@ export function VersionHistoryPanel({
       </select>
       {selectedEntry ? (
         <button
-          className="compact-action compact-action-full version-history-restore"
+          className="compact-action compact-action-full version-history-restore ew-surface ew-surface-hover ew-compact-row"
           type="button"
           onClick={() => onRestoreVersion(selectedEntry.id)}
         >

@@ -271,7 +271,7 @@ export function AnimationPanel({
           <h2 className="panel-heading">Motion</h2>
           <button
             aria-label="Play animation preview"
-            className="compact-action"
+            className="compact-action ew-surface ew-surface-hover ew-compact-row"
             type="button"
             onClick={() => onPlayAnimationPreview?.()}
           >
@@ -555,7 +555,7 @@ export function AnimationPanel({
           </>
         ) : null}
         <button
-          className="compact-action compact-action-full"
+          className="compact-action compact-action-full ew-surface ew-surface-hover ew-compact-row"
           disabled={selectedElementIds.length === 0}
           type="button"
           onClick={() =>

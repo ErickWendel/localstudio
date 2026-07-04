@@ -606,10 +606,12 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
           </div>
         </header>
         <div className="presenter-status-row" aria-label="Presenter status">
-          <span className="presenter-status-item">
+          <span className="presenter-status-item ew-ellipsis">
             Current: Slide {activePageIndex + 1} of {snapshot.project.pages.length}
           </span>
-          <span className="presenter-status-item">Builds remaining: {buildsRemaining}</span>
+          <span className="presenter-status-item ew-ellipsis">
+            Builds remaining: {buildsRemaining}
+          </span>
         </div>
         <section className="presenter-stage" aria-label="Current slide" ref={presenterStageRef}>
           <CanvasWorkspace

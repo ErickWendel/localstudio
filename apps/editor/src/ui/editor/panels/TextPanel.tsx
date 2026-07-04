@@ -17,7 +17,7 @@ const textPresets: Array<{
 export function TextPanel({ onInsertText }: TextPanelProps) {
   return (
     <section className="panel-stack" aria-label="Text tools">
-      <label className="layer-search text-search">
+      <label className="layer-search text-search ew-surface ew-compact-row">
         <span className="material-symbols-outlined" aria-hidden="true">
           search
         </span>

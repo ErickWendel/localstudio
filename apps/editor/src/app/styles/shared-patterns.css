@@ -24,6 +24,17 @@
   min-width: 0;
 }
 
+.ew-grid-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.ew-two-column-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
 .ew-compact-row {
   display: flex;
   align-items: center;
@@ -87,6 +98,19 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.ew-symbol-18 {
+  font-size: 18px;
+}
+
+.ew-symbol-20 {
+  font-size: 20px;
+}
+
+.ew-hover-raised:hover {
+  color: var(--ew-green-fixed);
+  background: var(--ew-raised);
 }
 
 .stitch-icon-button {
