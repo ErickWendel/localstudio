@@ -467,7 +467,7 @@ describe('PresenterView', () => {
 
     expect(screen.getByRole('region', { name: 'Remote control this presentation' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Remote control QR code' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Remote session code')).toHaveTextContent('LS-1234');
+    expect(screen.getByRole('button', { name: /copy remote link/i })).toBeInTheDocument();
 
     fireEvent.pointerDown(screen.getByLabelText('Current slide'));
 

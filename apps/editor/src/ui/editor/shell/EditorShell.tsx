@@ -19,6 +19,7 @@ import { MirrorSettingsPanel } from '../panels/MirrorSettingsPanel';
 import { PagesPanel } from '../panels/PagesPanel';
 import { ProjectVideoPreloader } from '../media/ProjectVideoPreloader';
 import { localMediaImportConfig } from '../media/localMediaImportConfig';
+import { movieStartPlayback } from '../media/movieStartPlayback';
 import { PromptBar } from '../prompting/PromptBar';
 import { RemoteImportPanel } from '../panels/RemoteImportPanel';
 import { ScrollingCanvasWorkspace } from '../canvas/ScrollingCanvasWorkspace';
@@ -233,6 +234,15 @@ export function EditorShell({ services }: EditorShellProps) {
     return presentationMovieControls.control(videos, action);
   }, []);
 
+  const advancePresentationPreviewFromUserAction = useCallback(() => {
+    movieStartPlayback.playPendingMovieStart(
+      slideFrameRef.current,
+      vm.project,
+      vm.animationPreview,
+    );
+    vm.advancePresentationPreview();
+  }, [vm]);
+
   const pulsePresentationMovieHold = useCallback((action: 'fast-forward' | 'rewind') => {
     movieHoldStateRef.current = presentationMovieControls.pulse(
       getPresentationVideos(),
@@ -317,7 +327,7 @@ export function EditorShell({ services }: EditorShellProps) {
       return;
     }
     if (action === 'next-build') {
-      vm.advancePresentationPreview();
+      advancePresentationPreviewFromUserAction();
       return;
     }
     if (action === 'previous-build') {
@@ -562,7 +572,7 @@ export function EditorShell({ services }: EditorShellProps) {
         }
         if (isNextPreviewKey || isPreviousPreviewKey) {
           event.preventDefault();
-          if (isNextPreviewKey) vm.advancePresentationPreview();
+          if (isNextPreviewKey) advancePresentationPreviewFromUserAction();
           if (isPreviousPreviewKey) playRelativePresentationSlide(-1);
           return;
         }
@@ -592,6 +602,7 @@ export function EditorShell({ services }: EditorShellProps) {
     };
   }, [
     activePageIndex,
+    advancePresentationPreviewFromUserAction,
     controlPresentationMovies,
     hasSelection,
     isHistoryReadOnly,
@@ -662,7 +673,7 @@ export function EditorShell({ services }: EditorShellProps) {
       }
       if (message.command === 'next') {
         if (!presenterSessionId && !remotePresenterActive) return;
-        vm.advancePresentationPreview();
+        advancePresentationPreviewFromUserAction();
         return;
       }
       if (message.command === 'previous') {
@@ -692,7 +703,7 @@ export function EditorShell({ services }: EditorShellProps) {
         closePresenterViewSession();
       }
     });
-  }, [presenterRemoteSession, presenterSessionId, remotePresenterActive, vm]);
+  }, [advancePresentationPreviewFromUserAction, presenterRemoteSession, presenterSessionId, remotePresenterActive, vm]);
 
   useEffect(() => {
     if (!presenterSessionId) {
@@ -969,6 +980,7 @@ export function EditorShell({ services }: EditorShellProps) {
           onSetSelectedElementZOrder={isHistoryReadOnly ? undefined : vm.setSelectedElementZOrder}
           onUpdateElementFrame={isHistoryReadOnly ? undefined : vm.updateElementFrame}
           onUpdateElementStyle={isHistoryReadOnly ? undefined : vm.updateElementStyle}
+          onUpdateTextContent={isHistoryReadOnly ? undefined : vm.updateTextContent}
           onUpdateMediaPlayback={isHistoryReadOnly ? undefined : vm.updateMediaPlayback}
           onUpdatePageBackground={isHistoryReadOnly ? undefined : vm.updatePageBackground}
           onReplaceVideoAsset={

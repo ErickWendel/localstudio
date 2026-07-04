@@ -105,6 +105,7 @@ interface LeftToolPanelProps {
   onSetSelectedElementZOrder?: ((mode: ZOrderMode) => void) | undefined;
   onUpdateElementFrame?: ((elementId: string, patch: ElementFramePatch) => void) | undefined;
   onUpdateElementStyle?: ((elementId: string, patch: ElementStylePatch) => void) | undefined;
+  onUpdateTextContent?: ((elementId: string, text: string) => void) | undefined;
   onUpdateMediaPlayback?: ((elementId: string, patch: MediaPlaybackPatch) => void) | undefined;
   onUpdatePageBackground?: ((background: PageBackground) => void) | undefined;
   onReplaceVideoAsset?: ((elementId: string, file: File) => void) | undefined;
@@ -188,6 +189,7 @@ export function LeftToolPanel({
   onSetSelectedElementZOrder,
   onUpdateElementFrame,
   onUpdateElementStyle,
+  onUpdateTextContent,
   onUpdateMediaPlayback,
   onUpdatePageBackground,
   onReplaceVideoAsset,
@@ -303,9 +305,11 @@ export function LeftToolPanel({
             {...(onSetSelectedElementZOrder ? { onSetSelectedElementZOrder } : {})}
             {...(onUpdateElementFrame ? { onUpdateElementFrame } : {})}
             {...(onUpdateElementStyle ? { onUpdateElementStyle } : {})}
+            {...(onUpdateTextContent ? { onUpdateTextContent } : {})}
             {...(onUpdateMediaPlayback ? { onUpdateMediaPlayback } : {})}
             {...(onUpdatePageBackground ? { onUpdatePageBackground } : {})}
             {...(onReplaceVideoAsset ? { onReplaceVideoAsset } : {})}
+            {...(onSetElementAnimationBuilds ? { onSetElementAnimationBuilds } : {})}
           />
         ) : null}
         {panelOpen && activeTab === 'text' ? (
@@ -336,6 +340,7 @@ export function LeftToolPanel({
             {...(onClearPageTransition ? { onClearPageTransition } : {})}
             {...(onSetPageTransition ? { onSetPageTransition } : {})}
             {...(onSetElementAnimationBuilds ? { onSetElementAnimationBuilds } : {})}
+            {...(onUpdateMediaPlayback ? { onUpdateMediaPlayback } : {})}
             {...(onClearElementAnimationBuild ? { onClearElementAnimationBuild } : {})}
             {...(onReorderElementAnimationBuild ? { onReorderElementAnimationBuild } : {})}
             {...(onPlayAnimationPreview ? { onPlayAnimationPreview } : {})}

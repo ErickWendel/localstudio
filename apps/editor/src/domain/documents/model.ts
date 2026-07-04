@@ -80,6 +80,7 @@ export interface ElementAnimationBuild {
   durationMs?: number;
   kind?: ElementAnimationKind;
   lineDrawDirection?: AnimationLineDrawDirection;
+  mediaAction?: 'play';
 }
 
 export interface ImportWarning {

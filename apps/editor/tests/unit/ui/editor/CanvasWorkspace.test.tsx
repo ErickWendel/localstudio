@@ -290,6 +290,49 @@ describe('CanvasWorkspace', () => {
     expect(onAnimationPreviewAdvance).toHaveBeenCalledTimes(1);
   });
 
+  it('starts pending movie builds when the slide click advances the next build', () => {
+    const playSpy = vi
+      .spyOn(HTMLMediaElement.prototype, 'play')
+      .mockImplementation(() => Promise.resolve());
+    const pauseSpy = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+    const onAnimationPreviewAdvance = vi.fn();
+    const project = updateVideoElement(createMediaProject(), { startOnClick: true });
+    project.pages[0]!.animationBuilds = [
+      {
+        id: 'video-build',
+        elementId: 'video-demo',
+        effect: 'reveal',
+        trigger: 'on-click',
+        delayMs: 0,
+        durationMs: 0,
+        mediaAction: 'play',
+      },
+    ];
+    const { container } = render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        animationPreview={{
+          activeBuildElementId: 'video-demo',
+          pageId: 'page-1',
+          phase: 'waiting',
+          hiddenElementIds: [],
+          playing: true,
+          waitingForClick: true,
+        }}
+        onAnimationPreviewAdvance={onAnimationPreviewAdvance}
+      />,
+    );
+
+    fireEvent.mouseDown(container.querySelector('canvas')!);
+
+    expect(playSpy).toHaveBeenCalledTimes(1);
+    expect(onAnimationPreviewAdvance).toHaveBeenCalledTimes(1);
+    playSpy.mockRestore();
+    pauseSpy.mockRestore();
+  });
+
   it('advances completed animation previews by click in presentation mode', () => {
     const onAnimationPreviewAdvance = vi.fn();
     const { container } = render(
@@ -489,7 +532,7 @@ describe('CanvasWorkspace', () => {
     expect(editorVideo).toBeInTheDocument();
     expect(editorVideo.autoplay).toBe(false);
     expect(editorVideo.loop).toBe(false);
-    expect(editorVideo.controls).toBe(true);
+    expect(editorVideo.controls).toBe(false);
     expect(editorVideo.muted).toBe(true);
     expect(editorVideo.volume).toBe(0.75);
     expect(editorVideo.preload).toBe('auto');
@@ -508,13 +551,122 @@ describe('CanvasWorkspace', () => {
       'video[aria-label="Demo clip"]',
     ) as HTMLVideoElement;
     expect(previewVideo.autoplay).toBe(true);
-    expect(previewVideo.controls).toBe(true);
+    expect(previewVideo.controls).toBe(false);
     expect(previewVideo.preload).toBe('auto');
     expect(previewVideo.dataset.trimStart).toBe('2');
     expect(previewVideo.dataset.trimEnd).toBe('6');
   });
 
-  it('allows native controls on the selected video in editor mode', () => {
+  it('plays start-on-click videos when their animation build becomes active', async () => {
+    const playSpy = vi
+      .spyOn(HTMLMediaElement.prototype, 'play')
+      .mockImplementation(() => Promise.resolve());
+    const pauseSpy = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+    const project = updateVideoElement(createMediaProject(), { startOnClick: true });
+    project.pages[0]!.animationBuilds = [
+      {
+        id: 'video-build',
+        elementId: 'video-demo',
+        effect: 'reveal',
+        trigger: 'on-click',
+        delayMs: 0,
+        durationMs: 0,
+        mediaAction: 'play',
+      },
+    ];
+
+    const { container, rerender } = render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        animationPreview={{
+          activeBuildElementId: 'video-demo',
+          animationProgress: 0,
+          hiddenElementIds: [],
+          pageId: 'page-1',
+          phase: 'waiting',
+          playing: true,
+          waitingForClick: true,
+        }}
+        presentationMode
+        readOnly
+      />,
+    );
+
+    const video = container.querySelector('video[aria-label="Demo clip"]') as HTMLVideoElement;
+    expect(video.autoplay).toBe(false);
+    expect(video.style.opacity).toBe('1');
+
+    rerender(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        animationPreview={{
+          activeBuild: project.pages[0]?.animationBuilds?.[0],
+          activeBuildElementId: 'video-demo',
+          animationProgress: 1,
+          hiddenElementIds: ['video-demo'],
+          pageId: 'page-1',
+          phase: 'animation',
+          playing: true,
+          waitingForClick: false,
+        }}
+        presentationMode
+        readOnly
+      />,
+    );
+
+    await waitFor(() => expect(playSpy).toHaveBeenCalled());
+    expect(video.style.opacity).toBe('1');
+    playSpy.mockRestore();
+    pauseSpy.mockRestore();
+  });
+
+  it('plays movie-start builds during editor animation preview', async () => {
+    const playSpy = vi
+      .spyOn(HTMLMediaElement.prototype, 'play')
+      .mockImplementation(() => Promise.resolve());
+    const pauseSpy = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+    const project = updateVideoElement(createMediaProject(), { startOnClick: true });
+    project.pages[0]!.animationBuilds = [
+      {
+        id: 'video-build',
+        elementId: 'video-demo',
+        effect: 'reveal',
+        trigger: 'on-click',
+        delayMs: 0,
+        durationMs: 0,
+        mediaAction: 'play',
+      },
+    ];
+
+    render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        animationPreview={{
+          activeBuild: project.pages[0]?.animationBuilds?.[0],
+          activeBuildElementId: 'video-demo',
+          animationProgress: 1,
+          hiddenElementIds: [],
+          mode: 'editor',
+          pageId: 'page-1',
+          phase: 'animation',
+          playing: true,
+          waitingForClick: false,
+        }}
+      />,
+    );
+
+    await waitFor(() => expect(playSpy).toHaveBeenCalled());
+    playSpy.mockRestore();
+    pauseSpy.mockRestore();
+  });
+
+  it('keeps video overlays non-interactive in editor mode so the canvas handles selection', () => {
     const project = createMediaProject();
     const { container, rerender } = render(
       <CanvasWorkspace
@@ -540,7 +692,8 @@ describe('CanvasWorkspace', () => {
     const selectedVideo = container.querySelector(
       'video[aria-label="Demo clip"]',
     ) as HTMLVideoElement;
-    expect(selectedVideo.style.pointerEvents).toBe('auto');
+    expect(selectedVideo.style.pointerEvents).toBe('none');
+    expect(selectedVideo.controls).toBe(false);
   });
 
   it('seeks the selected video when trim sliders update the boundaries', () => {

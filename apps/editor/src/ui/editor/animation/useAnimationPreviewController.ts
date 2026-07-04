@@ -199,7 +199,9 @@ export function useAnimationPreviewController({
       activeBuild: undefined,
       activeBuildElementId: undefined,
       animationProgress: 0,
-      hiddenElementIds: builds.map((build) => build.elementId),
+      hiddenElementIds: builds
+        .filter((build) => build.mediaAction !== 'play')
+        .map((build) => build.elementId),
       mode,
       pageId: page.id,
       phase: transitionDelay > 0 ? 'transition' : builds.length > 0 ? 'animation' : 'complete',
@@ -283,6 +285,7 @@ export function useAnimationPreviewController({
             animationProgress: 0,
             hiddenElementIds: builds
               .slice(targetBuildIndex)
+              .filter((build) => build.mediaAction !== 'play')
               .map((build) => build.elementId),
             phase: 'waiting',
             waitingForClick: true,

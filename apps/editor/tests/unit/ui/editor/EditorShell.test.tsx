@@ -140,6 +140,7 @@ const stockGif: StockMediaItem = {
   authorName: 'Motion Studio',
   thumbnailUrl: 'https://media.giphy.com/media/gif-1/200w.gif',
   mediaUrl: 'https://media.giphy.com/media/gif-1/giphy.gif',
+  videoUrl: 'https://media.giphy.com/media/gif-1/giphy.mp4',
   width: 480,
   height: 270,
 };
@@ -788,9 +789,10 @@ describe('EditorShell', () => {
     expect(stockMediaService.trackedItems).toEqual([stockImage]);
   });
 
-  it('inserts and selects a GIPHY GIF from the Elements panel', async () => {
+  it('inserts and selects a GIPHY GIF movie from the Elements panel', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
+    mockVideoMetadataLoad();
     services.stockMediaService = new ReadyStockMediaService();
 
     render(<EditorShell services={services} />);
@@ -801,9 +803,14 @@ describe('EditorShell', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
         'data-selected-elements',
-        expect.stringMatching(/^gif-/),
+        expect.stringMatching(/^video-/),
       );
     });
+    expect(screen.getByLabelText('Launch GIF').tagName.toLowerCase()).toBe('video');
+    expect(screen.getByLabelText('Launch GIF')).toHaveAttribute(
+      'src',
+      'https://media.giphy.com/media/gif-1/giphy.mp4',
+    );
   });
 
   it('shows a generic API key error when stock image search is rejected', async () => {
@@ -1760,6 +1767,49 @@ describe('EditorShell', () => {
     });
   });
 
+  it.each(['ArrowRight', ']'])(
+    'starts pending movie-start builds from the %s presentation shortcut',
+    async (key) => {
+      const user = userEvent.setup();
+      const playSpy = vi
+        .spyOn(HTMLMediaElement.prototype, 'play')
+        .mockImplementation(() => Promise.resolve());
+      const pauseSpy = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+      const project = createProjectWithVideo();
+      project.pages[0] = {
+        ...project.pages[0]!,
+        transition: { effect: 'reveal', delayMs: 0 },
+        animationBuilds: [
+          {
+            id: 'build-video-demo',
+            elementId: 'video-demo',
+            effect: 'reveal',
+            trigger: 'on-click',
+            delayMs: 0,
+            durationMs: 0,
+            mediaAction: 'play',
+          },
+        ],
+      };
+
+      render(<EditorShell services={createAppServices({ initialProject: project })} />);
+
+      await startFullscreenPresentation(user);
+      await waitFor(() => {
+        expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+          'data-animation-preview-waiting',
+          'true',
+        );
+      });
+
+      fireEvent.keyDown(window, { key });
+
+      expect(playSpy).toHaveBeenCalledTimes(1);
+      playSpy.mockRestore();
+      pauseSpy.mockRestore();
+    },
+  );
+
   it('uses arrow keys to move between slides after the current preview step completes', async () => {
     const user = userEvent.setup();
     const project = sampleProject.createSampleProject();
@@ -2393,7 +2443,11 @@ describe('EditorShell', () => {
       const importedVideo = Object.values(savedProject?.elements ?? {}).find(
         (element) => element.type === 'video',
       );
-      expect(importedVideo).toMatchObject({ type: 'video' });
+      expect(importedVideo).toMatchObject({
+        autoplayInPreview: true,
+        playing: true,
+        type: 'video',
+      });
       expect(savedProject?.assets[importedVideo?.assetId ?? '']?.name).toBe('toolbar-video.mp4');
       expect(savedProject?.assets[importedVideo?.assetId ?? '']?.objectUrl).toBe(
         'blob:toolbar-video',

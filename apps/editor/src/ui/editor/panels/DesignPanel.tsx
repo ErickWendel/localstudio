@@ -21,15 +21,17 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import type { FormEvent } from 'react';
+import type { FormEvent, RefObject } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   DesignElement,
+  ElementAnimationBuild,
   PageBackground,
   ProjectDocument,
   SelectionState,
   ShapeElement,
   ShapeLineEndpoint,
+  TextElement,
   VideoElement,
   VideoRepeatMode,
 } from '../../../domain/documents/model';
@@ -43,6 +45,9 @@ import type {
 import type { FontCatalogItem } from '../../../services/contracts/interfaces';
 import { PanelSection } from '../../components/PanelSection';
 import { textStyleOptions } from '../text/textStyleOptions';
+
+type ElementAnimationPatch = Omit<ElementAnimationBuild, 'elementId' | 'id'>;
+type MovieStartTrigger = ElementAnimationBuild['trigger'];
 
 const palette = ['#37FD76', '#050D10', '#FFFFFF', '#91999D', '#00779A'];
 const regularTextWeight = 400;
@@ -73,12 +78,14 @@ interface DesignPanelProps {
   onDownloadFont?: (family: string) => Promise<void>;
   onUpdateElementStyle?: (elementId: string, patch: ElementStylePatch) => void;
   onUpdateElementFrame?: (elementId: string, patch: ElementFramePatch) => void;
+  onUpdateTextContent?: (elementId: string, text: string) => void;
   onUpdateMediaPlayback?: (elementId: string, patch: MediaPlaybackPatch) => void;
   onUpdatePageBackground?: (background: PageBackground) => void;
   onAlignSelectedElement?: (mode: AlignMode) => void;
   onSetElementLock?: (elementId: string, locked: boolean) => void;
   onSetSelectedElementZOrder?: (mode: ZOrderMode) => void;
   onReplaceVideoAsset?: (elementId: string, file: File) => void;
+  onSetElementAnimationBuilds?: (elementIds: string[], patch: ElementAnimationPatch) => void;
 }
 
 function getSelectedElement(
@@ -111,6 +118,7 @@ export function DesignPanel({
   selection,
   onUpdateElementStyle,
   onUpdateElementFrame,
+  onUpdateTextContent,
   onUpdateMediaPlayback,
   onUpdatePageBackground,
   onAlignSelectedElement,
@@ -120,6 +128,7 @@ export function DesignPanel({
   focusFontControlKey,
   onDownloadFont,
   onReplaceVideoAsset,
+  onSetElementAnimationBuilds,
 }: DesignPanelProps) {
   const fontSelectRef = useRef<HTMLSelectElement>(null);
   const [fontDownloadOpen, setFontDownloadOpen] = useState(false);
@@ -147,8 +156,6 @@ export function DesignPanel({
       .filter((font) => fontMatchesQuery(font, query))
       .slice(0, 12);
   }, [availableFonts, fontSearchQuery]);
-  const selectedTextIsBold =
-    selectedElement?.type === 'text' && selectedElement.fontWeight >= boldTextWeight;
 
   useEffect(() => {
     if (!focusFontControlKey || selectedElement?.type !== 'text') return;
@@ -230,187 +237,6 @@ export function DesignPanel({
         </div>
       </PanelSection>
 
-      {selectedElement?.type === 'text' ? (
-        <PanelSection title="Font">
-          <div className="text-inspector-stack">
-            <div className="font-control-row">
-              <label className="text-inspector-field ew-field-scope ew-grid-compact text-inspector-field-full">
-                <span className="text-inspector-label ew-strong-label">Font</span>
-                <select
-                  aria-label="Selected text font"
-                  ref={fontSelectRef}
-                  value={selectedElement.fontFamily}
-                  onChange={(event) => {
-                    updateSelectedStyle({ fontFamily: event.target.value });
-                  }}
-                >
-                  {fontFamilyOptions.map((fontFamily) => (
-                    <option key={fontFamily} value={fontFamily}>
-                      {fontFamily}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button
-                aria-expanded={fontDownloadOpen}
-                aria-label="Download additional font"
-                className="font-add-button"
-                title="Download additional font"
-                type="button"
-                onClick={() => {
-                  setFontDownloadOpen((current) => !current);
-                }}
-              >
-                <Plus size={16} />
-              </button>
-            </div>
-            {fontDownloadOpen ? (
-              <div className="font-download-panel">
-                <form className="font-download-search" onSubmit={submitFontSearch}>
-                  <label className="layer-search font-download-search-box ew-surface ew-compact-row">
-                    <Search size={16} aria-hidden="true" />
-                    <input
-                      aria-label="Search downloadable fonts"
-                      placeholder="Search Google Fonts"
-                      type="search"
-                      value={fontSearchInput}
-                      onChange={(event) => {
-                        const nextSearch = event.target.value;
-                        setFontSearchInput(nextSearch);
-                        setFontSearchQuery(nextSearch.trim());
-                      }}
-                    />
-                  </label>
-                  <button className="font-search-submit" type="submit" aria-label="Search fonts">
-                    <Search size={16} />
-                  </button>
-                </form>
-                {fontSearchQuery ? (
-                  <div className="font-download-results" aria-label="Downloadable font results">
-                    {filteredDownloadableFonts.length > 0 ? (
-                      filteredDownloadableFonts.map((font) => (
-                        <button
-                          aria-label={`Download ${font.family}`}
-                          className="font-download-result"
-                          disabled={!onDownloadFont || downloadingFontFamily === font.family}
-                          key={font.family}
-                          type="button"
-                          onClick={() => {
-                            void downloadFont(font.family);
-                          }}
-                        >
-                          <span className="ew-ellipsis">{font.family}</span>
-                          <Download size={15} />
-                        </button>
-                      ))
-                    ) : (
-                      <p className="panel-muted">No Google Fonts match that search.</p>
-                    )}
-                  </div>
-                ) : null}
-                {fontDownloadStatus ? (
-                  <div className="panel-muted" role="status">
-                    {fontDownloadStatus}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-            <div className="text-inspector-pair">
-              <label className="text-inspector-field ew-field-scope ew-grid-compact">
-                <span className="text-inspector-label ew-strong-label">Weight</span>
-              <select
-                aria-label="Selected text font weight"
-                value={selectedElement.fontWeight}
-                onChange={(event) => {
-                  updateSelectedStyle({ fontWeight: Number(event.target.value) });
-                }}
-              >
-                {textStyleOptions.TEXT_FONT_WEIGHTS.map((fontWeight) => (
-                  <option key={fontWeight} value={fontWeight}>
-                    {fontWeight}
-                  </option>
-                ))}
-              </select>
-              </label>
-              <label className="text-inspector-field ew-field-scope ew-grid-compact">
-                <span className="text-inspector-label ew-strong-label">Size</span>
-                <input
-                  aria-label="Selected text font size"
-                  min="1"
-                  type="number"
-                  value={selectedElement.fontSize}
-                  onChange={(event) => {
-                    updateSelectedStyle({ fontSize: Number(event.target.value) });
-                  }}
-                />
-              </label>
-            </div>
-            <div className="text-style-row" aria-label="Text style controls">
-              <button
-                aria-label="Bold selected text"
-                aria-pressed={selectedTextIsBold}
-                className={selectedTextIsBold ? 'text-style-toggle active' : 'text-style-toggle'}
-                type="button"
-                onClick={() => {
-                  updateSelectedStyle({
-                    fontWeight: selectedTextIsBold ? regularTextWeight : boldTextWeight,
-                  });
-                }}
-              >
-                <Bold size={16} />
-              </button>
-              <button className="text-style-toggle" disabled type="button" aria-label="Italic unavailable">
-                <span>I</span>
-              </button>
-              <button className="text-style-toggle" disabled type="button" aria-label="Underline unavailable">
-                <span>U</span>
-              </button>
-              <button className="text-style-toggle" disabled type="button" aria-label="Strikethrough unavailable">
-                <span>S</span>
-              </button>
-            </div>
-            <label className="text-color-row">
-              <span>Text Color</span>
-              <input
-                aria-label="Selected text color"
-                type="color"
-                value={selectedElement.fill}
-                onChange={(event) => {
-                  updateSelectedStyle({ fill: event.target.value });
-                }}
-              />
-            </label>
-            <div className="text-align-grid" aria-label="Selected text alignment">
-              {([
-                { align: 'left' as const, icon: AlignLeft, label: 'Align selected text left' },
-                { align: 'center' as const, icon: AlignCenter, label: 'Align selected text center' },
-                { align: 'right' as const, icon: AlignRight, label: 'Align selected text right' },
-              ]).map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    aria-label={item.label}
-                    aria-pressed={selectedElement.align === item.align}
-                    className={
-                      selectedElement.align === item.align
-                        ? 'text-align-button active'
-                        : 'text-align-button'
-                    }
-                    key={item.align}
-                    type="button"
-                    onClick={() => {
-                      updateSelectedStyle({ align: item.align });
-                    }}
-                  >
-                    <Icon size={18} />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </PanelSection>
-      ) : null}
-
       {selectedElement ? (
         <ElementDesignInspector
           key={selectedElement.id}
@@ -426,9 +252,36 @@ export function DesignPanel({
           onFrameUpdate={(patch) => onUpdateElementFrame?.(selectedElement.id, patch)}
           onLockChange={(locked) => onSetElementLock?.(selectedElement.id, locked)}
           onReplaceVideoAsset={(file) => onReplaceVideoAsset?.(selectedElement.id, file)}
+          {...(onSetElementAnimationBuilds ? { onSetElementAnimationBuilds } : {})}
+          onTextContentChange={(text) => onUpdateTextContent?.(selectedElement.id, text)}
           onUpdateMedia={updateSelectedMediaPlayback}
           onUpdateStyle={updateSelectedStyle}
+          page={page}
           onZOrderChange={onSetSelectedElementZOrder}
+          textStyleControls={
+            selectedElement.type === 'text'
+              ? {
+                  downloadingFontFamily,
+                  filteredDownloadableFonts,
+                  fontDownloadOpen,
+                  fontDownloadStatus,
+                  fontFamilyOptions,
+                  fontSearchInput,
+                  fontSearchQuery,
+                  fontSelectRef,
+                  hasFontDownload: Boolean(onDownloadFont),
+                  onDownloadFontFamily: downloadFont,
+                  onFontSearchInputChange: (value) => {
+                    setFontSearchInput(value);
+                    setFontSearchQuery(value.trim());
+                  },
+                  onFontSearchSubmit: submitFontSearch,
+                  onToggleFontDownload: () => {
+                    setFontDownloadOpen((current) => !current);
+                  },
+                }
+              : undefined
+          }
         />
       ) : (
         <PanelSection title="Selection">
@@ -449,9 +302,29 @@ interface ElementDesignInspectorProps {
   onFrameUpdate?: ((patch: ElementFramePatch) => void) | undefined;
   onLockChange?: ((locked: boolean) => void) | undefined;
   onReplaceVideoAsset?: ((file: File) => void) | undefined;
+  onSetElementAnimationBuilds?: (elementIds: string[], patch: ElementAnimationPatch) => void;
+  onTextContentChange?: ((text: string) => void) | undefined;
   onUpdateMedia: (patch: MediaPlaybackPatch) => void;
   onUpdateStyle: (patch: ElementStylePatch) => void;
+  page?: ProjectDocument['pages'][number] | undefined;
   onZOrderChange?: ((mode: ZOrderMode) => void) | undefined;
+  textStyleControls?: TextStyleControls | undefined;
+}
+
+interface TextStyleControls {
+  downloadingFontFamily?: string | undefined;
+  filteredDownloadableFonts: FontCatalogItem[];
+  fontDownloadOpen: boolean;
+  fontDownloadStatus?: string | undefined;
+  fontFamilyOptions: string[];
+  fontSearchInput: string;
+  fontSearchQuery: string;
+  fontSelectRef: RefObject<HTMLSelectElement | null>;
+  hasFontDownload: boolean;
+  onDownloadFontFamily: (family: string) => Promise<void>;
+  onFontSearchInputChange: (value: string) => void;
+  onFontSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onToggleFontDownload: () => void;
 }
 
 function toTrimSeconds(value: string) {
@@ -489,6 +362,21 @@ function getTrimEndSeconds(element: VideoElement) {
   return element.trimEndSeconds ?? element.durationSeconds ?? getTrimSliderMax(element);
 }
 
+function getMovieStartValue(
+  mediaStartBuild: ElementAnimationBuild | undefined,
+  videoElement: VideoElement | undefined,
+) {
+  if (mediaStartBuild) {
+    return mediaStartBuild.trigger;
+  }
+  return videoElement?.startOnClick ? 'on-click' : 'after-transition';
+}
+
+function toMovieStartTrigger(value: string): MovieStartTrigger {
+  if (value === 'after-transition' || value === 'after-previous') return value;
+  return 'on-click';
+}
+
 type ElementInspectorTab = 'arrange' | 'content' | 'style';
 
 function getBoundedNumber(value: string, fallback: number, minimum = 0) {
@@ -511,6 +399,203 @@ function getElementIcon(element: DesignElement) {
   return <Square size={16} />;
 }
 
+function TextStyleInspector({
+  downloadingFontFamily,
+  element,
+  filteredDownloadableFonts,
+  fontDownloadOpen,
+  fontDownloadStatus,
+  fontFamilyOptions,
+  fontSearchInput,
+  fontSearchQuery,
+  fontSelectRef,
+  hasFontDownload,
+  onDownloadFontFamily,
+  onFontSearchInputChange,
+  onFontSearchSubmit,
+  onToggleFontDownload,
+  onUpdateStyle,
+}: TextStyleControls & {
+  element: TextElement;
+  onUpdateStyle: (patch: ElementStylePatch) => void;
+}) {
+  const selectedTextIsBold = element.fontWeight >= boldTextWeight;
+
+  return (
+    <section className="movie-panel-section" aria-label="Selected text controls">
+      <h3>Typography</h3>
+      <div className="text-inspector-stack">
+        <div className="font-control-row">
+          <label className="text-inspector-field ew-field-scope ew-grid-compact text-inspector-field-full">
+            <span className="text-inspector-label ew-strong-label">Font</span>
+            <select
+              aria-label="Selected text font"
+              ref={fontSelectRef}
+              value={element.fontFamily}
+              onChange={(event) => {
+                onUpdateStyle({ fontFamily: event.target.value });
+              }}
+            >
+              {fontFamilyOptions.map((fontFamily) => (
+                <option key={fontFamily} value={fontFamily}>
+                  {fontFamily}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            aria-expanded={fontDownloadOpen}
+            aria-label="Download additional font"
+            className="font-add-button"
+            title="Download additional font"
+            type="button"
+            onClick={onToggleFontDownload}
+          >
+            <Plus size={16} />
+          </button>
+        </div>
+        {fontDownloadOpen ? (
+          <div className="font-download-panel">
+            <form className="font-download-search" onSubmit={onFontSearchSubmit}>
+              <label className="layer-search font-download-search-box ew-surface ew-compact-row">
+                <Search size={16} aria-hidden="true" />
+                <input
+                  aria-label="Search downloadable fonts"
+                  placeholder="Search Google Fonts"
+                  type="search"
+                  value={fontSearchInput}
+                  onChange={(event) => {
+                    onFontSearchInputChange(event.target.value);
+                  }}
+                />
+              </label>
+              <button className="font-search-submit" type="submit" aria-label="Search fonts">
+                <Search size={16} />
+              </button>
+            </form>
+            {fontSearchQuery ? (
+              <div className="font-download-results" aria-label="Downloadable font results">
+                {filteredDownloadableFonts.length > 0 ? (
+                  filteredDownloadableFonts.map((font) => (
+                    <button
+                      aria-label={`Download ${font.family}`}
+                      className="font-download-result"
+                      disabled={!hasFontDownload || downloadingFontFamily === font.family}
+                      key={font.family}
+                      type="button"
+                      onClick={() => {
+                        void onDownloadFontFamily(font.family);
+                      }}
+                    >
+                      <span className="ew-ellipsis">{font.family}</span>
+                      <Download size={15} />
+                    </button>
+                  ))
+                ) : (
+                  <p className="panel-muted">No Google Fonts match that search.</p>
+                )}
+              </div>
+            ) : null}
+            {fontDownloadStatus ? (
+              <div className="panel-muted" role="status">
+                {fontDownloadStatus}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        <div className="text-inspector-pair">
+          <label className="text-inspector-field ew-field-scope ew-grid-compact">
+            <span className="text-inspector-label ew-strong-label">Weight</span>
+            <select
+              aria-label="Selected text font weight"
+              value={element.fontWeight}
+              onChange={(event) => {
+                onUpdateStyle({ fontWeight: Number(event.target.value) });
+              }}
+            >
+              {textStyleOptions.TEXT_FONT_WEIGHTS.map((fontWeight) => (
+                <option key={fontWeight} value={fontWeight}>
+                  {fontWeight}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-inspector-field ew-field-scope ew-grid-compact">
+            <span className="text-inspector-label ew-strong-label">Size</span>
+            <input
+              aria-label="Selected text font size"
+              min="1"
+              type="number"
+              value={element.fontSize}
+              onChange={(event) => {
+                onUpdateStyle({ fontSize: Number(event.target.value) });
+              }}
+            />
+          </label>
+        </div>
+        <div className="text-style-row" aria-label="Text style controls">
+          <button
+            aria-label="Bold selected text"
+            aria-pressed={selectedTextIsBold}
+            className={selectedTextIsBold ? 'text-style-toggle active' : 'text-style-toggle'}
+            type="button"
+            onClick={() => {
+              onUpdateStyle({
+                fontWeight: selectedTextIsBold ? regularTextWeight : boldTextWeight,
+              });
+            }}
+          >
+            <Bold size={16} />
+          </button>
+          <button className="text-style-toggle" disabled type="button" aria-label="Italic unavailable">
+            <span>I</span>
+          </button>
+          <button className="text-style-toggle" disabled type="button" aria-label="Underline unavailable">
+            <span>U</span>
+          </button>
+          <button className="text-style-toggle" disabled type="button" aria-label="Strikethrough unavailable">
+            <span>S</span>
+          </button>
+        </div>
+        <label className="text-color-row">
+          <span>Text Color</span>
+          <input
+            aria-label="Selected text color"
+            type="color"
+            value={element.fill}
+            onChange={(event) => {
+              onUpdateStyle({ fill: event.target.value });
+            }}
+          />
+        </label>
+        <div className="text-align-grid" aria-label="Selected text alignment">
+          {([
+            { align: 'left' as const, icon: AlignLeft, label: 'Align selected text left' },
+            { align: 'center' as const, icon: AlignCenter, label: 'Align selected text center' },
+            { align: 'right' as const, icon: AlignRight, label: 'Align selected text right' },
+          ]).map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                aria-label={item.label}
+                aria-pressed={element.align === item.align}
+                className={element.align === item.align ? 'text-align-button active' : 'text-align-button'}
+                key={item.align}
+                type="button"
+                onClick={() => {
+                  onUpdateStyle({ align: item.align });
+                }}
+              >
+                <Icon size={18} />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ElementDesignInspector({
   assetName,
   element,
@@ -518,11 +603,15 @@ function ElementDesignInspector({
   onFrameUpdate,
   onLockChange,
   onReplaceVideoAsset,
+  onSetElementAnimationBuilds,
+  onTextContentChange,
   onUpdateMedia,
   onUpdateStyle,
+  page,
   onZOrderChange,
+  textStyleControls,
 }: ElementDesignInspectorProps) {
-  const defaultTab = element.type === 'text' ? 'style' : 'content';
+  const defaultTab = element.type === 'text' || element.type === 'shape' ? 'style' : 'content';
   const [activeTab, setActiveTab] = useState<ElementInspectorTab>(defaultTab);
   const replaceVideoInputRef = useRef<HTMLInputElement>(null);
   const contentLabel = getElementContentTabLabel(element);
@@ -532,6 +621,25 @@ function ElementDesignInspector({
   const trimEndSeconds = videoElement ? getTrimEndSeconds(videoElement) : 0;
   const volume = videoElement?.muted ? 0 : Math.round((videoElement?.volume ?? 1) * 100);
   const repeatMode = videoElement ? getVideoRepeatMode(videoElement) : 'none';
+  const mediaStartBuild =
+    videoElement && page
+      ? page.animationBuilds?.find(
+          (build) => build.elementId === videoElement.id && build.mediaAction === 'play',
+        )
+      : undefined;
+  const movieStart = getMovieStartValue(mediaStartBuild, videoElement);
+
+  function setMovieStart(trigger: MovieStartTrigger) {
+    if (!videoElement) return;
+    onSetElementAnimationBuilds?.([videoElement.id], {
+      effect: 'reveal',
+      trigger,
+      delayMs: 0,
+      durationMs: 0,
+      mediaAction: 'play',
+    });
+    onUpdateMedia({ autoplayInPreview: true, startOnClick: trigger === 'on-click' });
+  }
 
   return (
     <PanelSection title={contentLabel}>
@@ -579,6 +687,136 @@ function ElementDesignInspector({
 
       {activeTab === 'style' ? (
         <>
+          {element.type === 'text' && textStyleControls ? (
+            <TextStyleInspector
+              element={element}
+              onUpdateStyle={onUpdateStyle}
+              {...textStyleControls}
+            />
+          ) : null}
+          {element.type === 'shape' ? (
+            <section className="movie-panel-section" aria-label="Selected shape controls">
+              <h3>Shape</h3>
+              <label className="design-control ew-field-scope">
+                <span>Fill</span>
+                <select
+                  aria-label="Selected shape fill mode"
+                  value={element.fill ? 'color' : 'none'}
+                  onChange={(event) => {
+                    onUpdateStyle({
+                      fill: event.target.value === 'color' ? (element.fill ?? '#37FD76') : null,
+                    });
+                  }}
+                >
+                  <option value="none">No fill</option>
+                  <option value="color">Color fill</option>
+                </select>
+              </label>
+              {element.fill ? (
+                <label className="design-control ew-field-scope">
+                  <span>Fill color</span>
+                  <input
+                    aria-label="Selected shape fill color"
+                    type="color"
+                    value={element.fill}
+                    onChange={(event) => {
+                      onUpdateStyle({ fill: event.target.value });
+                    }}
+                  />
+                </label>
+              ) : null}
+              <label className="design-control ew-field-scope">
+                <span>Border</span>
+                <select
+                  aria-label="Selected shape border mode"
+                  value={element.stroke && (element.strokeWidth ?? 0) > 0 ? 'color' : 'none'}
+                  onChange={(event) => {
+                    onUpdateStyle(
+                      event.target.value === 'color'
+                        ? {
+                            stroke: element.stroke ?? '#37FD76',
+                            strokeWidth:
+                              element.strokeWidth && element.strokeWidth > 0
+                                ? element.strokeWidth
+                                : 2,
+                          }
+                        : { stroke: null, strokeWidth: 0 },
+                    );
+                  }}
+                >
+                  <option value="none">No border</option>
+                  <option value="color">Color border</option>
+                </select>
+              </label>
+              {element.stroke && (element.strokeWidth ?? 0) > 0 ? (
+                <>
+                  <label className="design-control ew-field-scope">
+                    <span>Border color</span>
+                    <input
+                      aria-label="Selected shape border color"
+                      type="color"
+                      value={element.stroke}
+                      onChange={(event) => {
+                        onUpdateStyle({ stroke: event.target.value });
+                      }}
+                    />
+                  </label>
+                  <label className="design-control ew-field-scope">
+                    <span>Border width</span>
+                    <input
+                      aria-label="Selected shape border width"
+                      min="1"
+                      type="number"
+                      value={element.strokeWidth ?? 2}
+                      onChange={(event) => {
+                        onUpdateStyle({ strokeWidth: Number(event.target.value) });
+                      }}
+                    />
+                  </label>
+                  {supportsLineEndpoints(element) ? (
+                    <>
+                      <label className="design-control ew-field-scope">
+                        <span>Start endpoint</span>
+                        <select
+                          aria-label="Selected shape start endpoint"
+                          value={element.startEndpoint ?? 'none'}
+                          onChange={(event) => {
+                            onUpdateStyle({
+                              startEndpoint: event.target.value as ShapeLineEndpoint,
+                            });
+                          }}
+                        >
+                          {shapeLineEndpointOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="design-control ew-field-scope">
+                        <span>End endpoint</span>
+                        <select
+                          aria-label="Selected shape end endpoint"
+                          value={element.endEndpoint ?? (element.shape === 'arrow' ? 'arrow' : 'none')}
+                          onChange={(event) => {
+                            onUpdateStyle({
+                              endEndpoint: event.target.value as ShapeLineEndpoint,
+                            });
+                          }}
+                        >
+                          {shapeLineEndpointOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </>
+                  ) : null}
+                </>
+              ) : null}
+            </section>
+          ) : null}
           <section className="movie-panel-section" aria-label="Selected element style">
             <h3>Selection</h3>
             <div className="compact-action design-selection-summary ew-surface ew-surface-hover ew-compact-row">
@@ -598,17 +836,6 @@ function ElementDesignInspector({
                 }}
               />
             </label>
-            {element.type === 'video' ? (
-              <label className="design-control ew-field-scope">
-                <span>Controls</span>
-                <input
-                  aria-label="Show selected video controls"
-                  checked={element.controls}
-                  type="checkbox"
-                  onChange={(event) => onUpdateMedia({ controls: event.target.checked })}
-                />
-              </label>
-            ) : null}
           </section>
         </>
       ) : null}
@@ -789,9 +1016,19 @@ function ElementDesignInspector({
               </select>
             </label>
 
-            <label className="movie-checkbox-row movie-checkbox-row-disabled">
-              <input type="checkbox" disabled checked={Boolean(videoElement.startOnClick)} readOnly />
-              <span>Start movie on click</span>
+            <label className="movie-select-control">
+              <span>Start</span>
+              <select
+                aria-label="Selected video start"
+                value={movieStart}
+                onChange={(event) => {
+                  setMovieStart(toMovieStartTrigger(event.target.value));
+                }}
+              >
+                <option value="on-click">On click</option>
+                <option value="after-transition">After transition</option>
+                <option value="after-previous">After previous build</option>
+              </select>
             </label>
             <label className="movie-checkbox-row">
               <input
@@ -806,84 +1043,20 @@ function ElementDesignInspector({
             </>
           ) : null}
           {element.type === 'text' ? (
-            <section className="movie-panel-section" aria-label="Selected text controls">
-              <h3>Typography</h3>
-              <label className="design-control ew-field-scope">
-                <span>Font</span>
-                <select
-                  aria-label="Selected text font"
-                  value={element.fontFamily}
+            <section className="movie-panel-section" aria-label="Selected text content controls">
+              <h3>Content</h3>
+              <label className="design-control design-control-stacked ew-field-scope">
+                <span>Text</span>
+                <textarea
+                  aria-label="Selected text content"
+                  value={element.text}
                   onChange={(event) => {
-                    onUpdateStyle({ fontFamily: event.target.value });
-                  }}
-                >
-                  {textStyleOptions.TEXT_FONT_FAMILIES.map((fontFamily) => (
-                    <option key={fontFamily} value={fontFamily}>
-                      {fontFamily}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="design-control ew-field-scope">
-                <span>Size</span>
-                <input
-                  aria-label="Selected text font size"
-                  min="1"
-                  type="number"
-                  value={element.fontSize}
-                  onChange={(event) => {
-                    onUpdateStyle({ fontSize: Number(event.target.value) });
+                    onTextContentChange?.(event.target.value);
                   }}
                 />
               </label>
-              <label className="design-control ew-field-scope">
-                <span>Weight</span>
-                <select
-                  aria-label="Selected text font weight"
-                  value={element.fontWeight}
-                  onChange={(event) => {
-                    onUpdateStyle({ fontWeight: Number(event.target.value) });
-                  }}
-                >
-                  {textStyleOptions.TEXT_FONT_WEIGHTS.map((fontWeight) => (
-                    <option key={fontWeight} value={fontWeight}>
-                      {fontWeight}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="design-control ew-field-scope">
-                <span>Color</span>
-                <input
-                  aria-label="Selected text color"
-                  type="color"
-                  value={element.fill}
-                  onChange={(event) => {
-                    onUpdateStyle({ fill: event.target.value });
-                  }}
-                />
-              </label>
-              <label className="design-control ew-field-scope">
-                <span>Align</span>
-                <select
-                  aria-label="Selected text alignment"
-                  value={element.align}
-                  onChange={(event) => {
-                    onUpdateStyle({ align: event.target.value as 'left' | 'center' | 'right' });
-                  }}
-                >
-                  <option value="left">Left</option>
-                  <option value="center">Center</option>
-                  <option value="right">Right</option>
-                </select>
-              </label>
-              <div className="compact-action ew-surface ew-surface-hover ew-compact-row">
-                <AlignCenter size={16} />
-                <span>Text frame stays editable on canvas</span>
-              </div>
             </section>
           ) : null}
-
           {element.type === 'gif' ? (
             <section className="movie-panel-section" aria-label="GIF movie controls">
               <h3>Movie</h3>
@@ -913,129 +1086,6 @@ function ElementDesignInspector({
             </section>
           ) : null}
 
-          {element.type === 'shape' ? (
-            <section className="movie-panel-section" aria-label="Selected shape controls">
-              <h3>Shape</h3>
-              <label className="design-control ew-field-scope">
-                <span>Fill</span>
-                <select
-                  aria-label="Selected shape fill mode"
-                  value={element.fill ? 'color' : 'none'}
-                  onChange={(event) => {
-                    onUpdateStyle({
-                      fill: event.target.value === 'color' ? (element.fill ?? '#37FD76') : null,
-                    });
-                  }}
-                >
-                  <option value="none">No fill</option>
-                  <option value="color">Color fill</option>
-                </select>
-              </label>
-              {element.fill ? (
-                <label className="design-control ew-field-scope">
-                  <span>Fill color</span>
-                  <input
-                    aria-label="Selected shape fill color"
-                    type="color"
-                    value={element.fill}
-                    onChange={(event) => {
-                      onUpdateStyle({ fill: event.target.value });
-                    }}
-                  />
-                </label>
-              ) : null}
-              <label className="design-control ew-field-scope">
-                <span>Border</span>
-                <select
-                  aria-label="Selected shape border mode"
-                  value={element.stroke && (element.strokeWidth ?? 0) > 0 ? 'color' : 'none'}
-                  onChange={(event) => {
-                    onUpdateStyle(
-                      event.target.value === 'color'
-                        ? {
-                            stroke: element.stroke ?? '#37FD76',
-                            strokeWidth:
-                              element.strokeWidth && element.strokeWidth > 0
-                                ? element.strokeWidth
-                                : 2,
-                          }
-                        : { stroke: null, strokeWidth: 0 },
-                    );
-                  }}
-                >
-                  <option value="none">No border</option>
-                  <option value="color">Color border</option>
-                </select>
-              </label>
-              {element.stroke && (element.strokeWidth ?? 0) > 0 ? (
-                <>
-                  <label className="design-control ew-field-scope">
-                    <span>Border color</span>
-                    <input
-                      aria-label="Selected shape border color"
-                      type="color"
-                      value={element.stroke}
-                      onChange={(event) => {
-                        onUpdateStyle({ stroke: event.target.value });
-                      }}
-                    />
-                  </label>
-                  <label className="design-control ew-field-scope">
-                    <span>Border width</span>
-                    <input
-                      aria-label="Selected shape border width"
-                      min="1"
-                      type="number"
-                      value={element.strokeWidth ?? 2}
-                      onChange={(event) => {
-                        onUpdateStyle({ strokeWidth: Number(event.target.value) });
-                      }}
-                    />
-                  </label>
-                  {supportsLineEndpoints(element) ? (
-                    <>
-                      <label className="design-control ew-field-scope">
-                        <span>Start endpoint</span>
-                        <select
-                          aria-label="Selected shape start endpoint"
-                          value={element.startEndpoint ?? 'none'}
-                          onChange={(event) => {
-                            onUpdateStyle({
-                              startEndpoint: event.target.value as ShapeLineEndpoint,
-                            });
-                          }}
-                        >
-                          {shapeLineEndpointOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="design-control ew-field-scope">
-                        <span>End endpoint</span>
-                        <select
-                          aria-label="Selected shape end endpoint"
-                          value={element.endEndpoint ?? (element.shape === 'arrow' ? 'arrow' : 'none')}
-                          onChange={(event) => {
-                            onUpdateStyle({
-                              endEndpoint: event.target.value as ShapeLineEndpoint,
-                            });
-                          }}
-                        >
-                          {shapeLineEndpointOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </>
-                  ) : null}
-                </>
-              ) : null}
-            </section>
-          ) : null}
         </>
       ) : null}
 

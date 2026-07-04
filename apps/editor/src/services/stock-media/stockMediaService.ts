@@ -44,14 +44,18 @@ interface GiphyResponse {
   username?: unknown;
   url?: unknown;
   images?: {
+    downsized_small?: GiphyImageResponse;
     downsized_medium?: GiphyImageResponse;
     original?: GiphyImageResponse;
     fixed_width?: GiphyImageResponse;
+    fixed_height?: GiphyImageResponse;
     preview_gif?: GiphyImageResponse;
+    preview?: GiphyImageResponse;
   };
 }
 
 interface GiphyImageResponse {
+  mp4?: unknown;
   url?: unknown;
   width?: unknown;
   height?: unknown;
@@ -123,6 +127,12 @@ function mapUnsplashPhoto(photo: UnsplashPhotoResponse): StockMediaItem | null {
 function mapGiphyGif(gif: GiphyResponse): StockMediaItem | null {
   const media = gif.images?.downsized_medium ?? gif.images?.original;
   const thumbnail = gif.images?.fixed_width ?? gif.images?.preview_gif ?? media;
+  const video =
+    gif.images?.original?.mp4 ??
+    gif.images?.fixed_width?.mp4 ??
+    gif.images?.fixed_height?.mp4 ??
+    gif.images?.downsized_small?.mp4 ??
+    gif.images?.preview?.mp4;
   if (!isNonEmptyString(gif.id) || !isSafeRemoteUrl(media?.url) || !isSafeRemoteUrl(thumbnail?.url))
     return null;
 
@@ -135,6 +145,7 @@ function mapGiphyGif(gif: GiphyResponse): StockMediaItem | null {
     authorUrl: isSafeRemoteUrl(gif.url) ? gif.url : undefined,
     thumbnailUrl: thumbnail.url,
     mediaUrl: media.url,
+    ...(isSafeRemoteUrl(video) ? { videoUrl: video } : {}),
     width: readPositiveNumber(media.width, 480),
     height: readPositiveNumber(media.height, 270),
   };

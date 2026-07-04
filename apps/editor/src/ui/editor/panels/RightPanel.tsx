@@ -1,5 +1,10 @@
 import { Brush, Layers3, Sparkles } from 'lucide-react';
-import type { PageBackground, ProjectDocument, SelectionState } from '../../../domain/documents/model';
+import type {
+  ElementAnimationBuild,
+  PageBackground,
+  ProjectDocument,
+  SelectionState,
+} from '../../../domain/documents/model';
 import type {
   AlignMode,
   ElementFramePatch,
@@ -16,6 +21,7 @@ import { LayersPanel } from './LayersPanel';
 import type { RightPanelTab } from '../state/useEditorViewModel';
 
 type LegacyRightPanelTab = Exclude<RightPanelTab, 'assets' | 'animations' | 'elements' | 'text'>;
+type ElementAnimationPatch = Omit<ElementAnimationBuild, 'elementId' | 'id'>;
 
 interface RightPanelProps {
   activeTab: LegacyRightPanelTab;
@@ -51,10 +57,12 @@ interface RightPanelProps {
   onAlignSelectedElement?: (mode: AlignMode) => void;
   onUpdateElementStyle?: (elementId: string, patch: ElementStylePatch) => void;
   onUpdateElementFrame?: (elementId: string, patch: ElementFramePatch) => void;
+  onUpdateTextContent?: (elementId: string, text: string) => void;
   onUpdateMediaPlayback?: (elementId: string, patch: MediaPlaybackPatch) => void;
   onUpdatePageBackground?: (background: PageBackground) => void;
   onSetSelectedElementZOrder?: (mode: ZOrderMode) => void;
   onReplaceVideoAsset?: (elementId: string, file: File) => void;
+  onSetElementAnimationBuilds?: (elementIds: string[], patch: ElementAnimationPatch) => void;
 }
 
 const tabs: Array<SegmentedTab<LegacyRightPanelTab>> = [
@@ -97,10 +105,12 @@ export function RightPanel({
   onAlignSelectedElement,
   onUpdateElementStyle,
   onUpdateElementFrame,
+  onUpdateTextContent,
   onUpdateMediaPlayback,
   onUpdatePageBackground,
   onSetSelectedElementZOrder,
   onReplaceVideoAsset,
+  onSetElementAnimationBuilds,
 }: RightPanelProps) {
   return (
     <aside className="right-panel" aria-label="Editor tools">
@@ -152,9 +162,11 @@ export function RightPanel({
             {...(onSetSelectedElementZOrder ? { onSetSelectedElementZOrder } : {})}
             {...(onUpdateElementFrame ? { onUpdateElementFrame } : {})}
             {...(onUpdateElementStyle ? { onUpdateElementStyle } : {})}
+            {...(onUpdateTextContent ? { onUpdateTextContent } : {})}
             {...(onUpdateMediaPlayback ? { onUpdateMediaPlayback } : {})}
             {...(onUpdatePageBackground ? { onUpdatePageBackground } : {})}
             {...(onReplaceVideoAsset ? { onReplaceVideoAsset } : {})}
+            {...(onSetElementAnimationBuilds ? { onSetElementAnimationBuilds } : {})}
           />
         ) : null}
       </div>
