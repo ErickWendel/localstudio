@@ -200,10 +200,11 @@ describe('LeftToolPanel', () => {
     const onReorderElementAnimationBuild = vi.fn();
     const onPlayAnimationPreview = vi.fn();
     const onSetElementAnimationBuilds = vi.fn();
+    const onUpdateMediaPlayback = vi.fn();
     const project = sampleProject.createSampleProject();
     project.pages[0] = {
       ...project.pages[0]!,
-      elementIds: [...project.pages[0]!.elementIds, 'shape-line'],
+      elementIds: [...project.pages[0]!.elementIds, 'shape-line', 'video-demo'],
       transition: { effect: 'reveal', delayMs: 0 },
       animationBuilds: [
         {
@@ -228,7 +229,40 @@ describe('LeftToolPanel', () => {
           delayMs: 0,
           lineDrawDirection: 'start-to-end',
         },
+        {
+          id: 'build-video-demo',
+          elementId: 'video-demo',
+          effect: 'reveal',
+          trigger: 'on-click',
+          delayMs: 0,
+          durationMs: 0,
+          mediaAction: 'play',
+        },
       ],
+    };
+    project.assets['asset-video'] = {
+      id: 'asset-video',
+      type: 'video',
+      name: 'Demo clip',
+      mimeType: 'video/mp4',
+    };
+    project.elements['video-demo'] = {
+      id: 'video-demo',
+      type: 'video',
+      assetId: 'asset-video',
+      x: 0,
+      y: 0,
+      width: 640,
+      height: 360,
+      rotation: 0,
+      locked: false,
+      visible: true,
+      opacity: 1,
+      loop: false,
+      controls: true,
+      muted: false,
+      autoplayInPreview: true,
+      trimStartSeconds: 0,
     };
     project.elements['shape-line'] = {
       id: 'shape-line',
@@ -266,6 +300,7 @@ describe('LeftToolPanel', () => {
         onClearElementAnimationBuild={onClearElementAnimationBuild}
         onSetPageTransition={onSetPageTransition}
         onSetElementAnimationBuilds={onSetElementAnimationBuilds}
+        onUpdateMediaPlayback={onUpdateMediaPlayback}
         onReorderElementAnimationBuild={onReorderElementAnimationBuild}
         onPlayAnimationPreview={onPlayAnimationPreview}
       />,
@@ -280,6 +315,11 @@ describe('LeftToolPanel', () => {
     expect(screen.getByLabelText('Build 1')).toBeInTheDocument();
     expect(screen.getByLabelText('Build 2')).toBeInTheDocument();
     expect(screen.getByLabelText('Build 3')).toBeInTheDocument();
+    expect(screen.getByLabelText('Build 4')).toBeInTheDocument();
+    expect(screen.getByRole('listitem', { name: 'Build 4: Movie start' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Animation for Movie start' })).toHaveValue(
+      'movie-start',
+    );
     expect(screen.getByRole('listitem', { name: 'Build 2: AI Design Revolution' })).toHaveAttribute(
       'aria-current',
       'step',
@@ -345,6 +385,10 @@ describe('LeftToolPanel', () => {
       screen.getByRole('combobox', { name: 'Start for AI Design Revolution' }),
       'after-previous',
     );
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Start for Movie start' }),
+      'after-transition',
+    );
     await user.click(
       screen.getByRole('button', { name: 'Move AI Design Revolution animation up' }),
     );
@@ -379,6 +423,17 @@ describe('LeftToolPanel', () => {
       effect: 'reveal',
       trigger: 'after-previous',
       delayMs: 0,
+    });
+    expect(onSetElementAnimationBuilds).toHaveBeenCalledWith(['video-demo'], {
+      effect: 'reveal',
+      trigger: 'after-transition',
+      delayMs: 0,
+      durationMs: 0,
+      mediaAction: 'play',
+    });
+    expect(onUpdateMediaPlayback).toHaveBeenCalledWith('video-demo', {
+      autoplayInPreview: true,
+      startOnClick: false,
     });
     expect(onReorderElementAnimationBuild).toHaveBeenCalledWith('text-title', 0);
     expect(onPlayAnimationPreview).toHaveBeenCalledTimes(1);

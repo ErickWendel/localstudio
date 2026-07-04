@@ -211,7 +211,8 @@ function mapObject(
       loop: false,
       controls: true,
       muted: false,
-      autoplayInPreview: false,
+      autoplayInPreview: true,
+      startOnClick: object.startTrigger === 'on-click',
       trimStartSeconds: 0,
     };
   }

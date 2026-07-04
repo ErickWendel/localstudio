@@ -127,6 +127,68 @@ describe('useAnimationPreviewController', () => {
     });
   });
 
+  it('does not hide video media-play builds while waiting for their start trigger', () => {
+    const project = createProject();
+    project.assets.video = {
+      id: 'video',
+      type: 'video',
+      name: 'Clip',
+      mimeType: 'video/mp4',
+    };
+    project.elements.video = {
+      id: 'video',
+      type: 'video',
+      assetId: 'video',
+      x: 0,
+      y: 0,
+      width: 640,
+      height: 360,
+      rotation: 0,
+      opacity: 1,
+      visible: true,
+      locked: false,
+      loop: false,
+      controls: true,
+      muted: false,
+      autoplayInPreview: true,
+      trimStartSeconds: 0,
+    };
+    project.pages[0]!.elementIds = ['video'];
+    project.pages[0]!.animationBuilds = [
+      {
+        id: 'video-play',
+        elementId: 'video',
+        effect: 'reveal',
+        trigger: 'on-click',
+        delayMs: 0,
+        durationMs: 0,
+        mediaAction: 'play',
+      },
+    ];
+    const projectRef = { current: project };
+    const activePageIdRef = { current: 'page-1' };
+    const { result } = renderHook(() =>
+      useAnimationPreviewController({
+        activePageIdRef,
+        projectRef,
+        setActivePageId: vi.fn(),
+        setSelectedElementIds: vi.fn(),
+      }),
+    );
+
+    act(() => {
+      result.current.playAnimationPreview('page-1', 'presenter');
+      vi.runOnlyPendingTimers();
+    });
+
+    expect(result.current.animationPreview).toMatchObject({
+      activeBuildElementId: 'video',
+      hiddenElementIds: [],
+      phase: 'waiting',
+      waitingForClick: true,
+    });
+  });
+
   it('reports the current presenter page synchronously during presentation navigation', () => {
     const projectRef = { current: createProject() };
     const activePageIdRef = { current: 'page-1' };

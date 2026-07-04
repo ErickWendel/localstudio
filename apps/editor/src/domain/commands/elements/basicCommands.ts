@@ -959,6 +959,7 @@ class SetElementAnimationBuildsCommand implements EditorCommand {
             ...(this.patch.lineDrawDirection
               ? { lineDrawDirection: this.patch.lineDrawDirection }
               : {}),
+            ...(this.patch.mediaAction ? { mediaAction: this.patch.mediaAction } : {}),
           };
         });
         return { ...page, animationBuilds: [...retainedBuilds, ...nextBuilds] };

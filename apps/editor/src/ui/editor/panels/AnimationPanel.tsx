@@ -9,6 +9,7 @@ import type {
   SelectionState,
   SlideTransition,
 } from '../../../domain/documents/model';
+import type { MediaPlaybackPatch } from '../../../domain/commands/elements/basicCommands';
 
 type ElementAnimationPatch = Omit<ElementAnimationPatchSource, 'elementId' | 'id'>;
 type DurationChangeHandler = (durationMs: number) => void;
@@ -35,6 +36,7 @@ interface AnimationPanelProps {
   onSetElementAnimationBuilds?:
     | ((elementIds: string[], patch: ElementAnimationPatch) => void)
     | undefined;
+  onUpdateMediaPlayback?: ((elementId: string, patch: MediaPlaybackPatch) => void) | undefined;
   onSetPageTransition?: ((transition: SlideTransition) => void) | undefined;
 }
 
@@ -71,6 +73,11 @@ function getElementLabel(project: ProjectDocument, elementId: string) {
   return element.shape === 'ellipse' ? 'Ellipse' : 'Rectangle';
 }
 
+function getBuildLabel(project: ProjectDocument, build: ElementAnimationBuild) {
+  if (build.mediaAction === 'play') return 'Movie start';
+  return getElementLabel(project, build.elementId);
+}
+
 function getBuildPatch(build: ElementAnimationBuild | undefined): ElementAnimationPatch {
   return build
     ? {
@@ -81,6 +88,7 @@ function getBuildPatch(build: ElementAnimationBuild | undefined): ElementAnimati
         ...(build.durationMs !== undefined ? { durationMs: build.durationMs } : {}),
         ...(build.kind ? { kind: build.kind } : {}),
         ...(build.lineDrawDirection ? { lineDrawDirection: build.lineDrawDirection } : {}),
+        ...(build.mediaAction ? { mediaAction: build.mediaAction } : {}),
       }
     : DEFAULT_ELEMENT_ANIMATION;
 }
@@ -201,6 +209,7 @@ export function AnimationPanel({
   onPlayAnimationPreview,
   onReorderElementAnimationBuild,
   onSetElementAnimationBuilds,
+  onUpdateMediaPlayback,
   onSetPageTransition,
 }: AnimationPanelProps) {
   const [dropIndicator, setDropIndicator] = useState<
@@ -337,9 +346,10 @@ export function AnimationPanel({
           {animationBuilds.map((build, index) => {
             const elementId = build.elementId;
             const element = project.elements[elementId];
-            const label = getElementLabel(project, elementId);
+            const label = getBuildLabel(project, build);
             const patch = getBuildPatch(build);
             const availableEffects = getAvailableEffects(element);
+            const isMovieStartBuild = build.mediaAction === 'play';
             const dropPosition =
               dropIndicator?.elementId === elementId ? dropIndicator.position : undefined;
             const isActivePreviewBuild = activePreviewBuildElementId === elementId;
@@ -353,6 +363,18 @@ export function AnimationPanel({
             ]
               .filter(Boolean)
               .join(' ');
+            function setBuildTrigger(trigger: ElementAnimationPatch['trigger']) {
+              onSetElementAnimationBuilds?.([elementId], {
+                ...patch,
+                trigger,
+              });
+              if (isMovieStartBuild) {
+                onUpdateMediaPlayback?.(elementId, {
+                  autoplayInPreview: true,
+                  startOnClick: trigger === 'on-click',
+                });
+              }
+            }
             return (
               <div
                 aria-label={`Build ${index + 1}: ${label}`}
@@ -427,40 +449,49 @@ export function AnimationPanel({
                     </button>
                   </div>
                 </div>
-                <label className="animation-field ew-field-scope ew-compact-row">
-                  <span>Effect</span>
-                  <select
-                    aria-label={`Effect for ${label}`}
-                    value={build ? patch.effect : 'none'}
-                    onChange={(event) => {
-                      if (event.target.value === 'none') {
-                        onClearElementAnimationBuild?.(elementId);
-                        return;
-                      }
-                      onSetElementAnimationBuilds?.(
-                        [elementId],
-                        getAnimationEffectPatch(
-                          toAnimationEffect(event.target.value, availableEffects),
-                          patch,
-                        ),
-                      );
-                    }}
-                  >
-                    <option value="none">None</option>
-                    {ANIMATION_EFFECT_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                    {availableEffects.canLineDraw ? (
-                      <option value="line-draw">Line draw</option>
-                    ) : null}
-                    {availableEffects.canKeyboardType ? (
-                      <option value="keyboard-typing">Keyboard typing</option>
-                    ) : null}
-                  </select>
-                </label>
-                {patch.effect === 'line-draw' ? (
+                {isMovieStartBuild ? (
+                  <label className="animation-field ew-field-scope ew-compact-row">
+                    <span>Animation</span>
+                    <select aria-label={`Animation for ${label}`} value="movie-start" disabled>
+                      <option value="movie-start">Movie start</option>
+                    </select>
+                  </label>
+                ) : (
+                  <label className="animation-field ew-field-scope ew-compact-row">
+                    <span>Effect</span>
+                    <select
+                      aria-label={`Effect for ${label}`}
+                      value={build ? patch.effect : 'none'}
+                      onChange={(event) => {
+                        if (event.target.value === 'none') {
+                          onClearElementAnimationBuild?.(elementId);
+                          return;
+                        }
+                        onSetElementAnimationBuilds?.(
+                          [elementId],
+                          getAnimationEffectPatch(
+                            toAnimationEffect(event.target.value, availableEffects),
+                            patch,
+                          ),
+                        );
+                      }}
+                    >
+                      <option value="none">None</option>
+                      {ANIMATION_EFFECT_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                      {availableEffects.canLineDraw ? (
+                        <option value="line-draw">Line draw</option>
+                      ) : null}
+                      {availableEffects.canKeyboardType ? (
+                        <option value="keyboard-typing">Keyboard typing</option>
+                      ) : null}
+                    </select>
+                  </label>
+                )}
+                {!isMovieStartBuild && patch.effect === 'line-draw' ? (
                   <label className="animation-field ew-field-scope ew-compact-row">
                     <span>Direction</span>
                     <select
@@ -491,10 +522,7 @@ export function AnimationPanel({
                           : event.target.value === 'after-previous'
                             ? 'after-previous'
                             : 'on-click';
-                      onSetElementAnimationBuilds?.([elementId], {
-                        ...patch,
-                        trigger,
-                      });
+                      setBuildTrigger(trigger);
                     }}
                   >
                     <option value="on-click">On click</option>
@@ -502,16 +530,18 @@ export function AnimationPanel({
                     <option value="after-previous">After previous build</option>
                   </select>
                 </label>
-                <DurationField
-                  ariaLabel={`Duration for ${label}`}
-                  valueMs={patch.delayMs}
-                  onChange={(durationMs) => {
-                    onSetElementAnimationBuilds?.([elementId], {
-                      ...patch,
-                      delayMs: durationMs,
-                    });
-                  }}
-                />
+                {!isMovieStartBuild ? (
+                  <DurationField
+                    ariaLabel={`Duration for ${label}`}
+                    valueMs={patch.delayMs}
+                    onChange={(durationMs) => {
+                      onSetElementAnimationBuilds?.([elementId], {
+                        ...patch,
+                        delayMs: durationMs,
+                      });
+                    }}
+                  />
+                ) : null}
               </div>
             );
           })}

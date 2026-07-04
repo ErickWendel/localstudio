@@ -42,6 +42,7 @@ import { FloatingSelectionToolbar } from '../toolbars/FloatingSelectionToolbar';
 import { imageCrop } from './imageCrop';
 import type { ImageCropHandle } from './imageCrop';
 import { canvasWorkspaceUtils } from './canvasWorkspaceUtils';
+import { movieStartPlayback } from '../media/movieStartPlayback';
 
 const TEXT_FRAME_PADDING = 6;
 
@@ -146,9 +147,11 @@ function easeOutCubic(value: number) {
 }
 
 function getAnimationOpacity(baseOpacity: number, state: ElementAnimationRenderState) {
+  if (state.activeBuild?.mediaAction === 'play') return baseOpacity;
   if (state.activeBuild?.effect === 'dissolve') return baseOpacity * easeOutCubic(state.progress);
   if (state.activeBuild?.effect === 'keyboard-typing') return baseOpacity;
   if (state.activeBuild?.effect === 'line-draw') return baseOpacity;
+  if (state.hidden && state.activeBuild?.mediaAction === 'play') return baseOpacity;
   return state.hidden ? 0 : baseOpacity;
 }
 
@@ -955,6 +958,7 @@ export function CanvasWorkspace({
 
   function handleStagePointerDown(event: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     if (canAdvanceAnimationPreviewByClick) {
+      movieStartPlayback.playPendingMovieStart(artboardRef.current, project, animationPreview);
       onAnimationPreviewAdvance?.();
       return;
     }
@@ -1340,19 +1344,16 @@ export function CanvasWorkspace({
               const animationState = getElementAnimationState(element);
               return (
                 <CanvasMediaElement
+                  animationState={animationState}
                   key={element.id}
                   assetName={
                     asset?.name ?? (element.type === 'video' ? 'Imported video' : 'Imported GIF')
                   }
                   assetUrl={asset?.objectUrl}
                   element={element}
-                  interactive={
-                    presentationMode ||
-                    readOnly ||
-                    (element.type === 'video' && selection.elementIds.includes(element.id))
-                  }
+                  interactive={presentationMode || readOnly}
                   opacity={getAnimationOpacity(element.opacity, animationState)}
-                  previewMode={presentationMode || readOnly}
+                  previewMode={presentationMode || readOnly || isAnimationPreviewRunning}
                   scale={{ x: scaleX, y: scaleY }}
                 />
               );
@@ -1586,6 +1587,7 @@ interface CanvasImageElementProps {
 }
 
 interface CanvasMediaElementProps {
+  animationState: ElementAnimationRenderState;
   assetName: string;
   assetUrl: string | undefined;
   element: GifElement | VideoElement;
@@ -1613,6 +1615,7 @@ function getMediaStyle(
 }
 
 function CanvasMediaElement({
+  animationState,
   assetName,
   assetUrl,
   element,
@@ -1637,6 +1640,7 @@ function CanvasMediaElement({
       assetName={assetName}
       assetUrl={assetUrl}
       element={element}
+      animationState={animationState}
       interactive={interactive}
       opacity={opacity}
       previewMode={previewMode}
@@ -1646,6 +1650,7 @@ function CanvasMediaElement({
 }
 
 interface CanvasVideoElementProps {
+  animationState: ElementAnimationRenderState;
   assetName: string;
   assetUrl: string | undefined;
   element: VideoElement;
@@ -1656,6 +1661,7 @@ interface CanvasVideoElementProps {
 }
 
 function CanvasVideoElement({
+  animationState,
   assetName,
   assetUrl,
   element,
@@ -1676,7 +1682,8 @@ function CanvasVideoElement({
     | undefined
   >(undefined);
   const repeatMode = element.repeatMode ?? (element.loop ? 'loop' : 'none');
-  const autoplay = previewMode && element.autoplayInPreview && !element.startOnClick;
+  const autoplay =
+    previewMode && element.autoplayInPreview && !element.startOnClick && !animationState.hidden;
 
   function stopReversePlayback() {
     if (reverseIntervalRef.current === undefined) return;
@@ -1693,6 +1700,15 @@ function CanvasVideoElement({
       return Math.max(0, element.trimEndSeconds);
     }
     return Number.isFinite(video.duration) ? video.duration : undefined;
+  }
+
+  function playVideo(video: HTMLVideoElement) {
+    const playResult = video.play() as Promise<void> | undefined;
+    if (playResult !== undefined) {
+      void playResult.catch(() => {
+        video.pause();
+      });
+    }
   }
 
   useEffect(() => {
@@ -1752,10 +1768,32 @@ function CanvasVideoElement({
       video.pause();
       return;
     }
-    void video.play().catch(() => {
-      video.pause();
-    });
+    playVideo(video);
   }, [element.playing]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !previewMode || !element.autoplayInPreview) return;
+    if (animationState.activeBuild?.mediaAction === 'play') {
+      stopReversePlayback();
+      video.currentTime = Math.max(0, element.trimStartSeconds);
+      if (movieStartPlayback.consumeStartedBuild(video, animationState.activeBuild.id)) return;
+      playVideo(video);
+      return;
+    }
+    if (animationState.hidden || element.startOnClick) {
+      stopReversePlayback();
+      video.pause();
+      video.currentTime = Math.max(0, element.trimStartSeconds);
+    }
+  }, [
+    animationState.activeBuild,
+    animationState.hidden,
+    element.autoplayInPreview,
+    element.startOnClick,
+    element.trimStartSeconds,
+    previewMode,
+  ]);
 
   function playReverse(video: HTMLVideoElement) {
     stopReversePlayback();
@@ -1766,7 +1804,7 @@ function CanvasVideoElement({
       video.currentTime = nextTime;
       if (nextTime > trimStart) return;
       stopReversePlayback();
-      void video.play();
+      playVideo(video);
     }, 1000 / 30);
   }
 
@@ -1776,7 +1814,7 @@ function CanvasVideoElement({
     if (video.currentTime < trimEnd) return;
     if (repeatMode === 'loop') {
       video.currentTime = getTrimStart();
-      void video.play();
+      playVideo(video);
       return;
     }
     if (repeatMode === 'loop-back-and-forth') {
@@ -1792,6 +1830,7 @@ function CanvasVideoElement({
       autoPlay={autoplay}
       className="canvas-media-element"
       controls={false}
+      data-element-id={element.id}
       data-trim-end={element.trimEndSeconds ?? ''}
       data-trim-start={element.trimStartSeconds}
       loop={repeatMode === 'loop' && element.trimEndSeconds === undefined}

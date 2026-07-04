@@ -53,6 +53,7 @@ export type PptxSlideObject =
       frame: PptxRect;
       id: string;
       kind: 'image' | 'gif' | 'video';
+      startTrigger?: AnimationTrigger;
       sourceShapeId: string;
       zIndex: number;
     };
@@ -538,6 +539,28 @@ function isMediaControlTiming(timingNode: Element | undefined) {
   return timingNode?.getAttribute('presetClass') === 'mediacall';
 }
 
+function getVideoStartTriggers(document: Document, objects: PptxSlideObject[]) {
+  const videoObjectsByShapeId = new Map(
+    objects
+      .filter((object) => object.kind === 'video' && object.id.includes('-slide-'))
+      .map((object) => [object.sourceShapeId, object]),
+  );
+  const triggers = new Map<string, AnimationTrigger>();
+  let mediaBuildIndex = 0;
+  pptxXml.descendants(document, 'cBhvr').forEach((behavior) => {
+    const sourceShapeId = findBuildSourceShapeId(behavior);
+    if (!sourceShapeId || !videoObjectsByShapeId.has(sourceShapeId)) return;
+    const timingNode = findNearestAnimationTimingNode(behavior);
+    if (!isMediaControlTiming(timingNode)) return;
+    triggers.set(
+      sourceShapeId,
+      toBuildTrigger(timingNode?.getAttribute('nodeType') ?? null, mediaBuildIndex),
+    );
+    mediaBuildIndex += 1;
+  });
+  return triggers;
+}
+
 function parseAnimationBuilds(
   document: Document,
   slideId: string,
@@ -557,7 +580,7 @@ function parseAnimationBuilds(
     const object = slideObjectsByShapeId.get(sourceShapeId);
     if (!object) return;
     const timingNode = findNearestAnimationTimingNode(behavior);
-    if (isMediaControlTiming(timingNode)) return;
+    if (isMediaControlTiming(timingNode) && object.kind !== 'video') return;
     const buildIndex = builds.length;
     builds.push({
       id: `${slideId}-build-${buildIndex + 1}-${object.id}`,
@@ -565,8 +588,9 @@ function parseAnimationBuilds(
       effect: 'reveal',
       trigger: toBuildTrigger(timingNode?.getAttribute('nodeType') ?? null, buildIndex),
       delayMs: 0,
-      durationMs: getBuildDurationMs(timingNode),
+      durationMs: isMediaControlTiming(timingNode) ? 0 : getBuildDurationMs(timingNode),
       kind: toBuildKind(timingNode?.getAttribute('presetClass') ?? null),
+      ...(isMediaControlTiming(timingNode) ? { mediaAction: 'play' as const } : {}),
     });
     seenShapeIds.add(sourceShapeId);
   });
@@ -667,6 +691,11 @@ async function parseSlide(
         if (object) objects.push(object);
       }
     }
+  }
+  const videoStartTriggers = getVideoStartTriggers(document, objects);
+  for (const object of objects) {
+    const startTrigger = videoStartTriggers.get(object.sourceShapeId);
+    if (object.kind === 'video' && startTrigger) object.startTrigger = startTrigger;
   }
   return {
     backgroundColor: getBackgroundColor(document),

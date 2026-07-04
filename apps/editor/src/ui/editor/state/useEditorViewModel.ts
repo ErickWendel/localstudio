@@ -3708,6 +3708,7 @@ export function useEditorViewModel(services: AppServices) {
                 controls: true,
                 muted: true,
                 autoplayInPreview: true,
+                playing: true,
                 trimStartSeconds: 0,
                 ...(videoDurationSeconds !== undefined
                   ? {

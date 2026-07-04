@@ -312,6 +312,7 @@ describe('RightPanel', () => {
     const onUpdateElementStyle = vi.fn();
     const onUpdateMediaPlayback = vi.fn();
     const onReplaceVideoAsset = vi.fn();
+    const onSetElementAnimationBuilds = vi.fn();
 
     render(
       <RightPanel
@@ -328,6 +329,7 @@ describe('RightPanel', () => {
         onUpdateElementStyle={onUpdateElementStyle}
         onUpdateMediaPlayback={onUpdateMediaPlayback}
         onReplaceVideoAsset={onReplaceVideoAsset}
+        onSetElementAnimationBuilds={onSetElementAnimationBuilds}
       />,
     );
 
@@ -353,6 +355,19 @@ describe('RightPanel', () => {
     expect(onUpdateMediaPlayback).toHaveBeenCalledWith('video-demo', {
       loop: true,
       repeatMode: 'loop',
+    });
+
+    await user.selectOptions(screen.getByLabelText('Selected video start'), 'after-previous');
+    expect(onSetElementAnimationBuilds).toHaveBeenCalledWith(['video-demo'], {
+      effect: 'reveal',
+      trigger: 'after-previous',
+      delayMs: 0,
+      durationMs: 0,
+      mediaAction: 'play',
+    });
+    expect(onUpdateMediaPlayback).toHaveBeenCalledWith('video-demo', {
+      autoplayInPreview: true,
+      startOnClick: false,
     });
 
     expect(screen.getByLabelText('Selected video trim start')).toHaveAttribute('type', 'range');
@@ -388,6 +403,40 @@ describe('RightPanel', () => {
     expect(onUpdateElementFrame).toHaveBeenCalledWith('video-demo', { width: 800 });
     await user.click(screen.getByRole('button', { name: 'Lock' }));
     expect(onSetElementLock).toHaveBeenCalledWith('video-demo', true);
+  });
+
+  it('reflects the movie start animation build in the video design settings', () => {
+    const mediaProject = createMediaProject();
+    const videoElement = mediaProject.elements['video-demo'];
+    if (videoElement?.type !== 'video') throw new Error('Expected video fixture.');
+    mediaProject.elements['video-demo'] = {
+      ...videoElement,
+      startOnClick: true,
+    };
+    mediaProject.pages[0]!.animationBuilds = [
+      {
+        id: 'video-start',
+        elementId: 'video-demo',
+        effect: 'reveal',
+        trigger: 'after-previous',
+        delayMs: 0,
+        durationMs: 0,
+        mediaAction: 'play',
+      },
+    ];
+
+    render(
+      <RightPanel
+        activeTab="design"
+        onTabChange={vi.fn()}
+        project={mediaProject}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['video-demo'] }}
+        modelStates={modelStates}
+      />,
+    );
+
+    expect(screen.getByLabelText('Selected video start')).toHaveValue('after-previous');
   });
 
   it('shows movie controls for selected GIF objects', async () => {
