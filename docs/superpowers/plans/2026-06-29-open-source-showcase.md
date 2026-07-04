@@ -303,11 +303,10 @@ npm ci
 npm run dev
 ```
 
-The default dev script opens the landing app. Use the focused scripts when you need one app:
+The dev script starts the connected landing, editor, and joystick apps together:
 
 ```bash
-npm run dev:landing
-npm run dev:editor
+npm run dev
 ```
 
 ## Quality Checks
@@ -543,11 +542,10 @@ npm ci
 npm run dev
 ```
 
-Focused local apps:
+Local app stack:
 
 ```bash
-npm run dev:landing
-npm run dev:editor
+npm run dev
 ```
 
 Quality checks:
@@ -649,35 +647,23 @@ npm run build
 
 Expected: PASS with generated `dist/index.html` and `dist/editor/index.html`.
 
-- [ ] **Step 5: Smoke test landing dev script**
+- [ ] **Step 5: Smoke test connected dev stack**
 
 Run:
 
 ```bash
-npm run dev:landing -- --host 127.0.0.1
+npm run dev
 ```
 
-Expected: Vite prints a local URL and serves the landing app. Stop the server after confirming it starts.
+Expected: Vite prints local URLs and serves landing, editor, and joystick together. Stop the server after confirming they start.
 
-- [ ] **Step 6: Smoke test editor dev script**
+- [ ] **Step 6: Inspect development routes**
 
-Run:
+Open the routes from the connected dev stack:
 
-```bash
-npm run dev:editor -- --host 127.0.0.1
-```
-
-Expected: Vite prints a local URL and serves the editor app. Stop the server after confirming it starts.
-
-- [ ] **Step 7: Smoke test default dev script**
-
-Run:
-
-```bash
-npm run dev -- --host 127.0.0.1
-```
-
-Expected: Vite prints a local URL and serves the landing app. Stop the server after confirming it starts.
+- Landing: `/`
+- Editor: `/editor/`
+- Joystick: `/joystick/`
 
 - [ ] **Step 8: Inspect production output routes**
 

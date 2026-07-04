@@ -1,19 +1,17 @@
 import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 const apps = [
-  { name: 'landing', port: '4173', workspace: '@localstudio/landing' },
-  { name: 'editor', port: '4174', workspace: '@localstudio/editor' },
-  { name: 'joystick', port: '4175', workspace: '@localstudio/joystick' },
+  { name: 'landing', path: '../apps/landing', port: '4173' },
+  { name: 'editor', path: '../apps/editor', port: '4174' },
+  { name: 'joystick', path: '../apps/joystick', port: '4175' },
 ];
 
 const children = apps.map((app) => {
-  const child = spawn(
-    'npm',
-    ['run', 'dev', '--workspace', app.workspace, '--', '--port', app.port, '--strictPort'],
-    {
-      stdio: ['ignore', 'pipe', 'pipe'],
-    },
-  );
+  const child = spawn('vite', ['--host', '0.0.0.0', '--port', app.port, '--strictPort'], {
+    cwd: fileURLToPath(new URL(app.path, import.meta.url)),
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
 
   child.stdout.on('data', (chunk) => {
     process.stdout.write(prefixLines(app.name, chunk));
