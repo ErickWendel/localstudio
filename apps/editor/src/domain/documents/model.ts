@@ -42,6 +42,7 @@ export interface Page {
   elementIds: string[];
   transition?: SlideTransition;
   animationBuilds?: ElementAnimationBuild[];
+  speakerNotes?: string;
   visible?: boolean;
 }
 

@@ -41,6 +41,7 @@ interface TopToolbarProps {
   onSaveLocal?: (() => void) | undefined;
   onSaveLocalAs?: (() => void) | undefined;
   onProjectNameChange?: ((name: string) => void) | undefined;
+  onOpenPresenterView?: (() => void) | undefined;
   onRedo?: (() => void) | undefined;
   onResetZoom?: (() => void) | undefined;
   onSelectLayers?: (() => void) | undefined;
@@ -149,6 +150,7 @@ export function TopToolbar({
   onNewProject,
   onPersistenceToggle,
   onProjectNameChange,
+  onOpenPresenterView,
   onRedo,
   onResetZoom,
   onSelectLayers,
@@ -208,6 +210,16 @@ export function TopToolbar({
   function startPresenterMode(options?: { fromBeginning?: boolean }) {
     if (options) {
       onStartPresenterMode?.(options);
+    } else {
+      onStartPresenterMode?.();
+    }
+    setPlayMenuOpen(false);
+    setTranslationMenuOpen(false);
+  }
+
+  function startDefaultPresentation() {
+    if (onOpenPresenterView) {
+      onOpenPresenterView();
     } else {
       onStartPresenterMode?.();
     }
@@ -428,8 +440,8 @@ export function TopToolbar({
               className="project-play-button project-play-main"
               type="button"
               aria-label="Play presentation"
-              title="Play presentation"
-              onClick={() => startPresenterMode()}
+              title="Open presenter view"
+              onClick={startDefaultPresentation}
             >
               <span className="material-symbols-outlined" aria-hidden="true">
                 play_arrow
@@ -458,6 +470,31 @@ export function TopToolbar({
                 role="menu"
                 aria-label="Presentation play menu"
               >
+                <button
+                  className="toolbar-dropdown-item project-play-dropdown-item"
+                  role="menuitem"
+                  type="button"
+                  onClick={() => startPresenterMode()}
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    fullscreen
+                  </span>
+                  <span>Present in fullscreen</span>
+                </button>
+                <button
+                  className="toolbar-dropdown-item project-play-dropdown-item"
+                  role="menuitem"
+                  type="button"
+                  onClick={() => {
+                    setPlayMenuOpen(false);
+                    onOpenPresenterView?.();
+                  }}
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    co_present
+                  </span>
+                  <span>Presenter view</span>
+                </button>
                 <button
                   className="toolbar-dropdown-item project-play-dropdown-item"
                   role="menuitem"

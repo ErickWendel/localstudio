@@ -1933,6 +1933,62 @@ describe('EditorShell', () => {
     });
   });
 
+  it('opens presenter view with an audience fullscreen prompt and closes the popup on fullscreen exit', async () => {
+    const user = userEvent.setup();
+    let fullscreenElement: Element | null = null;
+    const popupClose = vi.fn();
+    const popupPostMessage = vi.fn();
+    const popup = {
+      close: popupClose,
+      closed: false,
+      location: { href: '' },
+      postMessage: popupPostMessage,
+    } as unknown as Window;
+    const openWindow = vi.fn(() => popup);
+    Object.defineProperty(window, 'open', {
+      configurable: true,
+      value: openWindow,
+    });
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      get: () => fullscreenElement,
+    });
+    const requestFullscreen = vi.fn(() => {
+      fullscreenElement = document.querySelector('[aria-label="Canvas workspace"]');
+      document.dispatchEvent(new Event('fullscreenchange'));
+      return Promise.resolve();
+    });
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+      configurable: true,
+      value: requestFullscreen,
+    });
+
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Presentation play options' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Presenter view' }));
+
+    expect(openWindow).toHaveBeenCalledTimes(1);
+    expect(popup.location.href).toContain('presenter=1');
+    expect(screen.getByRole('dialog', { name: 'Audience Window' })).toBeInTheDocument();
+    expect(requestFullscreen).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Enter full screen mode' }));
+
+    await waitFor(() => {
+      expect(requestFullscreen).toHaveBeenCalledTimes(1);
+      expect(document.fullscreenElement).toBe(screen.getByLabelText('Canvas workspace'));
+      expect(screen.queryByRole('dialog', { name: 'Audience Window' })).not.toBeInTheDocument();
+    });
+
+    fullscreenElement = null;
+    document.dispatchEvent(new Event('fullscreenchange'));
+
+    await waitFor(() => {
+      expect(popupClose).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('hides page insert controls in fullscreen presenter mode and restores a clean editor state on exit', async () => {
     const user = userEvent.setup();
     let fullscreenElement: Element | null = null;
@@ -2867,6 +2923,31 @@ describe('EditorShell', () => {
 
     expect(requestFullscreen).toHaveBeenCalled();
     expect(requestFullscreen.mock.instances[0]).toBe(screen.getByLabelText('Canvas workspace'));
+  });
+
+  it('shows speaker notes as a Canva-style side panel with controls', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    const notesToggle = screen.getByRole('button', { name: 'Toggle notes panel' });
+    expect(notesToggle).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('heading', { name: 'Page 1 - Slide 1' })).not.toBeInTheDocument();
+
+    await user.click(notesToggle);
+
+    expect(notesToggle).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('heading', { name: 'Page 1 - Slide 1' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Timer' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Change notes text size' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close notes panel' })).toBeInTheDocument();
+    expect(screen.getByText('0/5000')).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Speaker notes'), 'Opening note');
+
+    expect(screen.getByText('12/5000')).toBeInTheDocument();
+
+    await user.click(notesToggle);
+    expect(screen.queryByRole('heading', { name: 'Page 1 - Slide 1' })).not.toBeInTheDocument();
   });
 
   it('does not show the page size overlay on the canvas', () => {

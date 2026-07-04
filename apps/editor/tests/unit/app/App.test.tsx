@@ -112,6 +112,15 @@ describe('App', () => {
     expect(await screen.findByRole('heading', { name: 'WebMCP showcase' })).toBeInTheDocument();
   });
 
+  it('renders the presenter view route', async () => {
+    window.history.replaceState({}, '', '/editor/?presenter=1&presenterSession=session-1');
+
+    render(<App />);
+
+    expect(await screen.findByLabelText('Presenter view')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Presenter Window' })).toBeInTheDocument();
+  });
+
   it('renders a public shared deck page', async () => {
     const shareId = '00000000-0000-4000-8000-000000000101';
     const sourceUrl = `http://localhost:9000/localstudio/mirrors/public-shares/${shareId}/share.json`;

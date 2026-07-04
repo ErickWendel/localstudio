@@ -28,6 +28,7 @@ import { VersionHistoryPanel } from '../panels/VersionHistoryPanel';
 import { useEditorViewModel } from '../state/useEditorViewModel';
 import { SharePanel } from '../../share/SharePanel';
 import { editorShellBrowserUtils } from '../browser/editorShellBrowserUtils';
+import { BrowserPresenterSessionService } from '../../../services/presenter/presenterSessionService';
 
 interface EditorShellProps {
   services: AppServices;
@@ -38,11 +39,17 @@ export function EditorShell({ services }: EditorShellProps) {
   const automationDelegateRef = useRef(vm.automation);
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
   const [designFontFocusKey, setDesignFontFocusKey] = useState(0);
+  const [speakerNotesOpen, setSpeakerNotesOpen] = useState(false);
+  const [audienceFullscreenPromptOpen, setAudienceFullscreenPromptOpen] = useState(false);
+  const [presenterSessionId, setPresenterSessionId] = useState<string | undefined>();
+  const [presenterViewError, setPresenterViewError] = useState<string | undefined>();
   const [sharePanelOpen, setSharePanelOpen] = useState(false);
   const [shareMetadata, setShareMetadata] = useState<ShareMetadata | undefined>();
   const stageRef = useRef<Konva.Stage>(null);
   const workspaceRef = useRef<HTMLElement>(null);
   const slideFrameRef = useRef<HTMLDivElement>(null);
+  const presenterSessionServiceRef = useRef<BrowserPresenterSessionService | undefined>(undefined);
+  const presenterFullscreenEnteredRef = useRef(false);
   const toolbarImageInputRef = useRef<HTMLInputElement>(null);
   const hasSelection = vm.selection.elementIds.length > 0;
   const isHistoryReadOnly = vm.versionHistoryOpen;
@@ -50,6 +57,7 @@ export function EditorShell({ services }: EditorShellProps) {
     0,
     vm.project.pages.findIndex((page) => page.id === vm.activePageId),
   );
+  const activePage = vm.project.pages[activePageIndex];
   const deckTranslationStatus = vm.deckTranslationProgress
     ? `Translating ${vm.deckTranslationProgress.currentPageName} · ${vm.deckTranslationProgress.completedPages}/${vm.deckTranslationProgress.totalPages}`
     : undefined;
@@ -92,6 +100,46 @@ export function EditorShell({ services }: EditorShellProps) {
     const pageId = options?.fromBeginning ? vm.project.pages[0]?.id : vm.activePageId;
     if (!pageId) return;
     vm.playPresentationPreview(pageId);
+    void vm.toggleFullscreen(workspaceRef.current);
+  }
+
+  function getPresenterSessionService() {
+    presenterSessionServiceRef.current ??= new BrowserPresenterSessionService();
+    return presenterSessionServiceRef.current;
+  }
+
+  function closePresenterViewSession() {
+    presenterSessionServiceRef.current?.closePresenterWindow();
+    presenterFullscreenEnteredRef.current = false;
+    setAudienceFullscreenPromptOpen(false);
+    setPresenterSessionId(undefined);
+  }
+
+  function openPresenterView() {
+    const pageId = vm.activePageId;
+    if (!pageId) return;
+    const service = getPresenterSessionService();
+    const result = service.openPresenterWindow();
+    if (result.status === 'blocked') {
+      setPresenterViewError('Allow popups to open presenter view.');
+      return;
+    }
+    setPresenterViewError(undefined);
+    setPresenterSessionId(result.sessionId);
+    presenterFullscreenEnteredRef.current = false;
+    setAudienceFullscreenPromptOpen(true);
+    vm.playPresentationPreview(pageId);
+    window.setTimeout(() => {
+      service.publishState({
+        activePageId: pageId,
+        animationPreview: vm.animationPreview,
+        project: vm.project,
+      });
+    }, 0);
+  }
+
+  function enterAudienceFullscreen() {
+    setAudienceFullscreenPromptOpen(false);
     void vm.toggleFullscreen(workspaceRef.current);
   }
 
@@ -214,6 +262,56 @@ export function EditorShell({ services }: EditorShellProps) {
   useEffect(() => {
     automationDelegateRef.current = vm.automation;
   }, [vm.automation]);
+
+  useEffect(() => {
+    if (!presenterSessionId) return undefined;
+    return getPresenterSessionService().subscribeToCommands((message) => {
+      if (message.command === 'next') {
+        vm.advancePresentationPreview();
+        return;
+      }
+      if (message.command === 'previous') {
+        vm.rewindPresentationPreview();
+        return;
+      }
+      if (message.command === 'update-notes') {
+        vm.updatePageSpeakerNotes(message.pageId, message.notes);
+        return;
+      }
+      if (message.command === 'request-state') {
+        getPresenterSessionService().publishState({
+          activePageId: vm.activePageId,
+          animationPreview: vm.animationPreview,
+          project: vm.project,
+        });
+        return;
+      }
+      if (message.command === 'close') {
+        closePresenterViewSession();
+      }
+    });
+  }, [presenterSessionId, vm]);
+
+  useEffect(() => {
+    if (!presenterSessionId) {
+      presenterFullscreenEnteredRef.current = false;
+      return;
+    }
+    if (vm.isFullscreen) {
+      presenterFullscreenEnteredRef.current = true;
+      return;
+    }
+    if (presenterFullscreenEnteredRef.current) closePresenterViewSession();
+  }, [presenterSessionId, vm.isFullscreen]);
+
+  useEffect(() => {
+    if (!presenterSessionId) return;
+    getPresenterSessionService().publishState({
+      activePageId: vm.activePageId,
+      animationPreview: vm.animationPreview,
+      project: vm.project,
+    });
+  }, [presenterSessionId, vm.activePageId, vm.animationPreview, vm.project]);
 
   useEffect(() => {
     function handleCopy(event: ClipboardEvent) {
@@ -395,6 +493,7 @@ export function EditorShell({ services }: EditorShellProps) {
         onShare={() => {
           setSharePanelOpen(true);
         }}
+        onOpenPresenterView={openPresenterView}
         onStartPresenterMode={startPresenterMode}
         onSaveLocal={() => {
           void vm.saveLocalNow();
@@ -646,6 +745,82 @@ export function EditorShell({ services }: EditorShellProps) {
             onReorderPage={isHistoryReadOnly ? undefined : vm.reorderPage}
             onSetPageVisibility={isHistoryReadOnly ? undefined : vm.setPageVisibility}
           />
+          {activePage ? (
+            <section className="speaker-notes-editor" aria-label="Speaker notes editor">
+              {speakerNotesOpen ? (
+                <div className="speaker-notes-card">
+                  <header className="speaker-notes-header">
+                    <h2>
+                      Page {activePageIndex + 1} - {activePage.name}
+                    </h2>
+                    <div className="speaker-notes-actions">
+                      <button type="button" aria-label="Change notes text size">
+                        aA
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Close notes panel"
+                        onClick={() => setSpeakerNotesOpen(false)}
+                      >
+                        <span className="material-symbols-outlined" aria-hidden="true">
+                          close
+                        </span>
+                      </button>
+                    </div>
+                  </header>
+                  <textarea
+                    id="speaker-notes-textarea"
+                    aria-label="Speaker notes"
+                    maxLength={5000}
+                    placeholder="Add notes to your design"
+                    value={activePage.speakerNotes ?? ''}
+                    onChange={(event) =>
+                      vm.updatePageSpeakerNotes(activePage.id, event.target.value)
+                    }
+                  />
+                  <span className="speaker-notes-count">{activePage.speakerNotes?.length ?? 0}/5000</span>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+          {presenterViewError ? (
+            <p className="presenter-view-error" role="alert">
+              {presenterViewError}
+            </p>
+          ) : null}
+          {audienceFullscreenPromptOpen ? (
+            <div className="audience-fullscreen-backdrop" role="presentation">
+              <section
+                className="audience-fullscreen-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="audience-fullscreen-title"
+              >
+                <button
+                  className="audience-fullscreen-close"
+                  type="button"
+                  aria-label="Close audience fullscreen prompt"
+                  onClick={closePresenterViewSession}
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    close
+                  </span>
+                </button>
+                <h2 id="audience-fullscreen-title">Audience Window</h2>
+                <p>
+                  This window is what your audience sees. Drag it to the screen your
+                  audience will be looking at and enter full screen mode.
+                </p>
+                <button
+                  className="audience-fullscreen-primary"
+                  type="button"
+                  onClick={enterAudienceFullscreen}
+                >
+                  Enter full screen mode
+                </button>
+              </section>
+            </div>
+          ) : null}
           <input
             ref={toolbarImageInputRef}
             aria-label="Insert media file"
@@ -789,11 +964,13 @@ export function EditorShell({ services }: EditorShellProps) {
       <ProjectVideoPreloader project={vm.project} />
       <EditorFooter
         activePageIndex={activePageIndex}
+        notesOpen={speakerNotesOpen}
         pageCount={vm.project.pages.length}
         pagesPanelOpen={vm.pagesPanelOpen}
         zoomPercent={vm.zoomPercent}
         onResetZoom={vm.resetZoom}
         onOpenSettings={vm.openSettings}
+        onToggleNotes={() => setSpeakerNotesOpen((current) => !current)}
         onTogglePagesPanel={togglePagesPanel}
         onZoomIn={vm.zoomIn}
         onZoomOut={vm.zoomOut}

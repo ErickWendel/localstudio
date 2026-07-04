@@ -714,6 +714,9 @@ export function useEditorViewModel(services: AppServices) {
     if (stockMediaProviderState.gifs.configured && stockGifResults.length === 0) {
       void searchStockGifs('');
     }
+  // The stock search functions are declared later in this hook and intentionally not dependencies:
+  // adding them would rerun this bootstrap effect on every render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     stockGifResults.length,
     stockImageResults.length,
@@ -3262,6 +3265,16 @@ export function useEditorViewModel(services: AppServices) {
     );
   }
 
+  function updatePageSpeakerNotes(pageId: string, speakerNotes: string) {
+    commitProject((currentProject) => ({
+      ...currentProject,
+      updatedAt: new Date().toISOString(),
+      pages: currentProject.pages.map((page) =>
+        page.id === pageId ? { ...page, speakerNotes } : page,
+      ),
+    }));
+  }
+
   function activateScrolledPage(pageId: string) {
     if (pageId === activePageId) return;
     const page = project.pages.find((item) => item.id === pageId);
@@ -4036,6 +4049,7 @@ export function useEditorViewModel(services: AppServices) {
     reorderPage,
     renamePage,
     setPageVisibility,
+    updatePageSpeakerNotes,
     togglePagesPanel,
     toggleFullscreen,
     undo,

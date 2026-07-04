@@ -9,6 +9,9 @@ const EditorShell = lazy(() =>
 const PublicDeckViewer = lazy(() =>
   import('./ui/share/PublicDeckViewer').then((module) => ({ default: module.PublicDeckViewer })),
 );
+const PresenterView = lazy(() =>
+  import('./ui/presenter/PresenterView').then((module) => ({ default: module.PresenterView })),
+);
 const WebMcpShowcasePage = lazy(() =>
   import('./ui/webmcp/WebMcpShowcasePage').then((module) => ({
     default: module.WebMcpShowcasePage,
@@ -21,6 +24,15 @@ function normalizeRoutePath(pathname: string) {
 
 export function App() {
   const pathname = normalizeRoutePath(window.location.pathname);
+  const presenterSessionId = getPresenterSessionId();
+  if (presenterSessionId) {
+    return (
+      <Suspense fallback={null}>
+        <PresenterView sessionId={presenterSessionId} />
+      </Suspense>
+    );
+  }
+
   const shareRoute = getShareRoute(window.location.pathname);
   if (shareRoute) {
     const services = createAppServices();
@@ -45,6 +57,12 @@ export function App() {
   }
 
   return <EditorApp />;
+}
+
+function getPresenterSessionId() {
+  const url = new URL(window.location.href);
+  if (url.searchParams.get('presenter') !== '1') return undefined;
+  return url.searchParams.get('presenterSession') ?? undefined;
 }
 
 function getShareRoute(pathname: string) {
