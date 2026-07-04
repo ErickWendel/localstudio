@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import type { ProjectDocument } from '../../../domain/documents/model';
+import { localMediaImportConfig } from '../media/localMediaImportConfig';
 
 interface PageRailProps {
   project: ProjectDocument;
@@ -69,7 +70,7 @@ export function PageRail({ project, activePageId, onAddPage, onImportImage, onIm
           aria-label="Import media file"
           className="visually-hidden-input"
           type="file"
-          accept="image/*,video/*"
+          accept={localMediaImportConfig.accept}
           onChange={(event) => {
             const file = event.target.files?.[0];
             if (!file) return;

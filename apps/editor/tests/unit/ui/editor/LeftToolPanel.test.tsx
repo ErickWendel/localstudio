@@ -121,7 +121,10 @@ describe('LeftToolPanel', () => {
     );
 
     await user.click(screen.getByRole('tab', { name: 'Assets' }));
-    await user.upload(screen.getByLabelText('Import media file'), file);
+    const input = screen.getByLabelText('Import media file');
+    expect(input).toHaveAttribute('accept', 'image/*,.mp4,video/mp4,.webm,video/webm');
+    expect(input.getAttribute('accept')).not.toContain('video/*');
+    await user.upload(input, file);
 
     expect(onImportMedia).toHaveBeenCalledWith(file);
   });

@@ -22,6 +22,7 @@ import { AnimationPanel } from './AnimationPanel';
 import { DesignPanel } from './DesignPanel';
 import { ElementsPanel } from './ElementsPanel';
 import type { CreateImagePromptOptions } from '../media/imagePromptOptions';
+import { localMediaImportConfig } from '../media/localMediaImportConfig';
 import { LayersPanel } from './LayersPanel';
 import { TextPanel } from './TextPanel';
 import type { RightPanelTab, StockMediaErrorState, TextPreset } from '../state/useEditorViewModel';
@@ -328,7 +329,7 @@ export function LeftToolPanel({
               aria-label="Import media file"
               className="visually-hidden-input"
               type="file"
-              accept="image/*,video/*"
+              accept={localMediaImportConfig.accept}
               onChange={(event) => {
                 const file = event.target.files?.[0];
                 if (!file) return;

@@ -10,6 +10,7 @@ import {
   type WebMcpDemoWindow,
 } from '../../../services/webmcp/webMcpToolAdapter';
 import { EditorFooter } from './EditorFooter';
+import { MediaImportProgressOverlay } from './MediaImportProgressOverlay';
 import { PresentationImportProgressOverlay } from './PresentationImportProgressOverlay';
 import { LeftToolPanel } from '../panels/LeftToolPanel';
 import { LocalProjectSetupPanel } from '../panels/LocalProjectSetupPanel';
@@ -17,6 +18,7 @@ import { MediaIntegrationSettingsPanel } from '../panels/MediaIntegrationSetting
 import { MirrorSettingsPanel } from '../panels/MirrorSettingsPanel';
 import { PagesPanel } from '../panels/PagesPanel';
 import { ProjectVideoPreloader } from '../media/ProjectVideoPreloader';
+import { localMediaImportConfig } from '../media/localMediaImportConfig';
 import { PromptBar } from '../prompting/PromptBar';
 import { RemoteImportPanel } from '../panels/RemoteImportPanel';
 import { ScrollingCanvasWorkspace } from '../canvas/ScrollingCanvasWorkspace';
@@ -638,7 +640,7 @@ export function EditorShell({ services }: EditorShellProps) {
             aria-label="Insert media file"
             className="visually-hidden-input"
             type="file"
-            accept="image/*,video/*"
+            accept={localMediaImportConfig.accept}
             onChange={(event) => {
               const file = event.target.files?.[0];
               if (!file || isHistoryReadOnly) return;
@@ -766,6 +768,12 @@ export function EditorShell({ services }: EditorShellProps) {
       ) : null}
       {vm.presentationImportProgress ? (
         <PresentationImportProgressOverlay progress={vm.presentationImportProgress} />
+      ) : null}
+      {vm.mediaImportProgress ? (
+        <MediaImportProgressOverlay
+          progress={vm.mediaImportProgress}
+          onDismiss={vm.clearMediaImportProgress}
+        />
       ) : null}
       <ProjectVideoPreloader project={vm.project} />
       <EditorFooter

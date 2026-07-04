@@ -1136,6 +1136,23 @@ button {
   line-height: 1.4;
 }
 
+.presentation-import-dismiss {
+  margin-top: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ew-text);
+  font-weight: 700;
+  padding: 9px 14px;
+}
+
+.presentation-import-dismiss:hover,
+.presentation-import-dismiss:focus-visible {
+  border-color: rgba(125, 211, 252, 0.7);
+  background: rgba(125, 211, 252, 0.14);
+  outline: 0;
+}
+
 @keyframes presentationImportOrbit {
   from {
     transform: rotate(0deg) translateX(35px);
