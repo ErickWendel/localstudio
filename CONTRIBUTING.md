@@ -9,12 +9,8 @@ npm ci
 npm run dev
 ```
 
-The default dev script opens the landing app. Use the focused scripts when you need one app:
-
-```bash
-npm run dev:landing
-npm run dev:editor
-```
+The default dev script starts the landing, editor, and joystick apps together. Use the landing URL as the public entry
+point; `/editor/` and `/joystick/` are proxied to the connected app servers.
 
 ## Quality Checks
 

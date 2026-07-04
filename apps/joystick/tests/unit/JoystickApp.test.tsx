@@ -1,33 +1,97 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JoystickApp } from '../../src/app/JoystickApp';
 import { InMemoryPresenterRemoteSignalingService } from '@localstudio/presenter-remote/signaling-service';
 
 const streamReceiverMock = vi.hoisted(() => ({
-  create: vi.fn(
-    (options: {
-      onStatusChange: (status: 'connected') => void;
-      onStream: (stream: MediaStream | undefined) => void;
-    }) => ({
+  latestReceiver: undefined as
+    | {
+        sendCommand: ReturnType<typeof vi.fn>;
+        sendStreamPreference: ReturnType<typeof vi.fn>;
+        start: ReturnType<typeof vi.fn>;
+        stop: ReturnType<typeof vi.fn>;
+      }
+    | undefined,
+  create: vi.fn((options: {
+    onStatusChange: (status: 'connected') => void;
+    onStream: (stream: MediaStream | undefined) => void;
+  }) => {
+    const receiver = {
+      sendCommand: vi.fn(() => true),
       sendStreamPreference: vi.fn(() => true),
       start: vi.fn(() => {
         options.onStream({} as MediaStream);
         options.onStatusChange('connected');
       }),
       stop: vi.fn(),
-    }),
-  ),
+    };
+    streamReceiverMock.latestReceiver = receiver;
+    return receiver;
+  }),
 }));
 
 vi.mock('../../src/app/presenterRemoteStreamReceiver', () => ({
   presenterRemoteStreamReceiver: streamReceiverMock,
 }));
 
+const localStorageDescriptor = Object.getOwnPropertyDescriptor(window, 'localStorage');
+const localStoragePrototypeDescriptor = Object.getOwnPropertyDescriptor(
+  Object.getPrototypeOf(window),
+  'localStorage',
+);
+
+function createTestStorage(): Storage {
+  const values = new Map<string, string>();
+  return {
+    get length() {
+      return values.size;
+    },
+    clear: vi.fn(() => values.clear()),
+    getItem: vi.fn((key: string) => values.get(key) ?? null),
+    key: vi.fn((index: number) => Array.from(values.keys())[index] ?? null),
+    removeItem: vi.fn((key: string) => {
+      values.delete(key);
+    }),
+    setItem: vi.fn((key: string, value: string) => {
+      values.set(key, String(value));
+    }),
+  };
+}
+
+function installTestLocalStorage() {
+  const storage = createTestStorage();
+  Object.defineProperty(window, 'localStorage', {
+    configurable: true,
+    value: storage,
+  });
+  return storage;
+}
+
+function restoreLocalStorage() {
+  if (localStorageDescriptor) {
+    Object.defineProperty(window, 'localStorage', localStorageDescriptor);
+    return;
+  }
+  if (localStoragePrototypeDescriptor) {
+    Reflect.deleteProperty(window, 'localStorage');
+  }
+}
+
+function getTestLocalStorage() {
+  return window.localStorage ?? installTestLocalStorage();
+}
+
 describe('JoystickApp', () => {
   beforeEach(() => {
-    window.localStorage.clear();
+    restoreLocalStorage();
+    getTestLocalStorage().clear();
     streamReceiverMock.create.mockClear();
+    streamReceiverMock.latestReceiver = undefined;
+  });
+
+  afterEach(() => {
+    restoreLocalStorage();
   });
 
   it('renders the installable remote shell and starts with the query code', async () => {
@@ -49,7 +113,6 @@ describe('JoystickApp', () => {
   });
 
   it('renders when browser storage is unavailable', async () => {
-    const originalLocalStorage = window.localStorage;
     Object.defineProperty(window, 'localStorage', {
       configurable: true,
       value: undefined,
@@ -71,10 +134,7 @@ describe('JoystickApp', () => {
       expect(await screen.findByLabelText('Presentation remote control')).toBeInTheDocument();
       expect(screen.getByLabelText('Connected (1)')).toBeInTheDocument();
     } finally {
-      Object.defineProperty(window, 'localStorage', {
-        configurable: true,
-        value: originalLocalStorage,
-      });
+      restoreLocalStorage();
     }
   });
 
@@ -97,7 +157,7 @@ describe('JoystickApp', () => {
       timer: { elapsedMs: 0, paused: false },
       type: 'state',
     });
-    window.localStorage.setItem('localstudio.joystick.lastCode', 'ABCD-1234');
+    getTestLocalStorage().setItem('localstudio.joystick.lastCode', 'ABCD-1234');
 
     render(
       <JoystickApp initialUrl="https://localstudio.test/joystick" signalingService={service} />,
@@ -105,6 +165,76 @@ describe('JoystickApp', () => {
 
     expect(await screen.findByText('Current: Slide 1 of 1')).toBeInTheDocument();
     expect(screen.getByLabelText('Slide position')).toHaveTextContent('1 / 1');
+  });
+
+  it('stores approved codes and presenter device ids after a successful pairing', async () => {
+    const service = new InMemoryPresenterRemoteSignalingService({
+      randomCode: () => 'ABCD-1234',
+      randomId: () => 'session-1',
+    });
+    service.registerSession({
+      presenterDeviceId: 'presenter-macbook',
+      presenterLabel: 'MacBook Pro',
+      ttlMs: 60_000,
+    });
+
+    render(
+      <JoystickApp
+        initialUrl="https://localstudio.test/joystick?code=ABCD-1234"
+        signalingService={service}
+      />,
+    );
+
+    expect(await screen.findByLabelText('Connected (1)')).toBeInTheDocument();
+    expect(getTestLocalStorage().getItem('localstudio.joystick.lastCode')).toBe('ABCD-1234');
+    expect(JSON.parse(getTestLocalStorage().getItem('localstudio.joystick.approvedCodes') ?? '[]')).toEqual([
+      'ABCD-1234',
+    ]);
+    expect(
+      JSON.parse(getTestLocalStorage().getItem('localstudio.joystick.trustedPresenterDeviceIds') ?? '[]'),
+    ).toEqual(['presenter-macbook']);
+  });
+
+  it('connects to a new code from a previously paired presenter device', async () => {
+    const service = new InMemoryPresenterRemoteSignalingService({
+      randomCode: () => 'EFGH-5678',
+      randomId: () => 'session-2',
+    });
+    service.registerSession({
+      presenterDeviceId: 'presenter-macbook',
+      presenterLabel: 'MacBook Pro',
+      ttlMs: 120_000,
+    });
+    service.publishState('EFGH-5678', {
+      activePageId: 'page-1',
+      activePageIndex: 0,
+      buildsRemaining: 0,
+      connectedControllerCount: 1,
+      deckName: 'Launch Deck',
+      notes: '',
+      pageCount: 1,
+      presenterMode: 'presenting',
+      shortcuts: ['previous', 'next'],
+      timer: { elapsedMs: 0, paused: false },
+      type: 'state',
+    });
+    getTestLocalStorage().setItem('localstudio.joystick.lastCode', 'ABCD-1234');
+    getTestLocalStorage().setItem('localstudio.joystick.approvedCodes', JSON.stringify(['ABCD-1234']));
+    getTestLocalStorage().setItem(
+      'localstudio.joystick.trustedPresenterDeviceIds',
+      JSON.stringify(['presenter-macbook']),
+    );
+
+    render(
+      <JoystickApp initialUrl="https://localstudio.test/joystick" signalingService={service} />,
+    );
+
+    expect(await screen.findByText('Current: Slide 1 of 1')).toBeInTheDocument();
+    expect(getTestLocalStorage().getItem('localstudio.joystick.lastCode')).toBe('EFGH-5678');
+    expect(JSON.parse(getTestLocalStorage().getItem('localstudio.joystick.approvedCodes') ?? '[]')).toEqual([
+      'EFGH-5678',
+      'ABCD-1234',
+    ]);
   });
 
   it('requires a code even when one presentation is active if the phone is not paired', async () => {
@@ -185,7 +315,7 @@ describe('JoystickApp', () => {
     ]);
   });
 
-  it('sends slide jump commands from the streamed presenter preview', async () => {
+  it('sends slide jump commands through the streamed data channel with signaling backup', async () => {
     const user = userEvent.setup();
     const service = new InMemoryPresenterRemoteSignalingService({
       randomCode: () => 'ABCD-1234',
@@ -222,6 +352,50 @@ describe('JoystickApp', () => {
     const preview = await screen.findByRole('button', { name: 'Presenter stream preview' });
     await user.click(preview);
 
+    expect(streamReceiverMock.latestReceiver?.sendCommand).toHaveBeenCalledWith(
+      { command: 'go-to-page', pageId: 'page-2', type: 'command' },
+    );
+    expect(service.takeCommands('ABCD-1234')).toEqual([
+      { command: 'go-to-page', pageId: 'page-2', type: 'command' },
+    ]);
+  });
+
+  it('falls back to signaling commands when the streamed data channel is unavailable', async () => {
+    const user = userEvent.setup();
+    const service = new InMemoryPresenterRemoteSignalingService({
+      randomCode: () => 'ABCD-1234',
+      randomId: () => 'session-1',
+    });
+    service.registerSession({ presenterLabel: 'MacBook Pro', ttlMs: 60_000 });
+    service.publishState('ABCD-1234', {
+      activePageId: 'page-1',
+      activePageIndex: 0,
+      buildsRemaining: 0,
+      connectedControllerCount: 1,
+      deckName: 'Launch Deck',
+      notes: '',
+      pageCount: 2,
+      pages: [
+        { id: 'page-1', name: 'Intro' },
+        { id: 'page-2', name: 'Roadmap' },
+      ],
+      presenterMode: 'presenting',
+      previewMode: 'stream',
+      shortcuts: ['previous', 'next'],
+      stream: { enabled: true, fps: 8, height: 340, width: 390 },
+      timer: { elapsedMs: 0, paused: false },
+      type: 'state',
+    });
+
+    render(<JoystickApp initialUrl="https://localstudio.test/joystick?code=ABCD-1234" signalingService={service} />);
+
+    const preview = await screen.findByRole('button', { name: 'Presenter stream preview' });
+    streamReceiverMock.latestReceiver?.sendCommand.mockReturnValue(false);
+    await user.click(preview);
+
+    expect(streamReceiverMock.latestReceiver?.sendCommand).toHaveBeenCalledWith(
+      { command: 'go-to-page', pageId: 'page-2', type: 'command' },
+    );
     expect(service.takeCommands('ABCD-1234')).toEqual([
       { command: 'go-to-page', pageId: 'page-2', type: 'command' },
     ]);

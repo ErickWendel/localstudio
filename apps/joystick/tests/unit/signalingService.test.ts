@@ -16,6 +16,7 @@ describe('InMemoryPresenterRemoteSignalingService', () => {
         code: 'ABCD-1234',
         connectedControllerCount: 0,
         expiresAt: '2026-07-04T12:01:00.000Z',
+        presenterDeviceId: 'MacBook Pro',
         presenterLabel: 'MacBook Pro',
         sessionId: 'session-1',
       },

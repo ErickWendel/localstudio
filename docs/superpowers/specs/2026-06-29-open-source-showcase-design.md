@@ -142,12 +142,10 @@ Before implementation is considered complete, run the same local checks used by 
 - `npm run test`
 - `npm run build`
 
-Also verify the local npm scripts prove both user-facing apps work:
+Also verify the local npm script starts the connected app stack:
 
-- `npm run dev:landing` starts the landing page locally.
-- `npm run dev:editor` starts the editor locally.
-- `npm run dev` still starts the default landing experience.
-- Local routes load as expected: landing at `/` and editor at `/editor/` when using the production build or preview flow.
+- `npm run dev` starts landing, editor, and joystick together.
+- Local routes load as expected: landing at `/`, editor at `/editor/`, and joystick at `/joystick/` when using the development or production build flow.
 
 Inspect the production build output enough to confirm:
 

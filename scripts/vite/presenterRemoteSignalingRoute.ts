@@ -43,7 +43,12 @@ function readRequestJson(req: IncomingMessage) {
 }
 
 function isRegisterSessionInput(value: unknown): value is RegisterPresenterRemoteSessionInput {
-  return isRecord(value) && typeof value.presenterLabel === 'string' && typeof value.ttlMs === 'number';
+  return (
+    isRecord(value) &&
+    (value.presenterDeviceId === undefined || typeof value.presenterDeviceId === 'string') &&
+    typeof value.presenterLabel === 'string' &&
+    typeof value.ttlMs === 'number'
+  );
 }
 
 function isControllerConnectInput(value: unknown): value is { controllerId: string } {
@@ -182,7 +187,7 @@ async function handleControllerRoute(req: IncomingMessage, res: ServerResponse, 
   }
   if (route.action === 'answer' && req.method === 'GET') {
     const answerSdp = signalingService.getAnswer(route.code, route.controllerId);
-    sendJson(res, answerSdp ? 200 : 404, answerSdp ? { answerSdp } : null);
+    sendJson(res, 200, answerSdp ? { answerSdp } : null);
     return true;
   }
   if (route.action === 'ice' && req.method === 'POST') {

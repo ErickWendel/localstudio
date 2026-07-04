@@ -157,12 +157,8 @@ npm ci
 npm run dev
 ```
 
-Focused local apps:
-
-```bash
-npm run dev:landing
-npm run dev:editor
-```
+The dev server starts the landing, editor, and joystick apps together. Use the landing URL as the public entry point;
+`/editor/` and `/joystick/` are proxied to the connected app servers.
 
 Quality checks:
 
