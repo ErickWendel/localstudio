@@ -1,0 +1,56 @@
+
+.presenter-intro-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: rgba(5, 13, 16, 0.72);
+  backdrop-filter: blur(8px);
+}
+
+.presenter-intro-dialog {
+  width: min(512px, calc(100vw - 40px));
+  display: grid;
+  gap: 18px;
+  color: var(--ew-text);
+  background: var(--ew-black);
+  border: 1px solid var(--ew-border);
+  border-radius: 8px;
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.42);
+  padding: 34px 30px;
+}
+
+.presenter-intro-dialog h1 {
+  margin: 0;
+  font-family: var(--ls-font-display);
+  font-size: 24px;
+  letter-spacing: 0;
+}
+
+.presenter-intro-dialog p {
+  margin: 0;
+  color: var(--ew-muted);
+  line-height: 1.45;
+}
+
+.presenter-intro-dialog label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ew-text);
+  font-size: 14px;
+}
+
+.presenter-intro-dialog button {
+  justify-self: end;
+  min-width: 82px;
+  min-height: 40px;
+  color: var(--ew-on-primary);
+  background: var(--ew-green);
+  border: 1px solid rgba(55, 253, 118, 0.6);
+  border-radius: 6px;
+  font-weight: 800;
+  padding: 0 18px;
+  cursor: pointer;
+}

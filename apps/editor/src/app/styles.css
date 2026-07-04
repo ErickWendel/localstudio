@@ -18,6 +18,8 @@
 @import './styles/toolbar-actions.css';
 @import './styles/canvas.css';
 @import './styles/canvas-workspace.css';
+@import './styles/scroll-page.css';
+@import './styles/artboard-frame.css';
 @import './styles/prompt-composer.css';
 @import './styles/canvas-overlays.css';
 @import './styles/canvas-content-overlays.css';
@@ -25,6 +27,8 @@
 @import './styles/canvas-quick-actions.css';
 @import './styles/crop.css';
 @import './styles/text-toolbar.css';
+@import './styles/version-history.css';
+@import './styles/text-format-toolbar.css';
 @import './styles/left-panel.css';
 @import './styles/pages-panel.css';
 @import './styles/asset-list.css';
@@ -37,6 +41,7 @@
 @import './styles/text-inspector.css';
 @import './styles/font-controls.css';
 @import './styles/movie-inspector.css';
+@import './styles/movie-arrange-controls.css';
 @import './styles/palette-controls.css';
 @import './styles/layers-panel.css';
 @import './styles/ai-tools.css';
@@ -56,4 +61,6 @@
 @import './styles/keyboard-shortcuts.css';
 @import './styles/slide-navigator.css';
 @import './styles/presenter.css';
+@import './styles/presenter-notes.css';
+@import './styles/presenter-intro.css';
 @import './styles/responsive.css';

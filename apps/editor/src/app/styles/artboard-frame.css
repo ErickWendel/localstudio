@@ -1,0 +1,53 @@
+
+.canvas-frame {
+  position: relative;
+  width: min(calc(1180px * var(--canvas-zoom, 1)), calc(96% * var(--canvas-zoom, 1)));
+  min-width: 0;
+  max-width: none;
+  aspect-ratio: 16 / 9;
+  border-radius: 0;
+  background: #050d10;
+  padding: 0;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.52);
+  transform-origin: center;
+  transition: width 160ms ease;
+}
+
+.canvas-artboard {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 2px;
+  background: #050d10;
+}
+
+.canvas-media-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.canvas-media-element {
+  position: absolute;
+  display: block;
+  border-radius: 6px;
+  object-fit: fill;
+  transform-origin: top left;
+}
+
+.project-video-preloader {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.project-video-preloader video {
+  width: 1px;
+  height: 1px;
+}

@@ -1,0 +1,69 @@
+
+.presenter-notes-panel {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: 86px minmax(0, 1fr) 72px;
+  background: var(--ew-panel);
+}
+
+.presenter-notes-tabs {
+  display: flex;
+  justify-content: center;
+  align-items: end;
+  padding: 0 18px;
+  color: var(--ew-muted);
+}
+
+.presenter-notes-tab-active {
+  min-width: 156px;
+  padding: 0 0 12px;
+  color: var(--ew-text);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+  border-bottom: 3px solid var(--ew-green);
+}
+
+.presenter-notes-textarea {
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  color: var(--ew-text);
+  background: transparent;
+  border: 0;
+  font-family: var(--ls-font-body);
+  line-height: 1.24;
+  resize: none;
+  padding: 22px 18px;
+}
+
+.presenter-notes-textarea::placeholder,
+.presenter-notes-empty {
+  color: var(--ew-dim);
+}
+
+.presenter-notes-textarea:focus {
+  outline: 2px solid var(--ew-green);
+  outline-offset: -2px;
+}
+
+.presenter-notes-zoom {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0;
+  padding: 14px;
+}
+
+.presenter-notes-zoom span {
+  height: 40px;
+  min-width: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ew-text);
+  border-top: 1px solid var(--ew-border);
+  border-bottom: 1px solid var(--ew-border);
+  font-weight: 800;
+}

@@ -1,0 +1,83 @@
+
+.movie-arrange-grid button,
+.movie-lock-grid button,
+.movie-full-button,
+.movie-arrange-select-row button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ew-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.movie-arrange-grid button {
+  display: grid;
+  grid-template-rows: auto auto;
+  place-items: center;
+  min-height: 56px;
+  gap: 2px;
+}
+
+.movie-arrange-grid button:hover,
+.movie-lock-grid button:hover,
+.movie-full-button:hover,
+.movie-arrange-select-row button:hover {
+  background: rgba(55, 253, 118, 0.18);
+}
+
+.movie-arrange-grid button:disabled,
+.movie-lock-grid button:disabled,
+.movie-full-button:disabled,
+.movie-arrange-select-row button:disabled {
+  color: var(--ew-muted);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.movie-arrange-select-row select {
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ew-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 850;
+  padding: 0 12px;
+}
+
+.movie-number-grid label {
+  display: grid;
+  gap: 5px;
+  color: var(--ew-text);
+  font-size: 12px;
+  font-weight: 850;
+  text-align: center;
+}
+
+.movie-number-grid input {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ew-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 850;
+  padding: 0 10px;
+  text-align: center;
+}
+
+.movie-number-grid input:focus,
+.movie-arrange-select-row select:focus {
+  border-color: var(--ew-green);
+  box-shadow: 0 0 0 2px rgba(55, 253, 118, 0.14);
+  outline: none;
+}
