@@ -1,8 +1,10 @@
 interface EditorFooterProps {
   activePageIndex: number;
+  notesOpen?: boolean;
   pageCount: number;
   pagesPanelOpen?: boolean;
   zoomPercent: number;
+  onToggleNotes?: () => void;
   onOpenSettings?: () => void;
   onResetZoom?: () => void;
   onTogglePagesPanel?: () => void;
@@ -12,9 +14,11 @@ interface EditorFooterProps {
 
 export function EditorFooter({
   activePageIndex,
+  notesOpen = false,
   pageCount,
   pagesPanelOpen = true,
   zoomPercent,
+  onToggleNotes,
   onOpenSettings,
   onResetZoom,
   onTogglePagesPanel,
@@ -34,6 +38,18 @@ export function EditorFooter({
           <span className="material-symbols-outlined" aria-hidden="true">
             settings
           </span>
+        </button>
+        <button
+          className={notesOpen ? 'footer-toggle footer-toggle-active' : 'footer-toggle'}
+          type="button"
+          aria-label="Toggle notes panel"
+          aria-pressed={notesOpen}
+          onClick={onToggleNotes}
+        >
+          <span className="material-symbols-outlined" aria-hidden="true">
+            edit_note
+          </span>
+          Notes
         </button>
       </div>
       <div className="editor-footer-right">

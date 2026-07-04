@@ -53,7 +53,8 @@ describe('RightPanel', () => {
       muted: false,
       autoplayInPreview: false,
       trimStartSeconds: 0,
-      trimEndSeconds: 0,
+      trimEndSeconds: 12,
+      durationSeconds: 12,
     };
     mediaProject.elements['gif-demo'] = {
       id: 'gif-demo',
@@ -304,7 +305,13 @@ describe('RightPanel', () => {
 
   it('shows video playback settings for selected videos', async () => {
     const user = userEvent.setup();
+    const onAlignSelectedElement = vi.fn();
+    const onSetElementLock = vi.fn();
+    const onSetSelectedElementZOrder = vi.fn();
+    const onUpdateElementFrame = vi.fn();
+    const onUpdateElementStyle = vi.fn();
     const onUpdateMediaPlayback = vi.fn();
+    const onReplaceVideoAsset = vi.fn();
 
     render(
       <RightPanel
@@ -314,18 +321,39 @@ describe('RightPanel', () => {
         activePageId="page-1"
         selection={{ pageId: 'page-1', elementIds: ['video-demo'] }}
         modelStates={modelStates}
+        onAlignSelectedElement={onAlignSelectedElement}
+        onSetElementLock={onSetElementLock}
+        onSetSelectedElementZOrder={onSetSelectedElementZOrder}
+        onUpdateElementFrame={onUpdateElementFrame}
+        onUpdateElementStyle={onUpdateElementStyle}
         onUpdateMediaPlayback={onUpdateMediaPlayback}
+        onReplaceVideoAsset={onReplaceVideoAsset}
       />,
     );
 
-    expect(screen.getByText('Playback')).toBeInTheDocument();
-    expect(screen.getByLabelText('Loop selected video')).not.toBeChecked();
-    expect(screen.getByLabelText('Show selected video controls')).not.toBeChecked();
-    expect(screen.getByLabelText('Mute selected video')).not.toBeChecked();
-    expect(screen.getByLabelText('Autoplay selected video in preview')).not.toBeChecked();
+    expect(screen.getByRole('tab', { name: 'Movie' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('File Info')).toBeInTheDocument();
+    expect(screen.getByText('Demo clip')).toBeInTheDocument();
+    expect(screen.getByLabelText('Selected video repeat mode')).toHaveValue('none');
+    expect(screen.getByLabelText('Selected video volume')).toHaveValue('100');
+    const replacement = new File(['video'], 'replacement.mp4', { type: 'video/mp4' });
+    await user.upload(screen.getByLabelText('Replace video file'), replacement);
+    expect(onReplaceVideoAsset).toHaveBeenCalledWith('video-demo', replacement);
 
-    await user.click(screen.getByLabelText('Loop selected video'));
-    expect(onUpdateMediaPlayback).toHaveBeenCalledWith('video-demo', { loop: true });
+    await user.click(screen.getByRole('button', { name: 'Play movie' }));
+    expect(onUpdateMediaPlayback).toHaveBeenCalledWith('video-demo', { playing: true });
+
+    await user.click(screen.getByRole('button', { name: 'Jump movie to end' }));
+    expect(onUpdateMediaPlayback).toHaveBeenCalledWith('video-demo', {
+      playbackPositionSeconds: 12,
+      playing: false,
+    });
+
+    await user.selectOptions(screen.getByLabelText('Selected video repeat mode'), 'loop');
+    expect(onUpdateMediaPlayback).toHaveBeenCalledWith('video-demo', {
+      loop: true,
+      repeatMode: 'loop',
+    });
 
     expect(screen.getByLabelText('Selected video trim start')).toHaveAttribute('type', 'range');
     expect(screen.getByLabelText('Selected video trim end')).toHaveAttribute('type', 'range');
@@ -339,9 +367,31 @@ describe('RightPanel', () => {
       target: { value: '9.5' },
     });
     expect(onUpdateMediaPlayback).toHaveBeenCalledWith('video-demo', { trimEndSeconds: 9.5 });
+
+    fireEvent.change(screen.getByLabelText('Selected video poster frame'), {
+      target: { value: '3.5' },
+    });
+    expect(onUpdateMediaPlayback).toHaveBeenCalledWith('video-demo', { posterFrameSeconds: 3.5 });
+
+    await user.click(screen.getByRole('tab', { name: 'Style' }));
+    fireEvent.change(screen.getByLabelText('Selected element opacity'), {
+      target: { value: '48' },
+    });
+    expect(onUpdateElementStyle).toHaveBeenCalledWith('video-demo', { opacity: 0.48 });
+
+    await user.click(screen.getByRole('tab', { name: 'Arrange' }));
+    await user.click(screen.getByRole('button', { name: /Front/ }));
+    expect(onSetSelectedElementZOrder).toHaveBeenCalledWith('front');
+    await user.selectOptions(screen.getByLabelText('Align selected element'), 'page-center');
+    expect(onAlignSelectedElement).toHaveBeenCalledWith('page-center');
+    fireEvent.change(screen.getByLabelText('Selected element width'), { target: { value: '800' } });
+    expect(onUpdateElementFrame).toHaveBeenCalledWith('video-demo', { width: 800 });
+    await user.click(screen.getByRole('button', { name: 'Lock' }));
+    expect(onSetElementLock).toHaveBeenCalledWith('video-demo', true);
   });
 
-  it('does not show playback controls for selected GIF objects', () => {
+  it('shows movie controls for selected GIF objects', async () => {
+    const user = userEvent.setup();
     const onUpdateMediaPlayback = vi.fn();
 
     render(
@@ -356,9 +406,10 @@ describe('RightPanel', () => {
       />,
     );
 
-    expect(screen.queryByText('GIF Playback')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Play selected GIF')).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Movie' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByLabelText('Play selected GIF')).toBeChecked();
+    await user.click(screen.getByLabelText('Play selected GIF'));
+    expect(onUpdateMediaPlayback).toHaveBeenCalledWith('gif-demo', { playing: false });
     expect(screen.queryByLabelText('Selected video trim start')).not.toBeInTheDocument();
-    expect(onUpdateMediaPlayback).not.toHaveBeenCalled();
   });
 });

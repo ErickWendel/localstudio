@@ -26,7 +26,21 @@ export type ElementFramePatch = Partial<
 export type ImageCropPatch = ElementFramePatch & { crop: NonNullable<ImageElement['crop']> };
 export type GifPlaybackPatch = Partial<Pick<GifElement, 'playing'>>;
 export type VideoPlaybackPatch = Partial<
-  Pick<VideoElement, 'autoplayInPreview' | 'controls' | 'loop' | 'muted' | 'trimStartSeconds'>
+  Pick<
+    VideoElement,
+    | 'autoplayInPreview'
+    | 'controls'
+    | 'loop'
+    | 'muted'
+    | 'playAcrossSlides'
+    | 'playbackPositionSeconds'
+    | 'playing'
+    | 'posterFrameSeconds'
+    | 'repeatMode'
+    | 'startOnClick'
+    | 'trimStartSeconds'
+    | 'volume'
+  >
 > & {
   trimEndSeconds?: number | undefined;
 };
@@ -564,6 +578,49 @@ class ReplaceImageAssetCommand implements EditorCommand {
   }
 }
 
+class ReplaceVideoAssetCommand implements EditorCommand {
+  readonly description = 'Replace video asset';
+
+  constructor(
+    private readonly elementId: string,
+    private readonly asset: Asset,
+    private readonly metadata: { durationSeconds?: number } = {},
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    const element = project.elements[this.elementId];
+    if (!element || element.type !== 'video' || element.locked) return project;
+
+    const nextElement: VideoElement = {
+      ...element,
+      assetId: this.asset.id,
+      playbackPositionSeconds: 0,
+      playing: false,
+      trimStartSeconds: 0,
+    };
+    delete nextElement.durationSeconds;
+    delete nextElement.posterFrameSeconds;
+    delete nextElement.trimEndSeconds;
+    if (this.metadata.durationSeconds !== undefined) {
+      nextElement.durationSeconds = this.metadata.durationSeconds;
+      nextElement.trimEndSeconds = this.metadata.durationSeconds;
+    }
+
+    return {
+      ...project,
+      assets: {
+        ...project.assets,
+        [this.asset.id]: this.asset,
+      },
+      elements: {
+        ...project.elements,
+        [this.elementId]: nextElement,
+      },
+      updatedAt: projectMutationUtils.getProjectUpdatedAt(),
+    };
+  }
+}
+
 class AddElementsCommand implements EditorCommand {
   readonly description = 'Add elements';
 
@@ -1020,6 +1077,7 @@ export const basicCommands = {
   UpdateTextContentCommand,
   UpdateElementStyleCommand,
   ToggleImageFlipCommand,
+  ReplaceVideoAssetCommand,
   UpdateImageCropCommand,
   UpdatePageBackgroundCommand,
   SetPageTransitionCommand,

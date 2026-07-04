@@ -42,6 +42,7 @@ export interface Page {
   elementIds: string[];
   transition?: SlideTransition;
   animationBuilds?: ElementAnimationBuild[];
+  speakerNotes?: string;
   visible?: boolean;
 }
 
@@ -152,6 +153,8 @@ export interface GifElement extends BaseElement {
   playing: boolean;
 }
 
+export type VideoRepeatMode = 'loop' | 'loop-back-and-forth' | 'none';
+
 export interface VideoElement extends BaseElement {
   type: 'video';
   assetId: string;
@@ -159,8 +162,16 @@ export interface VideoElement extends BaseElement {
   controls: boolean;
   muted: boolean;
   autoplayInPreview: boolean;
+  playing?: boolean;
+  playbackPositionSeconds?: number;
   trimStartSeconds: number;
   trimEndSeconds?: number;
+  durationSeconds?: number;
+  playAcrossSlides?: boolean;
+  posterFrameSeconds?: number;
+  repeatMode?: VideoRepeatMode;
+  startOnClick?: boolean;
+  volume?: number;
 }
 
 export interface ShapeElement extends BaseElement {

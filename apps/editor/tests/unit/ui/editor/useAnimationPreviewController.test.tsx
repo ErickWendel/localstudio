@@ -167,4 +167,51 @@ describe('useAnimationPreviewController', () => {
     expect(onPresenterPageChange).toHaveBeenLastCalledWith('page-2');
     expect(activePageIdRef.current).toBe('page-2');
   });
+
+  it('rewinds through the current slide build pipeline before moving to the previous slide', () => {
+    const projectRef = { current: createProject() };
+    const activePageIdRef = { current: 'page-1' };
+    const setActivePageId = vi.fn();
+    const setSelectedElementIds = vi.fn();
+    const { result } = renderHook(() =>
+      useAnimationPreviewController({
+        activePageIdRef,
+        projectRef,
+        setActivePageId,
+        setSelectedElementIds,
+      }),
+    );
+
+    act(() => {
+      result.current.playPresentationPreview('page-1');
+    });
+    act(() => {
+      vi.runOnlyPendingTimers();
+    });
+    act(() => {
+      result.current.advancePresentationPreview();
+    });
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+
+    expect(result.current.animationPreview).toMatchObject({
+      hiddenElementIds: [],
+      pageId: 'page-1',
+      phase: 'complete',
+    });
+
+    act(() => {
+      result.current.rewindPresentationPreview();
+    });
+
+    expect(activePageIdRef.current).toBe('page-1');
+    expect(result.current.animationPreview).toMatchObject({
+      activeBuildElementId: 'title',
+      hiddenElementIds: ['title'],
+      pageId: 'page-1',
+      phase: 'waiting',
+      waitingForClick: true,
+    });
+  });
 });

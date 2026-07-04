@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
@@ -52,11 +52,14 @@ describe('CanvasWorkspace', () => {
       visible: true,
       opacity: 1,
       loop: true,
+      repeatMode: 'loop',
       controls: true,
       muted: true,
       autoplayInPreview: true,
       trimStartSeconds: 2,
       trimEndSeconds: 6,
+      durationSeconds: 12,
+      volume: 0.75,
     };
     project.elements['gif-demo'] = {
       id: 'gif-demo',
@@ -485,9 +488,10 @@ describe('CanvasWorkspace', () => {
     ) as HTMLVideoElement;
     expect(editorVideo).toBeInTheDocument();
     expect(editorVideo.autoplay).toBe(false);
-    expect(editorVideo.loop).toBe(true);
+    expect(editorVideo.loop).toBe(false);
     expect(editorVideo.controls).toBe(true);
     expect(editorVideo.muted).toBe(true);
+    expect(editorVideo.volume).toBe(0.75);
     expect(editorVideo.preload).toBe('auto');
 
     rerender(
@@ -572,6 +576,41 @@ describe('CanvasWorkspace', () => {
       />,
     );
     expect(video.currentTime).toBe(5);
+  });
+
+  it('plays, pauses, and seeks the selected video from inspector playback state', async () => {
+    const playSpy = vi
+      .spyOn(HTMLMediaElement.prototype, 'play')
+      .mockResolvedValue(undefined);
+    const pauseSpy = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+    const project = updateVideoElement(createMediaProject(), {
+      playbackPositionSeconds: 3,
+      playing: true,
+    });
+
+    const { container, rerender } = render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['video-demo'] }}
+      />,
+    );
+
+    const video = container.querySelector('video[aria-label="Demo clip"]') as HTMLVideoElement;
+    await waitFor(() => expect(playSpy).toHaveBeenCalled());
+    expect(video.currentTime).toBe(3);
+
+    rerender(
+      <CanvasWorkspace
+        project={updateVideoElement(project, { playing: false })}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['video-demo'] }}
+      />,
+    );
+
+    await waitFor(() => expect(pauseSpy).toHaveBeenCalled());
+    playSpy.mockRestore();
+    pauseSpy.mockRestore();
   });
 
   it('renders GIF media as an animated non-image element', () => {

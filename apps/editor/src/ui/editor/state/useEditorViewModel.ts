@@ -291,8 +291,11 @@ function readImageFileAsDataUrl(file: File) {
   });
 }
 
+type MediaSize = { height: number; width: number };
+type VideoSize = MediaSize & { durationSeconds?: number };
+
 function readImageSize(src: string) {
-  return new Promise<{ width: number; height: number }>((resolve, reject) => {
+  return new Promise<MediaSize>((resolve, reject) => {
     const image = new Image();
     image.addEventListener('load', () => {
       resolve({ width: image.naturalWidth, height: image.naturalHeight });
@@ -305,11 +308,17 @@ function readImageSize(src: string) {
 }
 
 function readVideoSize(src: string) {
-  return new Promise<{ width: number; height: number }>((resolve, reject) => {
+  return new Promise<VideoSize>((resolve, reject) => {
     const video = document.createElement('video');
     video.preload = 'metadata';
     video.addEventListener('loadedmetadata', () => {
-      resolve({ width: video.videoWidth || 16, height: video.videoHeight || 9 });
+      resolve({
+        ...(Number.isFinite(video.duration) && video.duration > 0
+          ? { durationSeconds: video.duration }
+          : {}),
+        width: video.videoWidth || 16,
+        height: video.videoHeight || 9,
+      });
     });
     video.addEventListener('error', () => {
       reject(new Error('Video dimensions could not be read.'));
@@ -714,6 +723,9 @@ export function useEditorViewModel(services: AppServices) {
     if (stockMediaProviderState.gifs.configured && stockGifResults.length === 0) {
       void searchStockGifs('');
     }
+  // The stock search functions are declared later in this hook and intentionally not dependencies:
+  // adding them would rerun this bootstrap effect on every render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     stockGifResults.length,
     stockImageResults.length,
@@ -3262,6 +3274,16 @@ export function useEditorViewModel(services: AppServices) {
     );
   }
 
+  function updatePageSpeakerNotes(pageId: string, speakerNotes: string) {
+    commitProject((currentProject) => ({
+      ...currentProject,
+      updatedAt: new Date().toISOString(),
+      pages: currentProject.pages.map((page) =>
+        page.id === pageId ? { ...page, speakerNotes } : page,
+      ),
+    }));
+  }
+
   function activateScrolledPage(pageId: string) {
     if (pageId === activePageId) return;
     const page = project.pages.find((item) => item.id === pageId);
@@ -3603,6 +3625,8 @@ export function useEditorViewModel(services: AppServices) {
       const mediaUrl = objectUrl ?? (await readImageFileAsDataUrl(file));
       const mediaSize =
         assetType === 'video' ? await readVideoSize(mediaUrl) : await readImageSize(mediaUrl);
+      const videoDurationSeconds =
+        assetType === 'video' ? (mediaSize as VideoSize).durationSeconds : undefined;
       const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
       if (!page) {
         setMediaImportProgress(undefined);
@@ -3685,6 +3709,12 @@ export function useEditorViewModel(services: AppServices) {
                 muted: true,
                 autoplayInPreview: true,
                 trimStartSeconds: 0,
+                ...(videoDurationSeconds !== undefined
+                  ? {
+                      durationSeconds: videoDurationSeconds,
+                      trimEndSeconds: videoDurationSeconds,
+                    }
+                  : {}),
               },
             }).execute(currentProject),
           { selectedElementIds: [elementId] },
@@ -3736,6 +3766,31 @@ export function useEditorViewModel(services: AppServices) {
       }
       if (imported) setMediaImportProgress(undefined);
     }
+  }
+
+  async function replaceVideoAsset(elementId: string, file: File) {
+    if (getMediaAssetType(file) !== 'video') return;
+    const dataUrl = await readImageFileAsDataUrl(file);
+    const mediaSize = await readVideoSize(dataUrl);
+    const videoDurationSeconds = mediaSize.durationSeconds;
+    const assetId = createPrefixedId('asset');
+    const mediaName = file.name.trim() || 'Replacement video';
+
+    commitProject(
+      (currentProject) =>
+        new basicCommands.ReplaceVideoAssetCommand(
+          elementId,
+          {
+            id: assetId,
+            type: 'video',
+            name: mediaName,
+            mimeType: file.type || 'video/mp4',
+            objectUrl: dataUrl,
+          },
+          videoDurationSeconds !== undefined ? { durationSeconds: videoDurationSeconds } : {},
+        ).execute(currentProject),
+      { selectedElementIds: [elementId] },
+    );
   }
 
   function addRecentStockMedia(item: StockMediaItem) {
@@ -4036,6 +4091,7 @@ export function useEditorViewModel(services: AppServices) {
     reorderPage,
     renamePage,
     setPageVisibility,
+    updatePageSpeakerNotes,
     togglePagesPanel,
     toggleFullscreen,
     undo,
@@ -4084,5 +4140,6 @@ export function useEditorViewModel(services: AppServices) {
     importImageFile,
     importMediaFile: importImageFile,
     clearMediaImportProgress,
+    replaceVideoAsset,
   };
 }

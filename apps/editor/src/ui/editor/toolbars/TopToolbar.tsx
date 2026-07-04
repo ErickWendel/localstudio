@@ -35,12 +35,14 @@ interface TopToolbarProps {
   onMirrorNow?: (() => void) | undefined;
   onMirrorToggle?: ((enabled: boolean) => void) | undefined;
   onOpenMirrorSettings?: (() => void) | undefined;
+  onOpenKeyboardShortcuts?: (() => void) | undefined;
   onOpenVersionHistory?: (() => void) | undefined;
   onNewProject?: (() => void) | undefined;
   onPersistenceToggle?: ((enabled: boolean) => void) | undefined;
   onSaveLocal?: (() => void) | undefined;
   onSaveLocalAs?: (() => void) | undefined;
   onProjectNameChange?: ((name: string) => void) | undefined;
+  onOpenPresenterView?: (() => void) | undefined;
   onRedo?: (() => void) | undefined;
   onResetZoom?: (() => void) | undefined;
   onSelectLayers?: (() => void) | undefined;
@@ -145,10 +147,12 @@ export function TopToolbar({
   onMirrorNow,
   onMirrorToggle,
   onOpenMirrorSettings,
+  onOpenKeyboardShortcuts,
   onOpenVersionHistory,
   onNewProject,
   onPersistenceToggle,
   onProjectNameChange,
+  onOpenPresenterView,
   onRedo,
   onResetZoom,
   onSelectLayers,
@@ -215,6 +219,16 @@ export function TopToolbar({
     setTranslationMenuOpen(false);
   }
 
+  function startDefaultPresentation() {
+    if (onOpenPresenterView) {
+      onOpenPresenterView();
+    } else {
+      onStartPresenterMode?.();
+    }
+    setPlayMenuOpen(false);
+    setTranslationMenuOpen(false);
+  }
+
   function commitProjectName() {
     const nextName = projectNameDraft.trim();
     if (nextName && nextName !== project.name) {
@@ -255,7 +269,7 @@ export function TopToolbar({
         : { label: 'Toggle Layers Panel', disabled: true },
     ],
     Help: [
-      { label: 'Keyboard Shortcuts', disabled: true },
+      { label: 'Keyboard Shortcuts', disabled: !onOpenKeyboardShortcuts, onSelect: onOpenKeyboardShortcuts },
       { label: 'Local AI Setup', disabled: true },
     ],
   };
@@ -428,8 +442,8 @@ export function TopToolbar({
               className="project-play-button project-play-main"
               type="button"
               aria-label="Play presentation"
-              title="Play presentation"
-              onClick={() => startPresenterMode()}
+              title="Open presenter view"
+              onClick={startDefaultPresentation}
             >
               <span className="material-symbols-outlined" aria-hidden="true">
                 play_arrow
@@ -458,6 +472,31 @@ export function TopToolbar({
                 role="menu"
                 aria-label="Presentation play menu"
               >
+                <button
+                  className="toolbar-dropdown-item project-play-dropdown-item"
+                  role="menuitem"
+                  type="button"
+                  onClick={() => startPresenterMode()}
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    fullscreen
+                  </span>
+                  <span>Present in fullscreen</span>
+                </button>
+                <button
+                  className="toolbar-dropdown-item project-play-dropdown-item"
+                  role="menuitem"
+                  type="button"
+                  onClick={() => {
+                    setPlayMenuOpen(false);
+                    onOpenPresenterView?.();
+                  }}
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    co_present
+                  </span>
+                  <span>Presenter view</span>
+                </button>
                 <button
                   className="toolbar-dropdown-item project-play-dropdown-item"
                   role="menuitem"

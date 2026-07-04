@@ -5,13 +5,21 @@ import {
   Bold,
   CaseSensitive,
   Download,
+  FileVideo,
   Film,
+  FolderOpen,
   Image,
   Plus,
+  Pause,
+  Play,
   Search,
+  SkipBack,
+  SkipForward,
   Square,
   Type,
   Video,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -23,10 +31,14 @@ import type {
   ShapeElement,
   ShapeLineEndpoint,
   VideoElement,
+  VideoRepeatMode,
 } from '../../../domain/documents/model';
 import type {
+  AlignMode,
+  ElementFramePatch,
   ElementStylePatch,
   MediaPlaybackPatch,
+  ZOrderMode,
 } from '../../../domain/commands/elements/basicCommands';
 import type { FontCatalogItem } from '../../../services/contracts/interfaces';
 import { PanelSection } from '../../components/PanelSection';
@@ -35,6 +47,11 @@ import { textStyleOptions } from '../text/textStyleOptions';
 const palette = ['#37FD76', '#050D10', '#FFFFFF', '#91999D', '#00779A'];
 const regularTextWeight = 400;
 const boldTextWeight = 800;
+const videoRepeatOptions: Array<{ value: VideoRepeatMode; label: string }> = [
+  { value: 'none', label: 'None' },
+  { value: 'loop', label: 'Loop' },
+  { value: 'loop-back-and-forth', label: 'Loop back and forth' },
+];
 const shapeLineEndpointOptions: Array<{ value: ShapeLineEndpoint; label: string }> = [
   { value: 'none', label: 'None' },
   { value: 'arrow', label: 'Arrow' },
@@ -55,8 +72,13 @@ interface DesignPanelProps {
   focusFontControlKey?: number | undefined;
   onDownloadFont?: (family: string) => Promise<void>;
   onUpdateElementStyle?: (elementId: string, patch: ElementStylePatch) => void;
+  onUpdateElementFrame?: (elementId: string, patch: ElementFramePatch) => void;
   onUpdateMediaPlayback?: (elementId: string, patch: MediaPlaybackPatch) => void;
   onUpdatePageBackground?: (background: PageBackground) => void;
+  onAlignSelectedElement?: (mode: AlignMode) => void;
+  onSetElementLock?: (elementId: string, locked: boolean) => void;
+  onSetSelectedElementZOrder?: (mode: ZOrderMode) => void;
+  onReplaceVideoAsset?: (elementId: string, file: File) => void;
 }
 
 function getSelectedElement(
@@ -88,11 +110,16 @@ export function DesignPanel({
   activePageId,
   selection,
   onUpdateElementStyle,
+  onUpdateElementFrame,
   onUpdateMediaPlayback,
   onUpdatePageBackground,
+  onAlignSelectedElement,
+  onSetElementLock,
+  onSetSelectedElementZOrder,
   availableFonts = [],
   focusFontControlKey,
   onDownloadFont,
+  onReplaceVideoAsset,
 }: DesignPanelProps) {
   const fontSelectRef = useRef<HTMLSelectElement>(null);
   const [fontDownloadOpen, setFontDownloadOpen] = useState(false);
@@ -384,173 +411,47 @@ export function DesignPanel({
         </PanelSection>
       ) : null}
 
-      <PanelSection title="Selection">
-        <div className="compact-action design-selection-summary">
-          {selectedElement?.type === 'text' ? <Type size={16} /> : null}
-          {selectedElement?.type === 'image' ? <Image size={16} /> : null}
-          {selectedElement?.type === 'gif' ? <Film size={16} /> : null}
-          {selectedElement?.type === 'video' ? <Video size={16} /> : null}
-          {selectedElement?.type === 'shape' ? <Square size={16} /> : null}
-          {!selectedElement ? <CaseSensitive size={16} /> : null}
-          <span>
-            {selectedElement ? `Selected ${selectedElement.type}` : 'No selected element'}
-          </span>
-        </div>
-        {selectedElement ? (
-          <label className="design-control">
-            <span>Opacity</span>
-            <input
-              aria-label="Selected element opacity"
-              max="100"
-              min="0"
-              type="range"
-              value={Math.round(selectedElement.opacity * 100)}
-              onChange={(event) => {
-                updateSelectedStyle({ opacity: Number(event.target.value) / 100 });
-              }}
-            />
-          </label>
-        ) : null}
-      </PanelSection>
-
-      {selectedElement?.type === 'video' ? (
-        <VideoPlaybackPanel element={selectedElement} onUpdate={updateSelectedMediaPlayback} />
-      ) : null}
-
-      {selectedElement?.type === 'shape' ? (
-        <PanelSection title="Shape">
-          <label className="design-control">
-            <span>Fill</span>
-            <select
-              aria-label="Selected shape fill mode"
-              value={selectedElement.fill ? 'color' : 'none'}
-              onChange={(event) => {
-                updateSelectedStyle({
-                  fill: event.target.value === 'color' ? (selectedElement.fill ?? '#37FD76') : null,
-                });
-              }}
-            >
-              <option value="none">No fill</option>
-              <option value="color">Color fill</option>
-            </select>
-          </label>
-          {selectedElement.fill ? (
-            <label className="design-control">
-              <span>Fill color</span>
-              <input
-                aria-label="Selected shape fill color"
-                type="color"
-                value={selectedElement.fill}
-                onChange={(event) => {
-                  updateSelectedStyle({ fill: event.target.value });
-                }}
-              />
-            </label>
-          ) : null}
-          <label className="design-control">
-            <span>Border</span>
-            <select
-              aria-label="Selected shape border mode"
-              value={
-                selectedElement.stroke && (selectedElement.strokeWidth ?? 0) > 0 ? 'color' : 'none'
-              }
-              onChange={(event) => {
-                updateSelectedStyle(
-                  event.target.value === 'color'
-                    ? {
-                        stroke: selectedElement.stroke ?? '#37FD76',
-                        strokeWidth:
-                          selectedElement.strokeWidth && selectedElement.strokeWidth > 0
-                            ? selectedElement.strokeWidth
-                            : 2,
-                      }
-                    : { stroke: null, strokeWidth: 0 },
-                );
-              }}
-            >
-              <option value="none">No border</option>
-              <option value="color">Color border</option>
-            </select>
-          </label>
-          {selectedElement.stroke && (selectedElement.strokeWidth ?? 0) > 0 ? (
-            <>
-              <label className="design-control">
-                <span>Border color</span>
-                <input
-                  aria-label="Selected shape border color"
-                  type="color"
-                  value={selectedElement.stroke}
-                  onChange={(event) => {
-                    updateSelectedStyle({ stroke: event.target.value });
-                  }}
-                />
-              </label>
-              <label className="design-control">
-                <span>Border width</span>
-                <input
-                  aria-label="Selected shape border width"
-                  min="1"
-                  type="number"
-                  value={selectedElement.strokeWidth ?? 2}
-                  onChange={(event) => {
-                    updateSelectedStyle({ strokeWidth: Number(event.target.value) });
-                  }}
-                />
-              </label>
-              {supportsLineEndpoints(selectedElement) ? (
-                <>
-                  <label className="design-control">
-                    <span>Start endpoint</span>
-                    <select
-                      aria-label="Selected shape start endpoint"
-                      value={selectedElement.startEndpoint ?? 'none'}
-                      onChange={(event) => {
-                        updateSelectedStyle({
-                          startEndpoint: event.target.value as ShapeLineEndpoint,
-                        });
-                      }}
-                    >
-                      {shapeLineEndpointOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="design-control">
-                    <span>End endpoint</span>
-                    <select
-                      aria-label="Selected shape end endpoint"
-                      value={
-                        selectedElement.endEndpoint ??
-                        (selectedElement.shape === 'arrow' ? 'arrow' : 'none')
-                      }
-                      onChange={(event) => {
-                        updateSelectedStyle({
-                          endEndpoint: event.target.value as ShapeLineEndpoint,
-                        });
-                      }}
-                    >
-                      {shapeLineEndpointOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </>
-              ) : null}
-            </>
-          ) : null}
+      {selectedElement ? (
+        <ElementDesignInspector
+          key={selectedElement.id}
+          assetName={
+            selectedElement.type === 'image' ||
+            selectedElement.type === 'gif' ||
+            selectedElement.type === 'video'
+              ? project.assets[selectedElement.assetId]?.name
+              : undefined
+          }
+          element={selectedElement}
+          onAlign={onAlignSelectedElement}
+          onFrameUpdate={(patch) => onUpdateElementFrame?.(selectedElement.id, patch)}
+          onLockChange={(locked) => onSetElementLock?.(selectedElement.id, locked)}
+          onReplaceVideoAsset={(file) => onReplaceVideoAsset?.(selectedElement.id, file)}
+          onUpdateMedia={updateSelectedMediaPlayback}
+          onUpdateStyle={updateSelectedStyle}
+          onZOrderChange={onSetSelectedElementZOrder}
+        />
+      ) : (
+        <PanelSection title="Selection">
+          <div className="compact-action design-selection-summary">
+            <CaseSensitive size={16} />
+            <span>No selected element</span>
+          </div>
         </PanelSection>
-      ) : null}
+      )}
     </div>
   );
 }
 
-interface VideoPlaybackPanelProps {
-  element: VideoElement;
-  onUpdate: (patch: MediaPlaybackPatch) => void;
+interface ElementDesignInspectorProps {
+  assetName?: string | undefined;
+  element: DesignElement;
+  onAlign?: ((mode: AlignMode) => void) | undefined;
+  onFrameUpdate?: ((patch: ElementFramePatch) => void) | undefined;
+  onLockChange?: ((locked: boolean) => void) | undefined;
+  onReplaceVideoAsset?: ((file: File) => void) | undefined;
+  onUpdateMedia: (patch: MediaPlaybackPatch) => void;
+  onUpdateStyle: (patch: ElementStylePatch) => void;
+  onZOrderChange?: ((mode: ZOrderMode) => void) | undefined;
 }
 
 function toTrimSeconds(value: string) {
@@ -559,86 +460,746 @@ function toTrimSeconds(value: string) {
 }
 
 function getTrimSliderMax(element: VideoElement) {
-  return Math.max(60, Math.ceil(element.trimStartSeconds), Math.ceil(element.trimEndSeconds ?? 0));
+  return Math.max(
+    1,
+    Math.ceil(element.durationSeconds ?? 0),
+    Math.ceil(element.trimStartSeconds),
+    Math.ceil(element.trimEndSeconds ?? 0),
+    Math.ceil(element.posterFrameSeconds ?? 0),
+  );
 }
 
-function VideoPlaybackPanel({ element, onUpdate }: VideoPlaybackPanelProps) {
-  const trimSliderMax = getTrimSliderMax(element);
+function formatMovieTime(seconds: number) {
+  const safeSeconds = Math.max(0, seconds);
+  const totalMilliseconds = Math.round(safeSeconds * 1000);
+  const milliseconds = (totalMilliseconds % 1000).toString().padStart(3, '0');
+  const totalSeconds = Math.floor(totalMilliseconds / 1000);
+  const displaySeconds = (totalSeconds % 60).toString().padStart(2, '0');
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const displayMinutes = (totalMinutes % 60).toString().padStart(2, '0');
+  const hours = Math.floor(totalMinutes / 60).toString().padStart(2, '0');
+  return `${hours}:${displayMinutes}:${displaySeconds},${milliseconds}`;
+}
+
+function getVideoRepeatMode(element: VideoElement): VideoRepeatMode {
+  return element.repeatMode ?? (element.loop ? 'loop' : 'none');
+}
+
+function getTrimEndSeconds(element: VideoElement) {
+  return element.trimEndSeconds ?? element.durationSeconds ?? getTrimSliderMax(element);
+}
+
+type ElementInspectorTab = 'arrange' | 'content' | 'style';
+
+function getBoundedNumber(value: string, fallback: number, minimum = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.max(minimum, parsed) : fallback;
+}
+
+function getElementContentTabLabel(element: DesignElement) {
+  if (element.type === 'text') return 'Text';
+  if (element.type === 'gif' || element.type === 'video') return 'Movie';
+  if (element.type === 'shape') return 'Shape';
+  return 'Image';
+}
+
+function getElementIcon(element: DesignElement) {
+  if (element.type === 'text') return <Type size={16} />;
+  if (element.type === 'image') return <Image size={16} />;
+  if (element.type === 'gif') return <Film size={16} />;
+  if (element.type === 'video') return <Video size={16} />;
+  return <Square size={16} />;
+}
+
+function ElementDesignInspector({
+  assetName,
+  element,
+  onAlign,
+  onFrameUpdate,
+  onLockChange,
+  onReplaceVideoAsset,
+  onUpdateMedia,
+  onUpdateStyle,
+  onZOrderChange,
+}: ElementDesignInspectorProps) {
+  const defaultTab = element.type === 'text' ? 'style' : 'content';
+  const [activeTab, setActiveTab] = useState<ElementInspectorTab>(defaultTab);
+  const replaceVideoInputRef = useRef<HTMLInputElement>(null);
+  const contentLabel = getElementContentTabLabel(element);
+  const locked = element.locked;
+  const videoElement = element.type === 'video' ? element : undefined;
+  const trimSliderMax = videoElement ? getTrimSliderMax(videoElement) : 1;
+  const trimEndSeconds = videoElement ? getTrimEndSeconds(videoElement) : 0;
+  const volume = videoElement?.muted ? 0 : Math.round((videoElement?.volume ?? 1) * 100);
+  const repeatMode = videoElement ? getVideoRepeatMode(videoElement) : 'none';
 
   return (
-    <PanelSection title="Playback">
-      <label className="design-control">
-        <span>Loop</span>
-        <input
-          aria-label="Loop selected video"
-          type="checkbox"
-          checked={element.loop}
-          onChange={(event) => {
-            onUpdate({ loop: event.target.checked });
-          }}
-        />
-      </label>
-      <label className="design-control">
-        <span>Controls</span>
-        <input
-          aria-label="Show selected video controls"
-          type="checkbox"
-          checked={element.controls}
-          onChange={(event) => {
-            onUpdate({ controls: event.target.checked });
-          }}
-        />
-      </label>
-      <label className="design-control">
-        <span>Muted</span>
-        <input
-          aria-label="Mute selected video"
-          type="checkbox"
-          checked={element.muted}
-          onChange={(event) => {
-            onUpdate({ muted: event.target.checked });
-          }}
-        />
-      </label>
-      <label className="design-control">
-        <span>Preview autoplay</span>
-        <input
-          aria-label="Autoplay selected video in preview"
-          type="checkbox"
-          checked={element.autoplayInPreview}
-          onChange={(event) => {
-            onUpdate({ autoplayInPreview: event.target.checked });
-          }}
-        />
-      </label>
-      <label className="design-control">
-        <span>Trim start {element.trimStartSeconds.toFixed(1)}s</span>
-        <input
-          aria-label="Selected video trim start"
-          max={trimSliderMax}
-          min="0"
-          step="0.1"
-          type="range"
-          value={element.trimStartSeconds}
-          onChange={(event) => {
-            onUpdate({ trimStartSeconds: toTrimSeconds(event.target.value) });
-          }}
-        />
-      </label>
-      <label className="design-control">
-        <span>Trim end {(element.trimEndSeconds ?? 0).toFixed(1)}s</span>
-        <input
-          aria-label="Selected video trim end"
-          max={trimSliderMax}
-          min="0"
-          step="0.1"
-          type="range"
-          value={element.trimEndSeconds ?? 0}
-          onChange={(event) => {
-            onUpdate({ trimEndSeconds: toTrimSeconds(event.target.value) });
-          }}
-        />
-      </label>
+    <PanelSection title={contentLabel}>
+      <div className="movie-inspector-tabs" role="tablist" aria-label="Movie inspector sections">
+        <button
+          aria-selected={activeTab === 'style'}
+          className={
+            activeTab === 'style'
+              ? 'movie-inspector-tab movie-inspector-tab-active'
+              : 'movie-inspector-tab'
+          }
+          role="tab"
+          type="button"
+          onClick={() => setActiveTab('style')}
+        >
+          Style
+        </button>
+        <button
+          aria-selected={activeTab === 'content'}
+          className={
+            activeTab === 'content'
+              ? 'movie-inspector-tab movie-inspector-tab-active'
+              : 'movie-inspector-tab'
+          }
+          role="tab"
+          type="button"
+          onClick={() => setActiveTab('content')}
+        >
+          {contentLabel}
+        </button>
+        <button
+          aria-selected={activeTab === 'arrange'}
+          className={
+            activeTab === 'arrange'
+              ? 'movie-inspector-tab movie-inspector-tab-active'
+              : 'movie-inspector-tab'
+          }
+          role="tab"
+          type="button"
+          onClick={() => setActiveTab('arrange')}
+        >
+          Arrange
+        </button>
+      </div>
+
+      {activeTab === 'style' ? (
+        <>
+          <section className="movie-panel-section" aria-label="Selected element style">
+            <h3>Selection</h3>
+            <div className="compact-action design-selection-summary">
+              {getElementIcon(element)}
+              <span>Selected {element.type}</span>
+            </div>
+            <label className="design-control">
+              <span>Opacity</span>
+              <input
+                aria-label="Selected element opacity"
+                max="100"
+                min="0"
+                type="range"
+                value={Math.round(element.opacity * 100)}
+                onChange={(event) => {
+                  onUpdateStyle({ opacity: Number(event.target.value) / 100 });
+                }}
+              />
+            </label>
+            {element.type === 'video' ? (
+              <label className="design-control">
+                <span>Controls</span>
+                <input
+                  aria-label="Show selected video controls"
+                  checked={element.controls}
+                  type="checkbox"
+                  onChange={(event) => onUpdateMedia({ controls: event.target.checked })}
+                />
+              </label>
+            ) : null}
+          </section>
+        </>
+      ) : null}
+
+      {activeTab === 'content' ? (
+        <>
+          {videoElement ? (
+            <>
+          <section className="movie-panel-section" aria-label="Movie file info">
+            <h3>File Info</h3>
+            <div className="movie-file-row">
+              <FileVideo size={18} aria-hidden="true" />
+              <span>{assetName}</span>
+              <button
+                className="stitch-icon-button"
+                type="button"
+                aria-label="Replace movie file"
+                onClick={() => replaceVideoInputRef.current?.click()}
+              >
+                <FolderOpen size={18} aria-hidden="true" />
+              </button>
+              <input
+                ref={replaceVideoInputRef}
+                aria-label="Replace video file"
+                accept="video/*"
+                className="visually-hidden-input"
+                type="file"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) onReplaceVideoAsset?.(file);
+                  event.target.value = '';
+                }}
+              />
+            </div>
+          </section>
+
+          <section className="movie-panel-section" aria-label="Movie controls">
+            <h3>Controls</h3>
+            <div className="movie-controls-row">
+              <button
+                type="button"
+                aria-label="Jump movie to beginning"
+                onClick={() =>
+                  onUpdateMedia({
+                    playbackPositionSeconds: videoElement.trimStartSeconds,
+                    playing: false,
+                  })
+                }
+              >
+                <SkipBack size={18} aria-hidden="true" />
+              </button>
+              <button
+                className="movie-play-button"
+                type="button"
+                aria-label={videoElement.playing ? 'Pause movie' : 'Play movie'}
+                aria-pressed={Boolean(videoElement.playing)}
+                onClick={() => onUpdateMedia({ playing: !videoElement.playing })}
+              >
+                {videoElement.playing ? (
+                  <Pause size={24} aria-hidden="true" />
+                ) : (
+                  <Play size={24} aria-hidden="true" />
+                )}
+              </button>
+              <button
+                type="button"
+                aria-label="Jump movie to end"
+                onClick={() =>
+                  onUpdateMedia({
+                    playbackPositionSeconds: trimEndSeconds,
+                    playing: false,
+                  })
+                }
+              >
+                <SkipForward size={18} aria-hidden="true" />
+              </button>
+            </div>
+          </section>
+
+          <section className="movie-panel-section" aria-label="Movie volume">
+            <h3>Volume</h3>
+            <div className="movie-volume-row">
+              <VolumeX size={18} aria-hidden="true" />
+              <input
+                aria-label="Selected video volume"
+                max="100"
+                min="0"
+                step="1"
+                type="range"
+                value={volume}
+                onChange={(event) => {
+                  const nextVolume = Number(event.target.value);
+                  onUpdateMedia({ muted: nextVolume === 0, volume: nextVolume / 100 });
+                }}
+              />
+              <Volume2 size={20} aria-hidden="true" />
+            </div>
+          </section>
+
+          <section className="movie-panel-section" aria-label="Edit movie">
+            <h3>Edit Movie</h3>
+            <div className="movie-trim-control">
+              <span>Trim</span>
+              <div className="movie-trim-track">
+                <input
+                  aria-label="Selected video trim start"
+                  max={trimSliderMax}
+                  min="0"
+                  step="0.1"
+                  type="range"
+                value={videoElement.trimStartSeconds}
+                  onChange={(event) => {
+                    const nextStart = Math.min(toTrimSeconds(event.target.value), trimEndSeconds);
+                    onUpdateMedia({ trimStartSeconds: nextStart });
+                  }}
+                />
+                <input
+                  aria-label="Selected video trim end"
+                  max={trimSliderMax}
+                  min="0"
+                  step="0.1"
+                  type="range"
+                  value={trimEndSeconds}
+                  onChange={(event) => {
+                    const nextEnd = Math.max(
+                      toTrimSeconds(event.target.value),
+                      videoElement.trimStartSeconds,
+                    );
+                    onUpdateMedia({ trimEndSeconds: nextEnd });
+                  }}
+                />
+              </div>
+              <div className="movie-time-row">
+                <span>{formatMovieTime(videoElement.trimStartSeconds)}</span>
+                <span>{formatMovieTime(trimEndSeconds)}</span>
+              </div>
+            </div>
+
+            <label className="movie-poster-control">
+              <span>Poster Frame</span>
+              <input
+                aria-label="Selected video poster frame"
+                max={trimSliderMax}
+                min="0"
+                step="0.1"
+                type="range"
+                value={videoElement.posterFrameSeconds ?? videoElement.trimStartSeconds}
+                onChange={(event) => {
+                  onUpdateMedia({ posterFrameSeconds: toTrimSeconds(event.target.value) });
+                }}
+              />
+              <strong>
+                {formatMovieTime(videoElement.posterFrameSeconds ?? videoElement.trimStartSeconds)}
+              </strong>
+            </label>
+          </section>
+
+          <section className="movie-panel-section" aria-label="Movie repeat">
+            <label className="movie-select-control">
+              <span>Repeat</span>
+              <select
+                aria-label="Selected video repeat mode"
+                value={repeatMode}
+                onChange={(event) => {
+                  const nextRepeatMode = event.target.value as VideoRepeatMode;
+                  onUpdateMedia({ loop: nextRepeatMode === 'loop', repeatMode: nextRepeatMode });
+                }}
+              >
+                {videoRepeatOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="movie-checkbox-row movie-checkbox-row-disabled">
+              <input type="checkbox" disabled checked={Boolean(videoElement.startOnClick)} readOnly />
+              <span>Start movie on click</span>
+            </label>
+            <label className="movie-checkbox-row">
+              <input
+                aria-label="Play movie across slides"
+                type="checkbox"
+                checked={Boolean(videoElement.playAcrossSlides)}
+                onChange={(event) => onUpdateMedia({ playAcrossSlides: event.target.checked })}
+              />
+              <span>Play movie across slides</span>
+            </label>
+          </section>
+            </>
+          ) : null}
+          {element.type === 'text' ? (
+            <section className="movie-panel-section" aria-label="Selected text controls">
+              <h3>Typography</h3>
+              <label className="design-control">
+                <span>Font</span>
+                <select
+                  aria-label="Selected text font"
+                  value={element.fontFamily}
+                  onChange={(event) => {
+                    onUpdateStyle({ fontFamily: event.target.value });
+                  }}
+                >
+                  {textStyleOptions.TEXT_FONT_FAMILIES.map((fontFamily) => (
+                    <option key={fontFamily} value={fontFamily}>
+                      {fontFamily}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="design-control">
+                <span>Size</span>
+                <input
+                  aria-label="Selected text font size"
+                  min="1"
+                  type="number"
+                  value={element.fontSize}
+                  onChange={(event) => {
+                    onUpdateStyle({ fontSize: Number(event.target.value) });
+                  }}
+                />
+              </label>
+              <label className="design-control">
+                <span>Weight</span>
+                <select
+                  aria-label="Selected text font weight"
+                  value={element.fontWeight}
+                  onChange={(event) => {
+                    onUpdateStyle({ fontWeight: Number(event.target.value) });
+                  }}
+                >
+                  {textStyleOptions.TEXT_FONT_WEIGHTS.map((fontWeight) => (
+                    <option key={fontWeight} value={fontWeight}>
+                      {fontWeight}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="design-control">
+                <span>Color</span>
+                <input
+                  aria-label="Selected text color"
+                  type="color"
+                  value={element.fill}
+                  onChange={(event) => {
+                    onUpdateStyle({ fill: event.target.value });
+                  }}
+                />
+              </label>
+              <label className="design-control">
+                <span>Align</span>
+                <select
+                  aria-label="Selected text alignment"
+                  value={element.align}
+                  onChange={(event) => {
+                    onUpdateStyle({ align: event.target.value as 'left' | 'center' | 'right' });
+                  }}
+                >
+                  <option value="left">Left</option>
+                  <option value="center">Center</option>
+                  <option value="right">Right</option>
+                </select>
+              </label>
+              <div className="compact-action">
+                <AlignCenter size={16} />
+                <span>Text frame stays editable on canvas</span>
+              </div>
+            </section>
+          ) : null}
+
+          {element.type === 'gif' ? (
+            <section className="movie-panel-section" aria-label="GIF movie controls">
+              <h3>Movie</h3>
+              <div className="movie-file-row">
+                <Film size={18} aria-hidden="true" />
+                <span>{assetName ?? 'Animated GIF'}</span>
+              </div>
+              <label className="movie-checkbox-row">
+                <input
+                  aria-label="Play selected GIF"
+                  type="checkbox"
+                  checked={element.playing}
+                  onChange={(event) => onUpdateMedia({ playing: event.target.checked })}
+                />
+                <span>Play GIF</span>
+              </label>
+            </section>
+          ) : null}
+
+          {element.type === 'image' ? (
+            <section className="movie-panel-section" aria-label="Selected image controls">
+              <h3>Image</h3>
+              <div className="movie-file-row">
+                <Image size={18} aria-hidden="true" />
+                <span>{assetName ?? 'Imported image'}</span>
+              </div>
+            </section>
+          ) : null}
+
+          {element.type === 'shape' ? (
+            <section className="movie-panel-section" aria-label="Selected shape controls">
+              <h3>Shape</h3>
+              <label className="design-control">
+                <span>Fill</span>
+                <select
+                  aria-label="Selected shape fill mode"
+                  value={element.fill ? 'color' : 'none'}
+                  onChange={(event) => {
+                    onUpdateStyle({
+                      fill: event.target.value === 'color' ? (element.fill ?? '#37FD76') : null,
+                    });
+                  }}
+                >
+                  <option value="none">No fill</option>
+                  <option value="color">Color fill</option>
+                </select>
+              </label>
+              {element.fill ? (
+                <label className="design-control">
+                  <span>Fill color</span>
+                  <input
+                    aria-label="Selected shape fill color"
+                    type="color"
+                    value={element.fill}
+                    onChange={(event) => {
+                      onUpdateStyle({ fill: event.target.value });
+                    }}
+                  />
+                </label>
+              ) : null}
+              <label className="design-control">
+                <span>Border</span>
+                <select
+                  aria-label="Selected shape border mode"
+                  value={element.stroke && (element.strokeWidth ?? 0) > 0 ? 'color' : 'none'}
+                  onChange={(event) => {
+                    onUpdateStyle(
+                      event.target.value === 'color'
+                        ? {
+                            stroke: element.stroke ?? '#37FD76',
+                            strokeWidth:
+                              element.strokeWidth && element.strokeWidth > 0
+                                ? element.strokeWidth
+                                : 2,
+                          }
+                        : { stroke: null, strokeWidth: 0 },
+                    );
+                  }}
+                >
+                  <option value="none">No border</option>
+                  <option value="color">Color border</option>
+                </select>
+              </label>
+              {element.stroke && (element.strokeWidth ?? 0) > 0 ? (
+                <>
+                  <label className="design-control">
+                    <span>Border color</span>
+                    <input
+                      aria-label="Selected shape border color"
+                      type="color"
+                      value={element.stroke}
+                      onChange={(event) => {
+                        onUpdateStyle({ stroke: event.target.value });
+                      }}
+                    />
+                  </label>
+                  <label className="design-control">
+                    <span>Border width</span>
+                    <input
+                      aria-label="Selected shape border width"
+                      min="1"
+                      type="number"
+                      value={element.strokeWidth ?? 2}
+                      onChange={(event) => {
+                        onUpdateStyle({ strokeWidth: Number(event.target.value) });
+                      }}
+                    />
+                  </label>
+                  {supportsLineEndpoints(element) ? (
+                    <>
+                      <label className="design-control">
+                        <span>Start endpoint</span>
+                        <select
+                          aria-label="Selected shape start endpoint"
+                          value={element.startEndpoint ?? 'none'}
+                          onChange={(event) => {
+                            onUpdateStyle({
+                              startEndpoint: event.target.value as ShapeLineEndpoint,
+                            });
+                          }}
+                        >
+                          {shapeLineEndpointOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="design-control">
+                        <span>End endpoint</span>
+                        <select
+                          aria-label="Selected shape end endpoint"
+                          value={element.endEndpoint ?? (element.shape === 'arrow' ? 'arrow' : 'none')}
+                          onChange={(event) => {
+                            onUpdateStyle({
+                              endEndpoint: event.target.value as ShapeLineEndpoint,
+                            });
+                          }}
+                        >
+                          {shapeLineEndpointOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </>
+                  ) : null}
+                </>
+              ) : null}
+            </section>
+          ) : null}
+        </>
+      ) : null}
+
+      {activeTab === 'arrange' ? (
+        <>
+          <section className="movie-panel-section" aria-label="Arrange selected element order">
+            <div className="movie-arrange-grid">
+              <button type="button" onClick={() => onZOrderChange?.('back')}>
+                <span className="material-symbols-outlined" aria-hidden="true">
+                  flip_to_back
+                </span>
+                Back
+              </button>
+              <button type="button" onClick={() => onZOrderChange?.('front')}>
+                <span className="material-symbols-outlined" aria-hidden="true">
+                  flip_to_front
+                </span>
+                Front
+              </button>
+              <button type="button" onClick={() => onZOrderChange?.('backward')}>
+                <span className="material-symbols-outlined" aria-hidden="true">
+                  keyboard_arrow_down
+                </span>
+                Backward
+              </button>
+              <button type="button" onClick={() => onZOrderChange?.('forward')}>
+                <span className="material-symbols-outlined" aria-hidden="true">
+                  keyboard_arrow_up
+                </span>
+                Forward
+              </button>
+            </div>
+            <div className="movie-arrange-select-row">
+              <select
+                aria-label="Align selected element"
+                defaultValue=""
+                onChange={(event) => {
+                  if (!event.target.value) return;
+                  onAlign?.(event.target.value as AlignMode);
+                  event.target.value = '';
+                }}
+              >
+                <option value="" disabled>
+                  Align
+                </option>
+                <option value="horizontal-center">Horizontal center</option>
+                <option value="vertical-center">Vertical center</option>
+                <option value="page-center">Page center</option>
+              </select>
+              <button type="button" disabled>
+                Distribute
+              </button>
+            </div>
+          </section>
+
+          <section className="movie-panel-section" aria-label="Selected element size">
+            <h3>Size</h3>
+            <div className="movie-number-grid">
+              <label>
+                <input
+                  aria-label="Selected element width"
+                  min="1"
+                  type="number"
+                  value={Math.round(element.width)}
+                  onChange={(event) =>
+                    onFrameUpdate?.({
+                      width: getBoundedNumber(event.target.value, element.width, 1),
+                    })
+                  }
+                />
+                <span>Width</span>
+              </label>
+              <label>
+                <input
+                  aria-label="Selected element height"
+                  min="1"
+                  type="number"
+                  value={Math.round(element.height)}
+                  onChange={(event) =>
+                    onFrameUpdate?.({
+                      height: getBoundedNumber(event.target.value, element.height, 1),
+                    })
+                  }
+                />
+                <span>Height</span>
+              </label>
+            </div>
+            <label className="movie-checkbox-row">
+              <input type="checkbox" checked readOnly />
+              <span>Constrain proportions</span>
+            </label>
+            <button className="movie-full-button" type="button" disabled>
+              Original Size
+            </button>
+          </section>
+
+          <section className="movie-panel-section" aria-label="Selected element position">
+            <h3>Position</h3>
+            <div className="movie-number-grid">
+              <label>
+                <input
+                  aria-label="Selected element x position"
+                  type="number"
+                  value={Math.round(element.x)}
+                  onChange={(event) =>
+                    onFrameUpdate?.({
+                      x: getBoundedNumber(event.target.value, element.x),
+                    })
+                  }
+                />
+                <span>X</span>
+              </label>
+              <label>
+                <input
+                  aria-label="Selected element y position"
+                  type="number"
+                  value={Math.round(element.y)}
+                  onChange={(event) =>
+                    onFrameUpdate?.({
+                      y: getBoundedNumber(event.target.value, element.y),
+                    })
+                  }
+                />
+                <span>Y</span>
+              </label>
+            </div>
+          </section>
+
+          <section className="movie-panel-section" aria-label="Selected element rotation">
+            <h3>Rotate</h3>
+            <div className="movie-number-grid">
+              <label>
+                <input
+                  aria-label="Selected element rotation"
+                  type="number"
+                  value={Math.round(element.rotation)}
+                  onChange={(event) =>
+                    onFrameUpdate?.({
+                      rotation: getBoundedNumber(event.target.value, element.rotation, -360),
+                    })
+                  }
+                />
+                <span>Angle</span>
+              </label>
+              <button className="movie-full-button" type="button" disabled>
+                Flip
+              </button>
+            </div>
+          </section>
+
+          <section className="movie-panel-section" aria-label="Selected element lock and grouping">
+            <div className="movie-lock-grid">
+              <button type="button" disabled={locked} onClick={() => onLockChange?.(true)}>
+                Lock
+              </button>
+              <button type="button" disabled={!locked} onClick={() => onLockChange?.(false)}>
+                Unlock
+              </button>
+              <button type="button" disabled>
+                Group
+              </button>
+              <button type="button" disabled>
+                Ungroup
+              </button>
+            </div>
+          </section>
+        </>
+      ) : null}
     </PanelSection>
   );
 }

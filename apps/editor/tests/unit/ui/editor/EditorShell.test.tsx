@@ -47,6 +47,11 @@ async function waitForShareButtonReady() {
   });
 }
 
+async function startFullscreenPresentation(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Presentation play options' }));
+  await user.click(screen.getByRole('menuitem', { name: 'Present in fullscreen' }));
+}
+
 function enableSyncedSharing(services: ReturnType<typeof createAppServices>) {
   services.mirrorService = new RecordingMirrorService();
   services.shareService = new RecordingShareService();
@@ -590,6 +595,7 @@ function mockVideoMetadataLoad() {
       if (tagName.toLowerCase() === 'video') {
         Object.defineProperty(element, 'videoWidth', { configurable: true, value: 1280 });
         Object.defineProperty(element, 'videoHeight', { configurable: true, value: 720 });
+        Object.defineProperty(element, 'duration', { configurable: true, value: 8.5 });
         queueMicrotask(() => {
           element.dispatchEvent(new Event('loadedmetadata'));
         });
@@ -1645,7 +1651,7 @@ describe('EditorShell', () => {
 
     render(<EditorShell services={createAppServices({ initialProject: project })} />);
 
-    await user.click(screen.getByRole('button', { name: 'Play presentation' }));
+    await startFullscreenPresentation(user);
 
     await waitFor(() => {
       expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
@@ -1658,6 +1664,25 @@ describe('EditorShell', () => {
       );
     });
     expect(screen.queryByLabelText('Animation build 1 for Image')).not.toBeInTheDocument();
+  });
+
+  it('opens keyboard shortcuts with question mark while presenting fullscreen', async () => {
+    const user = userEvent.setup();
+    const project = sampleProject.createSampleProject();
+
+    render(<EditorShell services={createAppServices({ initialProject: project })} />);
+
+    await startFullscreenPresentation(user);
+    await waitFor(() => {
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-animation-preview-mode',
+        'presenter',
+      );
+    });
+
+    fireEvent.keyDown(window, { key: '?' });
+
+    expect(screen.getByRole('dialog', { name: 'Keyboard Shortcuts' })).toBeInTheDocument();
   });
 
   it('starts animation preview from the Animate panel play button', async () => {
@@ -1713,7 +1738,7 @@ describe('EditorShell', () => {
 
     render(<EditorShell services={createAppServices({ initialProject: project })} />);
 
-    await user.click(screen.getByRole('button', { name: 'Play presentation' }));
+    await startFullscreenPresentation(user);
 
     await waitFor(() => {
       expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
@@ -1766,7 +1791,7 @@ describe('EditorShell', () => {
     render(<EditorShell services={createAppServices({ initialProject: project })} />);
 
     expect(screen.getByText('1 / 2')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Play presentation' }));
+    await startFullscreenPresentation(user);
 
     await waitFor(() => {
       expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
@@ -1847,7 +1872,7 @@ describe('EditorShell', () => {
       <EditorShell services={createAppServices({ initialProject: project })} />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Play presentation' }));
+    await startFullscreenPresentation(user);
 
     await waitFor(() => {
       expect(document.fullscreenElement).toBe(screen.getByLabelText('Canvas workspace'));
@@ -1911,7 +1936,7 @@ describe('EditorShell', () => {
     await user.click(screen.getByRole('button', { name: 'Activate Slide 3' }));
     expect(screen.getByText('3 / 3')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Play presentation' }));
+    await startFullscreenPresentation(user);
 
     await waitFor(() => {
       expect(screen.getByText('3 / 3')).toBeInTheDocument();
@@ -1930,6 +1955,62 @@ describe('EditorShell', () => {
         'data-animation-preview-mode',
         'presenter',
       );
+    });
+  });
+
+  it('opens presenter view with an audience fullscreen prompt and closes the popup on fullscreen exit', async () => {
+    const user = userEvent.setup();
+    let fullscreenElement: Element | null = null;
+    const popupClose = vi.fn();
+    const popupPostMessage = vi.fn();
+    const popup = {
+      close: popupClose,
+      closed: false,
+      location: { href: '' },
+      postMessage: popupPostMessage,
+    } as unknown as Window;
+    const openWindow = vi.fn(() => popup);
+    Object.defineProperty(window, 'open', {
+      configurable: true,
+      value: openWindow,
+    });
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      get: () => fullscreenElement,
+    });
+    const requestFullscreen = vi.fn(() => {
+      fullscreenElement = document.querySelector('[aria-label="Canvas workspace"]');
+      document.dispatchEvent(new Event('fullscreenchange'));
+      return Promise.resolve();
+    });
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+      configurable: true,
+      value: requestFullscreen,
+    });
+
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Presentation play options' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Presenter view' }));
+
+    expect(openWindow).toHaveBeenCalledTimes(1);
+    expect(popup.location.href).toContain('presenter=1');
+    expect(screen.getByRole('dialog', { name: 'Audience Window' })).toBeInTheDocument();
+    expect(requestFullscreen).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Enter full screen mode' }));
+
+    await waitFor(() => {
+      expect(requestFullscreen).toHaveBeenCalledTimes(1);
+      expect(document.fullscreenElement).toBe(screen.getByLabelText('Canvas workspace'));
+      expect(screen.queryByRole('dialog', { name: 'Audience Window' })).not.toBeInTheDocument();
+    });
+
+    fullscreenElement = null;
+    document.dispatchEvent(new Event('fullscreenchange'));
+
+    await waitFor(() => {
+      expect(popupClose).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -1982,7 +2063,7 @@ describe('EditorShell', () => {
     );
     expect(screen.getByRole('button', { name: 'Add page after Slide 1' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Play presentation' }));
+    await startFullscreenPresentation(user);
 
     await waitFor(() => {
       expect(document.fullscreenElement).toBe(screen.getByLabelText('Canvas workspace'));
@@ -2039,7 +2120,7 @@ describe('EditorShell', () => {
 
     render(<EditorShell services={createAppServices({ initialProject: project })} />);
 
-    await user.click(screen.getByRole('button', { name: 'Play presentation' }));
+    await startFullscreenPresentation(user);
 
     await waitFor(() => {
       expect(document.fullscreenElement).toBe(screen.getByLabelText('Canvas workspace'));
@@ -2299,7 +2380,8 @@ describe('EditorShell', () => {
     });
     expect(createObjectUrl).toHaveBeenCalledWith(video);
     expect(screen.getByRole('tab', { name: 'Design' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByLabelText('Show selected video controls')).toBeChecked();
+    expect(screen.getByRole('tab', { name: 'Movie' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByLabelText('Selected video trim end')).toHaveValue('8.5');
   });
 
   it('shows loading feedback while local video metadata is imported', async () => {
@@ -2373,8 +2455,8 @@ describe('EditorShell', () => {
     await user.click(screen.getByRole('button', { name: 'Demo clip' }));
 
     expect(screen.getByRole('tab', { name: 'Design' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByText('Playback')).toBeInTheDocument();
-    expect(screen.getByLabelText('Show selected video controls')).toBeChecked();
+    expect(screen.getByRole('tab', { name: 'Movie' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByLabelText('Selected video repeat mode')).toBeInTheDocument();
   });
 
   it('deletes the selected layer with Delete and Backspace keystrokes', async () => {
@@ -2867,6 +2949,31 @@ describe('EditorShell', () => {
 
     expect(requestFullscreen).toHaveBeenCalled();
     expect(requestFullscreen.mock.instances[0]).toBe(screen.getByLabelText('Canvas workspace'));
+  });
+
+  it('shows speaker notes as a Canva-style side panel with controls', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    const notesToggle = screen.getByRole('button', { name: 'Toggle notes panel' });
+    expect(notesToggle).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('heading', { name: 'Page 1 - Slide 1' })).not.toBeInTheDocument();
+
+    await user.click(notesToggle);
+
+    expect(notesToggle).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('heading', { name: 'Page 1 - Slide 1' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Timer' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Change notes text size' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close notes panel' })).toBeInTheDocument();
+    expect(screen.getByText('0/5000')).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Speaker notes'), 'Opening note');
+
+    expect(screen.getByText('12/5000')).toBeInTheDocument();
+
+    await user.click(notesToggle);
+    expect(screen.queryByRole('heading', { name: 'Page 1 - Slide 1' })).not.toBeInTheDocument();
   });
 
   it('does not show the page size overlay on the canvas', () => {

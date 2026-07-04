@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type Konva from 'konva';
 import type { AppServices } from '../../../app/composition';
 import type { ShareMetadata } from '../../../services/contracts/interfaces';
@@ -25,24 +25,73 @@ import { ScrollingCanvasWorkspace } from '../canvas/ScrollingCanvasWorkspace';
 import { SettingsPanel } from '../panels/SettingsPanel';
 import { TopToolbar } from '../toolbars/TopToolbar';
 import { VersionHistoryPanel } from '../panels/VersionHistoryPanel';
+import {
+  presentationMovieControls,
+  type MovieHoldState,
+} from '../media/presentationMovieControls';
 import { useEditorViewModel } from '../state/useEditorViewModel';
 import { SharePanel } from '../../share/SharePanel';
+import {
+  KeyboardShortcutsDialog,
+  type KeyboardShortcutAction,
+} from '../../components/KeyboardShortcutsDialog';
 import { editorShellBrowserUtils } from '../browser/editorShellBrowserUtils';
+import { BrowserPresenterSessionService } from '../../../services/presenter/presenterSessionService';
 
 interface EditorShellProps {
   services: AppServices;
 }
 
+const editorShortcutActions = [
+  'next-build',
+  'previous-build',
+  'next-slide',
+  'previous-slide',
+  'first-slide',
+  'last-slide',
+  'quit-presentation',
+  'shortcut-toggle',
+  'pause-presentation',
+  'black-screen',
+  'white-screen',
+  'cursor-toggle',
+  'show-slide-number',
+  'open-slide-navigator',
+  'next-navigator-slide',
+  'previous-navigator-slide',
+  'select-navigator-slide',
+  'close-slide-navigator',
+  'play-pause-movie',
+  'rewind-movie',
+  'fast-forward-movie',
+  'jump-movie-start',
+  'jump-movie-end',
+] satisfies KeyboardShortcutAction[];
+
 export function EditorShell({ services }: EditorShellProps) {
   const vm = useEditorViewModel(services);
   const automationDelegateRef = useRef(vm.automation);
+  const movieHoldStateRef = useRef<MovieHoldState | undefined>(undefined);
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
   const [designFontFocusKey, setDesignFontFocusKey] = useState(0);
+  const [speakerNotesOpen, setSpeakerNotesOpen] = useState(false);
+  const [audienceFullscreenPromptOpen, setAudienceFullscreenPromptOpen] = useState(false);
+  const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
+  const [slideNavigatorOpen, setSlideNavigatorOpen] = useState(false);
+  const [slideNavigatorIndex, setSlideNavigatorIndex] = useState(0);
+  const [presentationPaused, setPresentationPaused] = useState(false);
+  const [presentationBlankScreen, setPresentationBlankScreen] = useState<'black' | 'white' | undefined>();
+  const [presentationCursorHidden, setPresentationCursorHidden] = useState(false);
+  const [slideNumberVisible, setSlideNumberVisible] = useState(false);
+  const [presenterSessionId, setPresenterSessionId] = useState<string | undefined>();
+  const [presenterViewError, setPresenterViewError] = useState<string | undefined>();
   const [sharePanelOpen, setSharePanelOpen] = useState(false);
   const [shareMetadata, setShareMetadata] = useState<ShareMetadata | undefined>();
   const stageRef = useRef<Konva.Stage>(null);
   const workspaceRef = useRef<HTMLElement>(null);
   const slideFrameRef = useRef<HTMLDivElement>(null);
+  const presenterSessionServiceRef = useRef<BrowserPresenterSessionService | undefined>(undefined);
+  const presenterFullscreenEnteredRef = useRef(false);
   const toolbarImageInputRef = useRef<HTMLInputElement>(null);
   const hasSelection = vm.selection.elementIds.length > 0;
   const isHistoryReadOnly = vm.versionHistoryOpen;
@@ -50,6 +99,7 @@ export function EditorShell({ services }: EditorShellProps) {
     0,
     vm.project.pages.findIndex((page) => page.id === vm.activePageId),
   );
+  const activePage = vm.project.pages[activePageIndex];
   const deckTranslationStatus = vm.deckTranslationProgress
     ? `Translating ${vm.deckTranslationProgress.currentPageName} · ${vm.deckTranslationProgress.completedPages}/${vm.deckTranslationProgress.totalPages}`
     : undefined;
@@ -93,6 +143,182 @@ export function EditorShell({ services }: EditorShellProps) {
     if (!pageId) return;
     vm.playPresentationPreview(pageId);
     void vm.toggleFullscreen(workspaceRef.current);
+  }
+
+  function getPresenterSessionService() {
+    presenterSessionServiceRef.current ??= new BrowserPresenterSessionService();
+    return presenterSessionServiceRef.current;
+  }
+
+  function closePresenterViewSession() {
+    presenterSessionServiceRef.current?.closePresenterWindow();
+    presenterFullscreenEnteredRef.current = false;
+    setAudienceFullscreenPromptOpen(false);
+    setPresenterSessionId(undefined);
+  }
+
+  function openPresenterView() {
+    const pageId = vm.activePageId;
+    if (!pageId) return;
+    const service = getPresenterSessionService();
+    const result = service.openPresenterWindow();
+    if (result.status === 'blocked') {
+      setPresenterViewError('Allow popups to open presenter view.');
+      return;
+    }
+    setPresenterViewError(undefined);
+    setPresenterSessionId(result.sessionId);
+    presenterFullscreenEnteredRef.current = false;
+    setAudienceFullscreenPromptOpen(true);
+    vm.playPresentationPreview(pageId);
+    window.setTimeout(() => {
+      service.publishState({
+        activePageId: pageId,
+        animationPreview: vm.animationPreview,
+        project: vm.project,
+      });
+    }, 0);
+  }
+
+  function enterAudienceFullscreen() {
+    setAudienceFullscreenPromptOpen(false);
+    void vm.toggleFullscreen(workspaceRef.current);
+  }
+
+  const playPresentationPageAt = useCallback((index: number) => {
+    const pageId = vm.project.pages[index]?.id;
+    if (!pageId) return false;
+    setSlideNavigatorIndex(index);
+    vm.playPresentationPreview(pageId);
+    return true;
+  }, [vm]);
+
+  const playRelativePresentationSlide = useCallback((offset: -1 | 1) => {
+    return playPresentationPageAt(activePageIndex + offset);
+  }, [activePageIndex, playPresentationPageAt]);
+
+  function getPresentationVideos() {
+    return Array.from(slideFrameRef.current?.querySelectorAll('video') ?? []);
+  }
+
+  const controlPresentationMovies = useCallback((action: 'end' | 'play-toggle' | 'start') => {
+    const videos = getPresentationVideos();
+    return presentationMovieControls.control(videos, action);
+  }, []);
+
+  const pulsePresentationMovieHold = useCallback((action: 'fast-forward' | 'rewind') => {
+    movieHoldStateRef.current = presentationMovieControls.pulse(
+      getPresentationVideos(),
+      action,
+      movieHoldStateRef.current,
+    );
+  }, []);
+
+  const startPresentationMovieHold = useCallback((action: 'fast-forward' | 'rewind') => {
+    movieHoldStateRef.current = presentationMovieControls.startHold(
+      getPresentationVideos(),
+      action,
+      movieHoldStateRef.current,
+    );
+  }, []);
+
+  const stopPresentationMovieHold = useCallback(() => {
+    movieHoldStateRef.current = presentationMovieControls.stopHold(movieHoldStateRef.current);
+  }, []);
+
+  function showSlideNumber() {
+    setSlideNumberVisible(true);
+    window.setTimeout(() => setSlideNumberVisible(false), 1600);
+  }
+
+  function togglePresentationPause(blankScreen?: 'black' | 'white') {
+    setPresentationPaused(true);
+    setPresentationBlankScreen(blankScreen);
+  }
+
+  function resumePresentation() {
+    setPresentationPaused(false);
+    setPresentationBlankScreen(undefined);
+  }
+
+  function executePresentationShortcut(action: KeyboardShortcutAction) {
+    if (action === 'shortcut-toggle') {
+      setKeyboardShortcutsOpen((current) => !current);
+      return;
+    }
+    if (action === 'quit-presentation') {
+      setKeyboardShortcutsOpen(false);
+      if (vm.isFullscreen) void vm.toggleFullscreen(workspaceRef.current);
+      return;
+    }
+    if (action === 'open-slide-navigator') {
+      setSlideNavigatorIndex(activePageIndex);
+      setSlideNavigatorOpen(true);
+      return;
+    }
+    if (action === 'close-slide-navigator') {
+      setSlideNavigatorOpen(false);
+      return;
+    }
+    if (action === 'next-navigator-slide') {
+      setSlideNavigatorIndex((current) => Math.min(vm.project.pages.length - 1, current + 1));
+      return;
+    }
+    if (action === 'previous-navigator-slide') {
+      setSlideNavigatorIndex((current) => Math.max(0, current - 1));
+      return;
+    }
+    if (action === 'select-navigator-slide') {
+      playPresentationPageAt(slideNavigatorIndex);
+      setSlideNavigatorOpen(false);
+      return;
+    }
+    if (action === 'first-slide') {
+      playPresentationPageAt(0);
+      return;
+    }
+    if (action === 'last-slide') {
+      playPresentationPageAt(vm.project.pages.length - 1);
+      return;
+    }
+    if (action === 'next-slide') {
+      playRelativePresentationSlide(1);
+      return;
+    }
+    if (action === 'previous-slide') {
+      playRelativePresentationSlide(-1);
+      return;
+    }
+    if (action === 'next-build') {
+      vm.advancePresentationPreview();
+      return;
+    }
+    if (action === 'previous-build') {
+      vm.rewindPresentationPreview();
+      return;
+    }
+    if (action === 'pause-presentation') {
+      if (presentationPaused && !presentationBlankScreen) resumePresentation();
+      else togglePresentationPause();
+      return;
+    }
+    if (action === 'black-screen' || action === 'white-screen') {
+      togglePresentationPause(action === 'black-screen' ? 'black' : 'white');
+      return;
+    }
+    if (action === 'cursor-toggle') {
+      setPresentationCursorHidden((current) => !current);
+      return;
+    }
+    if (action === 'show-slide-number') {
+      showSlideNumber();
+      return;
+    }
+    if (action === 'play-pause-movie') controlPresentationMovies('play-toggle');
+    if (action === 'rewind-movie') pulsePresentationMovieHold('rewind');
+    if (action === 'fast-forward-movie') pulsePresentationMovieHold('fast-forward');
+    if (action === 'jump-movie-start') controlPresentationMovies('start');
+    if (action === 'jump-movie-end') controlPresentationMovies('end');
   }
 
   function isAnimatedMediaFile(file: File) {
@@ -146,12 +372,14 @@ export function EditorShell({ services }: EditorShellProps) {
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (isHistoryReadOnly) return;
+      const isEditableTarget = editorShellBrowserUtils.isEditableInteractionTarget(event.target);
       const isUndoShortcut =
         (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z' && !event.shiftKey;
       const isRedoShortcut =
         ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z' && event.shiftKey) ||
         ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'y');
       if (isUndoShortcut || isRedoShortcut) {
+        if (isEditableTarget) return;
         event.preventDefault();
         if (isUndoShortcut) vm.undo();
         if (isRedoShortcut) vm.redo();
@@ -174,22 +402,141 @@ export function EditorShell({ services }: EditorShellProps) {
       const isPresenterPlayback = vm.animationPreview?.mode === 'presenter';
       const isPreviewNavigationActive =
         vm.isFullscreen || Boolean(isPresenterPlayback && vm.animationPreview?.playing);
+      if (keyboardShortcutsOpen && event.key === 'Escape') {
+        event.preventDefault();
+        setKeyboardShortcutsOpen(false);
+        return;
+      }
+      if (slideNavigatorOpen && !isEditableTarget) {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          setSlideNavigatorOpen(false);
+          return;
+        }
+        if (event.key === '+' || event.key === '=') {
+          event.preventDefault();
+          setSlideNavigatorIndex((current) => Math.min(vm.project.pages.length - 1, current + 1));
+          return;
+        }
+        if (event.key === '-') {
+          event.preventDefault();
+          setSlideNavigatorIndex((current) => Math.max(0, current - 1));
+          return;
+        }
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          playPresentationPageAt(slideNavigatorIndex);
+          setSlideNavigatorOpen(false);
+          return;
+        }
+      }
       if (
         isPreviewNavigationActive &&
-        !editorShellBrowserUtils.isEditableInteractionTarget(event.target)
+        !isEditableTarget
       ) {
+        const lowerKey = event.key.toLowerCase();
+        if (event.key === '?' || (event.key === '/' && event.shiftKey)) {
+          event.preventDefault();
+          setKeyboardShortcutsOpen((current) => !current);
+          return;
+        }
+        if (presentationPaused && !['b', 'f', 'w'].includes(lowerKey)) {
+          event.preventDefault();
+          resumePresentation();
+          return;
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          if (vm.isFullscreen) void vm.toggleFullscreen(workspaceRef.current);
+          return;
+        }
+        if (event.key === '#') {
+          event.preventDefault();
+          setSlideNavigatorIndex(activePageIndex);
+          setSlideNavigatorOpen(true);
+          return;
+        }
+        if (event.key === 'Home') {
+          event.preventDefault();
+          playPresentationPageAt(0);
+          return;
+        }
+        if (event.key === 'End') {
+          event.preventDefault();
+          playPresentationPageAt(vm.project.pages.length - 1);
+          return;
+        }
+        if (lowerKey === 'f') {
+          event.preventDefault();
+          if (presentationPaused && !presentationBlankScreen) resumePresentation();
+          else togglePresentationPause();
+          return;
+        }
+        if (lowerKey === 'b' || lowerKey === 'w') {
+          event.preventDefault();
+          togglePresentationPause(lowerKey === 'b' ? 'black' : 'white');
+          return;
+        }
+        if (lowerKey === 'c') {
+          event.preventDefault();
+          setPresentationCursorHidden((current) => !current);
+          return;
+        }
+        if (lowerKey === 's') {
+          event.preventDefault();
+          showSlideNumber();
+          return;
+        }
+        if (lowerKey === 'k') {
+          event.preventDefault();
+          controlPresentationMovies('play-toggle');
+          return;
+        }
+        if (lowerKey === 'j') {
+          event.preventDefault();
+          if (!event.repeat) startPresentationMovieHold('rewind');
+          return;
+        }
+        if (lowerKey === 'l') {
+          event.preventDefault();
+          if (!event.repeat) startPresentationMovieHold('fast-forward');
+          return;
+        }
+        if (lowerKey === 'i') {
+          event.preventDefault();
+          controlPresentationMovies('start');
+          return;
+        }
+        if (lowerKey === 'o') {
+          event.preventDefault();
+          controlPresentationMovies('end');
+          return;
+        }
+        if (event.key === 'ArrowDown' && event.shiftKey) {
+          event.preventDefault();
+          playRelativePresentationSlide(1);
+          return;
+        }
         const isNextPreviewKey =
           event.key === 'ArrowRight' ||
           event.key === 'ArrowDown' ||
           event.key === 'PageDown' ||
+          event.key === ']' ||
           event.key === ' ' ||
           event.key === 'Enter';
         const isPreviousPreviewKey =
-          event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'PageUp';
+          event.key === 'ArrowLeft' ||
+          event.key === 'ArrowUp' ||
+          event.key === 'PageUp';
+        if (event.key === '[') {
+          event.preventDefault();
+          vm.rewindPresentationPreview();
+          return;
+        }
         if (isNextPreviewKey || isPreviousPreviewKey) {
           event.preventDefault();
           if (isNextPreviewKey) vm.advancePresentationPreview();
-          if (isPreviousPreviewKey) vm.rewindPresentationPreview();
+          if (isPreviousPreviewKey) playRelativePresentationSlide(-1);
           return;
         }
       }
@@ -205,15 +552,97 @@ export function EditorShell({ services }: EditorShellProps) {
       vm.deleteSelectedElement();
     }
 
+    function handleKeyUp(event: KeyboardEvent) {
+      if (event.key.toLowerCase() !== 'j' && event.key.toLowerCase() !== 'l') return;
+      stopPresentationMovieHold();
+    }
+
     window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [hasSelection, isHistoryReadOnly, vm]);
+  }, [
+    activePageIndex,
+    controlPresentationMovies,
+    hasSelection,
+    isHistoryReadOnly,
+    keyboardShortcutsOpen,
+    playPresentationPageAt,
+    playRelativePresentationSlide,
+    presentationBlankScreen,
+    presentationPaused,
+    startPresentationMovieHold,
+    slideNavigatorIndex,
+    slideNavigatorOpen,
+    stopPresentationMovieHold,
+    vm,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      movieHoldStateRef.current = presentationMovieControls.stopHold(movieHoldStateRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     automationDelegateRef.current = vm.automation;
   }, [vm.automation]);
+
+  useEffect(() => {
+    if (!presenterSessionId) return undefined;
+    return getPresenterSessionService().subscribeToCommands((message) => {
+      if (message.command === 'next') {
+        vm.advancePresentationPreview();
+        return;
+      }
+      if (message.command === 'previous') {
+        vm.rewindPresentationPreview();
+        return;
+      }
+      if (message.command === 'go-to-page') {
+        vm.playPresentationPreview(message.pageId);
+        return;
+      }
+      if (message.command === 'update-notes') {
+        vm.updatePageSpeakerNotes(message.pageId, message.notes);
+        return;
+      }
+      if (message.command === 'request-state') {
+        getPresenterSessionService().publishState({
+          activePageId: vm.activePageId,
+          animationPreview: vm.animationPreview,
+          project: vm.project,
+        });
+        return;
+      }
+      if (message.command === 'close') {
+        closePresenterViewSession();
+      }
+    });
+  }, [presenterSessionId, vm]);
+
+  useEffect(() => {
+    if (!presenterSessionId) {
+      presenterFullscreenEnteredRef.current = false;
+      return;
+    }
+    if (vm.isFullscreen) {
+      presenterFullscreenEnteredRef.current = true;
+      return;
+    }
+    if (presenterFullscreenEnteredRef.current) closePresenterViewSession();
+  }, [presenterSessionId, vm.isFullscreen]);
+
+  useEffect(() => {
+    if (!presenterSessionId) return;
+    getPresenterSessionService().publishState({
+      activePageId: vm.activePageId,
+      animationPreview: vm.animationPreview,
+      project: vm.project,
+    });
+  }, [presenterSessionId, vm.activePageId, vm.animationPreview, vm.project]);
 
   useEffect(() => {
     function handleCopy(event: ClipboardEvent) {
@@ -379,6 +808,7 @@ export function EditorShell({ services }: EditorShellProps) {
         onMirrorToggle={vm.setMirrorEnabled}
         onNewProject={openBlankProjectInNewTab}
         onOpenMirrorSettings={vm.openMirrorSettings}
+        onOpenKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
         onOpenVersionHistory={() => {
           void vm.openVersionHistory();
         }}
@@ -395,6 +825,7 @@ export function EditorShell({ services }: EditorShellProps) {
         onShare={() => {
           setSharePanelOpen(true);
         }}
+        onOpenPresenterView={openPresenterView}
         onStartPresenterMode={startPresenterMode}
         onSaveLocal={() => {
           void vm.saveLocalNow();
@@ -444,9 +875,19 @@ export function EditorShell({ services }: EditorShellProps) {
           onSetElementLock={isHistoryReadOnly ? undefined : vm.setElementLock}
           onDeleteElement={isHistoryReadOnly ? undefined : vm.deleteElement}
           onReorderElement={isHistoryReadOnly ? undefined : vm.reorderElement}
+          onAlignSelectedElement={isHistoryReadOnly ? undefined : vm.alignSelectedElement}
+          onSetSelectedElementZOrder={isHistoryReadOnly ? undefined : vm.setSelectedElementZOrder}
+          onUpdateElementFrame={isHistoryReadOnly ? undefined : vm.updateElementFrame}
           onUpdateElementStyle={isHistoryReadOnly ? undefined : vm.updateElementStyle}
           onUpdateMediaPlayback={isHistoryReadOnly ? undefined : vm.updateMediaPlayback}
           onUpdatePageBackground={isHistoryReadOnly ? undefined : vm.updatePageBackground}
+          onReplaceVideoAsset={
+            isHistoryReadOnly
+              ? undefined
+              : (elementId, file) => {
+                  void vm.replaceVideoAsset(elementId, file);
+                }
+          }
           onClearPageTransition={isHistoryReadOnly ? undefined : vm.clearPageTransition}
           onSetPageTransition={isHistoryReadOnly ? undefined : vm.setPageTransition}
           onSetElementAnimationBuilds={isHistoryReadOnly ? undefined : vm.setElementAnimationBuilds}
@@ -524,12 +965,75 @@ export function EditorShell({ services }: EditorShellProps) {
             'workspace-column',
             leftPanelOpen ? 'workspace-column-left-panel-open' : '',
             vm.zoomPercent < 100 ? 'workspace-column-zoomed-out' : '',
+            presentationCursorHidden ? 'workspace-column-cursor-hidden' : '',
           ]
             .filter(Boolean)
             .join(' ')}
           aria-label="Canvas workspace"
           ref={workspaceRef}
         >
+          {keyboardShortcutsOpen ? (
+            <KeyboardShortcutsDialog
+              onClose={() => setKeyboardShortcutsOpen(false)}
+              onShortcutAction={executePresentationShortcut}
+              supportedActions={editorShortcutActions}
+            />
+          ) : null}
+          {slideNavigatorOpen ? (
+            <div className="presentation-slide-navigator" role="dialog" aria-modal="true" aria-label="Slide navigator">
+              <div className="presentation-slide-navigator-header">
+                <h2>Slide Navigator</h2>
+                <button
+                  className="stitch-icon-button"
+                  type="button"
+                  aria-label="Close slide navigator"
+                  onClick={() => setSlideNavigatorOpen(false)}
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    close
+                  </span>
+                </button>
+              </div>
+              <div className="presentation-slide-navigator-list" role="listbox" aria-label="Slides">
+                {vm.project.pages.map((page, index) => (
+                  <button
+                    aria-selected={index === slideNavigatorIndex}
+                    className={
+                      index === slideNavigatorIndex
+                        ? 'presentation-slide-navigator-item presentation-slide-navigator-item-active'
+                        : 'presentation-slide-navigator-item'
+                    }
+                    key={page.id}
+                    type="button"
+                    role="option"
+                    onClick={() => setSlideNavigatorIndex(index)}
+                    onDoubleClick={() => {
+                      playPresentationPageAt(index);
+                      setSlideNavigatorOpen(false);
+                    }}
+                  >
+                    <span>Slide {index + 1}</span>
+                    <strong>{page.name}</strong>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {presentationBlankScreen ? (
+            <div
+              className={
+                presentationBlankScreen === 'black'
+                  ? 'presentation-blank-screen presentation-blank-screen-black'
+                  : 'presentation-blank-screen presentation-blank-screen-white'
+              }
+              aria-label={presentationBlankScreen === 'black' ? 'Black screen' : 'White screen'}
+            />
+          ) : null}
+          {slideNumberVisible ? (
+            <div className="presentation-slide-number" aria-live="polite">
+              Slide {activePageIndex + 1} of {vm.project.pages.length}
+            </div>
+          ) : null}
           <ScrollingCanvasWorkspace
             project={vm.project}
             activePageId={vm.activePageId}
@@ -646,6 +1150,82 @@ export function EditorShell({ services }: EditorShellProps) {
             onReorderPage={isHistoryReadOnly ? undefined : vm.reorderPage}
             onSetPageVisibility={isHistoryReadOnly ? undefined : vm.setPageVisibility}
           />
+          {activePage ? (
+            <section className="speaker-notes-editor" aria-label="Speaker notes editor">
+              {speakerNotesOpen ? (
+                <div className="speaker-notes-card">
+                  <header className="speaker-notes-header">
+                    <h2>
+                      Page {activePageIndex + 1} - {activePage.name}
+                    </h2>
+                    <div className="speaker-notes-actions">
+                      <button type="button" aria-label="Change notes text size">
+                        aA
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Close notes panel"
+                        onClick={() => setSpeakerNotesOpen(false)}
+                      >
+                        <span className="material-symbols-outlined" aria-hidden="true">
+                          close
+                        </span>
+                      </button>
+                    </div>
+                  </header>
+                  <textarea
+                    id="speaker-notes-textarea"
+                    aria-label="Speaker notes"
+                    maxLength={5000}
+                    placeholder="Add notes to your design"
+                    value={activePage.speakerNotes ?? ''}
+                    onChange={(event) =>
+                      vm.updatePageSpeakerNotes(activePage.id, event.target.value)
+                    }
+                  />
+                  <span className="speaker-notes-count">{activePage.speakerNotes?.length ?? 0}/5000</span>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+          {presenterViewError ? (
+            <p className="presenter-view-error" role="alert">
+              {presenterViewError}
+            </p>
+          ) : null}
+          {audienceFullscreenPromptOpen ? (
+            <div className="audience-fullscreen-backdrop" role="presentation">
+              <section
+                className="audience-fullscreen-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="audience-fullscreen-title"
+              >
+                <button
+                  className="audience-fullscreen-close"
+                  type="button"
+                  aria-label="Close audience fullscreen prompt"
+                  onClick={closePresenterViewSession}
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    close
+                  </span>
+                </button>
+                <h2 id="audience-fullscreen-title">Audience Window</h2>
+                <p>
+                  This window is what your audience sees. Drag it to the screen your
+                  audience will be looking at and enter full screen mode.
+                </p>
+                <button
+                  className="audience-fullscreen-primary"
+                  type="button"
+                  onClick={enterAudienceFullscreen}
+                >
+                  Enter full screen mode
+                </button>
+              </section>
+            </div>
+          ) : null}
           <input
             ref={toolbarImageInputRef}
             aria-label="Insert media file"
@@ -789,11 +1369,13 @@ export function EditorShell({ services }: EditorShellProps) {
       <ProjectVideoPreloader project={vm.project} />
       <EditorFooter
         activePageIndex={activePageIndex}
+        notesOpen={speakerNotesOpen}
         pageCount={vm.project.pages.length}
         pagesPanelOpen={vm.pagesPanelOpen}
         zoomPercent={vm.zoomPercent}
         onResetZoom={vm.resetZoom}
         onOpenSettings={vm.openSettings}
+        onToggleNotes={() => setSpeakerNotesOpen((current) => !current)}
         onTogglePagesPanel={togglePagesPanel}
         onZoomIn={vm.zoomIn}
         onZoomOut={vm.zoomOut}
