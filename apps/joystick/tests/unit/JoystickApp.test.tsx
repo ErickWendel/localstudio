@@ -18,6 +18,31 @@ describe('JoystickApp', () => {
     expect(screen.getByLabelText('Connected (1)')).toBeInTheDocument();
   });
 
+  it('renders when browser storage is unavailable', async () => {
+    const originalLocalStorage = window.localStorage;
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      value: undefined,
+    });
+    const service = new InMemoryPresenterRemoteSignalingService({
+      randomCode: () => 'ABCD-1234',
+      randomId: () => 'session-1',
+    });
+    service.registerSession({ presenterLabel: 'MacBook Pro', ttlMs: 60_000 });
+
+    try {
+      render(<JoystickApp initialUrl="https://localstudio.test/joystick?code=abcd-1234" signalingService={service} />);
+
+      expect(await screen.findByLabelText('Presentation remote control')).toBeInTheDocument();
+      expect(screen.getByLabelText('Connected (1)')).toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window, 'localStorage', {
+        configurable: true,
+        value: originalLocalStorage,
+      });
+    }
+  });
+
   it('auto-selects only when there is one active presentation', async () => {
     const service = new InMemoryPresenterRemoteSignalingService({
       randomCode: () => 'ABCD-1234',

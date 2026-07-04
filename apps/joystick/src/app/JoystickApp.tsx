@@ -86,14 +86,30 @@ function createStreamSignalingAdapter(signalingService: JoystickSignalingService
   };
 }
 
+function getLocalStorage() {
+  try {
+    return typeof window === 'undefined' ? undefined : window.localStorage;
+  } catch {
+    return undefined;
+  }
+}
+
+function getStoredValue(key: string) {
+  return getLocalStorage()?.getItem(key) ?? undefined;
+}
+
+function setStoredValue(key: string, value: string) {
+  getLocalStorage()?.setItem(key, value);
+}
+
 function getControllerId() {
-  const existingId = window.localStorage.getItem(controllerIdKey);
+  const existingId = getStoredValue(controllerIdKey);
   if (existingId) return existingId;
   const id =
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
       ? crypto.randomUUID()
       : `controller-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-  window.localStorage.setItem(controllerIdKey, id);
+  setStoredValue(controllerIdKey, id);
   return id;
 }
 
@@ -488,7 +504,7 @@ export function JoystickApp({
 
       if (activeSessions.length === 0) {
         const rememberedCode = presenterRemoteSessionCode.normalize(
-          window.localStorage.getItem(rememberedCodeKey) ?? '',
+          getStoredValue(rememberedCodeKey) ?? '',
         );
         const rememberedSession = rememberedCode ? await signalingService.lookupSession(rememberedCode) : undefined;
         if (!cancelled) {
@@ -514,7 +530,7 @@ export function JoystickApp({
   const displayedCode = code || session?.code || '';
 
   useEffect(() => {
-    if (session) window.localStorage.setItem(rememberedCodeKey, session.code);
+    if (session) setStoredValue(rememberedCodeKey, session.code);
   }, [session]);
 
   useEffect(() => {
