@@ -212,6 +212,31 @@ describe('minioMirrorService.MinioMirrorService', () => {
     expect(putUrls.some((url) => url.endsWith('/localstudio-mirror.json'))).toBe(true);
   });
 
+  it('does not set the forbidden Host header on signed browser requests', async () => {
+    const project = sampleProject.createSampleProject();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = getRequestUrl(input);
+      if (init?.method === 'GET' && url.endsWith('localstudio-mirror.json')) {
+        return Promise.resolve(new Response('', { status: 404 }));
+      }
+      if (init?.method === 'PUT') {
+        return Promise.resolve(new Response('', { status: 200 }));
+      }
+      return Promise.resolve(new Response('', { status: 404 }));
+    });
+    const service = new minioMirrorService.MinioMirrorService({
+      fetch: fetchMock,
+      now: () => new Date('2026-06-30T10:00:00.000Z'),
+    });
+
+    await service.syncProject(project, new VersionedRepository([], project), config);
+
+    const [, init] = fetchMock.mock.calls[0]!;
+    const headers = init?.headers as Record<string, string>;
+    expect(headers.host).toBeUndefined();
+    expect(headers.authorization).toContain('SignedHeaders=host;x-amz-content-sha256;x-amz-date');
+  });
+
   it('deletes every object under a mirrored project prefix', async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = getRequestUrl(input);

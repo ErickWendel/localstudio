@@ -62,18 +62,18 @@ async function createSignedHeaders(
   const now = new Date();
   const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
   const dateStamp = amzDate.slice(0, 8);
-  const headers: Record<string, string> = {
+  const signingHeaders: Record<string, string> = {
     host: url.host,
     'x-amz-content-sha256': 'UNSIGNED-PAYLOAD',
     'x-amz-date': amzDate,
   };
-  if (contentType) headers['content-type'] = contentType;
+  if (contentType) signingHeaders['content-type'] = contentType;
 
-  const canonicalHeaders = Object.entries(headers)
+  const canonicalHeaders = Object.entries(signingHeaders)
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([name, value]) => `${name}:${value.trim()}\n`)
     .join('');
-  const signedHeaders = Object.keys(headers).sort().join(';');
+  const signedHeaders = Object.keys(signingHeaders).sort().join(';');
   const canonicalQuery = Array.from(url.searchParams.entries())
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([name, value]) => `${encodeURIComponent(name)}=${encodeURIComponent(value)}`)
@@ -96,8 +96,11 @@ async function createSignedHeaders(
   ].join('\n');
   const signature = await hmacHex(await getSigningKey(config, dateStamp), stringToSign);
 
+  const requestHeaders = Object.fromEntries(
+    Object.entries(signingHeaders).filter(([name]) => name !== 'host'),
+  );
   return {
-    ...headers,
+    ...requestHeaders,
     authorization: `AWS4-HMAC-SHA256 Credential=${config.accessKey}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
   };
 }
