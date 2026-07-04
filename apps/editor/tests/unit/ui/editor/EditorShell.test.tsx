@@ -595,6 +595,7 @@ function mockVideoMetadataLoad() {
       if (tagName.toLowerCase() === 'video') {
         Object.defineProperty(element, 'videoWidth', { configurable: true, value: 1280 });
         Object.defineProperty(element, 'videoHeight', { configurable: true, value: 720 });
+        Object.defineProperty(element, 'duration', { configurable: true, value: 8.5 });
         queueMicrotask(() => {
           element.dispatchEvent(new Event('loadedmetadata'));
         });
@@ -2379,7 +2380,8 @@ describe('EditorShell', () => {
     });
     expect(createObjectUrl).toHaveBeenCalledWith(video);
     expect(screen.getByRole('tab', { name: 'Design' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByLabelText('Show selected video controls')).toBeChecked();
+    expect(screen.getByRole('tab', { name: 'Movie' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByLabelText('Selected video trim end')).toHaveValue('8.5');
   });
 
   it('shows loading feedback while local video metadata is imported', async () => {
@@ -2453,8 +2455,8 @@ describe('EditorShell', () => {
     await user.click(screen.getByRole('button', { name: 'Demo clip' }));
 
     expect(screen.getByRole('tab', { name: 'Design' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByText('Playback')).toBeInTheDocument();
-    expect(screen.getByLabelText('Show selected video controls')).toBeChecked();
+    expect(screen.getByRole('tab', { name: 'Movie' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByLabelText('Selected video repeat mode')).toBeInTheDocument();
   });
 
   it('deletes the selected layer with Delete and Backspace keystrokes', async () => {

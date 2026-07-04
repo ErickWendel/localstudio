@@ -1,6 +1,12 @@
 import { Brush, Layers3, Sparkles } from 'lucide-react';
 import type { PageBackground, ProjectDocument, SelectionState } from '../../../domain/documents/model';
-import type { ElementStylePatch, MediaPlaybackPatch } from '../../../domain/commands/elements/basicCommands';
+import type {
+  AlignMode,
+  ElementFramePatch,
+  ElementStylePatch,
+  MediaPlaybackPatch,
+  ZOrderMode,
+} from '../../../domain/commands/elements/basicCommands';
 import type { AiProviderState, ModelState } from '../../../services/contracts/interfaces';
 import { SegmentedTabs, type SegmentedTab } from '../../components/SegmentedTabs';
 import { AiToolsPanel } from './AiToolsPanel';
@@ -42,9 +48,12 @@ interface RightPanelProps {
   onSetElementLock?: (elementId: string, locked: boolean) => void;
   onDeleteElement?: (elementId: string) => void;
   onReorderElement?: (elementId: string, targetElementId: string, position?: 'before' | 'after') => void;
+  onAlignSelectedElement?: (mode: AlignMode) => void;
   onUpdateElementStyle?: (elementId: string, patch: ElementStylePatch) => void;
+  onUpdateElementFrame?: (elementId: string, patch: ElementFramePatch) => void;
   onUpdateMediaPlayback?: (elementId: string, patch: MediaPlaybackPatch) => void;
   onUpdatePageBackground?: (background: PageBackground) => void;
+  onSetSelectedElementZOrder?: (mode: ZOrderMode) => void;
 }
 
 const tabs: Array<SegmentedTab<LegacyRightPanelTab>> = [
@@ -84,9 +93,12 @@ export function RightPanel({
   onSetElementLock,
   onDeleteElement,
   onReorderElement,
+  onAlignSelectedElement,
   onUpdateElementStyle,
+  onUpdateElementFrame,
   onUpdateMediaPlayback,
   onUpdatePageBackground,
+  onSetSelectedElementZOrder,
 }: RightPanelProps) {
   return (
     <aside className="right-panel" aria-label="Editor tools">
@@ -133,6 +145,10 @@ export function RightPanel({
             project={project}
             activePageId={activePageId}
             selection={selection}
+            {...(onAlignSelectedElement ? { onAlignSelectedElement } : {})}
+            {...(onSetElementLock ? { onSetElementLock } : {})}
+            {...(onSetSelectedElementZOrder ? { onSetSelectedElementZOrder } : {})}
+            {...(onUpdateElementFrame ? { onUpdateElementFrame } : {})}
             {...(onUpdateElementStyle ? { onUpdateElementStyle } : {})}
             {...(onUpdateMediaPlayback ? { onUpdateMediaPlayback } : {})}
             {...(onUpdatePageBackground ? { onUpdatePageBackground } : {})}

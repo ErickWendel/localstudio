@@ -26,7 +26,21 @@ export type ElementFramePatch = Partial<
 export type ImageCropPatch = ElementFramePatch & { crop: NonNullable<ImageElement['crop']> };
 export type GifPlaybackPatch = Partial<Pick<GifElement, 'playing'>>;
 export type VideoPlaybackPatch = Partial<
-  Pick<VideoElement, 'autoplayInPreview' | 'controls' | 'loop' | 'muted' | 'trimStartSeconds'>
+  Pick<
+    VideoElement,
+    | 'autoplayInPreview'
+    | 'controls'
+    | 'loop'
+    | 'muted'
+    | 'playAcrossSlides'
+    | 'playbackPositionSeconds'
+    | 'playing'
+    | 'posterFrameSeconds'
+    | 'repeatMode'
+    | 'startOnClick'
+    | 'trimStartSeconds'
+    | 'volume'
+  >
 > & {
   trimEndSeconds?: number | undefined;
 };

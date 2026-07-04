@@ -291,8 +291,11 @@ function readImageFileAsDataUrl(file: File) {
   });
 }
 
+type MediaSize = { height: number; width: number };
+type VideoSize = MediaSize & { durationSeconds?: number };
+
 function readImageSize(src: string) {
-  return new Promise<{ width: number; height: number }>((resolve, reject) => {
+  return new Promise<MediaSize>((resolve, reject) => {
     const image = new Image();
     image.addEventListener('load', () => {
       resolve({ width: image.naturalWidth, height: image.naturalHeight });
@@ -305,11 +308,17 @@ function readImageSize(src: string) {
 }
 
 function readVideoSize(src: string) {
-  return new Promise<{ width: number; height: number }>((resolve, reject) => {
+  return new Promise<VideoSize>((resolve, reject) => {
     const video = document.createElement('video');
     video.preload = 'metadata';
     video.addEventListener('loadedmetadata', () => {
-      resolve({ width: video.videoWidth || 16, height: video.videoHeight || 9 });
+      resolve({
+        ...(Number.isFinite(video.duration) && video.duration > 0
+          ? { durationSeconds: video.duration }
+          : {}),
+        width: video.videoWidth || 16,
+        height: video.videoHeight || 9,
+      });
     });
     video.addEventListener('error', () => {
       reject(new Error('Video dimensions could not be read.'));
@@ -3616,6 +3625,8 @@ export function useEditorViewModel(services: AppServices) {
       const mediaUrl = objectUrl ?? (await readImageFileAsDataUrl(file));
       const mediaSize =
         assetType === 'video' ? await readVideoSize(mediaUrl) : await readImageSize(mediaUrl);
+      const videoDurationSeconds =
+        assetType === 'video' ? (mediaSize as VideoSize).durationSeconds : undefined;
       const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
       if (!page) {
         setMediaImportProgress(undefined);
@@ -3698,6 +3709,12 @@ export function useEditorViewModel(services: AppServices) {
                 muted: true,
                 autoplayInPreview: true,
                 trimStartSeconds: 0,
+                ...(videoDurationSeconds !== undefined
+                  ? {
+                      durationSeconds: videoDurationSeconds,
+                      trimEndSeconds: videoDurationSeconds,
+                    }
+                  : {}),
               },
             }).execute(currentProject),
           { selectedElementIds: [elementId] },

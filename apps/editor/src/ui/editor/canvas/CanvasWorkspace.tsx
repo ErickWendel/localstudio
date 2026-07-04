@@ -1665,10 +1665,29 @@ function CanvasVideoElement({
   scale,
 }: CanvasVideoElementProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const reverseIntervalRef = useRef<number | undefined>(undefined);
   const previousTrimRef = useRef<
     { assetUrl: string | undefined; end: number | undefined; start: number } | undefined
   >(undefined);
-  const autoplay = previewMode && element.autoplayInPreview;
+  const repeatMode = element.repeatMode ?? (element.loop ? 'loop' : 'none');
+  const autoplay = previewMode && element.autoplayInPreview && !element.startOnClick;
+
+  function stopReversePlayback() {
+    if (reverseIntervalRef.current === undefined) return;
+    window.clearInterval(reverseIntervalRef.current);
+    reverseIntervalRef.current = undefined;
+  }
+
+  function getTrimStart() {
+    return Math.max(0, element.trimStartSeconds);
+  }
+
+  function getTrimEnd(video: HTMLVideoElement) {
+    if (element.trimEndSeconds !== undefined && element.trimEndSeconds > 0) {
+      return Math.max(0, element.trimEndSeconds);
+    }
+    return Number.isFinite(video.duration) ? video.duration : undefined;
+  }
 
   useEffect(() => {
     const video = videoRef.current;
@@ -1677,23 +1696,80 @@ function CanvasVideoElement({
     const end =
       element.trimEndSeconds !== undefined && element.trimEndSeconds > 0
         ? Math.max(0, element.trimEndSeconds)
-        : undefined;
+        : Number.isFinite(video.duration)
+          ? video.duration
+          : undefined;
     const previousTrim = previousTrimRef.current;
     const assetChanged = previousTrim?.assetUrl !== assetUrl;
-    if (assetChanged || previousTrim?.start !== start) {
+    video.volume = Math.min(1, Math.max(0, element.volume ?? 1));
+    if (assetChanged && element.posterFrameSeconds !== undefined) {
+      video.currentTime = Math.max(0, element.posterFrameSeconds);
+    } else if (assetChanged || previousTrim?.start !== start) {
       video.currentTime = start;
     } else if (previousTrim?.end !== end && end !== undefined) {
       video.currentTime = end;
     }
     previousTrimRef.current = { assetUrl, end, start };
-  }, [assetUrl, element.trimEndSeconds, element.trimStartSeconds]);
+  }, [
+    assetUrl,
+    element.posterFrameSeconds,
+    element.trimEndSeconds,
+    element.trimStartSeconds,
+    element.volume,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      if (reverseIntervalRef.current === undefined) return;
+      window.clearInterval(reverseIntervalRef.current);
+      reverseIntervalRef.current = undefined;
+    };
+  }, []);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || element.playbackPositionSeconds === undefined) return;
+    stopReversePlayback();
+    video.currentTime = Math.max(0, element.playbackPositionSeconds);
+  }, [element.playbackPositionSeconds]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || element.playing === undefined) return;
+    stopReversePlayback();
+    if (!element.playing) {
+      video.pause();
+      return;
+    }
+    void video.play().catch(() => {
+      video.pause();
+    });
+  }, [element.playing]);
+
+  function playReverse(video: HTMLVideoElement) {
+    stopReversePlayback();
+    video.pause();
+    reverseIntervalRef.current = window.setInterval(() => {
+      const trimStart = getTrimStart();
+      const nextTime = Math.max(trimStart, video.currentTime - 1 / 30);
+      video.currentTime = nextTime;
+      if (nextTime > trimStart) return;
+      stopReversePlayback();
+      void video.play();
+    }, 1000 / 30);
+  }
 
   function enforceTrimWindow(video: HTMLVideoElement) {
-    const trimEnd = element.trimEndSeconds;
+    const trimEnd = getTrimEnd(video);
     if (trimEnd === undefined || trimEnd <= 0) return;
     if (video.currentTime < trimEnd) return;
-    if (element.loop) {
-      video.currentTime = Math.max(0, element.trimStartSeconds);
+    if (repeatMode === 'loop') {
+      video.currentTime = getTrimStart();
+      void video.play();
+      return;
+    }
+    if (repeatMode === 'loop-back-and-forth') {
+      playReverse(video);
       return;
     }
     video.pause();
@@ -1707,7 +1783,7 @@ function CanvasVideoElement({
       controls={interactive && element.controls}
       data-trim-end={element.trimEndSeconds ?? ''}
       data-trim-start={element.trimStartSeconds}
-      loop={element.loop}
+      loop={repeatMode === 'loop' && element.trimEndSeconds === undefined}
       muted={element.muted}
       playsInline
       preload="auto"
@@ -1715,7 +1791,8 @@ function CanvasVideoElement({
       src={assetUrl}
       style={getMediaStyle(element, scale, interactive, opacity)}
       onLoadedMetadata={(event) => {
-        event.currentTarget.currentTime = Math.max(0, element.trimStartSeconds);
+        event.currentTarget.volume = Math.min(1, Math.max(0, element.volume ?? 1));
+        event.currentTarget.currentTime = element.posterFrameSeconds ?? getTrimStart();
       }}
       onTimeUpdate={(event) => {
         enforceTrimWindow(event.currentTarget);

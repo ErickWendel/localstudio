@@ -10,7 +10,13 @@ import type {
   ShapeKind,
   SlideTransition,
 } from '../../../domain/documents/model';
-import type { ElementStylePatch, MediaPlaybackPatch } from '../../../domain/commands/elements/basicCommands';
+import type {
+  AlignMode,
+  ElementFramePatch,
+  ElementStylePatch,
+  MediaPlaybackPatch,
+  ZOrderMode,
+} from '../../../domain/commands/elements/basicCommands';
 import type {
   AiProviderState,
   FontCatalogItem,
@@ -95,6 +101,9 @@ interface LeftToolPanelProps {
   onSetElementLock?: ((elementId: string, locked: boolean) => void) | undefined;
   onDeleteElement?: ((elementId: string) => void) | undefined;
   onReorderElement?: ((elementId: string, targetElementId: string, position?: 'before' | 'after') => void) | undefined;
+  onAlignSelectedElement?: ((mode: AlignMode) => void) | undefined;
+  onSetSelectedElementZOrder?: ((mode: ZOrderMode) => void) | undefined;
+  onUpdateElementFrame?: ((elementId: string, patch: ElementFramePatch) => void) | undefined;
   onUpdateElementStyle?: ((elementId: string, patch: ElementStylePatch) => void) | undefined;
   onUpdateMediaPlayback?: ((elementId: string, patch: MediaPlaybackPatch) => void) | undefined;
   onUpdatePageBackground?: ((background: PageBackground) => void) | undefined;
@@ -174,6 +183,9 @@ export function LeftToolPanel({
   onSetElementLock,
   onDeleteElement,
   onReorderElement,
+  onAlignSelectedElement,
+  onSetSelectedElementZOrder,
+  onUpdateElementFrame,
   onUpdateElementStyle,
   onUpdateMediaPlayback,
   onUpdatePageBackground,
@@ -249,6 +261,10 @@ export function LeftToolPanel({
             {...(availableFonts ? { availableFonts } : {})}
             {...(focusFontControlKey ? { focusFontControlKey } : {})}
             {...(onDownloadFont ? { onDownloadFont } : {})}
+            {...(onAlignSelectedElement ? { onAlignSelectedElement } : {})}
+            {...(onSetElementLock ? { onSetElementLock } : {})}
+            {...(onSetSelectedElementZOrder ? { onSetSelectedElementZOrder } : {})}
+            {...(onUpdateElementFrame ? { onUpdateElementFrame } : {})}
             {...(onUpdateElementStyle ? { onUpdateElementStyle } : {})}
             {...(onUpdateMediaPlayback ? { onUpdateMediaPlayback } : {})}
             {...(onUpdatePageBackground ? { onUpdatePageBackground } : {})}

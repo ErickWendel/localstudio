@@ -57,13 +57,20 @@ type SnapshotElement = Pick<
   assetId?: string;
   autoplayInPreview?: boolean;
   controls?: boolean;
+  durationSeconds?: number;
   fill?: string;
   loop?: boolean;
   muted?: boolean;
+  playAcrossSlides?: boolean;
+  playbackPositionSeconds?: number;
   playing?: boolean;
+  posterFrameSeconds?: number;
+  repeatMode?: string;
+  startOnClick?: boolean;
   text?: string;
   trimEndSeconds?: number | undefined;
   trimStartSeconds?: number;
+  volume?: number;
 };
 
 const VALID_TRANSLATION_SCOPES: TranslationScope[] = ['selection', 'slide', 'deck'];
@@ -119,8 +126,24 @@ function compactElement(element: DesignElement): SnapshotElement {
       controls: element.controls,
       loop: element.loop,
       muted: element.muted,
-      trimEndSeconds: element.trimEndSeconds,
       trimStartSeconds: element.trimStartSeconds,
+      ...(element.durationSeconds !== undefined
+        ? { durationSeconds: element.durationSeconds }
+        : {}),
+      ...(element.playbackPositionSeconds !== undefined
+        ? { playbackPositionSeconds: element.playbackPositionSeconds }
+        : {}),
+      ...(element.playAcrossSlides !== undefined
+        ? { playAcrossSlides: element.playAcrossSlides }
+        : {}),
+      ...(element.playing !== undefined ? { playing: element.playing } : {}),
+      ...(element.posterFrameSeconds !== undefined
+        ? { posterFrameSeconds: element.posterFrameSeconds }
+        : {}),
+      ...(element.repeatMode !== undefined ? { repeatMode: element.repeatMode } : {}),
+      ...(element.startOnClick !== undefined ? { startOnClick: element.startOnClick } : {}),
+      ...(element.trimEndSeconds !== undefined ? { trimEndSeconds: element.trimEndSeconds } : {}),
+      ...(element.volume !== undefined ? { volume: element.volume } : {}),
     };
   }
   return {

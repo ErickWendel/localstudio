@@ -875,6 +875,9 @@ export function EditorShell({ services }: EditorShellProps) {
           onSetElementLock={isHistoryReadOnly ? undefined : vm.setElementLock}
           onDeleteElement={isHistoryReadOnly ? undefined : vm.deleteElement}
           onReorderElement={isHistoryReadOnly ? undefined : vm.reorderElement}
+          onAlignSelectedElement={isHistoryReadOnly ? undefined : vm.alignSelectedElement}
+          onSetSelectedElementZOrder={isHistoryReadOnly ? undefined : vm.setSelectedElementZOrder}
+          onUpdateElementFrame={isHistoryReadOnly ? undefined : vm.updateElementFrame}
           onUpdateElementStyle={isHistoryReadOnly ? undefined : vm.updateElementStyle}
           onUpdateMediaPlayback={isHistoryReadOnly ? undefined : vm.updateMediaPlayback}
           onUpdatePageBackground={isHistoryReadOnly ? undefined : vm.updatePageBackground}
