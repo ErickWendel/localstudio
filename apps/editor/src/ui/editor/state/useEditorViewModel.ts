@@ -3768,6 +3768,31 @@ export function useEditorViewModel(services: AppServices) {
     }
   }
 
+  async function replaceVideoAsset(elementId: string, file: File) {
+    if (getMediaAssetType(file) !== 'video') return;
+    const dataUrl = await readImageFileAsDataUrl(file);
+    const mediaSize = await readVideoSize(dataUrl);
+    const videoDurationSeconds = mediaSize.durationSeconds;
+    const assetId = createPrefixedId('asset');
+    const mediaName = file.name.trim() || 'Replacement video';
+
+    commitProject(
+      (currentProject) =>
+        new basicCommands.ReplaceVideoAssetCommand(
+          elementId,
+          {
+            id: assetId,
+            type: 'video',
+            name: mediaName,
+            mimeType: file.type || 'video/mp4',
+            objectUrl: dataUrl,
+          },
+          videoDurationSeconds !== undefined ? { durationSeconds: videoDurationSeconds } : {},
+        ).execute(currentProject),
+      { selectedElementIds: [elementId] },
+    );
+  }
+
   function addRecentStockMedia(item: StockMediaItem) {
     setStockMediaRecentItems((currentItems) => [
       item,
@@ -4115,5 +4140,6 @@ export function useEditorViewModel(services: AppServices) {
     importImageFile,
     importMediaFile: importImageFile,
     clearMediaImportProgress,
+    replaceVideoAsset,
   };
 }

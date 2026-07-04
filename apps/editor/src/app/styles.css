@@ -1467,6 +1467,7 @@ button {
 }
 
 .left-tool-panel {
+  position: relative;
   min-height: 0;
   display: grid;
   grid-template-columns: 78px 0;
@@ -1480,8 +1481,12 @@ button {
 }
 
 .left-tool-panel-open {
-  grid-template-columns: 78px 266px;
-  width: 344px;
+  grid-template-columns: 78px var(--left-tool-content-width, 266px);
+  width: calc(78px + var(--left-tool-content-width, 266px));
+}
+
+.left-tool-panel-resizing {
+  user-select: none;
 }
 
 .left-tool-rail {
@@ -1532,6 +1537,38 @@ button {
   overflow-x: hidden;
   overflow-y: auto;
   padding: 18px;
+}
+
+.left-tool-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  bottom: 0;
+  z-index: 20;
+  width: 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: ew-resize;
+  padding: 0;
+}
+
+.left-tool-resize-handle::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 1px;
+  background: rgba(55, 253, 118, 0.34);
+}
+
+.left-tool-resize-handle:hover::before,
+.left-tool-panel-resizing .left-tool-resize-handle::before {
+  left: 2px;
+  width: 3px;
+  background: var(--ew-green);
+  box-shadow: 0 0 18px rgba(55, 253, 118, 0.34);
 }
 
 .left-tool-panel:not(.left-tool-panel-open) .left-tool-content {
@@ -3817,6 +3854,10 @@ button {
     width: min(348px, calc(100vw - 24px));
   }
 
+  .left-tool-resize-handle {
+    display: none;
+  }
+
   .left-tool-rail {
     padding: 10px 7px;
   }
@@ -4207,6 +4248,10 @@ button {
   .left-tool-panel-open {
     height: min(58dvh, 460px);
     grid-template-rows: minmax(0, 1fr) 64px;
+  }
+
+  .left-tool-resize-handle {
+    display: none;
   }
 
   .left-tool-rail {

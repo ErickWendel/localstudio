@@ -1,5 +1,5 @@
 import { Brush, Clapperboard, ImagePlus, Layers3, Shapes, Sparkles, Type } from 'lucide-react';
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { collectReferencedAssetIds } from '../../../domain/assets/assetUsage';
 import type {
   Asset,
@@ -107,6 +107,7 @@ interface LeftToolPanelProps {
   onUpdateElementStyle?: ((elementId: string, patch: ElementStylePatch) => void) | undefined;
   onUpdateMediaPlayback?: ((elementId: string, patch: MediaPlaybackPatch) => void) | undefined;
   onUpdatePageBackground?: ((background: PageBackground) => void) | undefined;
+  onReplaceVideoAsset?: ((elementId: string, file: File) => void) | undefined;
   onClearPageTransition?: (() => void) | undefined;
   onSetPageTransition?: ((transition: SlideTransition) => void) | undefined;
   onSetElementAnimationBuilds?: ((elementIds: string[], patch: Omit<ElementAnimationBuild, 'elementId' | 'id'>) => void) | undefined;
@@ -189,6 +190,7 @@ export function LeftToolPanel({
   onUpdateElementStyle,
   onUpdateMediaPlayback,
   onUpdatePageBackground,
+  onReplaceVideoAsset,
   onClearPageTransition,
   onSetPageTransition,
   onSetElementAnimationBuilds,
@@ -197,6 +199,9 @@ export function LeftToolPanel({
   onPlayAnimationPreview,
 }: LeftToolPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const resizeStartRef = useRef<{ pointerX: number; width: number } | undefined>(undefined);
+  const [contentWidth, setContentWidth] = useState(266);
+  const [resizing, setResizing] = useState(false);
   const isAttentionOpen = Boolean(attentionModelId || promptApiAttention || translationTargetAttention);
   const panelOpen = open || isAttentionOpen;
   const assetRows = useMemo(() => {
@@ -210,8 +215,40 @@ export function LeftToolPanel({
       .sort((a, b) => a.asset.name.localeCompare(b.asset.name, undefined, { sensitivity: 'base' }));
   }, [activeTab, panelOpen, project]);
 
+  useEffect(() => {
+    if (!resizing) return undefined;
+
+    function handlePointerMove(event: PointerEvent) {
+      const resizeStart = resizeStartRef.current;
+      if (!resizeStart) return;
+      setContentWidth(Math.min(520, Math.max(240, resizeStart.width + event.clientX - resizeStart.pointerX)));
+    }
+
+    function handlePointerUp() {
+      resizeStartRef.current = undefined;
+      setResizing(false);
+    }
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp, { once: true });
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [resizing]);
+
   return (
-    <aside className={panelOpen ? 'left-tool-panel left-tool-panel-open' : 'left-tool-panel'} aria-label="Editor tools">
+    <aside
+      className={
+        panelOpen
+          ? resizing
+            ? 'left-tool-panel left-tool-panel-open left-tool-panel-resizing'
+            : 'left-tool-panel left-tool-panel-open'
+          : 'left-tool-panel'
+      }
+      aria-label="Editor tools"
+      style={{ '--left-tool-content-width': `${contentWidth}px` } as CSSProperties}
+    >
       <nav className="left-tool-rail" aria-label="Tool menu">
         {menuItems.map((item) => {
           const Icon = item.icon;
@@ -268,6 +305,7 @@ export function LeftToolPanel({
             {...(onUpdateElementStyle ? { onUpdateElementStyle } : {})}
             {...(onUpdateMediaPlayback ? { onUpdateMediaPlayback } : {})}
             {...(onUpdatePageBackground ? { onUpdatePageBackground } : {})}
+            {...(onReplaceVideoAsset ? { onReplaceVideoAsset } : {})}
           />
         ) : null}
         {panelOpen && activeTab === 'text' ? (
@@ -384,6 +422,21 @@ export function LeftToolPanel({
           </section>
         ) : null}
       </div>
+      {panelOpen ? (
+        <button
+          aria-label="Resize design panel"
+          className="left-tool-resize-handle"
+          type="button"
+          onPointerDown={(event) => {
+            resizeStartRef.current = {
+              pointerX: event.clientX,
+              width: contentWidth,
+            };
+            setResizing(true);
+            event.currentTarget.setPointerCapture(event.pointerId);
+          }}
+        />
+      ) : null}
     </aside>
   );
 }

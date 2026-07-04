@@ -54,6 +54,7 @@ interface RightPanelProps {
   onUpdateMediaPlayback?: (elementId: string, patch: MediaPlaybackPatch) => void;
   onUpdatePageBackground?: (background: PageBackground) => void;
   onSetSelectedElementZOrder?: (mode: ZOrderMode) => void;
+  onReplaceVideoAsset?: (elementId: string, file: File) => void;
 }
 
 const tabs: Array<SegmentedTab<LegacyRightPanelTab>> = [
@@ -99,6 +100,7 @@ export function RightPanel({
   onUpdateMediaPlayback,
   onUpdatePageBackground,
   onSetSelectedElementZOrder,
+  onReplaceVideoAsset,
 }: RightPanelProps) {
   return (
     <aside className="right-panel" aria-label="Editor tools">
@@ -152,6 +154,7 @@ export function RightPanel({
             {...(onUpdateElementStyle ? { onUpdateElementStyle } : {})}
             {...(onUpdateMediaPlayback ? { onUpdateMediaPlayback } : {})}
             {...(onUpdatePageBackground ? { onUpdatePageBackground } : {})}
+            {...(onReplaceVideoAsset ? { onReplaceVideoAsset } : {})}
           />
         ) : null}
       </div>

@@ -881,6 +881,13 @@ export function EditorShell({ services }: EditorShellProps) {
           onUpdateElementStyle={isHistoryReadOnly ? undefined : vm.updateElementStyle}
           onUpdateMediaPlayback={isHistoryReadOnly ? undefined : vm.updateMediaPlayback}
           onUpdatePageBackground={isHistoryReadOnly ? undefined : vm.updatePageBackground}
+          onReplaceVideoAsset={
+            isHistoryReadOnly
+              ? undefined
+              : (elementId, file) => {
+                  void vm.replaceVideoAsset(elementId, file);
+                }
+          }
           onClearPageTransition={isHistoryReadOnly ? undefined : vm.clearPageTransition}
           onSetPageTransition={isHistoryReadOnly ? undefined : vm.setPageTransition}
           onSetElementAnimationBuilds={isHistoryReadOnly ? undefined : vm.setElementAnimationBuilds}

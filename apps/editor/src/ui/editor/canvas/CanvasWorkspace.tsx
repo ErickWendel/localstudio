@@ -1667,7 +1667,13 @@ function CanvasVideoElement({
   const videoRef = useRef<HTMLVideoElement>(null);
   const reverseIntervalRef = useRef<number | undefined>(undefined);
   const previousTrimRef = useRef<
-    { assetUrl: string | undefined; end: number | undefined; start: number } | undefined
+    | {
+        assetUrl: string | undefined;
+        end: number | undefined;
+        poster: number | undefined;
+        start: number;
+      }
+    | undefined
   >(undefined);
   const repeatMode = element.repeatMode ?? (element.loop ? 'loop' : 'none');
   const autoplay = previewMode && element.autoplayInPreview && !element.startOnClick;
@@ -1701,15 +1707,20 @@ function CanvasVideoElement({
           : undefined;
     const previousTrim = previousTrimRef.current;
     const assetChanged = previousTrim?.assetUrl !== assetUrl;
+    const poster =
+      element.posterFrameSeconds !== undefined
+        ? Math.max(0, element.posterFrameSeconds)
+        : undefined;
+    const posterChanged = previousTrim?.poster !== poster;
     video.volume = Math.min(1, Math.max(0, element.volume ?? 1));
-    if (assetChanged && element.posterFrameSeconds !== undefined) {
-      video.currentTime = Math.max(0, element.posterFrameSeconds);
+    if (posterChanged && poster !== undefined) {
+      video.currentTime = poster;
     } else if (assetChanged || previousTrim?.start !== start) {
       video.currentTime = start;
     } else if (previousTrim?.end !== end && end !== undefined) {
       video.currentTime = end;
     }
-    previousTrimRef.current = { assetUrl, end, start };
+    previousTrimRef.current = { assetUrl, end, poster, start };
   }, [
     assetUrl,
     element.posterFrameSeconds,
