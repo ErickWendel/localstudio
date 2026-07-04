@@ -13,6 +13,7 @@ import type {
 import type { ElementStylePatch, MediaPlaybackPatch } from '../../../domain/commands/elements/basicCommands';
 import type {
   AiProviderState,
+  FontCatalogItem,
   ModelState,
   StockMediaItem,
   StockMediaProviderState,
@@ -39,6 +40,7 @@ interface LeftToolPanelProps {
       }
     | undefined;
   activeSlideLanguage?: { code: string; displayCode: string; flag: string; label: string } | undefined;
+  focusFontControlKey?: number | undefined;
   onTabChange: (tab: RightPanelTab) => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -49,6 +51,7 @@ interface LeftToolPanelProps {
   translationProviderStates?: AiProviderState[];
   languageDetectionProviderStates?: AiProviderState[];
   translationLanguageOptions?: Array<{ code: string; flag: string; label: string }>;
+  availableFonts?: FontCatalogItem[];
   languageDetectionPreparation?: { progress: number; sourceLanguage?: string; status: 'idle' | 'downloading' | 'ready' | 'failed' };
   translationPreparation?: { progress: number; sourceLanguage?: string; status: 'idle' | 'downloading' | 'ready' | 'failed' };
   translationTargetAttention?: boolean;
@@ -57,6 +60,7 @@ interface LeftToolPanelProps {
   promptApiNotice?: string | undefined;
   promptPreparation?: { availability: string; progress: number; status: 'idle' | 'downloading' | 'ready' | 'failed' };
   onDownloadModel?: ((id: string) => Promise<void>) | undefined;
+  onDownloadFont?: ((family: string) => Promise<void>) | undefined;
   onRemoveModel?: ((id: string) => Promise<void>) | undefined;
   onCreateImageOptionsChange?: ((options: CreateImagePromptOptions) => void) | undefined;
   stockGifResults?: StockMediaItem[];
@@ -115,6 +119,7 @@ export function LeftToolPanel({
   activeTab,
   animationPreview,
   activeSlideLanguage,
+  focusFontControlKey,
   onTabChange,
   open = false,
   onOpenChange,
@@ -125,6 +130,7 @@ export function LeftToolPanel({
   translationProviderStates,
   languageDetectionProviderStates,
   translationLanguageOptions,
+  availableFonts,
   languageDetectionPreparation,
   translationPreparation,
   translationTargetAttention,
@@ -133,6 +139,7 @@ export function LeftToolPanel({
   promptApiNotice,
   promptPreparation,
   onDownloadModel,
+  onDownloadFont,
   onRemoveModel,
   onCreateImageOptionsChange,
   stockGifResults,
@@ -238,6 +245,9 @@ export function LeftToolPanel({
             project={project}
             activePageId={activePageId}
             selection={selection}
+            {...(availableFonts ? { availableFonts } : {})}
+            {...(focusFontControlKey ? { focusFontControlKey } : {})}
+            {...(onDownloadFont ? { onDownloadFont } : {})}
             {...(onUpdateElementStyle ? { onUpdateElementStyle } : {})}
             {...(onUpdateMediaPlayback ? { onUpdateMediaPlayback } : {})}
             {...(onUpdatePageBackground ? { onUpdatePageBackground } : {})}

@@ -2571,6 +2571,11 @@ button {
   font:
     600 13px 'Open Sans',
     sans-serif;
+  cursor: pointer;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .text-toolbar-size {
@@ -5569,6 +5574,232 @@ button {
 .design-control select:focus {
   border-color: var(--ew-green);
   box-shadow: 0 0 0 2px rgba(55, 253, 118, 0.14);
+}
+
+.text-inspector-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.text-inspector-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.text-inspector-label {
+  color: var(--ew-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.text-inspector-field input,
+.text-inspector-field select {
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--ew-text);
+  font: inherit;
+  font-size: 14px;
+  outline: 0;
+  padding: 0 12px;
+}
+
+.text-inspector-field input:focus,
+.text-inspector-field select:focus {
+  box-shadow: 0 0 0 2px rgba(55, 253, 118, 0.42);
+}
+
+.text-inspector-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(86px, 0.6fr);
+  gap: 8px;
+  align-items: end;
+}
+
+.text-style-row,
+.text-align-grid {
+  display: grid;
+  overflow: hidden;
+  min-height: 40px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.text-style-row {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.text-align-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.text-style-toggle,
+.text-align-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  border: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  color: var(--ew-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.text-style-toggle:last-child,
+.text-align-button:last-child {
+  border-right: 0;
+}
+
+.text-style-toggle.active,
+.text-align-button.active {
+  color: #000;
+  background: var(--ew-green);
+}
+
+.text-style-toggle:focus-visible,
+.text-align-button:focus-visible {
+  outline: 2px solid rgba(55, 253, 118, 0.55);
+  outline-offset: -2px;
+}
+
+.text-style-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.text-color-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  align-items: center;
+  min-height: 54px;
+  gap: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--ew-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.text-color-row input {
+  width: 100%;
+  height: 34px;
+  border: 0;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.16);
+  padding: 3px;
+}
+
+.font-control-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 38px;
+  gap: 8px;
+  align-items: end;
+}
+
+.font-control-select {
+  min-width: 0;
+}
+
+.font-add-button,
+.font-search-submit,
+.font-download-result {
+  border: 1px solid rgba(55, 253, 118, 0.24);
+  border-radius: 6px;
+  background: #050d10;
+  color: var(--ew-text);
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.font-add-button,
+.font-search-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  width: 38px;
+  height: 40px;
+  min-height: 0;
+  padding: 0;
+}
+
+.font-add-button:hover,
+.font-add-button:focus-visible,
+.font-search-submit:hover,
+.font-search-submit:focus-visible,
+.font-download-result:hover,
+.font-download-result:focus-visible {
+  border-color: var(--ew-green);
+  box-shadow: 0 0 16px rgba(55, 253, 118, 0.1);
+  outline: 0;
+}
+
+.font-add-button[aria-expanded='true'] {
+  color: #000;
+  background: var(--ew-green);
+}
+
+.font-download-panel {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(55, 253, 118, 0.18);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.34);
+}
+
+.font-download-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 38px;
+  gap: 8px;
+}
+
+.font-download-search-box {
+  margin: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: #000;
+}
+
+.font-download-results {
+  display: grid;
+  gap: 6px;
+}
+
+.font-download-result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  align-items: center;
+  min-height: 36px;
+  gap: 8px;
+  padding: 0 10px;
+  color: var(--ew-text);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+}
+
+.font-download-result span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.font-download-result:disabled {
+  cursor: progress;
+  opacity: 0.65;
 }
 
 .design-selection-summary {

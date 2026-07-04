@@ -27,6 +27,7 @@ import { sampleProject } from '../../../domain/projects/sampleProject';
 import type { EditorAutomationDelegate } from '../../../services/automation/editorAutomationController';
 import type {
   AiProviderState,
+  FontImportService,
   MirrorProjectSummary,
   MirrorState,
   ModelDownloadProgressDetails,
@@ -38,6 +39,7 @@ import type {
   VersionHistoryEntry,
 } from '../../../services/contracts/interfaces';
 import type { PptxImportInput } from '../../../services/importing/pptx/pptxImportService';
+import { pptxFontRequests } from '../../../services/importing/pptx/pptxFontRequests';
 import { pptxImportLogger } from '../../../services/importing/pptx/pptxImportLogger';
 import { minioMirrorService } from '../../../services/mirror/minioMirrorService';
 import type { MinioMirrorConfig } from '../../../services/mirror/minioMirrorService';
@@ -102,7 +104,14 @@ interface PromptPreparationState extends ModelDownloadProgressDetails {
 export interface PresentationImportProgressState {
   detail: string;
   progress: number;
-  stage: 'reading' | 'inspecting' | 'extracting-objects' | 'extracting-media' | 'mapping-animations' | 'opening';
+  stage:
+    | 'reading'
+    | 'inspecting'
+    | 'extracting-objects'
+    | 'downloading-fonts'
+    | 'extracting-media'
+    | 'mapping-animations'
+    | 'opening';
   title: string;
 }
 
@@ -252,6 +261,10 @@ function normalizeProjectDocument(project: ProjectDocument): ProjectDocument {
       visible: page.visible ?? true,
     })),
   };
+}
+
+async function loadProjectFonts(project: ProjectDocument, fontImportService: FontImportService) {
+  await fontImportService.loadProjectFonts(project).catch(() => undefined);
 }
 
 function readImageFileAsDataUrl(file: File) {
@@ -657,6 +670,10 @@ export function useEditorViewModel(services: AppServices) {
     const element = project.elements[selectedElementIds[0] ?? ''];
     return element?.type === 'image' ? element : undefined;
   }, [project.elements, selectedElementIds]);
+  const availableFonts = useMemo(
+    () => services.fontImportService.listDownloadableFonts(),
+    [services.fontImportService],
+  );
   useEffect(() => {
     if (stockMediaProviderState.images.configured && stockImageResults.length === 0) {
       void searchStockImages('');
@@ -769,10 +786,12 @@ export function useEditorViewModel(services: AppServices) {
       .loadProject(
         services.storedProjectName ? { projectName: services.storedProjectName } : undefined,
       )
-      .then((savedProject) => {
+      .then(async (savedProject) => {
         if (!isMounted) return;
         if (savedProject) {
           const normalizedProject = normalizeProjectDocument(savedProject);
+          await loadProjectFonts(normalizedProject, services.fontImportService);
+          if (!isMounted) return;
           setProject(normalizedProject);
           setActivePageId(normalizedProject.pages[0]?.id ?? '');
           setPageLanguageCodes({});
@@ -805,6 +824,7 @@ export function useEditorViewModel(services: AppServices) {
     };
   }, [
     persistenceEnabled,
+    services.fontImportService,
     services.projectRepository,
     services.storedProjectName,
     storedMirrorConfig,
@@ -1723,6 +1743,7 @@ export function useEditorViewModel(services: AppServices) {
       const importedProject = await services.projectRepository.importProject();
       if (!importedProject) return;
       const normalizedProject = normalizeProjectDocument(importedProject);
+      await loadProjectFonts(normalizedProject, services.fontImportService);
       setProject(normalizedProject);
       setActivePageId(normalizedProject.pages[0]?.id ?? '');
       setPageLanguageCodes({});
@@ -1785,6 +1806,43 @@ export function useEditorViewModel(services: AppServices) {
       });
       await waitForNextPaint();
       setPresentationImportProgress({
+        detail: 'Matching imported text styles with downloadable Google Fonts.',
+        progress: 68,
+        stage: 'downloading-fonts',
+        title: 'Downloading fonts',
+      });
+      await waitForNextPaint();
+      const fontRequests = pptxFontRequests.collect(importedProject);
+      const fontImportResult =
+        fontRequests.length > 0
+          ? await services.fontImportService.resolveAndDownloadFonts(fontRequests).catch(() => ({
+              fonts: {},
+              warnings: [
+                {
+                  code: 'font-download-failed',
+                  message: 'Could not download one or more imported PowerPoint fonts.',
+                  severity: 'warning' as const,
+                },
+              ],
+            }))
+          : { fonts: {}, warnings: [] };
+      const importedProjectWithFonts: ProjectDocument = {
+        ...importedProject,
+        fonts: {
+          ...(importedProject.fonts ?? {}),
+          ...fontImportResult.fonts,
+        },
+        ...((importedProject.importWarnings?.length ?? 0) > 0 ||
+        fontImportResult.warnings.length > 0
+          ? {
+              importWarnings: [
+                ...(importedProject.importWarnings ?? []),
+                ...fontImportResult.warnings,
+              ],
+            }
+          : {}),
+      };
+      setPresentationImportProgress({
         detail: 'Linking original videos and GIFs from the PowerPoint package.',
         progress: 72,
         stage: 'extracting-media',
@@ -1798,7 +1856,8 @@ export function useEditorViewModel(services: AppServices) {
         title: 'Mapping animations',
       });
       await waitForNextPaint();
-      const normalizedProject = normalizeProjectDocument(importedProject);
+      const normalizedProject = normalizeProjectDocument(importedProjectWithFonts);
+      await loadProjectFonts(normalizedProject, services.fontImportService);
       setPresentationImportProgress({
         detail: 'Opening the imported project in the editor.',
         progress: 94,
@@ -2048,6 +2107,7 @@ export function useEditorViewModel(services: AppServices) {
       const files = await services.mirrorService.downloadProject(projectId, config);
       const importedProject = await services.projectRepository.importMirrorFiles(files);
       const normalizedProject = normalizeProjectDocument(importedProject);
+      await loadProjectFonts(normalizedProject, services.fontImportService);
       setProject(normalizedProject);
       setActivePageId(normalizedProject.pages[0]?.id ?? '');
       setPageLanguageCodes({});
@@ -2134,6 +2194,7 @@ export function useEditorViewModel(services: AppServices) {
     const versionProject = await services.projectRepository.loadVersion(versionId);
     if (!versionProject) return;
     const normalizedVersionProject = normalizeProjectDocument(versionProject);
+    await loadProjectFonts(normalizedVersionProject, services.fontImportService);
     setSelectedVersionId(versionId);
     setPreviewProject(normalizedVersionProject);
     const nextPageId = entry?.firstChangedPageId ?? normalizedVersionProject.pages[0]?.id ?? '';
@@ -2149,6 +2210,7 @@ export function useEditorViewModel(services: AppServices) {
       ...restoredProject,
       updatedAt: new Date().toISOString(),
     });
+    await loadProjectFonts(normalizedProject, services.fontImportService);
     await services.projectRepository.saveProject(normalizedProject);
     setSaveAnimationKey((current) => current + 1);
     if (services.projectRepository.saveVersion) {
@@ -2236,6 +2298,47 @@ export function useEditorViewModel(services: AppServices) {
       const minimumHeight = getMinimumTextHeight(element.text, element.fontSize);
       if (element.height >= minimumHeight) return nextProject;
       return new basicCommands.UpdateElementFrameCommand(elementId, {
+        height: minimumHeight,
+      }).execute(nextProject);
+    });
+  }
+
+  async function downloadFontForSelection(family: string) {
+    const selectedElementId = selectedElementIdsRef.current[0];
+    if (!selectedElementId) throw new Error('Select a text element before downloading a font.');
+    const selectedElement = projectRef.current.elements[selectedElementId];
+    if (!selectedElement || selectedElement.type !== 'text') {
+      throw new Error('Select a text element before downloading a font.');
+    }
+
+    const result = await services.fontImportService.resolveAndDownloadFonts([
+      {
+        family,
+        fontStyle: 'normal',
+        fontWeight: selectedElement.fontWeight >= 700 ? 700 : 400,
+      },
+    ]);
+    const font = Object.values(result.fonts)[0];
+    if (!font) {
+      throw new Error(result.warnings[0]?.message ?? 'Font download failed.');
+    }
+
+    commitProject((currentProject) => {
+      const projectWithFont: ProjectDocument = {
+        ...currentProject,
+        fonts: {
+          ...(currentProject.fonts ?? {}),
+          ...result.fonts,
+        },
+      };
+      const nextProject = new basicCommands.UpdateElementStyleCommand(selectedElementId, {
+        fontFamily: font.family,
+      }).execute(projectWithFont);
+      const nextElement = nextProject.elements[selectedElementId];
+      if (!nextElement || nextElement.type !== 'text') return nextProject;
+      const minimumHeight = getMinimumTextHeight(nextElement.text, nextElement.fontSize);
+      if (nextElement.height >= minimumHeight) return nextProject;
+      return new basicCommands.UpdateElementFrameCommand(selectedElementId, {
         height: minimumHeight,
       }).execute(nextProject);
     });
@@ -3748,6 +3851,7 @@ export function useEditorViewModel(services: AppServices) {
     canRedo: history.future.length > 0,
     selection,
     activeTab,
+    availableFonts,
     activeSlideLanguage,
     setActiveTab,
     modelStates,
@@ -3871,6 +3975,7 @@ export function useEditorViewModel(services: AppServices) {
     updateElementFrame,
     updateElementFrames,
     updateElementStyle,
+    downloadFontForSelection,
     updateMediaPlayback,
     updatePageBackground,
     clearPageTransition,

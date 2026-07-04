@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -519,6 +520,14 @@ export function CanvasWorkspace({
     (element): element is GifElement | VideoElement =>
       element.type === 'gif' || element.type === 'video',
   );
+  const projectFontSignature = useMemo(
+    () =>
+      Object.values(project.fonts ?? {})
+        .map((font) => `${font.family}:${font.fontStyle}:${font.fontWeight}:${font.objectUrl ?? ''}`)
+        .sort()
+        .join('|'),
+    [project.fonts],
+  );
   const hasSelection = selection.elementIds.length > 0;
   const isPresenterPlayback = presentationMode || animationPreview?.mode === 'presenter';
   const showEditorOverlays = !isPresenterPlayback && !readOnly;
@@ -619,9 +628,14 @@ export function CanvasWorkspace({
     if (!fontSet) return;
     let isMounted = true;
 
+    const projectFontLoads = Object.values(project.fonts ?? {}).map((font) =>
+      fontSet.load(`${font.fontWeight} 16px "${font.family}"`),
+    );
+
     void Promise.all([
       fontSet.load('800 96px Orbitron'),
       fontSet.load('600 40px "Open Sans"'),
+      ...projectFontLoads,
       fontSet.ready,
     ]).then(() => {
       if (!isMounted) return;
@@ -632,7 +646,7 @@ export function CanvasWorkspace({
     return () => {
       isMounted = false;
     };
-  }, [stageRef]);
+  }, [project.fonts, projectFontSignature, stageRef]);
 
   useEffect(() => {
     if (backgroundSelectionMode || hasProcessingElements) return;

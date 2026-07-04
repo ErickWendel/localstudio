@@ -35,11 +35,14 @@ const LAST_PROJECT_NAME_KEY = 'localstudio.ai.opfs.last-project-name';
 async function createFileBackedProjectSnapshot(
   project: ProjectDocument,
   assetsDirectory: FileSystemDirectoryHandle,
+  fontsDirectory: FileSystemDirectoryHandle,
 ): Promise<ProjectDocument> {
   const projectAssets = project.assets;
+  const projectFonts = project.fonts ?? {};
   const projectForDisk: ProjectDocument = {
     ...project,
     assets: { ...projectAssets },
+    ...(project.fonts ? { fonts: { ...projectFonts } } : {}),
   };
 
   for (const [assetId, asset] of Object.entries(projectAssets)) {
@@ -62,6 +65,28 @@ async function createFileBackedProjectSnapshot(
     projectForDisk.assets[assetId] = {
       ...assetForDisk,
       fileName,
+      storage: 'file',
+    };
+  }
+
+  for (const [fontId, font] of Object.entries(projectFonts)) {
+    if (font.storage === 'file' && font.fileName) {
+      const fontForDisk = { ...font };
+      delete fontForDisk.objectUrl;
+      projectForDisk.fonts![fontId] = fontForDisk;
+      continue;
+    }
+
+    if (!assetFileUtils.isReadableObjectUrl(font.objectUrl)) continue;
+    await writeBlobFileToDirectory(
+      fontsDirectory,
+      font.fileName,
+      await assetFileUtils.objectUrlToBlob(font.objectUrl),
+    );
+    const fontForDisk = { ...font };
+    delete fontForDisk.objectUrl;
+    projectForDisk.fonts![fontId] = {
+      ...fontForDisk,
       storage: 'file',
     };
   }
@@ -151,12 +176,13 @@ export class OpfsProjectRepository implements ProjectRepository {
       options?.projectDirectoryName ?? project.name,
     );
     const assetsDirectory = await directoryHandle.getDirectoryHandle('assets', { create: true });
+    const fontsDirectory = await directoryHandle.getDirectoryHandle('fonts', { create: true });
     await Promise.all([
       directoryHandle.getDirectoryHandle('cache', { create: true }),
       directoryHandle.getDirectoryHandle('config', { create: true }),
     ]);
 
-    const projectForDisk = await createFileBackedProjectSnapshot(project, assetsDirectory);
+    const projectForDisk = await createFileBackedProjectSnapshot(project, assetsDirectory, fontsDirectory);
     const retainedAssetFileNames = new Set(
       Object.values(projectForDisk.assets)
         .map((asset) => asset.fileName)
@@ -164,6 +190,14 @@ export class OpfsProjectRepository implements ProjectRepository {
     );
 
     await this.removeUnretainedAssetFiles(assetsDirectory, retainedAssetFileNames);
+    await this.removeUnretainedAssetFiles(
+      fontsDirectory,
+      new Set(
+        Object.values(projectForDisk.fonts ?? {})
+          .map((font) => font.fileName)
+          .filter((fileName): fileName is string => Boolean(fileName)),
+      ),
+    );
     await this.writeJsonFile(directoryHandle, PROJECT_FILE_NAME, projectForDisk);
     const configDirectory = await directoryHandle.getDirectoryHandle('config', { create: true });
     await this.writeJsonFile(configDirectory, PROJECT_CONFIG_FILE_NAME, {
@@ -206,6 +240,7 @@ export class OpfsProjectRepository implements ProjectRepository {
   ): Promise<VersionHistoryEntry> {
     const directoryHandle = await this.ensureProjectDirectory(project.name);
     const assetsDirectory = await directoryHandle.getDirectoryHandle('assets', { create: true });
+    const fontsDirectory = await directoryHandle.getDirectoryHandle('fonts', { create: true });
     const historyDirectory = await directoryHandle.getDirectoryHandle('history', { create: true });
     const versionsDirectory = await historyDirectory.getDirectoryHandle('versions', {
       create: true,
@@ -231,7 +266,7 @@ export class OpfsProjectRepository implements ProjectRepository {
         : {}),
     };
 
-    const projectForHistory = await createFileBackedProjectSnapshot(project, assetsDirectory);
+    const projectForHistory = await createFileBackedProjectSnapshot(project, assetsDirectory, fontsDirectory);
     await this.writeJsonFile(
       versionsDirectory,
       fileName,
@@ -263,7 +298,7 @@ export class OpfsProjectRepository implements ProjectRepository {
       const versionsDirectory = await historyDirectory.getDirectoryHandle('versions');
       const fileHandle = await versionsDirectory.getFileHandle(entry.fileName);
       const file = await fileHandle.getFile();
-      return this.hydrateProjectAssets(JSON.parse(await file.text()) as ProjectDocument, {
+      return this.hydrateProjectFiles(JSON.parse(await file.text()) as ProjectDocument, {
         allowMissingAssetFiles: true,
       });
     } catch (error) {
@@ -389,16 +424,18 @@ export class OpfsProjectRepository implements ProjectRepository {
     }
 
     const project = JSON.parse(await file.text()) as ProjectDocument;
-    return this.hydrateProjectAssets(project, options);
+    return this.hydrateProjectFiles(project, options);
   }
 
-  private async hydrateProjectAssets(
+  private async hydrateProjectFiles(
     project: ProjectDocument,
     options: HydrateProjectAssetsOptions = {},
   ): Promise<ProjectDocument> {
     if (!this.directoryHandle) return project;
     const assets: ProjectDocument['assets'] = {};
+    const fonts: ProjectDocument['fonts'] = {};
     let assetsDirectory: FileSystemDirectoryHandle | undefined;
+    let fontsDirectory: FileSystemDirectoryHandle | undefined;
 
     for (const [assetId, asset] of Object.entries(project.assets)) {
       if (asset.storage !== 'file' || !asset.fileName) {
@@ -419,7 +456,26 @@ export class OpfsProjectRepository implements ProjectRepository {
       }
     }
 
-    return { ...project, assets };
+    for (const [fontId, font] of Object.entries(project.fonts ?? {})) {
+      if (font.storage !== 'file' || !font.fileName) {
+        fonts[fontId] = font;
+        continue;
+      }
+      try {
+        fontsDirectory ??= await this.directoryHandle.getDirectoryHandle('fonts');
+        const fileHandle = await fontsDirectory.getFileHandle(font.fileName);
+        const file = await fileHandle.getFile();
+        fonts[fontId] = {
+          ...font,
+          objectUrl: URL.createObjectURL(file),
+        };
+      } catch (error) {
+        if (!isNotFoundError(error) || !options.allowMissingAssetFiles) throw error;
+        fonts[fontId] = font;
+      }
+    }
+
+    return { ...project, assets, ...(project.fonts ? { fonts } : {}) };
   }
 
   private rememberProject(projectName: string) {

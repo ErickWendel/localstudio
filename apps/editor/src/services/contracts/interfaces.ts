@@ -1,4 +1,4 @@
-import type { Asset, ProjectDocument } from '../../domain/documents/model';
+import type { Asset, ImportWarning, ProjectDocument, ProjectFont } from '../../domain/documents/model';
 import type { PptxImportInput } from '../importing/pptx/pptxImportService';
 import type {
   GeneratedSlideElement,
@@ -132,6 +132,29 @@ export interface ExportService {
 
 export interface PresentationImportService {
   importPowerPoint(input: PptxImportInput): Promise<ProjectDocument>;
+}
+
+export interface FontImportRequest {
+  family: string;
+  fontStyle: 'normal' | 'italic';
+  fontWeight: number;
+}
+
+export interface FontImportResult {
+  fonts: Record<string, ProjectFont>;
+  warnings: ImportWarning[];
+}
+
+export interface FontCatalogItem {
+  aliases?: string[];
+  family: string;
+  source: 'google-fonts';
+}
+
+export interface FontImportService {
+  listDownloadableFonts(): FontCatalogItem[];
+  resolveAndDownloadFonts(requests: FontImportRequest[]): Promise<FontImportResult>;
+  loadProjectFonts(project: ProjectDocument): Promise<void>;
 }
 
 export type ShareStatus = 'published' | 'copied' | 'syncing' | 'sync-failed';

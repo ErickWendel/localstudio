@@ -101,6 +101,7 @@ describe('ScrollingCanvasWorkspace', () => {
   it('keeps text editing controls in the sticky slide toolbar and wires translation', async () => {
     const user = userEvent.setup();
     const onOpenAnimations = vi.fn();
+    const onOpenFontPanel = vi.fn();
     const onTranslateSelectedText = vi.fn();
     const onUpdateElementStyle = vi.fn();
 
@@ -111,6 +112,7 @@ describe('ScrollingCanvasWorkspace', () => {
         selection={{ pageId: 'page-1', elementIds: ['text-subtitle'] }}
         canTranslateSelection
         onOpenAnimations={onOpenAnimations}
+        onOpenFontPanel={onOpenFontPanel}
         onTranslateSelectedText={onTranslateSelectedText}
         onUpdateElementStyle={onUpdateElementStyle}
       />,
@@ -119,6 +121,18 @@ describe('ScrollingCanvasWorkspace', () => {
     expect(screen.getByTestId('sticky-text-selection-toolbar')).toContainElement(
       screen.getByRole('toolbar', { name: 'Text editing controls' }),
     );
+
+    await user.click(
+      within(screen.getByTestId('sticky-text-selection-toolbar')).getByRole('button', {
+        name: 'Text font family',
+      }),
+    );
+    expect(onOpenFontPanel).toHaveBeenCalledTimes(1);
+    expect(
+      onUpdateElementStyle.mock.calls.some(
+        ([elementId, patch]) => elementId === 'text-subtitle' && 'fontFamily' in patch,
+      ),
+    ).toBe(false);
 
     await user.click(
       within(screen.getByTestId('sticky-text-selection-toolbar')).getByRole('button', {

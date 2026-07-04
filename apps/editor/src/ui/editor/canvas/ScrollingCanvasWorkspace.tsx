@@ -23,6 +23,7 @@ interface ScrollingCanvasWorkspaceProps extends CanvasWorkspaceProps {
   onRenamePage?: ((pageId: string, name: string) => void) | undefined;
   onReorderPage?: ((pageId: string, targetIndex: number) => void) | undefined;
   onSetPageVisibility?: ((pageId: string, visible: boolean) => void) | undefined;
+  onOpenFontPanel?: (() => void) | undefined;
   onTranslatePage?: ((pageId: string) => void) | undefined;
   onUpdateElementStyle?: ((elementId: string, patch: ElementStylePatch) => void) | undefined;
   translatingPageIds?: string[] | undefined;
@@ -41,6 +42,7 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
       onRenamePage,
       onReorderPage,
       onSetPageVisibility,
+      onOpenFontPanel,
       onTranslatePage,
       onUpdateElementStyle,
       project,
@@ -136,6 +138,7 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
               {...(canvasProps.onOpenAnimations
                 ? { onOpenAnimations: canvasProps.onOpenAnimations }
                 : {})}
+              {...(onOpenFontPanel ? { onOpenFontPanel } : {})}
               {...(canvasProps.onTranslateSelectedText
                 ? { onTranslateSelectedText: canvasProps.onTranslateSelectedText }
                 : {})}

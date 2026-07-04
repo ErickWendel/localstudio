@@ -4,11 +4,12 @@ import type {
   ProjectDocument,
   SelectionState,
 } from '../../domain/documents/model';
-import type { ShareService } from '../../services/contracts/interfaces';
+import type { FontImportService, ShareService } from '../../services/contracts/interfaces';
 import { CanvasWorkspace } from '../editor/canvas/CanvasWorkspace';
 
 interface PublicDeckViewerProps {
   shareId: string;
+  fontImportService: FontImportService;
   shareService: ShareService;
   embed?: boolean;
 }
@@ -34,7 +35,12 @@ function getBuildPlaybackDurationMs(build: ElementAnimationBuild) {
   return Math.max(0, build.durationMs ?? build.delayMs);
 }
 
-export function PublicDeckViewer({ shareId, shareService, embed = false }: PublicDeckViewerProps) {
+export function PublicDeckViewer({
+  shareId,
+  fontImportService,
+  shareService,
+  embed = false,
+}: PublicDeckViewerProps) {
   const [viewerState, setViewerState] = useState<ViewerState>({ status: 'loading' });
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [animationPreview, setAnimationPreview] = useState<AnimationPreviewState | undefined>();
@@ -250,7 +256,11 @@ export function PublicDeckViewer({ shareId, shareService, embed = false }: Publi
 
   useEffect(() => {
     let isActive = true;
-    void shareService.getShare(shareId).then((record) => {
+    void shareService.getShare(shareId).then(async (record) => {
+      if (!isActive) return;
+      if (record) {
+        await fontImportService.loadProjectFonts(record.project).catch(() => undefined);
+      }
       if (!isActive) return;
       setViewerState(record ? { status: 'ready', project: record.project } : { status: 'missing' });
       if (record) {
@@ -263,7 +273,7 @@ export function PublicDeckViewer({ shareId, shareService, embed = false }: Publi
     return () => {
       isActive = false;
     };
-  }, [playPresentationPage, shareId, shareService]);
+  }, [fontImportService, playPresentationPage, shareId, shareService]);
 
   useEffect(() => {
     return () => {
