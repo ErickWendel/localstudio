@@ -140,8 +140,25 @@ export interface FontImportRequest {
   fontWeight: number;
 }
 
+export type FontResolutionStatus =
+  | 'available-system'
+  | 'downloaded-exact'
+  | 'downloaded-compatible'
+  | 'missing-needs-user'
+  | 'failed';
+
+export interface FontResolution {
+  family?: string;
+  fontStyle: 'normal' | 'italic';
+  fontWeight: number;
+  message?: string;
+  requestedFamily: string;
+  status: FontResolutionStatus;
+}
+
 export interface FontImportResult {
   fonts: Record<string, ProjectFont>;
+  resolutions: FontResolution[];
   warnings: ImportWarning[];
 }
 

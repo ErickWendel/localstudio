@@ -4,8 +4,6 @@ import type { FontImportRequest } from '../../contracts/interfaces';
 const SYSTEM_FONT_FAMILIES = new Set([
   'arial',
   'avenir',
-  'calibri',
-  'cambria',
   'candara',
   'consolas',
   'courier',
@@ -22,6 +20,17 @@ const SYSTEM_FONT_FAMILIES = new Set([
   'verdana',
 ]);
 
+const DOWNLOADABLE_COMPATIBLE_FONT_FAMILIES = new Set([
+  'arial',
+  'calibri',
+  'cambria',
+  'courier',
+  'courier new',
+  'helvetica',
+  'times',
+  'times new roman',
+]);
+
 function normalizeFontFamily(fontFamily: string) {
   return fontFamily
     .split(',')
@@ -34,6 +43,7 @@ function normalizeFontFamily(fontFamily: string) {
 function shouldDownloadFont(fontFamily: string | undefined) {
   if (!fontFamily) return false;
   if (fontFamily.startsWith('+')) return false;
+  if (DOWNLOADABLE_COMPATIBLE_FONT_FAMILIES.has(fontFamily.toLowerCase())) return true;
   return !SYSTEM_FONT_FAMILIES.has(fontFamily.toLowerCase());
 }
 

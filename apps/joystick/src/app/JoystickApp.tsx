@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent, PointerEvent, TouchEvent } from 'react';
-import { ChevronLeft, List, Minus, NotebookText, Pause, Play, Plus, TimerReset, X } from 'lucide-react';
+import {
+  ChevronLeft,
+  List,
+  Minus,
+  NotebookText,
+  Pause,
+  Play,
+  Plus,
+  TimerReset,
+  X,
+} from 'lucide-react';
 import { presenterRemoteSessionCode } from '@localstudio/presenter-remote/session-code';
 import { presenterRemoteTimerFormat } from '@localstudio/presenter-remote/timer-format';
 import {
@@ -22,10 +32,25 @@ import {
 } from './presenterRemoteStreamReceiver';
 
 interface JoystickSignalingService {
-  connectController?: ((code: string, controllerId: string) => PresenterRemoteSession | Promise<PresenterRemoteSession | undefined> | undefined) | undefined;
-  getPublishedState?: ((code: string) => PresenterRemoteState | undefined | Promise<PresenterRemoteState | undefined>) | undefined;
-  lookupSession: (code: string) => PresenterRemoteSession | undefined | Promise<PresenterRemoteSession | undefined>;
-  publishCommand: (code: string, command: PresenterRemoteCommand, controllerId?: string) => boolean | Promise<unknown>;
+  connectController?:
+    | ((
+        code: string,
+        controllerId: string,
+      ) => PresenterRemoteSession | Promise<PresenterRemoteSession | undefined> | undefined)
+    | undefined;
+  getPublishedState?:
+    | ((
+        code: string,
+      ) => PresenterRemoteState | undefined | Promise<PresenterRemoteState | undefined>)
+    | undefined;
+  lookupSession: (
+    code: string,
+  ) => PresenterRemoteSession | undefined | Promise<PresenterRemoteSession | undefined>;
+  publishCommand: (
+    code: string,
+    command: PresenterRemoteCommand,
+    controllerId?: string,
+  ) => boolean | Promise<unknown>;
 }
 
 interface JoystickAppProps {
@@ -56,7 +81,9 @@ function createDefaultSignalingService(): JoystickSignalingService {
   return service;
 }
 
-function createStreamSignalingAdapter(signalingService: JoystickSignalingService): PresenterRemoteStreamSignaling {
+function createStreamSignalingAdapter(
+  signalingService: JoystickSignalingService,
+): PresenterRemoteStreamSignaling {
   const candidate = signalingService as unknown as PresenterRemoteStreamSignaling & {
     createControllerOffer?: ((...args: unknown[]) => unknown) | undefined;
   };
@@ -105,7 +132,10 @@ function getControllerId() {
   return id;
 }
 
-function getElementStyle(element: PresenterRemoteSlidePreviewElement, preview: PresenterRemoteSlidePreview) {
+function getElementStyle(
+  element: PresenterRemoteSlidePreviewElement,
+  preview: PresenterRemoteSlidePreview,
+) {
   return {
     height: `${(element.height / preview.height) * 100}%`,
     left: `${(element.x / preview.width) * 100}%`,
@@ -117,9 +147,13 @@ function getElementStyle(element: PresenterRemoteSlidePreviewElement, preview: P
 }
 
 function getNetworkQualityHint(): PresenterRemoteStreamPreference['quality'] {
-  const connection = (navigator as Navigator & {
-    connection?: { effectiveType?: string | undefined; saveData?: boolean | undefined } | undefined;
-  }).connection;
+  const connection = (
+    navigator as Navigator & {
+      connection?:
+        | { effectiveType?: string | undefined; saveData?: boolean | undefined }
+        | undefined;
+    }
+  ).connection;
   if (connection?.saveData) return 'low';
   if (connection?.effectiveType === '2g' || connection?.effectiveType === 'slow-2g') return 'low';
   if (connection?.effectiveType === '3g') return 'medium';
@@ -129,7 +163,8 @@ function getNetworkQualityHint(): PresenterRemoteStreamPreference['quality'] {
 function createStreamPreference(element: HTMLElement): PresenterRemoteStreamPreference {
   const bounds = element.getBoundingClientRect();
   const quality = getNetworkQualityHint();
-  const multiplier = quality === 'high' ? Math.min(window.devicePixelRatio || 1, 3) : quality === 'medium' ? 1.5 : 1;
+  const multiplier =
+    quality === 'high' ? Math.min(window.devicePixelRatio || 1, 3) : quality === 'medium' ? 1.5 : 1;
   const width = Math.max(390, Math.min(1280, Math.round(bounds.width * multiplier)));
   const height = Math.max(340, Math.min(1120, Math.round(width / streamPreferenceAspectRatio)));
   return {
@@ -193,7 +228,13 @@ function SlideCanvas({
 }) {
   if (!preview) {
     return (
-      <span className={compact ? 'joystick-slide-canvas joystick-slide-canvas-empty joystick-slide-canvas-compact' : 'joystick-slide-canvas joystick-slide-canvas-empty'}>
+      <span
+        className={
+          compact
+            ? 'joystick-slide-canvas joystick-slide-canvas-empty joystick-slide-canvas-compact'
+            : 'joystick-slide-canvas joystick-slide-canvas-empty'
+        }
+      >
         <NotebookText size={compact ? 24 : 38} />
       </span>
     );
@@ -201,7 +242,9 @@ function SlideCanvas({
 
   return (
     <span
-      className={compact ? 'joystick-slide-canvas joystick-slide-canvas-compact' : 'joystick-slide-canvas'}
+      className={
+        compact ? 'joystick-slide-canvas joystick-slide-canvas-compact' : 'joystick-slide-canvas'
+      }
       style={{
         aspectRatio: `${preview.width} / ${preview.height}`,
         backgroundColor: preview.backgroundColor,
@@ -252,7 +295,11 @@ function SlideCanvas({
             );
           }
           return (
-            <span className="joystick-slide-element joystick-slide-media" key={element.id} style={style}>
+            <span
+              className="joystick-slide-element joystick-slide-media"
+              key={element.id}
+              style={style}
+            >
               <span aria-hidden="true">play_arrow</span>
             </span>
           );
@@ -267,7 +314,9 @@ function SlideCanvas({
                 alignItems:
                   element.verticalAlign === 'bottom'
                     ? 'flex-end'
-                    : element.verticalAlign === 'middle' ? 'center' : 'flex-start',
+                    : element.verticalAlign === 'middle'
+                      ? 'center'
+                      : 'flex-start',
                 color: element.fill,
                 fontFamily: element.fontFamily,
                 fontSize: `${Math.max(compact ? 3 : 5, (element.fontSize / preview.width) * 100)}cqw`,
@@ -275,7 +324,9 @@ function SlideCanvas({
                 justifyContent:
                   element.align === 'right'
                     ? 'flex-end'
-                    : element.align === 'center' ? 'center' : 'flex-start',
+                    : element.align === 'center'
+                      ? 'center'
+                      : 'flex-start',
                 lineHeight: element.lineHeight ?? 1.05,
                 textAlign: element.align,
               }}
@@ -402,7 +453,10 @@ function UpcomingSlideStrip({
 }) {
   if (previews.length === 0) {
     return (
-      <section className="joystick-upcoming-strip joystick-upcoming-strip-empty" aria-label="Upcoming slides">
+      <section
+        className="joystick-upcoming-strip joystick-upcoming-strip-empty"
+        aria-label="Upcoming slides"
+      >
         <span>End of deck</span>
       </section>
     );
@@ -426,6 +480,81 @@ function UpcomingSlideStrip({
   );
 }
 
+function getSlideNavigatorPreview(
+  page: NonNullable<PresenterRemoteState['pages']>[number],
+  displayedRemoteState: PresenterRemoteState | undefined,
+  upcomingSlidePreviews: NonNullable<PresenterRemoteState['upcomingSlidePreviews']>,
+) {
+  if (page.preview) return page.preview;
+  if (page.id === displayedRemoteState?.activePageId) return displayedRemoteState.slidePreview;
+  return upcomingSlidePreviews.find((item) => item.pageId === page.id)?.preview;
+}
+
+function SlideNavigatorSheet({
+  displayedRemoteState,
+  onClose,
+  onGoToPage,
+  pages,
+  renderMediaAssets,
+  upcomingSlidePreviews,
+}: {
+  displayedRemoteState: PresenterRemoteState | undefined;
+  onClose: () => void;
+  onGoToPage: (pageId: string) => void;
+  pages: NonNullable<PresenterRemoteState['pages']>;
+  renderMediaAssets: boolean;
+  upcomingSlidePreviews: NonNullable<PresenterRemoteState['upcomingSlidePreviews']>;
+}) {
+  return (
+    <section
+      className="joystick-slide-navigator"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Slide navigation"
+    >
+      <header>
+        <div>
+          <h2>Go to slide</h2>
+          <p>{displayedRemoteState?.deckName ?? 'Presentation'}</p>
+        </div>
+        <button type="button" aria-label="Close slide navigation" onClick={onClose}>
+          <X size={20} />
+        </button>
+      </header>
+      <div className="joystick-slide-navigator-list">
+        {pages.map((page, index) => {
+          const preview = getSlideNavigatorPreview(
+            page,
+            displayedRemoteState,
+            upcomingSlidePreviews,
+          );
+          const active = page.id === displayedRemoteState?.activePageId;
+          return (
+            <button
+              type="button"
+              key={page.id}
+              aria-current={active ? 'page' : undefined}
+              aria-label={`Go to slide ${index + 1}: ${page.name}`}
+              onClick={() => {
+                onGoToPage(page.id);
+                onClose();
+              }}
+            >
+              <span className="joystick-slide-navigator-thumb" aria-hidden="true">
+                <SlideCanvas compact preview={preview} renderMediaAssets={renderMediaAssets} />
+              </span>
+              <span className="joystick-slide-navigator-meta">
+                <span>{active ? 'Current' : `Slide ${index + 1}`}</span>
+                <strong>{page.name}</strong>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export function JoystickApp({
   initialUrl = window.location.href,
   signalingService: providedSignalingService,
@@ -443,15 +572,21 @@ export function JoystickApp({
   const [notesFontSize, setNotesFontSize] = useState(28);
   const [controllerId] = useState(() => getControllerId());
   const [remoteStream, setRemoteStream] = useState<MediaStream | undefined>();
-  const [remoteStreamStatus, setRemoteStreamStatus] = useState<'connected' | 'connecting' | 'failed' | 'idle'>('idle');
-  const remoteStreamReceiverRef = useRef<ReturnType<typeof presenterRemoteStreamReceiver.create> | undefined>(undefined);
+  const [remoteStreamStatus, setRemoteStreamStatus] = useState<
+    'connected' | 'connecting' | 'failed' | 'idle'
+  >('idle');
+  const remoteStreamReceiverRef = useRef<
+    ReturnType<typeof presenterRemoteStreamReceiver.create> | undefined
+  >(undefined);
   const sessionCode = session?.code;
 
   useEffect(() => {
     let cancelled = false;
     async function resolveSession() {
       setResolvingSession(true);
-      const rememberedCode = presenterRemoteSessionCode.normalize(getStoredValue(rememberedCodeKey) ?? '');
+      const rememberedCode = presenterRemoteSessionCode.normalize(
+        getStoredValue(rememberedCodeKey) ?? '',
+      );
       const requestedCode = presenterRemoteSessionCode.isValid(code) ? code : rememberedCode;
       if (requestedCode && presenterRemoteSessionCode.isValid(requestedCode)) {
         const foundSession = await signalingService.lookupSession(requestedCode);
@@ -539,7 +674,14 @@ export function JoystickApp({
       receiver.stop();
       if (remoteStreamReceiverRef.current === receiver) remoteStreamReceiverRef.current = undefined;
     };
-  }, [controllerId, remoteState?.presenterMode, remoteState?.previewMode, remoteState?.stream?.enabled, sessionCode, signalingService]);
+  }, [
+    controllerId,
+    remoteState?.presenterMode,
+    remoteState?.previewMode,
+    remoteState?.stream?.enabled,
+    sessionCode,
+    signalingService,
+  ]);
 
   const connectionLabel = useMemo(() => {
     const connectedControllerCount = Math.max(
@@ -557,8 +699,9 @@ export function JoystickApp({
       setLastCommand(command.command);
       return;
     }
-    void Promise.resolve(signalingService.publishCommand(session.code, command, controllerId))
-      .then(() => setLastCommand(command.command));
+    void Promise.resolve(signalingService.publishCommand(session.code, command, controllerId)).then(
+      () => setLastCommand(command.command),
+    );
   }
 
   const sendStreamPreference = useCallback((preference: PresenterRemoteStreamPreference) => {
@@ -573,9 +716,7 @@ export function JoystickApp({
     if (!connected) return;
     const currentIndex = displayedRemoteState?.activePageIndex;
     const targetIndex =
-      typeof currentIndex === 'number'
-        ? currentIndex + (direction === 'next' ? 1 : -1)
-        : undefined;
+      typeof currentIndex === 'number' ? currentIndex + (direction === 'next' ? 1 : -1) : undefined;
     const targetPage = typeof targetIndex === 'number' ? pages[targetIndex] : undefined;
     if (targetPage) {
       sendRemoteCommand({ command: 'go-to-page', pageId: targetPage.id, type: 'command' });
@@ -588,7 +729,9 @@ export function JoystickApp({
   const displayedRemoteState = sessionCode ? remoteState : undefined;
   const slidePosition = displayedRemoteState
     ? `${displayedRemoteState.activePageIndex + 1} / ${displayedRemoteState.pageCount}`
-    : connected ? 'Connected' : '-- / --';
+    : connected
+      ? 'Connected'
+      : '-- / --';
   const currentStatusLabel = displayedRemoteState
     ? `Current: Slide ${displayedRemoteState.activePageIndex + 1} of ${displayedRemoteState.pageCount}`
     : 'Current: Waiting';
@@ -606,9 +749,11 @@ export function JoystickApp({
   const timerPaused = displayedRemoteState?.timer.paused ?? false;
   const timerToggleCommand = timerPaused ? 'resume-timer' : 'pause-timer';
   const pages = displayedRemoteState?.pages ?? [];
-  const streamModeActive = connected && displayedRemoteState?.previewMode === 'stream' && remoteStream;
+  const streamModeActive =
+    connected && displayedRemoteState?.previewMode === 'stream' && remoteStream;
   const renderStructuredMediaAssets = displayedRemoteState?.previewMode !== 'stream';
-  const upcomingSlidePreviews = displayedRemoteState?.upcomingSlidePreviews ??
+  const upcomingSlidePreviews =
+    displayedRemoteState?.upcomingSlidePreviews ??
     (displayedRemoteState?.nextSlidePreview
       ? [
           {
@@ -628,11 +773,14 @@ export function JoystickApp({
         </header>
         <section className="joystick-start-screen" aria-label="Presenter mode required">
           <p>
-            Open presenter mode on <strong>{session?.presenterLabel ?? 'this computer'}</strong> to control{' '}
-            <strong>{displayedRemoteState?.deckName ?? 'this presentation'}</strong> from this phone.
+            Open presenter mode on <strong>{session?.presenterLabel ?? 'this computer'}</strong> to
+            control <strong>{displayedRemoteState?.deckName ?? 'this presentation'}</strong> from
+            this phone.
           </p>
           <span className="joystick-start-indicator" aria-hidden="true" />
-          {lastCommand ? <span className="joystick-start-status">Command sent: {lastCommand}</span> : null}
+          {lastCommand ? (
+            <span className="joystick-start-status">Command sent: {lastCommand}</span>
+          ) : null}
         </section>
       </main>
     );
@@ -645,18 +793,27 @@ export function JoystickApp({
           <span className="joystick-page-count" aria-label="Slide position">
             {slidePosition}
           </span>
-          <span className={`joystick-status-dot joystick-status-dot-${status}`} aria-label={connectionLabel} />
+          <span
+            className={`joystick-status-dot joystick-status-dot-${status}`}
+            aria-label={connectionLabel}
+          />
           <span className="joystick-timer" aria-label="Presentation timer">
             {timerLabel}
           </span>
           <span>{buildsRemainingLabel}</span>
         </header>
         <section className="joystick-stream-stage" aria-label="Streamed presenter preview">
-          <StreamPreview stream={remoteStream} onNavigate={navigateSlide} onStreamPreference={sendStreamPreference} />
+          <StreamPreview
+            stream={remoteStream}
+            onNavigate={navigateSlide}
+            onStreamPreference={sendStreamPreference}
+          />
         </section>
         <UpcomingSlideStrip
           previews={upcomingSlidePreviews}
-          onGoToPage={(pageId) => sendRemoteCommand({ command: 'go-to-page', pageId, type: 'command' })}
+          onGoToPage={(pageId) =>
+            sendRemoteCommand({ command: 'go-to-page', pageId, type: 'command' })
+          }
           renderMediaAssets={false}
         />
         <section className="joystick-stream-notes" aria-label="Presenter notes">
@@ -696,7 +853,11 @@ export function JoystickApp({
         </section>
         <div className="joystick-stream-controls" aria-label="Remote controls">
           <span>{connectionLabel}</span>
-          <button type="button" onClick={() => navigateSlide('previous')} aria-label="Previous slide">
+          <button
+            type="button"
+            onClick={() => navigateSlide('previous')}
+            aria-label="Previous slide"
+          >
             <ChevronLeft size={22} />
           </button>
           <button
@@ -722,31 +883,16 @@ export function JoystickApp({
           <p className="joystick-stream-status">Stream unavailable. Using fallback controls.</p>
         ) : null}
         {slideNavigatorOpen ? (
-          <section className="joystick-slide-navigator" role="dialog" aria-modal="true" aria-label="Slide navigation">
-            <header>
-              <h2>Slides</h2>
-              <button type="button" aria-label="Close slide navigation" onClick={() => setSlideNavigatorOpen(false)}>
-                <X size={20} />
-              </button>
-            </header>
-            <div className="joystick-slide-navigator-list">
-              {pages.map((page, index) => (
-                <button
-                  type="button"
-                  key={page.id}
-                  aria-current={page.id === displayedRemoteState?.activePageId ? 'page' : undefined}
-                  aria-label={`Go to slide ${index + 1}: ${page.name}`}
-                  onClick={() => {
-                    sendRemoteCommand({ command: 'go-to-page', pageId: page.id, type: 'command' });
-                    setSlideNavigatorOpen(false);
-                  }}
-                >
-                  <span>{index + 1}</span>
-                  <strong>{page.name}</strong>
-                </button>
-              ))}
-            </div>
-          </section>
+          <SlideNavigatorSheet
+            displayedRemoteState={displayedRemoteState}
+            onClose={() => setSlideNavigatorOpen(false)}
+            onGoToPage={(pageId) =>
+              sendRemoteCommand({ command: 'go-to-page', pageId, type: 'command' })
+            }
+            pages={pages}
+            renderMediaAssets={false}
+            upcomingSlidePreviews={upcomingSlidePreviews}
+          />
         ) : null}
       </main>
     );
@@ -758,7 +904,10 @@ export function JoystickApp({
         <span className="joystick-page-count" aria-label="Slide position">
           {slidePosition}
         </span>
-        <span className={`joystick-status-dot joystick-status-dot-${status}`} aria-label={connectionLabel} />
+        <span
+          className={`joystick-status-dot joystick-status-dot-${status}`}
+          aria-label={connectionLabel}
+        />
         <span className="joystick-timer" aria-label="Presentation timer">
           {timerLabel}
         </span>
@@ -770,7 +919,12 @@ export function JoystickApp({
         >
           {timerPaused ? <Play size={20} /> : <Pause size={20} />}
         </button>
-        <button type="button" disabled={!connected} onClick={() => sendCommand('reset-timer')} aria-label="Reset timer">
+        <button
+          type="button"
+          disabled={!connected}
+          onClick={() => sendCommand('reset-timer')}
+          aria-label="Reset timer"
+        >
           <TimerReset size={20} />
         </button>
         <button
@@ -790,30 +944,32 @@ export function JoystickApp({
 
       {!connected ? (
         <section className="joystick-pairing-panel" aria-label="Pair remote">
-        <div className="joystick-code-row">
-          <label htmlFor="session-code">Code</label>
-          <input
-            id="session-code"
-            inputMode="text"
-            maxLength={9}
-            value={displayedCode}
-            onChange={(event) => setCode(presenterRemoteSessionCode.normalize(event.target.value))}
-          />
-          <button
-            type="button"
-            onClick={() => setCode(displayedCode)}
-            disabled={!presenterRemoteSessionCode.isValid(displayedCode)}
-          >
-            Join
-          </button>
-        </div>
-        {session ? (
-          <p className="joystick-presenter-name">{session.presenterLabel}</p>
-        ) : resolvingSession ? (
-          <p className="joystick-help">Looking for the presenter session...</p>
-        ) : (
-          <p className="joystick-help">Enter the code shown on the presenter screen.</p>
-        )}
+          <div className="joystick-code-row">
+            <label htmlFor="session-code">Code</label>
+            <input
+              id="session-code"
+              inputMode="text"
+              maxLength={9}
+              value={displayedCode}
+              onChange={(event) =>
+                setCode(presenterRemoteSessionCode.normalize(event.target.value))
+              }
+            />
+            <button
+              type="button"
+              onClick={() => setCode(displayedCode)}
+              disabled={!presenterRemoteSessionCode.isValid(displayedCode)}
+            >
+              Join
+            </button>
+          </div>
+          {session ? (
+            <p className="joystick-presenter-name">{session.presenterLabel}</p>
+          ) : resolvingSession ? (
+            <p className="joystick-help">Looking for the presenter session...</p>
+          ) : (
+            <p className="joystick-help">Enter the code shown on the presenter screen.</p>
+          )}
         </section>
       ) : null}
 
@@ -827,7 +983,9 @@ export function JoystickApp({
 
       <UpcomingSlideStrip
         previews={upcomingSlidePreviews}
-        onGoToPage={(pageId) => sendRemoteCommand({ command: 'go-to-page', pageId, type: 'command' })}
+        onGoToPage={(pageId) =>
+          sendRemoteCommand({ command: 'go-to-page', pageId, type: 'command' })
+        }
         renderMediaAssets={renderStructuredMediaAssets}
       />
 
@@ -869,31 +1027,16 @@ export function JoystickApp({
 
       {lastCommand ? <p className="joystick-command-status">Command sent: {lastCommand}</p> : null}
       {slideNavigatorOpen ? (
-        <section className="joystick-slide-navigator" role="dialog" aria-modal="true" aria-label="Slide navigation">
-          <header>
-            <h2>Slides</h2>
-            <button type="button" aria-label="Close slide navigation" onClick={() => setSlideNavigatorOpen(false)}>
-              <X size={20} />
-            </button>
-          </header>
-          <div className="joystick-slide-navigator-list">
-            {pages.map((page, index) => (
-              <button
-                type="button"
-                key={page.id}
-                aria-current={page.id === displayedRemoteState?.activePageId ? 'page' : undefined}
-                aria-label={`Go to slide ${index + 1}: ${page.name}`}
-                onClick={() => {
-                  sendRemoteCommand({ command: 'go-to-page', pageId: page.id, type: 'command' });
-                  setSlideNavigatorOpen(false);
-                }}
-              >
-                <span>{index + 1}</span>
-                <strong>{page.name}</strong>
-              </button>
-            ))}
-          </div>
-        </section>
+        <SlideNavigatorSheet
+          displayedRemoteState={displayedRemoteState}
+          onClose={() => setSlideNavigatorOpen(false)}
+          onGoToPage={(pageId) =>
+            sendRemoteCommand({ command: 'go-to-page', pageId, type: 'command' })
+          }
+          pages={pages}
+          renderMediaAssets={renderStructuredMediaAssets}
+          upcomingSlidePreviews={upcomingSlidePreviews}
+        />
       ) : null}
     </main>
   );

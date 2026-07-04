@@ -49,7 +49,12 @@ describe('JoystickApp', () => {
     });
     service.registerSession({ presenterLabel: 'MacBook Pro', ttlMs: 60_000 });
 
-    render(<JoystickApp initialUrl="https://localstudio.test/joystick?code=abcd-1234" signalingService={service} />);
+    render(
+      <JoystickApp
+        initialUrl="https://localstudio.test/joystick?code=abcd-1234"
+        signalingService={service}
+      />,
+    );
 
     expect(await screen.findByLabelText('Presentation remote control')).toBeInTheDocument();
     expect(screen.getByLabelText('Connected (1)')).toBeInTheDocument();
@@ -68,7 +73,12 @@ describe('JoystickApp', () => {
     service.registerSession({ presenterLabel: 'MacBook Pro', ttlMs: 60_000 });
 
     try {
-      render(<JoystickApp initialUrl="https://localstudio.test/joystick?code=abcd-1234" signalingService={service} />);
+      render(
+        <JoystickApp
+          initialUrl="https://localstudio.test/joystick?code=abcd-1234"
+          signalingService={service}
+        />,
+      );
 
       expect(await screen.findByLabelText('Presentation remote control')).toBeInTheDocument();
       expect(screen.getByLabelText('Connected (1)')).toBeInTheDocument();
@@ -101,7 +111,9 @@ describe('JoystickApp', () => {
     });
     window.localStorage.setItem('localstudio.joystick.lastCode', 'ABCD-1234');
 
-    render(<JoystickApp initialUrl="https://localstudio.test/joystick" signalingService={service} />);
+    render(
+      <JoystickApp initialUrl="https://localstudio.test/joystick" signalingService={service} />,
+    );
 
     expect(await screen.findByText('Current: Slide 1 of 1')).toBeInTheDocument();
     expect(screen.getByLabelText('Slide position')).toHaveTextContent('1 / 1');
@@ -114,9 +126,13 @@ describe('JoystickApp', () => {
     });
     service.registerSession({ presenterLabel: 'MacBook Pro', ttlMs: 60_000 });
 
-    render(<JoystickApp initialUrl="https://localstudio.test/joystick" signalingService={service} />);
+    render(
+      <JoystickApp initialUrl="https://localstudio.test/joystick" signalingService={service} />,
+    );
 
-    expect(await screen.findByText('Enter the code shown on the presenter screen.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Enter the code shown on the presenter screen.'),
+    ).toBeInTheDocument();
     expect(screen.queryByText('MacBook Pro')).not.toBeInTheDocument();
   });
 
@@ -130,9 +146,13 @@ describe('JoystickApp', () => {
     service.registerSession({ presenterLabel: 'MacBook Pro', ttlMs: 60_000 });
     service.registerSession({ presenterLabel: 'Studio Display', ttlMs: 60_000 });
 
-    render(<JoystickApp initialUrl="https://localstudio.test/joystick" signalingService={service} />);
+    render(
+      <JoystickApp initialUrl="https://localstudio.test/joystick" signalingService={service} />,
+    );
 
-    expect(await screen.findByText('Enter the code shown on the presenter screen.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Enter the code shown on the presenter screen.'),
+    ).toBeInTheDocument();
     expect(screen.queryByText('MacBook Pro')).not.toBeInTheDocument();
   });
 
@@ -161,7 +181,12 @@ describe('JoystickApp', () => {
       type: 'state',
     });
 
-    render(<JoystickApp initialUrl="https://localstudio.test/joystick?code=ABCD-1234" signalingService={service} />);
+    render(
+      <JoystickApp
+        initialUrl="https://localstudio.test/joystick?code=ABCD-1234"
+        signalingService={service}
+      />,
+    );
 
     const preview = await screen.findByRole('button', { name: 'Current slide preview' });
     await user.click(preview);
@@ -199,7 +224,12 @@ describe('JoystickApp', () => {
       type: 'state',
     });
 
-    render(<JoystickApp initialUrl="https://localstudio.test/joystick?code=ABCD-1234" signalingService={service} />);
+    render(
+      <JoystickApp
+        initialUrl="https://localstudio.test/joystick?code=ABCD-1234"
+        signalingService={service}
+      />,
+    );
 
     const preview = await screen.findByRole('button', { name: 'Presenter stream preview' });
     await user.click(preview);
@@ -276,7 +306,12 @@ describe('JoystickApp', () => {
       type: 'state',
     });
 
-    render(<JoystickApp initialUrl="https://localstudio.test/joystick?code=ABCD-1234" signalingService={service} />);
+    render(
+      <JoystickApp
+        initialUrl="https://localstudio.test/joystick?code=ABCD-1234"
+        signalingService={service}
+      />,
+    );
 
     const preview = await screen.findByRole('button', { name: 'Current slide preview' });
     await waitFor(() => expect(screen.getByLabelText('Slide position')).toHaveTextContent('2 / 3'));
@@ -309,9 +344,16 @@ describe('JoystickApp', () => {
       type: 'state',
     });
 
-    render(<JoystickApp initialUrl="https://localstudio.test/joystick?code=ABCD-1234" signalingService={service} />);
+    render(
+      <JoystickApp
+        initialUrl="https://localstudio.test/joystick?code=ABCD-1234"
+        signalingService={service}
+      />,
+    );
 
-    await waitFor(() => expect(screen.getByLabelText('Presentation timer')).toHaveTextContent('01:19'));
+    await waitFor(() =>
+      expect(screen.getByLabelText('Presentation timer')).toHaveTextContent('01:19'),
+    );
     await user.click(screen.getByRole('button', { name: 'Resume timer' }));
     await user.click(screen.getByRole('button', { name: 'Reset timer' }));
 
@@ -341,9 +383,16 @@ describe('JoystickApp', () => {
       type: 'state',
     });
 
-    render(<JoystickApp initialUrl="https://localstudio.test/joystick?code=ABCD-1234" signalingService={service} />);
+    render(
+      <JoystickApp
+        initialUrl="https://localstudio.test/joystick?code=ABCD-1234"
+        signalingService={service}
+      />,
+    );
 
-    await waitFor(() => expect(screen.getByLabelText('Presentation timer')).toHaveTextContent('01:02:01'));
+    await waitFor(() =>
+      expect(screen.getByLabelText('Presentation timer')).toHaveTextContent('01:02:01'),
+    );
   });
 
   it('advances active timers from the presenter update timestamp instead of poll time', async () => {
@@ -366,9 +415,16 @@ describe('JoystickApp', () => {
       type: 'state',
     });
 
-    render(<JoystickApp initialUrl="https://localstudio.test/joystick?code=ABCD-1234" signalingService={service} />);
+    render(
+      <JoystickApp
+        initialUrl="https://localstudio.test/joystick?code=ABCD-1234"
+        signalingService={service}
+      />,
+    );
 
-    await waitFor(() => expect(screen.getByLabelText('Presentation timer')).toHaveTextContent('01:00'));
+    await waitFor(() =>
+      expect(screen.getByLabelText('Presentation timer')).toHaveTextContent('01:00'),
+    );
   });
 
   it('renders published presenter state for slide status and notes', async () => {
@@ -468,16 +524,30 @@ describe('JoystickApp', () => {
       ],
     });
 
-    render(<JoystickApp initialUrl="https://localstudio.test/joystick?code=ABCD-1234" signalingService={service} />);
+    render(
+      <JoystickApp
+        initialUrl="https://localstudio.test/joystick?code=ABCD-1234"
+        signalingService={service}
+      />,
+    );
 
     expect(await screen.findByText('Current: Slide 2 of 5')).toBeInTheDocument();
     expect(screen.getByText('Current: Slide 2 of 5')).toBeInTheDocument();
     expect(screen.getByText('Builds remaining: 2')).toBeInTheDocument();
     expect(screen.getByText('Launch timeline')).toBeInTheDocument();
-    expect(screen.getByLabelText('Slide video')).toHaveAttribute('src', 'https://cdn.localstudio.test/demo.mp4');
-    expect(screen.getByRole('button', { name: 'Go to upcoming slide 1: Budget' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Go to upcoming slide 2: Demo' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Go to upcoming slide 3: Close' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Slide video')).toHaveAttribute(
+      'src',
+      'https://cdn.localstudio.test/demo.mp4',
+    );
+    expect(
+      screen.getByRole('button', { name: 'Go to upcoming slide 1: Budget' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Go to upcoming slide 2: Demo' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Go to upcoming slide 3: Close' }),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText('Slide position')).toHaveTextContent('2 / 5');
     expect(screen.getByText('Talk through the launch timeline.')).toBeInTheDocument();
   });
@@ -535,7 +605,12 @@ describe('JoystickApp', () => {
       ],
     });
 
-    render(<JoystickApp initialUrl="https://localstudio.test/joystick?code=ABCD-1234" signalingService={service} />);
+    render(
+      <JoystickApp
+        initialUrl="https://localstudio.test/joystick?code=ABCD-1234"
+        signalingService={service}
+      />,
+    );
 
     await user.click(await screen.findByRole('button', { name: 'Go to upcoming slide 3: Close' }));
 
@@ -560,9 +635,36 @@ describe('JoystickApp', () => {
       notes: '',
       pageCount: 3,
       pages: [
-        { id: 'page-1', name: 'Intro' },
-        { id: 'page-2', name: 'Roadmap' },
-        { id: 'page-3', name: 'Budget' },
+        {
+          id: 'page-1',
+          name: 'Intro',
+          preview: {
+            backgroundColor: '#111111',
+            elements: [],
+            height: 1080,
+            width: 1920,
+          },
+        },
+        {
+          id: 'page-2',
+          name: 'Roadmap',
+          preview: {
+            backgroundColor: '#222222',
+            elements: [],
+            height: 1080,
+            width: 1920,
+          },
+        },
+        {
+          id: 'page-3',
+          name: 'Budget',
+          preview: {
+            backgroundColor: '#333333',
+            elements: [],
+            height: 1080,
+            width: 1920,
+          },
+        },
       ],
       presenterMode: 'presenting',
       shortcuts: ['previous', 'next'],
@@ -570,9 +672,17 @@ describe('JoystickApp', () => {
       type: 'state',
     });
 
-    render(<JoystickApp initialUrl="https://localstudio.test/joystick?code=ABCD-1234" signalingService={service} />);
+    const { container } = render(
+      <JoystickApp
+        initialUrl="https://localstudio.test/joystick?code=ABCD-1234"
+        signalingService={service}
+      />,
+    );
 
     await user.click(await screen.findByRole('button', { name: 'Show slide navigation' }));
+    expect(
+      container.querySelectorAll('.joystick-slide-navigator-thumb .joystick-slide-canvas'),
+    ).toHaveLength(3);
     await user.click(screen.getByRole('button', { name: 'Go to slide 3: Budget' }));
 
     expect(service.takeCommands('ABCD-1234')).toEqual([
@@ -601,7 +711,12 @@ describe('JoystickApp', () => {
       type: 'state',
     });
 
-    render(<JoystickApp initialUrl="https://localstudio.test/joystick?code=ABCD-1234" signalingService={service} />);
+    render(
+      <JoystickApp
+        initialUrl="https://localstudio.test/joystick?code=ABCD-1234"
+        signalingService={service}
+      />,
+    );
 
     const notes = await screen.findByLabelText('Presenter notes content');
     expect(notes).toHaveStyle({ fontSize: '28px' });
@@ -631,7 +746,12 @@ describe('JoystickApp', () => {
       type: 'state',
     });
 
-    render(<JoystickApp initialUrl="https://localstudio.test/joystick?code=ABCD-1234" signalingService={service} />);
+    render(
+      <JoystickApp
+        initialUrl="https://localstudio.test/joystick?code=ABCD-1234"
+        signalingService={service}
+      />,
+    );
 
     expect(await screen.findByLabelText('Presenter mode required')).toBeInTheDocument();
     expect(screen.getByText(/Open presenter mode on/)).toBeInTheDocument();

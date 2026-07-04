@@ -1,8 +1,4 @@
-import type {
-  DesignElement,
-  Page,
-  ProjectDocument,
-} from '../../domain/documents/model';
+import type { DesignElement, Page, ProjectDocument } from '../../domain/documents/model';
 import type {
   PresenterCommandMessage,
   PresenterRemoteSessionMetadata,
@@ -30,7 +26,9 @@ type ResolveRemoteControlOrigin = (origin: string) => Promise<string | undefined
 type PresenterRemoteSignaling = {
   closeSession: (code: string) => boolean | Promise<unknown>;
   publishState: (code: string, state: PresenterRemoteState) => boolean | Promise<unknown>;
-  registerSession: (input: RegisterPresenterRemoteSessionInput) => PresenterRemoteSession | Promise<PresenterRemoteSession>;
+  registerSession: (
+    input: RegisterPresenterRemoteSessionInput,
+  ) => PresenterRemoteSession | Promise<PresenterRemoteSession>;
   takeCommands: (code: string) => PresenterRemoteCommand[] | Promise<PresenterRemoteCommand[]>;
 };
 
@@ -87,8 +85,7 @@ export class BrowserPresenterSessionService {
     this.href = options.href ?? targetWindow.location.href;
     this.origin = new URL(this.href).origin;
     this.openWindow =
-      options.openWindow ??
-      ((url, target, features) => targetWindow.open(url, target, features));
+      options.openWindow ?? ((url, target, features) => targetWindow.open(url, target, features));
     this.randomId = options.randomId ?? createSessionId;
     this.resolveRemoteControlOrigin =
       options.resolveRemoteControlOrigin ?? resolveRemoteControlOrigin;
@@ -148,12 +145,15 @@ export class BrowserPresenterSessionService {
   closePresenterWindow() {
     if (this.popupWindow && !this.popupWindow.closed) this.popupWindow.close();
     this.popupWindow = null;
-    if (this.remoteSession) void Promise.resolve(this.remoteSignalingService.closeSession(this.remoteSession.code));
+    if (this.remoteSession)
+      void Promise.resolve(this.remoteSignalingService.closeSession(this.remoteSession.code));
     this.remoteSession = undefined;
     this.sessionId = undefined;
   }
 
-  async openRemoteControlSession(input: RegisterPresenterRemoteSessionInput): Promise<PresenterRemoteSessionMetadata> {
+  async openRemoteControlSession(
+    input: RegisterPresenterRemoteSessionInput,
+  ): Promise<PresenterRemoteSessionMetadata> {
     if (this.remoteSession) return this.remoteSession;
     const session = await this.remoteSignalingService.registerSession(input);
     const remoteOrigin = (await this.resolveRemoteControlOrigin(this.origin)) ?? this.origin;
@@ -268,7 +268,10 @@ export class BrowserPresenterSessionService {
     );
   }
 
-  private getCurrentPresenterTimer(payloadTimer: PresenterRemoteTimerState | undefined, elapsedMs: number) {
+  private getCurrentPresenterTimer(
+    payloadTimer: PresenterRemoteTimerState | undefined,
+    elapsedMs: number,
+  ) {
     const now = Date.now();
     if (!this.presenterTimer) {
       return payloadTimer ?? { elapsedMs, paused: false, updatedAtEpochMs: now };
@@ -342,45 +345,53 @@ function createRemoteState(
   );
   const activePage = payload.project.pages[activePageIndex] ?? payload.project.pages[0];
   const nextPage = payload.project.pages[activePageIndex + 1];
-  const upcomingPages = payload.project.pages.slice(activePageIndex + 1, activePageIndex + 4);
   const hiddenElementIds =
     activePage && payload.animationPreview?.pageId === activePage.id
       ? new Set(payload.animationPreview.hiddenElementIds)
       : undefined;
   return Promise.all([
-    activePage ? createSlidePreview(payload.project, activePage, resolvePortableAssetUrl, hiddenElementIds) : undefined,
-    nextPage ? createSlidePreview(payload.project, nextPage, resolvePortableAssetUrl) : undefined,
-    createUpcomingSlidePreviews(payload.project, upcomingPages, resolvePortableAssetUrl),
-  ]).then(([slidePreview, nextSlidePreview, upcomingSlidePreviews]) => ({
-    activePageId: activePage?.id ?? payload.activePageId,
-    activePageIndex,
-    activePageName: activePage?.name,
-    buildsRemaining: activePage ? getRemoteBuildsRemaining(payload, activePage) : 0,
-    connectedControllerCount,
-    deckName: payload.project.name,
-    nextPageName: nextPage?.name,
-    nextSlidePreview,
-    notes: activePage?.speakerNotes ?? '',
-    pageCount: payload.project.pages.length,
-    pages: payload.project.pages.map((page) => ({ id: page.id, name: page.name })),
-    presenterMode: payload.presenterMode ?? 'presenting',
-    commandAvailability: [
-      'previous',
-      'next',
-      'go-to-page',
-      'pause-timer',
-      'resume-timer',
-      'reset-timer',
-      'play-pause-movie',
-    ],
-    previewMode: 'stream',
-    slidePreview,
-    shortcuts: ['previous', 'next', 'pause-timer', 'reset-timer'],
-    stream: { enabled: true, fps: 8, height: 340, width: 390 },
-    timer,
-    type: 'state',
-    upcomingSlidePreviews,
-  }));
+    activePage
+      ? createSlidePreview(payload.project, activePage, resolvePortableAssetUrl, hiddenElementIds)
+      : undefined,
+    createUpcomingSlidePreviews(payload.project, payload.project.pages, resolvePortableAssetUrl),
+  ]).then(([slidePreview, pagePreviews]) => {
+    const nextSlidePreview = pagePreviews[activePageIndex + 1]?.preview;
+    const upcomingSlidePreviews = pagePreviews.slice(activePageIndex + 1, activePageIndex + 4);
+    return {
+      activePageId: activePage?.id ?? payload.activePageId,
+      activePageIndex,
+      activePageName: activePage?.name,
+      buildsRemaining: activePage ? getRemoteBuildsRemaining(payload, activePage) : 0,
+      connectedControllerCount,
+      deckName: payload.project.name,
+      nextPageName: nextPage?.name,
+      nextSlidePreview,
+      notes: activePage?.speakerNotes ?? '',
+      pageCount: payload.project.pages.length,
+      pages: pagePreviews.map((page) => ({
+        id: page.pageId,
+        name: page.pageName,
+        preview: page.preview,
+      })),
+      presenterMode: payload.presenterMode ?? 'presenting',
+      commandAvailability: [
+        'previous',
+        'next',
+        'go-to-page',
+        'pause-timer',
+        'resume-timer',
+        'reset-timer',
+        'play-pause-movie',
+      ],
+      previewMode: 'stream',
+      slidePreview,
+      shortcuts: ['previous', 'next', 'pause-timer', 'reset-timer'],
+      stream: { enabled: true, fps: 8, height: 340, width: 390 },
+      timer,
+      type: 'state',
+      upcomingSlidePreviews,
+    };
+  });
 }
 
 function getRemoteBuildsRemaining(payload: PresenterStatePayload, page: Page) {
@@ -478,7 +489,8 @@ function createSlidePreviewElement(
     return resolvePortableAssetUrl(project.assets[element.assetId]?.objectUrl).then((assetUrl) => ({
       ...frame,
       assetUrl,
-      autoplay: element.type === 'gif' ? element.playing : element.autoplayInPreview || element.playing,
+      autoplay:
+        element.type === 'gif' ? element.playing : element.autoplayInPreview || element.playing,
       controls: element.type === 'video' ? element.controls : false,
       kind: 'media',
       loop: element.type === 'gif' ? element.playing : element.loop,
@@ -498,7 +510,12 @@ function createSlidePreviewElement(
 
 function isLoopbackOrigin(origin: string) {
   const hostname = new URL(origin).hostname;
-  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '0.0.0.0';
+  return (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '::1' ||
+    hostname === '0.0.0.0'
+  );
 }
 
 function isValidRemoteOrigin(value: unknown): value is string {
@@ -516,7 +533,7 @@ async function resolveRemoteControlOrigin(origin: string) {
   try {
     const response = await fetch('/__localstudio/network-origin', { cache: 'no-store' });
     if (!response.ok) return origin;
-    const payload = await response.json() as { origin?: unknown };
+    const payload = (await response.json()) as { origin?: unknown };
     return isValidRemoteOrigin(payload.origin) ? payload.origin : origin;
   } catch {
     return origin;
