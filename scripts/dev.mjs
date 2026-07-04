@@ -1,53 +1,133 @@
-import { spawn } from 'node:child_process';
+import { createServer as createHttpServer } from 'node:http';
+import { networkInterfaces } from 'node:os';
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { createServer as createViteServer } from 'vite';
+
+const host = '0.0.0.0';
+const port = 4173;
 
 const apps = [
-  { name: 'landing', path: '../apps/landing', port: '4173' },
-  { name: 'editor', path: '../apps/editor', port: '4174' },
-  { name: 'joystick', path: '../apps/joystick', port: '4175' },
+  {
+    base: '/editor/',
+    configFile: '../apps/editor/vite.config.ts',
+    indexFile: '../apps/editor/index.html',
+    name: 'editor',
+  },
+  {
+    base: '/joystick/',
+    configFile: '../apps/joystick/vite.config.ts',
+    indexFile: '../apps/joystick/index.html',
+    name: 'joystick',
+  },
+  {
+    base: '/',
+    configFile: '../apps/landing/vite.config.ts',
+    indexFile: '../apps/landing/index.html',
+    name: 'landing',
+  },
 ];
 
-const children = apps.map((app) => {
-  const child = spawn('vite', ['--host', '0.0.0.0', '--port', app.port, '--strictPort'], {
-    cwd: fileURLToPath(new URL(app.path, import.meta.url)),
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+const httpServer = createHttpServer();
+const viteServers = [];
 
-  child.stdout.on('data', (chunk) => {
-    process.stdout.write(prefixLines(app.name, chunk));
+for (const app of apps) {
+  const server = await createViteServer({
+    appType: 'spa',
+    configFile: fileURLToPath(new URL(app.configFile, import.meta.url)),
+    server: {
+      hmr: {
+        server: httpServer,
+      },
+      middlewareMode: true,
+    },
   });
-  child.stderr.on('data', (chunk) => {
-    process.stderr.write(prefixLines(app.name, chunk));
-  });
-  child.on('exit', (code, signal) => {
-    if (shuttingDown) return;
-    console.error(`[${app.name}] exited with ${signal ?? code}`);
-    shutdown(code ?? 1);
-  });
+  viteServers.push({ ...app, server });
+}
 
-  return child;
+httpServer.on('request', (request, response) => {
+  const app =
+    viteServers.find((candidate) => candidate.base !== '/' && request.url?.startsWith(candidate.base)) ??
+    viteServers.find((candidate) => candidate.base === '/');
+  if (shouldServeIndex(request.url)) {
+    void serveIndex(app, request, response);
+    return;
+  }
+  app?.server.middlewares(request, response, () => {
+    if (!response.headersSent) {
+      response.statusCode = 404;
+      response.end();
+    }
+  });
+});
+
+httpServer.listen(port, host, () => {
+  const networkUrls = getNetworkUrls();
+  console.log(`LocalStudio dev server ready on one origin:`);
+  console.log(`  Local:   http://localhost:${port}/`);
+  for (const url of networkUrls) console.log(`  Network: ${url}`);
+  console.log('');
+  console.log(`Routes:`);
+  console.log(`  /`);
+  console.log(`  /editor/`);
+  console.log(`  /joystick/`);
 });
 
 let shuttingDown = false;
 
-function prefixLines(name, chunk) {
-  return chunk
-    .toString()
-    .split(/\n/)
-    .map((line, index, lines) => {
-      if (index === lines.length - 1 && line === '') return '';
-      return `[${name}] ${line}`;
-    })
-    .join('\n');
+function getNetworkUrls() {
+  const interfaces = getNetworkInterfaces();
+  return interfaces.map((address) => `http://${address}:${port}/`);
 }
 
-function shutdown(code = 0) {
-  shuttingDown = true;
-  for (const child of children) {
-    if (!child.killed) child.kill('SIGTERM');
+function getNetworkInterfaces() {
+  return Object.values(networkInterfaces())
+    .flat()
+    .filter((entry) => entry?.family === 'IPv4' && !entry.internal)
+    .map((entry) => entry.address);
+}
+
+async function serveIndex(app, request, response) {
+  if (!shouldServeIndex(request.url)) {
+    response.statusCode = 404;
+    response.end();
+    return;
   }
-  setTimeout(() => process.exit(code), 250).unref();
+  try {
+    const indexPath = fileURLToPath(new URL(app.indexFile, import.meta.url));
+    const html = await readFile(indexPath, 'utf8');
+    const transformedHtml = await app.server.transformIndexHtml(request.url ?? app.base, html);
+    response.statusCode = 200;
+    response.setHeader('Content-Type', 'text/html');
+    response.end(transformedHtml);
+  } catch (error) {
+    app.server.ssrFixStacktrace(error);
+    console.error(error);
+    response.statusCode = 500;
+    response.end();
+  }
 }
 
-process.on('SIGINT', () => shutdown(0));
-process.on('SIGTERM', () => shutdown(0));
+function shouldServeIndex(url) {
+  if (!url) return true;
+  const pathname = new URL(url, 'http://localstudio.invalid').pathname;
+  const filename = pathname.split('/').at(-1) ?? '';
+  return (
+    !filename.includes('.') &&
+    !pathname.startsWith('/__localstudio/') &&
+    !pathname.includes('/@') &&
+    !pathname.includes('/src/') &&
+    !pathname.includes('/node_modules/')
+  );
+}
+
+async function shutdown(code = 0) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  await Promise.all(viteServers.map((app) => app.server.close()));
+  httpServer.close(() => process.exit(code));
+  setTimeout(() => process.exit(code), 500).unref();
+}
+
+process.on('SIGINT', () => void shutdown(0));
+process.on('SIGTERM', () => void shutdown(0));
