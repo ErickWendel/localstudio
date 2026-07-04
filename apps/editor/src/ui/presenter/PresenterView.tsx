@@ -19,7 +19,10 @@ import {
 import { PresenterRemotePanel } from './PresenterRemotePanel';
 import { presenterRemoteMirror } from './presenterRemoteMirror';
 import { presenterRemoteStreamPublisher } from './presenterRemoteStreamPublisher';
-import type { PresenterRemoteCommand } from '@localstudio/presenter-remote/protocol';
+import type {
+  PresenterRemoteCommand,
+  PresenterRemoteStreamPreference,
+} from '@localstudio/presenter-remote/protocol';
 import { presenterRemoteTimerFormat } from '@localstudio/presenter-remote/timer-format';
 
 interface PresenterViewProps {
@@ -34,6 +37,8 @@ const notesDefaultWidthPx = 364;
 const notesMinWidthPx = 280;
 const notesMaxWidthPx = 760;
 const presenterMainMinWidthPx = 520;
+const defaultRemoteStreamSize = presenterRemoteMirror.size;
+const maxRemoteStreamSize = { height: 1120, width: 1280 };
 const presenterShortcutActions = [
   'next-build',
   'previous-build',
@@ -163,6 +168,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
   const [notesPanelWidth, setNotesPanelWidth] = useState(getInitialNotesWidth);
   const [keyboardShortcutsMode, setKeyboardShortcutsMode] = useState<'dialog' | 'popover' | undefined>();
   const [remotePanelOpen, setRemotePanelOpen] = useState(false);
+  const [remoteStreamSize, setRemoteStreamSize] = useState(defaultRemoteStreamSize);
   const [slideNavigatorOpen, setSlideNavigatorOpen] = useState(false);
   const [slideNavigatorIndex, setSlideNavigatorIndex] = useState(0);
   const [introDismissed, setIntroDismissed] = useState(getInitialIntroDismissed);
@@ -400,6 +406,19 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     }
     postCommand({ command: command.command });
   }, [applyTimerCommand, postCommand]);
+
+  const handleRemoteStreamPreference = useCallback((preference: PresenterRemoteStreamPreference) => {
+    setRemoteStreamSize({
+      height: Math.max(
+        defaultRemoteStreamSize.height,
+        Math.min(maxRemoteStreamSize.height, Math.round(preference.height)),
+      ),
+      width: Math.max(
+        defaultRemoteStreamSize.width,
+        Math.min(maxRemoteStreamSize.width, Math.round(preference.width)),
+      ),
+    });
+  }, []);
 
   function getPresenterVideos() {
     return Array.from(presenterStageRef.current?.querySelectorAll('video') ?? []);
@@ -697,14 +716,14 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
         project: snapshot.project,
         timerLabel: presenterRemoteTimerFormat.formatElapsed(elapsedMs),
         videoElements: getPresenterVideos(),
-      });
+      }, remoteStreamSize);
     };
     render();
     const intervalId = window.setInterval(render, 125);
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [activePage, activePageIndex, buildsRemaining, currentTimeLabel, elapsedMs, snapshot]);
+  }, [activePage, activePageIndex, buildsRemaining, currentTimeLabel, elapsedMs, remoteStreamSize, snapshot]);
 
   useEffect(() => {
     const canvas = remoteMirrorCanvasRef.current;
@@ -718,6 +737,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     const publisher = presenterRemoteStreamPublisher.create({
       canvas,
       onCommand: handleRemoteStreamCommand,
+      onStreamPreference: handleRemoteStreamPreference,
       sessionCode,
     });
     remoteStreamPublisherRef.current = publisher;
@@ -726,7 +746,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
       publisher.stop();
       if (remoteStreamPublisherRef.current === publisher) remoteStreamPublisherRef.current = undefined;
     };
-  }, [handleRemoteStreamCommand, snapshot?.remoteSession?.code]);
+  }, [handleRemoteStreamCommand, handleRemoteStreamPreference, snapshot?.remoteSession?.code]);
 
   const introOverlay = !introDismissed ? (
     <div className="presenter-intro-backdrop" role="presentation">

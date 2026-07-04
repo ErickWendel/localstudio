@@ -1,22 +1,31 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { PresenterRemoteCommand } from '@localstudio/presenter-remote/protocol';
+import type {
+  PresenterRemoteCommand,
+  PresenterRemoteStreamPreference,
+} from '@localstudio/presenter-remote/protocol';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 import { PresenterView } from '../../../../src/ui/presenter/PresenterView';
 
 const remoteStreamPublisherMock = vi.hoisted(() => {
   let onCommand: ((command: PresenterRemoteCommand) => void) | undefined;
+  let onStreamPreference: ((preference: PresenterRemoteStreamPreference) => void) | undefined;
   const publisher = {
     start: vi.fn(),
     stop: vi.fn(),
   };
   return {
-    create: vi.fn((options: { onCommand: (command: PresenterRemoteCommand) => void }) => {
+    create: vi.fn((options: {
+      onCommand: (command: PresenterRemoteCommand) => void;
+      onStreamPreference?: (preference: PresenterRemoteStreamPreference) => void;
+    }) => {
       onCommand = options.onCommand;
+      onStreamPreference = options.onStreamPreference;
       return publisher;
     }),
     getOnCommand: () => onCommand,
+    getOnStreamPreference: () => onStreamPreference,
     publisher,
   };
 });
@@ -422,6 +431,53 @@ describe('PresenterView', () => {
       }),
       window.location.origin,
     );
+  });
+
+  it('applies remote stream quality preferences to the mirror canvas', () => {
+    window.localStorage.setItem('localstudio.presenterWindowIntroDismissed', '1');
+    render(<PresenterView sessionId="session-1" />);
+    const project = sampleProject.createSampleProject();
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          origin: window.location.origin,
+          data: {
+            payload: {
+              activePageId: 'page-1',
+              animationPreview: undefined,
+              project,
+              remoteSession: {
+                code: 'ABCD-1234',
+                connectedControllerCount: 1,
+                expiresAt: '2026-07-04T12:00:00.000Z',
+                presenterLabel: 'MacBook Pro',
+                qrUrl: 'https://localstudio.test/joystick',
+                sessionId: 'remote-session-1',
+              },
+            },
+            sessionId: 'session-1',
+            source: 'localstudio-presenter-main',
+            type: 'state',
+          },
+        }),
+      );
+    });
+
+    const onStreamPreference = remoteStreamPublisherMock.getOnStreamPreference();
+    expect(onStreamPreference).toBeDefined();
+    act(() => {
+      onStreamPreference?.({
+        fps: 12,
+        height: 1020,
+        quality: 'high',
+        type: 'stream-preference',
+        width: 1170,
+      });
+    });
+
+    const canvas = document.querySelector<HTMLCanvasElement>('.presenter-remote-mirror-canvas');
+    expect(canvas?.width).toBe(1170);
+    expect(canvas?.height).toBe(1020);
   });
 
   it('formats presenter timer with hours after sixty minutes', () => {

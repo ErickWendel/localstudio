@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent, PointerEvent, TouchEvent } from 'react';
 import { ChevronLeft, List, Minus, NotebookText, Pause, Play, Plus, TimerReset, X } from 'lucide-react';
 import { presenterRemoteSessionCode } from '@localstudio/presenter-remote/session-code';
@@ -14,6 +14,7 @@ import type {
   PresenterRemoteSlidePreviewElement,
   PresenterRemoteSession,
   PresenterRemoteState,
+  PresenterRemoteStreamPreference,
 } from '@localstudio/presenter-remote/protocol';
 import {
   presenterRemoteStreamReceiver,
@@ -38,6 +39,7 @@ const rememberedCodeKey = 'localstudio.joystick.lastCode';
 const controllerIdKey = 'localstudio.joystick.controllerId';
 type JoystickSimpleCommand = 'next' | 'pause-timer' | 'previous' | 'reset-timer';
 const swipeThresholdPx = 44;
+const streamPreferenceAspectRatio = 390 / 340;
 
 function getInitialCode(initialUrl: string) {
   const url = new URL(initialUrl);
@@ -103,6 +105,31 @@ function getElementStyle(element: PresenterRemoteSlidePreviewElement, preview: P
     top: `${(element.y / preview.height) * 100}%`,
     transform: `rotate(${element.rotation}deg)`,
     width: `${(element.width / preview.width) * 100}%`,
+  };
+}
+
+function getNetworkQualityHint(): PresenterRemoteStreamPreference['quality'] {
+  const connection = (navigator as Navigator & {
+    connection?: { effectiveType?: string | undefined; saveData?: boolean | undefined } | undefined;
+  }).connection;
+  if (connection?.saveData) return 'low';
+  if (connection?.effectiveType === '2g' || connection?.effectiveType === 'slow-2g') return 'low';
+  if (connection?.effectiveType === '3g') return 'medium';
+  return window.devicePixelRatio >= 2 ? 'high' : 'medium';
+}
+
+function createStreamPreference(element: HTMLElement): PresenterRemoteStreamPreference {
+  const bounds = element.getBoundingClientRect();
+  const quality = getNetworkQualityHint();
+  const multiplier = quality === 'high' ? Math.min(window.devicePixelRatio || 1, 3) : quality === 'medium' ? 1.5 : 1;
+  const width = Math.max(390, Math.min(1280, Math.round(bounds.width * multiplier)));
+  const height = Math.max(340, Math.min(1120, Math.round(width / streamPreferenceAspectRatio)));
+  return {
+    fps: quality === 'high' ? 12 : quality === 'medium' ? 8 : 6,
+    height,
+    quality,
+    type: 'stream-preference',
+    width,
   };
 }
 
@@ -228,12 +255,15 @@ function SlideCanvas({
 
 function StreamPreview({
   onNavigate,
+  onStreamPreference,
   stream,
 }: {
   onNavigate: (direction: 'next' | 'previous') => void;
+  onStreamPreference: (preference: PresenterRemoteStreamPreference) => void;
   stream: MediaStream;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLButtonElement>(null);
   const touchStartX = useRef<number | undefined>(undefined);
   const pointerStartX = useRef<number | undefined>(undefined);
 
@@ -246,6 +276,24 @@ function StreamPreview({
       if (video.srcObject === stream) video.srcObject = null;
     };
   }, [stream]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    let lastPreferenceKey = '';
+    const publishPreference = () => {
+      const preference = createStreamPreference(container);
+      const preferenceKey = `${preference.width}x${preference.height}@${preference.fps}:${preference.quality}`;
+      if (preferenceKey === lastPreferenceKey) return;
+      lastPreferenceKey = preferenceKey;
+      onStreamPreference(preference);
+    };
+    publishPreference();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(publishPreference);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [onStreamPreference, stream]);
 
   function handleClick() {
     onNavigate('next');
@@ -283,6 +331,7 @@ function StreamPreview({
   return (
     <button
       type="button"
+      ref={containerRef}
       className="joystick-stream-hit-target"
       aria-label="Presenter stream preview"
       onClick={handleClick}
@@ -558,6 +607,10 @@ export function JoystickApp({
       .then(() => setLastCommand(command.command));
   }
 
+  const sendStreamPreference = useCallback((preference: PresenterRemoteStreamPreference) => {
+    remoteStreamReceiverRef.current?.sendStreamPreference(preference);
+  }, []);
+
   function sendCommand(command: JoystickSimpleCommand) {
     sendRemoteCommand({ command, type: 'command' });
   }
@@ -645,7 +698,7 @@ export function JoystickApp({
           <span>{buildsRemainingLabel}</span>
         </header>
         <section className="joystick-stream-stage" aria-label="Streamed presenter preview">
-          <StreamPreview stream={remoteStream} onNavigate={navigateSlide} />
+          <StreamPreview stream={remoteStream} onNavigate={navigateSlide} onStreamPreference={sendStreamPreference} />
         </section>
         <UpcomingSlideStrip
           previews={upcomingSlidePreviews}

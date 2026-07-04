@@ -1,10 +1,15 @@
-import { presenterRemoteProtocol, type PresenterRemoteCommand } from '@localstudio/presenter-remote/protocol';
+import {
+  presenterRemoteProtocol,
+  type PresenterRemoteCommand,
+  type PresenterRemoteStreamPreference,
+} from '@localstudio/presenter-remote/protocol';
 import { PresenterRemoteSignalingClient } from '@localstudio/presenter-remote/signaling-client';
 import { presenterRemoteWebRtc } from '@localstudio/presenter-remote/webrtc';
 
 interface PresenterRemoteStreamPublisherOptions {
   canvas: HTMLCanvasElement;
   onCommand: (command: PresenterRemoteCommand) => void;
+  onStreamPreference?: ((preference: PresenterRemoteStreamPreference) => void) | undefined;
   sessionCode: string;
   signalingClient?: PresenterRemoteSignalingClient | undefined;
 }
@@ -12,20 +17,24 @@ interface PresenterRemoteStreamPublisherOptions {
 interface PresenterRemoteStreamConnection {
   icePollIntervalId: number;
   peerConnection: RTCPeerConnection;
+  sender: RTCRtpSender | undefined;
 }
 
 class PresenterRemoteStreamPublisher {
   private readonly canvas: HTMLCanvasElement;
   private readonly connections = new Map<string, PresenterRemoteStreamConnection>();
   private readonly onCommand: (command: PresenterRemoteCommand) => void;
+  private readonly onStreamPreference: ((preference: PresenterRemoteStreamPreference) => void) | undefined;
   private readonly sessionCode: string;
   private readonly signalingClient: PresenterRemoteSignalingClient;
+  private fps = 8;
   private offerPollIntervalId = 0;
   private stream: MediaStream | undefined;
 
   constructor(options: PresenterRemoteStreamPublisherOptions) {
     this.canvas = options.canvas;
     this.onCommand = options.onCommand;
+    this.onStreamPreference = options.onStreamPreference;
     this.sessionCode = options.sessionCode;
     this.signalingClient = options.signalingClient ?? new PresenterRemoteSignalingClient({
       endpoint: '/__localstudio/presenter-remote',
@@ -34,7 +43,7 @@ class PresenterRemoteStreamPublisher {
 
   start() {
     if (typeof this.canvas.captureStream !== 'function') return;
-    this.stream = this.canvas.captureStream(8);
+    this.stream = this.canvas.captureStream(this.fps);
     this.offerPollIntervalId = window.setInterval(() => {
       void this.answerPendingOffers();
     }, 800);
@@ -65,11 +74,18 @@ class PresenterRemoteStreamPublisher {
 
   private async answerOffer(controllerId: string, offerSdp: string, stream: MediaStream) {
     const peerConnection = new RTCPeerConnection(presenterRemoteWebRtc.peerConfig);
-    for (const track of stream.getVideoTracks()) peerConnection.addTrack(track, stream);
+    const videoTrack = stream.getVideoTracks()[0];
+    const sender = videoTrack ? peerConnection.addTrack(videoTrack, stream) : undefined;
     peerConnection.ondatachannel = (event) => {
       event.channel.onmessage = (messageEvent) => {
-        const parsed = parseCommand(messageEvent.data);
-        if (parsed) this.onCommand(parsed);
+        const parsed = parseStreamMessage(messageEvent.data);
+        if (!parsed) return;
+        if (parsed.type === 'stream-preference') {
+          this.applyStreamPreference(parsed);
+          this.onStreamPreference?.(parsed);
+          return;
+        }
+        this.onCommand(parsed);
       };
     };
     peerConnection.onicecandidate = (event) => {
@@ -90,7 +106,24 @@ class PresenterRemoteStreamPublisher {
     const icePollIntervalId = window.setInterval(() => {
       void this.takeControllerIce(controllerId, peerConnection);
     }, 500);
-    this.connections.set(controllerId, { icePollIntervalId, peerConnection });
+    this.connections.set(controllerId, { icePollIntervalId, peerConnection, sender });
+  }
+
+  private applyStreamPreference(preference: PresenterRemoteStreamPreference) {
+    const nextFps = clampFps(preference.fps);
+    if (this.fps === nextFps) return;
+    this.fps = nextFps;
+    if (typeof this.canvas.captureStream !== 'function') return;
+    const previousStream = this.stream;
+    const nextStream = this.canvas.captureStream(this.fps);
+    const nextTrack = nextStream.getVideoTracks()[0];
+    this.stream = nextStream;
+    if (nextTrack) {
+      for (const connection of this.connections.values()) {
+        void connection.sender?.replaceTrack(nextTrack).catch(() => undefined);
+      }
+    }
+    previousStream?.getTracks().forEach((track) => track.stop());
   }
 
   private async takeControllerIce(controllerId: string, peerConnection: RTCPeerConnection) {
@@ -112,11 +145,18 @@ class PresenterRemoteStreamPublisher {
   }
 }
 
-function parseCommand(value: unknown) {
+function clampFps(value: number) {
+  if (!Number.isFinite(value)) return 8;
+  return Math.max(4, Math.min(15, Math.round(value)));
+}
+
+function parseStreamMessage(value: unknown) {
   if (typeof value !== 'string') return undefined;
   try {
     const parsed = JSON.parse(value) as unknown;
-    return presenterRemoteProtocol.isCommand(parsed) ? parsed : undefined;
+    if (presenterRemoteProtocol.isCommand(parsed)) return parsed;
+    if (presenterRemoteProtocol.isStreamPreference(parsed)) return parsed;
+    return undefined;
   } catch {
     return undefined;
   }

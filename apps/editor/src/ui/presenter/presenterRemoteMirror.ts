@@ -12,6 +12,11 @@ export interface PresenterRemoteMirrorFrame {
   videoElements: HTMLVideoElement[];
 }
 
+export interface PresenterRemoteMirrorSize {
+  height: number;
+  width: number;
+}
+
 const mirrorSize = { height: 340, width: 390 };
 const mirrorBackground = '#020805';
 const mirrorPanel = '#07120d';
@@ -158,11 +163,15 @@ function drawSlide(
   context.strokeRect(viewport.x, viewport.y, viewport.width, viewport.height);
 }
 
-function renderFrame(canvas: HTMLCanvasElement, frame: PresenterRemoteMirrorFrame) {
-  canvas.width = mirrorSize.width;
-  canvas.height = mirrorSize.height;
+function renderFrame(canvas: HTMLCanvasElement, frame: PresenterRemoteMirrorFrame, requestedSize = mirrorSize) {
+  const width = Math.max(mirrorSize.width, Math.round(requestedSize.width));
+  const height = Math.max(mirrorSize.height, Math.round(requestedSize.height));
+  canvas.width = width;
+  canvas.height = height;
   const context = canvas.getContext('2d');
   if (!context) return;
+  context.save();
+  context.scale(width / mirrorSize.width, height / mirrorSize.height);
   context.fillStyle = mirrorBackground;
   context.fillRect(0, 0, mirrorSize.width, mirrorSize.height);
   const gradient = context.createLinearGradient(0, 0, 0, 180);
@@ -174,6 +183,7 @@ function renderFrame(canvas: HTMLCanvasElement, frame: PresenterRemoteMirrorFram
   context.fillStyle = mirrorPanel;
   context.fill();
   drawSlide(context, frame, frame.activePage, { height: 306, width: mirrorSize.width - 24, x: 12, y: 20 });
+  context.restore();
 }
 
 export const presenterRemoteMirror = {

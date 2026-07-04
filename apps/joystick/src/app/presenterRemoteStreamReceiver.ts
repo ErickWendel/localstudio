@@ -1,4 +1,7 @@
-import type { PresenterRemoteCommand } from '@localstudio/presenter-remote/protocol';
+import type {
+  PresenterRemoteCommand,
+  PresenterRemoteStreamPreference,
+} from '@localstudio/presenter-remote/protocol';
 import { presenterRemoteWebRtc } from '@localstudio/presenter-remote/webrtc';
 
 export interface PresenterRemoteStreamSignaling {
@@ -32,6 +35,7 @@ class PresenterRemoteStreamReceiver {
   private readonly onStatusChange: PresenterRemoteStreamReceiverOptions['onStatusChange'];
   private readonly onStream: PresenterRemoteStreamReceiverOptions['onStream'];
   private readonly options: PresenterRemoteStreamReceiverOptions;
+  private pendingPreference: PresenterRemoteStreamPreference | undefined;
   private peerConnection: RTCPeerConnection | undefined;
   private started = false;
 
@@ -52,6 +56,9 @@ class PresenterRemoteStreamReceiver {
     const peerConnection = new RTCPeerConnection(presenterRemoteWebRtc.peerConfig);
     this.peerConnection = peerConnection;
     this.dataChannel = peerConnection.createDataChannel('presenter-control', { ordered: true });
+    this.dataChannel.onopen = () => {
+      if (this.pendingPreference) this.sendStreamPreference(this.pendingPreference);
+    };
     peerConnection.addTransceiver('video', { direction: 'recvonly' });
     peerConnection.ontrack = (event) => {
       const stream = event.streams[0] ?? new MediaStream([event.track]);
@@ -90,6 +97,13 @@ class PresenterRemoteStreamReceiver {
   sendCommand(command: PresenterRemoteCommand) {
     if (this.dataChannel?.readyState !== 'open') return false;
     this.dataChannel.send(JSON.stringify(command));
+    return true;
+  }
+
+  sendStreamPreference(preference: PresenterRemoteStreamPreference) {
+    this.pendingPreference = preference;
+    if (this.dataChannel?.readyState !== 'open') return false;
+    this.dataChannel.send(JSON.stringify(preference));
     return true;
   }
 
