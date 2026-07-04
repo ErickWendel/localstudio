@@ -36,17 +36,31 @@ vi.mock('../../src/app/presenterRemoteStreamReceiver', () => ({
 }));
 
 const localStorageDescriptor = Object.getOwnPropertyDescriptor(window, 'localStorage');
+const localStoragePrototypeDescriptor = Object.getOwnPropertyDescriptor(
+  Object.getPrototypeOf(window),
+  'localStorage',
+);
 
 function restoreLocalStorage() {
   if (localStorageDescriptor) {
     Object.defineProperty(window, 'localStorage', localStorageDescriptor);
+    return;
   }
+  if (localStoragePrototypeDescriptor) {
+    Reflect.deleteProperty(window, 'localStorage');
+  }
+}
+
+function getTestLocalStorage() {
+  restoreLocalStorage();
+  const storage = window.localStorage;
+  if (!storage) throw new Error('Expected jsdom localStorage to be available for this test');
+  return storage;
 }
 
 describe('JoystickApp', () => {
   beforeEach(() => {
-    restoreLocalStorage();
-    window.localStorage?.clear();
+    getTestLocalStorage().clear();
     streamReceiverMock.create.mockClear();
     streamReceiverMock.latestReceiver = undefined;
   });
@@ -118,7 +132,7 @@ describe('JoystickApp', () => {
       timer: { elapsedMs: 0, paused: false },
       type: 'state',
     });
-    window.localStorage.setItem('localstudio.joystick.lastCode', 'ABCD-1234');
+    getTestLocalStorage().setItem('localstudio.joystick.lastCode', 'ABCD-1234');
 
     render(
       <JoystickApp initialUrl="https://localstudio.test/joystick" signalingService={service} />,
@@ -147,12 +161,12 @@ describe('JoystickApp', () => {
     );
 
     expect(await screen.findByLabelText('Connected (1)')).toBeInTheDocument();
-    expect(window.localStorage.getItem('localstudio.joystick.lastCode')).toBe('ABCD-1234');
-    expect(JSON.parse(window.localStorage.getItem('localstudio.joystick.approvedCodes') ?? '[]')).toEqual([
+    expect(getTestLocalStorage().getItem('localstudio.joystick.lastCode')).toBe('ABCD-1234');
+    expect(JSON.parse(getTestLocalStorage().getItem('localstudio.joystick.approvedCodes') ?? '[]')).toEqual([
       'ABCD-1234',
     ]);
     expect(
-      JSON.parse(window.localStorage.getItem('localstudio.joystick.trustedPresenterDeviceIds') ?? '[]'),
+      JSON.parse(getTestLocalStorage().getItem('localstudio.joystick.trustedPresenterDeviceIds') ?? '[]'),
     ).toEqual(['presenter-macbook']);
   });
 
@@ -179,9 +193,9 @@ describe('JoystickApp', () => {
       timer: { elapsedMs: 0, paused: false },
       type: 'state',
     });
-    window.localStorage.setItem('localstudio.joystick.lastCode', 'ABCD-1234');
-    window.localStorage.setItem('localstudio.joystick.approvedCodes', JSON.stringify(['ABCD-1234']));
-    window.localStorage.setItem(
+    getTestLocalStorage().setItem('localstudio.joystick.lastCode', 'ABCD-1234');
+    getTestLocalStorage().setItem('localstudio.joystick.approvedCodes', JSON.stringify(['ABCD-1234']));
+    getTestLocalStorage().setItem(
       'localstudio.joystick.trustedPresenterDeviceIds',
       JSON.stringify(['presenter-macbook']),
     );
@@ -191,8 +205,8 @@ describe('JoystickApp', () => {
     );
 
     expect(await screen.findByText('Current: Slide 1 of 1')).toBeInTheDocument();
-    expect(window.localStorage.getItem('localstudio.joystick.lastCode')).toBe('EFGH-5678');
-    expect(JSON.parse(window.localStorage.getItem('localstudio.joystick.approvedCodes') ?? '[]')).toEqual([
+    expect(getTestLocalStorage().getItem('localstudio.joystick.lastCode')).toBe('EFGH-5678');
+    expect(JSON.parse(getTestLocalStorage().getItem('localstudio.joystick.approvedCodes') ?? '[]')).toEqual([
       'EFGH-5678',
       'ABCD-1234',
     ]);
