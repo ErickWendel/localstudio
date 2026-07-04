@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import type {
@@ -191,7 +191,7 @@ describe('DesignPanel', () => {
     expect(screen.queryByText('No Google Fonts match that search.')).not.toBeInTheDocument();
   });
 
-  it('shows font controls before selection controls for selected text', () => {
+  it('shows typography controls before selection controls for selected text styles', () => {
     render(
       <DesignPanel
         project={createProjectWithSelectedText()}
@@ -201,7 +201,54 @@ describe('DesignPanel', () => {
     );
 
     const headings = screen.getAllByRole('heading').map((heading) => heading.textContent);
-    expect(headings.indexOf('Font')).toBeLessThan(headings.indexOf('Selection'));
+    expect(headings).toContain('Typography');
+    expect(headings).toContain('Selection');
+    expect(headings.indexOf('Typography')).toBeLessThan(headings.indexOf('Selection'));
+  });
+
+  it('keeps selected text style controls in the Style tab only', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DesignPanel
+        project={createProjectWithSelectedText()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['text-test'] }}
+      />,
+    );
+
+    expect(screen.getAllByLabelText('Selected text font')).toHaveLength(1);
+
+    await user.click(screen.getByRole('tab', { name: 'Text' }));
+
+    expect(screen.queryByLabelText('Selected text font')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Selected text font size')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Selected text font weight')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Selected text color')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Selected text alignment')).not.toBeInTheDocument();
+  });
+
+  it('shows selected text content editing in the Text tab', async () => {
+    const user = userEvent.setup();
+    const onUpdateTextContent = vi.fn();
+
+    render(
+      <DesignPanel
+        project={createProjectWithSelectedText()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['text-test'] }}
+        onUpdateTextContent={onUpdateTextContent}
+      />,
+    );
+
+    await user.click(screen.getByRole('tab', { name: 'Text' }));
+
+    const textContent = screen.getByLabelText('Selected text content');
+    expect(textContent).toHaveValue('Editable text');
+
+    fireEvent.change(textContent, { target: { value: 'Updated copy' } });
+
+    expect(onUpdateTextContent).toHaveBeenLastCalledWith('text-test', 'Updated copy');
   });
 
   it('focuses the selected text font list when requested', async () => {

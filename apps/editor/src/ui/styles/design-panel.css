@@ -35,9 +35,20 @@
 }
 
 .design-control input,
-.design-control select {
+.design-control select,
+.design-control textarea {
   width: 100%;
   padding: 7px 8px;
+}
+
+.design-control-stacked {
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+
+.design-control textarea {
+  min-height: 96px;
+  resize: vertical;
 }
 
 .design-control input[type='color'] {
