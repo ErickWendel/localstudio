@@ -123,8 +123,15 @@ describe('BrowserStockMediaService', () => {
                   width: '480',
                   height: '270',
                 },
+                original: {
+                  url: 'https://media.giphy.com/media/gif-1/original.gif',
+                  mp4: 'https://media.giphy.com/media/gif-1/giphy.mp4',
+                  width: '480',
+                  height: '270',
+                },
                 fixed_width: {
                   url: 'https://media.giphy.com/media/gif-1/200w.gif',
+                  mp4: 'https://media.giphy.com/media/gif-1/200w.mp4',
                   width: '200',
                   height: '113',
                 },
@@ -148,6 +155,7 @@ describe('BrowserStockMediaService', () => {
         authorUrl: 'https://giphy.com/gifs/gif-1',
         thumbnailUrl: 'https://media.giphy.com/media/gif-1/200w.gif',
         mediaUrl: 'https://media.giphy.com/media/gif-1/giphy.gif',
+        videoUrl: 'https://media.giphy.com/media/gif-1/giphy.mp4',
         width: 480,
         height: 270,
       },

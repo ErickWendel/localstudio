@@ -1791,7 +1791,7 @@ function CanvasVideoElement({
       aria-label={assetName}
       autoPlay={autoplay}
       className="canvas-media-element"
-      controls={interactive && element.controls}
+      controls={false}
       data-trim-end={element.trimEndSeconds ?? ''}
       data-trim-start={element.trimStartSeconds}
       loop={repeatMode === 'loop' && element.trimEndSeconds === undefined}
