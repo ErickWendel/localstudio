@@ -25,6 +25,7 @@ import type { FormEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   DesignElement,
+  ElementAnimationBuild,
   PageBackground,
   ProjectDocument,
   SelectionState,
@@ -43,6 +44,9 @@ import type {
 import type { FontCatalogItem } from '../../../services/contracts/interfaces';
 import { PanelSection } from '../../components/PanelSection';
 import { textStyleOptions } from '../text/textStyleOptions';
+
+type ElementAnimationPatch = Omit<ElementAnimationBuild, 'elementId' | 'id'>;
+type MovieStartTrigger = ElementAnimationBuild['trigger'];
 
 const palette = ['#37FD76', '#050D10', '#FFFFFF', '#91999D', '#00779A'];
 const regularTextWeight = 400;
@@ -79,6 +83,7 @@ interface DesignPanelProps {
   onSetElementLock?: (elementId: string, locked: boolean) => void;
   onSetSelectedElementZOrder?: (mode: ZOrderMode) => void;
   onReplaceVideoAsset?: (elementId: string, file: File) => void;
+  onSetElementAnimationBuilds?: (elementIds: string[], patch: ElementAnimationPatch) => void;
 }
 
 function getSelectedElement(
@@ -120,6 +125,7 @@ export function DesignPanel({
   focusFontControlKey,
   onDownloadFont,
   onReplaceVideoAsset,
+  onSetElementAnimationBuilds,
 }: DesignPanelProps) {
   const fontSelectRef = useRef<HTMLSelectElement>(null);
   const [fontDownloadOpen, setFontDownloadOpen] = useState(false);
@@ -426,8 +432,10 @@ export function DesignPanel({
           onFrameUpdate={(patch) => onUpdateElementFrame?.(selectedElement.id, patch)}
           onLockChange={(locked) => onSetElementLock?.(selectedElement.id, locked)}
           onReplaceVideoAsset={(file) => onReplaceVideoAsset?.(selectedElement.id, file)}
+          {...(onSetElementAnimationBuilds ? { onSetElementAnimationBuilds } : {})}
           onUpdateMedia={updateSelectedMediaPlayback}
           onUpdateStyle={updateSelectedStyle}
+          page={page}
           onZOrderChange={onSetSelectedElementZOrder}
         />
       ) : (
@@ -449,8 +457,10 @@ interface ElementDesignInspectorProps {
   onFrameUpdate?: ((patch: ElementFramePatch) => void) | undefined;
   onLockChange?: ((locked: boolean) => void) | undefined;
   onReplaceVideoAsset?: ((file: File) => void) | undefined;
+  onSetElementAnimationBuilds?: (elementIds: string[], patch: ElementAnimationPatch) => void;
   onUpdateMedia: (patch: MediaPlaybackPatch) => void;
   onUpdateStyle: (patch: ElementStylePatch) => void;
+  page?: ProjectDocument['pages'][number] | undefined;
   onZOrderChange?: ((mode: ZOrderMode) => void) | undefined;
 }
 
@@ -489,6 +499,21 @@ function getTrimEndSeconds(element: VideoElement) {
   return element.trimEndSeconds ?? element.durationSeconds ?? getTrimSliderMax(element);
 }
 
+function getMovieStartValue(
+  mediaStartBuild: ElementAnimationBuild | undefined,
+  videoElement: VideoElement | undefined,
+) {
+  if (mediaStartBuild) {
+    return mediaStartBuild.trigger;
+  }
+  return videoElement?.startOnClick ? 'on-click' : 'after-transition';
+}
+
+function toMovieStartTrigger(value: string): MovieStartTrigger {
+  if (value === 'after-transition' || value === 'after-previous') return value;
+  return 'on-click';
+}
+
 type ElementInspectorTab = 'arrange' | 'content' | 'style';
 
 function getBoundedNumber(value: string, fallback: number, minimum = 0) {
@@ -518,8 +543,10 @@ function ElementDesignInspector({
   onFrameUpdate,
   onLockChange,
   onReplaceVideoAsset,
+  onSetElementAnimationBuilds,
   onUpdateMedia,
   onUpdateStyle,
+  page,
   onZOrderChange,
 }: ElementDesignInspectorProps) {
   const defaultTab = element.type === 'text' ? 'style' : 'content';
@@ -532,6 +559,25 @@ function ElementDesignInspector({
   const trimEndSeconds = videoElement ? getTrimEndSeconds(videoElement) : 0;
   const volume = videoElement?.muted ? 0 : Math.round((videoElement?.volume ?? 1) * 100);
   const repeatMode = videoElement ? getVideoRepeatMode(videoElement) : 'none';
+  const mediaStartBuild =
+    videoElement && page
+      ? page.animationBuilds?.find(
+          (build) => build.elementId === videoElement.id && build.mediaAction === 'play',
+        )
+      : undefined;
+  const movieStart = getMovieStartValue(mediaStartBuild, videoElement);
+
+  function setMovieStart(trigger: MovieStartTrigger) {
+    if (!videoElement) return;
+    onSetElementAnimationBuilds?.([videoElement.id], {
+      effect: 'reveal',
+      trigger,
+      delayMs: 0,
+      durationMs: 0,
+      mediaAction: 'play',
+    });
+    onUpdateMedia({ autoplayInPreview: true, startOnClick: trigger === 'on-click' });
+  }
 
   return (
     <PanelSection title={contentLabel}>
@@ -789,9 +835,19 @@ function ElementDesignInspector({
               </select>
             </label>
 
-            <label className="movie-checkbox-row movie-checkbox-row-disabled">
-              <input type="checkbox" disabled checked={Boolean(videoElement.startOnClick)} readOnly />
-              <span>Start movie on click</span>
+            <label className="movie-select-control">
+              <span>Start</span>
+              <select
+                aria-label="Selected video start"
+                value={movieStart}
+                onChange={(event) => {
+                  setMovieStart(toMovieStartTrigger(event.target.value));
+                }}
+              >
+                <option value="on-click">On click</option>
+                <option value="after-transition">After transition</option>
+                <option value="after-previous">After previous build</option>
+              </select>
             </label>
             <label className="movie-checkbox-row">
               <input

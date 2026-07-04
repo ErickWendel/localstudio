@@ -121,6 +121,11 @@ const slideXml = `<?xml version="1.0" encoding="UTF-8"?>
                 <p:childTnLst><p:anim><p:cBhvr><p:tgtEl><p:spTgt spid="3"/></p:tgtEl></p:cBhvr></p:anim></p:childTnLst>
               </p:cTn>
             </p:par>
+            <p:par>
+              <p:cTn id="4" nodeType="clickEffect" presetClass="mediacall">
+                <p:childTnLst><p:cmd type="call" cmd="play"><p:cBhvr><p:tgtEl><p:spTgt spid="4"/></p:tgtEl></p:cBhvr></p:cmd></p:childTnLst>
+              </p:cTn>
+            </p:par>
           </p:childTnLst>
         </p:cTn>
       </p:par>
@@ -154,11 +159,11 @@ const notesSlideXml = `<?xml version="1.0" encoding="UTF-8"?>
   </p:cSld>
 </p:notes>`;
 
-function createPptxFixture() {
+function createPptxFixture(slideContents = slideXml) {
   return createStoredPptxFile([
     { path: 'ppt/presentation.xml', contents: presentationXml },
     { path: 'ppt/_rels/presentation.xml.rels', contents: presentationRels },
-    { path: 'ppt/slides/slide1.xml', contents: slideXml },
+    { path: 'ppt/slides/slide1.xml', contents: slideContents },
     { path: 'ppt/slides/_rels/slide1.xml.rels', contents: slideRels },
     { path: 'ppt/notesSlides/notesSlide1.xml', contents: notesSlideXml },
     { path: 'ppt/slideLayouts/slideLayout1.xml', contents: layoutXml },
@@ -197,6 +202,14 @@ describe('BrowserPptxImportService', () => {
         trigger: 'on-click',
         durationMs: 450,
         kind: 'build-out',
+      },
+      {
+        elementId: 'pptx-page-1-slide-video-4',
+        effect: 'reveal',
+        trigger: 'on-click',
+        durationMs: 0,
+        kind: 'build-in',
+        mediaAction: 'play',
       },
     ]);
 
@@ -262,12 +275,49 @@ describe('BrowserPptxImportService', () => {
     expect(project.pages[0]?.elementIds.some((elementId) => elementId.includes('placeholder'))).toBe(false);
     expect(imageElements).toHaveLength(2);
     expect(imageElement).toMatchObject({ locked: false, type: 'image' });
-    expect(videoElement).toMatchObject({ controls: true, locked: false, type: 'video' });
+    expect(videoElement).toMatchObject({
+      autoplayInPreview: true,
+      controls: true,
+      locked: false,
+      startOnClick: true,
+      type: 'video',
+    });
 
     const videoAsset = Object.values(project.assets).find((asset) => asset.fileName === 'media1.mp4');
     expect(imageAsset?.mimeType).toBe('image/png');
     expect(layoutImageAsset?.mimeType).toBe('image/png');
     expect(videoAsset?.mimeType).toBe('video/mp4');
+  });
+
+  it('imports PowerPoint video media calls that start after the slide transition', async () => {
+    const service = new BrowserPptxImportService();
+    const project = await service.importPowerPoint({
+      file: createPptxFixture(
+        slideXml
+          .replace(
+            '<p:cTn id="4" nodeType="clickEffect" presetClass="mediacall">',
+            '<p:cTn id="4" nodeType="afterEffect" presetClass="mediacall">',
+          )
+          .replace('<p:spTgt spid="2"/>', '<p:spTgt spid="200"/>')
+          .replace('<p:spTgt spid="3"/>', '<p:spTgt spid="300"/>')
+          .replace('<p:bldP spid="3"/>', '<p:bldP spid="300"/>')
+          .replace('<p:bldP spid="2"/>', '<p:bldP spid="200"/>'),
+      ),
+    });
+    const videoElement = Object.values(project.elements).find(
+      (element) => element.type === 'video',
+    );
+
+    expect(project.pages[0]?.animationBuilds?.at(-1)).toMatchObject({
+      elementId: 'pptx-page-1-slide-video-4',
+      mediaAction: 'play',
+      trigger: 'after-transition',
+    });
+    expect(videoElement).toMatchObject({
+      autoplayInPreview: true,
+      startOnClick: false,
+      type: 'video',
+    });
   });
 
   it('rejects files that are not valid PPTX packages', async () => {

@@ -1,5 +1,10 @@
 import { Brush, Layers3, Sparkles } from 'lucide-react';
-import type { PageBackground, ProjectDocument, SelectionState } from '../../../domain/documents/model';
+import type {
+  ElementAnimationBuild,
+  PageBackground,
+  ProjectDocument,
+  SelectionState,
+} from '../../../domain/documents/model';
 import type {
   AlignMode,
   ElementFramePatch,
@@ -16,6 +21,7 @@ import { LayersPanel } from './LayersPanel';
 import type { RightPanelTab } from '../state/useEditorViewModel';
 
 type LegacyRightPanelTab = Exclude<RightPanelTab, 'assets' | 'animations' | 'elements' | 'text'>;
+type ElementAnimationPatch = Omit<ElementAnimationBuild, 'elementId' | 'id'>;
 
 interface RightPanelProps {
   activeTab: LegacyRightPanelTab;
@@ -55,6 +61,7 @@ interface RightPanelProps {
   onUpdatePageBackground?: (background: PageBackground) => void;
   onSetSelectedElementZOrder?: (mode: ZOrderMode) => void;
   onReplaceVideoAsset?: (elementId: string, file: File) => void;
+  onSetElementAnimationBuilds?: (elementIds: string[], patch: ElementAnimationPatch) => void;
 }
 
 const tabs: Array<SegmentedTab<LegacyRightPanelTab>> = [
@@ -101,6 +108,7 @@ export function RightPanel({
   onUpdatePageBackground,
   onSetSelectedElementZOrder,
   onReplaceVideoAsset,
+  onSetElementAnimationBuilds,
 }: RightPanelProps) {
   return (
     <aside className="right-panel" aria-label="Editor tools">
@@ -155,6 +163,7 @@ export function RightPanel({
             {...(onUpdateMediaPlayback ? { onUpdateMediaPlayback } : {})}
             {...(onUpdatePageBackground ? { onUpdatePageBackground } : {})}
             {...(onReplaceVideoAsset ? { onReplaceVideoAsset } : {})}
+            {...(onSetElementAnimationBuilds ? { onSetElementAnimationBuilds } : {})}
           />
         ) : null}
       </div>

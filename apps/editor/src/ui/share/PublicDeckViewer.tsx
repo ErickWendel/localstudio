@@ -216,7 +216,9 @@ export function PublicDeckViewer({
         activeBuild: undefined,
         activeBuildElementId: undefined,
         animationProgress: 0,
-        hiddenElementIds: builds.map((build) => build.elementId),
+        hiddenElementIds: builds
+          .filter((build) => build.mediaAction !== 'play')
+          .map((build) => build.elementId),
         mode: 'presenter',
         pageId: page.id,
         phase: transitionDelay > 0 ? 'transition' : builds.length > 0 ? 'animation' : 'complete',

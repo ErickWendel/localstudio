@@ -306,6 +306,7 @@ export function LeftToolPanel({
             {...(onUpdateMediaPlayback ? { onUpdateMediaPlayback } : {})}
             {...(onUpdatePageBackground ? { onUpdatePageBackground } : {})}
             {...(onReplaceVideoAsset ? { onReplaceVideoAsset } : {})}
+            {...(onSetElementAnimationBuilds ? { onSetElementAnimationBuilds } : {})}
           />
         ) : null}
         {panelOpen && activeTab === 'text' ? (
@@ -336,6 +337,7 @@ export function LeftToolPanel({
             {...(onClearPageTransition ? { onClearPageTransition } : {})}
             {...(onSetPageTransition ? { onSetPageTransition } : {})}
             {...(onSetElementAnimationBuilds ? { onSetElementAnimationBuilds } : {})}
+            {...(onUpdateMediaPlayback ? { onUpdateMediaPlayback } : {})}
             {...(onClearElementAnimationBuild ? { onClearElementAnimationBuild } : {})}
             {...(onReorderElementAnimationBuild ? { onReorderElementAnimationBuild } : {})}
             {...(onPlayAnimationPreview ? { onPlayAnimationPreview } : {})}
