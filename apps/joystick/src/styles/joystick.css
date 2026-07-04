@@ -25,17 +25,19 @@ input {
 
 .joystick-app {
   min-height: 100vh;
-  display: grid;
-  grid-template-rows: auto minmax(0, 28vh) auto minmax(360px, 1fr) auto;
-  gap: 10px;
-  padding: max(18px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  min-height: 100dvh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  padding: max(8px, env(safe-area-inset-top)) 8px max(10px, env(safe-area-inset-bottom));
   background:
     linear-gradient(180deg, rgba(55, 253, 118, 0.05), transparent 180px),
     var(--ls-black);
 }
 
 .joystick-app-start {
-  grid-template-rows: auto minmax(0, 1fr);
   background: var(--ls-black);
 }
 
@@ -131,7 +133,7 @@ input {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  padding: 0 6px;
+  padding: 0;
   color: var(--ls-text);
   font-size: 13px;
   font-weight: 900;
@@ -150,17 +152,17 @@ input {
 }
 
 .joystick-stage {
+  flex: 0 0 auto;
   min-height: 0;
   display: grid;
-  place-items: center;
-  padding: 2px 6px 0;
+  align-items: start;
+  padding: 0;
 }
 
 .joystick-stage-button {
   width: 100%;
-  height: 100%;
   display: grid;
-  place-items: center;
+  align-items: start;
   border: 0;
   padding: 0;
   background: transparent;
@@ -180,7 +182,6 @@ input {
   container-type: inline-size;
   position: relative;
   width: 100%;
-  max-height: 100%;
   display: block;
   overflow: hidden;
   background: #050d10;
@@ -257,13 +258,14 @@ input {
 }
 
 .joystick-upcoming-strip {
+  flex: 0 0 auto;
   min-width: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(128px, 1fr));
   gap: 10px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
-  padding: 0 6px 4px;
+  padding: 0 0 4px;
   scrollbar-width: none;
   color: var(--ls-muted);
   font-size: 11px;
@@ -311,6 +313,7 @@ input {
 }
 
 .joystick-notes-panel {
+  flex: 1 1 220px;
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
