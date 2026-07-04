@@ -1,4 +1,4 @@
-import type { DesignElement, Page, ProjectDocument } from '../../domain/documents/model';
+import type { Page } from '../../domain/documents/model';
 import type {
   PresenterCommandMessage,
   PresenterRemoteSessionMetadata,
@@ -13,8 +13,6 @@ import {
 import { PresenterRemoteSignalingClient } from '@localstudio/presenter-remote/signaling-client';
 import type {
   PresenterRemoteCommand,
-  PresenterRemoteSlidePreview,
-  PresenterRemoteSlidePreviewElement,
   PresenterRemoteUpcomingSlidePreview,
   PresenterRemoteSession,
   PresenterRemoteState,
@@ -86,7 +84,6 @@ export class BrowserPresenterSessionService {
   private readonly remoteSignalingService: PresenterRemoteSignaling;
   private readonly targetWindow: Window;
   private popupWindow: Window | null = null;
-  private portableAssetUrlCache = new Map<string, Promise<string | undefined>>();
   private presenterTimer: PresenterRemoteTimerState | undefined;
   private presenterTimerReceivedAt = 0;
   private lastPresenterPayload: PresenterStatePayload | undefined;
@@ -149,14 +146,13 @@ export class BrowserPresenterSessionService {
     if (this.remoteSession) {
       const publishSequence = ++this.remoteStatePublishSequence;
       const sessionCode = this.remoteSession.code;
-      void this.createRemoteState(
+      const remoteState = this.createRemoteState(
         payload,
         this.remoteSession.connectedControllerCount,
         this.remoteSessionStartedAt ? Date.now() - this.remoteSessionStartedAt : 0,
-      ).then((remoteState) => {
-        if (publishSequence !== this.remoteStatePublishSequence) return;
-        void Promise.resolve(this.remoteSignalingService.publishState(sessionCode, remoteState));
-      });
+      );
+      if (publishSequence !== this.remoteStatePublishSequence) return;
+      void Promise.resolve(this.remoteSignalingService.publishState(sessionCode, remoteState));
     }
   }
 
@@ -276,7 +272,7 @@ export class BrowserPresenterSessionService {
     );
   }
 
-  private async createRemoteState(
+  private createRemoteState(
     payload: PresenterStatePayload,
     connectedControllerCount: number,
     elapsedMs: number,
@@ -285,7 +281,6 @@ export class BrowserPresenterSessionService {
       payload,
       connectedControllerCount,
       this.getCurrentPresenterTimer(payload.timer, elapsedMs),
-      (assetUrl) => this.getPortableAssetUrl(assetUrl),
     );
   }
 
@@ -304,15 +299,6 @@ export class BrowserPresenterSessionService {
       updatedAtEpochMs: now,
     };
   }
-
-  private getPortableAssetUrl(assetUrl: string | undefined) {
-    if (!assetUrl?.startsWith('blob:')) return Promise.resolve(assetUrl);
-    const cachedAssetUrl = this.portableAssetUrlCache.get(assetUrl);
-    if (cachedAssetUrl) return cachedAssetUrl;
-    const portableAssetUrl = objectUrlToDataUrl(assetUrl).catch(() => undefined);
-    this.portableAssetUrlCache.set(assetUrl, portableAssetUrl);
-    return portableAssetUrl;
-  }
 }
 
 function isPresenterRemoteTimerState(value: unknown): value is PresenterRemoteTimerState {
@@ -323,24 +309,6 @@ function isPresenterRemoteTimerState(value: unknown): value is PresenterRemoteTi
     typeof record.paused === 'boolean' &&
     (record.updatedAtEpochMs === undefined || typeof record.updatedAtEpochMs === 'number')
   );
-}
-
-async function objectUrlToDataUrl(objectUrl: string) {
-  const response = await fetch(objectUrl);
-  const blob = await response.blob();
-  return blobToDataUrl(blob);
-}
-
-function blobToDataUrl(blob: Blob) {
-  return blob.arrayBuffer().then((buffer) => {
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    const chunkSize = 0x8000;
-    for (let index = 0; index < bytes.length; index += chunkSize) {
-      binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
-    }
-    return `data:${blob.type || 'application/octet-stream'};base64,${btoa(binary)}`;
-  });
 }
 
 function createDefaultRemoteSignalingService(): PresenterRemoteSignaling {
@@ -358,61 +326,51 @@ function createRemoteState(
   payload: PresenterStatePayload,
   connectedControllerCount: number,
   timer: PresenterRemoteTimerState,
-  resolvePortableAssetUrl: (assetUrl: string | undefined) => Promise<string | undefined>,
-): Promise<PresenterRemoteState> {
+): PresenterRemoteState {
   const activePageIndex = Math.max(
     0,
     payload.project.pages.findIndex((page) => page.id === payload.activePageId),
   );
   const activePage = payload.project.pages[activePageIndex] ?? payload.project.pages[0];
   const nextPage = payload.project.pages[activePageIndex + 1];
-  const hiddenElementIds =
-    activePage && payload.animationPreview?.pageId === activePage.id
-      ? new Set(payload.animationPreview.hiddenElementIds)
-      : undefined;
-  return Promise.all([
-    activePage
-      ? createSlidePreview(payload.project, activePage, resolvePortableAssetUrl, hiddenElementIds)
-      : undefined,
-    createUpcomingSlidePreviews(payload.project, payload.project.pages, resolvePortableAssetUrl),
-  ]).then(([slidePreview, pagePreviews]) => {
-    const nextSlidePreview = pagePreviews[activePageIndex + 1]?.preview;
-    const upcomingSlidePreviews = pagePreviews.slice(activePageIndex + 1, activePageIndex + 4);
-    return {
-      activePageId: activePage?.id ?? payload.activePageId,
-      activePageIndex,
-      activePageName: activePage?.name,
-      buildsRemaining: activePage ? getRemoteBuildsRemaining(payload, activePage) : 0,
-      connectedControllerCount,
-      deckName: payload.project.name,
-      nextPageName: nextPage?.name,
-      nextSlidePreview,
-      notes: activePage?.speakerNotes ?? '',
-      pageCount: payload.project.pages.length,
-      pages: pagePreviews.map((page) => ({
-        id: page.pageId,
-        name: page.pageName,
-        preview: page.preview,
-      })),
-      presenterMode: payload.presenterMode ?? 'presenting',
-      commandAvailability: [
-        'previous',
-        'next',
-        'go-to-page',
-        'pause-timer',
-        'resume-timer',
-        'reset-timer',
-        'play-pause-movie',
-      ],
-      previewMode: 'stream',
-      slidePreview,
-      shortcuts: ['previous', 'next', 'pause-timer', 'reset-timer'],
-      stream: { enabled: true, fps: 8, height: 340, width: 390 },
-      timer,
-      type: 'state',
-      upcomingSlidePreviews,
-    };
-  });
+  const pages = payload.project.pages.map((page) => ({
+    id: page.id,
+    name: page.name,
+  }));
+  const upcomingSlidePreviews: PresenterRemoteUpcomingSlidePreview[] = payload.project.pages
+    .slice(activePageIndex + 1, activePageIndex + 4)
+    .map((page) => ({
+      pageId: page.id,
+      pageName: page.name,
+    }));
+  return {
+    activePageId: activePage?.id ?? payload.activePageId,
+    activePageIndex,
+    activePageName: activePage?.name,
+    buildsRemaining: activePage ? getRemoteBuildsRemaining(payload, activePage) : 0,
+    connectedControllerCount,
+    deckName: payload.project.name,
+    nextPageName: nextPage?.name,
+    notes: activePage?.speakerNotes ?? '',
+    pageCount: payload.project.pages.length,
+    pages,
+    presenterMode: payload.presenterMode ?? 'presenting',
+    commandAvailability: [
+      'previous',
+      'next',
+      'go-to-page',
+      'pause-timer',
+      'resume-timer',
+      'reset-timer',
+      'play-pause-movie',
+    ],
+    previewMode: 'stream',
+    shortcuts: ['previous', 'next', 'pause-timer', 'reset-timer'],
+    stream: { enabled: true, fps: 8, height: 340, width: 390 },
+    timer,
+    type: 'state',
+    upcomingSlidePreviews,
+  };
 }
 
 function getRemoteBuildsRemaining(payload: PresenterStatePayload, page: Page) {
@@ -424,109 +382,6 @@ function getRemoteBuildsRemaining(payload: PresenterStatePayload, page: Page) {
   if (payload.animationPreview.phase === 'complete') return 0;
   const hiddenElementIds = new Set(payload.animationPreview.hiddenElementIds);
   return validBuilds.filter((build) => hiddenElementIds.has(build.elementId)).length;
-}
-
-function createUpcomingSlidePreviews(
-  project: ProjectDocument,
-  pages: Page[],
-  resolvePortableAssetUrl: (assetUrl: string | undefined) => Promise<string | undefined>,
-): Promise<PresenterRemoteUpcomingSlidePreview[]> {
-  return Promise.all(
-    pages.map((page) =>
-      createSlidePreview(project, page, resolvePortableAssetUrl).then((preview) => ({
-        pageId: page.id,
-        pageName: page.name,
-        preview,
-      })),
-    ),
-  );
-}
-
-async function createSlidePreview(
-  project: ProjectDocument,
-  page: Page,
-  resolvePortableAssetUrl: (assetUrl: string | undefined) => Promise<string | undefined>,
-  hiddenElementIds = new Set<string>(),
-): Promise<PresenterRemoteSlidePreview> {
-  const backgroundAsset =
-    page.background.type === 'asset' ? project.assets[page.background.assetId] : undefined;
-  const elements: PresenterRemoteSlidePreviewElement[] = [];
-  for (const elementId of page.elementIds) {
-    if (hiddenElementIds.has(elementId)) continue;
-    const element = project.elements[elementId];
-    if (!element || element.visible === false) continue;
-    elements.push(await createSlidePreviewElement(project, element, resolvePortableAssetUrl));
-  }
-  return {
-    backgroundColor:
-      page.background.type === 'color' ? page.background.color : page.background.colorFallback,
-    backgroundImageUrl: await resolvePortableAssetUrl(backgroundAsset?.objectUrl),
-    elements,
-    height: page.height,
-    width: page.width,
-  };
-}
-
-function createElementFrame(element: DesignElement) {
-  return {
-    height: element.height,
-    id: element.id,
-    opacity: element.opacity,
-    rotation: element.rotation,
-    width: element.width,
-    x: element.x,
-    y: element.y,
-  };
-}
-
-function createSlidePreviewElement(
-  project: ProjectDocument,
-  element: DesignElement,
-  resolvePortableAssetUrl: (assetUrl: string | undefined) => Promise<string | undefined>,
-): Promise<PresenterRemoteSlidePreviewElement> {
-  const frame = createElementFrame(element);
-  if (element.type === 'text') {
-    return Promise.resolve({
-      ...frame,
-      align: element.align,
-      fill: element.fill,
-      fontFamily: element.fontFamily,
-      fontSize: element.fontSize,
-      fontWeight: element.fontWeight,
-      kind: 'text',
-      lineHeight: element.lineHeight,
-      text: element.text,
-      verticalAlign: element.verticalAlign,
-    });
-  }
-  if (element.type === 'image') {
-    return resolvePortableAssetUrl(project.assets[element.assetId]?.objectUrl).then((assetUrl) => ({
-      ...frame,
-      assetUrl,
-      kind: 'image',
-    }));
-  }
-  if (element.type === 'gif' || element.type === 'video') {
-    return resolvePortableAssetUrl(project.assets[element.assetId]?.objectUrl).then((assetUrl) => ({
-      ...frame,
-      assetUrl,
-      autoplay:
-        element.type === 'gif' ? element.playing : element.autoplayInPreview || element.playing,
-      controls: element.type === 'video' ? element.controls : false,
-      kind: 'media',
-      loop: element.type === 'gif' ? element.playing : element.loop,
-      mediaType: element.type,
-      muted: element.type === 'video' ? element.muted : true,
-    }));
-  }
-  return Promise.resolve({
-    ...frame,
-    fill: element.fill,
-    kind: 'shape',
-    shape: element.shape,
-    stroke: element.stroke,
-    strokeWidth: element.strokeWidth,
-  });
 }
 
 function isLoopbackOrigin(origin: string) {

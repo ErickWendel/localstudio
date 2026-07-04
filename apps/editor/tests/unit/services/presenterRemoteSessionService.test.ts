@@ -2,19 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { sampleProject } from '../../../src/domain/projects/sampleProject';
 import { BrowserPresenterSessionService } from '../../../src/services/presenter/presenterSessionService';
 import { InMemoryPresenterRemoteSignalingService } from '@localstudio/presenter-remote/signaling-service';
-import type { PresenterRemoteSlidePreviewElement } from '@localstudio/presenter-remote/protocol';
-
-function isImagePreviewElement(
-  element: PresenterRemoteSlidePreviewElement,
-): element is Extract<PresenterRemoteSlidePreviewElement, { kind: 'image' | 'media' }> {
-  return element.kind === 'image';
-}
-
-function isMediaPreviewElement(
-  element: PresenterRemoteSlidePreviewElement,
-): element is Extract<PresenterRemoteSlidePreviewElement, { kind: 'media' }> {
-  return element.kind === 'media';
-}
 
 describe('BrowserPresenterSessionService remote control', () => {
   it('registers a remote control session with QR metadata', async () => {
@@ -114,27 +101,25 @@ describe('BrowserPresenterSessionService remote control', () => {
         connectedControllerCount: 0,
         notes: project.pages[0]!.speakerNotes ?? '',
         pageCount: project.pages.length,
-        slidePreview: {
-          backgroundColor:
-            project.pages[0]!.background.type === 'color'
-              ? project.pages[0]!.background.color
-              : project.pages[0]!.background.colorFallback,
-          height: project.pages[0]!.height,
-          width: project.pages[0]!.width,
-        },
+        previewMode: 'stream',
+        stream: { enabled: true, fps: 8, height: 340, width: 390 },
         type: 'state',
       });
     });
     const publishedState = signalingService.getPublishedState('ABCD-1234');
-    expect(publishedState?.slidePreview?.elements.length).toBeGreaterThan(0);
-    expect(publishedState?.pages?.[0]?.preview?.elements.length).toBeGreaterThan(0);
+    expect(publishedState?.slidePreview).toBeUndefined();
+    expect(publishedState?.nextSlidePreview).toBeUndefined();
     expect(publishedState?.pages).toHaveLength(project.pages.length);
+    expect(publishedState?.pages?.[0]).toEqual({
+      id: project.pages[0]!.id,
+      name: project.pages[0]!.name,
+    });
     expect(publishedState?.upcomingSlidePreviews).toHaveLength(
       Math.min(3, project.pages.length - 1),
     );
   });
 
-  it('publishes portable slide preview asset URLs for remote devices', async () => {
+  it('does not publish portable slide preview asset URLs in stream-mode state', async () => {
     const popup = {
       location: { href: '' },
       postMessage: vi.fn(),
@@ -169,14 +154,75 @@ describe('BrowserPresenterSessionService remote control', () => {
     });
 
     await vi.waitFor(() => {
-      const imageElement = signalingService
-        .getPublishedState('ABCD-1234')
-        ?.slidePreview?.elements.find(isImagePreviewElement);
-      expect(imageElement?.assetUrl).toMatch(/^data:image\/png;base64,/);
+      expect(signalingService.getPublishedState('ABCD-1234')?.previewMode).toBe('stream');
     });
+    const publishedState = signalingService.getPublishedState('ABCD-1234');
+
+    expect(publishedState?.slidePreview).toBeUndefined();
+    expect(JSON.stringify(publishedState)).not.toContain('data:image/png;base64');
   });
 
-  it('publishes build-aware remote previews and media metadata', async () => {
+  it('keeps stream-mode remote state metadata-only for mobile polling', async () => {
+    const popup = {
+      location: { href: '' },
+      postMessage: vi.fn(),
+      closed: false,
+    } as unknown as Window;
+    const signalingService = new InMemoryPresenterRemoteSignalingService({
+      randomCode: () => 'ABCD-1234',
+      randomId: () => 'remote-session-1',
+    });
+    const service = new BrowserPresenterSessionService({
+      href: 'https://localstudio.test/editor/?project=Demo',
+      openWindow: vi.fn(() => popup),
+      randomId: () => 'session-1',
+      remoteSignalingService: signalingService,
+    });
+    service.openPresenterWindow();
+    await service.openRemoteControlSession({ presenterLabel: 'MacBook Pro', ttlMs: 60_000 });
+    const project = sampleProject.createSampleProject();
+    project.assets['asset-heavy'] = {
+      id: 'asset-heavy',
+      mimeType: 'image/png',
+      name: 'Heavy slide capture',
+      objectUrl: 'data:image/png;base64,'.concat('a'.repeat(500_000)),
+      storage: 'inline',
+      type: 'image',
+    };
+    project.elements['heavy-image'] = {
+      assetId: 'asset-heavy',
+      height: 1080,
+      id: 'heavy-image',
+      locked: false,
+      opacity: 1,
+      rotation: 0,
+      type: 'image',
+      visible: true,
+      width: 1920,
+      x: 0,
+      y: 0,
+    };
+    project.pages[0]!.elementIds = ['heavy-image', ...project.pages[0]!.elementIds];
+
+    service.publishState({
+      activePageId: project.pages[0]!.id,
+      animationPreview: undefined,
+      project,
+    });
+
+    await vi.waitFor(() => {
+      expect(signalingService.getPublishedState('ABCD-1234')?.previewMode).toBe('stream');
+    });
+    const publishedState = signalingService.getPublishedState('ABCD-1234');
+
+    expect(publishedState?.slidePreview).toBeUndefined();
+    expect(publishedState?.nextSlidePreview).toBeUndefined();
+    expect(publishedState?.pages?.some((page) => page.preview)).toBe(false);
+    expect(publishedState?.upcomingSlidePreviews?.some((page) => page.preview)).toBe(false);
+    expect(JSON.stringify(publishedState)).not.toContain('data:image/png;base64');
+  });
+
+  it('publishes build-aware stream metadata without media previews', async () => {
     const popup = {
       location: { href: '' },
       postMessage: vi.fn(),
@@ -255,23 +301,15 @@ describe('BrowserPresenterSessionService remote control', () => {
     await vi.waitFor(() => {
       expect(signalingService.getPublishedState('ABCD-1234')?.buildsRemaining).toBe(1);
     });
-    const publishedPreview = signalingService.getPublishedState('ABCD-1234')?.slidePreview;
     expect(signalingService.getPublishedState('ABCD-1234')).toMatchObject({
+      buildsRemaining: 1,
       previewMode: 'stream',
       stream: { enabled: true, fps: 8, height: 340, width: 390 },
     });
-    expect(publishedPreview?.elements.some((element) => element.id === hiddenElementId)).toBe(
-      false,
+    expect(signalingService.getPublishedState('ABCD-1234')?.slidePreview).toBeUndefined();
+    expect(JSON.stringify(signalingService.getPublishedState('ABCD-1234'))).not.toContain(
+      'https://cdn.localstudio.test/demo.mp4',
     );
-    expect(publishedPreview?.elements.find(isMediaPreviewElement)).toMatchObject({
-      assetUrl: 'https://cdn.localstudio.test/demo.mp4',
-      autoplay: true,
-      controls: true,
-      kind: 'media',
-      loop: true,
-      mediaType: 'video',
-      muted: true,
-    });
   });
 
   it('publishes the presenter timer state received from the presenter window', async () => {
