@@ -1,0 +1,262 @@
+.movie-inspector-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  min-height: 42px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.movie-inspector-tab {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ew-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.movie-inspector-tab-active {
+  background: var(--ew-green);
+  color: #050d10;
+}
+
+.movie-panel-section {
+  display: grid;
+  gap: 10px;
+  padding: 14px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.movie-panel-section h3 {
+  margin: 0;
+  color: var(--ew-text);
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 20px;
+}
+
+.movie-file-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  color: var(--ew-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.movie-file-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.movie-controls-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+}
+
+.movie-controls-row button {
+  width: 42px;
+  height: 42px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ew-text);
+  cursor: pointer;
+}
+
+.movie-controls-row .movie-play-button {
+  width: 54px;
+  height: 54px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.movie-controls-row button:hover {
+  background: rgba(55, 253, 118, 0.18);
+}
+
+.movie-volume-row,
+.movie-trim-control,
+.movie-poster-control,
+.movie-select-control {
+  display: grid;
+  gap: 8px;
+  color: var(--ew-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.movie-volume-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.movie-volume-row input,
+.movie-poster-control input,
+.movie-trim-track input {
+  width: 100%;
+  min-width: 0;
+  accent-color: var(--ew-green);
+}
+
+.movie-trim-track {
+  position: relative;
+  min-height: 28px;
+}
+
+.movie-trim-track input {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.movie-trim-track input::-webkit-slider-thumb {
+  pointer-events: auto;
+}
+
+.movie-trim-track input::-moz-range-thumb {
+  pointer-events: auto;
+}
+
+.movie-time-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--ew-text);
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.movie-poster-control strong {
+  color: var(--ew-text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.movie-select-control select {
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ew-text);
+  font: inherit;
+  font-weight: 800;
+  padding: 0 12px;
+}
+
+.movie-checkbox-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  color: var(--ew-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.movie-checkbox-row input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--ew-green);
+}
+
+.movie-checkbox-row-disabled {
+  color: var(--ew-muted);
+  opacity: 0.58;
+}
+
+.movie-arrange-grid button,
+.movie-lock-grid button,
+.movie-full-button,
+.movie-arrange-select-row button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ew-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.movie-arrange-grid button {
+  display: grid;
+  grid-template-rows: auto auto;
+  place-items: center;
+  min-height: 56px;
+  gap: 2px;
+}
+
+.movie-arrange-grid button:hover,
+.movie-lock-grid button:hover,
+.movie-full-button:hover,
+.movie-arrange-select-row button:hover {
+  background: rgba(55, 253, 118, 0.18);
+}
+
+.movie-arrange-grid button:disabled,
+.movie-lock-grid button:disabled,
+.movie-full-button:disabled,
+.movie-arrange-select-row button:disabled {
+  color: var(--ew-muted);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.movie-arrange-select-row select {
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ew-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 850;
+  padding: 0 12px;
+}
+
+.movie-number-grid label {
+  display: grid;
+  gap: 5px;
+  color: var(--ew-text);
+  font-size: 12px;
+  font-weight: 850;
+  text-align: center;
+}
+
+.movie-number-grid input {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ew-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 850;
+  padding: 0 10px;
+  text-align: center;
+}
+
+.movie-number-grid input:focus,
+.movie-arrange-select-row select:focus {
+  border-color: var(--ew-green);
+  box-shadow: 0 0 0 2px rgba(55, 253, 118, 0.14);
+  outline: none;
+}

@@ -1,0 +1,140 @@
+.project-group {
+  gap: 8px;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.project-play-shell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  z-index: 1;
+}
+
+.project-title {
+  min-width: 0;
+  max-width: 150px;
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ew-text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.project-title-button {
+  cursor: text;
+  padding: 0;
+}
+
+.project-title-button:hover {
+  color: var(--ew-green);
+}
+
+.project-play-button {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  border: 1px solid rgba(55, 253, 118, 0.34);
+  border-radius: 5px;
+  background: rgba(55, 253, 118, 0.1);
+  color: var(--ew-green-fixed);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 16px;
+  white-space: nowrap;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.project-play-main {
+  border-radius: 5px 0 0 5px;
+}
+
+.project-play-menu-button {
+  width: 28px;
+  justify-content: center;
+  padding: 0;
+  border-left: 0;
+  border-radius: 0 5px 5px 0;
+}
+
+.project-play-dropdown {
+  top: 34px;
+  left: 0;
+  min-width: 220px;
+}
+
+.project-play-dropdown-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.project-play-dropdown-item .material-symbols-outlined {
+  color: var(--ew-muted);
+  font-size: 18px;
+}
+
+.project-play-button:hover {
+  border-color: rgba(55, 253, 118, 0.58);
+  background: rgba(55, 253, 118, 0.16);
+  box-shadow: 0 0 14px rgba(55, 253, 118, 0.12);
+}
+
+.project-play-button .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.project-title-input {
+  width: min(220px, 24vw);
+  height: 26px;
+  border: 1px solid var(--ew-green);
+  border-radius: 4px;
+  outline: 0;
+  background: rgba(5, 13, 16, 0.92);
+  color: var(--ew-text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  padding: 2px 7px;
+  box-shadow: 0 0 12px rgba(55, 253, 118, 0.14);
+}
+
+.local-only-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--ew-border);
+  border-radius: 4px;
+  color: var(--ew-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.toolbar-right {
+  gap: 16px;
+  height: 100%;
+  flex-shrink: 0;
+}
+
+.toolbar-icon-group,
+.zoom-group {
+  gap: 4px;
+}
+
+.toolbar-icon-group {
+  position: relative;
+}

@@ -1,0 +1,95 @@
+.floating-toolbar {
+  position: absolute;
+  left: 50%;
+  top: -48px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  transform: translateX(-50%);
+  height: 36px;
+  padding: 0 4px;
+  border: 1px solid var(--ew-border);
+  border-radius: 4px;
+  background: rgba(12, 22, 13, 0.9);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+}
+
+.floating-toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.floating-toolbar-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--ew-border);
+}
+
+.floating-toolbar-button {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ew-muted);
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.floating-toolbar-button .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.floating-toolbar-label {
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.floating-toolbar-button:hover {
+  color: var(--ew-green-fixed);
+  background: var(--ew-raised);
+}
+
+.floating-toolbar-button:disabled,
+.floating-toolbar-button:disabled:hover {
+  color: rgba(255, 255, 255, 0.28);
+  background: transparent;
+  cursor: progress;
+}
+
+.floating-toolbar-button-ai:hover {
+  color: var(--ew-green);
+  background: rgba(55, 253, 118, 0.1);
+}
+
+.floating-toolbar-button-active,
+.floating-toolbar-button-active:hover {
+  color: var(--ew-green);
+  background: rgba(55, 253, 118, 0.16);
+  box-shadow: 0 0 14px rgba(55, 253, 118, 0.16);
+}
+
+.floating-toolbar-button-danger {
+  color: #ffb4ab;
+}
+
+.floating-toolbar-button-danger:hover {
+  color: #ffdad6;
+  background: rgba(255, 180, 171, 0.1);
+}

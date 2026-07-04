@@ -1,0 +1,9 @@
+@media (max-width: 1180px) {
+  .webmcp-page {
+    grid-template-columns: 420px minmax(620px, 1fr);
+  }
+
+  .webmcp-control-plane {
+    padding: 22px;
+  }
+}

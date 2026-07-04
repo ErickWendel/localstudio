@@ -1,0 +1,97 @@
+.mirror-secret-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  gap: 6px;
+}
+
+.mirror-secret-toggle {
+  border: 1px solid rgba(122, 255, 199, 0.18);
+  background: rgba(5, 13, 16, 0.72);
+}
+
+.mirror-checkbox-row {
+  grid-column: 1 / -1;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 8px !important;
+}
+
+.mirror-checkbox-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ew-green);
+}
+
+.mirror-settings-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.mirror-settings-status-error {
+  color: #ffb4ab;
+}
+
+.mirror-settings-help {
+  display: grid;
+  gap: 8px;
+  color: var(--ew-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.mirror-settings-help p {
+  margin: 0;
+}
+
+.mirror-settings-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mirror-settings-links a {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(55, 253, 118, 0.24);
+  border-radius: 4px;
+  color: var(--ew-green);
+  padding: 0 8px;
+  text-decoration: none;
+}
+
+.mirror-settings-links a:hover {
+  background: rgba(55, 253, 118, 0.08);
+}
+
+.mirror-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.mirror-settings-toggle-danger {
+  border-color: rgba(255, 95, 86, 0.46);
+  background: rgba(255, 95, 86, 0.12);
+  color: #ff9a94;
+}
+
+.mirror-settings-toggle-danger:hover {
+  border-color: rgba(255, 95, 86, 0.72);
+  background: rgba(255, 95, 86, 0.2);
+  color: #ffc5c1;
+}
+
+.mirror-settings-toggle-success {
+  border-color: rgba(55, 253, 118, 0.42);
+  background: rgba(55, 253, 118, 0.12);
+  color: var(--ew-green);
+}
+
+.mirror-settings-toggle-success:hover {
+  border-color: rgba(55, 253, 118, 0.68);
+  background: rgba(55, 253, 118, 0.2);
+  color: var(--ew-green-fixed);
+}

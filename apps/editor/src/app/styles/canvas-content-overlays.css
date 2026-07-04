@@ -1,0 +1,88 @@
+.canvas-text-editor {
+  position: absolute;
+  z-index: 8;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--ew-green);
+  border-radius: 2px;
+  outline: 0;
+  background: rgba(5, 13, 16, 0.72);
+  box-sizing: border-box;
+  box-shadow: 0 0 18px rgba(55, 253, 118, 0.18);
+  line-height: 1.08;
+  resize: none;
+  transform-origin: top left;
+}
+
+.animation-build-badges {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  pointer-events: none;
+}
+
+.animation-build-badge {
+  position: absolute;
+  min-width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(204, 232, 255, 0.55);
+  border-radius: 6px;
+  background: linear-gradient(180deg, #9fc0df, #6382a0);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.35),
+    inset 0 1px 2px rgba(255, 255, 255, 0.32);
+}
+
+.animation-build-badge-selected {
+  border-color: rgba(55, 253, 118, 0.9);
+  background: linear-gradient(180deg, #62c840, #4ca936);
+  box-shadow:
+    0 0 0 2px rgba(55, 253, 118, 0.22),
+    0 0 16px rgba(55, 253, 118, 0.28);
+}
+
+.canvas-image-card {
+  position: absolute;
+  inset: 18% 18% 20%;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(55, 253, 118, 0.42);
+  border-radius: 6px;
+  color: var(--ew-muted);
+  background: linear-gradient(135deg, rgba(55, 253, 118, 0.16), transparent), #101b1d;
+}
+
+.canvas-title,
+.canvas-subtitle {
+  position: absolute;
+  width: 100%;
+  margin: 0;
+  text-align: center;
+}
+
+.canvas-title {
+  top: 42%;
+  color: var(--ew-green);
+  font-size: clamp(28px, 5vw, 62px);
+  font-weight: 900;
+}
+
+.canvas-subtitle {
+  top: 66%;
+  color: var(--ew-text);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.neon-border {
+  border: 1px solid rgba(64, 73, 63, 0.55);
+  outline: 1px solid rgba(64, 73, 63, 0.3);
+}

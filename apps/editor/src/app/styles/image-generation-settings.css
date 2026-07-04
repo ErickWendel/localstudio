@@ -1,0 +1,107 @@
+.image-generation-settings {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 2px;
+  padding-top: 10px;
+}
+
+.image-generation-setting {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: var(--ew-muted);
+  font-size: 11px;
+}
+
+.image-generation-range {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  min-width: 0;
+}
+
+.image-generation-range .translation-target-label {
+  grid-column: 1 / 3;
+}
+
+.image-generation-range input {
+  width: 100%;
+  min-width: 0;
+  accent-color: var(--ew-green);
+}
+
+.image-generation-range strong {
+  min-width: 22px;
+  color: var(--ew-text);
+  font-size: 12px;
+  text-align: right;
+}
+
+.image-generation-seed-input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(55, 253, 118, 0.28);
+  border-radius: 4px;
+  background: #050d10;
+  color: var(--ew-text);
+  font: inherit;
+  outline: 0;
+  padding: 8px 9px;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.image-generation-seed-input:focus {
+  border-color: var(--ew-green);
+  box-shadow: 0 0 0 2px rgba(55, 253, 118, 0.14);
+}
+
+.model-row-meta {
+  justify-content: space-between;
+  color: var(--ew-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  gap: 8px;
+}
+
+.download-progress-copy {
+  display: inline-flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  line-height: 1.25;
+  text-align: right;
+  text-transform: none;
+}
+
+.download-progress-primary {
+  max-width: 100%;
+  color: var(--ew-text);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.download-progress-secondary {
+  color: var(--ew-muted);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.model-progress {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.model-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ew-green);
+}

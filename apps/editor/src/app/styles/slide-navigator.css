@@ -1,0 +1,112 @@
+.presentation-slide-navigator {
+  position: absolute;
+  top: 72px;
+  right: 24px;
+  z-index: 115;
+  width: min(340px, calc(100vw - 48px));
+  max-height: min(560px, calc(100vh - 120px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  border: 1px solid var(--ew-border);
+  border-radius: 8px;
+  background: var(--ew-black);
+  color: var(--ew-text);
+  box-shadow:
+    0 22px 64px rgba(0, 0, 0, 0.52),
+    0 0 18px rgba(55, 253, 118, 0.1);
+}
+
+.presentation-slide-navigator-header {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px 0 16px;
+  border-bottom: 1px solid var(--ew-border);
+}
+
+.presentation-slide-navigator-header h2 {
+  margin: 0;
+  font-family: var(--ls-font-display);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 20px;
+}
+
+.presentation-slide-navigator-list {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+}
+
+.presentation-slide-navigator-item {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ew-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.presentation-slide-navigator-item span {
+  color: var(--ew-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.presentation-slide-navigator-item strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.presentation-slide-navigator-item-active {
+  border-color: rgba(55, 253, 118, 0.38);
+  background: rgba(55, 253, 118, 0.12);
+}
+
+.presentation-blank-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 112;
+}
+
+.presentation-blank-screen-black {
+  background: #000000;
+}
+
+.presentation-blank-screen-white {
+  background: #ffffff;
+}
+
+.presentation-slide-number {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  z-index: 113;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+  border: 1px solid var(--ew-border);
+  border-radius: 6px;
+  background: var(--ew-black);
+  color: var(--ew-green-fixed);
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.42);
+}

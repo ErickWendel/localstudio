@@ -1,0 +1,51 @@
+.webmcp-result-panel {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 34px minmax(160px, 1fr);
+  border: 1px solid rgba(122, 255, 199, 0.16);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.26);
+  overflow: hidden;
+}
+
+.webmcp-result-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-bottom: 1px solid rgba(122, 255, 199, 0.12);
+  color: #9fffd2;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.webmcp-result-panel pre {
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  color: rgba(238, 250, 245, 0.82);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: pre-wrap;
+}
+
+.webmcp-editor-frame {
+  min-width: 0;
+  min-height: 100vh;
+  padding: 18px;
+  background:
+    linear-gradient(135deg, rgba(159, 255, 210, 0.08), transparent 30%), rgba(3, 5, 6, 0.88);
+}
+
+.webmcp-editor-frame iframe {
+  width: 100%;
+  height: calc(100vh - 36px);
+  display: block;
+  border: 1px solid rgba(159, 255, 210, 0.2);
+  border-radius: 8px;
+  background: #050d10;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.45);
+}

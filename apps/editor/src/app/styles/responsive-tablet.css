@@ -1,0 +1,110 @@
+@media (max-width: 1023px) {
+  .app-shell {
+    width: 100vw;
+  }
+
+  .top-toolbar {
+    gap: 10px;
+    padding-inline: 10px;
+  }
+
+  .toolbar-left {
+    flex: 1 1 auto;
+    gap: 12px;
+  }
+
+  .toolbar-product-title {
+    max-width: 136px;
+    overflow: hidden;
+    font-size: 14px;
+    text-overflow: ellipsis;
+  }
+
+  .toolbar-menu {
+    gap: 0;
+    margin-left: 0;
+  }
+
+  .toolbar-menu-item {
+    padding-inline: 8px;
+    font-size: 12px;
+  }
+
+  .toolbar-divider-menu,
+  .language-chip,
+  .github-toolbar-link,
+  .profile-avatar {
+    display: none;
+  }
+
+  .project-group {
+    flex: 1 1 auto;
+    gap: 6px;
+  }
+
+  .project-title {
+    max-width: 120px;
+  }
+
+  .local-only-badge {
+    display: none;
+  }
+
+  .toolbar-right {
+    flex-shrink: 0;
+    gap: 8px;
+  }
+
+  .editor-grid {
+    grid-template-columns: max-content minmax(0, 1fr);
+  }
+
+  .left-tool-panel {
+    grid-template-columns: 68px 0;
+    width: 68px;
+  }
+
+  .left-tool-panel-open {
+    grid-template-columns: 68px minmax(240px, 280px);
+    width: min(348px, calc(100vw - 24px));
+  }
+
+  .left-tool-resize-handle {
+    display: none;
+  }
+
+  .left-tool-rail {
+    padding: 10px 7px;
+  }
+
+  .left-tool-button {
+    min-height: 54px;
+    font-size: 9px;
+  }
+
+  .left-tool-content {
+    padding: 14px;
+  }
+
+  .pages-panel {
+    position: fixed;
+    top: 60px;
+    right: 12px;
+    bottom: 56px;
+    z-index: 130;
+    width: min(340px, calc(100vw - 24px));
+    border: 1px solid var(--ew-border);
+    border-radius: 8px;
+    box-shadow:
+      0 22px 60px rgba(0, 0, 0, 0.44),
+      0 0 24px rgba(55, 253, 118, 0.08);
+  }
+
+  .workspace-column {
+    padding: 12px 14px 14px;
+  }
+
+  .scrolling-canvas-workspace {
+    padding-inline: 24px;
+  }
+}

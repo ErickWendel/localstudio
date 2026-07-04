@@ -1,0 +1,131 @@
+.public-deck-viewer {
+  position: relative;
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 18px;
+  padding: 24px;
+  color: var(--ew-text);
+  background: #05080a;
+}
+
+.public-deck-viewer-present {
+  height: 100vh;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+  background: #050d10;
+}
+
+.public-deck-viewer-embed {
+  min-height: 100vh;
+  gap: 10px;
+  padding: 10px;
+  background: #05080a;
+}
+
+.public-deck-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.public-deck-kicker {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--ew-green);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.public-deck-header h1,
+.public-deck-empty h1 {
+  margin: 0;
+  font-family: Orbitron, sans-serif;
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.public-deck-stage-shell {
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.public-deck-stage-shell .canvas-workspace {
+  height: 100%;
+}
+
+.public-deck-stage-shell .canvas-frame {
+  width: min(100%, 1180px);
+  max-height: 72vh;
+}
+
+.public-deck-viewer-present .public-deck-stage-shell {
+  height: 100vh;
+  padding: 0;
+}
+
+.public-deck-viewer-present .public-deck-stage-shell .canvas-workspace {
+  width: 100vw;
+  height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+.public-deck-viewer-present .public-deck-stage-shell .canvas-frame {
+  width: min(100vw, calc(100vh * 16 / 9));
+  max-height: 100vh;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+  transform: none !important;
+}
+
+.public-deck-viewer-present .public-deck-stage-shell .canvas-artboard {
+  border-radius: 0;
+}
+
+.public-deck-viewer-embed .public-deck-stage-shell .canvas-frame {
+  width: 100%;
+  max-height: calc(100vh - 58px);
+}
+
+.public-deck-controls {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.public-deck-viewer-present .public-deck-controls {
+  position: absolute;
+  right: 50%;
+  bottom: 18px;
+  z-index: 5;
+  transform: translateX(50%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(10px);
+}
+
+.public-deck-page-count,
+.public-deck-status,
+.public-deck-empty p {
+  color: var(--ew-muted);
+  font-size: 14px;
+}
+
+.public-deck-empty {
+  align-self: center;
+  justify-self: center;
+  display: grid;
+  gap: 8px;
+  text-align: center;
+}

@@ -74,4 +74,31 @@ describe('editor responsive styles', () => {
     expect(styles).toMatch(/@keyframes\s+presentationImportOrbit/s);
     expect(styles).toMatch(/\.media-import-info-icon\s*\{[\s\S]*display:\s*grid/s);
   });
+
+  it('keeps critical split stylesheet selectors in the composed editor CSS', () => {
+    const criticalSelectors = [
+      '.prompt-examples',
+      '.prompt-example-chip',
+      '.prompt-bar',
+      '.prompt-input-cluster',
+      '.prompt-mode-token',
+      '.presentation-import-backdrop',
+      '.presentation-import-orbit',
+      '.image-size-presets',
+      '.image-size-preset',
+      '.image-crop-frame',
+      '.image-crop-handle',
+      '.text-selection-toolbar',
+      '.floating-toolbar',
+      '.canvas-quick-actions',
+      '.public-deck-viewer',
+      '.share-panel',
+      '.presenter-view',
+      '.keyboard-shortcuts-dialog',
+    ];
+
+    for (const selector of criticalSelectors) {
+      expect(styles, `${selector} should be present in composed editor styles`).toContain(selector);
+    }
+  });
 });

@@ -1,0 +1,64 @@
+@media (max-width: 760px) {
+  .editor-footer {
+    position: relative;
+    z-index: 160;
+    gap: 8px;
+    min-width: 0;
+    padding-inline: 8px;
+  }
+
+  .editor-footer-left {
+    min-width: 0;
+  }
+
+  .editor-footer-right {
+    min-width: 0;
+    gap: 6px;
+  }
+
+  .editor-footer .stitch-icon-button {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+  }
+
+  .editor-footer .material-symbols-outlined {
+    font-size: 20px;
+  }
+
+  .footer-toggle {
+    min-height: 32px;
+    padding-inline: 6px;
+  }
+
+  .zoom-value {
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .footer-page-count {
+    min-width: max-content;
+    font-size: 11px;
+  }
+
+  .settings-panel,
+  .mirror-settings-panel,
+  .remote-import-panel {
+    right: 8px;
+    bottom: 112px;
+    left: 8px;
+    width: auto;
+    max-height: calc(100dvh - 128px);
+    overflow: auto;
+  }
+
+  .share-panel {
+    top: 52px;
+    right: 8px;
+    left: 8px;
+    width: auto;
+    max-height: calc(100dvh - 68px);
+  }
+}

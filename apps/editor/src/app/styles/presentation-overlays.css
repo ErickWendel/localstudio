@@ -1,0 +1,106 @@
+.presenter-view-error {
+  margin: -8px 24px 18px;
+  color: #8f1f1f;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.audience-fullscreen-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(5, 13, 16, 0.68);
+  backdrop-filter: blur(7px);
+  pointer-events: auto;
+}
+
+.audience-fullscreen-dialog {
+  position: relative;
+  width: min(544px, calc(100vw - 48px));
+  display: grid;
+  gap: 16px;
+  padding: 30px 32px 32px;
+  border: 1px solid var(--ew-border);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(55, 253, 118, 0.05), transparent 42%),
+    var(--ew-black);
+  color: var(--ew-text);
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.48),
+    0 0 24px rgba(55, 253, 118, 0.08);
+}
+
+.audience-fullscreen-dialog h2 {
+  margin: 0;
+  font-family: var(--ls-font-display);
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 30px;
+}
+
+.audience-fullscreen-dialog p {
+  max-width: 410px;
+  margin: 0;
+  color: var(--ew-muted);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.audience-fullscreen-close {
+  position: absolute;
+  top: 0;
+  right: -50px;
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ew-border);
+  border-radius: 4px;
+  background: var(--ew-panel);
+  color: var(--ew-text);
+  cursor: pointer;
+}
+
+.audience-fullscreen-close:hover {
+  color: var(--ew-green-fixed);
+  background: var(--ew-raised);
+}
+
+.audience-fullscreen-primary {
+  justify-self: end;
+  min-height: 40px;
+  padding: 0 18px;
+  border: 1px solid rgba(55, 253, 118, 0.6);
+  border-radius: 6px;
+  background: var(--ew-green);
+  color: var(--ew-on-primary);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 800;
+  transition:
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.audience-fullscreen-primary:hover {
+  background: var(--ew-green-hover);
+  box-shadow: 0 0 18px rgba(55, 253, 118, 0.24);
+}
+
+.workspace-column:fullscreen .speaker-notes-editor,
+.workspace-column:fullscreen .presenter-view-error,
+.workspace-column:fullscreen .audience-fullscreen-backdrop {
+  display: none;
+}
+
+.workspace-column-cursor-hidden,
+.workspace-column-cursor-hidden * {
+  cursor: none !important;
+}
