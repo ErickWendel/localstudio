@@ -429,6 +429,7 @@ class FailingFontImportService implements FontImportService {
       this.resolveFonts = () => {
         resolve({
           fonts: {},
+          resolutions: [],
           warnings: [
             {
               code: 'font-download-failed',

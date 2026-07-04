@@ -16,7 +16,7 @@ describe('PublicDeckViewer', () => {
       return [];
     },
     resolveAndDownloadFonts(): Promise<FontImportResult> {
-      return Promise.resolve({ fonts: {}, warnings: [] });
+      return Promise.resolve({ fonts: {}, resolutions: [], warnings: [] });
     },
     loadProjectFonts(): Promise<void> {
       return Promise.resolve();

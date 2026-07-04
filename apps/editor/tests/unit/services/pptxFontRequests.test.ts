@@ -62,7 +62,7 @@ describe('pptxFontRequests', () => {
           fontSize: 20,
           fontWeight: 400,
         },
-        system: {
+        compatibleOffice: {
           id: 'system',
           type: 'text',
           text: 'System',
@@ -76,7 +76,25 @@ describe('pptxFontRequests', () => {
           opacity: 1,
           align: 'left',
           fill: '#111111',
-          fontFamily: 'Arial',
+          fontFamily: 'Calibri',
+          fontSize: 20,
+          fontWeight: 400,
+        },
+        system: {
+          id: 'system-available',
+          type: 'text',
+          text: 'System',
+          x: 0,
+          y: 160,
+          width: 100,
+          height: 30,
+          rotation: 0,
+          locked: false,
+          visible: true,
+          opacity: 1,
+          align: 'left',
+          fill: '#111111',
+          fontFamily: 'Verdana',
           fontSize: 20,
           fontWeight: 400,
         },
@@ -86,6 +104,7 @@ describe('pptxFontRequests', () => {
     expect(pptxFontRequests.collect(project)).toEqual([
       { family: 'Montserrat', fontStyle: 'normal', fontWeight: 700 },
       { family: 'Merriweather', fontStyle: 'normal', fontWeight: 400 },
+      { family: 'Calibri', fontStyle: 'normal', fontWeight: 400 },
     ]);
   });
 });
