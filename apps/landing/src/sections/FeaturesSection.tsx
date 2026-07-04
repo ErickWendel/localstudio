@@ -1,9 +1,8 @@
 import { Layers3 } from 'lucide-react';
 import { Reveal } from '../components/Reveal';
 import { editorProof } from '../content/editorProof';
-import { S3MirrorSection } from './S3MirrorSection';
 
-export function FeaturesSection({ prefersReducedMotion }: { prefersReducedMotion: boolean }) {
+export function FeaturesSection() {
   return (
     <section id="features" className="features-section" aria-labelledby="features-title">
       <div className="feature-details" aria-label="Feature details">
@@ -22,7 +21,6 @@ export function FeaturesSection({ prefersReducedMotion }: { prefersReducedMotion
             </Reveal>
           ))}
         </ul>
-        <S3MirrorSection prefersReducedMotion={prefersReducedMotion} />
       </div>
     </section>
   );

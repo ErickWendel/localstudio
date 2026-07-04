@@ -10,27 +10,35 @@
 
 Design slides with local AI, then keep editing.
 
-LocalStudio.dev is a browser-native Canva-style editor that turns prompt generation, image creation, translation,
-background removal, local project history, and S3-compatible sharing into one editable slide workflow.
+LocalStudio.dev is a browser-native Canva-style editor that turns PowerPoint (`.pptx`) import, prompt generation, image
+creation, translation, background removal, local project history, and S3-compatible projects into one editable slide
+workflow.
 
 [Live demo](https://localstudio.dev/) · [WebMCP showcase](https://localstudio.dev/webmcp/) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md)
 
 ## About It
 
-LocalStudio.dev runs in the browser without a product backend. Your deck remains a layered document: prompts become
-editable slide objects, generated images stay as normal assets, translated text updates in place, and project files can
-be saved to a local folder you control.
+LocalStudio.dev runs in the browser without a product backend. Your deck remains a layered document: PowerPoint
+(`.pptx`) files can become editable LocalStudio projects, prompts become editable slide objects, generated images stay
+as normal assets, translated text updates in place, and project files can be saved to a local folder you control.
 
 | Landing section | What it proves |
 | --- | --- |
 | About it | Browser-native slide creation with local AI and editable output. |
-| Features | Layered editing, local persistence, and S3-compatible project mirroring. |
+| Features | PowerPoint (`.pptx`) import, layered editing, local persistence, and S3-compatible project mirroring. |
 | WebMCP Showcase | Host pages and agents can discover editor tools and drive the same local-first surface. |
 | Requirements | Chrome-first browser APIs, WebGPU model caches, and local storage expectations. |
 
 ![LocalStudio prompt-to-slide workflow](apps/landing/public/prompt-to-slide.gif)
 
 ## Features
+
+### PowerPoint (`.pptx`) import
+
+Google Slides? Keynote? Export as `.pptx` and import into LocalStudio. Existing decks can become the starting point for
+a local, editable project instead of forcing every presentation to start from a blank canvas or prompt.
+
+![PowerPoint import](apps/landing/public/powerpoint-import.gif)
 
 ### Editable AI output
 
@@ -41,12 +49,13 @@ reorderable, translatable, exportable, and ready for follow-up edits.
 
 | Workflow | Result |
 | --- | --- |
+| Import existing presentations | Google Slides? Keynote? Export as `.pptx` and import into LocalStudio. |
 | Prompt to slides | Turn a plain-language request into editable slide layers. |
 | Translate the deck | Translate one text layer, one page, or the whole deck while preserving layout intent. |
-| Remove backgrounds | Segment an image subject and keep refining before applying the edit. |
+| Edit images | Segment an image subject and keep refining before applying the edit. |
 | Create images | Generate an asset from the prompt bar and drop it into the active slide. |
 | Save local projects | Store metadata and assets in a folder instead of a remote workspace. |
-| Share your slides | Use your own external storage to publish stable links or reimport projects on other machines. |
+| Share your slides | Use your own S3-compatible storage to publish stable links or reimport projects on other machines. |
 
 ### Feature proof
 
@@ -66,11 +75,13 @@ Local project history restores saved versions from disk.
 
 ![Local project history](apps/landing/public/fs-history.gif)
 
-### S3-compatible mirror
+### S3-compatible projects
 
 Local projects can still publish public links. S3-compatible storage keeps viewer assets reachable while the editable
-project starts on your machine. MinIO works as the local/self-hosted example, but the same mirror shape fits AWS S3,
-Cloudflare R2, or any compatible endpoint.
+project starts on your machine. MinIO works as the local/self-hosted example, but the same project mirror shape fits AWS
+S3, Cloudflare R2, or any compatible endpoint.
+
+![S3-compatible project storage](apps/landing/public/s3-projects.gif)
 
 Mirrored payloads include:
 
@@ -112,7 +123,7 @@ LocalStudio runs in the browser, but modern browser AI workflows still need the 
 - At least 10GB free storage is recommended for model weights, browser-managed caches, generated assets, and local project history.
 - Local folder permissions are required for project persistence flows.
 
-## Mirror Setup
+## S3-Compatible Project Setup
 
 Start the local MinIO stack:
 
@@ -132,9 +143,9 @@ Default local settings:
 - Prefix: `mirrors`
 - Path-style URLs: enabled
 
-In the editor, open `Settings` -> `Mirror Settings` and enter those values. Use `File` -> `Mirror Now` to force an upload,
-or `File` -> `Import Remote` on another computer to download a mirrored project into a new local folder and continue
-syncing.
+In the editor, open `Settings` -> `Mirror Settings` and enter those values. Use `File` -> `Mirror Now` to force an
+upload, or `File` -> `Import Remote` on another computer to download a mirrored project into a new local folder and
+continue syncing.
 
 The dev compose file sets the `localstudio` bucket to public download mode so mirrored files can be shared through the
 public base URL. For production, use a bucket or prefix policy that matches what you intend to publish. Browser-stored

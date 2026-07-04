@@ -9,8 +9,8 @@ export function ShowcaseSection() {
         <p className="eyebrow">Feature showcase</p>
         <h2 id="showcase-title">Every AI action returns to the editor.</h2>
         <p>
-          The product story is not five separate demos. Each feature keeps the deck editable and moves the same local
-          project forward.
+          The product story is not a pile of separate demos. Each feature keeps the deck editable and moves the same
+          local project forward.
         </p>
       </Reveal>
       <div className="showcase-list">

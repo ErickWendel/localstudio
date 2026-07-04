@@ -40,19 +40,30 @@ export function WorkflowPreview({
             <span>Translate</span>
           </div>
           <div className="preview-slide">
-            <video
-              key={demoVideo.src}
-              className="workflow-demo-video"
-              aria-label={demoVideo.label}
-              autoPlay={!prefersReducedMotion}
-              muted
-              playsInline
-              preload="metadata"
-              onEnded={onDemoEnded}
-            >
-              <source src={demoVideo.src} type="video/mp4" />
-              <a href={demoVideo.fallbackSrc}>View the workflow demo</a>
-            </video>
+            {demoVideo.kind === 'image' ? (
+              <img
+                key={demoVideo.src}
+                className="workflow-demo-video"
+                src={demoVideo.src}
+                alt={demoVideo.label}
+                loading="eager"
+                decoding="async"
+              />
+            ) : (
+              <video
+                key={demoVideo.src}
+                className="workflow-demo-video"
+                aria-label={demoVideo.label}
+                autoPlay={!prefersReducedMotion}
+                muted
+                playsInline
+                preload="metadata"
+                onEnded={onDemoEnded}
+              >
+                <source src={demoVideo.src} type="video/mp4" />
+                <a href={demoVideo.fallbackSrc}>View the workflow demo</a>
+              </video>
+            )}
             <span className="workflow-selection-pulse" aria-hidden="true" />
             <span className="workflow-editor-cursor" aria-hidden="true" />
             <div className="slide-grid" />

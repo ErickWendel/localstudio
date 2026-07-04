@@ -9,21 +9,19 @@ export function HeroSection({ prefersReducedMotion }: { prefersReducedMotion: bo
         <p className="eyebrow">Browser-native Canva-style editor</p>
         <h1 id="hero-title">Design slides with local AI, then keep editing.</h1>
         <p className="hero-subtitle">
-          LocalStudio.dev turns prompt, image generation, translation, background removal, and local saving into one
-          continuous slide workflow inside the browser.
+          LocalStudio.dev turns existing presentations, image generation, translation, background removal, and local
+          saving into one continuous slide workflow inside the browser.
         </p>
         <div className="hero-actions">
-          <a className="secondary-action" href="/editor/">
-            Launch editor
+          <a className="header-cta hero-cta" href="/editor/">
+            Open editor
             <ArrowRight size={18} aria-hidden="true" />
+            <span className="hero-cta-snake" aria-hidden="true">
+              <svg viewBox="0 0 100 40" preserveAspectRatio="none" focusable="false">
+                <rect x="2" y="2" width="96" height="36" rx="6" pathLength={100} />
+              </svg>
+            </span>
           </a>
-        </div>
-        <div className="hero-status-row" aria-label="LocalStudio capabilities">
-          <span>Beta</span>
-          <span>Live editor</span>
-          <span>Browser API</span>
-          <span>WebGPU models</span>
-          <span>Local folder</span>
         </div>
       </Reveal>
 

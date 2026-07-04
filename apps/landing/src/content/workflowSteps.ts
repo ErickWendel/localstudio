@@ -1,6 +1,12 @@
-import { BrainCircuit, Eraser, FolderOpen, ImagePlus, Languages, Sparkles } from 'lucide-react';
+import { BrainCircuit, Eraser, FileUp, FolderOpen, ImagePlus, Languages, Sparkles } from 'lucide-react';
 
 export const workflowSteps = [
+  {
+    id: 'pptx',
+    icon: FileUp,
+    title: 'Import existing presentations',
+    copy: 'Google Slides? Keynote? Export as .pptx and import into LocalStudio.',
+  },
   {
     id: 'prompt',
     icon: BrainCircuit,

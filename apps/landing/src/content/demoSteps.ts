@@ -1,6 +1,12 @@
-import { BrainCircuit, Eraser, FolderOpen, ImagePlus, Languages, Share2 } from 'lucide-react';
+import { BrainCircuit, Eraser, FileUp, FolderOpen, ImagePlus, Languages, Share2 } from 'lucide-react';
 
 export const demoSteps = [
+  {
+    icon: FileUp,
+    title: 'Import presentations',
+    copy: 'Google Slides? Keynote? Export as .pptx and import into LocalStudio as an editable project.',
+    proof: 'PowerPoint (.pptx)',
+  },
   {
     icon: BrainCircuit,
     title: 'Prompt to slides',
@@ -15,7 +21,7 @@ export const demoSteps = [
   },
   {
     icon: Eraser,
-    title: 'Remove backgrounds',
+    title: 'Edit images',
     copy: 'Click the subject, preview the segment mask, and keep refining before cutting.',
     proof: 'Canvas image action',
   },

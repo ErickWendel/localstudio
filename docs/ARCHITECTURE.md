@@ -13,9 +13,23 @@ LocalStudio.dev is a browser-only React workspace with a landing app, an editor 
 
 The editor keeps product state in serializable domain objects under `apps/editor/src/domain`. React UI and view-model orchestration live under `apps/editor/src/ui`. Browser integrations live under `apps/editor/src/services`.
 
+## PowerPoint (`.pptx`) Import
+
+PowerPoint (`.pptx`) import is an editor service flow. The browser reads the selected package, parses supported slide
+content, maps it into the same serializable project document used by generated and hand-edited decks, and then returns
+the user to the normal editor surface. Google Slides and Keynote decks should be exported as `.pptx` before import.
+
 ## Local-First Storage
 
 Projects are saved through the browser File System Access API. The app writes project metadata and assets to a user-selected folder. Model weights and browser AI caches stay in browser-managed storage, not in the project folder.
+
+## S3-Compatible Project Mirrors
+
+LocalStudio can mirror local projects to S3-compatible storage so assets and public-share payloads are reachable outside
+the local folder. MinIO is the development and self-hosted example, while the same endpoint, bucket, region, public base
+URL, and prefix settings can point at AWS S3, Cloudflare R2, or another compatible service. The editable source of truth
+still starts as the local project folder; the mirror carries project JSON, assets, history, config, and share payloads
+needed for public links and remote reimport.
 
 ## Browser AI
 

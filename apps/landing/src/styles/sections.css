@@ -97,8 +97,12 @@
 
 .demo-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
+}
+
+.demo-grid--stair .demo-card:nth-child(n + 5) {
+  transform: translateX(calc(50% + 7px));
 }
 
 .demo-card,
@@ -124,6 +128,10 @@
   transform: translateY(-4px);
   border-color: rgba(55, 253, 118, 0.78);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+}
+
+.demo-grid--stair .demo-card:nth-child(n + 5):hover {
+  transform: translate(calc(50% + 7px), -4px);
 }
 
 .demo-card svg,
@@ -162,11 +170,6 @@
 
 .feature-details {
   align-items: center;
-}
-
-.feature-details .s3-mirror-section {
-  grid-column: 1 / -1;
-  margin-top: clamp(38px, 5vw, 72px);
 }
 
 .web-ai-copy {
