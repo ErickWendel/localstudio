@@ -489,7 +489,7 @@ describe('CanvasWorkspace', () => {
     expect(editorVideo).toBeInTheDocument();
     expect(editorVideo.autoplay).toBe(false);
     expect(editorVideo.loop).toBe(false);
-    expect(editorVideo.controls).toBe(true);
+    expect(editorVideo.controls).toBe(false);
     expect(editorVideo.muted).toBe(true);
     expect(editorVideo.volume).toBe(0.75);
     expect(editorVideo.preload).toBe('auto');
@@ -508,13 +508,13 @@ describe('CanvasWorkspace', () => {
       'video[aria-label="Demo clip"]',
     ) as HTMLVideoElement;
     expect(previewVideo.autoplay).toBe(true);
-    expect(previewVideo.controls).toBe(true);
+    expect(previewVideo.controls).toBe(false);
     expect(previewVideo.preload).toBe('auto');
     expect(previewVideo.dataset.trimStart).toBe('2');
     expect(previewVideo.dataset.trimEnd).toBe('6');
   });
 
-  it('allows native controls on the selected video in editor mode', () => {
+  it('keeps native video controls hidden while selected in editor mode', () => {
     const project = createMediaProject();
     const { container, rerender } = render(
       <CanvasWorkspace
@@ -541,6 +541,7 @@ describe('CanvasWorkspace', () => {
       'video[aria-label="Demo clip"]',
     ) as HTMLVideoElement;
     expect(selectedVideo.style.pointerEvents).toBe('auto');
+    expect(selectedVideo.controls).toBe(false);
   });
 
   it('seeks the selected video when trim sliders update the boundaries', () => {

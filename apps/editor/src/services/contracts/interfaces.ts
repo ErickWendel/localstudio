@@ -212,6 +212,7 @@ export interface StockMediaItem {
   authorUrl?: string | undefined;
   thumbnailUrl: string;
   mediaUrl: string;
+  videoUrl?: string | undefined;
   width: number;
   height: number;
   downloadLocation?: string | undefined;
