@@ -230,10 +230,11 @@ describe('BrowserPresenterSessionService remote control', () => {
     const publishedPreview = signalingService.getPublishedState('ABCD-1234')?.slidePreview;
     expect(signalingService.getPublishedState('ABCD-1234')).toMatchObject({
       previewMode: 'stream',
-      stream: { enabled: true, fps: 8, height: 844, width: 390 },
+      stream: { enabled: true, fps: 8, height: 340, width: 390 },
     });
     expect(publishedPreview?.elements.some((element) => element.id === hiddenElementId)).toBe(false);
     expect(publishedPreview?.elements.find(isMediaPreviewElement)).toMatchObject({
+      assetUrl: 'https://cdn.localstudio.test/demo.mp4',
       autoplay: true,
       controls: true,
       kind: 'media',

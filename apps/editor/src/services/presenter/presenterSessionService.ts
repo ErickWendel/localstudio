@@ -375,7 +375,7 @@ function createRemoteState(
     previewMode: 'stream',
     slidePreview,
     shortcuts: ['previous', 'next', 'pause-timer', 'reset-timer'],
-    stream: { enabled: true, fps: 8, height: 844, width: 390 },
+    stream: { enabled: true, fps: 8, height: 340, width: 390 },
     timer,
     type: 'state',
     upcomingSlidePreviews,
@@ -474,15 +474,16 @@ function createSlidePreviewElement(
     }));
   }
   if (element.type === 'gif' || element.type === 'video') {
-    return Promise.resolve({
+    return resolvePortableAssetUrl(project.assets[element.assetId]?.objectUrl).then((assetUrl) => ({
       ...frame,
+      assetUrl,
       autoplay: element.type === 'gif' ? element.playing : element.autoplayInPreview || element.playing,
       controls: element.type === 'video' ? element.controls : false,
       kind: 'media',
       loop: element.type === 'gif' ? element.playing : element.loop,
       mediaType: element.type,
       muted: element.type === 'video' ? element.muted : true,
-    });
+    }));
   }
   return Promise.resolve({
     ...frame,

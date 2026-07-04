@@ -7,20 +7,14 @@ export interface PresenterRemoteMirrorFrame {
   animationPreview: AnimationPreviewState | undefined;
   buildsRemaining: number;
   currentTimeLabel: string;
-  notes: string;
   project: ProjectDocument;
   timerLabel: string;
   videoElements: HTMLVideoElement[];
 }
 
-const mirrorSize = { height: 844, width: 390 };
+const mirrorSize = { height: 340, width: 390 };
 const mirrorBackground = '#020805';
 const mirrorPanel = '#07120d';
-const mirrorGreen = '#37fd76';
-const mirrorCyan = '#36d7ff';
-const mirrorText = '#f4f7f1';
-const mirrorMuted = '#aab4a8';
-const mirrorNotes = '#f3f5ee';
 const imageCache = new Map<string, HTMLImageElement>();
 
 function getCachedImage(src: string | undefined) {
@@ -164,62 +158,6 @@ function drawSlide(
   context.strokeRect(viewport.x, viewport.y, viewport.width, viewport.height);
 }
 
-function drawNotes(context: CanvasRenderingContext2D, notes: string) {
-  const y = 560;
-  roundedRect(context, 8, y, mirrorSize.width - 16, mirrorSize.height - y - 8, 8);
-  context.fillStyle = mirrorNotes;
-  context.fill();
-  context.fillStyle = '#506050';
-  context.font = '700 12px system-ui, sans-serif';
-  context.fillText('Notes', 24, y + 24);
-  context.fillStyle = '#111b12';
-  context.font = '400 28px system-ui, sans-serif';
-  drawWrappedText(
-    context,
-    notes.trim() || 'Presenter notes that are created will appear here',
-    24,
-    y + 70,
-    mirrorSize.width - 48,
-    34,
-    7,
-  );
-}
-
-function drawHeader(context: CanvasRenderingContext2D, frame: PresenterRemoteMirrorFrame) {
-  context.fillStyle = mirrorText;
-  context.font = '700 22px monospace';
-  context.fillText(`${frame.activePageIndex + 1} / ${frame.project.pages.length}`, 16, 34);
-  context.fillStyle = mirrorGreen;
-  context.beginPath();
-  context.arc(90, 26, 4, 0, Math.PI * 2);
-  context.fill();
-  context.fillStyle = mirrorText;
-  context.textAlign = 'center';
-  context.fillText(frame.timerLabel, mirrorSize.width / 2, 34);
-  context.textAlign = 'right';
-  context.fillStyle = mirrorCyan;
-  context.fillText('||  ↻  ≡', mirrorSize.width - 16, 34);
-  context.textAlign = 'left';
-  context.fillStyle = mirrorText;
-  context.font = '900 13px system-ui, sans-serif';
-  context.fillText(`Current: Slide ${frame.activePageIndex + 1} of ${frame.project.pages.length}`, 16, 82);
-  context.textAlign = 'right';
-  context.fillText(`Builds remaining: ${frame.buildsRemaining}`, mirrorSize.width - 16, 82);
-  context.textAlign = 'left';
-}
-
-function drawUpcoming(context: CanvasRenderingContext2D, frame: PresenterRemoteMirrorFrame) {
-  const pages = frame.project.pages.slice(frame.activePageIndex + 1, frame.activePageIndex + 4);
-  let x = 16;
-  for (const [index, page] of pages.entries()) {
-    context.fillStyle = mirrorMuted;
-    context.font = '800 12px system-ui, sans-serif';
-    context.fillText(`Next ${index + 1}`, x, 472);
-    drawSlide(context, frame, page, { height: 64, width: 104, x, y: 488 });
-    x += 116;
-  }
-}
-
 function renderFrame(canvas: HTMLCanvasElement, frame: PresenterRemoteMirrorFrame) {
   canvas.width = mirrorSize.width;
   canvas.height = mirrorSize.height;
@@ -231,14 +169,11 @@ function renderFrame(canvas: HTMLCanvasElement, frame: PresenterRemoteMirrorFram
   gradient.addColorStop(0, 'rgba(55,253,118,0.10)');
   gradient.addColorStop(1, 'rgba(55,253,118,0)');
   context.fillStyle = gradient;
-  context.fillRect(0, 0, mirrorSize.width, 180);
-  drawHeader(context, frame);
-  roundedRect(context, 16, 112, mirrorSize.width - 32, 310, 2);
+  context.fillRect(0, 0, mirrorSize.width, 120);
+  roundedRect(context, 8, 8, mirrorSize.width - 16, 330, 2);
   context.fillStyle = mirrorPanel;
   context.fill();
-  drawSlide(context, frame, frame.activePage, { height: 280, width: mirrorSize.width - 40, x: 20, y: 126 });
-  drawUpcoming(context, frame);
-  drawNotes(context, frame.notes);
+  drawSlide(context, frame, frame.activePage, { height: 306, width: mirrorSize.width - 24, x: 12, y: 20 });
 }
 
 export const presenterRemoteMirror = {

@@ -191,6 +191,31 @@ describe('JoystickApp', () => {
     await waitFor(() => expect(screen.getByLabelText('Presentation timer')).toHaveTextContent('01:02:01'));
   });
 
+  it('advances active timers from the presenter update timestamp instead of poll time', async () => {
+    const service = new InMemoryPresenterRemoteSignalingService({
+      randomCode: () => 'ABCD-1234',
+      randomId: () => 'session-1',
+    });
+    service.registerSession({ presenterLabel: 'MacBook Pro', ttlMs: 60_000 });
+    service.publishState('ABCD-1234', {
+      activePageId: 'page-1',
+      activePageIndex: 0,
+      buildsRemaining: 0,
+      connectedControllerCount: 1,
+      deckName: 'Launch Deck',
+      notes: '',
+      pageCount: 1,
+      presenterMode: 'presenting',
+      shortcuts: ['pause-timer', 'reset-timer'],
+      timer: { elapsedMs: 10_000, paused: false, updatedAtEpochMs: Date.now() - 50_000 },
+      type: 'state',
+    });
+
+    render(<JoystickApp initialUrl="https://localstudio.test/joystick?code=ABCD-1234" signalingService={service} />);
+
+    await waitFor(() => expect(screen.getByLabelText('Presentation timer')).toHaveTextContent('01:00'));
+  });
+
   it('renders published presenter state for slide status and notes', async () => {
     const service = new InMemoryPresenterRemoteSignalingService({
       randomCode: () => 'ABCD-1234',

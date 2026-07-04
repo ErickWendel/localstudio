@@ -1,12 +1,35 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { PresenterRemoteCommand } from '@localstudio/presenter-remote/protocol';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 import { PresenterView } from '../../../../src/ui/presenter/PresenterView';
+
+const remoteStreamPublisherMock = vi.hoisted(() => {
+  let onCommand: ((command: PresenterRemoteCommand) => void) | undefined;
+  const publisher = {
+    start: vi.fn(),
+    stop: vi.fn(),
+  };
+  return {
+    create: vi.fn((options: { onCommand: (command: PresenterRemoteCommand) => void }) => {
+      onCommand = options.onCommand;
+      return publisher;
+    }),
+    getOnCommand: () => onCommand,
+    publisher,
+  };
+});
 
 vi.mock('qrcode', () => ({
   default: {
     toDataURL: vi.fn().mockResolvedValue('data:image/png;base64,remote-qr'),
+  },
+}));
+
+vi.mock('../../../../src/ui/presenter/presenterRemoteStreamPublisher', () => ({
+  presenterRemoteStreamPublisher: {
+    create: remoteStreamPublisherMock.create,
   },
 }));
 
@@ -322,6 +345,73 @@ describe('PresenterView', () => {
           },
         }),
       );
+    });
+
+    expect(screen.getByText('00:00')).toBeInTheDocument();
+    expect(opener.postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        command: 'update-timer',
+        timer: { elapsedMs: 0, paused: false, updatedAtEpochMs: Date.now() },
+      }),
+      window.location.origin,
+    );
+  });
+
+  it('applies timer commands received through the remote stream channel', () => {
+    const opener = { postMessage: vi.fn() };
+    Object.defineProperty(window, 'opener', {
+      configurable: true,
+      value: opener,
+    });
+    window.localStorage.setItem('localstudio.presenterWindowIntroDismissed', '1');
+    render(<PresenterView sessionId="session-1" />);
+    const project = sampleProject.createSampleProject();
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          origin: window.location.origin,
+          data: {
+            payload: {
+              activePageId: 'page-1',
+              animationPreview: undefined,
+              project,
+              remoteSession: {
+                code: 'ABCD-1234',
+                connectedControllerCount: 1,
+                expiresAt: '2026-07-04T12:00:00.000Z',
+                presenterLabel: 'MacBook Pro',
+                qrUrl: 'https://localstudio.test/joystick',
+                sessionId: 'remote-session-1',
+              },
+            },
+            sessionId: 'session-1',
+            source: 'localstudio-presenter-main',
+            type: 'state',
+          },
+        }),
+      );
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(79_000);
+    });
+    const onCommand = remoteStreamPublisherMock.getOnCommand();
+    expect(onCommand).toBeDefined();
+    act(() => {
+      onCommand?.({ command: 'pause-timer', type: 'command' });
+    });
+
+    expect(screen.getByText('01:19')).toBeInTheDocument();
+    expect(opener.postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        command: 'update-timer',
+        timer: { elapsedMs: 79_000, paused: true, updatedAtEpochMs: Date.now() },
+      }),
+      window.location.origin,
+    );
+
+    act(() => {
+      onCommand?.({ command: 'reset-timer', type: 'command' });
     });
 
     expect(screen.getByText('00:00')).toBeInTheDocument();

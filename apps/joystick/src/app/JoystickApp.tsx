@@ -109,9 +109,11 @@ function getElementStyle(element: PresenterRemoteSlidePreviewElement, preview: P
 function SlideCanvas({
   compact = false,
   preview,
+  renderMediaAssets = true,
 }: {
   compact?: boolean;
   preview: PresenterRemoteSlidePreview | undefined;
+  renderMediaAssets?: boolean;
 }) {
   if (!preview) {
     return (
@@ -147,7 +149,7 @@ function SlideCanvas({
           );
         }
         if (element.kind === 'media') {
-          if (element.assetUrl && element.mediaType === 'gif') {
+          if (renderMediaAssets && element.assetUrl && element.mediaType === 'gif') {
             return (
               <img
                 alt=""
@@ -158,13 +160,12 @@ function SlideCanvas({
               />
             );
           }
-          if (element.assetUrl && element.mediaType === 'video') {
+          if (renderMediaAssets && element.assetUrl && element.mediaType === 'video') {
             return (
               <video
                 aria-label="Slide video"
                 autoPlay={element.autoplay}
                 className="joystick-slide-element joystick-slide-video"
-                controls={element.controls}
                 key={element.id}
                 loop={element.loop}
                 muted={element.muted}
@@ -296,9 +297,11 @@ function StreamPreview({
 }
 
 function SlidePreview({
+  renderMediaAssets = true,
   onNavigate,
   preview,
 }: {
+  renderMediaAssets?: boolean;
   onNavigate: (direction: 'next' | 'previous') => void;
   preview: PresenterRemoteSlidePreview | undefined;
 }) {
@@ -350,7 +353,7 @@ function SlidePreview({
       onTouchEnd={handleTouchEnd}
       onTouchStart={handleTouchStart}
     >
-      <SlideCanvas preview={preview} />
+      <SlideCanvas preview={preview} renderMediaAssets={renderMediaAssets} />
     </button>
   );
 }
@@ -358,9 +361,11 @@ function SlidePreview({
 function UpcomingSlideStrip({
   onGoToPage,
   previews,
+  renderMediaAssets = true,
 }: {
   onGoToPage: (pageId: string) => void;
   previews: NonNullable<PresenterRemoteState['upcomingSlidePreviews']>;
+  renderMediaAssets?: boolean;
 }) {
   if (previews.length === 0) {
     return (
@@ -381,7 +386,7 @@ function UpcomingSlideStrip({
           onClick={() => onGoToPage(item.pageId)}
         >
           <span>Next {index + 1}</span>
-          <SlideCanvas compact preview={item.preview} />
+          <SlideCanvas compact preview={item.preview} renderMediaAssets={renderMediaAssets} />
         </button>
       ))}
     </section>
@@ -584,7 +589,9 @@ export function JoystickApp({
   const notes = displayedRemoteState?.notes.trim();
   const timerElapsedMs = displayedRemoteState
     ? displayedRemoteState.timer.elapsedMs +
-      (displayedRemoteState.timer.paused || !remoteStateReceivedAt ? 0 : timerNow - remoteStateReceivedAt)
+      (displayedRemoteState.timer.paused
+        ? 0
+        : timerNow - (displayedRemoteState.timer.updatedAtEpochMs ?? remoteStateReceivedAt))
     : 0;
   const timerLabel = presenterRemoteTimerFormat.formatElapsed(timerElapsedMs);
   const presenterReady = connected && displayedRemoteState?.presenterMode === 'ready';
@@ -593,6 +600,7 @@ export function JoystickApp({
   const timerToggleCommand = timerPaused ? 'resume-timer' : 'pause-timer';
   const pages = displayedRemoteState?.pages ?? [];
   const streamModeActive = connected && displayedRemoteState?.previewMode === 'stream' && remoteStream;
+  const renderStructuredMediaAssets = displayedRemoteState?.previewMode !== 'stream';
   const upcomingSlidePreviews = displayedRemoteState?.upcomingSlidePreviews ??
     (displayedRemoteState?.nextSlidePreview
       ? [
@@ -626,12 +634,73 @@ export function JoystickApp({
   if (streamModeActive) {
     return (
       <main className="joystick-app joystick-app-stream" aria-label="Presentation remote control">
-        <StreamPreview stream={remoteStream} onNavigate={navigateSlide} />
-        <div className="joystick-stream-overlay" aria-label="Remote controls">
+        <header className="joystick-stream-topbar">
+          <span className="joystick-page-count" aria-label="Slide position">
+            {slidePosition}
+          </span>
           <span className={`joystick-status-dot joystick-status-dot-${status}`} aria-label={connectionLabel} />
+          <span className="joystick-timer" aria-label="Presentation timer">
+            {timerLabel}
+          </span>
+          <span>{buildsRemainingLabel}</span>
+        </header>
+        <section className="joystick-stream-stage" aria-label="Streamed presenter preview">
+          <StreamPreview stream={remoteStream} onNavigate={navigateSlide} />
+        </section>
+        <UpcomingSlideStrip
+          previews={upcomingSlidePreviews}
+          onGoToPage={(pageId) => sendRemoteCommand({ command: 'go-to-page', pageId, type: 'command' })}
+          renderMediaAssets={false}
+        />
+        <section className="joystick-stream-notes" aria-label="Presenter notes">
+          <div className="joystick-stream-notes-toolbar" aria-label="Notes controls">
+            <span>Notes</span>
+            <div>
+              <button
+                type="button"
+                aria-label="Decrease notes size"
+                onClick={() => setNotesFontSize((current) => Math.max(18, current - 3))}
+              >
+                <Minus size={17} />
+              </button>
+              <button
+                type="button"
+                aria-label="Increase notes size"
+                onClick={() => setNotesFontSize((current) => Math.min(54, current + 3))}
+              >
+                <Plus size={17} />
+              </button>
+            </div>
+          </div>
+          {notes ? (
+            <div
+              className="joystick-stream-notes-content"
+              aria-label="Presenter notes content"
+              style={{ fontSize: `${notesFontSize}px` }}
+            >
+              {notes}
+            </div>
+          ) : (
+            <div className="joystick-stream-empty-notes">
+              <NotebookText size={34} />
+              <p>Presenter notes that are created will appear here</p>
+            </div>
+          )}
+        </section>
+        <div className="joystick-stream-controls" aria-label="Remote controls">
           <span>{connectionLabel}</span>
           <button type="button" onClick={() => navigateSlide('previous')} aria-label="Previous slide">
-            <ChevronLeft size={19} />
+            <ChevronLeft size={22} />
+          </button>
+          <button
+            type="button"
+            onClick={() => sendRemoteCommand({ command: timerToggleCommand, type: 'command' })}
+            aria-label={timerPaused ? 'Resume timer' : 'Pause timer'}
+          >
+            {timerPaused ? <Play size={22} /> : <Pause size={22} />}
+          </button>
+          <button type="button" onClick={() => sendCommand('reset-timer')} aria-label="Reset timer">
+            <TimerReset size={22} />
           </button>
           <button
             type="button"
@@ -639,7 +708,7 @@ export function JoystickApp({
             onClick={() => setSlideNavigatorOpen(true)}
             aria-label="Show slide navigation"
           >
-            <List size={19} />
+            <List size={22} />
           </button>
         </div>
         {remoteStreamStatus === 'failed' ? (
@@ -745,12 +814,14 @@ export function JoystickApp({
         <SlidePreview
           preview={displayedRemoteState?.slidePreview}
           onNavigate={navigateSlide}
+          renderMediaAssets={renderStructuredMediaAssets}
         />
       </section>
 
       <UpcomingSlideStrip
         previews={upcomingSlidePreviews}
         onGoToPage={(pageId) => sendRemoteCommand({ command: 'go-to-page', pageId, type: 'command' })}
+        renderMediaAssets={renderStructuredMediaAssets}
       />
 
       <section className="joystick-notes-panel" aria-label="Presenter notes">

@@ -198,6 +198,30 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
   }, [postCommand]);
   const elapsedMs = timerPaused ? timerBaseMs : timerBaseMs + (timerNow - timerStartedAt);
 
+  const applyTimerCommand = useCallback((command: 'pause-timer' | 'reset-timer' | 'resume-timer') => {
+    if (command === 'pause-timer') {
+      const currentElapsedMs = elapsedMsRef.current;
+      setTimerBaseMs(currentElapsedMs);
+      setTimerPaused(true);
+      publishTimerState({ elapsedMs: currentElapsedMs, paused: true });
+      return;
+    }
+    if (command === 'resume-timer') {
+      const now = Date.now();
+      setTimerNow(now);
+      setTimerStartedAt(now);
+      setTimerPaused(false);
+      publishTimerState({ elapsedMs: timerBaseMsRef.current, paused: false });
+      return;
+    }
+    const now = Date.now();
+    setTimerBaseMs(0);
+    setTimerNow(now);
+    setTimerStartedAt(now);
+    setTimerPaused(false);
+    publishTimerState({ elapsedMs: 0, paused: false });
+  }, [publishTimerState]);
+
   const updateNotesPanelWidth = useCallback((nextWidth: number | ((currentWidth: number) => number)) => {
     setNotesPanelWidth((currentWidth) => {
       const rawWidth = typeof nextWidth === 'function' ? nextWidth(currentWidth) : nextWidth;
@@ -272,27 +296,15 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
       if (!isPresenterMainCommandMessage(event.data)) return;
       if (event.data.sessionId !== resolvedSessionId) return;
       if (event.data.command === 'pause-timer') {
-        const currentElapsedMs = elapsedMsRef.current;
-        setTimerBaseMs(currentElapsedMs);
-        setTimerPaused(true);
-        publishTimerState({ elapsedMs: currentElapsedMs, paused: true });
+        applyTimerCommand('pause-timer');
         return;
       }
       if (event.data.command === 'resume-timer') {
-        const now = Date.now();
-        setTimerNow(now);
-        setTimerStartedAt(now);
-        setTimerPaused(false);
-        publishTimerState({ elapsedMs: timerBaseMsRef.current, paused: false });
+        applyTimerCommand('resume-timer');
         return;
       }
       if (event.data.command === 'reset-timer') {
-        const now = Date.now();
-        setTimerBaseMs(0);
-        setTimerNow(now);
-        setTimerStartedAt(now);
-        setTimerPaused(false);
-        publishTimerState({ elapsedMs: 0, paused: false });
+        applyTimerCommand('reset-timer');
       }
     }
 
@@ -302,7 +314,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, [postCommand, publishTimerState, resolvedSessionId]);
+  }, [applyTimerCommand, postCommand, resolvedSessionId]);
 
   useEffect(() => {
     function handlePageHide() {
@@ -378,8 +390,16 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
       postCommand({ command: 'update-notes', notes: command.notes, pageId: command.pageId });
       return;
     }
+    if (
+      command.command === 'pause-timer' ||
+      command.command === 'reset-timer' ||
+      command.command === 'resume-timer'
+    ) {
+      applyTimerCommand(command.command);
+      return;
+    }
     postCommand({ command: command.command });
-  }, [postCommand]);
+  }, [applyTimerCommand, postCommand]);
 
   function getPresenterVideos() {
     return Array.from(presenterStageRef.current?.querySelectorAll('video') ?? []);
@@ -674,7 +694,6 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
         animationPreview: snapshot.animationPreview,
         buildsRemaining,
         currentTimeLabel,
-        notes: speakerNotes,
         project: snapshot.project,
         timerLabel: presenterRemoteTimerFormat.formatElapsed(elapsedMs),
         videoElements: getPresenterVideos(),
@@ -685,7 +704,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [activePage, activePageIndex, buildsRemaining, currentTimeLabel, elapsedMs, snapshot, speakerNotes]);
+  }, [activePage, activePageIndex, buildsRemaining, currentTimeLabel, elapsedMs, snapshot]);
 
   useEffect(() => {
     const canvas = remoteMirrorCanvasRef.current;
