@@ -119,6 +119,76 @@ describe('JoystickApp', () => {
     expect(screen.getByLabelText('Slide position')).toHaveTextContent('1 / 1');
   });
 
+  it('stores approved codes and presenter device ids after a successful pairing', async () => {
+    const service = new InMemoryPresenterRemoteSignalingService({
+      randomCode: () => 'ABCD-1234',
+      randomId: () => 'session-1',
+    });
+    service.registerSession({
+      presenterDeviceId: 'presenter-macbook',
+      presenterLabel: 'MacBook Pro',
+      ttlMs: 60_000,
+    });
+
+    render(
+      <JoystickApp
+        initialUrl="https://localstudio.test/joystick?code=ABCD-1234"
+        signalingService={service}
+      />,
+    );
+
+    expect(await screen.findByLabelText('Connected (1)')).toBeInTheDocument();
+    expect(window.localStorage.getItem('localstudio.joystick.lastCode')).toBe('ABCD-1234');
+    expect(JSON.parse(window.localStorage.getItem('localstudio.joystick.approvedCodes') ?? '[]')).toEqual([
+      'ABCD-1234',
+    ]);
+    expect(
+      JSON.parse(window.localStorage.getItem('localstudio.joystick.trustedPresenterDeviceIds') ?? '[]'),
+    ).toEqual(['presenter-macbook']);
+  });
+
+  it('connects to a new code from a previously paired presenter device', async () => {
+    const service = new InMemoryPresenterRemoteSignalingService({
+      randomCode: () => 'EFGH-5678',
+      randomId: () => 'session-2',
+    });
+    service.registerSession({
+      presenterDeviceId: 'presenter-macbook',
+      presenterLabel: 'MacBook Pro',
+      ttlMs: 120_000,
+    });
+    service.publishState('EFGH-5678', {
+      activePageId: 'page-1',
+      activePageIndex: 0,
+      buildsRemaining: 0,
+      connectedControllerCount: 1,
+      deckName: 'Launch Deck',
+      notes: '',
+      pageCount: 1,
+      presenterMode: 'presenting',
+      shortcuts: ['previous', 'next'],
+      timer: { elapsedMs: 0, paused: false },
+      type: 'state',
+    });
+    window.localStorage.setItem('localstudio.joystick.lastCode', 'ABCD-1234');
+    window.localStorage.setItem('localstudio.joystick.approvedCodes', JSON.stringify(['ABCD-1234']));
+    window.localStorage.setItem(
+      'localstudio.joystick.trustedPresenterDeviceIds',
+      JSON.stringify(['presenter-macbook']),
+    );
+
+    render(
+      <JoystickApp initialUrl="https://localstudio.test/joystick" signalingService={service} />,
+    );
+
+    expect(await screen.findByText('Current: Slide 1 of 1')).toBeInTheDocument();
+    expect(window.localStorage.getItem('localstudio.joystick.lastCode')).toBe('EFGH-5678');
+    expect(JSON.parse(window.localStorage.getItem('localstudio.joystick.approvedCodes') ?? '[]')).toEqual([
+      'EFGH-5678',
+      'ABCD-1234',
+    ]);
+  });
+
   it('requires a code even when one presentation is active if the phone is not paired', async () => {
     const service = new InMemoryPresenterRemoteSignalingService({
       randomCode: () => 'ABCD-1234',

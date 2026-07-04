@@ -12,6 +12,7 @@ export interface PresenterRemoteSignalingServiceOptions {
 }
 
 export interface RegisterPresenterRemoteSessionInput {
+  presenterDeviceId?: string | undefined;
   presenterLabel: string;
   ttlMs: number;
 }
@@ -67,6 +68,7 @@ export class InMemoryPresenterRemoteSignalingService {
       code,
       connectedControllerCount: 0,
       expiresAt: new Date(this.now() + input.ttlMs).toISOString(),
+      presenterDeviceId: input.presenterDeviceId ?? input.presenterLabel,
       presenterLabel: input.presenterLabel,
       sessionId: this.randomId(),
     };
@@ -83,6 +85,10 @@ export class InMemoryPresenterRemoteSignalingService {
   listActiveSessions(): PresenterRemoteSession[] {
     this.pruneExpiredSessions();
     return Array.from(this.sessions.values(), ({ session }) => ({ ...session }));
+  }
+
+  listSessions(): PresenterRemoteSession[] {
+    return this.listActiveSessions();
   }
 
   getSingleActiveSession() {

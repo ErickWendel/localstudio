@@ -21,6 +21,12 @@ function editorPreviewRouteFallback() {
 
 export default defineConfig({
   base: siteBase,
+  server: {
+    proxy: {
+      '/editor': 'http://localhost:4174',
+      '/joystick': 'http://localhost:4175',
+    },
+  },
   plugins: [
     localNetworkOriginRoute(),
     localPowerPointSampleRoute(),

@@ -128,6 +128,7 @@ export interface PresenterRemoteSession {
   code: string;
   connectedControllerCount: number;
   expiresAt: string;
+  presenterDeviceId: string;
   presenterLabel: string;
   sessionId: string;
 }
@@ -296,6 +297,7 @@ function isSession(value: unknown): value is PresenterRemoteSession {
     typeof value.code === 'string' &&
     typeof value.connectedControllerCount === 'number' &&
     typeof value.expiresAt === 'string' &&
+    typeof value.presenterDeviceId === 'string' &&
     typeof value.presenterLabel === 'string' &&
     typeof value.sessionId === 'string'
   );

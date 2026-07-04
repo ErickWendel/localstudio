@@ -43,7 +43,12 @@ function readRequestJson(req: IncomingMessage) {
 }
 
 function isRegisterSessionInput(value: unknown): value is RegisterPresenterRemoteSessionInput {
-  return isRecord(value) && typeof value.presenterLabel === 'string' && typeof value.ttlMs === 'number';
+  return (
+    isRecord(value) &&
+    (value.presenterDeviceId === undefined || typeof value.presenterDeviceId === 'string') &&
+    typeof value.presenterLabel === 'string' &&
+    typeof value.ttlMs === 'number'
+  );
 }
 
 function isControllerConnectInput(value: unknown): value is { controllerId: string } {

@@ -8,10 +8,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace @localstudio/landing",
-    "dev:landing": "npm run dev --workspace @localstudio/landing",
-    "dev:editor": "npm run dev --workspace @localstudio/editor",
-    "dev:joystick": "npm run dev --workspace @localstudio/joystick",
+    "dev": "node scripts/dev.mjs",
     "build": "npm run build --workspace @localstudio/landing && npm run build --workspace @localstudio/editor && npm run build --workspace @localstudio/joystick && node scripts/prepare-pages-artifacts.mjs",
     "build:landing": "npm run build --workspace @localstudio/landing",
     "build:editor": "npm run build --workspace @localstudio/editor",

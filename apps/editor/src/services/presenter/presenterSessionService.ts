@@ -35,6 +35,7 @@ type PresenterRemoteSignaling = {
 interface BrowserPresenterSessionServiceOptions {
   href?: string;
   openWindow?: OpenPresenterWindow;
+  presenterDeviceId?: string | undefined;
   randomId?: () => string;
   remoteSignalingService?: PresenterRemoteSignaling | undefined;
   resolveRemoteControlOrigin?: ResolveRemoteControlOrigin | undefined;
@@ -48,6 +49,20 @@ type PresenterWindowOpenResult =
 function createSessionId() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
   return `presenter-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+const presenterDeviceIdKey = 'localstudio.presenter.deviceId';
+
+function getOrCreatePresenterDeviceId(targetWindow: Window) {
+  try {
+    const existingId = targetWindow.localStorage.getItem(presenterDeviceIdKey);
+    if (existingId) return existingId;
+    const id = createSessionId();
+    targetWindow.localStorage.setItem(presenterDeviceIdKey, id);
+    return id;
+  } catch {
+    return createSessionId();
+  }
 }
 
 function isPresenterCommandMessage(value: unknown): value is PresenterCommandMessage {
@@ -65,6 +80,7 @@ export class BrowserPresenterSessionService {
   private readonly href: string;
   private readonly openWindow: OpenPresenterWindow;
   private readonly origin: string;
+  private readonly presenterDeviceId: string;
   private readonly randomId: () => string;
   private readonly resolveRemoteControlOrigin: ResolveRemoteControlOrigin;
   private readonly remoteSignalingService: PresenterRemoteSignaling;
@@ -86,6 +102,8 @@ export class BrowserPresenterSessionService {
     this.origin = new URL(this.href).origin;
     this.openWindow =
       options.openWindow ?? ((url, target, features) => targetWindow.open(url, target, features));
+    this.presenterDeviceId =
+      options.presenterDeviceId ?? getOrCreatePresenterDeviceId(targetWindow);
     this.randomId = options.randomId ?? createSessionId;
     this.resolveRemoteControlOrigin =
       options.resolveRemoteControlOrigin ?? resolveRemoteControlOrigin;
@@ -155,9 +173,12 @@ export class BrowserPresenterSessionService {
     input: RegisterPresenterRemoteSessionInput,
   ): Promise<PresenterRemoteSessionMetadata> {
     if (this.remoteSession) return this.remoteSession;
-    const session = await this.remoteSignalingService.registerSession(input);
+    const session = await this.remoteSignalingService.registerSession({
+      ...input,
+      presenterDeviceId: input.presenterDeviceId ?? this.presenterDeviceId,
+    });
     const remoteOrigin = (await this.resolveRemoteControlOrigin(this.origin)) ?? this.origin;
-    const qrUrl = new URL('/joystick', remoteOrigin);
+    const qrUrl = new URL('/joystick/', remoteOrigin);
     qrUrl.searchParams.set('code', session.code);
     this.remoteSession = {
       ...session,

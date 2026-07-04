@@ -31,6 +31,7 @@ describe('BrowserPresenterSessionService remote control', () => {
     const service = new BrowserPresenterSessionService({
       href: 'https://localstudio.test/editor/?project=Demo',
       openWindow: vi.fn(() => popup),
+      presenterDeviceId: 'presenter-device-1',
       randomId: () => 'session-1',
       remoteSignalingService: signalingService,
     });
@@ -45,8 +46,9 @@ describe('BrowserPresenterSessionService remote control', () => {
       code: 'ABCD-1234',
       connectedControllerCount: 0,
       expiresAt: '2026-07-04T12:01:00.000Z',
+      presenterDeviceId: 'presenter-device-1',
       presenterLabel: 'MacBook Pro',
-      qrUrl: 'https://localstudio.test/joystick?code=ABCD-1234',
+      qrUrl: 'https://localstudio.test/joystick/?code=ABCD-1234',
       sessionId: 'remote-session-1',
     });
   });
@@ -65,6 +67,7 @@ describe('BrowserPresenterSessionService remote control', () => {
     const service = new BrowserPresenterSessionService({
       href: 'http://localhost:4176/editor/',
       openWindow: vi.fn(() => popup),
+      presenterDeviceId: 'presenter-device-1',
       randomId: () => 'session-1',
       remoteSignalingService: signalingService,
       resolveRemoteControlOrigin: vi.fn(() => Promise.resolve('http://192.168.0.33:4176')),
@@ -76,7 +79,7 @@ describe('BrowserPresenterSessionService remote control', () => {
       ttlMs: 60_000,
     });
 
-    expect(remoteSession.qrUrl).toBe('http://192.168.0.33:4176/joystick?code=ABCD-1234');
+    expect(remoteSession.qrUrl).toBe('http://192.168.0.33:4176/joystick/?code=ABCD-1234');
   });
 
   it('publishes remote state snapshots derived from presenter payloads', async () => {

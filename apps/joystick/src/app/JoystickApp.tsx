@@ -46,6 +46,7 @@ interface JoystickSignalingService {
   lookupSession: (
     code: string,
   ) => PresenterRemoteSession | undefined | Promise<PresenterRemoteSession | undefined>;
+  listSessions?: (() => PresenterRemoteSession[] | Promise<PresenterRemoteSession[]>) | undefined;
   publishCommand: (
     code: string,
     command: PresenterRemoteCommand,
@@ -59,7 +60,9 @@ interface JoystickAppProps {
 }
 
 const rememberedCodeKey = 'localstudio.joystick.lastCode';
+const approvedCodesKey = 'localstudio.joystick.approvedCodes';
 const controllerIdKey = 'localstudio.joystick.controllerId';
+const trustedPresenterDeviceIdsKey = 'localstudio.joystick.trustedPresenterDeviceIds';
 type JoystickSimpleCommand = 'next' | 'pause-timer' | 'previous' | 'reset-timer';
 const swipeThresholdPx = 44;
 const streamPreferenceAspectRatio = 390 / 340;
@@ -119,6 +122,49 @@ function getStoredValue(key: string) {
 
 function setStoredValue(key: string, value: string) {
   getLocalStorage()?.setItem(key, value);
+}
+
+function getStoredStringList(key: string) {
+  const value = getStoredValue(key);
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is string => typeof item === 'string' && item.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+function setStoredStringList(key: string, values: string[]) {
+  getLocalStorage()?.setItem(key, JSON.stringify(values));
+}
+
+function addStoredStringListValue(key: string, value: string) {
+  if (!value) return;
+  const existingValues = getStoredStringList(key);
+  const values = [value, ...existingValues.filter((existingValue) => existingValue !== value)]
+    .slice(0, 20);
+  setStoredStringList(key, values);
+}
+
+function getTrustedPresenterDeviceIds() {
+  return new Set(getStoredStringList(trustedPresenterDeviceIdsKey));
+}
+
+function rememberSuccessfulSession(session: PresenterRemoteSession) {
+  const code = presenterRemoteSessionCode.normalize(session.code);
+  setStoredValue(rememberedCodeKey, code);
+  addStoredStringListValue(approvedCodesKey, code);
+  addStoredStringListValue(trustedPresenterDeviceIdsKey, session.presenterDeviceId);
+}
+
+function getNewestTrustedSession(sessions: PresenterRemoteSession[]) {
+  const trustedPresenterDeviceIds = getTrustedPresenterDeviceIds();
+  if (trustedPresenterDeviceIds.size === 0) return undefined;
+  return sessions
+    .filter((session) => trustedPresenterDeviceIds.has(session.presenterDeviceId))
+    .sort((left, right) => Date.parse(right.expiresAt) - Date.parse(left.expiresAt))[0];
 }
 
 function getControllerId() {
@@ -590,12 +636,29 @@ export function JoystickApp({
       const requestedCode = presenterRemoteSessionCode.isValid(code) ? code : rememberedCode;
       if (requestedCode && presenterRemoteSessionCode.isValid(requestedCode)) {
         const foundSession = await signalingService.lookupSession(requestedCode);
+        if (foundSession) {
+          const connectedSession =
+            signalingService.connectController
+              ? await signalingService.connectController(requestedCode, controllerId)
+              : foundSession;
+          if (!cancelled) {
+            setCode(requestedCode);
+            setSession(connectedSession);
+            setResolvingSession(false);
+          }
+          return;
+        }
+      }
+
+      const trustedSession = getNewestTrustedSession(await (signalingService.listSessions?.() ?? []));
+      if (trustedSession) {
         const connectedSession =
-          foundSession && signalingService.connectController
-            ? await signalingService.connectController(requestedCode, controllerId)
-            : foundSession;
+          signalingService.connectController
+            ? await signalingService.connectController(trustedSession.code, controllerId)
+            : trustedSession;
         if (!cancelled) {
-          setCode(requestedCode);
+          const trustedCode = presenterRemoteSessionCode.normalize(trustedSession.code);
+          setCode(trustedCode);
           setSession(connectedSession);
           setResolvingSession(false);
         }
@@ -603,6 +666,9 @@ export function JoystickApp({
       }
 
       if (!cancelled) {
+        if (requestedCode && presenterRemoteSessionCode.isValid(requestedCode)) {
+          setCode(requestedCode);
+        }
         setSession(undefined);
         setResolvingSession(false);
       }
@@ -618,7 +684,7 @@ export function JoystickApp({
   const displayedCode = code || session?.code || '';
 
   useEffect(() => {
-    if (session) setStoredValue(rememberedCodeKey, session.code);
+    if (session) rememberSuccessfulSession(session);
   }, [session]);
 
   useEffect(() => {
