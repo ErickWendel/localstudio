@@ -79,12 +79,12 @@ function restoreLocalStorage() {
 }
 
 function getTestLocalStorage() {
-  restoreLocalStorage();
   return window.localStorage ?? installTestLocalStorage();
 }
 
 describe('JoystickApp', () => {
   beforeEach(() => {
+    restoreLocalStorage();
     getTestLocalStorage().clear();
     streamReceiverMock.create.mockClear();
     streamReceiverMock.latestReceiver = undefined;
