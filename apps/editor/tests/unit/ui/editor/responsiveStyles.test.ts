@@ -1,8 +1,10 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const stylesPath = resolve(__dirname, '../../../../src/app/styles.css');
+const stylesDirectory = resolve(__dirname, '../../../../src/app/styles');
+const maxOwnedStylesheetLines = 420;
 
 function readComposedStyles(filePath: string, visited = new Set<string>()): string {
   if (visited.has(filePath)) return '';
@@ -100,5 +102,26 @@ describe('editor responsive styles', () => {
     for (const selector of criticalSelectors) {
       expect(styles, `${selector} should be present in composed editor styles`).toContain(selector);
     }
+  });
+
+  it('keeps editor styles split into a manifest and small owned files', () => {
+    const manifest = readFileSync(stylesPath, 'utf8');
+    const manifestViolations = manifest
+      .split('\n')
+      .map((line, index) => ({ line: line.trim(), lineNumber: index + 1 }))
+      .filter(({ line }) => line && !line.startsWith('@import '));
+
+    expect(manifestViolations).toEqual([]);
+
+    const oversizedStylesheets = readdirSync(stylesDirectory)
+      .filter((fileName) => fileName.endsWith('.css'))
+      .map((fileName) => {
+        const filePath = resolve(stylesDirectory, fileName);
+        const lineCount = readFileSync(filePath, 'utf8').trimEnd().split('\n').length;
+        return { fileName, lineCount };
+      })
+      .filter(({ lineCount }) => lineCount > maxOwnedStylesheetLines);
+
+    expect(oversizedStylesheets).toEqual([]);
   });
 });
