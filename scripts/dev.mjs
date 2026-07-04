@@ -13,18 +13,21 @@ const apps = [
     configFile: '../apps/editor/vite.config.ts',
     indexFile: '../apps/editor/index.html',
     name: 'editor',
+    root: '../apps/editor',
   },
   {
     base: '/joystick/',
     configFile: '../apps/joystick/vite.config.ts',
     indexFile: '../apps/joystick/index.html',
     name: 'joystick',
+    root: '../apps/joystick',
   },
   {
     base: '/',
     configFile: '../apps/landing/vite.config.ts',
     indexFile: '../apps/landing/index.html',
     name: 'landing',
+    root: '../apps/landing',
   },
 ];
 
@@ -35,6 +38,7 @@ for (const app of apps) {
   const server = await createViteServer({
     appType: 'spa',
     configFile: fileURLToPath(new URL(app.configFile, import.meta.url)),
+    root: fileURLToPath(new URL(app.root, import.meta.url)),
     server: {
       hmr: {
         server: httpServer,
