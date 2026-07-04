@@ -48,6 +48,7 @@ import { createPrefixedId } from '../../../services/ids/idUtils';
 import { slideTaskPrompt } from '../../../services/prompting/slideTaskPrompt';
 import { imagePromptOptions } from '../media/imagePromptOptions';
 import type { CreateImagePromptOptions } from '../media/imagePromptOptions';
+import { localMediaImportConfig } from '../media/localMediaImportConfig';
 import { TRANSLATION_LANGUAGE_OPTIONS } from '../translation/translationLanguages';
 import { translationLanguageUtils } from '../translation/translationLanguageUtils';
 import { editorPreferences } from '../persistence/editorPreferences';
@@ -104,6 +105,12 @@ export interface PresentationImportProgressState {
   progress: number;
   stage: 'reading' | 'inspecting' | 'extracting-objects' | 'extracting-media' | 'mapping-animations' | 'opening';
   title: string;
+}
+
+export interface MediaImportProgressState {
+  detail: string;
+  title: string;
+  tone: 'loading' | 'error';
 }
 
 interface ElementClipboardState {
@@ -298,9 +305,32 @@ function readVideoSize(src: string) {
   });
 }
 
+function getFileExtension(fileName: string) {
+  const extension = fileName.trim().toLowerCase().split('.').pop();
+  return extension && extension !== fileName.toLowerCase() ? extension : '';
+}
+
+function isSupportedLocalVideoFile(file: File) {
+  const extension = getFileExtension(file.name);
+  return (
+    localMediaImportConfig.supportedVideoMimeTypes.has(file.type) ||
+    localMediaImportConfig.supportedVideoExtensions.has(extension)
+  );
+}
+
+function createMediaObjectUrl(file: File) {
+  if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
+    throw new Error('This browser cannot import video files from disk.');
+  }
+  return URL.createObjectURL(file);
+}
+
 function getMediaAssetType(file: File): 'image' | 'gif' | 'video' {
+  const extension = getFileExtension(file.name);
   if (file.type === 'image/gif') return 'gif';
-  if (file.type.startsWith('video/')) return 'video';
+  if (file.type.startsWith('video/') || localMediaImportConfig.localVideoExtensions.has(extension)) {
+    return 'video';
+  }
   return 'image';
 }
 
@@ -517,6 +547,9 @@ export function useEditorViewModel(services: AppServices) {
   const [persistenceEnabled, setPersistenceEnabled] = useState(shouldRestoreStoredProject);
   const [presentationImportProgress, setPresentationImportProgress] = useState<
     PresentationImportProgressState | undefined
+  >();
+  const [mediaImportProgress, setMediaImportProgress] = useState<
+    MediaImportProgressState | undefined
   >();
   const [hasPersistedLocalProject, setHasPersistedLocalProject] = useState(
     shouldRestoreStoredProject,
@@ -3436,43 +3469,140 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   async function importImageFile(file: File) {
-    const dataUrl = await readImageFileAsDataUrl(file);
     const assetType = getMediaAssetType(file);
-    const mediaSize =
-      assetType === 'video' ? await readVideoSize(dataUrl) : await readImageSize(dataUrl);
-    const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
-    if (!page) return;
+    if (assetType === 'video' && !isSupportedLocalVideoFile(file)) {
+      setMediaImportProgress({
+        detail:
+          'Video import supports MP4 and WebM files. Convert this clip to MP4 or WebM and import it again.',
+        title: 'Unsupported video format',
+        tone: 'error',
+      });
+      return;
+    }
 
-    const assetId = createPrefixedId('asset');
-    const elementId = createPrefixedId(assetType);
-    const mediaName =
-      file.name.trim() ||
-      (assetType === 'video'
-        ? 'Pasted video'
-        : assetType === 'gif'
-          ? 'Pasted GIF'
-          : 'Pasted image');
-    const fittedMedia = fitImageWithinPage({
-      imageWidth: mediaSize.width,
-      imageHeight: mediaSize.height,
-      pageWidth: page.width,
-      pageHeight: page.height,
+    setMediaImportProgress({
+      detail:
+        assetType === 'video'
+          ? 'Loading video metadata without copying the full file into memory.'
+          : assetType === 'gif'
+            ? 'Loading animated media from disk.'
+            : 'Loading image from disk.',
+      title: 'Loading media',
+      tone: 'loading',
     });
+    await waitForNextPaint();
 
-    if (assetType === 'gif') {
+    let imported = false;
+    let objectUrl: string | undefined;
+    try {
+      objectUrl =
+        assetType === 'video' || assetType === 'gif' ? createMediaObjectUrl(file) : undefined;
+      const mediaUrl = objectUrl ?? (await readImageFileAsDataUrl(file));
+      const mediaSize =
+        assetType === 'video' ? await readVideoSize(mediaUrl) : await readImageSize(mediaUrl);
+      const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
+      if (!page) {
+        setMediaImportProgress(undefined);
+        return;
+      }
+
+      const assetId = createPrefixedId('asset');
+      const elementId = createPrefixedId(assetType);
+      const mediaName =
+        file.name.trim() ||
+        (assetType === 'video'
+          ? 'Pasted video'
+          : assetType === 'gif'
+            ? 'Pasted GIF'
+            : 'Pasted image');
+      const fittedMedia = fitImageWithinPage({
+        imageWidth: mediaSize.width,
+        imageHeight: mediaSize.height,
+        pageWidth: page.width,
+        pageHeight: page.height,
+      });
+
+      if (assetType === 'gif') {
+        commitProject(
+          (currentProject) =>
+            new basicCommands.AddMediaElementCommand(activePageId, {
+              asset: {
+                id: assetId,
+                type: 'gif',
+                name: mediaName,
+                mimeType: file.type || 'image/gif',
+                objectUrl: mediaUrl,
+              },
+              element: {
+                id: elementId,
+                type: 'gif',
+                assetId,
+                x: fittedMedia.x,
+                y: fittedMedia.y,
+                width: fittedMedia.width,
+                height: fittedMedia.height,
+                rotation: 0,
+                locked: false,
+                visible: true,
+                opacity: 1,
+                playing: true,
+              },
+            }).execute(currentProject),
+          { selectedElementIds: [elementId] },
+        );
+        imported = true;
+        return;
+      }
+
+      if (assetType === 'video') {
+        commitProject(
+          (currentProject) =>
+            new basicCommands.AddMediaElementCommand(activePageId, {
+              asset: {
+                id: assetId,
+                type: 'video',
+                name: mediaName,
+                mimeType: file.type || 'video/mp4',
+                objectUrl: mediaUrl,
+              },
+              element: {
+                id: elementId,
+                type: 'video',
+                assetId,
+                x: fittedMedia.x,
+                y: fittedMedia.y,
+                width: fittedMedia.width,
+                height: fittedMedia.height,
+                rotation: 0,
+                locked: false,
+                visible: true,
+                opacity: 1,
+                loop: false,
+                controls: true,
+                muted: true,
+                autoplayInPreview: true,
+                trimStartSeconds: 0,
+              },
+            }).execute(currentProject),
+          { selectedElementIds: [elementId] },
+        );
+        imported = true;
+        return;
+      }
+
       commitProject(
         (currentProject) =>
-          new basicCommands.AddMediaElementCommand(activePageId, {
+          new basicCommands.AddImageElementCommand(activePageId, {
             asset: {
               id: assetId,
-              type: 'gif',
+              type: 'image',
               name: mediaName,
-              mimeType: file.type || 'image/gif',
-              objectUrl: dataUrl,
+              mimeType: file.type || 'image/*',
+              objectUrl: mediaUrl,
             },
             element: {
               id: elementId,
-              type: 'gif',
+              type: 'image',
               assetId,
               x: fittedMedia.x,
               y: fittedMedia.y,
@@ -3482,75 +3612,27 @@ export function useEditorViewModel(services: AppServices) {
               locked: false,
               visible: true,
               opacity: 1,
-              playing: true,
             },
-          }).execute(currentProject),
-        { selectedElementIds: [elementId] },
-      );
-      return;
-    }
-
-    if (assetType === 'video') {
-      commitProject(
-        (currentProject) =>
-          new basicCommands.AddMediaElementCommand(activePageId, {
-            asset: {
-              id: assetId,
-              type: 'video',
-              name: mediaName,
-              mimeType: file.type || 'video/mp4',
-              objectUrl: dataUrl,
-            },
-            element: {
-              id: elementId,
-              type: 'video',
-              assetId,
-              x: fittedMedia.x,
-              y: fittedMedia.y,
-              width: fittedMedia.width,
-              height: fittedMedia.height,
-              rotation: 0,
-              locked: false,
-              visible: true,
-              opacity: 1,
-              loop: false,
-              controls: true,
-              muted: true,
-              autoplayInPreview: true,
-              trimStartSeconds: 0,
-            },
-          }).execute(currentProject),
-        { selectedElementIds: [elementId] },
-      );
-      return;
-    }
-
-    commitProject(
-      (currentProject) =>
-        new basicCommands.AddImageElementCommand(activePageId, {
-          asset: {
-            id: assetId,
-            type: 'image',
-            name: mediaName,
-            mimeType: file.type || 'image/*',
-            objectUrl: dataUrl,
-          },
-          element: {
-            id: elementId,
-            type: 'image',
-            assetId,
-            x: fittedMedia.x,
-            y: fittedMedia.y,
-            width: fittedMedia.width,
-            height: fittedMedia.height,
-            rotation: 0,
-            locked: false,
-            visible: true,
-            opacity: 1,
-          },
         }).execute(currentProject),
-      { selectedElementIds: [elementId] },
-    );
+        { selectedElementIds: [elementId] },
+      );
+      imported = true;
+    } catch (error) {
+      setMediaImportProgress({
+        detail:
+          error instanceof Error
+            ? error.message
+            : 'The selected media file could not be loaded.',
+        title: 'Media import failed',
+        tone: 'error',
+      });
+      return;
+    } finally {
+      if (!imported && objectUrl && typeof URL.revokeObjectURL === 'function') {
+        URL.revokeObjectURL(objectUrl);
+      }
+      if (imported) setMediaImportProgress(undefined);
+    }
   }
 
   function addRecentStockMedia(item: StockMediaItem) {
@@ -3702,6 +3784,10 @@ export function useEditorViewModel(services: AppServices) {
     );
   }
 
+  function clearMediaImportProgress() {
+    setMediaImportProgress(undefined);
+  }
+
   return {
     project: previewProject ?? project,
     automation,
@@ -3711,6 +3797,7 @@ export function useEditorViewModel(services: AppServices) {
     isFullscreen,
     persistenceEnabled,
     presentationImportProgress,
+    mediaImportProgress,
     persistenceAttention,
     persistenceNotice,
     mirrorState,
@@ -3891,5 +3978,6 @@ export function useEditorViewModel(services: AppServices) {
     removeAsset,
     importImageFile,
     importMediaFile: importImageFile,
+    clearMediaImportProgress,
   };
 }

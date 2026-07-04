@@ -39,7 +39,9 @@ describe('PageRail', () => {
       />,
     );
 
-    await user.upload(screen.getByLabelText('Import media file'), file);
+    const input = screen.getByLabelText('Import media file');
+    expect(input).toHaveAttribute('accept', 'image/*,video/*');
+    await user.upload(input, file);
 
     expect(onImportImage).toHaveBeenCalledWith(file);
   });
