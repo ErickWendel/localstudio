@@ -82,7 +82,7 @@ export function MirrorSettingsPanel({
       aria-modal="false"
       aria-label="Mirror settings"
     >
-      <div className="mirror-settings-header">
+      <div className="mirror-settings-header ew-split-row-start">
         <div className="settings-panel-title-row">
           {onBack ? (
             <button

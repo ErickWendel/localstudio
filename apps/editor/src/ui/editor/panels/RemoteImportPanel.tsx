@@ -61,7 +61,7 @@ export function RemoteImportPanel({
       aria-modal="false"
       aria-label="Import remote project"
     >
-      <div className="settings-panel-header">
+      <div className="settings-panel-header ew-split-row-start">
         <div>
           <h2>Import remote</h2>
           <p>Choose a mirrored project from MinIO.</p>

@@ -30,7 +30,7 @@ export function MediaIntegrationSettingsPanel({
       aria-modal="false"
       aria-label="Media integrations"
     >
-      <div className="settings-panel-header">
+      <div className="settings-panel-header ew-split-row-start">
         <div className="settings-panel-title-row">
           {onBack ? (
             <button

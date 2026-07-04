@@ -971,7 +971,7 @@ export function CanvasWorkspace({
   }
 
   return (
-    <div className="canvas-workspace">
+    <div className="canvas-workspace ew-viewport-stage">
       <div
         className="canvas-frame neon-border"
         aria-label={canvasLabel}

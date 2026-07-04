@@ -46,14 +46,6 @@
     0 0 24px rgba(55, 253, 118, 0.08);
 }
 
-.settings-panel-header,
-.mirror-settings-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
 .settings-panel-title-row {
   min-width: 0;
   display: flex;

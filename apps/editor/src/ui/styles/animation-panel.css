@@ -1,10 +1,3 @@
-.animation-panel-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
 .animation-build-row {
   position: relative;
   display: grid;
@@ -83,12 +76,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.animation-build-title {
-  color: var(--ew-text);
-  font-size: 13px;
-  font-weight: 800;
 }
 
 .animation-build-name {

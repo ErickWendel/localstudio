@@ -458,7 +458,7 @@ function AssetRow({
         {asset.objectUrl ? <img alt="" src={asset.objectUrl} /> : <span className="material-symbols-outlined">image</span>}
       </div>
       <div className="asset-row-body">
-        <div className="asset-row-title-line">
+        <div className="asset-row-title-line ew-compact-row">
           <h3 className="asset-row-title ew-ellipsis">{asset.name}</h3>
           <span className={used ? 'asset-status asset-status-used' : 'asset-status asset-status-unused'}>
             {used ? 'Used' : 'Unused'}

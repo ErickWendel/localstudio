@@ -372,7 +372,7 @@ export function AiToolsPanel({
           </div>
           <p>Choose the local model used for prompt-to-slides.</p>
           <label className="translation-target-control">
-            <span className="translation-target-label">Model</span>
+            <span className="translation-target-label ew-inline-row">Model</span>
             <select
               aria-label="LLM Model"
               disabled={promptPreparation.status === 'downloading'}
@@ -397,7 +397,7 @@ export function AiToolsPanel({
             ) : null}
           </label>
           <div className="translation-target-control">
-            <div className="translation-preparation" aria-label="LLM preparation">
+            <div className="translation-preparation ew-grid-compact" aria-label="LLM preparation">
               <div className="translation-preparation-meta">
                 <StatusPill
                   label={getPreparationLabel(promptStatus)}
@@ -464,7 +464,7 @@ export function AiToolsPanel({
           </div>
           <p>Choose how LocalStudio.dev detects source text language before translation.</p>
           <label className="translation-target-control">
-            <span className="translation-target-label">Detection Model</span>
+            <span className="translation-target-label ew-inline-row">Detection Model</span>
             <select
               aria-label="Language Detection Model"
               disabled={languageDetectionPreparation.status === 'downloading'}
@@ -489,7 +489,10 @@ export function AiToolsPanel({
             ) : null}
           </label>
           <div className="translation-target-control">
-            <div className="translation-preparation" aria-label="Language detection preparation">
+            <div
+              className="translation-preparation ew-grid-compact"
+              aria-label="Language detection preparation"
+            >
               <div className="translation-preparation-meta">
                 <StatusPill
                   label={getPreparationLabel(languageDetectionStatus)}
@@ -554,7 +557,7 @@ export function AiToolsPanel({
           </div>
           <p>Translate visible text using the selected local translation model.</p>
           <label className="translation-target-control">
-            <span className="translation-target-label">Translation Model</span>
+            <span className="translation-target-label ew-inline-row">Translation Model</span>
             <select
               aria-label="Translation Model"
               disabled={translationPreparation.status === 'downloading'}
@@ -580,7 +583,10 @@ export function AiToolsPanel({
           </label>
           {selectedTranslationProvider?.modelId ? (
             <div className="translation-target-control">
-              <div className="translation-preparation" aria-label="Translation model preparation">
+              <div
+                className="translation-preparation ew-grid-compact"
+                aria-label="Translation model preparation"
+              >
                 <div className="translation-preparation-meta">
                   <StatusPill
                     label={getPreparationLabel(translationProviderStatus)}
@@ -600,7 +606,7 @@ export function AiToolsPanel({
             </div>
           ) : null}
           <label className="translation-target-control">
-            <span className="translation-target-label">
+            <span className="translation-target-label ew-inline-row">
               Translate to:
               <ToolHelp
                 id="translation-target-tooltip"
@@ -625,7 +631,7 @@ export function AiToolsPanel({
             </select>
             {translationTargetLanguage ? (
               <div
-                className="translation-preparation"
+                className="translation-preparation ew-grid-compact"
                 aria-label="Translation language preparation"
               >
                 {shouldShowTranslationLanguageProgress ? (
@@ -706,7 +712,7 @@ export function AiToolsPanel({
                 )}
               </div>
               <label className="translation-target-control model-row-selector">
-                <span className="translation-target-label">Model</span>
+                <span className="translation-target-label ew-inline-row">Model</span>
                 <select
                   aria-label={`${model.label} model`}
                   value={model.id}
@@ -732,7 +738,7 @@ export function AiToolsPanel({
               {model.id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID ? (
                 <div className="image-generation-settings" aria-label="Image generation settings">
                   <div className="image-generation-setting">
-                    <span className="translation-target-label">Size</span>
+                    <span className="translation-target-label ew-inline-row">Size</span>
                     <div className="image-size-presets" role="group" aria-label="Image size">
                       {imagePromptOptions.imageSizePresets.map((preset) => (
                         <button
@@ -756,7 +762,7 @@ export function AiToolsPanel({
                     </div>
                   </div>
                   <label className="image-generation-setting image-generation-range">
-                    <span className="translation-target-label">
+                    <span className="translation-target-label ew-inline-row">
                       Steps
                       <ToolHelp
                         id="image-steps-tooltip"
@@ -777,7 +783,7 @@ export function AiToolsPanel({
                     <strong>{createImageOptions.steps}</strong>
                   </label>
                   <label className="image-generation-setting">
-                    <span className="translation-target-label">
+                    <span className="translation-target-label ew-inline-row">
                       Seed
                       <ToolHelp
                         id="image-seed-tooltip"

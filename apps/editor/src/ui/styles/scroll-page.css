@@ -86,13 +86,6 @@
   color: var(--ew-green);
 }
 
-.scroll-page-actions,
-.page-card-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
 .scroll-page-placeholder {
   width: min(calc(1180px * var(--canvas-zoom, 1)), calc(96% * var(--canvas-zoom, 1)));
   aspect-ratio: 16 / 9;

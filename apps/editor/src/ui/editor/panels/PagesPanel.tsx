@@ -101,7 +101,7 @@ export function PagesPanel({
           <h2 className="panel-heading">Pages</h2>
           <p className="panel-muted">{project.pages.length} pages</p>
         </div>
-        <div className="pages-panel-header-actions">
+        <div className="pages-panel-header-actions ew-inline-row">
           <button className="icon-button" type="button" aria-label="Add page" title="Add page" onClick={onAddPage}>
             <span className="material-symbols-outlined" aria-hidden="true">
               add
@@ -198,7 +198,10 @@ export function PagesPanel({
                     {page.name}
                   </button>
                 )}
-                <div className="page-card-actions" aria-label={`${page.name} actions`}>
+                <div
+                  className="page-card-actions ew-inline-row-tight"
+                  aria-label={`${page.name} actions`}
+                >
                   <button
                     className="icon-button"
                     type="button"
@@ -305,7 +308,11 @@ function MiniPagePreview({
       style={{ backgroundColor: page.background.type === 'color' ? background : page.background.colorFallback }}
     >
       {page.background.type === 'asset' && project.assets[page.background.assetId]?.objectUrl ? (
-        <img alt="" className="page-card-bg-image" src={project.assets[page.background.assetId]?.objectUrl} />
+        <img
+          alt=""
+          className="page-card-bg-image ew-fill-media"
+          src={project.assets[page.background.assetId]?.objectUrl}
+        />
       ) : null}
       {page.elementIds.map((elementId) => {
         const element = project.elements[elementId];

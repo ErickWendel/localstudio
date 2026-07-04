@@ -286,7 +286,10 @@ function PageHeader({
       >
         Page {index + 1} - {name}
       </button>
-      <div className="scroll-page-actions" aria-label={`${name} page actions`}>
+      <div
+        className="scroll-page-actions ew-inline-row-tight"
+        aria-label={`${name} page actions`}
+      >
         <IconAction
           disabled={!canMoveUp}
           label={`Move ${name} up`}

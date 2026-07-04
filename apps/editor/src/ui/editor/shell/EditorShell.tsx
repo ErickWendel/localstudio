@@ -1158,7 +1158,7 @@ export function EditorShell({ services }: EditorShellProps) {
                     <h2>
                       Page {activePageIndex + 1} - {activePage.name}
                     </h2>
-                    <div className="speaker-notes-actions">
+                    <div className="speaker-notes-actions ew-compact-row">
                       <button type="button" aria-label="Change notes text size">
                         aA
                       </button>

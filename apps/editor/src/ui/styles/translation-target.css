@@ -13,12 +13,6 @@
   min-height: 32px;
 }
 
-.translation-target-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
 .translation-target-help {
   position: relative;
   display: inline-grid;
@@ -98,12 +92,6 @@
 .compact-action-full {
   width: 100%;
   justify-content: center;
-}
-
-.translation-preparation {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
 }
 
 .translation-preparation-meta {

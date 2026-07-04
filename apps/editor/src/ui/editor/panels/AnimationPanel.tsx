@@ -267,7 +267,7 @@ export function AnimationPanel({
   return (
     <section className="panel-stack animation-panel">
       <div className="panel-section ew-panel-card">
-        <div className="animation-panel-heading">
+        <div className="animation-panel-heading ew-split-row">
           <h2 className="panel-heading">Motion</h2>
           <button
             aria-label="Play animation preview"
@@ -379,7 +379,7 @@ export function AnimationPanel({
                     aria-label={`Current animation step ${index + 1}`}
                   />
                 ) : null}
-                <div className="animation-build-title ew-compact-row">
+                <div className="animation-build-title ew-compact-row ew-strong-label">
                   <span className="animation-build-name">
                     <span
                       className="material-symbols-outlined animation-build-drag-handle"

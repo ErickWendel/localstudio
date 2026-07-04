@@ -16,12 +16,6 @@
   pointer-events: auto;
 }
 
-.floating-toolbar-group {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
 .floating-toolbar-divider {
   width: 1px;
   height: 16px;

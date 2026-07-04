@@ -92,13 +92,6 @@
   max-width: 100vw;
 }
 
-.workspace-column:fullscreen .canvas-workspace {
-  width: 100vw;
-  height: 100vh;
-  display: grid;
-  place-items: center;
-}
-
 .workspace-column:fullscreen .canvas-frame {
   border: 0;
   outline: 0;

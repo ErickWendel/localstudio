@@ -549,7 +549,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
             <span className="presenter-divider" aria-hidden="true" />
             <span className="presenter-timer">{formatElapsed(elapsedMs)}</span>
           </div>
-          <div className="presenter-controls" aria-label="Presenter controls">
+          <div className="presenter-controls ew-compact-row" aria-label="Presenter controls">
             <button
               className="stitch-icon-button presenter-control-button"
               type="button"
@@ -746,7 +746,11 @@ function PresenterThumbnail({ page, project }: { page: Page; project: ProjectDoc
       }}
     >
       {page.background.type === 'asset' && project.assets[page.background.assetId]?.objectUrl ? (
-        <img alt="" className="presenter-thumb-bg" src={project.assets[page.background.assetId]?.objectUrl} />
+        <img
+          alt=""
+          className="presenter-thumb-bg ew-fill-media"
+          src={project.assets[page.background.assetId]?.objectUrl}
+        />
       ) : null}
       {page.elementIds.map((elementId) => {
         const element = project.elements[elementId];

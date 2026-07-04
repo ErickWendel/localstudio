@@ -3,18 +3,6 @@
   gap: 10px;
 }
 
-.text-inspector-field {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-}
-
-.text-inspector-label {
-  color: var(--ew-text);
-  font-size: 13px;
-  font-weight: 800;
-}
-
 .text-inspector-field input,
 .text-inspector-field select {
   width: 100%;

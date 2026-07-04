@@ -16,13 +16,6 @@
   box-shadow: 0 22px 60px rgba(0, 0, 0, 0.35);
 }
 
-.share-panel-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
 .share-panel-header h2 {
   margin: 0;
   color: #111418;

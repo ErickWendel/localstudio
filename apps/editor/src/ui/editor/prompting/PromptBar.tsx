@@ -156,7 +156,7 @@ export function PromptBar({
             </div>
           ) : null}
         </div>
-        <div className="prompt-input-cluster">
+        <div className="prompt-input-cluster ew-compact-row">
           {activeMode === 'create-image' ? (
             <button
               aria-label="Remove Create image mode"
@@ -169,7 +169,7 @@ export function PromptBar({
               }}
             >
               <ImagePlus size={15} />
-              <span>Create image</span>
+              <span className="ew-truncate">Create image</span>
               <X className="prompt-mode-token-close" size={13} />
             </button>
           ) : null}

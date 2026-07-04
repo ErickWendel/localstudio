@@ -165,7 +165,7 @@ function ElementSectionHeader({
   onSeeAll?: (() => void) | undefined;
 }) {
   return (
-    <div className="element-section-heading">
+    <div className="element-section-heading ew-split-row">
       <h3>{title}</h3>
       {onSeeAll ? (
         <button

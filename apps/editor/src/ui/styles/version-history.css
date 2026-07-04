@@ -86,12 +86,6 @@
   font-weight: 800;
 }
 
-.version-history-author {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
 .version-history-author span {
   width: 7px;
   height: 7px;

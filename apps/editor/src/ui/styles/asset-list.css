@@ -32,10 +32,7 @@
 }
 
 .asset-row-title-line {
-  display: flex;
-  align-items: center;
   gap: 8px;
-  min-width: 0;
 }
 
 .asset-row-title {

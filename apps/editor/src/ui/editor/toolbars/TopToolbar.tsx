@@ -676,7 +676,7 @@ export function TopToolbar({
           {deckTranslationStatus ? (
             <div className="deck-translation-status" role="status" aria-live="polite">
               <span className="deck-translation-status-orbit" aria-hidden="true" />
-              <span>{deckTranslationStatus}</span>
+              <span className="ew-truncate">{deckTranslationStatus}</span>
             </div>
           ) : null}
         </div>

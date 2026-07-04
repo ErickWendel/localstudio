@@ -16,12 +16,6 @@
   padding: 14px 12px;
 }
 
-.pages-panel-header-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
 .pages-list {
   display: grid;
   align-content: start;
@@ -102,12 +96,6 @@
   position: absolute;
   object-fit: cover;
   pointer-events: none;
-}
-
-.page-card-bg-image {
-  inset: 0;
-  width: 100%;
-  height: 100%;
 }
 
 .page-card-mini-element {

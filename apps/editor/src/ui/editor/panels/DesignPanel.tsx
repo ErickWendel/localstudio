@@ -234,8 +234,8 @@ export function DesignPanel({
         <PanelSection title="Font">
           <div className="text-inspector-stack">
             <div className="font-control-row">
-              <label className="text-inspector-field text-inspector-field-full">
-                <span className="text-inspector-label">Font</span>
+              <label className="text-inspector-field ew-grid-compact text-inspector-field-full">
+                <span className="text-inspector-label ew-strong-label">Font</span>
                 <select
                   aria-label="Selected text font"
                   ref={fontSelectRef}
@@ -316,8 +316,8 @@ export function DesignPanel({
               </div>
             ) : null}
             <div className="text-inspector-pair">
-              <label className="text-inspector-field">
-                <span className="text-inspector-label">Weight</span>
+              <label className="text-inspector-field ew-grid-compact">
+                <span className="text-inspector-label ew-strong-label">Weight</span>
               <select
                 aria-label="Selected text font weight"
                 value={selectedElement.fontWeight}
@@ -332,8 +332,8 @@ export function DesignPanel({
                 ))}
               </select>
               </label>
-              <label className="text-inspector-field">
-                <span className="text-inspector-label">Size</span>
+              <label className="text-inspector-field ew-grid-compact">
+                <span className="text-inspector-label ew-strong-label">Size</span>
                 <input
                   aria-label="Selected text font size"
                   min="1"

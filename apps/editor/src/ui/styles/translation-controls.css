@@ -103,12 +103,6 @@
   white-space: nowrap;
 }
 
-.deck-translation-status span:last-child {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .deck-translation-status-orbit {
   width: 9px;
   height: 9px;
