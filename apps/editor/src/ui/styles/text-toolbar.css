@@ -1,0 +1,18 @@
+.text-selection-toolbar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 38px;
+  max-width: min(860px, calc(100vw - 40px));
+  padding: 4px 6px;
+  border: 1px solid rgba(55, 253, 118, 0.32);
+  border-radius: 5px;
+  background: rgba(5, 13, 16, 0.94);
+  color: var(--ew-text);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.42),
+    0 0 28px rgba(55, 253, 118, 0.1);
+  pointer-events: auto;
+  backdrop-filter: blur(12px);
+}

@@ -45,7 +45,7 @@ export function VersionHistoryPanel({
       </select>
       {selectedEntry ? (
         <button
-          className="compact-action compact-action-full version-history-restore"
+          className="compact-action compact-action-full version-history-restore ew-surface ew-surface-hover ew-compact-row"
           type="button"
           onClick={() => onRestoreVersion(selectedEntry.id)}
         >
@@ -67,7 +67,7 @@ export function VersionHistoryPanel({
             <strong>{formatVersionDate(entry.createdAt)}</strong>
             {index === 0 ? <span className="version-history-current">Current version</span> : null}
             <span>{entry.summary}</span>
-            <span className="version-history-author">
+            <span className="version-history-author ew-inline-row">
               <span aria-hidden="true" />
               {entry.authorName}
             </span>

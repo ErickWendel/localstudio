@@ -1,0 +1,107 @@
+.speaker-notes-editor {
+  position: absolute;
+  left: 20px;
+  bottom: 10px;
+  z-index: 55;
+  width: min(360px, calc(100% - 40px));
+  height: calc(100% - 28px);
+  max-height: 760px;
+  pointer-events: none;
+}
+
+.speaker-notes-card {
+  height: 100%;
+  min-height: 360px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  color: var(--ew-text);
+  background: linear-gradient(180deg, rgba(55, 253, 118, 0.04), transparent 42%), var(--ew-panel);
+  border: 1px solid var(--ew-border);
+  border-radius: 6px;
+  box-shadow:
+    0 20px 52px rgba(0, 0, 0, 0.42),
+    0 0 18px rgba(55, 253, 118, 0.08);
+  pointer-events: auto;
+}
+
+.speaker-notes-header {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px;
+}
+
+.speaker-notes-header h2 {
+  margin: 0;
+  min-width: 0;
+  color: var(--ew-text);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.speaker-notes-actions {
+  gap: 8px;
+}
+
+.speaker-notes-actions button {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ew-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.speaker-notes-actions button:hover {
+  color: var(--ew-green-fixed);
+  background: var(--ew-raised);
+}
+
+.speaker-notes-actions .material-symbols-outlined {
+  font-size: 20px;
+}
+
+.speaker-notes-card textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  color: var(--ew-text);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-size: 21px;
+  line-height: 1.4;
+  resize: none;
+  padding: 0 18px 16px;
+}
+
+.speaker-notes-card textarea::placeholder {
+  color: var(--ew-dim);
+}
+
+.speaker-notes-card textarea:focus {
+  outline: 0;
+}
+
+.speaker-notes-count {
+  justify-self: end;
+  color: var(--ew-muted);
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 18px 14px;
+}

@@ -7,7 +7,7 @@ interface SettingsPanelProps {
 export function SettingsPanel({ onClose, onOpenMediaSettings, onOpenMirrorSettings }: SettingsPanelProps) {
   return (
     <aside className="settings-panel" role="dialog" aria-modal="false" aria-label="Settings">
-      <div className="settings-panel-header">
+      <div className="settings-panel-header ew-split-row-start">
         <h2>Settings</h2>
         <button className="stitch-icon-button" type="button" aria-label="Close settings" onClick={onClose}>
           <span className="material-symbols-outlined" aria-hidden="true">

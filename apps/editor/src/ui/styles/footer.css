@@ -1,0 +1,64 @@
+.editor-footer {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid var(--ew-border);
+  background: var(--ew-panel);
+  padding: 0 18px;
+  color: var(--ew-muted);
+}
+
+.editor-footer-left,
+.editor-footer-right,
+.footer-note,
+.footer-zoom-controls,
+.footer-toggle {
+  display: inline-flex;
+  align-items: center;
+}
+
+.editor-footer-right {
+  gap: 10px;
+}
+
+.editor-footer-left {
+  min-width: 32px;
+  gap: 8px;
+}
+
+.footer-settings-button {
+  border: 1px solid rgba(122, 255, 199, 0.12);
+  background: rgba(5, 13, 16, 0.48);
+}
+
+.footer-note,
+.footer-toggle,
+.footer-page-count {
+  gap: 6px;
+  color: var(--ew-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.footer-toggle {
+  min-height: 30px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  padding: 0 8px;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.footer-toggle:hover,
+.footer-toggle-active {
+  border-color: rgba(55, 253, 118, 0.28);
+  background: rgba(55, 253, 118, 0.08);
+  color: var(--ew-green);
+}

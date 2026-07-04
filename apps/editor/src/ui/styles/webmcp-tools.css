@@ -1,0 +1,33 @@
+.webmcp-tool-list {
+  min-height: 74px;
+  display: flex;
+  align-content: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(122, 255, 199, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.webmcp-tool-pill,
+.webmcp-empty-tools {
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 9px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+}
+
+.webmcp-tool-pill {
+  border: 1px solid rgba(100, 183, 255, 0.28);
+  color: #bfe5ff;
+  background: rgba(100, 183, 255, 0.1);
+}
+
+.webmcp-empty-tools {
+  color: rgba(238, 250, 245, 0.52);
+}

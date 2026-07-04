@@ -196,11 +196,11 @@ export function DesignPanel({
   return (
     <div className="panel-stack">
       <PanelSection title="Canvas">
-        <div className="property-row">
+        <div className="property-row ew-surface ew-surface-hover ew-compact-row">
           <span>Format</span>
           <strong>{page ? `${page.width} x ${page.height}` : 'No page'}</strong>
         </div>
-        <label className="design-control">
+        <label className="design-control ew-field-scope">
           <span>Background</span>
           <input
             aria-label="Canvas background color"
@@ -234,8 +234,8 @@ export function DesignPanel({
         <PanelSection title="Font">
           <div className="text-inspector-stack">
             <div className="font-control-row">
-              <label className="text-inspector-field text-inspector-field-full">
-                <span className="text-inspector-label">Font</span>
+              <label className="text-inspector-field ew-field-scope ew-grid-compact text-inspector-field-full">
+                <span className="text-inspector-label ew-strong-label">Font</span>
                 <select
                   aria-label="Selected text font"
                   ref={fontSelectRef}
@@ -267,7 +267,7 @@ export function DesignPanel({
             {fontDownloadOpen ? (
               <div className="font-download-panel">
                 <form className="font-download-search" onSubmit={submitFontSearch}>
-                  <label className="layer-search font-download-search-box">
+                  <label className="layer-search font-download-search-box ew-surface ew-compact-row">
                     <Search size={16} aria-hidden="true" />
                     <input
                       aria-label="Search downloadable fonts"
@@ -299,7 +299,7 @@ export function DesignPanel({
                             void downloadFont(font.family);
                           }}
                         >
-                          <span>{font.family}</span>
+                          <span className="ew-ellipsis">{font.family}</span>
                           <Download size={15} />
                         </button>
                       ))
@@ -316,8 +316,8 @@ export function DesignPanel({
               </div>
             ) : null}
             <div className="text-inspector-pair">
-              <label className="text-inspector-field">
-                <span className="text-inspector-label">Weight</span>
+              <label className="text-inspector-field ew-field-scope ew-grid-compact">
+                <span className="text-inspector-label ew-strong-label">Weight</span>
               <select
                 aria-label="Selected text font weight"
                 value={selectedElement.fontWeight}
@@ -332,8 +332,8 @@ export function DesignPanel({
                 ))}
               </select>
               </label>
-              <label className="text-inspector-field">
-                <span className="text-inspector-label">Size</span>
+              <label className="text-inspector-field ew-field-scope ew-grid-compact">
+                <span className="text-inspector-label ew-strong-label">Size</span>
                 <input
                   aria-label="Selected text font size"
                   min="1"
@@ -432,7 +432,7 @@ export function DesignPanel({
         />
       ) : (
         <PanelSection title="Selection">
-          <div className="compact-action design-selection-summary">
+          <div className="compact-action design-selection-summary ew-surface ew-surface-hover ew-compact-row">
             <CaseSensitive size={16} />
             <span>No selected element</span>
           </div>
@@ -581,11 +581,11 @@ function ElementDesignInspector({
         <>
           <section className="movie-panel-section" aria-label="Selected element style">
             <h3>Selection</h3>
-            <div className="compact-action design-selection-summary">
+            <div className="compact-action design-selection-summary ew-surface ew-surface-hover ew-compact-row">
               {getElementIcon(element)}
               <span>Selected {element.type}</span>
             </div>
-            <label className="design-control">
+            <label className="design-control ew-field-scope">
               <span>Opacity</span>
               <input
                 aria-label="Selected element opacity"
@@ -599,7 +599,7 @@ function ElementDesignInspector({
               />
             </label>
             {element.type === 'video' ? (
-              <label className="design-control">
+              <label className="design-control ew-field-scope">
                 <span>Controls</span>
                 <input
                   aria-label="Show selected video controls"
@@ -621,7 +621,7 @@ function ElementDesignInspector({
             <h3>File Info</h3>
             <div className="movie-file-row">
               <FileVideo size={18} aria-hidden="true" />
-              <span>{assetName}</span>
+              <span className="ew-ellipsis">{assetName}</span>
               <button
                 className="stitch-icon-button"
                 type="button"
@@ -694,6 +694,7 @@ function ElementDesignInspector({
               <VolumeX size={18} aria-hidden="true" />
               <input
                 aria-label="Selected video volume"
+                className="ew-range-input"
                 max="100"
                 min="0"
                 step="1"
@@ -715,6 +716,7 @@ function ElementDesignInspector({
               <div className="movie-trim-track">
                 <input
                   aria-label="Selected video trim start"
+                  className="ew-range-input"
                   max={trimSliderMax}
                   min="0"
                   step="0.1"
@@ -727,6 +729,7 @@ function ElementDesignInspector({
                 />
                 <input
                   aria-label="Selected video trim end"
+                  className="ew-range-input"
                   max={trimSliderMax}
                   min="0"
                   step="0.1"
@@ -751,6 +754,7 @@ function ElementDesignInspector({
               <span>Poster Frame</span>
               <input
                 aria-label="Selected video poster frame"
+                className="ew-range-input"
                 max={trimSliderMax}
                 min="0"
                 step="0.1"
@@ -804,7 +808,7 @@ function ElementDesignInspector({
           {element.type === 'text' ? (
             <section className="movie-panel-section" aria-label="Selected text controls">
               <h3>Typography</h3>
-              <label className="design-control">
+              <label className="design-control ew-field-scope">
                 <span>Font</span>
                 <select
                   aria-label="Selected text font"
@@ -820,7 +824,7 @@ function ElementDesignInspector({
                   ))}
                 </select>
               </label>
-              <label className="design-control">
+              <label className="design-control ew-field-scope">
                 <span>Size</span>
                 <input
                   aria-label="Selected text font size"
@@ -832,7 +836,7 @@ function ElementDesignInspector({
                   }}
                 />
               </label>
-              <label className="design-control">
+              <label className="design-control ew-field-scope">
                 <span>Weight</span>
                 <select
                   aria-label="Selected text font weight"
@@ -848,7 +852,7 @@ function ElementDesignInspector({
                   ))}
                 </select>
               </label>
-              <label className="design-control">
+              <label className="design-control ew-field-scope">
                 <span>Color</span>
                 <input
                   aria-label="Selected text color"
@@ -859,7 +863,7 @@ function ElementDesignInspector({
                   }}
                 />
               </label>
-              <label className="design-control">
+              <label className="design-control ew-field-scope">
                 <span>Align</span>
                 <select
                   aria-label="Selected text alignment"
@@ -873,7 +877,7 @@ function ElementDesignInspector({
                   <option value="right">Right</option>
                 </select>
               </label>
-              <div className="compact-action">
+              <div className="compact-action ew-surface ew-surface-hover ew-compact-row">
                 <AlignCenter size={16} />
                 <span>Text frame stays editable on canvas</span>
               </div>
@@ -885,7 +889,7 @@ function ElementDesignInspector({
               <h3>Movie</h3>
               <div className="movie-file-row">
                 <Film size={18} aria-hidden="true" />
-                <span>{assetName ?? 'Animated GIF'}</span>
+                <span className="ew-ellipsis">{assetName ?? 'Animated GIF'}</span>
               </div>
               <label className="movie-checkbox-row">
                 <input
@@ -904,7 +908,7 @@ function ElementDesignInspector({
               <h3>Image</h3>
               <div className="movie-file-row">
                 <Image size={18} aria-hidden="true" />
-                <span>{assetName ?? 'Imported image'}</span>
+                <span className="ew-ellipsis">{assetName ?? 'Imported image'}</span>
               </div>
             </section>
           ) : null}
@@ -912,7 +916,7 @@ function ElementDesignInspector({
           {element.type === 'shape' ? (
             <section className="movie-panel-section" aria-label="Selected shape controls">
               <h3>Shape</h3>
-              <label className="design-control">
+              <label className="design-control ew-field-scope">
                 <span>Fill</span>
                 <select
                   aria-label="Selected shape fill mode"
@@ -928,7 +932,7 @@ function ElementDesignInspector({
                 </select>
               </label>
               {element.fill ? (
-                <label className="design-control">
+                <label className="design-control ew-field-scope">
                   <span>Fill color</span>
                   <input
                     aria-label="Selected shape fill color"
@@ -940,7 +944,7 @@ function ElementDesignInspector({
                   />
                 </label>
               ) : null}
-              <label className="design-control">
+              <label className="design-control ew-field-scope">
                 <span>Border</span>
                 <select
                   aria-label="Selected shape border mode"
@@ -965,7 +969,7 @@ function ElementDesignInspector({
               </label>
               {element.stroke && (element.strokeWidth ?? 0) > 0 ? (
                 <>
-                  <label className="design-control">
+                  <label className="design-control ew-field-scope">
                     <span>Border color</span>
                     <input
                       aria-label="Selected shape border color"
@@ -976,7 +980,7 @@ function ElementDesignInspector({
                       }}
                     />
                   </label>
-                  <label className="design-control">
+                  <label className="design-control ew-field-scope">
                     <span>Border width</span>
                     <input
                       aria-label="Selected shape border width"
@@ -990,7 +994,7 @@ function ElementDesignInspector({
                   </label>
                   {supportsLineEndpoints(element) ? (
                     <>
-                      <label className="design-control">
+                      <label className="design-control ew-field-scope">
                         <span>Start endpoint</span>
                         <select
                           aria-label="Selected shape start endpoint"
@@ -1008,7 +1012,7 @@ function ElementDesignInspector({
                           ))}
                         </select>
                       </label>
-                      <label className="design-control">
+                      <label className="design-control ew-field-scope">
                         <span>End endpoint</span>
                         <select
                           aria-label="Selected shape end endpoint"
@@ -1038,7 +1042,7 @@ function ElementDesignInspector({
       {activeTab === 'arrange' ? (
         <>
           <section className="movie-panel-section" aria-label="Arrange selected element order">
-            <div className="movie-arrange-grid">
+            <div className="movie-arrange-grid ew-two-column-grid">
               <button type="button" onClick={() => onZOrderChange?.('back')}>
                 <span className="material-symbols-outlined" aria-hidden="true">
                   flip_to_back
@@ -1064,7 +1068,7 @@ function ElementDesignInspector({
                 Forward
               </button>
             </div>
-            <div className="movie-arrange-select-row">
+            <div className="movie-arrange-select-row ew-field-scope ew-two-column-grid">
               <select
                 aria-label="Align selected element"
                 defaultValue=""
@@ -1089,7 +1093,7 @@ function ElementDesignInspector({
 
           <section className="movie-panel-section" aria-label="Selected element size">
             <h3>Size</h3>
-            <div className="movie-number-grid">
+            <div className="movie-number-grid ew-field-scope ew-two-column-grid">
               <label>
                 <input
                   aria-label="Selected element width"
@@ -1130,7 +1134,7 @@ function ElementDesignInspector({
 
           <section className="movie-panel-section" aria-label="Selected element position">
             <h3>Position</h3>
-            <div className="movie-number-grid">
+            <div className="movie-number-grid ew-field-scope ew-two-column-grid">
               <label>
                 <input
                   aria-label="Selected element x position"
@@ -1162,7 +1166,7 @@ function ElementDesignInspector({
 
           <section className="movie-panel-section" aria-label="Selected element rotation">
             <h3>Rotate</h3>
-            <div className="movie-number-grid">
+            <div className="movie-number-grid ew-field-scope ew-two-column-grid">
               <label>
                 <input
                   aria-label="Selected element rotation"
@@ -1183,7 +1187,7 @@ function ElementDesignInspector({
           </section>
 
           <section className="movie-panel-section" aria-label="Selected element lock and grouping">
-            <div className="movie-lock-grid">
+            <div className="movie-lock-grid ew-two-column-grid">
               <button type="button" disabled={locked} onClick={() => onLockChange?.(true)}>
                 Lock
               </button>

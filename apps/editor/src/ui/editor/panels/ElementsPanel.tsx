@@ -79,7 +79,7 @@ export function ElementsPanel({
 
   return (
     <section className="panel-stack" aria-label="Elements tools">
-      <div className="panel-section element-section">
+      <div className="panel-section ew-panel-card element-section">
         <h2 className="panel-heading">Elements</h2>
         <p className="panel-muted">Add shapes, images, and GIFs to the current slide.</p>
       </div>
@@ -165,7 +165,7 @@ function ElementSectionHeader({
   onSeeAll?: (() => void) | undefined;
 }) {
   return (
-    <div className="element-section-heading">
+    <div className="element-section-heading ew-split-row">
       <h3>{title}</h3>
       {onSeeAll ? (
         <button
@@ -227,7 +227,7 @@ function MediaProviderSection({
     <section className="element-section" aria-label={title}>
       <ElementSectionHeader title={title} />
       <form
-        className="media-search-row"
+        className="media-search-row ew-field-scope"
         onSubmit={(event) => {
           event.preventDefault();
           onSearch?.(query.trim());
@@ -279,7 +279,11 @@ function ProviderConfigurationCallout({
   return (
     <div className="provider-disabled-callout">
       <p>{message}</p>
-      <button className="compact-action compact-action-full" type="button" onClick={onConfigureStockMedia}>
+      <button
+        className="compact-action compact-action-full ew-surface ew-surface-hover ew-compact-row"
+        type="button"
+        onClick={onConfigureStockMedia}
+      >
         <span className="material-symbols-outlined" aria-hidden="true">
           key
         </span>

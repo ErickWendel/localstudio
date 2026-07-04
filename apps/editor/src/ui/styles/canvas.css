@@ -1,0 +1,129 @@
+.page-rail {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  z-index: 40;
+  overflow-y: auto;
+  border-right: 1px solid var(--ew-border);
+  background: var(--ew-panel-low);
+  padding: 16px 0;
+}
+
+.rail-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+  padding: 0 8px;
+}
+
+.slide-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 8px;
+}
+
+.slide-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.slide-thumb {
+  width: 56px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--ew-border);
+  border-radius: 4px;
+  background: var(--ew-panel);
+  color: var(--ew-border);
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    color 140ms ease,
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.slide-item-active .slide-thumb {
+  border: 2px solid var(--ew-green);
+  background: #ffffff;
+  box-shadow: 0 0 8px rgba(55, 253, 118, 0.3);
+}
+
+.slide-thumb:hover {
+  border-color: var(--ew-muted);
+  transform: translateY(-1px);
+}
+
+.slide-thumb-add {
+  border-style: dashed;
+  color: var(--ew-green);
+}
+
+.slide-number,
+.rail-action-button span:last-child {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 12px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.slide-number {
+  color: var(--ew-muted);
+}
+
+.slide-item-active .slide-number {
+  color: var(--ew-green);
+}
+
+.slide-preview {
+  width: 100%;
+  height: 100%;
+  opacity: 0.8;
+  background:
+    linear-gradient(135deg, rgba(55, 253, 118, 0.18), transparent 45%),
+    radial-gradient(circle at 70% 30%, rgba(0, 119, 154, 0.45), transparent 38%), #111f14;
+}
+
+.slide-empty-icon {
+  font-size: 16px;
+}
+
+.rail-action-button {
+  width: 100%;
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid rgba(236, 255, 233, 0.2);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ew-muted);
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.rail-action-button:hover {
+  color: var(--ew-text);
+  border-color: rgba(55, 253, 118, 0.36);
+  background: var(--ew-raised);
+}

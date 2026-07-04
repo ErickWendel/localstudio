@@ -17,7 +17,7 @@ const textPresets: Array<{
 export function TextPanel({ onInsertText }: TextPanelProps) {
   return (
     <section className="panel-stack" aria-label="Text tools">
-      <label className="layer-search text-search">
+      <label className="layer-search text-search ew-surface ew-compact-row">
         <span className="material-symbols-outlined" aria-hidden="true">
           search
         </span>
@@ -50,7 +50,7 @@ export function TextPanel({ onInsertText }: TextPanelProps) {
         </button>
       </div>
 
-      <div className="panel-section">
+      <div className="panel-section ew-panel-card">
         <h2 className="panel-heading text-panel-heading">Default text styles</h2>
         <div className="text-preset-list">
           {textPresets.map((item) => (

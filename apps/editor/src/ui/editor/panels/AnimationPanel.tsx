@@ -161,7 +161,7 @@ function DurationField({
   const valueSeconds = valueMs / 1000;
 
   return (
-    <label className="animation-field animation-duration-field">
+    <label className="animation-field ew-field-scope animation-duration-field">
       <span>Duration</span>
       <div className="animation-duration-controls">
         <input
@@ -266,12 +266,12 @@ export function AnimationPanel({
 
   return (
     <section className="panel-stack animation-panel">
-      <div className="panel-section">
-        <div className="animation-panel-heading">
+      <div className="panel-section ew-panel-card">
+        <div className="animation-panel-heading ew-split-row">
           <h2 className="panel-heading">Motion</h2>
           <button
             aria-label="Play animation preview"
-            className="compact-action"
+            className="compact-action ew-surface ew-surface-hover ew-compact-row"
             type="button"
             onClick={() => onPlayAnimationPreview?.()}
           >
@@ -283,9 +283,9 @@ export function AnimationPanel({
         </div>
       </div>
 
-      <div className="panel-section">
+      <div className="panel-section ew-panel-card">
         <h3 className="panel-section-title">Slide Transition</h3>
-        <label className="animation-field">
+        <label className="animation-field ew-field-scope ew-compact-row">
           <span>Effect</span>
           <select
             aria-label="Slide transition effect"
@@ -324,9 +324,13 @@ export function AnimationPanel({
         />
       </div>
 
-      <div className="panel-section">
+      <div className="panel-section ew-panel-card">
         <h3 className="panel-section-title">Object Animations</h3>
-        <div className="animation-build-list" role="list" aria-label="Object animation build order">
+        <div
+          className="animation-build-list ew-panel-card"
+          role="list"
+          aria-label="Object animation build order"
+        >
           {animationBuilds.length === 0 ? (
             <p className="panel-muted">No object animations on this slide.</p>
           ) : null}
@@ -341,6 +345,8 @@ export function AnimationPanel({
             const isActivePreviewBuild = activePreviewBuildElementId === elementId;
             const rowClassName = [
               'animation-build-row',
+              'ew-surface',
+              'ew-surface-hover',
               isActivePreviewBuild ? 'animation-build-row-active' : '',
               dropPosition === 'before' ? 'drop-indicator-before' : '',
               dropPosition === 'after' ? 'drop-indicator-after' : '',
@@ -373,7 +379,7 @@ export function AnimationPanel({
                     aria-label={`Current animation step ${index + 1}`}
                   />
                 ) : null}
-                <div className="animation-build-title">
+                <div className="animation-build-title ew-compact-row ew-strong-label">
                   <span className="animation-build-name">
                     <span
                       className="material-symbols-outlined animation-build-drag-handle"
@@ -421,7 +427,7 @@ export function AnimationPanel({
                     </button>
                   </div>
                 </div>
-                <label className="animation-field">
+                <label className="animation-field ew-field-scope ew-compact-row">
                   <span>Effect</span>
                   <select
                     aria-label={`Effect for ${label}`}
@@ -455,7 +461,7 @@ export function AnimationPanel({
                   </select>
                 </label>
                 {patch.effect === 'line-draw' ? (
-                  <label className="animation-field">
+                  <label className="animation-field ew-field-scope ew-compact-row">
                     <span>Direction</span>
                     <select
                       aria-label={`Line draw direction for ${label}`}
@@ -473,7 +479,7 @@ export function AnimationPanel({
                     </select>
                   </label>
                 ) : null}
-                <label className="animation-field">
+                <label className="animation-field ew-field-scope ew-compact-row">
                   <span>Start</span>
                   <select
                     aria-label={`Start for ${label}`}
@@ -512,7 +518,7 @@ export function AnimationPanel({
         </div>
         {selectedElementIds.length > 0 ? (
           <>
-            <label className="animation-field">
+            <label className="animation-field ew-field-scope ew-compact-row">
               <span>New effect</span>
               <select
                 aria-label="New object animation effect"
@@ -537,7 +543,7 @@ export function AnimationPanel({
               </select>
             </label>
             {selectedNewAnimationEffect === 'line-draw' ? (
-              <label className="animation-field">
+              <label className="animation-field ew-field-scope ew-compact-row">
                 <span>Direction</span>
                 <select
                   aria-label="New line draw direction"
@@ -555,7 +561,7 @@ export function AnimationPanel({
           </>
         ) : null}
         <button
-          className="compact-action compact-action-full"
+          className="compact-action compact-action-full ew-surface ew-surface-hover ew-compact-row"
           disabled={selectedElementIds.length === 0}
           type="button"
           onClick={() =>

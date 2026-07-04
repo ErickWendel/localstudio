@@ -372,12 +372,12 @@ export function LeftToolPanel({
         ) : null}
         {panelOpen && activeTab === 'assets' ? (
           <section className="panel-stack">
-            <div className="panel-section">
+            <div className="panel-section ew-panel-card">
               <h2 className="panel-heading">Assets</h2>
               <p className="panel-muted">Imported assets in this project.</p>
             </div>
             <button
-              className="compact-action compact-action-full"
+              className="compact-action compact-action-full ew-surface ew-surface-hover ew-compact-row"
               type="button"
               onClick={() => {
                 fileInputRef.current?.click();
@@ -405,7 +405,7 @@ export function LeftToolPanel({
                 event.target.value = '';
               }}
             />
-            <div className="asset-list" aria-label="Project assets">
+            <div className="asset-list ew-panel-card" aria-label="Project assets">
               {assetRows.length > 0 ? (
                 assetRows.map(({ asset, used }) => (
                   <AssetRow
@@ -453,21 +453,21 @@ function AssetRow({
   const detail = asset.fileName ?? asset.id;
   const storageLabel = asset.storage === 'file' ? 'Saved file' : asset.storage === 'remote' ? 'Remote' : 'Inline';
   return (
-    <div className="asset-row">
+    <div className="asset-row ew-surface ew-surface-hover">
       <div className="asset-thumb" aria-hidden="true">
         {asset.objectUrl ? <img alt="" src={asset.objectUrl} /> : <span className="material-symbols-outlined">image</span>}
       </div>
       <div className="asset-row-body">
-        <div className="asset-row-title-line">
-          <h3 className="asset-row-title">{asset.name}</h3>
+        <div className="asset-row-title-line ew-compact-row">
+          <h3 className="asset-row-title ew-ellipsis">{asset.name}</h3>
           <span className={used ? 'asset-status asset-status-used' : 'asset-status asset-status-unused'}>
             {used ? 'Used' : 'Unused'}
           </span>
         </div>
-        <p className="asset-row-meta">
+        <p className="asset-row-meta ew-ellipsis">
           {asset.mimeType} · {storageLabel}
         </p>
-        <p className="asset-row-meta">{detail}</p>
+        <p className="asset-row-meta ew-ellipsis">{detail}</p>
       </div>
       <button
         aria-label={`Remove ${asset.name}`}

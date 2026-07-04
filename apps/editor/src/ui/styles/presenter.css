@@ -1,0 +1,138 @@
+.presenter-view {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 364px;
+  color: var(--ew-text);
+  background: var(--ew-bg);
+  overflow: hidden;
+}
+
+.presenter-view-disconnected {
+  display: grid;
+  place-items: center;
+  color: var(--ew-muted);
+  font-size: 18px;
+}
+
+.presenter-main {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: 82px 58px minmax(0, 1fr) 164px;
+  border-right: 1px solid var(--ew-border);
+}
+
+.presenter-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 20px;
+}
+
+.presenter-clock-group {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-width: 0;
+  font-family: var(--ls-font-display);
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.presenter-clock {
+  color: var(--ls-cyan);
+}
+
+.presenter-timer {
+  color: var(--ew-text);
+}
+
+.presenter-divider {
+  width: 1px;
+  height: 40px;
+  background: var(--ew-border);
+}
+
+.presenter-controls {
+  gap: 8px;
+}
+
+.presenter-control-button,
+.presenter-notes-zoom-button {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--ew-border);
+  background: var(--ew-panel);
+}
+
+.presenter-status-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 0 44px 12px;
+  color: var(--ew-text);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 26px;
+}
+
+.presenter-stage {
+  min-height: 0;
+  padding: 0 44px;
+}
+
+.presenter-stage .canvas-workspace {
+  height: 100%;
+}
+
+.presenter-stage .canvas-frame {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.presenter-slide-strip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 260px;
+  gap: 18px;
+  overflow-x: auto;
+  padding: 18px 20px;
+}
+
+.presenter-thumb {
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.presenter-thumb-active {
+  border-color: var(--ew-green);
+  box-shadow: 0 0 16px rgba(55, 253, 118, 0.18);
+}
+
+.presenter-thumb-canvas {
+  container-type: inline-size;
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: 6px;
+}
+
+.presenter-thumb-bg,
+.presenter-thumb-element {
+  position: absolute;
+  object-fit: cover;
+}
+
+.presenter-thumb-text {
+  overflow: hidden;
+  line-height: 0.95;
+  white-space: pre-wrap;
+}

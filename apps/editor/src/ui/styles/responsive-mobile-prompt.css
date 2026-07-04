@@ -1,0 +1,79 @@
+@media (max-width: 760px) {
+  .prompt-stack {
+    width: 100%;
+    gap: 6px;
+  }
+
+  .prompt-examples {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .prompt-examples::-webkit-scrollbar {
+    display: none;
+  }
+
+  .prompt-example-chip {
+    flex: 0 0 auto;
+    max-width: min(260px, 78vw);
+    min-height: 28px;
+    padding: 5px 10px;
+  }
+
+  .prompt-bar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    min-height: 48px;
+    border-radius: 16px;
+    padding: 7px 8px;
+  }
+
+  .prompt-input-cluster {
+    grid-column: auto;
+    grid-row: auto;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .prompt-bar textarea {
+    flex-basis: auto;
+    max-height: 44px;
+    font-size: 12px;
+  }
+
+  .prompt-mode-token {
+    max-width: min(160px, 52vw);
+    min-height: 30px;
+    padding-inline: 4px;
+    font-size: 12px;
+  }
+
+  .prompt-submit-actions {
+    justify-self: end;
+  }
+
+  .prompt-submit-actions .icon-button {
+    width: 34px;
+    height: 34px;
+  }
+
+  .prompt-submit-actions .icon-button svg,
+  .prompt-action-button svg,
+  .prompt-mode-token svg {
+    flex: 0 0 auto;
+  }
+
+  .prompt-generation-status,
+  .prompt-generation-notice {
+    max-width: 100%;
+    border-radius: 8px;
+    font-size: 11px;
+  }
+}

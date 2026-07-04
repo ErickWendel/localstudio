@@ -1,0 +1,59 @@
+.media-integration-form,
+.media-key-field {
+  display: grid;
+  gap: 10px;
+}
+
+.media-key-field {
+  color: var(--ew-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.media-key-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.media-key-label a {
+  color: var(--ew-green);
+  font-weight: 800;
+  letter-spacing: 0;
+  text-decoration: none;
+}
+
+.media-key-label a::before {
+  color: rgba(255, 255, 255, 0.42);
+  content: '(';
+}
+
+.media-key-label a::after {
+  color: rgba(255, 255, 255, 0.42);
+  content: ')';
+}
+
+.media-key-label a:hover,
+.media-key-label a:focus-visible {
+  text-decoration: underline;
+}
+
+.media-key-field input {
+  height: 38px;
+  padding: 0 10px;
+}
+
+.media-key-field small {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.media-integration-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}

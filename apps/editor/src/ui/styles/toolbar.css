@@ -1,0 +1,120 @@
+.toolbar-left {
+  gap: 24px;
+  height: 100%;
+  min-width: 0;
+}
+
+.toolbar-product-title {
+  margin: 0;
+  color: var(--ew-green-fixed);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 24px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.toolbar-menu {
+  gap: 4px;
+  height: 100%;
+  margin-left: 16px;
+}
+
+.toolbar-menu-shell {
+  position: relative;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+}
+
+.toolbar-menu-item {
+  height: 100%;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: var(--ew-muted);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  line-height: 16px;
+  transition:
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease;
+}
+
+.toolbar-menu-item:hover,
+.stitch-icon-button:hover {
+  color: var(--ew-green-fixed);
+  background: var(--ew-raised);
+}
+
+.toolbar-menu-item-active {
+  color: var(--ew-green-fixed);
+  background: rgba(55, 253, 118, 0.1);
+  box-shadow: inset 0 -2px 0 var(--ew-green);
+}
+
+.toolbar-dropdown {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  z-index: 100;
+  min-width: 190px;
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border: 1px solid var(--ew-border);
+  border-radius: 6px;
+  background: rgba(12, 22, 13, 0.98);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.45),
+    0 0 16px rgba(55, 253, 118, 0.08);
+}
+
+.toolbar-dropdown-item {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ew-text);
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.toolbar-dropdown-item:hover:not(:disabled) {
+  border-color: rgba(55, 253, 118, 0.28);
+  background: rgba(55, 253, 118, 0.1);
+  color: var(--ew-green-fixed);
+  transform: translateX(2px);
+}
+
+.toolbar-dropdown-item:disabled {
+  color: rgba(193, 201, 189, 0.38);
+  cursor: not-allowed;
+}
+
+.toolbar-dropdown-separator {
+  height: 1px;
+  margin: 6px 2px;
+  background: rgba(122, 255, 199, 0.16);
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--ew-border);
+}
+
+.toolbar-divider-menu {
+  margin: 0 8px;
+}

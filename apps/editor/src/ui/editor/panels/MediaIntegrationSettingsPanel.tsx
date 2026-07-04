@@ -30,7 +30,7 @@ export function MediaIntegrationSettingsPanel({
       aria-modal="false"
       aria-label="Media integrations"
     >
-      <div className="settings-panel-header">
+      <div className="settings-panel-header ew-split-row-start">
         <div className="settings-panel-title-row">
           {onBack ? (
             <button
@@ -65,7 +65,7 @@ export function MediaIntegrationSettingsPanel({
           });
         }}
       >
-        <label className="media-key-field">
+        <label className="media-key-field ew-field-scope">
           <span className="media-key-label">
             <span>Unsplash access key</span>
             <a
@@ -101,7 +101,7 @@ export function MediaIntegrationSettingsPanel({
           </span>
           <small>{unsplashConfigured ? 'Unsplash configured' : 'Unsplash not configured'}</small>
         </label>
-        <label className="media-key-field">
+        <label className="media-key-field ew-field-scope">
           <span className="media-key-label">
             <span>GIPHY API key</span>
             <a
@@ -145,7 +145,7 @@ export function MediaIntegrationSettingsPanel({
             Save media integrations
           </button>
           <button
-            className="compact-action compact-action-secondary"
+            className="compact-action compact-action-secondary ew-surface ew-surface-hover ew-compact-row"
             type="button"
             disabled={!config || (!unsplashConfigured && !giphyConfigured)}
             onClick={() => {

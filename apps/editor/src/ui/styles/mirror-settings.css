@@ -1,0 +1,26 @@
+.mirror-settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.mirror-settings-grid label {
+  display: grid;
+  gap: 5px;
+  color: var(--ew-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.mirror-settings-grid label:first-child,
+.mirror-settings-grid label:nth-child(6),
+.mirror-settings-grid label:nth-child(7) {
+  grid-column: 1 / -1;
+}
+
+.mirror-settings-grid input {
+  height: 32px;
+  font-size: 12px;
+  padding: 0 9px;
+}

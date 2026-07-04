@@ -1,0 +1,124 @@
+.text-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+}
+
+.text-search input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ew-text);
+}
+
+.text-primary-action,
+.text-secondary-action,
+.text-brand-preview button,
+.text-preset-button {
+  min-height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease,
+    filter 140ms ease,
+    transform 140ms ease;
+}
+
+.text-primary-action,
+.text-secondary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  font-weight: 800;
+}
+
+.text-primary-action {
+  border-color: rgba(55, 253, 118, 0.48);
+  background: var(--ew-green);
+  color: var(--ew-on-primary);
+}
+
+.text-secondary-action {
+  background: #000;
+  color: var(--ew-text);
+}
+
+.text-secondary-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.text-primary-action:hover,
+.text-brand-preview button:hover,
+.text-preset-button:hover {
+  border-color: rgba(55, 253, 118, 0.58);
+  box-shadow: 0 0 18px rgba(55, 253, 118, 0.14);
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.text-brand-kit {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ew-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.text-brand-preview,
+.text-preset-list {
+  display: grid;
+  gap: 8px;
+}
+
+.text-brand-preview button,
+.text-preset-button {
+  width: 100%;
+  background: #050d10;
+  color: var(--ew-text);
+  padding: 12px 16px;
+  text-align: left;
+}
+
+.text-brand-preview button:first-child span {
+  color: var(--ew-green);
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.text-brand-preview button:last-child span {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.text-panel-heading {
+  margin-bottom: 0;
+  font-size: 13px;
+  text-transform: none;
+}
+
+.text-preset-sample-title {
+  color: var(--ew-green);
+  font-family: 'Orbitron', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.text-preset-sample-subtitle {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.text-preset-sample-body {
+  color: var(--ew-muted);
+  font-size: 13px;
+}

@@ -1,0 +1,126 @@
+@media (max-width: 760px) {
+  .editor-grid {
+    position: relative;
+    display: block;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .workspace-column {
+    height: 100%;
+    gap: 8px;
+    padding: 8px 8px 70px;
+  }
+
+  .workspace-column::before {
+    background-size: 28px 28px;
+    opacity: 0.025;
+  }
+
+  .scrolling-canvas-workspace {
+    gap: 14px;
+    padding: 8px 4px 12px;
+  }
+
+  .scroll-page {
+    gap: 7px;
+  }
+
+  .scroll-page-header {
+    width: 100%;
+    gap: 8px;
+  }
+
+  .scroll-page-title {
+    min-height: 28px;
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .scroll-page-actions {
+    flex: 0 0 auto;
+    max-width: min(208px, 58vw);
+    gap: 2px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .scroll-page-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scroll-page-actions .icon-button {
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+  }
+
+  .scroll-page-actions .icon-button .material-symbols-outlined {
+    font-size: 18px;
+  }
+
+  .scroll-page-insert {
+    width: 32px;
+    height: 32px;
+    opacity: 1;
+    transform: none;
+  }
+
+  .scroll-page-insert .material-symbols-outlined {
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  .canvas-frame,
+  .scroll-page-placeholder {
+    width: 100%;
+  }
+
+  .background-selection-hint {
+    top: 8px;
+    font-size: 11px;
+  }
+
+  .background-selection-hint-translation {
+    top: 50px;
+  }
+
+  .animation-preview-hint {
+    bottom: 8px;
+    max-width: calc(100% - 16px);
+    white-space: normal;
+  }
+
+  .floating-toolbar {
+    top: auto;
+    bottom: calc(100% + 8px);
+    max-width: calc(100vw - 24px);
+    overflow-x: auto;
+  }
+
+  .floating-toolbar-label {
+    display: none;
+  }
+
+  .canvas-quick-actions {
+    left: 8px;
+    top: auto;
+    bottom: 8px;
+    flex-direction: row;
+    transform: none;
+  }
+
+  .canvas-quick-actions button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .canvas-quick-actions .material-symbols-outlined {
+    font-size: 22px;
+  }
+}

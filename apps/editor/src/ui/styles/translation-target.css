@@ -1,0 +1,96 @@
+.translation-target-control {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: var(--ew-muted);
+  font-size: 11px;
+}
+
+.provider-action-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  min-height: 32px;
+}
+
+.translation-target-help {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  z-index: 1;
+}
+
+.translation-target-help:hover,
+.translation-target-help:focus-within {
+  z-index: 80;
+}
+
+.translation-target-help .material-symbols-outlined {
+  color: var(--ew-green);
+  cursor: help;
+  font-size: 15px;
+  line-height: 1;
+  outline: 0;
+}
+
+.translation-target-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  z-index: 1000;
+  width: min(260px, calc(100vw - 48px));
+  transform: translateX(-50%);
+  border: 1px solid rgba(55, 253, 118, 0.34);
+  border-radius: 4px;
+  background: rgba(5, 13, 16, 0.98);
+  box-shadow: 0 0 24px rgba(55, 253, 118, 0.14);
+  color: var(--ew-text);
+  opacity: 0;
+  padding: 8px 9px;
+  pointer-events: none;
+  line-height: 1.35;
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+
+.translation-target-help:hover .translation-target-tooltip,
+.translation-target-help:focus-within .translation-target-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-2px);
+}
+
+.image-generation-settings .translation-target-tooltip {
+  left: 0;
+  right: auto;
+  width: min(230px, calc(100vw - 80px));
+  transform: translateY(4px);
+}
+
+.image-generation-settings .translation-target-help:hover .translation-target-tooltip,
+.image-generation-settings .translation-target-help:focus-within .translation-target-tooltip {
+  transform: translateY(-2px);
+}
+
+.translation-target-control select {
+  width: 100%;
+  padding: 8px 9px;
+}
+
+.compact-action-full {
+  width: 100%;
+  justify-content: center;
+}
+
+.translation-preparation-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--ew-muted);
+  font-size: 10px;
+}
+
+.translation-source-note {
+  color: var(--ew-dim);
+  font-size: 10px;
+}

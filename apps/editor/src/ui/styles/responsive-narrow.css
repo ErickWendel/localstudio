@@ -1,0 +1,31 @@
+@media (max-width: 430px) {
+  .toolbar-left {
+    gap: 5px;
+  }
+
+  .toolbar-product-title {
+    width: 28px;
+  }
+
+  .toolbar-menu-shell:nth-child(n + 3) {
+    display: none;
+  }
+
+  .toolbar-menu-item {
+    padding-inline: 5px;
+    font-size: 9px;
+  }
+
+  .project-title {
+    max-width: 48px;
+  }
+
+  .footer-zoom-controls .stitch-icon-button {
+    width: 30px;
+  }
+
+  .zoom-value {
+    min-width: 34px;
+    font-size: 10px;
+  }
+}

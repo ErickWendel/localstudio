@@ -1,0 +1,111 @@
+.settings-panel,
+.mirror-settings-panel,
+.remote-import-panel {
+  position: fixed;
+  left: 16px;
+  bottom: 52px;
+  z-index: 140;
+  width: min(440px, calc(100vw - 32px));
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid rgba(122, 255, 199, 0.2);
+  border-radius: 8px;
+  background: rgba(8, 18, 12, 0.98);
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.48),
+    0 0 24px rgba(55, 253, 118, 0.08);
+}
+
+.settings-panel {
+  width: min(280px, calc(100vw - 32px));
+}
+
+.media-integration-settings-panel {
+  width: min(420px, calc(100vw - 32px));
+}
+
+.remote-import-panel {
+  width: min(360px, calc(100vw - 32px));
+}
+
+.local-project-setup-panel {
+  position: absolute;
+  top: 42px;
+  left: 0;
+  z-index: 150;
+  width: min(380px, calc(100vw - 32px));
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid rgba(122, 255, 199, 0.2);
+  border-radius: 8px;
+  background: rgba(8, 18, 12, 0.98);
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.48),
+    0 0 24px rgba(55, 253, 118, 0.08);
+}
+
+.settings-panel-title-row {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.settings-panel-back-button {
+  flex: 0 0 auto;
+}
+
+.settings-panel-header h2,
+.mirror-settings-header h2,
+.mirror-settings-header p {
+  margin: 0;
+}
+
+.settings-panel-header h2,
+.mirror-settings-header h2 {
+  color: var(--ew-text);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.settings-panel-row {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(122, 255, 199, 0.14);
+  border-radius: 6px;
+  background: rgba(5, 13, 16, 0.72);
+  color: var(--ew-text);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0 10px;
+  text-align: left;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.settings-panel-row:hover {
+  border-color: rgba(55, 253, 118, 0.28);
+  background: rgba(55, 253, 118, 0.08);
+  color: var(--ew-green);
+}
+
+.settings-panel-header p,
+.mirror-settings-header p,
+.mirror-settings-status {
+  color: var(--ew-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.settings-panel-header p {
+  margin: 4px 0 0;
+}

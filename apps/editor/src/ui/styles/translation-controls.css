@@ -1,0 +1,103 @@
+.deck-translation-shell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(236, 255, 233, 0.2);
+  border-radius: 4px;
+  background: var(--ew-panel);
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.deck-translation-shell:hover,
+.deck-translation-shell:focus-within {
+  border-color: rgba(236, 255, 233, 0.5);
+  box-shadow: 0 0 12px rgba(55, 253, 118, 0.12);
+}
+
+.deck-translation-main {
+  width: 32px;
+  min-width: 32px;
+  justify-content: center;
+  padding: 0;
+  border-radius: 4px 0 0 4px;
+}
+
+.deck-translation-main:disabled {
+  opacity: 0.62;
+}
+
+.deck-translation-menu-button {
+  width: 24px;
+  border-left: 1px solid rgba(236, 255, 233, 0.2);
+  border-radius: 0 4px 4px 0;
+}
+
+.deck-translation-menu-button .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.translation-path-dropdown {
+  position: absolute;
+  top: 38px;
+  left: 0;
+  z-index: 152;
+  width: 230px;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(55, 253, 118, 0.28);
+  border-radius: 6px;
+  background: rgba(6, 18, 11, 0.98);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.45),
+    0 0 20px rgba(55, 253, 118, 0.1);
+}
+
+.translation-path-field {
+  display: grid;
+  gap: 5px;
+  color: var(--ew-muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.translation-path-field select {
+  width: 100%;
+  min-height: 30px;
+  letter-spacing: 0;
+  padding: 0 8px;
+  text-transform: none;
+}
+
+.deck-translation-status {
+  min-width: 0;
+  max-width: min(280px, 24vw);
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid rgba(55, 253, 118, 0.34);
+  border-radius: 5px;
+  background: rgba(6, 18, 11, 0.92);
+  color: var(--ew-green-fixed);
+  box-shadow: 0 0 18px rgba(55, 253, 118, 0.1);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+.deck-translation-status-orbit {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--ew-green-fixed);
+  box-shadow: 0 0 10px rgba(55, 253, 118, 0.72);
+  animation: deckTranslateDot 900ms ease-in-out infinite;
+}

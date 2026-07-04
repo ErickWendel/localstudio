@@ -1,0 +1,139 @@
+.share-panel {
+  position: fixed;
+  top: 58px;
+  right: 16px;
+  z-index: 80;
+  width: min(384px, calc(100vw - 32px));
+  max-height: calc(100vh - 78px);
+  overflow: auto;
+  display: grid;
+  gap: 18px;
+  padding: 18px;
+  color: var(--ew-text);
+  background: #f8f8fb;
+  border: 1px solid rgba(5, 13, 16, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.35);
+}
+
+.share-panel-header h2 {
+  margin: 0;
+  color: #111418;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.share-panel-header p,
+.share-access-block p {
+  margin: 4px 0 0;
+  color: #5e6470;
+  font-size: 13px;
+}
+
+.share-access-block {
+  display: grid;
+  gap: 8px;
+}
+
+.share-status-pill {
+  justify-self: start;
+  padding: 6px 10px;
+  color: #15191f;
+  background: #eef0f4;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.share-copy-link-button {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #fff;
+  background: linear-gradient(135deg, #9b37ff, #7c3cff);
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.share-copy-link-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.share-copy-link-button[data-loading='true']:disabled {
+  cursor: wait;
+}
+
+.share-link-fields {
+  display: grid;
+  gap: 10px;
+}
+
+.share-link-fields label {
+  display: grid;
+  gap: 6px;
+  color: #15191f;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.share-link-fields input,
+.share-link-fields textarea {
+  width: 100%;
+  box-sizing: border-box;
+  color: #1b2028;
+  background: #fff;
+  border: 1px solid #d8dce4;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12px;
+  padding: 10px;
+}
+
+.share-link-fields textarea {
+  min-height: 74px;
+  resize: vertical;
+}
+
+.share-action-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px 8px;
+}
+
+.share-action-button {
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  color: #20242c;
+  background: transparent;
+  border: 0;
+  font-size: 12px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.share-action-button:disabled {
+  color: #9aa1ad;
+  cursor: not-allowed;
+}
+
+.share-action-icon {
+  width: 48px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #363b45;
+  background: #eef0f4;
+  border-radius: 999px;
+}
+
+.share-action-button-accent .share-action-icon {
+  color: #fff;
+  background: #ff5f0a;
+}

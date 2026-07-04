@@ -1,0 +1,101 @@
+.font-control-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 38px;
+  gap: 8px;
+  align-items: end;
+}
+
+.font-control-select {
+  min-width: 0;
+}
+
+.font-add-button,
+.font-search-submit,
+.font-download-result {
+  border: 1px solid rgba(55, 253, 118, 0.24);
+  border-radius: 6px;
+  background: #050d10;
+  color: var(--ew-text);
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.font-add-button,
+.font-search-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  width: 38px;
+  height: 40px;
+  min-height: 0;
+  padding: 0;
+}
+
+.font-add-button:hover,
+.font-add-button:focus-visible,
+.font-search-submit:hover,
+.font-search-submit:focus-visible,
+.font-download-result:hover,
+.font-download-result:focus-visible {
+  border-color: var(--ew-green);
+  box-shadow: 0 0 16px rgba(55, 253, 118, 0.1);
+  outline: 0;
+}
+
+.font-add-button[aria-expanded='true'] {
+  color: #000;
+  background: var(--ew-green);
+}
+
+.font-download-panel {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(55, 253, 118, 0.18);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.34);
+}
+
+.font-download-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 38px;
+  gap: 8px;
+}
+
+.font-download-search-box {
+  margin: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: #000;
+}
+
+.font-download-results {
+  display: grid;
+  gap: 6px;
+}
+
+.font-download-result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  align-items: center;
+  min-height: 36px;
+  gap: 8px;
+  padding: 0 10px;
+  color: var(--ew-text);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+}
+
+.font-download-result:disabled {
+  cursor: progress;
+  opacity: 0.65;
+}
+
+.design-selection-summary {
+  cursor: default;
+}

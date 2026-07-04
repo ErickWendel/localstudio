@@ -1,0 +1,39 @@
+@media (max-width: 760px) {
+  .workspace-column {
+    padding-inline: 10px;
+  }
+
+  .prompt-stack {
+    width: 100%;
+  }
+
+  .prompt-examples {
+    justify-content: flex-start;
+  }
+
+  .prompt-bar {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    border-radius: 18px;
+    padding: 8px;
+  }
+
+  .prompt-input-cluster {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .prompt-input-cluster textarea {
+    flex-basis: 100%;
+  }
+
+  .prompt-submit-actions {
+    justify-self: end;
+  }
+
+  .prompt-mode-token {
+    max-width: 100%;
+  }
+}

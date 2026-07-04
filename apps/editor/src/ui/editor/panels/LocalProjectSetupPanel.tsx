@@ -28,7 +28,7 @@ export function LocalProjectSetupPanel({
       aria-modal="false"
       aria-label="Save local project"
     >
-      <div className="settings-panel-header">
+      <div className="settings-panel-header ew-split-row-start">
         <div>
           <h2>Save local project</h2>
           <p>Name the project folder before choosing where to create it.</p>
@@ -45,7 +45,7 @@ export function LocalProjectSetupPanel({
         </button>
       </div>
 
-      <label className="local-project-setup-field">
+      <label className="local-project-setup-field ew-field-scope">
         <span>Project folder name</span>
         <input
           ref={inputRef}

@@ -1,0 +1,175 @@
+.stitch-icon-button:active,
+.floating-toolbar-button:active,
+.icon-button:active,
+.rail-action-button:active,
+.download-models-button:active,
+.github-toolbar-link:active,
+.export-button:active {
+  transform: translateY(1px);
+}
+
+.material-symbols-outlined {
+  font-size: 20px;
+  font-variation-settings: 'FILL' 0;
+  line-height: 1;
+}
+
+.zoom-value {
+  min-width: 36px;
+  border: 0;
+  background: transparent;
+  color: var(--ew-muted);
+  cursor: pointer;
+  text-align: center;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.zoom-value:hover {
+  color: var(--ew-green);
+}
+
+.language-chip {
+  height: 32px;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid rgba(236, 255, 233, 0.2);
+  border-radius: 4px;
+  background: var(--ew-panel);
+  color: var(--ew-text);
+  cursor: pointer;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  line-height: 12px;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.language-chip:hover {
+  border-color: rgba(236, 255, 233, 0.5);
+  box-shadow: 0 0 12px rgba(55, 253, 118, 0.12);
+}
+
+.language-flag {
+  font-family: 'Open Sans', Helvetica, sans-serif;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.github-toolbar-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 70px;
+  height: 32px;
+  border: 1px solid rgba(236, 255, 233, 0.2);
+  border-radius: 4px;
+  padding: 0 9px;
+  background: var(--ew-panel);
+  color: var(--ew-text);
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  animation: github-toolbar-pulse 2.15s ease-in-out infinite;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.github-toolbar-link:hover {
+  border-color: rgba(55, 253, 118, 0.58);
+  color: var(--ew-green-fixed);
+  box-shadow: 0 0 12px rgba(55, 253, 118, 0.14);
+  transform: translateY(-1px);
+}
+
+.github-toolbar-logo {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.github-toolbar-count {
+  min-width: 30px;
+  text-align: right;
+}
+
+@keyframes github-toolbar-pulse {
+  0%,
+  100% {
+    border-color: rgba(236, 255, 233, 0.2);
+    box-shadow: 0 0 0 rgba(55, 253, 118, 0);
+    transform: translateY(0);
+  }
+
+  48% {
+    border-color: rgba(55, 253, 118, 0.78);
+    box-shadow:
+      0 0 0 3px rgba(55, 253, 118, 0.11),
+      0 0 18px rgba(55, 253, 118, 0.24);
+    transform: translateY(-1px);
+  }
+}
+
+.export-button {
+  height: 32px;
+  gap: 8px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--ew-green);
+  color: var(--ew-on-primary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  line-height: 16px;
+  text-transform: uppercase;
+  transition:
+    box-shadow 140ms ease,
+    filter 140ms ease,
+    transform 140ms ease;
+}
+
+.export-button .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.export-button:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 0 18px rgba(55, 253, 118, 0.28);
+}
+
+.profile-avatar {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-left: 8px;
+  overflow: hidden;
+  border: 1px solid var(--ew-border);
+  border-radius: 50%;
+  background: var(--ew-raised);
+  cursor: pointer;
+}
+
+.profile-avatar-core {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--ew-green);
+  box-shadow:
+    0 0 8px rgba(55, 253, 118, 0.42),
+    inset 0 0 6px rgba(55, 253, 118, 0.2);
+  transform: rotate(45deg);
+}

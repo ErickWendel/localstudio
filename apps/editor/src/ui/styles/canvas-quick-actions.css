@@ -1,0 +1,41 @@
+.canvas-quick-actions {
+  position: absolute;
+  left: -46px;
+  top: 50%;
+  z-index: 8;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 8px;
+  transform: translateY(-50%);
+  pointer-events: auto;
+}
+
+.canvas-quick-actions button {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(55, 253, 118, 0.32);
+  border-radius: 6px;
+  background: rgba(12, 22, 13, 0.92);
+  color: var(--ew-muted);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.canvas-quick-actions button:hover {
+  border-color: rgba(55, 253, 118, 0.72);
+  background: rgba(55, 253, 118, 0.12);
+  color: var(--ew-green);
+  transform: translateX(-2px);
+}
+
+.canvas-quick-actions .material-symbols-outlined {
+  font-size: 20px;
+}

@@ -1,0 +1,47 @@
+
+:root {
+  font-family: var(--ls-font-body);
+  background: var(--ew-bg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 0;
+  min-height: 100vh;
+  background: var(--ew-bg);
+  color: var(--ew-text);
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+.font-orbitron {
+  font-family: 'Orbitron', sans-serif;
+}
+
+.visually-hidden-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.material-symbols-outlined {
+  font-size: 20px;
+  font-variation-settings: 'FILL' 0;
+  line-height: 1;
+}

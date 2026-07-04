@@ -1,11 +1,24 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const stylesPath = resolve(__dirname, '../../../../src/app/styles.css');
+const stylesPath = resolve(__dirname, '../../../../src/ui/styles.css');
+const stylesDirectory = resolve(__dirname, '../../../../src/ui/styles');
+const maxOwnedStylesheetLines = 420;
+
+function readComposedStyles(filePath: string, visited = new Set<string>()): string {
+  if (visited.has(filePath)) return '';
+  visited.add(filePath);
+
+  const styles = readFileSync(filePath, 'utf8');
+  return styles.replace(/@import\s+['"]([^'"]+)['"];\s*/g, (statement, importPath: string) => {
+    if (!importPath.startsWith('.')) return statement;
+    return readComposedStyles(resolve(dirname(filePath), importPath), visited);
+  });
+}
 
 describe('editor responsive styles', () => {
-  const styles = readFileSync(stylesPath, 'utf8');
+  const styles = readComposedStyles(stylesPath);
 
   it('does not force the editor viewport to desktop width on mobile', () => {
     expect(styles).not.toMatch(/body\s*\{[^}]*min-width:\s*1024px/s);
@@ -53,5 +66,62 @@ describe('editor responsive styles', () => {
     expect(styles).toMatch(/\.prompt-submit-actions \.icon-button\s*\{[\s\S]*width:\s*34px/s);
     expect(styles).toMatch(/\.canvas-quick-actions button\s*\{[\s\S]*width:\s*36px/s);
     expect(styles).toMatch(/\.zoom-value\s*\{[\s\S]*min-height:\s*32px/s);
+  });
+
+  it('keeps import progress overlays styled after stylesheet composition', () => {
+    expect(styles).toMatch(/\.presentation-import-backdrop\s*\{[\s\S]*position:\s*fixed/s);
+    expect(styles).toMatch(/\.presentation-import-backdrop\s*\{[\s\S]*z-index:\s*420/s);
+    expect(styles).toMatch(/\.presentation-import-panel\s*\{[\s\S]*width:\s*min\(520px,\s*100%\)/s);
+    expect(styles).toMatch(/\.presentation-import-orbit span\s*\{[\s\S]*animation:\s*presentationImportOrbit/s);
+    expect(styles).toMatch(/@keyframes\s+presentationImportOrbit/s);
+    expect(styles).toMatch(/\.media-import-info-icon\s*\{[\s\S]*display:\s*grid/s);
+  });
+
+  it('keeps critical split stylesheet selectors in the composed editor CSS', () => {
+    const criticalSelectors = [
+      '.prompt-examples',
+      '.prompt-example-chip',
+      '.prompt-bar',
+      '.prompt-input-cluster',
+      '.prompt-mode-token',
+      '.presentation-import-backdrop',
+      '.presentation-import-orbit',
+      '.image-size-presets',
+      '.image-size-preset',
+      '.image-crop-frame',
+      '.image-crop-handle',
+      '.text-selection-toolbar',
+      '.floating-toolbar',
+      '.canvas-quick-actions',
+      '.public-deck-viewer',
+      '.share-panel',
+      '.presenter-view',
+      '.keyboard-shortcuts-dialog',
+    ];
+
+    for (const selector of criticalSelectors) {
+      expect(styles, `${selector} should be present in composed editor styles`).toContain(selector);
+    }
+  });
+
+  it('keeps editor styles split into a manifest and small owned files', () => {
+    const manifest = readFileSync(stylesPath, 'utf8');
+    const manifestViolations = manifest
+      .split('\n')
+      .map((line, index) => ({ line: line.trim(), lineNumber: index + 1 }))
+      .filter(({ line }) => line && !line.startsWith('@import '));
+
+    expect(manifestViolations).toEqual([]);
+
+    const oversizedStylesheets = readdirSync(stylesDirectory)
+      .filter((fileName) => fileName.endsWith('.css'))
+      .map((fileName) => {
+        const filePath = resolve(stylesDirectory, fileName);
+        const lineCount = readFileSync(filePath, 'utf8').trimEnd().split('\n').length;
+        return { fileName, lineCount };
+      })
+      .filter(({ lineCount }) => lineCount > maxOwnedStylesheetLines);
+
+    expect(oversizedStylesheets).toEqual([]);
   });
 });

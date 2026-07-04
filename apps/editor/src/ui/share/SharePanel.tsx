@@ -62,7 +62,7 @@ export function SharePanel({
 
   return (
     <aside className="share-panel" aria-label="Share design panel">
-      <div className="share-panel-header">
+      <div className="share-panel-header ew-split-row-start">
         <div>
           <h2>Share design</h2>
           <p>{projectName}</p>

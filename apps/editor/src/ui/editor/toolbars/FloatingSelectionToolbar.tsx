@@ -103,7 +103,10 @@ export function FloatingSelectionToolbar({
   return (
     <div className="floating-toolbar" aria-label="Selected element actions">
       {groups.map((group, groupIndex) => (
-        <div className="floating-toolbar-group" key={group.map((item) => item.label).join('-')}>
+        <div
+          className="floating-toolbar-group ew-inline-row-tight"
+          key={group.map((item) => item.label).join('-')}
+        >
           {groupIndex > 0 ? <span className="floating-toolbar-divider" aria-hidden="true" /> : null}
           {group.map((action) => (
             <button

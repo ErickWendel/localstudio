@@ -1,0 +1,85 @@
+.compact-action {
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 10px;
+  color: var(--ew-text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.compact-action svg {
+  color: var(--ew-green);
+}
+
+.layer-search {
+  height: 34px;
+  gap: 8px;
+  padding: 0 10px;
+  color: var(--ew-muted);
+}
+
+.layer-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ew-text);
+  font-size: 12px;
+}
+
+.layer-row {
+  min-height: 40px;
+  gap: 8px;
+  padding: 0 6px;
+  color: var(--ew-muted);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.layer-row-name {
+  flex: 1;
+  color: var(--ew-text);
+}
+
+.layer-row .icon-button {
+  width: 26px;
+  height: 26px;
+}
+
+.layer-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+}
+
+.layer-row-static {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.layer-row-selected {
+  border-color: var(--ew-green);
+  box-shadow: 0 0 10px rgba(55, 253, 118, 0.14);
+}
+
+.download-models-button {
+  width: 100%;
+  height: 36px;
+  border: 1px solid var(--ew-green);
+  border-radius: 4px;
+  background: rgba(55, 253, 118, 0.08);
+  color: var(--ew-green);
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.download-models-button:hover {
+  background: rgba(55, 253, 118, 0.14);
+  box-shadow: 0 0 18px rgba(55, 253, 118, 0.14);
+}

@@ -1,0 +1,51 @@
+.property-row {
+  justify-content: space-between;
+  min-height: 36px;
+  padding: 0 10px;
+  color: var(--ew-muted);
+  font-size: 12px;
+}
+
+.property-row strong {
+  color: var(--ew-text);
+  font-size: 12px;
+}
+
+.design-control {
+  display: grid;
+  grid-template-columns: minmax(76px, 0.8fr) minmax(0, 1.2fr);
+  align-items: center;
+  min-height: 38px;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: #000;
+  color: var(--ew-muted);
+  font-size: 12px;
+  padding: 6px 10px;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.design-control:hover,
+.design-control:focus-within {
+  border-color: rgba(55, 253, 118, 0.36);
+  box-shadow: 0 0 16px rgba(55, 253, 118, 0.08);
+}
+
+.design-control input,
+.design-control select {
+  width: 100%;
+  padding: 7px 8px;
+}
+
+.design-control input[type='color'] {
+  height: 30px;
+  padding: 3px;
+}
+
+.design-control input[type='range'] {
+  padding: 0;
+  accent-color: var(--ew-green);
+}

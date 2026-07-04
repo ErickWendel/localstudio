@@ -1,0 +1,14 @@
+.local-project-setup-field {
+  display: grid;
+  gap: 6px;
+  color: var(--ew-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.local-project-setup-field input {
+  height: 34px;
+  font-size: 13px;
+  padding: 0 9px;
+}

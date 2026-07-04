@@ -331,12 +331,16 @@ export function AiToolsPanel({
 
   return (
     <div className="panel-stack">
-      <div className="tool-card-list">
+      <div className="tool-card-list ew-panel-card">
         <article
-          className={promptApiAttention ? 'tool-card tool-card-attention' : 'tool-card'}
+          className={
+            promptApiAttention
+              ? 'tool-card ew-surface ew-surface-hover tool-card-attention'
+              : 'tool-card ew-surface ew-surface-hover'
+          }
           aria-label="LLM Model"
         >
-          <div className="tool-card-heading">
+          <div className="tool-card-heading ew-compact-row">
             <ImagePlus size={18} />
             <strong>LLM Model</strong>
             <StatusPill
@@ -367,8 +371,8 @@ export function AiToolsPanel({
             ) : null}
           </div>
           <p>Choose the local model used for prompt-to-slides.</p>
-          <label className="translation-target-control">
-            <span className="translation-target-label">Model</span>
+          <label className="translation-target-control ew-field-scope">
+            <span className="translation-target-label ew-inline-row">Model</span>
             <select
               aria-label="LLM Model"
               disabled={promptPreparation.status === 'downloading'}
@@ -392,8 +396,8 @@ export function AiToolsPanel({
               </span>
             ) : null}
           </label>
-          <div className="translation-target-control">
-            <div className="translation-preparation" aria-label="LLM preparation">
+          <div className="translation-target-control ew-field-scope">
+            <div className="translation-preparation ew-grid-compact" aria-label="LLM preparation">
               <div className="translation-preparation-meta">
                 <StatusPill
                   label={getPreparationLabel(promptStatus)}
@@ -418,8 +422,8 @@ export function AiToolsPanel({
           </div>
         </article>
 
-        <article className="tool-card" aria-label="Language Detection">
-          <div className="tool-card-heading">
+        <article className="tool-card ew-surface ew-surface-hover" aria-label="Language Detection">
+          <div className="tool-card-heading ew-compact-row">
             <ScanSearch size={18} />
             <strong>Language Detection</strong>
             <StatusPill
@@ -459,8 +463,8 @@ export function AiToolsPanel({
             ) : null}
           </div>
           <p>Choose how LocalStudio.dev detects source text language before translation.</p>
-          <label className="translation-target-control">
-            <span className="translation-target-label">Detection Model</span>
+          <label className="translation-target-control ew-field-scope">
+            <span className="translation-target-label ew-inline-row">Detection Model</span>
             <select
               aria-label="Language Detection Model"
               disabled={languageDetectionPreparation.status === 'downloading'}
@@ -484,8 +488,11 @@ export function AiToolsPanel({
               </span>
             ) : null}
           </label>
-          <div className="translation-target-control">
-            <div className="translation-preparation" aria-label="Language detection preparation">
+          <div className="translation-target-control ew-field-scope">
+            <div
+              className="translation-preparation ew-grid-compact"
+              aria-label="Language detection preparation"
+            >
               <div className="translation-preparation-meta">
                 <StatusPill
                   label={getPreparationLabel(languageDetectionStatus)}
@@ -506,10 +513,14 @@ export function AiToolsPanel({
         </article>
 
         <article
-          className={translationTargetAttention ? 'tool-card tool-card-attention' : 'tool-card'}
+          className={
+            translationTargetAttention
+              ? 'tool-card ew-surface ew-surface-hover tool-card-attention'
+              : 'tool-card ew-surface ew-surface-hover'
+          }
           aria-label="Translate Design"
         >
-          <div className="tool-card-heading">
+          <div className="tool-card-heading ew-compact-row">
             <Languages size={18} />
             <strong>Translate Design</strong>
             <StatusPill
@@ -545,8 +556,8 @@ export function AiToolsPanel({
             ) : null}
           </div>
           <p>Translate visible text using the selected local translation model.</p>
-          <label className="translation-target-control">
-            <span className="translation-target-label">Translation Model</span>
+          <label className="translation-target-control ew-field-scope">
+            <span className="translation-target-label ew-inline-row">Translation Model</span>
             <select
               aria-label="Translation Model"
               disabled={translationPreparation.status === 'downloading'}
@@ -571,8 +582,11 @@ export function AiToolsPanel({
             ) : null}
           </label>
           {selectedTranslationProvider?.modelId ? (
-            <div className="translation-target-control">
-              <div className="translation-preparation" aria-label="Translation model preparation">
+            <div className="translation-target-control ew-field-scope">
+              <div
+                className="translation-preparation ew-grid-compact"
+                aria-label="Translation model preparation"
+              >
                 <div className="translation-preparation-meta">
                   <StatusPill
                     label={getPreparationLabel(translationProviderStatus)}
@@ -591,8 +605,8 @@ export function AiToolsPanel({
               </div>
             </div>
           ) : null}
-          <label className="translation-target-control">
-            <span className="translation-target-label">
+          <label className="translation-target-control ew-field-scope">
+            <span className="translation-target-label ew-inline-row">
               Translate to:
               <ToolHelp
                 id="translation-target-tooltip"
@@ -617,7 +631,7 @@ export function AiToolsPanel({
             </select>
             {translationTargetLanguage ? (
               <div
-                className="translation-preparation"
+                className="translation-preparation ew-grid-compact"
                 aria-label="Translation language preparation"
               >
                 {shouldShowTranslationLanguageProgress ? (
@@ -657,10 +671,14 @@ export function AiToolsPanel({
           return (
             <article
               aria-label={model.label}
-              className={needsAttention ? 'model-row model-row-attention' : 'model-row'}
+              className={
+                needsAttention
+                  ? 'model-row ew-surface ew-surface-hover model-row-attention'
+                  : 'model-row ew-surface ew-surface-hover'
+              }
               key={model.id}
             >
-              <div className="model-row-main">
+              <div className="model-row-main ew-compact-row">
                 <ScanSearch size={17} />
                 <div className="model-row-title">
                   <strong>{model.label}</strong>
@@ -693,8 +711,8 @@ export function AiToolsPanel({
                   </IconButton>
                 )}
               </div>
-              <label className="translation-target-control model-row-selector">
-                <span className="translation-target-label">Model</span>
+              <label className="translation-target-control ew-field-scope model-row-selector">
+                <span className="translation-target-label ew-inline-row">Model</span>
                 <select
                   aria-label={`${model.label} model`}
                   value={model.id}
@@ -705,7 +723,7 @@ export function AiToolsPanel({
                   </option>
                 </select>
               </label>
-              <div className="model-row-meta">
+              <div className="model-row-meta ew-compact-row">
                 <StatusPill label={formatStatus(model.status)} tone={statusTone(model.status)} />
                 <DownloadProgressCopy
                   details={model}
@@ -720,7 +738,7 @@ export function AiToolsPanel({
               {model.id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID ? (
                 <div className="image-generation-settings" aria-label="Image generation settings">
                   <div className="image-generation-setting">
-                    <span className="translation-target-label">Size</span>
+                    <span className="translation-target-label ew-inline-row">Size</span>
                     <div className="image-size-presets" role="group" aria-label="Image size">
                       {imagePromptOptions.imageSizePresets.map((preset) => (
                         <button
@@ -744,7 +762,7 @@ export function AiToolsPanel({
                     </div>
                   </div>
                   <label className="image-generation-setting image-generation-range">
-                    <span className="translation-target-label">
+                    <span className="translation-target-label ew-inline-row">
                       Steps
                       <ToolHelp
                         id="image-steps-tooltip"
@@ -752,6 +770,7 @@ export function AiToolsPanel({
                       />
                     </span>
                     <input
+                      className="ew-range-input"
                       type="range"
                       min={1}
                       max={8}
@@ -764,7 +783,7 @@ export function AiToolsPanel({
                     <strong>{createImageOptions.steps}</strong>
                   </label>
                   <label className="image-generation-setting">
-                    <span className="translation-target-label">
+                    <span className="translation-target-label ew-inline-row">
                       Seed
                       <ToolHelp
                         id="image-seed-tooltip"
@@ -773,7 +792,7 @@ export function AiToolsPanel({
                     </span>
                     <input
                       aria-label="Image seed"
-                      className="image-generation-seed-input"
+                      className="image-generation-seed-input ew-field"
                       inputMode="numeric"
                       pattern="[0-9]*"
                       placeholder="random"

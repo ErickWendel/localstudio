@@ -1,0 +1,131 @@
+@media (max-width: 760px) {
+  body {
+    overflow: hidden;
+  }
+
+  .app-shell {
+    height: 100dvh;
+    grid-template-rows: 44px minmax(0, 1fr) 40px;
+  }
+
+  .top-toolbar {
+    height: 44px;
+    gap: 6px;
+    overflow: visible;
+    padding-inline: 8px;
+  }
+
+  .toolbar-left {
+    min-width: 0;
+    gap: 8px;
+    overflow: visible;
+    scrollbar-width: none;
+  }
+
+  .toolbar-left::-webkit-scrollbar {
+    display: none;
+  }
+
+  .toolbar-product-title {
+    flex: 0 0 auto;
+    width: 34px;
+    font-size: 0;
+    letter-spacing: 0;
+  }
+
+  .toolbar-product-title::after {
+    content: 'LS';
+    color: var(--ew-green-fixed);
+    font-size: 13px;
+    letter-spacing: 0.08em;
+  }
+
+  .toolbar-menu {
+    flex: 0 0 auto;
+  }
+
+  .toolbar-menu-item {
+    padding-inline: 7px;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+
+  .toolbar-dropdown {
+    top: 44px;
+    max-width: calc(100vw - 16px);
+  }
+
+  .project-group {
+    flex: 0 0 auto;
+    gap: 4px;
+    margin-left: auto;
+  }
+
+  .project-title {
+    max-width: 48px;
+    min-height: 28px;
+    font-size: 12px;
+  }
+
+  .project-title-input {
+    width: min(180px, 54vw);
+  }
+
+  .project-play-main {
+    padding-inline: 8px;
+  }
+
+  .project-play-main span:not(.material-symbols-outlined) {
+    display: none;
+  }
+
+  .project-play-menu-button {
+    width: 28px;
+  }
+
+  .project-play-dropdown {
+    left: auto;
+    right: 0;
+  }
+
+  .toolbar-icon-group {
+    display: inline-flex;
+    flex: 0 0 auto;
+    gap: 2px;
+  }
+
+  .toolbar-icon-group .stitch-icon-button {
+    width: 28px;
+    height: 28px;
+  }
+
+  .toolbar-icon-group .material-symbols-outlined {
+    font-size: 18px;
+  }
+
+  .toolbar-icon-group button[aria-label='Undo'],
+  .toolbar-icon-group button[aria-label='Redo'] {
+    display: none;
+  }
+
+  .toolbar-right {
+    margin-left: auto;
+    gap: 6px;
+  }
+
+  .export-button {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 6px;
+  }
+
+  .export-button .material-symbols-outlined {
+    font-size: 20px;
+  }
+
+  .export-button span:last-child {
+    display: none;
+  }
+}

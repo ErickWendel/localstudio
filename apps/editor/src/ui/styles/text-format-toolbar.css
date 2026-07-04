@@ -1,0 +1,133 @@
+
+.text-toolbar-font,
+.text-toolbar-size,
+.text-toolbar-button,
+.text-toolbar-color {
+  height: 30px;
+  border: 1px solid rgba(55, 253, 118, 0.18);
+  border-radius: 4px;
+  background: rgba(12, 22, 13, 0.95);
+  color: var(--ew-text);
+}
+
+.text-toolbar-font {
+  width: 124px;
+  padding: 0 10px;
+  font:
+    600 13px 'Open Sans',
+    sans-serif;
+  cursor: pointer;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.text-toolbar-size {
+  display: inline-grid;
+  grid-template-columns: 26px 48px 26px;
+  align-items: center;
+  overflow: hidden;
+}
+
+.text-toolbar-size button,
+.text-toolbar-size input {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ew-text);
+  text-align: center;
+  font:
+    800 13px 'Open Sans',
+    sans-serif;
+}
+
+.text-toolbar-size button {
+  cursor: pointer;
+}
+
+.text-toolbar-size input {
+  appearance: textfield;
+}
+
+.text-toolbar-size input::-webkit-outer-spin-button,
+.text-toolbar-size input::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.text-toolbar-color {
+  position: relative;
+  display: inline-grid;
+  width: 32px;
+  place-items: center;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.text-toolbar-color .material-symbols-outlined {
+  font-size: 20px;
+  color: var(--ew-text);
+}
+
+.text-toolbar-color input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.text-toolbar-button {
+  min-width: 30px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font:
+    900 14px 'Open Sans',
+    sans-serif;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.text-toolbar-button .material-symbols-outlined {
+  font-size: 19px;
+}
+
+.text-toolbar-button:hover:not(:disabled),
+.text-toolbar-size button:hover:not(:disabled),
+.text-toolbar-color:hover {
+  background: rgba(55, 253, 118, 0.12);
+  border-color: rgba(55, 253, 118, 0.56);
+  color: var(--ew-green);
+}
+
+.text-toolbar-button-active,
+.text-toolbar-button-active:hover:not(:disabled) {
+  background: rgba(55, 253, 118, 0.2);
+  border-color: rgba(55, 253, 118, 0.66);
+  color: var(--ew-green);
+  box-shadow: 0 0 16px rgba(55, 253, 118, 0.14);
+}
+
+.text-toolbar-button-ai {
+  color: var(--ew-green);
+}
+
+.text-toolbar-segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: 5px;
+  border-left: 1px solid rgba(55, 253, 118, 0.18);
+}
+
+.text-selection-toolbar :disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
