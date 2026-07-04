@@ -228,9 +228,12 @@ describe('BrowserPresenterSessionService remote control', () => {
       expect(signalingService.getPublishedState('ABCD-1234')?.buildsRemaining).toBe(1);
     });
     const publishedPreview = signalingService.getPublishedState('ABCD-1234')?.slidePreview;
+    expect(signalingService.getPublishedState('ABCD-1234')).toMatchObject({
+      previewMode: 'stream',
+      stream: { enabled: true, fps: 8, height: 844, width: 390 },
+    });
     expect(publishedPreview?.elements.some((element) => element.id === hiddenElementId)).toBe(false);
     expect(publishedPreview?.elements.find(isMediaPreviewElement)).toMatchObject({
-      assetUrl: 'https://cdn.localstudio.test/demo.mp4',
       autoplay: true,
       controls: true,
       kind: 'media',
@@ -328,7 +331,7 @@ describe('BrowserPresenterSessionService remote control', () => {
     });
 
     await vi.waitFor(() => {
-      expect(signalingService.getPublishedState('ABCD-1234')?.timer).toEqual({
+      expect(signalingService.getPublishedState('ABCD-1234')?.timer).toMatchObject({
         elapsedMs: 42_000,
         paused: false,
       });

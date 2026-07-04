@@ -17,6 +17,9 @@ import {
   type MovieHoldState,
 } from '../editor/media/presentationMovieControls';
 import { PresenterRemotePanel } from './PresenterRemotePanel';
+import { presenterRemoteMirror } from './presenterRemoteMirror';
+import { presenterRemoteStreamPublisher } from './presenterRemoteStreamPublisher';
+import type { PresenterRemoteCommand } from '@localstudio/presenter-remote/protocol';
 import { presenterRemoteTimerFormat } from '@localstudio/presenter-remote/timer-format';
 
 interface PresenterViewProps {
@@ -167,6 +170,8 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
   const emptySelection = useMemo<SelectionState>(() => ({ elementIds: [], pageId: '' }), []);
   const openerRef = useRef<Window | null>(getPresenterOpener());
   const movieHoldStateRef = useRef<MovieHoldState | undefined>(undefined);
+  const remoteMirrorCanvasRef = useRef<HTMLCanvasElement>(null);
+  const remoteStreamPublisherRef = useRef<ReturnType<typeof presenterRemoteStreamPublisher.create> | undefined>(undefined);
   const presenterStageRef = useRef<HTMLElement>(null);
   const presenterRemotePanelRef = useRef<HTMLDivElement>(null);
   const notesRef = useRef<HTMLTextAreaElement>(null);
@@ -189,7 +194,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
   }, [resolvedSessionId]);
 
   const publishTimerState = useCallback((timer: { elapsedMs: number; paused: boolean }) => {
-    postCommand({ command: 'update-timer', timer });
+    postCommand({ command: 'update-timer', timer: { ...timer, updatedAtEpochMs: Date.now() } });
   }, [postCommand]);
   const elapsedMs = timerPaused ? timerBaseMs : timerBaseMs + (timerNow - timerStartedAt);
 
@@ -363,6 +368,18 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     postCommand({ command: 'reset-timer' });
     publishTimerState({ elapsedMs: 0, paused: false });
   }, [postCommand, publishTimerState]);
+
+  const handleRemoteStreamCommand = useCallback((command: PresenterRemoteCommand) => {
+    if (command.command === 'go-to-page') {
+      postCommand({ command: 'go-to-page', pageId: command.pageId });
+      return;
+    }
+    if (command.command === 'update-notes') {
+      postCommand({ command: 'update-notes', notes: command.notes, pageId: command.pageId });
+      return;
+    }
+    postCommand({ command: command.command });
+  }, [postCommand]);
 
   function getPresenterVideos() {
     return Array.from(presenterStageRef.current?.querySelectorAll('video') ?? []);
@@ -647,6 +664,51 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     };
   }, []);
 
+  useEffect(() => {
+    const canvas = remoteMirrorCanvasRef.current;
+    if (!canvas || !snapshot || !activePage) return;
+    const render = () => {
+      presenterRemoteMirror.renderFrame(canvas, {
+        activePage,
+        activePageIndex,
+        animationPreview: snapshot.animationPreview,
+        buildsRemaining,
+        currentTimeLabel,
+        notes: speakerNotes,
+        project: snapshot.project,
+        timerLabel: presenterRemoteTimerFormat.formatElapsed(elapsedMs),
+        videoElements: getPresenterVideos(),
+      });
+    };
+    render();
+    const intervalId = window.setInterval(render, 125);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [activePage, activePageIndex, buildsRemaining, currentTimeLabel, elapsedMs, snapshot, speakerNotes]);
+
+  useEffect(() => {
+    const canvas = remoteMirrorCanvasRef.current;
+    const sessionCode = snapshot?.remoteSession?.code;
+    if (!canvas || !sessionCode) {
+      remoteStreamPublisherRef.current?.stop();
+      remoteStreamPublisherRef.current = undefined;
+      return;
+    }
+    remoteStreamPublisherRef.current?.stop();
+    const publisher = presenterRemoteStreamPublisher.create({
+      canvas,
+      onCommand: handleRemoteStreamCommand,
+      sessionCode,
+    });
+    remoteStreamPublisherRef.current = publisher;
+    publisher.start();
+    return () => {
+      publisher.stop();
+      if (remoteStreamPublisherRef.current === publisher) remoteStreamPublisherRef.current = undefined;
+    };
+  }, [handleRemoteStreamCommand, snapshot?.remoteSession?.code]);
+
   const introOverlay = !introDismissed ? (
     <div className="presenter-intro-backdrop" role="presentation">
       <section className="presenter-intro-dialog" role="dialog" aria-modal="true" aria-labelledby="presenter-intro-title">
@@ -681,6 +743,13 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
 
   return (
     <main className="presenter-view" aria-label="Presenter view" style={presenterViewStyle}>
+      <canvas
+        aria-hidden="true"
+        className="presenter-remote-mirror-canvas"
+        height={presenterRemoteMirror.size.height}
+        ref={remoteMirrorCanvasRef}
+        width={presenterRemoteMirror.size.width}
+      />
       <section className="presenter-main">
         <header className="presenter-topbar">
           <div className="presenter-clock-group">

@@ -5,6 +5,10 @@ import {
   type PresenterRemoteState,
 } from './protocol';
 import type { RegisterPresenterRemoteSessionInput } from './signaling-service';
+import type {
+  PresenterRemoteControllerOffer,
+  PresenterRemoteIceCandidateMessage,
+} from './webrtc';
 
 export interface PresenterRemoteSignalingClientOptions {
   endpoint: string;
@@ -103,6 +107,105 @@ export class PresenterRemoteSignalingClient {
       }),
     );
   }
+
+  async createControllerOffer(code: string, controllerId: string, offerSdp: string) {
+    await readJson(
+      await this.fetcher(
+        `${this.endpoint}/sessions/${encodeURIComponent(code)}/controllers/${encodeURIComponent(controllerId)}/offer`,
+        {
+          body: JSON.stringify({ offerSdp }),
+          headers: { 'content-type': 'application/json' },
+          method: 'POST',
+        },
+      ),
+    );
+  }
+
+  async takeControllerOffers(code: string): Promise<PresenterRemoteControllerOffer[]> {
+    const value = await readJson(
+      await this.fetcher(`${this.endpoint}/sessions/${encodeURIComponent(code)}/offers`),
+    );
+    if (!Array.isArray(value)) return [];
+    return value.filter(isControllerOffer);
+  }
+
+  async publishAnswer(code: string, controllerId: string, answerSdp: string) {
+    await readJson(
+      await this.fetcher(
+        `${this.endpoint}/sessions/${encodeURIComponent(code)}/controllers/${encodeURIComponent(controllerId)}/answer`,
+        {
+          body: JSON.stringify({ answerSdp }),
+          headers: { 'content-type': 'application/json' },
+          method: 'POST',
+        },
+      ),
+    );
+  }
+
+  async getAnswer(code: string, controllerId: string): Promise<string | undefined> {
+    const response = await this.fetcher(
+      `${this.endpoint}/sessions/${encodeURIComponent(code)}/controllers/${encodeURIComponent(controllerId)}/answer`,
+    );
+    if (response.status === 404) return undefined;
+    const value = await readJson(response);
+    return isAnswer(value) ? value.answerSdp : undefined;
+  }
+
+  async publishIceCandidate(
+    code: string,
+    controllerId: string,
+    message: PresenterRemoteIceCandidateMessage,
+  ) {
+    await readJson(
+      await this.fetcher(
+        `${this.endpoint}/sessions/${encodeURIComponent(code)}/controllers/${encodeURIComponent(controllerId)}/ice`,
+        {
+          body: JSON.stringify(message),
+          headers: { 'content-type': 'application/json' },
+          method: 'POST',
+        },
+      ),
+    );
+  }
+
+  async takeIceCandidates(
+    code: string,
+    controllerId: string,
+    target: 'controller' | 'presenter',
+  ): Promise<RTCIceCandidateInit[]> {
+    const value = await readJson(
+      await this.fetcher(
+        `${this.endpoint}/sessions/${encodeURIComponent(code)}/controllers/${encodeURIComponent(controllerId)}/ice/${target}`,
+      ),
+    );
+    if (!Array.isArray(value)) return [];
+    return value.filter(isIceCandidate);
+  }
+
+  async closeController(code: string, controllerId: string) {
+    await readJson(
+      await this.fetcher(
+        `${this.endpoint}/sessions/${encodeURIComponent(code)}/controllers/${encodeURIComponent(controllerId)}`,
+        { method: 'DELETE' },
+      ),
+    );
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object';
+}
+
+function isControllerOffer(value: unknown): value is PresenterRemoteControllerOffer {
+  return isRecord(value) && typeof value.controllerId === 'string' && typeof value.offerSdp === 'string';
+}
+
+function isAnswer(value: unknown): value is { answerSdp: string } {
+  return isRecord(value) && typeof value.answerSdp === 'string';
+}
+
+function isIceCandidate(value: unknown): value is RTCIceCandidateInit {
+  return isRecord(value) && (typeof value.candidate === 'string' || value.candidate === undefined);
 }
 
 function resolveEndpoint(endpoint: string) {

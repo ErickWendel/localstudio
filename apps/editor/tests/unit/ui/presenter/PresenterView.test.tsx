@@ -305,7 +305,7 @@ describe('PresenterView', () => {
     expect(opener.postMessage).toHaveBeenLastCalledWith(
       expect.objectContaining({
         command: 'update-timer',
-        timer: { elapsedMs: 79_000, paused: true },
+        timer: { elapsedMs: 79_000, paused: true, updatedAtEpochMs: Date.now() },
       }),
       window.location.origin,
     );
@@ -328,7 +328,7 @@ describe('PresenterView', () => {
     expect(opener.postMessage).toHaveBeenLastCalledWith(
       expect.objectContaining({
         command: 'update-timer',
-        timer: { elapsedMs: 0, paused: false },
+        timer: { elapsedMs: 0, paused: false, updatedAtEpochMs: Date.now() },
       }),
       window.location.origin,
     );

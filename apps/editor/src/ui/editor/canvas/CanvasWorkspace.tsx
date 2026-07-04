@@ -1833,6 +1833,7 @@ function CanvasVideoElement({
       data-element-id={element.id}
       data-trim-end={element.trimEndSeconds ?? ''}
       data-trim-start={element.trimStartSeconds}
+      data-media-element-id={element.id}
       loop={repeatMode === 'loop' && element.trimEndSeconds === undefined}
       muted={element.muted}
       playsInline

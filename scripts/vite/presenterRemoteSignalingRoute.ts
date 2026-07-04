@@ -6,6 +6,7 @@ import type {
   PresenterRemoteState,
 } from '@localstudio/presenter-remote/protocol';
 import type { RegisterPresenterRemoteSessionInput } from '@localstudio/presenter-remote/signaling-service';
+import type { PresenterRemoteControllerOffer } from '@localstudio/presenter-remote/webrtc';
 
 const codeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ123456789';
 const codePattern = /^[A-HJ-NP-Z1-9]{4}-[A-HJ-NP-Z1-9]{4}$/;
@@ -16,6 +17,14 @@ interface StoredPresenterRemoteSession {
   controllers: Set<string>;
   publishedState?: PresenterRemoteState | undefined;
   session: PresenterRemoteSession;
+  webRtcControllers: Map<string, StoredControllerConnection>;
+}
+
+interface StoredControllerConnection {
+  answerSdp?: string | undefined;
+  controllerIceCandidates: RTCIceCandidateInit[];
+  offerSdp: string;
+  presenterIceCandidates: RTCIceCandidateInit[];
 }
 
 const sessions = new Map<string, StoredPresenterRemoteSession>();
@@ -60,7 +69,7 @@ function registerSession(input: RegisterPresenterRemoteSessionInput) {
     presenterLabel: input.presenterLabel,
     sessionId: createSessionId(),
   };
-  sessions.set(code, { commands: [], controllers: new Set(), session });
+  sessions.set(code, { commands: [], controllers: new Set(), session, webRtcControllers: new Map() });
   return session;
 }
 
@@ -199,10 +208,45 @@ function isControllerConnectInput(value: unknown): value is { controllerId: stri
   return isRecord(value) && typeof value.controllerId === 'string' && value.controllerId.length > 0;
 }
 
+function isOfferInput(value: unknown): value is { offerSdp: string } {
+  return isRecord(value) && typeof value.offerSdp === 'string' && value.offerSdp.length > 0;
+}
+
+function isAnswerInput(value: unknown): value is { answerSdp: string } {
+  return isRecord(value) && typeof value.answerSdp === 'string' && value.answerSdp.length > 0;
+}
+
+function isIceCandidate(value: unknown): value is RTCIceCandidateInit {
+  return isRecord(value) && (typeof value.candidate === 'string' || value.candidate === undefined);
+}
+
+function isIceCandidateMessage(value: unknown): value is {
+  candidate: RTCIceCandidateInit;
+  target: 'controller' | 'presenter';
+} {
+  return (
+    isRecord(value) &&
+    isIceCandidate(value.candidate) &&
+    (value.target === 'controller' || value.target === 'presenter')
+  );
+}
+
 function getSessionCode(pathname: string, suffix = '') {
   const prefix = `${presenterRemotePath}/sessions/`;
   if (!pathname.startsWith(prefix) || !pathname.endsWith(suffix)) return undefined;
   return decodeURIComponent(pathname.slice(prefix.length, suffix ? -suffix.length : undefined));
+}
+
+function getControllerRoute(pathname: string) {
+  const prefix = `${presenterRemotePath}/sessions/`;
+  if (!pathname.startsWith(prefix)) return undefined;
+  const parts = pathname.slice(prefix.length).split('/');
+  if (parts.length < 3 || parts[1] !== 'controllers') return undefined;
+  return {
+    action: parts.slice(3).join('/'),
+    code: decodeURIComponent(parts[0] ?? ''),
+    controllerId: decodeURIComponent(parts[2] ?? ''),
+  };
 }
 
 async function handlePresenterRemoteSignaling(req: IncomingMessage, res: ServerResponse, next: Connect.NextFunction) {
@@ -225,6 +269,19 @@ async function handlePresenterRemoteSignaling(req: IncomingMessage, res: ServerR
         return;
       }
       sendJson(res, 201, registerSession(payload));
+      return;
+    }
+
+    const offersCode = getSessionCode(requestUrl.pathname, '/offers');
+    if (offersCode && req.method === 'GET') {
+      pruneExpiredSessions();
+      const storedSession = sessions.get(normalizeCode(offersCode));
+      const offers: PresenterRemoteControllerOffer[] = storedSession
+        ? Array.from(storedSession.webRtcControllers.entries())
+            .filter(([, connection]) => connection.answerSdp === undefined)
+            .map(([controllerId, connection]) => ({ controllerId, offerSdp: connection.offerSdp }))
+        : [];
+      sendJson(res, 200, offers);
       return;
     }
 
@@ -282,6 +339,80 @@ async function handlePresenterRemoteSignaling(req: IncomingMessage, res: ServerR
       storedSession.session.connectedControllerCount = storedSession.controllers.size;
       sendJson(res, 200, storedSession.session);
       return;
+    }
+
+    const controllerRoute = getControllerRoute(requestUrl.pathname);
+    if (controllerRoute) {
+      const code = normalizeCode(controllerRoute.code);
+      pruneExpiredSessions();
+      const storedSession = sessions.get(code);
+      if (!storedSession) {
+        sendJson(res, 404, { ok: false });
+        return;
+      }
+      if (controllerRoute.action === 'offer' && req.method === 'POST') {
+        const payload = await readRequestJson(req);
+        if (!isOfferInput(payload)) {
+          sendJson(res, 400, { error: 'Invalid offer payload.' });
+          return;
+        }
+        storedSession.webRtcControllers.set(controllerRoute.controllerId, {
+          controllerIceCandidates: [],
+          offerSdp: payload.offerSdp,
+          presenterIceCandidates: [],
+        });
+        sendJson(res, 200, { ok: true });
+        return;
+      }
+      const connection = storedSession.webRtcControllers.get(controllerRoute.controllerId);
+      if (!connection) {
+        sendJson(res, 404, { ok: false });
+        return;
+      }
+      if (controllerRoute.action === 'answer' && req.method === 'POST') {
+        const payload = await readRequestJson(req);
+        if (!isAnswerInput(payload)) {
+          sendJson(res, 400, { error: 'Invalid answer payload.' });
+          return;
+        }
+        connection.answerSdp = payload.answerSdp;
+        sendJson(res, 200, { ok: true });
+        return;
+      }
+      if (controllerRoute.action === 'answer' && req.method === 'GET') {
+        sendJson(res, connection.answerSdp ? 200 : 404, connection.answerSdp ? { answerSdp: connection.answerSdp } : null);
+        return;
+      }
+      if (controllerRoute.action === 'ice' && req.method === 'POST') {
+        const payload = await readRequestJson(req);
+        if (!isIceCandidateMessage(payload)) {
+          sendJson(res, 400, { error: 'Invalid ICE payload.' });
+          return;
+        }
+        if (payload.target === 'presenter') connection.controllerIceCandidates.push(payload.candidate);
+        else connection.presenterIceCandidates.push(payload.candidate);
+        sendJson(res, 200, { ok: true });
+        return;
+      }
+      if (controllerRoute.action === 'ice/controller' && req.method === 'GET') {
+        const candidates = connection.presenterIceCandidates;
+        connection.presenterIceCandidates = [];
+        sendJson(res, 200, candidates);
+        return;
+      }
+      if (controllerRoute.action === 'ice/presenter' && req.method === 'GET') {
+        const candidates = connection.controllerIceCandidates;
+        connection.controllerIceCandidates = [];
+        sendJson(res, 200, candidates);
+        return;
+      }
+      if (controllerRoute.action === '' && req.method === 'DELETE') {
+        storedSession.webRtcControllers.delete(controllerRoute.controllerId);
+        storedSession.controllers.delete(controllerRoute.controllerId);
+        storedSession.session.connectedControllerCount = storedSession.controllers.size;
+        sendJson(res, 200, { ok: true });
+        return;
+      }
     }
 
     const commandsCode = getSessionCode(requestUrl.pathname, '/commands');

@@ -48,16 +48,21 @@ describe('InMemoryPresenterRemoteSignalingService', () => {
 
     expect(
       service.createControllerOffer({
+        controllerId: 'controller-1',
         offerSdp: 'controller-offer',
         sessionCode: session.code,
       }),
     ).toEqual({ status: 'pending' });
+    expect(service.takePendingOffers(session.code)).toEqual([
+      { controllerId: 'controller-1', offerSdp: 'controller-offer' },
+    ]);
 
     now = new Date('2026-07-04T12:02:00.000Z').getTime();
 
     expect(service.lookupSession(session.code)).toBeUndefined();
     expect(
       service.createControllerOffer({
+        controllerId: 'controller-1',
         offerSdp: 'late-offer',
         sessionCode: session.code,
       }),

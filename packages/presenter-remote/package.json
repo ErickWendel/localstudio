@@ -9,7 +9,8 @@
     "./session-code": "./src/session-code.ts",
     "./signaling-client": "./src/signaling-client.ts",
     "./signaling-service": "./src/signaling-service.ts",
-    "./timer-format": "./src/timer-format.ts"
+    "./timer-format": "./src/timer-format.ts",
+    "./webrtc": "./src/webrtc.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit --pretty false"

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent, PointerEvent, TouchEvent } from 'react';
-import { List, Minus, NotebookText, Pause, Play, Plus, TimerReset, X } from 'lucide-react';
+import { ChevronLeft, List, Minus, NotebookText, Pause, Play, Plus, TimerReset, X } from 'lucide-react';
 import { presenterRemoteSessionCode } from '@localstudio/presenter-remote/session-code';
 import { presenterRemoteTimerFormat } from '@localstudio/presenter-remote/timer-format';
 import {
@@ -15,6 +15,10 @@ import type {
   PresenterRemoteSession,
   PresenterRemoteState,
 } from '@localstudio/presenter-remote/protocol';
+import {
+  presenterRemoteStreamReceiver,
+  type PresenterRemoteStreamSignaling,
+} from './presenterRemoteStreamReceiver';
 
 interface JoystickSignalingService {
   connectController?: ((code: string, controllerId: string) => Promise<PresenterRemoteSession | undefined>) | undefined;
@@ -56,6 +60,28 @@ function listActiveSessions(signalingService: JoystickSignalingService) {
   if (signalingService.listSessions) return signalingService.listSessions();
   if (signalingService.listActiveSessions) return signalingService.listActiveSessions();
   return [];
+}
+
+function createStreamSignalingAdapter(signalingService: JoystickSignalingService): PresenterRemoteStreamSignaling {
+  const candidate = signalingService as unknown as PresenterRemoteStreamSignaling & {
+    createControllerOffer?: ((...args: unknown[]) => unknown) | undefined;
+  };
+  return {
+    closeController: candidate.closeController?.bind(candidate),
+    createControllerOffer:
+      typeof candidate.createControllerOffer === 'function'
+        ? (code, controllerId, offerSdp) => {
+            if (candidate.createControllerOffer?.length === 1) {
+              void candidate.createControllerOffer({ controllerId, offerSdp, sessionCode: code });
+              return;
+            }
+            void candidate.createControllerOffer?.(code, controllerId, offerSdp);
+          }
+        : undefined,
+    getAnswer: candidate.getAnswer?.bind(candidate),
+    publishIceCandidate: candidate.publishIceCandidate?.bind(candidate),
+    takeIceCandidates: candidate.takeIceCandidates?.bind(candidate),
+  };
 }
 
 function getControllerId() {
@@ -199,6 +225,76 @@ function SlideCanvas({
   );
 }
 
+function StreamPreview({
+  onNavigate,
+  stream,
+}: {
+  onNavigate: (direction: 'next' | 'previous') => void;
+  stream: MediaStream;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const touchStartX = useRef<number | undefined>(undefined);
+  const pointerStartX = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.srcObject = stream;
+    void video.play().catch(() => undefined);
+    return () => {
+      if (video.srcObject === stream) video.srcObject = null;
+    };
+  }, [stream]);
+
+  function handleClick() {
+    onNavigate('next');
+  }
+
+  function handleTouchStart(event: TouchEvent<HTMLButtonElement>) {
+    touchStartX.current = event.changedTouches[0]?.clientX;
+  }
+
+  function handleTouchEnd(event: TouchEvent<HTMLButtonElement>) {
+    const startX = touchStartX.current;
+    touchStartX.current = undefined;
+    const endX = event.changedTouches[0]?.clientX;
+    if (startX === undefined || endX === undefined) return;
+    const deltaX = endX - startX;
+    if (Math.abs(deltaX) < swipeThresholdPx) return;
+    onNavigate(deltaX < 0 ? 'next' : 'previous');
+  }
+
+  function handlePointerDown(event: PointerEvent<HTMLButtonElement>) {
+    if (event.pointerType === 'mouse') return;
+    pointerStartX.current = event.clientX;
+  }
+
+  function handlePointerUp(event: PointerEvent<HTMLButtonElement>) {
+    if (event.pointerType === 'mouse') return;
+    const startX = pointerStartX.current;
+    pointerStartX.current = undefined;
+    if (startX === undefined) return;
+    const deltaX = event.clientX - startX;
+    if (Math.abs(deltaX) < swipeThresholdPx) return;
+    onNavigate(deltaX < 0 ? 'next' : 'previous');
+  }
+
+  return (
+    <button
+      type="button"
+      className="joystick-stream-hit-target"
+      aria-label="Presenter stream preview"
+      onClick={handleClick}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onTouchEnd={handleTouchEnd}
+      onTouchStart={handleTouchStart}
+    >
+      <video ref={videoRef} autoPlay className="joystick-stream-video" muted playsInline />
+    </button>
+  );
+}
+
 function SlidePreview({
   onNavigate,
   preview,
@@ -308,6 +404,9 @@ export function JoystickApp({
   const [slideNavigatorOpen, setSlideNavigatorOpen] = useState(false);
   const [notesFontSize, setNotesFontSize] = useState(28);
   const [controllerId] = useState(() => getControllerId());
+  const [remoteStream, setRemoteStream] = useState<MediaStream | undefined>();
+  const [remoteStreamStatus, setRemoteStreamStatus] = useState<'connected' | 'connecting' | 'failed' | 'idle'>('idle');
+  const remoteStreamReceiverRef = useRef<ReturnType<typeof presenterRemoteStreamReceiver.create> | undefined>(undefined);
   const sessionCode = session?.code;
 
   useEffect(() => {
@@ -406,6 +505,34 @@ export function JoystickApp({
     return () => window.clearInterval(intervalId);
   }, [sessionCode]);
 
+  useEffect(() => {
+    const shouldUseStream = Boolean(
+      sessionCode &&
+      remoteState?.presenterMode === 'presenting' &&
+      remoteState.previewMode === 'stream' &&
+      remoteState.stream?.enabled,
+    );
+    if (!sessionCode || !shouldUseStream) {
+      remoteStreamReceiverRef.current?.stop();
+      remoteStreamReceiverRef.current = undefined;
+      return;
+    }
+    remoteStreamReceiverRef.current?.stop();
+    const receiver = presenterRemoteStreamReceiver.create({
+      controllerId,
+      onStatusChange: setRemoteStreamStatus,
+      onStream: setRemoteStream,
+      sessionCode,
+      signaling: createStreamSignalingAdapter(signalingService),
+    });
+    remoteStreamReceiverRef.current = receiver;
+    void receiver.start();
+    return () => {
+      receiver.stop();
+      if (remoteStreamReceiverRef.current === receiver) remoteStreamReceiverRef.current = undefined;
+    };
+  }, [controllerId, remoteState?.presenterMode, remoteState?.previewMode, remoteState?.stream?.enabled, sessionCode, signalingService]);
+
   const connectionLabel = useMemo(() => {
     const connectedControllerCount = Math.max(
       1,
@@ -418,6 +545,10 @@ export function JoystickApp({
 
   function sendRemoteCommand(command: PresenterRemoteCommand) {
     if (!session) return;
+    if (remoteStreamReceiverRef.current?.sendCommand(command)) {
+      setLastCommand(command.command);
+      return;
+    }
     void Promise.resolve(signalingService.publishCommand(session.code, command))
       .then(() => setLastCommand(command.command));
   }
@@ -461,6 +592,7 @@ export function JoystickApp({
   const timerPaused = displayedRemoteState?.timer.paused ?? false;
   const timerToggleCommand = timerPaused ? 'resume-timer' : 'pause-timer';
   const pages = displayedRemoteState?.pages ?? [];
+  const streamModeActive = connected && displayedRemoteState?.previewMode === 'stream' && remoteStream;
   const upcomingSlidePreviews = displayedRemoteState?.upcomingSlidePreviews ??
     (displayedRemoteState?.nextSlidePreview
       ? [
@@ -487,6 +619,59 @@ export function JoystickApp({
           <span className="joystick-start-indicator" aria-hidden="true" />
           {lastCommand ? <span className="joystick-start-status">Command sent: {lastCommand}</span> : null}
         </section>
+      </main>
+    );
+  }
+
+  if (streamModeActive) {
+    return (
+      <main className="joystick-app joystick-app-stream" aria-label="Presentation remote control">
+        <StreamPreview stream={remoteStream} onNavigate={navigateSlide} />
+        <div className="joystick-stream-overlay" aria-label="Remote controls">
+          <span className={`joystick-status-dot joystick-status-dot-${status}`} aria-label={connectionLabel} />
+          <span>{connectionLabel}</span>
+          <button type="button" onClick={() => sendCommand('previous')} aria-label="Previous slide">
+            <ChevronLeft size={19} />
+          </button>
+          <button
+            type="button"
+            disabled={pages.length === 0}
+            onClick={() => setSlideNavigatorOpen(true)}
+            aria-label="Show slide navigation"
+          >
+            <List size={19} />
+          </button>
+        </div>
+        {remoteStreamStatus === 'failed' ? (
+          <p className="joystick-stream-status">Stream unavailable. Using fallback controls.</p>
+        ) : null}
+        {slideNavigatorOpen ? (
+          <section className="joystick-slide-navigator" role="dialog" aria-modal="true" aria-label="Slide navigation">
+            <header>
+              <h2>Slides</h2>
+              <button type="button" aria-label="Close slide navigation" onClick={() => setSlideNavigatorOpen(false)}>
+                <X size={20} />
+              </button>
+            </header>
+            <div className="joystick-slide-navigator-list">
+              {pages.map((page, index) => (
+                <button
+                  type="button"
+                  key={page.id}
+                  aria-current={page.id === displayedRemoteState?.activePageId ? 'page' : undefined}
+                  aria-label={`Go to slide ${index + 1}: ${page.name}`}
+                  onClick={() => {
+                    sendRemoteCommand({ command: 'go-to-page', pageId: page.id, type: 'command' });
+                    setSlideNavigatorOpen(false);
+                  }}
+                >
+                  <span>{index + 1}</span>
+                  <strong>{page.name}</strong>
+                </button>
+              ))}
+            </div>
+          </section>
+        ) : null}
       </main>
     );
   }

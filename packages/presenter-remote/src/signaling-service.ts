@@ -1,5 +1,9 @@
 import type { PresenterRemoteCommand, PresenterRemoteState, PresenterRemoteSession } from './protocol';
 import { presenterRemoteSessionCode } from './session-code';
+import type {
+  PresenterRemoteControllerOffer,
+  PresenterRemoteIceCandidateMessage,
+} from './webrtc';
 
 export interface PresenterRemoteSignalingServiceOptions {
   now?: (() => number) | undefined;
@@ -13,18 +17,25 @@ export interface RegisterPresenterRemoteSessionInput {
 }
 
 export interface ControllerOfferInput {
+  controllerId: string;
   offerSdp: string;
   sessionCode: string;
 }
 
 export type ControllerOfferResult = { status: 'not-found' } | { status: 'pending' };
 
-interface StoredSession {
+interface StoredControllerConnection {
   answerSdp?: string | undefined;
+  controllerIceCandidates: RTCIceCandidateInit[];
+  offerSdp: string;
+  presenterIceCandidates: RTCIceCandidateInit[];
+}
+
+interface StoredSession {
   commands: PresenterRemoteCommand[];
-  offerSdp?: string | undefined;
   publishedState?: PresenterRemoteState | undefined;
   session: PresenterRemoteSession;
+  webRtcControllers: Map<string, StoredControllerConnection>;
 }
 
 function createSessionId() {
@@ -57,7 +68,7 @@ export class InMemoryPresenterRemoteSignalingService {
       presenterLabel: input.presenterLabel,
       sessionId: this.randomId(),
     };
-    this.sessions.set(code, { commands: [], session });
+    this.sessions.set(code, { commands: [], session, webRtcControllers: new Map() });
     return session;
   }
 
@@ -82,29 +93,71 @@ export class InMemoryPresenterRemoteSignalingService {
     const code = presenterRemoteSessionCode.normalize(input.sessionCode);
     const storedSession = this.sessions.get(code);
     if (!storedSession) return { status: 'not-found' };
-    storedSession.offerSdp = input.offerSdp;
-    storedSession.answerSdp = undefined;
+    storedSession.webRtcControllers.set(input.controllerId, {
+      controllerIceCandidates: [],
+      offerSdp: input.offerSdp,
+      presenterIceCandidates: [],
+    });
     return { status: 'pending' };
   }
 
-  takePendingOffer(sessionCode: string) {
+  takePendingOffers(sessionCode: string): PresenterRemoteControllerOffer[] {
     this.pruneExpiredSessions();
     const storedSession = this.sessions.get(presenterRemoteSessionCode.normalize(sessionCode));
-    return storedSession?.offerSdp;
+    if (!storedSession) return [];
+    return Array.from(storedSession.webRtcControllers.entries())
+      .filter(([, connection]) => connection.answerSdp === undefined)
+      .map(([controllerId, connection]) => ({ controllerId, offerSdp: connection.offerSdp }));
   }
 
-  publishAnswer(sessionCode: string, answerSdp: string) {
+  publishAnswer(sessionCode: string, controllerId: string, answerSdp: string) {
     this.pruneExpiredSessions();
     const storedSession = this.sessions.get(presenterRemoteSessionCode.normalize(sessionCode));
     if (!storedSession) return false;
-    storedSession.answerSdp = answerSdp;
-    storedSession.session.connectedControllerCount += 1;
+    const connection = storedSession.webRtcControllers.get(controllerId);
+    if (!connection) return false;
+    connection.answerSdp = answerSdp;
     return true;
   }
 
-  getAnswer(sessionCode: string) {
+  getAnswer(sessionCode: string, controllerId: string) {
     this.pruneExpiredSessions();
-    return this.sessions.get(presenterRemoteSessionCode.normalize(sessionCode))?.answerSdp;
+    return this.sessions.get(presenterRemoteSessionCode.normalize(sessionCode))?.webRtcControllers.get(controllerId)
+      ?.answerSdp;
+  }
+
+  publishIceCandidate(sessionCode: string, controllerId: string, message: PresenterRemoteIceCandidateMessage) {
+    this.pruneExpiredSessions();
+    const connection = this.sessions
+      .get(presenterRemoteSessionCode.normalize(sessionCode))
+      ?.webRtcControllers.get(controllerId);
+    if (!connection) return false;
+    if (message.target === 'presenter') connection.controllerIceCandidates.push(message.candidate);
+    else connection.presenterIceCandidates.push(message.candidate);
+    return true;
+  }
+
+  takeIceCandidates(sessionCode: string, controllerId: string, target: 'controller' | 'presenter') {
+    this.pruneExpiredSessions();
+    const connection = this.sessions
+      .get(presenterRemoteSessionCode.normalize(sessionCode))
+      ?.webRtcControllers.get(controllerId);
+    if (!connection) return [];
+    const candidates = target === 'presenter'
+      ? connection.controllerIceCandidates
+      : connection.presenterIceCandidates;
+    if (target === 'presenter') connection.controllerIceCandidates = [];
+    else connection.presenterIceCandidates = [];
+    return candidates;
+  }
+
+  closeController(sessionCode: string, controllerId: string) {
+    this.pruneExpiredSessions();
+    const storedSession = this.sessions.get(presenterRemoteSessionCode.normalize(sessionCode));
+    if (!storedSession) return false;
+    const deleted = storedSession.webRtcControllers.delete(controllerId);
+    storedSession.session.connectedControllerCount = Math.max(0, storedSession.session.connectedControllerCount - 1);
+    return deleted;
   }
 
   publishState(sessionCode: string, state: PresenterRemoteState) {

@@ -13,6 +13,7 @@ export type PresenterRemoteCommand =
 export interface PresenterRemoteTimerState {
   elapsedMs: number;
   paused: boolean;
+  updatedAtEpochMs?: number | undefined;
 }
 
 export type PresenterRemoteSlidePreviewElement =
@@ -89,6 +90,7 @@ export interface PresenterRemoteState {
   activePageIndex: number;
   activePageName?: string | undefined;
   buildsRemaining: number;
+  commandAvailability?: string[] | undefined;
   connectedControllerCount: number;
   deckName: string;
   nextPageName?: string | undefined;
@@ -96,9 +98,16 @@ export interface PresenterRemoteState {
   notes: string;
   pageCount: number;
   pages?: PresenterRemotePageSummary[] | undefined;
+  previewMode?: 'stream' | 'structured-fallback' | undefined;
   presenterMode: 'presenting' | 'ready';
   slidePreview?: PresenterRemoteSlidePreview | undefined;
   shortcuts: string[];
+  stream?: {
+    enabled: boolean;
+    fps: number;
+    height: number;
+    width: number;
+  } | undefined;
   timer: PresenterRemoteTimerState;
   type: 'state';
   upcomingSlidePreviews?: PresenterRemoteUpcomingSlidePreview[] | undefined;
@@ -118,6 +127,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+function isStreamMetadata(value: unknown) {
+  return (
+    isRecord(value) &&
+    typeof value.enabled === 'boolean' &&
+    typeof value.fps === 'number' &&
+    typeof value.height === 'number' &&
+    typeof value.width === 'number'
+  );
 }
 
 function isPageSummary(value: unknown): value is PresenterRemotePageSummary {
@@ -209,6 +228,7 @@ function isState(value: unknown): value is PresenterRemoteState {
     typeof value.activePageIndex === 'number' &&
     (value.activePageName === undefined || typeof value.activePageName === 'string') &&
     typeof value.buildsRemaining === 'number' &&
+    (value.commandAvailability === undefined || isStringArray(value.commandAvailability)) &&
     typeof value.connectedControllerCount === 'number' &&
     typeof value.deckName === 'string' &&
     (value.nextPageName === undefined || typeof value.nextPageName === 'string') &&
@@ -216,11 +236,16 @@ function isState(value: unknown): value is PresenterRemoteState {
     typeof value.notes === 'string' &&
     typeof value.pageCount === 'number' &&
     (value.pages === undefined || (Array.isArray(value.pages) && value.pages.every(isPageSummary))) &&
+    (value.previewMode === undefined ||
+      value.previewMode === 'stream' ||
+      value.previewMode === 'structured-fallback') &&
     (value.presenterMode === 'presenting' || value.presenterMode === 'ready') &&
     (value.slidePreview === undefined || isSlidePreview(value.slidePreview)) &&
     isStringArray(value.shortcuts) &&
+    (value.stream === undefined || isStreamMetadata(value.stream)) &&
     typeof value.timer.elapsedMs === 'number' &&
     typeof value.timer.paused === 'boolean' &&
+    (value.timer.updatedAtEpochMs === undefined || typeof value.timer.updatedAtEpochMs === 'number') &&
     (value.upcomingSlidePreviews === undefined ||
       (Array.isArray(value.upcomingSlidePreviews) &&
         value.upcomingSlidePreviews.every(isUpcomingSlidePreview)))

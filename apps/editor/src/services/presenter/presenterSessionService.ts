@@ -268,11 +268,15 @@ export class BrowserPresenterSessionService {
   }
 
   private getCurrentPresenterTimer(payloadTimer: PresenterRemoteTimerState | undefined, elapsedMs: number) {
-    if (!this.presenterTimer) return payloadTimer ?? { elapsedMs, paused: false };
+    const now = Date.now();
+    if (!this.presenterTimer) {
+      return payloadTimer ?? { elapsedMs, paused: false, updatedAtEpochMs: now };
+    }
     if (this.presenterTimer.paused || !this.presenterTimerReceivedAt) return this.presenterTimer;
     return {
-      elapsedMs: this.presenterTimer.elapsedMs + (Date.now() - this.presenterTimerReceivedAt),
+      elapsedMs: this.presenterTimer.elapsedMs + (now - this.presenterTimerReceivedAt),
       paused: false,
+      updatedAtEpochMs: now,
     };
   }
 
@@ -289,7 +293,11 @@ export class BrowserPresenterSessionService {
 function isPresenterRemoteTimerState(value: unknown): value is PresenterRemoteTimerState {
   if (!value || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
-  return typeof record.elapsedMs === 'number' && typeof record.paused === 'boolean';
+  return (
+    typeof record.elapsedMs === 'number' &&
+    typeof record.paused === 'boolean' &&
+    (record.updatedAtEpochMs === undefined || typeof record.updatedAtEpochMs === 'number')
+  );
 }
 
 async function objectUrlToDataUrl(objectUrl: string) {
@@ -355,8 +363,19 @@ function createRemoteState(
     pageCount: payload.project.pages.length,
     pages: payload.project.pages.map((page) => ({ id: page.id, name: page.name })),
     presenterMode: payload.presenterMode ?? 'presenting',
+    commandAvailability: [
+      'previous',
+      'next',
+      'go-to-page',
+      'pause-timer',
+      'resume-timer',
+      'reset-timer',
+      'play-pause-movie',
+    ],
+    previewMode: 'stream',
     slidePreview,
     shortcuts: ['previous', 'next', 'pause-timer', 'reset-timer'],
+    stream: { enabled: true, fps: 8, height: 844, width: 390 },
     timer,
     type: 'state',
     upcomingSlidePreviews,
@@ -455,16 +474,15 @@ function createSlidePreviewElement(
     }));
   }
   if (element.type === 'gif' || element.type === 'video') {
-    return resolvePortableAssetUrl(project.assets[element.assetId]?.objectUrl).then((assetUrl) => ({
+    return Promise.resolve({
       ...frame,
-      assetUrl,
       autoplay: element.type === 'gif' ? element.playing : element.autoplayInPreview || element.playing,
       controls: element.type === 'video' ? element.controls : false,
       kind: 'media',
       loop: element.type === 'gif' ? element.playing : element.loop,
       mediaType: element.type,
       muted: element.type === 'video' ? element.muted : true,
-    }));
+    });
   }
   return Promise.resolve({
     ...frame,
