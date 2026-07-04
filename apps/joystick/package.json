@@ -1,5 +1,5 @@
 {
-  "name": "@localstudio/editor",
+  "name": "@localstudio/joystick",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,18 +12,10 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@giphy/js-fetch-api": "^5.8.0",
-    "@huggingface/transformers": "^4.2.0",
     "@localstudio/brand": "*",
     "@localstudio/presenter-remote": "*",
-    "@types/qrcode": "^1.5.6",
-    "jspdf": "^4.2.1",
-    "konva": "^10.3.0",
     "lucide-react": "^1.21.0",
-    "qrcode": "^1.5.4",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "react-konva": "^19.2.5",
-    "unsplash-js": "^8.0.0"
+    "react-dom": "^19.2.7"
   }
 }

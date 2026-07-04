@@ -1,0 +1,245 @@
+export type PresenterRemoteCommand =
+  | { command: 'close'; type: 'command' }
+  | { command: 'go-to-page'; pageId: string; type: 'command' }
+  | { command: 'next'; type: 'command' }
+  | { command: 'pause-timer'; type: 'command' }
+  | { command: 'previous'; type: 'command' }
+  | { command: 'request-state'; type: 'command' }
+  | { command: 'reset-timer'; type: 'command' }
+  | { command: 'resume-timer'; type: 'command' }
+  | { command: 'start-presenting'; type: 'command' }
+  | { command: 'update-notes'; notes: string; pageId: string; type: 'command' };
+
+export interface PresenterRemoteTimerState {
+  elapsedMs: number;
+  paused: boolean;
+}
+
+export type PresenterRemoteSlidePreviewElement =
+  | {
+      align: 'center' | 'left' | 'right';
+      fill: string;
+      fontFamily: string;
+      fontSize: number;
+      fontWeight: number;
+      height: number;
+      id: string;
+      kind: 'text';
+      lineHeight?: number | undefined;
+      opacity: number;
+      rotation: number;
+      text: string;
+      verticalAlign?: 'bottom' | 'middle' | 'top' | undefined;
+      width: number;
+      x: number;
+      y: number;
+    }
+  | {
+      assetUrl?: string | undefined;
+      autoplay?: boolean | undefined;
+      controls?: boolean | undefined;
+      height: number;
+      id: string;
+      kind: 'image' | 'media';
+      loop?: boolean | undefined;
+      mediaType?: 'gif' | 'video' | undefined;
+      muted?: boolean | undefined;
+      opacity: number;
+      rotation: number;
+      width: number;
+      x: number;
+      y: number;
+    }
+  | {
+      fill?: string | undefined;
+      height: number;
+      id: string;
+      kind: 'shape';
+      opacity: number;
+      rotation: number;
+      shape: string;
+      stroke?: string | undefined;
+      strokeWidth?: number | undefined;
+      width: number;
+      x: number;
+      y: number;
+    };
+
+export interface PresenterRemoteSlidePreview {
+  backgroundColor: string;
+  backgroundImageUrl?: string | undefined;
+  elements: PresenterRemoteSlidePreviewElement[];
+  height: number;
+  width: number;
+}
+
+export interface PresenterRemotePageSummary {
+  id: string;
+  name: string;
+}
+
+export interface PresenterRemoteUpcomingSlidePreview {
+  pageId: string;
+  pageName: string;
+  preview?: PresenterRemoteSlidePreview | undefined;
+}
+
+export interface PresenterRemoteState {
+  activePageId: string;
+  activePageIndex: number;
+  activePageName?: string | undefined;
+  buildsRemaining: number;
+  connectedControllerCount: number;
+  deckName: string;
+  nextPageName?: string | undefined;
+  nextSlidePreview?: PresenterRemoteSlidePreview | undefined;
+  notes: string;
+  pageCount: number;
+  pages?: PresenterRemotePageSummary[] | undefined;
+  presenterMode: 'presenting' | 'ready';
+  slidePreview?: PresenterRemoteSlidePreview | undefined;
+  shortcuts: string[];
+  timer: PresenterRemoteTimerState;
+  type: 'state';
+  upcomingSlidePreviews?: PresenterRemoteUpcomingSlidePreview[] | undefined;
+}
+
+export interface PresenterRemoteSession {
+  code: string;
+  connectedControllerCount: number;
+  expiresAt: string;
+  presenterLabel: string;
+  sessionId: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object';
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+function isPageSummary(value: unknown): value is PresenterRemotePageSummary {
+  return isRecord(value) && typeof value.id === 'string' && typeof value.name === 'string';
+}
+
+function isUpcomingSlidePreview(value: unknown): value is PresenterRemoteUpcomingSlidePreview {
+  return (
+    isRecord(value) &&
+    typeof value.pageId === 'string' &&
+    typeof value.pageName === 'string' &&
+    (value.preview === undefined || isSlidePreview(value.preview))
+  );
+}
+
+function isPreviewElement(value: unknown): value is PresenterRemoteSlidePreviewElement {
+  if (!isRecord(value)) return false;
+  const hasCommonFrame =
+    typeof value.id === 'string' &&
+    typeof value.x === 'number' &&
+    typeof value.y === 'number' &&
+    typeof value.width === 'number' &&
+    typeof value.height === 'number' &&
+    typeof value.rotation === 'number' &&
+    typeof value.opacity === 'number';
+  if (!hasCommonFrame || typeof value.kind !== 'string') return false;
+  if (value.kind === 'text') {
+    return (
+      typeof value.text === 'string' &&
+      typeof value.fontFamily === 'string' &&
+      typeof value.fontSize === 'number' &&
+      typeof value.fontWeight === 'number' &&
+      typeof value.fill === 'string' &&
+      (value.align === 'left' || value.align === 'center' || value.align === 'right')
+    );
+  }
+  if (value.kind === 'image' || value.kind === 'media') {
+    return (
+      (value.assetUrl === undefined || typeof value.assetUrl === 'string') &&
+      (value.autoplay === undefined || typeof value.autoplay === 'boolean') &&
+      (value.controls === undefined || typeof value.controls === 'boolean') &&
+      (value.loop === undefined || typeof value.loop === 'boolean') &&
+      (value.mediaType === undefined || value.mediaType === 'gif' || value.mediaType === 'video') &&
+      (value.muted === undefined || typeof value.muted === 'boolean')
+    );
+  }
+  if (value.kind === 'shape') return typeof value.shape === 'string';
+  return false;
+}
+
+function isSlidePreview(value: unknown): value is PresenterRemoteSlidePreview {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.backgroundColor === 'string' &&
+    (value.backgroundImageUrl === undefined || typeof value.backgroundImageUrl === 'string') &&
+    Array.isArray(value.elements) &&
+    value.elements.every(isPreviewElement) &&
+    typeof value.height === 'number' &&
+    typeof value.width === 'number'
+  );
+}
+
+function isCommand(value: unknown): value is PresenterRemoteCommand {
+  if (!isRecord(value) || value.type !== 'command' || typeof value.command !== 'string') return false;
+  if (
+    value.command === 'close' ||
+    value.command === 'next' ||
+    value.command === 'pause-timer' ||
+    value.command === 'previous' ||
+    value.command === 'request-state' ||
+    value.command === 'reset-timer' ||
+    value.command === 'resume-timer' ||
+    value.command === 'start-presenting'
+  ) {
+    return true;
+  }
+  if (value.command === 'go-to-page') return typeof value.pageId === 'string';
+  if (value.command === 'update-notes') {
+    return typeof value.pageId === 'string' && typeof value.notes === 'string';
+  }
+  return false;
+}
+
+function isState(value: unknown): value is PresenterRemoteState {
+  if (!isRecord(value) || value.type !== 'state') return false;
+  if (!isRecord(value.timer)) return false;
+  return (
+    typeof value.activePageId === 'string' &&
+    typeof value.activePageIndex === 'number' &&
+    (value.activePageName === undefined || typeof value.activePageName === 'string') &&
+    typeof value.buildsRemaining === 'number' &&
+    typeof value.connectedControllerCount === 'number' &&
+    typeof value.deckName === 'string' &&
+    (value.nextPageName === undefined || typeof value.nextPageName === 'string') &&
+    (value.nextSlidePreview === undefined || isSlidePreview(value.nextSlidePreview)) &&
+    typeof value.notes === 'string' &&
+    typeof value.pageCount === 'number' &&
+    (value.pages === undefined || (Array.isArray(value.pages) && value.pages.every(isPageSummary))) &&
+    (value.presenterMode === 'presenting' || value.presenterMode === 'ready') &&
+    (value.slidePreview === undefined || isSlidePreview(value.slidePreview)) &&
+    isStringArray(value.shortcuts) &&
+    typeof value.timer.elapsedMs === 'number' &&
+    typeof value.timer.paused === 'boolean' &&
+    (value.upcomingSlidePreviews === undefined ||
+      (Array.isArray(value.upcomingSlidePreviews) &&
+        value.upcomingSlidePreviews.every(isUpcomingSlidePreview)))
+  );
+}
+
+function isSession(value: unknown): value is PresenterRemoteSession {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.code === 'string' &&
+    typeof value.connectedControllerCount === 'number' &&
+    typeof value.expiresAt === 'string' &&
+    typeof value.presenterLabel === 'string' &&
+    typeof value.sessionId === 'string'
+  );
+}
+
+export const presenterRemoteProtocol = {
+  isCommand,
+  isSession,
+  isState,
+} as const;

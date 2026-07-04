@@ -178,6 +178,9 @@ const IMAGE_GENERATION_DIMENSION_MULTIPLE = 16;
 const BACKGROUND_PREVIEW_DEBOUNCE_MS = 120;
 const PASTED_ELEMENT_OFFSET = 32;
 const STOCK_MEDIA_RECENT_LIMIT = 12;
+const LOCAL_PPTX_SAMPLE_IMPORT_PARAM = 'importPptxSample';
+const LOCAL_PPTX_SAMPLE_IMPORT_ROUTE = '/__localstudio/pptx-sample/file';
+const LOCAL_PPTX_SAMPLE_FILE_NAME = 'fullstack-monitoring-jsnation-11062026.pptx';
 
 function normalizeImageGenerationDimension(value: number) {
   return Math.max(
@@ -421,6 +424,34 @@ async function pickPowerPointImportInput(): Promise<PptxImportInput | null> {
   });
   if (file) return { file };
   return null;
+}
+
+async function loadLocalPowerPointSampleInput(): Promise<PptxImportInput> {
+  const response = await fetch(LOCAL_PPTX_SAMPLE_IMPORT_ROUTE);
+  if (!response.ok) {
+    throw new Error(`Sample PowerPoint could not be loaded (${response.status}).`);
+  }
+  const blob = await response.blob();
+  return {
+    file: new File([blob], LOCAL_PPTX_SAMPLE_FILE_NAME, {
+      type:
+        blob.type ||
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    }),
+  };
+}
+
+function consumeLocalPowerPointSampleImportRequest() {
+  if (typeof window === 'undefined') return false;
+  const nextUrl = new URL(window.location.href);
+  if (nextUrl.searchParams.get(LOCAL_PPTX_SAMPLE_IMPORT_PARAM) !== '1') return false;
+  nextUrl.searchParams.delete(LOCAL_PPTX_SAMPLE_IMPORT_PARAM);
+  window.history.replaceState(
+    window.history.state,
+    '',
+    `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`,
+  );
+  return true;
 }
 
 function getMinimumTextHeight(text: string, fontSize: number) {
@@ -1936,6 +1967,19 @@ export function useEditorViewModel(services: AppServices) {
       setPersistenceNotice(`PowerPoint import failed: ${message}`);
     }
   }
+
+  const importPowerPointRef = useRef(importPowerPoint);
+
+  useEffect(() => {
+    if (!consumeLocalPowerPointSampleImportRequest()) return;
+    void loadLocalPowerPointSampleInput()
+      .then((input) => importPowerPointRef.current(input))
+      .catch((error: unknown) => {
+        pptxImportLogger.error('Local PowerPoint sample import failed.', error);
+        const message = pptxImportLogger.describeError(error).message;
+        setPersistenceNotice(`PowerPoint import failed: ${message}`);
+      });
+  }, []);
 
   function openSettings() {
     setSettingsOpen(true);

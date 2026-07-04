@@ -2,7 +2,9 @@
   "files": [],
   "references": [
     { "path": "./packages/brand" },
+    { "path": "./packages/presenter-remote" },
     { "path": "./apps/landing" },
-    { "path": "./apps/editor" }
+    { "path": "./apps/editor" },
+    { "path": "./apps/joystick" }
   ]
 }

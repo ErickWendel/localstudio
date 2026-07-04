@@ -173,6 +173,7 @@ export function TopToolbar({
   const [isEditingProjectName, setIsEditingProjectName] = useState(false);
   const [projectNameDraft, setProjectNameDraft] = useState(project.name);
   const projectNameInputRef = useRef<HTMLInputElement>(null);
+  const toolbarMenuRef = useRef<HTMLElement>(null);
   const translationMenuRef = useRef<HTMLDivElement>(null);
   const stars = useAnimatedStarCount(githubStarCount);
 
@@ -200,6 +201,24 @@ export function TopToolbar({
       document.removeEventListener('pointerdown', closeTranslationMenuOnOutsidePointer);
     };
   }, [translationMenuOpen]);
+
+  useEffect(() => {
+    if (!openMenu) return;
+
+    const closeHeaderMenuOnOutsidePointer = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (toolbarMenuRef.current?.contains(target)) return;
+
+      setOpenMenu(null);
+    };
+
+    document.addEventListener('pointerdown', closeHeaderMenuOnOutsidePointer);
+
+    return () => {
+      document.removeEventListener('pointerdown', closeHeaderMenuOnOutsidePointer);
+    };
+  }, [openMenu]);
 
   function triggerShare() {
     onShare?.();
@@ -351,7 +370,7 @@ export function TopToolbar({
     <header className="top-toolbar">
       <div className="toolbar-left">
         <h1 className="toolbar-product-title font-orbitron">LocalStudio.dev</h1>
-        <nav className="toolbar-menu" aria-label="Application menu">
+        <nav className="toolbar-menu" aria-label="Application menu" ref={toolbarMenuRef}>
           {menuLabels.map((item) => (
             <div className="toolbar-menu-shell" key={item}>
               <button

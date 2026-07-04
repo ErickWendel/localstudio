@@ -60,6 +60,7 @@
 @import './styles/keyboard-shortcuts.css';
 @import './styles/slide-navigator.css';
 @import './styles/presenter.css';
+@import './styles/presenter-remote.css';
 @import './styles/presenter-notes.css';
 @import './styles/presenter-intro.css';
 @import './styles/responsive.css';

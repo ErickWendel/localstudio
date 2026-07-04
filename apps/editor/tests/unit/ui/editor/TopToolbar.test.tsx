@@ -111,6 +111,24 @@ describe('TopToolbar', () => {
     expect(onOpenKeyboardShortcuts).toHaveBeenCalledTimes(1);
   });
 
+  it('closes header menus when clicking outside them', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <div>
+        <TopToolbar project={sampleProject.createSampleProject()} language="PT-BR" />
+        <button type="button">Outside target</button>
+      </div>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    expect(screen.getByRole('menu', { name: 'File menu' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Outside target' }));
+
+    expect(screen.queryByRole('menu', { name: 'File menu' })).not.toBeInTheDocument();
+  });
+
   it('translates the deck from the toolbar icon beside persistence', async () => {
     const user = userEvent.setup();
     const onTranslateDeck = vi.fn();

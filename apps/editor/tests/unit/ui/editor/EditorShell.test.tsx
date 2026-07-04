@@ -1958,6 +1958,17 @@ describe('EditorShell', () => {
     });
   });
 
+  it('keeps the remote control panel closed on editor load', async () => {
+    render(<EditorShell services={createAppServices()} />);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByRole('region', { name: 'Remote control this presentation' })).not.toBeInTheDocument();
+  });
+
   it('opens presenter view with an audience fullscreen prompt and closes the popup on fullscreen exit', async () => {
     const user = userEvent.setup();
     let fullscreenElement: Element | null = null;
@@ -1996,7 +2007,17 @@ describe('EditorShell', () => {
     expect(openWindow).toHaveBeenCalledTimes(1);
     expect(popup.location.href).toContain('presenter=1');
     expect(screen.getByRole('dialog', { name: 'Audience Window' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Remote control this presentation' })).toBeInTheDocument();
+    expect(await screen.findByRole('img', { name: 'Remote control QR code' })).toHaveAttribute(
+      'src',
+      expect.stringContaining('data:image/png'),
+    );
+    expect(screen.getByRole('button', { name: 'Copy remote link' })).toBeInTheDocument();
     expect(requestFullscreen).not.toHaveBeenCalled();
+
+    await user.click(screen.getByLabelText('Canvas workspace'));
+
+    expect(screen.queryByRole('region', { name: 'Remote control this presentation' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Enter full screen mode' }));
 

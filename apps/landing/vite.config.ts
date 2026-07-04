@@ -1,6 +1,9 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Connect } from 'vite';
 import { rewriteEditorPreviewRoute } from './src/routing/rewriteEditorPreviewRoute';
+import { localNetworkOriginRoute } from '../../scripts/vite/localNetworkOriginRoute';
+import { localPowerPointSampleRoute } from '../../scripts/vite/localPowerPointSampleRoute';
+import { presenterRemoteSignalingRoute } from '../../scripts/vite/presenterRemoteSignalingRoute';
 
 const siteBase = process.env.LOCALSTUDIO_BASE_PATH ?? '/';
 
@@ -18,7 +21,13 @@ function editorPreviewRouteFallback() {
 
 export default defineConfig({
   base: siteBase,
-  plugins: [editorPreviewRouteFallback(), react()],
+  plugins: [
+    localNetworkOriginRoute(),
+    localPowerPointSampleRoute(),
+    presenterRemoteSignalingRoute(),
+    editorPreviewRouteFallback(),
+    react(),
+  ],
   build: {
     emptyOutDir: true,
     outDir: '../../dist',
