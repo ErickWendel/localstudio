@@ -85,8 +85,8 @@ const shortcutGroups = [
     title: 'Movies',
     items: [
       { action: 'play-pause-movie', keys: ['K'], label: 'Pause/Play movie' },
-      { action: 'rewind-movie', keys: ['J'], label: 'Rewind movie (by frame, if paused)' },
-      { action: 'fast-forward-movie', keys: ['L'], label: 'Fast forward movie (by frame, if paused)' },
+      { action: 'rewind-movie', keys: ['J'], label: 'Hold to rewind movie' },
+      { action: 'fast-forward-movie', keys: ['L'], label: 'Hold to fast forward movie' },
       { action: 'jump-movie-start', keys: ['I'], label: 'Jump to beginning of movie' },
       { action: 'jump-movie-end', keys: ['O'], label: 'Jump to end of movie' },
     ],

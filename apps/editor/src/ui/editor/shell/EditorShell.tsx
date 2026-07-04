@@ -25,6 +25,10 @@ import { ScrollingCanvasWorkspace } from '../canvas/ScrollingCanvasWorkspace';
 import { SettingsPanel } from '../panels/SettingsPanel';
 import { TopToolbar } from '../toolbars/TopToolbar';
 import { VersionHistoryPanel } from '../panels/VersionHistoryPanel';
+import {
+  presentationMovieControls,
+  type MovieHoldState,
+} from '../media/presentationMovieControls';
 import { useEditorViewModel } from '../state/useEditorViewModel';
 import { SharePanel } from '../../share/SharePanel';
 import {
@@ -67,6 +71,7 @@ const editorShortcutActions = [
 export function EditorShell({ services }: EditorShellProps) {
   const vm = useEditorViewModel(services);
   const automationDelegateRef = useRef(vm.automation);
+  const movieHoldStateRef = useRef<MovieHoldState | undefined>(undefined);
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
   const [designFontFocusKey, setDesignFontFocusKey] = useState(0);
   const [speakerNotesOpen, setSpeakerNotesOpen] = useState(false);
@@ -196,35 +201,29 @@ export function EditorShell({ services }: EditorShellProps) {
     return Array.from(slideFrameRef.current?.querySelectorAll('video') ?? []);
   }
 
-  function getVideoTrimStart(video: HTMLVideoElement) {
-    const trimStart = Number(video.dataset.trimStart);
-    return Number.isFinite(trimStart) ? Math.max(0, trimStart) : 0;
-  }
-
-  function getVideoTrimEnd(video: HTMLVideoElement) {
-    const trimEnd = Number(video.dataset.trimEnd);
-    if (Number.isFinite(trimEnd) && trimEnd > 0) return trimEnd;
-    return Number.isFinite(video.duration) ? video.duration : video.currentTime;
-  }
-
-  const controlPresentationMovies = useCallback((action: 'end' | 'forward' | 'play-toggle' | 'rewind' | 'start') => {
+  const controlPresentationMovies = useCallback((action: 'end' | 'play-toggle' | 'start') => {
     const videos = getPresentationVideos();
-    if (videos.length === 0) return false;
-    const frameStepSeconds = 1 / 30;
-    for (const video of videos) {
-      if (action === 'play-toggle') {
-        if (video.paused) void video.play();
-        else video.pause();
-        continue;
-      }
-      const trimStart = getVideoTrimStart(video);
-      const trimEnd = getVideoTrimEnd(video);
-      if (action === 'start') video.currentTime = trimStart;
-      if (action === 'end') video.currentTime = trimEnd;
-      if (action === 'rewind') video.currentTime = Math.max(trimStart, video.currentTime - frameStepSeconds);
-      if (action === 'forward') video.currentTime = Math.min(trimEnd, video.currentTime + frameStepSeconds);
-    }
-    return true;
+    return presentationMovieControls.control(videos, action);
+  }, []);
+
+  const pulsePresentationMovieHold = useCallback((action: 'fast-forward' | 'rewind') => {
+    movieHoldStateRef.current = presentationMovieControls.pulse(
+      getPresentationVideos(),
+      action,
+      movieHoldStateRef.current,
+    );
+  }, []);
+
+  const startPresentationMovieHold = useCallback((action: 'fast-forward' | 'rewind') => {
+    movieHoldStateRef.current = presentationMovieControls.startHold(
+      getPresentationVideos(),
+      action,
+      movieHoldStateRef.current,
+    );
+  }, []);
+
+  const stopPresentationMovieHold = useCallback(() => {
+    movieHoldStateRef.current = presentationMovieControls.stopHold(movieHoldStateRef.current);
   }, []);
 
   function showSlideNumber() {
@@ -316,8 +315,8 @@ export function EditorShell({ services }: EditorShellProps) {
       return;
     }
     if (action === 'play-pause-movie') controlPresentationMovies('play-toggle');
-    if (action === 'rewind-movie') controlPresentationMovies('rewind');
-    if (action === 'fast-forward-movie') controlPresentationMovies('forward');
+    if (action === 'rewind-movie') pulsePresentationMovieHold('rewind');
+    if (action === 'fast-forward-movie') pulsePresentationMovieHold('fast-forward');
     if (action === 'jump-movie-start') controlPresentationMovies('start');
     if (action === 'jump-movie-end') controlPresentationMovies('end');
   }
@@ -495,12 +494,12 @@ export function EditorShell({ services }: EditorShellProps) {
         }
         if (lowerKey === 'j') {
           event.preventDefault();
-          controlPresentationMovies('rewind');
+          if (!event.repeat) startPresentationMovieHold('rewind');
           return;
         }
         if (lowerKey === 'l') {
           event.preventDefault();
-          controlPresentationMovies('forward');
+          if (!event.repeat) startPresentationMovieHold('fast-forward');
           return;
         }
         if (lowerKey === 'i') {
@@ -553,9 +552,16 @@ export function EditorShell({ services }: EditorShellProps) {
       vm.deleteSelectedElement();
     }
 
+    function handleKeyUp(event: KeyboardEvent) {
+      if (event.key.toLowerCase() !== 'j' && event.key.toLowerCase() !== 'l') return;
+      stopPresentationMovieHold();
+    }
+
     window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
     };
   }, [
     activePageIndex,
@@ -567,10 +573,18 @@ export function EditorShell({ services }: EditorShellProps) {
     playRelativePresentationSlide,
     presentationBlankScreen,
     presentationPaused,
+    startPresentationMovieHold,
     slideNavigatorIndex,
     slideNavigatorOpen,
+    stopPresentationMovieHold,
     vm,
   ]);
+
+  useEffect(() => {
+    return () => {
+      movieHoldStateRef.current = presentationMovieControls.stopHold(movieHoldStateRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     automationDelegateRef.current = vm.automation;

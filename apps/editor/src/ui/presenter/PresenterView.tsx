@@ -12,6 +12,10 @@ import {
   type KeyboardShortcutAction,
 } from '../components/KeyboardShortcutsDialog';
 import { CanvasWorkspace } from '../editor/canvas/CanvasWorkspace';
+import {
+  presentationMovieControls,
+  type MovieHoldState,
+} from '../editor/media/presentationMovieControls';
 
 interface PresenterViewProps {
   sessionId?: string;
@@ -136,6 +140,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
   const [dismissIntroForever, setDismissIntroForever] = useState(false);
   const emptySelection = useMemo<SelectionState>(() => ({ elementIds: [], pageId: '' }), []);
   const openerRef = useRef<Window | null>(getPresenterOpener());
+  const movieHoldStateRef = useRef<MovieHoldState | undefined>(undefined);
   const presenterStageRef = useRef<HTMLElement>(null);
   const notesRef = useRef<HTMLTextAreaElement>(null);
   const resolvedSessionId = sessionId ?? 'presenter';
@@ -224,35 +229,29 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     return Array.from(presenterStageRef.current?.querySelectorAll('video') ?? []);
   }
 
-  function getVideoTrimStart(video: HTMLVideoElement) {
-    const trimStart = Number(video.dataset.trimStart);
-    return Number.isFinite(trimStart) ? Math.max(0, trimStart) : 0;
-  }
-
-  function getVideoTrimEnd(video: HTMLVideoElement) {
-    const trimEnd = Number(video.dataset.trimEnd);
-    if (Number.isFinite(trimEnd) && trimEnd > 0) return trimEnd;
-    return Number.isFinite(video.duration) ? video.duration : video.currentTime;
-  }
-
-  const controlPresenterMovies = useCallback((action: 'end' | 'forward' | 'play-toggle' | 'rewind' | 'start') => {
+  const controlPresenterMovies = useCallback((action: 'end' | 'play-toggle' | 'start') => {
     const videos = getPresenterVideos();
-    if (videos.length === 0) return false;
-    const frameStepSeconds = 1 / 30;
-    for (const video of videos) {
-      if (action === 'play-toggle') {
-        if (video.paused) void video.play();
-        else video.pause();
-        continue;
-      }
-      const trimStart = getVideoTrimStart(video);
-      const trimEnd = getVideoTrimEnd(video);
-      if (action === 'start') video.currentTime = trimStart;
-      if (action === 'end') video.currentTime = trimEnd;
-      if (action === 'rewind') video.currentTime = Math.max(trimStart, video.currentTime - frameStepSeconds);
-      if (action === 'forward') video.currentTime = Math.min(trimEnd, video.currentTime + frameStepSeconds);
-    }
-    return true;
+    return presentationMovieControls.control(videos, action);
+  }, []);
+
+  const pulsePresenterMovieHold = useCallback((action: 'fast-forward' | 'rewind') => {
+    movieHoldStateRef.current = presentationMovieControls.pulse(
+      getPresenterVideos(),
+      action,
+      movieHoldStateRef.current,
+    );
+  }, []);
+
+  const startPresenterMovieHold = useCallback((action: 'fast-forward' | 'rewind') => {
+    movieHoldStateRef.current = presentationMovieControls.startHold(
+      getPresenterVideos(),
+      action,
+      movieHoldStateRef.current,
+    );
+  }, []);
+
+  const stopPresenterMovieHold = useCallback(() => {
+    movieHoldStateRef.current = presentationMovieControls.stopHold(movieHoldStateRef.current);
   }, []);
 
   const goToPage = useCallback((index: number) => {
@@ -333,8 +332,8 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
       return;
     }
     if (action === 'play-pause-movie') controlPresenterMovies('play-toggle');
-    if (action === 'rewind-movie') controlPresenterMovies('rewind');
-    if (action === 'fast-forward-movie') controlPresenterMovies('forward');
+    if (action === 'rewind-movie') pulsePresenterMovieHold('rewind');
+    if (action === 'fast-forward-movie') pulsePresenterMovieHold('fast-forward');
     if (action === 'jump-movie-start') controlPresenterMovies('start');
     if (action === 'jump-movie-end') controlPresenterMovies('end');
     if (action === 'quit-presentation') window.close();
@@ -342,6 +341,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     activePageIndex,
     controlPresenterMovies,
     goToPage,
+    pulsePresenterMovieHold,
     postCommand,
     resetTimer,
     slideNavigatorIndex,
@@ -457,12 +457,12 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
       }
       if (lowerKey === 'j') {
         event.preventDefault();
-        executePresenterShortcut('rewind-movie');
+        if (!event.repeat) startPresenterMovieHold('rewind');
         return;
       }
       if (lowerKey === 'l') {
         event.preventDefault();
-        executePresenterShortcut('fast-forward-movie');
+        if (!event.repeat) startPresenterMovieHold('fast-forward');
         return;
       }
       if (lowerKey === 'i') {
@@ -476,8 +476,17 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
       }
     }
 
+    function handleKeyUp(event: KeyboardEvent) {
+      if (event.key.toLowerCase() !== 'j' && event.key.toLowerCase() !== 'l') return;
+      stopPresenterMovieHold();
+    }
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
   }, [
     activePageIndex,
     controlPresenterMovies,
@@ -489,7 +498,15 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     slideNavigatorIndex,
     slideNavigatorOpen,
     snapshot,
+    startPresenterMovieHold,
+    stopPresenterMovieHold,
   ]);
+
+  useEffect(() => {
+    return () => {
+      movieHoldStateRef.current = presentationMovieControls.stopHold(movieHoldStateRef.current);
+    };
+  }, []);
 
   const introOverlay = !introDismissed ? (
     <div className="presenter-intro-backdrop" role="presentation">
