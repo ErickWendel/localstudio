@@ -29,12 +29,15 @@ interface PresenterRemoteStreamReceiverOptions {
 }
 
 class PresenterRemoteStreamReceiver {
-  private answerPollIntervalId = 0;
+  private answerPollTimeoutId = 0;
   private dataChannel: RTCDataChannel | undefined;
-  private icePollIntervalId = 0;
+  private icePollTimeoutId = 0;
+  private icePollDelayMs = 500;
   private readonly onStatusChange: PresenterRemoteStreamReceiverOptions['onStatusChange'];
   private readonly onStream: PresenterRemoteStreamReceiverOptions['onStream'];
   private readonly options: PresenterRemoteStreamReceiverOptions;
+  private answerPollDelayMs = 150;
+  private currentStream: MediaStream | undefined;
   private pendingPreference: PresenterRemoteStreamPreference | undefined;
   private peerConnection: RTCPeerConnection | undefined;
   private started = false;
@@ -62,6 +65,10 @@ class PresenterRemoteStreamReceiver {
     peerConnection.addTransceiver('video', { direction: 'recvonly' });
     peerConnection.ontrack = (event) => {
       const stream = event.streams[0] ?? new MediaStream([event.track]);
+      if (this.currentStream && this.currentStream !== stream) {
+        stopMediaStream(this.currentStream);
+      }
+      this.currentStream = stream;
       this.onStream(stream);
       this.onStatusChange('connected');
     };
@@ -73,7 +80,10 @@ class PresenterRemoteStreamReceiver {
       });
     };
     peerConnection.onconnectionstatechange = () => {
-      if (peerConnection.connectionState === 'connected') this.onStatusChange('connected');
+      if (peerConnection.connectionState === 'connected') {
+        this.icePollDelayMs = 1500;
+        this.onStatusChange('connected');
+      }
       if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
         this.onStatusChange('failed');
       }
@@ -85,13 +95,8 @@ class PresenterRemoteStreamReceiver {
       this.options.controllerId,
       offer.sdp ?? '',
     );
-    this.answerPollIntervalId = window.setInterval(() => {
-      void this.tryApplyAnswer();
-    }, 500);
-    this.icePollIntervalId = window.setInterval(() => {
-      void this.takePresenterIce();
-    }, 500);
-    await this.tryApplyAnswer();
+    this.scheduleAnswerPoll(0);
+    this.scheduleIcePoll(250);
   }
 
   sendCommand(command: PresenterRemoteCommand) {
@@ -108,23 +113,28 @@ class PresenterRemoteStreamReceiver {
   }
 
   stop() {
-    window.clearInterval(this.answerPollIntervalId);
-    window.clearInterval(this.icePollIntervalId);
+    window.clearTimeout(this.answerPollTimeoutId);
+    window.clearTimeout(this.icePollTimeoutId);
     this.dataChannel?.close();
     this.peerConnection?.close();
+    if (this.currentStream) stopMediaStream(this.currentStream);
     this.dataChannel = undefined;
+    this.currentStream = undefined;
     this.peerConnection = undefined;
     this.onStream(undefined);
-    void this.options.signaling.closeController?.(this.options.sessionCode, this.options.controllerId);
+    void Promise.resolve(this.options.signaling.closeController?.(this.options.sessionCode, this.options.controllerId))
+      .catch(() => undefined);
   }
 
   private async tryApplyAnswer() {
     const peerConnection = this.peerConnection;
     if (!peerConnection || peerConnection.remoteDescription) return;
-    const answerSdp = await this.options.signaling.getAnswer?.(this.options.sessionCode, this.options.controllerId);
+    const answerSdp = await Promise.resolve(
+      this.options.signaling.getAnswer?.(this.options.sessionCode, this.options.controllerId),
+    ).catch(() => undefined);
     if (!answerSdp) return;
     await peerConnection.setRemoteDescription({ sdp: answerSdp, type: 'answer' });
-    window.clearInterval(this.answerPollIntervalId);
+    window.clearTimeout(this.answerPollTimeoutId);
   }
 
   private async takePresenterIce() {
@@ -139,6 +149,27 @@ class PresenterRemoteStreamReceiver {
       await peerConnection.addIceCandidate(candidate).catch(() => undefined);
     }
   }
+
+  private scheduleAnswerPoll(delayMs: number) {
+    window.clearTimeout(this.answerPollTimeoutId);
+    this.answerPollTimeoutId = window.setTimeout(() => {
+      void this.tryApplyAnswer().finally(() => {
+        if (!this.peerConnection || this.peerConnection.remoteDescription) return;
+        this.answerPollDelayMs = Math.min(1500, Math.round(this.answerPollDelayMs * 1.6));
+        this.scheduleAnswerPoll(this.answerPollDelayMs);
+      });
+    }, delayMs);
+  }
+
+  private scheduleIcePoll(delayMs: number) {
+    window.clearTimeout(this.icePollTimeoutId);
+    this.icePollTimeoutId = window.setTimeout(() => {
+      void this.takePresenterIce().finally(() => {
+        if (!this.peerConnection) return;
+        this.scheduleIcePoll(this.icePollDelayMs);
+      });
+    }, delayMs);
+  }
 }
 
 function canUseWebRtc(signaling: PresenterRemoteStreamSignaling) {
@@ -147,6 +178,10 @@ function canUseWebRtc(signaling: PresenterRemoteStreamSignaling) {
     typeof MediaStream !== 'undefined' &&
     Boolean(signaling.createControllerOffer && signaling.getAnswer && signaling.publishIceCandidate)
   );
+}
+
+function stopMediaStream(stream: MediaStream) {
+  stream.getTracks().forEach((track) => track.stop());
 }
 
 export const presenterRemoteStreamReceiver = {

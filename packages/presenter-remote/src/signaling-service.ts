@@ -180,10 +180,10 @@ export class InMemoryPresenterRemoteSignalingService {
     this.pruneExpiredSessions();
     const storedSession = this.sessions.get(presenterRemoteSessionCode.normalize(sessionCode));
     if (!storedSession) return false;
-    const deleted = storedSession.webRtcControllers.delete(controllerId);
+    storedSession.webRtcControllers.delete(controllerId);
     storedSession.connectedControllers.delete(controllerId);
     storedSession.session.connectedControllerCount = storedSession.connectedControllers.size;
-    return deleted;
+    return true;
   }
 
   publishState(sessionCode: string, state: PresenterRemoteState) {
