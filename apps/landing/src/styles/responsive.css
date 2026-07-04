@@ -38,6 +38,22 @@
   .demo-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .demo-grid--stair .demo-card:nth-child(n + 5) {
+    transform: none;
+  }
+
+  .demo-grid--stair .demo-card:last-child {
+    transform: translateX(calc(50% + 7px));
+  }
+
+  .demo-grid--stair .demo-card:nth-child(n + 5):hover {
+    transform: translateY(-4px);
+  }
+
+  .demo-grid--stair .demo-card:last-child:hover {
+    transform: translate(calc(50% + 7px), -4px);
+  }
 }
 
 @media (max-width: 760px) {
@@ -102,9 +118,26 @@
     max-width: 84%;
   }
 
-  .workflow-tabs button {
-    flex: 1 1 150px;
-    justify-content: center;
+  .workflow-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workflow-tabs--stair button:nth-child(n + 5) {
+    transform: none;
+  }
+
+  .workflow-tabs--stair button:last-child {
+    transform: translateX(calc(50% + 4px));
+  }
+
+  .workflow-tabs--stair button:nth-child(n + 5):hover,
+  .workflow-tabs--stair button:nth-child(n + 5):focus-visible {
+    transform: translateY(-1px);
+  }
+
+  .workflow-tabs--stair button:last-child:hover,
+  .workflow-tabs--stair button:last-child:focus-visible {
+    transform: translate(calc(50% + 4px), -1px);
   }
 
   .github-star-button {
@@ -116,7 +149,7 @@
   }
 
   .demo-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .requirements-grid {
@@ -166,6 +199,19 @@
 
   .header-cta svg {
     color: var(--ls-on-primary);
+  }
+
+  .workflow-tabs,
+  .demo-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workflow-tabs--stair button:last-child,
+  .workflow-tabs--stair button:last-child:hover,
+  .workflow-tabs--stair button:last-child:focus-visible,
+  .demo-grid--stair .demo-card:last-child,
+  .demo-grid--stair .demo-card:last-child:hover {
+    transform: none;
   }
 }
 

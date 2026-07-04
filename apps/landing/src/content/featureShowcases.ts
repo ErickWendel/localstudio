@@ -1,5 +1,19 @@
 export const featureShowcases = [
   {
+    id: 'pptx',
+    eyebrow: 'PowerPoint (.pptx)',
+    title: 'Bring your existing presentations to LocalStudio.',
+    copy: 'Google Slides? Keynote? Export as .pptx and import into LocalStudio. Your existing presentation becomes the starting point for a local, editable deck.',
+    bullets: ['Import .pptx files from the editor', 'Turn existing decks into editable projects', 'Keep refining with local AI workflows'],
+  },
+  {
+    id: 'presenter',
+    eyebrow: 'Presenter mode',
+    title: 'Present with confidence from LocalStudio.',
+    copy: 'Presenter mode gives speakers a dedicated view with timer, notes, and slide controls, so the same deck moves from editing to delivery without leaving the browser.',
+    bullets: ['Speaker timer and notes', 'Next and previous slide controls', 'Fullscreen presenter playback'],
+  },
+  {
     id: 'prompt',
     eyebrow: 'Prompt-to-slide',
     title: 'Generate a real slide structure, then keep editing every layer.',
@@ -33,5 +47,12 @@ export const featureShowcases = [
     title: 'Project files, assets, and history stay in a folder you control.',
     copy: 'The editor is local-first: project JSON, assets, cache, and version snapshots live on disk while model weights stay in browser-managed caches.',
     bullets: ['File System Access API', 'Local version history', 'No account or cloud workspace required'],
+  },
+  {
+    id: 's3',
+    eyebrow: 'S3-compatible mirror',
+    title: 'S3-compatible projects can still publish public links.',
+    copy: 'MinIO works as the local/self-hosted example, while the same project mirror shape fits AWS S3, R2, or any compatible endpoint.',
+    bullets: ['Project JSON and assets', 'Version history and config', 'Public share payloads'],
   },
 ] as const;

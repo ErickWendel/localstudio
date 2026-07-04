@@ -18,21 +18,34 @@
   margin-top: 22px;
 }
 
-.hero-status-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 18px;
+.hero-cta {
+  position: relative;
+  isolation: isolate;
+  overflow: visible;
 }
 
-.hero-status-row span {
-  border: 1px solid rgba(54, 215, 255, 0.24);
-  border-radius: 999px;
-  padding: 7px 9px;
-  background: rgba(0, 0, 0, 0.42);
-  color: var(--ls-muted);
-  font-size: 12px;
-  font-weight: 900;
+.hero-cta-snake {
+  position: absolute;
+  inset: -4px;
+  pointer-events: none;
+}
+
+.hero-cta-snake svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.hero-cta-snake rect {
+  fill: none;
+  stroke: var(--ls-green-fixed);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-dasharray: 15 85;
+  stroke-dashoffset: 0;
+  filter: drop-shadow(0 0 5px rgba(105, 255, 137, 0.68));
+  animation: hero-cta-snake-crawl 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
 .workflow-carousel {
@@ -511,29 +524,43 @@
 }
 
 .workflow-tabs {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
 .workflow-tabs button {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
+  min-height: 52px;
   border: 1px solid rgba(105, 255, 137, 0.28);
   border-radius: 999px;
-  padding: 8px 11px;
+  padding: 8px 14px;
   background: rgba(0, 0, 0, 0.54);
   color: var(--ls-muted);
   font: inherit;
   font-size: 12px;
   font-weight: 800;
+  line-height: 1.18;
+  text-align: center;
   cursor: pointer;
   transition:
     border-color var(--motion-fast, 150ms) ease,
     color var(--motion-fast, 150ms) ease,
     background var(--motion-fast, 150ms) ease,
     transform var(--motion-fast, 150ms) ease;
+}
+
+.workflow-tabs button svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+}
+
+.workflow-tabs--stair button:nth-child(n + 5) {
+  transform: translateX(calc(50% + 4px));
 }
 
 .workflow-tabs button:hover,
@@ -549,6 +576,11 @@
   transform: translateY(-1px);
 }
 
+.workflow-tabs--stair button:nth-child(n + 5):hover,
+.workflow-tabs--stair button:nth-child(n + 5):focus-visible {
+  transform: translate(calc(50% + 4px), -1px);
+}
+
 @keyframes progress-loop {
   0% {
     transform: translateX(-80%);
@@ -560,6 +592,16 @@
 
   100% {
     transform: translateX(128%);
+  }
+}
+
+@keyframes hero-cta-snake-crawl {
+  0% {
+    stroke-dashoffset: 0;
+  }
+
+  100% {
+    stroke-dashoffset: -100;
   }
 }
 

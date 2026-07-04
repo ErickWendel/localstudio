@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LandingPage } from '../../src/LandingPage';
@@ -43,7 +43,11 @@ describe('LandingPage', () => {
 
     expect(screen.getByRole('heading', { name: /Design slides with local AI/i })).toBeInTheDocument();
     expect(screen.getByText(/one continuous slide workflow/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Google Slides\? Keynote\? Export as \.pptx/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText('Beta').length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText('LocalStudio workflow path')).not.toBeInTheDocument();
+    expect(screen.queryByText('Live editor')).not.toBeInTheDocument();
+    expect(screen.queryByText('Browser API')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'About it' })).toHaveAttribute('href', '#top');
     expect(screen.getByRole('link', { name: 'Features' })).toHaveAttribute('href', '#features');
     expect(screen.getByRole('link', { name: 'WebMCP Showcase' })).toHaveAttribute('href', '#webmcp');
@@ -53,7 +57,13 @@ describe('LandingPage', () => {
     expect(screen.queryByRole('link', { name: 'Showcase' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Web AI' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Thanks' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Open editor/i })).toHaveAttribute('href', '/editor/');
+    const openEditorLinks = screen.getAllByRole('link', { name: /Open editor/i });
+    expect(openEditorLinks).toHaveLength(2);
+    const heroOpenEditorLink = openEditorLinks[1]!;
+    expect(heroOpenEditorLink).toHaveClass('header-cta');
+    expect(heroOpenEditorLink).toHaveClass('hero-cta');
+    expect(heroOpenEditorLink.querySelector('.hero-cta-snake')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Launch editor/i })).not.toBeInTheDocument();
   });
 
   it('marks the current landing section in the header nav without changing anchor destinations', () => {
@@ -103,24 +113,41 @@ describe('LandingPage', () => {
   it('keeps workflow steps product-focused instead of model-focused', () => {
     render(<LandingPage />);
 
+    const workflowTabs = screen.getAllByRole('tab');
+
+    expect(screen.getByRole('tablist', { name: 'Choose workflow demo' })).toHaveClass('workflow-tabs--stair');
+    expect(workflowTabs.every((tab) => tab.classList.contains('workflow-tab'))).toBe(true);
+    expect(workflowTabs[0]).toHaveTextContent(/Import existing presentations/i);
+    expect(screen.getByRole('img', { name: /PowerPoint \(\.pptx\) import workflow/i })).toHaveAttribute(
+      'src',
+      '/powerpoint-import.gif',
+    );
     expect(screen.getByRole('tab', { name: /Prompt-to-slide/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Prompt-to-image/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Powered by Web AI/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/Prompt-to-slide workflow/i).querySelector('source')).toHaveAttribute(
-      'src',
-      '/prompt-to-slide.mp4',
-    );
-    expect(screen.getByLabelText(/Prompt-to-slide workflow/i)).toHaveAttribute('preload', 'metadata');
     expect(screen.queryByText('Chrome Prompt API')).not.toBeInTheDocument();
     expect(screen.queryByText('Bonsai Image WebGPU')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Share your slides' })).toBeInTheDocument();
     expect(screen.getByText(/use your own external storage/i)).toBeInTheDocument();
     expect(screen.getByText(/reimport it into different machines/i)).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Remove backgrounds' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Edit images' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Watch workflow steps')).toHaveClass('demo-grid--stair');
   });
 
   it('lets people choose workflow demos from the hero carousel', async () => {
     const user = userEvent.setup();
     render(<LandingPage />);
+
+    const promptTab = screen.getByRole('tab', { name: /Prompt-to-slide/i });
+    await user.click(promptTab);
+
+    expect(promptTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByLabelText(/Prompt-to-slide workflow/i).querySelector('source')).toHaveAttribute(
+      'src',
+      '/prompt-to-slide.mp4',
+    );
+    expect(screen.getByLabelText(/Prompt-to-slide workflow/i)).toHaveAttribute('preload', 'metadata');
 
     const imageTab = screen.getByRole('tab', { name: /Prompt-to-image/i });
     await user.click(imageTab);
@@ -169,6 +196,8 @@ describe('LandingPage', () => {
   it('automatically advances workflow demos when the active video finishes', () => {
     render(<LandingPage />);
 
+    fireEvent.click(screen.getByRole('tab', { name: /Prompt-to-slide/i }));
+
     expect(screen.getByRole('tab', { name: /Prompt-to-slide/i })).toHaveAttribute('aria-selected', 'true');
 
     fireEvent.ended(screen.getByLabelText(/Prompt-to-slide workflow/i));
@@ -184,6 +213,8 @@ describe('LandingPage', () => {
     stubReducedMotion(true);
     render(<LandingPage />);
 
+    fireEvent.click(screen.getByRole('tab', { name: /Prompt-to-slide/i }));
+
     expect(screen.getByRole('tab', { name: /Prompt-to-slide/i })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByLabelText('9999 GitHub stars')).toHaveTextContent('9999');
 
@@ -196,26 +227,68 @@ describe('LandingPage', () => {
   it('explains S3-compatible mirroring as the bridge from local projects to public links', () => {
     render(<LandingPage />);
 
-    expect(screen.getByRole('heading', { name: /Local projects can still publish public links/i })).toBeInTheDocument();
-    expect(screen.getByText(/S3-compatible storage keeps viewer assets reachable/i)).toBeInTheDocument();
-    expect(screen.getByText(/MinIO works as the local\/self-hosted example/i)).toBeInTheDocument();
+    const showcaseSection = screen.getByRole('heading', { name: /Every AI action returns to the editor/i }).closest('section');
+    if (!showcaseSection) {
+      throw new Error('Feature showcase section was not rendered.');
+    }
+
+    expect(
+      within(showcaseSection).getByRole('heading', { name: /S3-compatible projects can still publish public links/i }),
+    ).toBeInTheDocument();
+    expect(within(showcaseSection).getByText(/MinIO works as the local\/self-hosted example/i)).toBeInTheDocument();
     expect(screen.getByText(/AWS S3, R2, or any compatible endpoint/i)).toBeInTheDocument();
-    expect(screen.getByLabelText('Feature details')).toContainElement(
-      screen.getByRole('heading', { name: /Local projects can still publish public links/i }),
+    expect(within(showcaseSection).getByText('Project JSON and assets')).toBeInTheDocument();
+    expect(within(showcaseSection).getByText('Version history and config')).toBeInTheDocument();
+    expect(within(showcaseSection).getByText('Public share payloads')).toBeInTheDocument();
+    expect(within(showcaseSection).getByRole('img', { name: /S3-compatible project storage/i })).toHaveAttribute(
+      'src',
+      '/s3-projects.gif',
     );
-    expect(screen.getByText('project.json')).toBeInTheDocument();
-    expect(screen.getByText('assets/')).toBeInTheDocument();
-    expect(screen.getByText('history/')).toBeInTheDocument();
-    expect(screen.getByText('config/')).toBeInTheDocument();
-    expect(screen.getByText('share.json')).toBeInTheDocument();
-    expect(screen.getByLabelText('Local-to-public S3 mirror flow')).toHaveAttribute('data-motion', 'active');
+    expect(screen.queryByLabelText('Local-to-public S3 mirror flow')).not.toBeInTheDocument();
   });
 
-  it('renders the S3 mirror diagram as a static flow for reduced-motion users', () => {
+  it('features PowerPoint import first and uses media for the S3 project feature', () => {
+    render(<LandingPage />);
+
+    const featuresSection = screen.getByRole('heading', { name: /Every AI action returns to the editor/i }).closest('section');
+    if (!featuresSection) {
+      throw new Error('Feature showcase section was not rendered.');
+    }
+    const showcaseHeadings = within(featuresSection).getAllByRole('heading', { level: 3 });
+
+    expect(showcaseHeadings[0]).toHaveTextContent(/Bring your existing presentations to LocalStudio/i);
+    expect(showcaseHeadings[1]).toHaveTextContent(/Present with confidence from LocalStudio/i);
+    expect(within(featuresSection).getByText(/Google Slides\? Keynote\?/i)).toBeInTheDocument();
+    expect(within(featuresSection).getByText(/Export as \.pptx and import into LocalStudio/i)).toBeInTheDocument();
+    expect(within(featuresSection).getByRole('img', { name: /PowerPoint \(\.pptx\) import/i })).toHaveAttribute(
+      'src',
+      '/powerpoint-import.gif',
+    );
+    expect(within(featuresSection).getByRole('heading', { name: /Present with confidence from LocalStudio/i })).toBeInTheDocument();
+    expect(within(featuresSection).getByText(/timer, notes, and slide controls/i)).toBeInTheDocument();
+    expect(within(featuresSection).getByText('Speaker timer and notes')).toBeInTheDocument();
+    expect(within(featuresSection).getByText('Next and previous slide controls')).toBeInTheDocument();
+    expect(within(featuresSection).getByRole('img', { name: /presenter mode with speaker timer/i })).toHaveAttribute(
+      'src',
+      '/presenter-mode.gif',
+    );
+    expect(showcaseHeadings.some((heading) => /S3-compatible projects/i.test(heading.textContent ?? ''))).toBe(true);
+    expect(within(featuresSection).getByRole('img', { name: /S3-compatible project storage/i })).toHaveAttribute(
+      'src',
+      '/s3-projects.gif',
+    );
+    expect(screen.queryByLabelText('Local-to-public S3 mirror flow')).not.toBeInTheDocument();
+  });
+
+  it('renders the S3 mirror media for reduced-motion users', () => {
     stubReducedMotion(true);
     render(<LandingPage />);
 
-    expect(screen.getByLabelText('Local-to-public S3 mirror flow')).toHaveAttribute('data-motion', 'static');
+    expect(screen.getAllByRole('img', { name: /S3-compatible project storage/i })).toHaveLength(1);
+    expect(screen.getByRole('img', { name: /S3-compatible project storage/i })).toHaveAttribute(
+      'src',
+      '/s3-projects.gif',
+    );
   });
 
   it('promotes the GitHub repository with a custom star button and feature showcase sections', () => {

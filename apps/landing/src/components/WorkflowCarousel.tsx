@@ -27,14 +27,14 @@ export function WorkflowCarousel({ prefersReducedMotion }: { prefersReducedMotio
         <h2>{activeWorkflow.title}</h2>
         <p>{activeWorkflow.copy}</p>
       </div>
-      <div className="workflow-tabs" role="tablist" aria-label="Choose workflow demo">
+      <div className="workflow-tabs workflow-tabs--stair" role="tablist" aria-label="Choose workflow demo">
         {workflowSteps.map(({ id, icon: Icon, title }) => (
           <button
             key={id}
             type="button"
             role="tab"
             aria-selected={activeWorkflowStep === id}
-            className={activeWorkflowStep === id ? 'active' : undefined}
+            className={activeWorkflowStep === id ? 'workflow-tab active' : 'workflow-tab'}
             onClick={() => setActiveWorkflowStep(id)}
           >
             <Icon size={16} aria-hidden="true" />

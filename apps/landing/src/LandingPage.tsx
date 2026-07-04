@@ -26,7 +26,7 @@ export function LandingPage() {
       <DemoSection />
       <WebAiSection />
       <WebMcpSection />
-      <FeaturesSection prefersReducedMotion={prefersReducedMotion} />
+      <FeaturesSection />
       <RequirementsSection />
       <ThanksSection />
       <ClosingSection />
