@@ -74,19 +74,7 @@
 
 .translation-target-control select {
   width: 100%;
-  min-width: 0;
-  border: 1px solid rgba(55, 253, 118, 0.32);
-  border-radius: 4px;
-  background: #050d10;
-  color: var(--ew-text);
   padding: 8px 9px;
-  font: inherit;
-  outline: 0;
-}
-
-.translation-target-control select:focus {
-  border-color: var(--ew-green);
-  box-shadow: 0 0 0 2px rgba(55, 253, 118, 0.14);
 }
 
 .compact-action-full {

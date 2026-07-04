@@ -6,21 +6,9 @@
 .text-inspector-field input,
 .text-inspector-field select {
   width: 100%;
-  min-width: 0;
   height: 40px;
-  border: 0;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.16);
-  color: var(--ew-text);
-  font: inherit;
   font-size: 14px;
-  outline: 0;
   padding: 0 12px;
-}
-
-.text-inspector-field input:focus,
-.text-inspector-field select:focus {
-  box-shadow: 0 0 0 2px rgba(55, 253, 118, 0.42);
 }
 
 .text-inspector-pair {

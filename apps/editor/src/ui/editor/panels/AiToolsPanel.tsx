@@ -371,7 +371,7 @@ export function AiToolsPanel({
             ) : null}
           </div>
           <p>Choose the local model used for prompt-to-slides.</p>
-          <label className="translation-target-control">
+          <label className="translation-target-control ew-field-scope">
             <span className="translation-target-label ew-inline-row">Model</span>
             <select
               aria-label="LLM Model"
@@ -396,7 +396,7 @@ export function AiToolsPanel({
               </span>
             ) : null}
           </label>
-          <div className="translation-target-control">
+          <div className="translation-target-control ew-field-scope">
             <div className="translation-preparation ew-grid-compact" aria-label="LLM preparation">
               <div className="translation-preparation-meta">
                 <StatusPill
@@ -463,7 +463,7 @@ export function AiToolsPanel({
             ) : null}
           </div>
           <p>Choose how LocalStudio.dev detects source text language before translation.</p>
-          <label className="translation-target-control">
+          <label className="translation-target-control ew-field-scope">
             <span className="translation-target-label ew-inline-row">Detection Model</span>
             <select
               aria-label="Language Detection Model"
@@ -488,7 +488,7 @@ export function AiToolsPanel({
               </span>
             ) : null}
           </label>
-          <div className="translation-target-control">
+          <div className="translation-target-control ew-field-scope">
             <div
               className="translation-preparation ew-grid-compact"
               aria-label="Language detection preparation"
@@ -556,7 +556,7 @@ export function AiToolsPanel({
             ) : null}
           </div>
           <p>Translate visible text using the selected local translation model.</p>
-          <label className="translation-target-control">
+          <label className="translation-target-control ew-field-scope">
             <span className="translation-target-label ew-inline-row">Translation Model</span>
             <select
               aria-label="Translation Model"
@@ -582,7 +582,7 @@ export function AiToolsPanel({
             ) : null}
           </label>
           {selectedTranslationProvider?.modelId ? (
-            <div className="translation-target-control">
+            <div className="translation-target-control ew-field-scope">
               <div
                 className="translation-preparation ew-grid-compact"
                 aria-label="Translation model preparation"
@@ -605,7 +605,7 @@ export function AiToolsPanel({
               </div>
             </div>
           ) : null}
-          <label className="translation-target-control">
+          <label className="translation-target-control ew-field-scope">
             <span className="translation-target-label ew-inline-row">
               Translate to:
               <ToolHelp
@@ -711,7 +711,7 @@ export function AiToolsPanel({
                   </IconButton>
                 )}
               </div>
-              <label className="translation-target-control model-row-selector">
+              <label className="translation-target-control ew-field-scope model-row-selector">
                 <span className="translation-target-label ew-inline-row">Model</span>
                 <select
                   aria-label={`${model.label} model`}
@@ -792,7 +792,7 @@ export function AiToolsPanel({
                     </span>
                     <input
                       aria-label="Image seed"
-                      className="image-generation-seed-input"
+                      className="image-generation-seed-input ew-field"
                       inputMode="numeric"
                       pattern="[0-9]*"
                       placeholder="random"

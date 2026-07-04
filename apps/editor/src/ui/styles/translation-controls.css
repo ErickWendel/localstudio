@@ -68,20 +68,9 @@
 .translation-path-field select {
   width: 100%;
   min-height: 30px;
-  border: 1px solid rgba(55, 253, 118, 0.26);
-  border-radius: 4px;
-  background: #050d10;
-  color: var(--ew-text);
-  font: inherit;
   letter-spacing: 0;
-  outline: 0;
   padding: 0 8px;
   text-transform: none;
-}
-
-.translation-path-field select:focus-visible {
-  border-color: var(--ew-green-fixed);
-  box-shadow: 0 0 0 2px rgba(55, 253, 118, 0.18);
 }
 
 .deck-translation-status {

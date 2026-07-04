@@ -227,7 +227,7 @@ function MediaProviderSection({
     <section className="element-section" aria-label={title}>
       <ElementSectionHeader title={title} />
       <form
-        className="media-search-row"
+        className="media-search-row ew-field-scope"
         onSubmit={(event) => {
           event.preventDefault();
           onSearch?.(query.trim());

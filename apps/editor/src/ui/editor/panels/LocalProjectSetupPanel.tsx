@@ -45,7 +45,7 @@ export function LocalProjectSetupPanel({
         </button>
       </div>
 
-      <label className="local-project-setup-field">
+      <label className="local-project-setup-field ew-field-scope">
         <span>Project folder name</span>
         <input
           ref={inputRef}

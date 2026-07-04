@@ -161,7 +161,7 @@ function DurationField({
   const valueSeconds = valueMs / 1000;
 
   return (
-    <label className="animation-field animation-duration-field">
+    <label className="animation-field ew-field-scope animation-duration-field">
       <span>Duration</span>
       <div className="animation-duration-controls">
         <input
@@ -285,7 +285,7 @@ export function AnimationPanel({
 
       <div className="panel-section ew-panel-card">
         <h3 className="panel-section-title">Slide Transition</h3>
-        <label className="animation-field ew-compact-row">
+        <label className="animation-field ew-field-scope ew-compact-row">
           <span>Effect</span>
           <select
             aria-label="Slide transition effect"
@@ -427,7 +427,7 @@ export function AnimationPanel({
                     </button>
                   </div>
                 </div>
-                <label className="animation-field ew-compact-row">
+                <label className="animation-field ew-field-scope ew-compact-row">
                   <span>Effect</span>
                   <select
                     aria-label={`Effect for ${label}`}
@@ -461,7 +461,7 @@ export function AnimationPanel({
                   </select>
                 </label>
                 {patch.effect === 'line-draw' ? (
-                  <label className="animation-field ew-compact-row">
+                  <label className="animation-field ew-field-scope ew-compact-row">
                     <span>Direction</span>
                     <select
                       aria-label={`Line draw direction for ${label}`}
@@ -479,7 +479,7 @@ export function AnimationPanel({
                     </select>
                   </label>
                 ) : null}
-                <label className="animation-field ew-compact-row">
+                <label className="animation-field ew-field-scope ew-compact-row">
                   <span>Start</span>
                   <select
                     aria-label={`Start for ${label}`}
@@ -518,7 +518,7 @@ export function AnimationPanel({
         </div>
         {selectedElementIds.length > 0 ? (
           <>
-            <label className="animation-field ew-compact-row">
+            <label className="animation-field ew-field-scope ew-compact-row">
               <span>New effect</span>
               <select
                 aria-label="New object animation effect"
@@ -543,7 +543,7 @@ export function AnimationPanel({
               </select>
             </label>
             {selectedNewAnimationEffect === 'line-draw' ? (
-              <label className="animation-field ew-compact-row">
+              <label className="animation-field ew-field-scope ew-compact-row">
                 <span>Direction</span>
                 <select
                   aria-label="New line draw direction"

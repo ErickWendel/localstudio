@@ -641,7 +641,7 @@ export function TopToolbar({
             </button>
             {translationMenuOpen ? (
               <div className="translation-path-dropdown" role="group" aria-label="Translation path">
-                <label className="translation-path-field">
+                <label className="translation-path-field ew-field-scope">
                   <span>From</span>
                   <select
                     value={translationSourceLanguage}
@@ -655,7 +655,7 @@ export function TopToolbar({
                     ))}
                   </select>
                 </label>
-                <label className="translation-path-field">
+                <label className="translation-path-field ew-field-scope">
                   <span>To</span>
                   <select
                     value={translationTargetLanguage}

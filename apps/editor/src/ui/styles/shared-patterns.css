@@ -90,6 +90,21 @@
   box-shadow: 0 0 0 2px rgba(55, 253, 118, 0.14);
 }
 
+.ew-field-scope :where(input:not([type='range']):not([type='checkbox']), select, textarea) {
+  min-width: 0;
+  border: 1px solid rgba(55, 253, 118, 0.24);
+  border-radius: 4px;
+  background: #050d10;
+  color: var(--ew-text);
+  font: inherit;
+  outline: 0;
+}
+
+.ew-field-scope :where(input:not([type='range']):not([type='checkbox']), select, textarea):focus {
+  border-color: var(--ew-green);
+  box-shadow: 0 0 0 2px rgba(55, 253, 118, 0.14);
+}
+
 .ew-range-input {
   width: 100%;
   min-width: 0;

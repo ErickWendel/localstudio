@@ -4,17 +4,6 @@
   gap: 8px;
 }
 
-.media-search-row input,
-.media-key-field input {
-  min-width: 0;
-  border: 1px solid rgba(255, 255, 255, 0.11);
-  border-radius: 8px;
-  background: #111418;
-  color: var(--ew-text);
-  font: inherit;
-  outline: none;
-}
-
 .media-search-row input {
   height: 36px;
   padding: 0 10px;

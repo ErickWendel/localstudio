@@ -113,7 +113,7 @@ export function MirrorSettingsPanel({
         </button>
       </div>
 
-      <div className="mirror-settings-grid">
+      <div className="mirror-settings-grid ew-field-scope">
         <label>
           <span>Endpoint</span>
           <input

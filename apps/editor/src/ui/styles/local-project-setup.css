@@ -8,18 +8,7 @@
 }
 
 .local-project-setup-field input {
-  min-width: 0;
   height: 34px;
-  border: 1px solid rgba(122, 255, 199, 0.18);
-  border-radius: 4px;
-  outline: 0;
-  background: rgba(5, 13, 16, 0.9);
-  color: var(--ew-text);
   font-size: 13px;
   padding: 0 9px;
-}
-
-.local-project-setup-field input:focus {
-  border-color: var(--ew-green);
-  box-shadow: 0 0 0 2px rgba(55, 253, 118, 0.14);
 }

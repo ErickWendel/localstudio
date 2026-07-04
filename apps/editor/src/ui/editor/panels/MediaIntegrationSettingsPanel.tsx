@@ -65,7 +65,7 @@ export function MediaIntegrationSettingsPanel({
           });
         }}
       >
-        <label className="media-key-field">
+        <label className="media-key-field ew-field-scope">
           <span className="media-key-label">
             <span>Unsplash access key</span>
             <a
@@ -101,7 +101,7 @@ export function MediaIntegrationSettingsPanel({
           </span>
           <small>{unsplashConfigured ? 'Unsplash configured' : 'Unsplash not configured'}</small>
         </label>
-        <label className="media-key-field">
+        <label className="media-key-field ew-field-scope">
           <span className="media-key-label">
             <span>GIPHY API key</span>
             <a

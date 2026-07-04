@@ -37,13 +37,6 @@
 .design-control input,
 .design-control select {
   width: 100%;
-  min-width: 0;
-  border: 1px solid rgba(55, 253, 118, 0.24);
-  border-radius: 4px;
-  background: #050d10;
-  color: var(--ew-text);
-  font: inherit;
-  outline: 0;
   padding: 7px 8px;
 }
 
@@ -55,10 +48,4 @@
 .design-control input[type='range'] {
   padding: 0;
   accent-color: var(--ew-green);
-}
-
-.design-control input:focus,
-.design-control select:focus {
-  border-color: var(--ew-green);
-  box-shadow: 0 0 0 2px rgba(55, 253, 118, 0.14);
 }

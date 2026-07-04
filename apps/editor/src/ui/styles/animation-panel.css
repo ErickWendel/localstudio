@@ -118,11 +118,6 @@
 .animation-field select {
   width: 136px;
   min-height: 32px;
-  border: 1px solid var(--ew-border);
-  border-radius: 5px;
-  background: var(--ew-surface);
-  color: var(--ew-text);
-  font: inherit;
   padding: 0 8px;
 }
 
