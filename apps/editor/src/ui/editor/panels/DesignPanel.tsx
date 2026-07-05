@@ -4,6 +4,7 @@ import {
   AlignRight,
   Bold,
   CaseSensitive,
+  ChevronDown,
   Download,
   FileVideo,
   Film,
@@ -21,16 +22,18 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import type { FormEvent, RefObject } from 'react';
+import type { CSSProperties, FormEvent, RefObject } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   DesignElement,
   ElementAnimationBuild,
   PageBackground,
+  PresentationTheme,
   ProjectDocument,
   SelectionState,
   ShapeElement,
   ShapeLineEndpoint,
+  SlideLayout,
   TextElement,
   VideoElement,
   VideoRepeatMode,
@@ -49,7 +52,6 @@ import { textStyleOptions } from '../text/textStyleOptions';
 type ElementAnimationPatch = Omit<ElementAnimationBuild, 'elementId' | 'id'>;
 type MovieStartTrigger = ElementAnimationBuild['trigger'];
 
-const palette = ['#37FD76', '#050D10', '#FFFFFF', '#91999D', '#00779A'];
 const regularTextWeight = 400;
 const boldTextWeight = 800;
 const videoRepeatOptions: Array<{ value: VideoRepeatMode; label: string }> = [
@@ -68,6 +70,7 @@ const shapeLineEndpointOptions: Array<{ value: ShapeLineEndpoint; label: string 
   { value: 'diamond', label: 'Diamond' },
   { value: 'bar', label: 'Bar' },
 ];
+const palette = ['#37FD76', '#050D10', '#FFFFFF', '#91999D', '#00779A'];
 
 interface DesignPanelProps {
   project: ProjectDocument;
@@ -81,6 +84,11 @@ interface DesignPanelProps {
   onUpdateTextContent?: (elementId: string, text: string) => void;
   onUpdateMediaPlayback?: (elementId: string, patch: MediaPlaybackPatch) => void;
   onUpdatePageBackground?: (background: PageBackground) => void;
+  onChangeTheme?: () => void;
+  onApplyTheme?: (themeId: string) => void;
+  onEditTheme?: (themeId: string) => void;
+  onApplySlideLayout?: (pageId: string, layoutId: string) => void;
+  onEditSlideLayout?: (layoutId: string) => void;
   onAlignSelectedElement?: (mode: AlignMode) => void;
   onSetElementLock?: (elementId: string, locked: boolean) => void;
   onSetSelectedElementZOrder?: (mode: ZOrderMode) => void;
@@ -135,15 +143,22 @@ export function DesignPanel({
   onDownloadFont,
   onReplaceVideoAsset,
   onSetElementAnimationBuilds,
+  onChangeTheme,
+  onApplyTheme,
+  onEditTheme,
+  onApplySlideLayout,
+  onEditSlideLayout,
 }: DesignPanelProps) {
   const fontSelectRef = useRef<HTMLSelectElement>(null);
   const [fontDownloadOpen, setFontDownloadOpen] = useState(false);
+  const [themeGalleryOpen, setThemeGalleryOpen] = useState(false);
   const [fontSearchInput, setFontSearchInput] = useState('');
   const [fontSearchQuery, setFontSearchQuery] = useState('');
   const [downloadingFontFamily, setDownloadingFontFamily] = useState<string | undefined>();
   const [fontDownloadStatus, setFontDownloadStatus] = useState<string | undefined>();
   const page = project.pages.find((item) => item.id === activePageId);
   const selectedElement = getSelectedElement(project, selection);
+  const selectionTarget = selectedElement ? 'elements' : (selection.target ?? 'presentation');
   const backgroundColor = page ? getBackgroundColor(page.background) : '#050D10';
   const projectFontFamilies = useMemo(
     () =>
@@ -185,14 +200,6 @@ export function DesignPanel({
     onUpdateMediaPlayback?.(selectedElement.id, patch);
   }
 
-  function applyColor(color: string) {
-    if (selectedElement?.type === 'text' || selectedElement?.type === 'shape') {
-      updateSelectedStyle({ fill: color });
-      return;
-    }
-    onUpdatePageBackground?.({ type: 'color', color });
-  }
-
   async function downloadFont(family: string) {
     if (!family || !onDownloadFont) return;
     setDownloadingFontFamily(family);
@@ -212,98 +219,497 @@ export function DesignPanel({
     setFontSearchQuery(fontSearchInput.trim());
   }
 
+  function applyColor(color: string) {
+    if (selectedElement?.type === 'text' || selectedElement?.type === 'shape') {
+      updateSelectedStyle({ fill: color });
+      return;
+    }
+    onUpdatePageBackground?.({ type: 'color', color });
+  }
+
   return (
     <div className="panel-stack">
-      <PanelSection title="Canvas">
-        <div className="property-row ew-surface ew-surface-hover ew-compact-row">
-          <span>Format</span>
-          <strong>{page ? `${page.width} x ${page.height}` : 'No page'}</strong>
-        </div>
-        <label className="design-control ew-field-scope">
-          <span>Background</span>
-          <input
-            aria-label="Canvas background color"
-            type="color"
-            value={backgroundColor}
-            onChange={(event) => {
-              onUpdatePageBackground?.({ type: 'color', color: event.target.value });
-            }}
-          />
-        </label>
-      </PanelSection>
-
-      <PanelSection title="Palette">
-        <div className="palette-row">
-          {palette.map((color) => (
-            <button
-              key={color}
-              aria-label={`Apply ${color}`}
-              className="color-swatch"
-              style={{ backgroundColor: color }}
-              type="button"
-              onClick={() => {
-                applyColor(color);
-              }}
-            />
-          ))}
-        </div>
-      </PanelSection>
-
-      {selectedElement ? (
-        <ElementDesignInspector
-          key={selectedElement.id}
-          assetName={
-            selectedElement.type === 'image' ||
-            selectedElement.type === 'gif' ||
-            selectedElement.type === 'video'
-              ? project.assets[selectedElement.assetId]?.name
-              : undefined
-          }
-          element={selectedElement}
-          onAlign={onAlignSelectedElement}
-          onFrameUpdate={(patch) => onUpdateElementFrame?.(selectedElement.id, patch)}
-          onLockChange={(locked) => onSetElementLock?.(selectedElement.id, locked)}
-          onReplaceVideoAsset={(file) => onReplaceVideoAsset?.(selectedElement.id, file)}
-          {...(onSetElementAnimationBuilds ? { onSetElementAnimationBuilds } : {})}
-          onTextContentChange={(text) => onUpdateTextContent?.(selectedElement.id, text)}
-          onUpdateMedia={updateSelectedMediaPlayback}
-          onUpdateStyle={updateSelectedStyle}
-          page={page}
-          onZOrderChange={onSetSelectedElementZOrder}
-          textStyleControls={
-            selectedElement.type === 'text'
-              ? {
-                  downloadingFontFamily,
-                  filteredDownloadableFonts,
-                  fontDownloadOpen,
-                  fontDownloadStatus,
-                  fontFamilyOptions,
-                  fontSearchInput,
-                  fontSearchQuery,
-                  fontSelectRef,
-                  hasFontDownload: Boolean(onDownloadFont),
-                  onDownloadFontFamily: downloadFont,
-                  onFontSearchInputChange: (value) => {
-                    setFontSearchInput(value);
-                    setFontSearchQuery(value.trim());
-                  },
-                  onFontSearchSubmit: submitFontSearch,
-                  onToggleFontDownload: () => {
-                    setFontDownloadOpen((current) => !current);
-                  },
-                }
-              : undefined
-          }
+      {selectionTarget === 'presentation' ? (
+        <PresentationDesignInspector
+          project={project}
+          themeGalleryOpen={themeGalleryOpen}
+          onApplyTheme={onApplyTheme}
+          onChangeTheme={() => {
+            setThemeGalleryOpen((current) => !current);
+            onChangeTheme?.();
+          }}
+          onEditTheme={onEditTheme}
         />
-      ) : (
+      ) : null}
+
+      {selectionTarget === 'slide' && page ? (
+        <SlideDesignInspector
+          page={page}
+          project={project}
+          onApplySlideLayout={onApplySlideLayout}
+          onEditSlideLayout={onEditSlideLayout}
+          onUpdatePageBackground={onUpdatePageBackground}
+        />
+      ) : null}
+
+      {selectionTarget === 'elements' && selectedElement ? (
+        <>
+          <PanelSection title="Canvas">
+            <div className="property-row ew-surface ew-surface-hover ew-compact-row">
+              <span>Format</span>
+              <strong>{page ? `${page.width} x ${page.height}` : 'No page'}</strong>
+            </div>
+            <label className="design-control ew-field-scope">
+              <span>Background</span>
+              <input
+                aria-label="Canvas background color"
+                type="color"
+                value={backgroundColor}
+                onChange={(event) => {
+                  onUpdatePageBackground?.({ type: 'color', color: event.target.value });
+                }}
+              />
+            </label>
+          </PanelSection>
+          <PanelSection title="Palette">
+            <div className="palette-row">
+              {palette.map((color) => (
+                <button
+                  key={color}
+                  aria-label={`Apply ${color}`}
+                  className="color-swatch"
+                  style={{ backgroundColor: color }}
+                  type="button"
+                  onClick={() => {
+                    applyColor(color);
+                  }}
+                />
+              ))}
+            </div>
+          </PanelSection>
+          <ElementDesignInspector
+            key={selectedElement.id}
+            assetName={
+              selectedElement.type === 'image' ||
+              selectedElement.type === 'gif' ||
+              selectedElement.type === 'video'
+                ? project.assets[selectedElement.assetId]?.name
+                : undefined
+            }
+            element={selectedElement}
+            onAlign={onAlignSelectedElement}
+            onFrameUpdate={(patch) => onUpdateElementFrame?.(selectedElement.id, patch)}
+            onLockChange={(locked) => onSetElementLock?.(selectedElement.id, locked)}
+            onReplaceVideoAsset={(file) => onReplaceVideoAsset?.(selectedElement.id, file)}
+            {...(onSetElementAnimationBuilds ? { onSetElementAnimationBuilds } : {})}
+            onTextContentChange={(text) => onUpdateTextContent?.(selectedElement.id, text)}
+            onUpdateMedia={updateSelectedMediaPlayback}
+            onUpdateStyle={updateSelectedStyle}
+            page={page}
+            onZOrderChange={onSetSelectedElementZOrder}
+            textStyleControls={
+              selectedElement.type === 'text'
+                ? {
+                    downloadingFontFamily,
+                    filteredDownloadableFonts,
+                    fontDownloadOpen,
+                    fontDownloadStatus,
+                    fontFamilyOptions,
+                    fontSearchInput,
+                    fontSearchQuery,
+                    fontSelectRef,
+                    hasFontDownload: Boolean(onDownloadFont),
+                    onDownloadFontFamily: downloadFont,
+                    onFontSearchInputChange: (value) => {
+                      setFontSearchInput(value);
+                      setFontSearchQuery(value.trim());
+                    },
+                    onFontSearchSubmit: submitFontSearch,
+                    onToggleFontDownload: () => {
+                      setFontDownloadOpen((current) => !current);
+                    },
+                  }
+                : undefined
+            }
+          />
+        </>
+      ) : null}
+
+      {selectionTarget === 'elements' && !selectedElement ? (
         <PanelSection title="Selection">
           <div className="compact-action design-selection-summary ew-surface ew-surface-hover ew-compact-row">
             <CaseSensitive size={16} />
             <span>No selected element</span>
           </div>
         </PanelSection>
-      )}
+      ) : null}
     </div>
+  );
+}
+
+interface PresentationDesignInspectorProps {
+  project: ProjectDocument;
+  themeGalleryOpen: boolean;
+  onApplyTheme?: ((themeId: string) => void) | undefined;
+  onChangeTheme: () => void;
+  onEditTheme?: ((themeId: string) => void) | undefined;
+}
+
+interface SlideDesignInspectorProps {
+  page: ProjectDocument['pages'][number];
+  project: ProjectDocument;
+  onApplySlideLayout?: ((pageId: string, layoutId: string) => void) | undefined;
+  onEditSlideLayout?: ((layoutId: string) => void) | undefined;
+  onUpdatePageBackground?: ((background: PageBackground) => void) | undefined;
+}
+
+function getActiveTheme(project: ProjectDocument): PresentationTheme {
+  const themeId = project.themeId ?? project.themeGallery?.[0];
+  const theme = themeId ? project.themes?.[themeId] : undefined;
+  return (
+    theme ?? {
+      id: 'theme-localstudio',
+      name: 'LocalStudio',
+      palette: {
+        background: '#050D10',
+        text: '#FFFFFF',
+        primary: '#37FD76',
+        secondary: '#36D7FF',
+        muted: '#91999D',
+      },
+      typography: {
+        bodyFontFamily: 'Open Sans',
+        displayFontFamily: 'Orbitron',
+      },
+      preview: { background: '#050D10', accents: ['#37FD76', '#36D7FF'] },
+      source: 'system',
+    }
+  );
+}
+
+function getThemeGallery(project: ProjectDocument) {
+  const themes = project.themes ?? {};
+  const ids = project.themeGallery?.length ? project.themeGallery : Object.keys(themes);
+  return ids.map((themeId) => themes[themeId]).filter((theme): theme is PresentationTheme => Boolean(theme));
+}
+
+function TemplatePreview({ background, accents }: { background: string; accents: string[] }) {
+  return (
+    <span className="template-preview" style={{ background }}>
+      <span style={{ background: accents[0] ?? '#37FD76' }} />
+      <span style={{ background: accents[1] ?? '#36D7FF' }} />
+    </span>
+  );
+}
+
+interface LayoutThumbnailSource {
+  background: PageBackground;
+  elements: DesignElement[];
+  height: number;
+  width: number;
+}
+
+function getProjectElements(project: ProjectDocument, elementIds: string[]) {
+  return elementIds
+    .map((elementId) => project.elements[elementId])
+    .filter((element): element is DesignElement => Boolean(element));
+}
+
+function getLayoutThumbnailSource(project: ProjectDocument, layout: SlideLayout): LayoutThumbnailSource {
+  const linkedPage = project.pages.find((page) => page.layoutId === layout.id);
+  if (layout.elements.length > 0) {
+    return {
+      background: layout.background,
+      elements: layout.elements,
+      height: linkedPage?.height ?? 1080,
+      width: linkedPage?.width ?? 1920,
+    };
+  }
+
+  if (linkedPage) {
+    return {
+      background: linkedPage.background,
+      elements: getProjectElements(project, linkedPage.elementIds),
+      height: linkedPage.height,
+      width: linkedPage.width,
+    };
+  }
+
+  return {
+    background: layout.background,
+    elements: [],
+    height: 1080,
+    width: 1920,
+  };
+}
+
+function getThumbnailBackgroundStyle(project: ProjectDocument, background: PageBackground): CSSProperties {
+  if (background.type === 'color') return { background: background.color };
+  const asset = project.assets[background.assetId];
+  return {
+    backgroundColor: background.colorFallback,
+    backgroundImage: asset?.objectUrl ? `url(${asset.objectUrl})` : undefined,
+  };
+}
+
+function getThumbnailElementStyle(element: DesignElement, source: LayoutThumbnailSource): CSSProperties {
+  return {
+    height: `${(element.height / source.height) * 100}%`,
+    left: `${(element.x / source.width) * 100}%`,
+    opacity: element.opacity,
+    top: `${(element.y / source.height) * 100}%`,
+    transform: element.rotation ? `rotate(${element.rotation}deg)` : undefined,
+    width: `${(element.width / source.width) * 100}%`,
+  };
+}
+
+function getThumbnailTextStyle(element: TextElement, source: LayoutThumbnailSource): CSSProperties {
+  const fontSize = Math.max(3, Math.min(11, (element.fontSize / source.height) * 62));
+  return {
+    ...getThumbnailElementStyle(element, source),
+    color: element.fill,
+    fontFamily: element.fontFamily,
+    fontSize: `${fontSize}px`,
+    fontWeight: element.fontWeight,
+    justifyContent:
+      element.verticalAlign === 'bottom' ? 'flex-end' : element.verticalAlign === 'middle' ? 'center' : 'flex-start',
+    textAlign: element.align,
+  };
+}
+
+function renderLayoutThumbnailElement(
+  project: ProjectDocument,
+  source: LayoutThumbnailSource,
+  element: DesignElement,
+) {
+  if (!element.visible) return null;
+  const baseStyle = getThumbnailElementStyle(element, source);
+
+  if (element.type === 'text') {
+    return (
+      <span className="layout-thumbnail-text" key={element.id} style={getThumbnailTextStyle(element, source)}>
+        {element.text}
+      </span>
+    );
+  }
+
+  if (element.type === 'shape') {
+    const isLine = element.shape === 'arrow' || element.shape === 'line';
+    return (
+      <span
+        className={isLine ? 'layout-thumbnail-shape layout-thumbnail-line' : 'layout-thumbnail-shape'}
+        key={element.id}
+        style={{
+          ...baseStyle,
+          background: isLine ? element.stroke ?? element.fill ?? '#37FD76' : element.fill ?? 'transparent',
+          borderColor: element.stroke ?? element.fill ?? 'rgba(255, 255, 255, 0.7)',
+          borderRadius: element.shape === 'ellipse' ? '999px' : element.shape === 'rounded-rect' ? '4px' : '1px',
+          borderWidth: element.stroke ? 1 : 0,
+        }}
+      />
+    );
+  }
+
+  const asset = project.assets[element.assetId];
+  if (asset?.objectUrl && (element.type === 'gif' || element.type === 'image')) {
+    return (
+      <img alt="" className="layout-thumbnail-media" key={element.id} src={asset.objectUrl} style={baseStyle} />
+    );
+  }
+
+  return (
+    <span className="layout-thumbnail-media layout-thumbnail-media-fallback" key={element.id} style={baseStyle}>
+      {element.type === 'video' ? 'Video' : 'Media'}
+    </span>
+  );
+}
+
+function LayoutThumbnail({ layout, project }: { layout: SlideLayout; project: ProjectDocument }) {
+  const source = getLayoutThumbnailSource(project, layout);
+
+  return (
+    <span className="layout-thumbnail" style={getThumbnailBackgroundStyle(project, source.background)}>
+      {source.elements.length > 0 ? (
+        source.elements.map((element) => renderLayoutThumbnailElement(project, source, element))
+      ) : (
+        <span className="layout-thumbnail-empty">{layout.name}</span>
+      )}
+    </span>
+  );
+}
+
+function PresentationDesignInspector({
+  project,
+  themeGalleryOpen,
+  onApplyTheme,
+  onChangeTheme,
+  onEditTheme,
+}: PresentationDesignInspectorProps) {
+  const activeTheme = getActiveTheme(project);
+  const themes = getThemeGallery(project);
+
+  return (
+    <>
+      <PanelSection title="Theme">
+        <div className="theme-current-card ew-surface">
+          <TemplatePreview
+            background={activeTheme.preview.background}
+            accents={activeTheme.preview.accents}
+          />
+          <div className="theme-current-copy">
+            <span>Current theme</span>
+            <strong>{activeTheme.name}</strong>
+          </div>
+        </div>
+        <div className="template-action-row">
+          <button className="compact-action ew-surface ew-surface-hover" type="button" onClick={onChangeTheme}>
+            Change Theme
+          </button>
+          <button
+            aria-label="Edit theme"
+            className="compact-action ew-surface ew-surface-hover"
+            type="button"
+            onClick={() => onEditTheme?.(activeTheme.id)}
+          >
+            Edit
+          </button>
+          <button
+            className="compact-action ew-surface ew-surface-hover"
+            type="button"
+            onClick={() => onApplyTheme?.(activeTheme.id)}
+          >
+            Apply Theme
+          </button>
+        </div>
+      </PanelSection>
+      {themeGalleryOpen ? (
+        <PanelSection title="Gallery">
+          <div className="theme-gallery" role="region" aria-label="Theme gallery">
+            {themes.map((theme) => (
+              <button
+                aria-label={`Choose ${theme.name} theme`}
+                className={
+                  theme.id === activeTheme.id
+                    ? 'theme-gallery-item theme-gallery-item-active ew-surface'
+                    : 'theme-gallery-item ew-surface ew-surface-hover'
+                }
+                key={theme.id}
+                type="button"
+                onClick={() => onApplyTheme?.(theme.id)}
+              >
+                <TemplatePreview background={theme.preview.background} accents={theme.preview.accents} />
+                <span>{theme.name}</span>
+              </button>
+            ))}
+          </div>
+        </PanelSection>
+      ) : null}
+    </>
+  );
+}
+
+function SlideDesignInspector({
+  page,
+  project,
+  onApplySlideLayout,
+  onEditSlideLayout,
+  onUpdatePageBackground,
+}: SlideDesignInspectorProps) {
+  const [layoutGalleryOpen, setLayoutGalleryOpen] = useState(false);
+  const layouts = Object.values(project.slideLayouts ?? {});
+  const currentLayout = page.layoutId ? project.slideLayouts?.[page.layoutId] : undefined;
+  const layout = currentLayout ?? layouts[0];
+  const backgroundColor = getBackgroundColor(page.background);
+  const layoutButtonLabel = `Slide layout: ${layout?.name ?? 'Custom'}`;
+
+  return (
+    <>
+      <PanelSection title="Slide">
+        <div className="layout-picker-shell">
+          <button
+            aria-expanded={layoutGalleryOpen}
+            aria-label={layoutButtonLabel}
+            className="theme-current-card layout-current-button ew-surface ew-surface-hover"
+            type="button"
+            onClick={() => setLayoutGalleryOpen((isOpen) => !isOpen)}
+          >
+            {layout ? (
+              <LayoutThumbnail layout={layout} project={project} />
+            ) : (
+              <TemplatePreview background={backgroundColor} accents={['#37FD76']} />
+            )}
+            <div className="theme-current-copy">
+              <span>Slide layout</span>
+              <strong>{layout?.name ?? 'Custom'}</strong>
+            </div>
+            <ChevronDown size={16} aria-hidden />
+          </button>
+          {layoutGalleryOpen ? (
+            <div className="layout-gallery-popover ew-surface" role="region" aria-label="Slide layout gallery">
+              <span className="layout-gallery-caret" aria-hidden />
+              <div className="layout-gallery-title">Choose a layout</div>
+              <div className="layout-gallery-grid">
+                {layouts.map((item) => (
+                  <button
+                    aria-pressed={item.id === layout?.id}
+                    className={
+                      item.id === layout?.id
+                        ? 'layout-gallery-item layout-gallery-item-active'
+                        : 'layout-gallery-item'
+                    }
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      onApplySlideLayout?.(page.id, item.id);
+                      setLayoutGalleryOpen(false);
+                    }}
+                  >
+                    <LayoutThumbnail layout={item} project={project} />
+                    <span>{item.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </PanelSection>
+      <PanelSection title="Appearance">
+        <div className="template-toggle-list">
+          {(layout?.placeholderRoles ?? ['title', 'body']).map((role) => (
+            <label className="template-checkbox-row" key={role}>
+              <input aria-label={`Slide ${role} placeholder`} defaultChecked type="checkbox" />
+              <span>{role.charAt(0).toUpperCase() + role.slice(1)}</span>
+            </label>
+          ))}
+        </div>
+      </PanelSection>
+      <PanelSection title="Background">
+        <div className="movie-inspector-tabs" role="tablist" aria-label="Slide background mode">
+          <button aria-selected className="movie-inspector-tab movie-inspector-tab-active" role="tab" type="button">
+            Standard
+          </button>
+          <button aria-selected={false} className="movie-inspector-tab" role="tab" type="button">
+            Dynamic
+          </button>
+        </div>
+        <label className="design-control ew-field-scope">
+          <span>Current Fill</span>
+          <input
+            aria-label="Slide background color"
+            type="color"
+            value={backgroundColor}
+            onChange={(event) => onUpdatePageBackground?.({ type: 'color', color: event.target.value })}
+          />
+        </label>
+        <button
+          className="compact-action compact-action-full ew-surface ew-surface-hover"
+          type="button"
+          onClick={() => layout && onEditSlideLayout?.(layout.id)}
+        >
+          Edit Slide Layout
+        </button>
+      </PanelSection>
+    </>
   );
 }
 

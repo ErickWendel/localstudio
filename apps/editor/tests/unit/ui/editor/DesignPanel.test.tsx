@@ -105,7 +105,198 @@ function createProjectWithImportedTextFont(): ProjectDocument {
   };
 }
 
+function createProjectWithTemplates(): ProjectDocument {
+  const project = sampleProject.createSampleProject();
+  const statementTitle: TextElement = {
+    id: 'layout-statement-title',
+    type: 'text',
+    text: 'Statement Title',
+    x: 220,
+    y: 420,
+    width: 1480,
+    height: 120,
+    rotation: 0,
+    locked: true,
+    visible: true,
+    opacity: 1,
+    align: 'center',
+    fill: '#FFFFFF',
+    fontFamily: 'Orbitron',
+    fontSize: 72,
+    fontWeight: 800,
+  };
+  const mediaTitle: TextElement = {
+    id: 'layout-media-title',
+    type: 'text',
+    text: 'Media Title',
+    x: 180,
+    y: 180,
+    width: 760,
+    height: 100,
+    rotation: 0,
+    locked: true,
+    visible: true,
+    opacity: 1,
+    align: 'left',
+    fill: '#FFFFFF',
+    fontFamily: 'Open Sans',
+    fontSize: 54,
+    fontWeight: 800,
+  };
+  const mediaBlock: ShapeElement = {
+    id: 'layout-media-block',
+    type: 'shape',
+    shape: 'rect',
+    x: 1080,
+    y: 160,
+    width: 620,
+    height: 760,
+    rotation: 0,
+    locked: true,
+    visible: true,
+    opacity: 1,
+    fill: '#36D7FF',
+  };
+  return {
+    ...project,
+    themeId: 'theme-localstudio',
+    themeGallery: ['theme-localstudio', 'theme-ice'],
+    themes: {
+      'theme-localstudio': {
+        id: 'theme-localstudio',
+        name: 'LocalStudio',
+        palette: {
+          background: '#050D10',
+          text: '#FFFFFF',
+          primary: '#37FD76',
+          secondary: '#36D7FF',
+          muted: '#91999D',
+        },
+        typography: {
+          bodyFontFamily: 'Open Sans',
+          displayFontFamily: 'Orbitron',
+        },
+        preview: { background: '#050D10', accents: ['#37FD76', '#36D7FF'] },
+        source: 'custom',
+      },
+      'theme-ice': {
+        id: 'theme-ice',
+        name: 'Ice Room',
+        palette: {
+          background: '#EAF6FF',
+          text: '#061319',
+          primary: '#00779A',
+          secondary: '#37FD76',
+          muted: '#52636A',
+        },
+        typography: {
+          bodyFontFamily: 'Open Sans',
+          displayFontFamily: 'Orbitron',
+        },
+        preview: { background: '#EAF6FF', accents: ['#00779A', '#37FD76'] },
+        source: 'custom',
+      },
+    },
+    slideLayouts: {
+      'layout-statement': {
+        id: 'layout-statement',
+        themeId: 'theme-localstudio',
+        name: 'Statement',
+        background: { type: 'color', color: '#050D10' },
+        placeholderRoles: ['title', 'body'],
+        elements: [statementTitle],
+        preview: { background: '#050D10', accents: ['#37FD76'] },
+      },
+      'layout-media': {
+        id: 'layout-media',
+        themeId: 'theme-localstudio',
+        name: 'Media split',
+        background: { type: 'color', color: '#101B12' },
+        placeholderRoles: ['title', 'media'],
+        elements: [mediaTitle, mediaBlock],
+        preview: { background: '#101B12', accents: ['#36D7FF'] },
+      },
+    },
+    pages: project.pages.map((page) =>
+      page.id === 'page-1' ? { ...page, layoutId: 'layout-statement' } : page,
+    ),
+  };
+}
+
 describe('DesignPanel', () => {
+  it('shows presentation theme controls and opens the theme gallery', async () => {
+    const user = userEvent.setup();
+    const onChangeTheme = vi.fn();
+    const onApplyTheme = vi.fn();
+    const onEditTheme = vi.fn();
+
+    render(
+      <DesignPanel
+        project={createProjectWithTemplates()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [], target: 'presentation' }}
+        onChangeTheme={onChangeTheme}
+        onApplyTheme={onApplyTheme}
+        onEditTheme={onEditTheme}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Theme' })).toBeInTheDocument();
+    expect(screen.getByText('LocalStudio')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Change Theme' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Change Theme' }));
+
+    expect(onChangeTheme).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('region', { name: 'Theme gallery' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Choose Ice Room theme' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Edit theme' }));
+    await user.click(screen.getByRole('button', { name: 'Apply Theme' }));
+
+    expect(onEditTheme).toHaveBeenCalledWith('theme-localstudio');
+    expect(onApplyTheme).toHaveBeenCalledWith('theme-localstudio');
+  });
+
+  it('shows slide layout and background controls for slide selection', async () => {
+    const user = userEvent.setup();
+    const onApplySlideLayout = vi.fn();
+    const onEditSlideLayout = vi.fn();
+    const onUpdatePageBackground = vi.fn();
+
+    render(
+      <DesignPanel
+        project={createProjectWithTemplates()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [], target: 'slide' }}
+        onApplySlideLayout={onApplySlideLayout}
+        onEditSlideLayout={onEditSlideLayout}
+        onUpdatePageBackground={onUpdatePageBackground}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Slide' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Slide layout: Statement' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Slide title placeholder')).toBeChecked();
+    expect(screen.getByLabelText('Slide body placeholder')).toBeChecked();
+
+    await user.click(screen.getByRole('button', { name: 'Slide layout: Statement' }));
+    expect(screen.getByRole('region', { name: 'Slide layout gallery' })).toBeInTheDocument();
+    expect(screen.getAllByText('Statement Title')).toHaveLength(2);
+    expect(screen.getByText('Media Title')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Media split/ }));
+    expect(onApplySlideLayout).toHaveBeenCalledWith('page-1', 'layout-media');
+
+    await user.click(screen.getByRole('button', { name: 'Edit Slide Layout' }));
+    expect(onEditSlideLayout).toHaveBeenCalledWith('layout-statement');
+
+    fireEvent.change(screen.getByLabelText('Slide background color'), {
+      target: { value: '#123456' },
+    });
+    expect(onUpdatePageBackground).toHaveBeenCalledWith({ type: 'color', color: '#123456' });
+  });
+
   it('updates selected shape fill and border modes', async () => {
     const user = userEvent.setup();
     const onUpdateElementStyle = vi.fn();

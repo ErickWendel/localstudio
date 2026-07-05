@@ -17,6 +17,27 @@ function createBlankProject(): ProjectDocument {
     name: 'Untitled Project',
     createdAt: now,
     updatedAt: now,
+    themeId: 'theme-localstudio',
+    themeGallery: ['theme-localstudio'],
+    themes: {
+      'theme-localstudio': {
+        id: 'theme-localstudio',
+        name: 'LocalStudio',
+        palette: {
+          background: '#050D10',
+          text: '#FFFFFF',
+          primary: '#37FD76',
+          secondary: '#36D7FF',
+          muted: '#91999D',
+        },
+        typography: {
+          bodyFontFamily: 'Open Sans',
+          displayFontFamily: 'Orbitron',
+        },
+        preview: { background: '#050D10', accents: ['#37FD76', '#36D7FF'] },
+        source: 'system',
+      },
+    },
     assets: {},
     pages: [
       {
@@ -40,6 +61,27 @@ function createSampleProject(): ProjectDocument {
     name: 'Untitled AI Deck',
     createdAt: now,
     updatedAt: now,
+    themeId: 'theme-localstudio',
+    themeGallery: ['theme-localstudio'],
+    themes: {
+      'theme-localstudio': {
+        id: 'theme-localstudio',
+        name: 'LocalStudio',
+        palette: {
+          background: '#050D10',
+          text: '#FFFFFF',
+          primary: '#37FD76',
+          secondary: '#36D7FF',
+          muted: '#91999D',
+        },
+        typography: {
+          bodyFontFamily: 'Open Sans',
+          displayFontFamily: 'Orbitron',
+        },
+        preview: { background: '#050D10', accents: ['#37FD76', '#36D7FF'] },
+        source: 'system',
+      },
+    },
     assets: {
       'asset-hero': {
         id: 'asset-hero',

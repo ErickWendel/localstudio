@@ -103,6 +103,8 @@ interface CanvasWorkspaceProps {
   onInsertText?: (() => void) | undefined;
   onOpenAnimations?: (() => void) | undefined;
   onSelectElement?: ((elementId: string, options?: { additive?: boolean }) => void) | undefined;
+  onSelectPresentation?: (() => void) | undefined;
+  onSelectSlide?: (() => void) | undefined;
   onSendSelectedElementBackward?: (() => void) | undefined;
   onTranslateSelectedText?: (() => void) | undefined;
   onUpdateImageCrop?: ((elementId: string, patch: ImageCropPatch) => void) | undefined;
@@ -476,6 +478,8 @@ export function CanvasWorkspace({
   onInsertText,
   onOpenAnimations,
   onSelectElement,
+  onSelectPresentation,
+  onSelectSlide,
   onSendSelectedElementBackward,
   onTranslateSelectedText,
   onUpdateImageCrop,
@@ -971,7 +975,8 @@ export function CanvasWorkspace({
       finishCropMode();
       return;
     }
-    onClearSelection?.();
+    onSelectSlide?.();
+    if (!onSelectSlide) onClearSelection?.();
   }
 
   return (
@@ -981,9 +986,12 @@ export function CanvasWorkspace({
         aria-label={canvasLabel}
         ref={slideFrameRef}
         onPointerDown={(event) => {
-          if (!isCropModeActive) return;
           if (event.target !== event.currentTarget) return;
-          finishCropMode();
+          if (isCropModeActive) {
+            finishCropMode();
+            return;
+          }
+          onSelectPresentation?.();
         }}
         {...(backgroundSelectionTargetId
           ? { 'data-background-selection-target': backgroundSelectionTargetId }

@@ -1,6 +1,6 @@
 import { basicCommands } from '../../../../src/domain/commands/elements/basicCommands';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
-import type { ShapeElement } from '../../../../src/domain/documents/model';
+import type { DesignElement, ProjectDocument, ShapeElement } from '../../../../src/domain/documents/model';
 
 function createShapeFixture(overrides: Partial<ShapeElement> = {}) {
   const project = sampleProject.createSampleProject();
@@ -33,7 +33,154 @@ function createShapeFixture(overrides: Partial<ShapeElement> = {}) {
   };
 }
 
+function createTemplateProject(): ProjectDocument {
+  const project = sampleProject.createSampleProject();
+  const layoutElement: DesignElement = {
+    id: 'layout-old-rule',
+    type: 'shape',
+    shape: 'rect',
+    x: 0,
+    y: 0,
+    width: 1920,
+    height: 24,
+    rotation: 0,
+    locked: false,
+    visible: true,
+    opacity: 1,
+    fill: '#37FD76',
+    templateSource: { type: 'layout', layoutId: 'layout-old' },
+  };
+
+  return {
+    ...project,
+    themeId: 'theme-localstudio',
+    themeGallery: ['theme-localstudio'],
+    themes: {
+      'theme-localstudio': {
+        id: 'theme-localstudio',
+        name: 'LocalStudio',
+        palette: {
+          background: '#050D10',
+          text: '#FFFFFF',
+          primary: '#37FD76',
+          secondary: '#36D7FF',
+          muted: '#91999D',
+        },
+        typography: {
+          bodyFontFamily: 'Open Sans',
+          displayFontFamily: 'Orbitron',
+        },
+        preview: { background: '#050D10', accents: ['#37FD76', '#36D7FF'] },
+        source: 'custom',
+      },
+      'theme-ice': {
+        id: 'theme-ice',
+        name: 'Ice Room',
+        palette: {
+          background: '#EAF6FF',
+          text: '#061319',
+          primary: '#00779A',
+          secondary: '#37FD76',
+          muted: '#52636A',
+        },
+        typography: {
+          bodyFontFamily: 'Open Sans',
+          displayFontFamily: 'Orbitron',
+        },
+        preview: { background: '#EAF6FF', accents: ['#00779A', '#37FD76'] },
+        source: 'custom',
+      },
+    },
+    slideLayouts: {
+      'layout-old': {
+        id: 'layout-old',
+        themeId: 'theme-localstudio',
+        name: 'Old rule',
+        background: { type: 'color', color: '#050D10' },
+        placeholderRoles: ['title'],
+        elements: [layoutElement],
+        preview: { background: '#050D10', accents: ['#37FD76'] },
+      },
+      'layout-new': {
+        id: 'layout-new',
+        themeId: 'theme-ice',
+        name: 'New rule',
+        background: { type: 'color', color: '#EAF6FF' },
+        placeholderRoles: ['title', 'body'],
+        elements: [
+          {
+            ...layoutElement,
+            id: 'layout-new-rule',
+            fill: '#00779A',
+            templateSource: { type: 'layout', layoutId: 'layout-new' },
+          },
+        ],
+        preview: { background: '#EAF6FF', accents: ['#00779A'] },
+      },
+    },
+    elements: {
+      ...project.elements,
+      [layoutElement.id]: layoutElement,
+    },
+    pages: project.pages.map((page) =>
+      page.id === 'page-1'
+        ? {
+            ...page,
+            layoutId: 'layout-old',
+            elementIds: [layoutElement.id, ...page.elementIds],
+          }
+        : page,
+    ),
+  };
+}
+
 describe('editor commands', () => {
+  it('saves the active theme into the project gallery without duplicating it', () => {
+    const project = createTemplateProject();
+    const next = new basicCommands.SaveThemeCommand('Snapshot').execute(project);
+    const savedThemeId = next.themeGallery?.at(-1);
+
+    expect(savedThemeId).toBeDefined();
+    expect(next.themeGallery).toHaveLength(2);
+    expect(savedThemeId).not.toBe(project.themeId);
+    expect(next.themes?.[savedThemeId ?? '']).toMatchObject({
+      name: 'Snapshot',
+      palette: project.themes?.['theme-localstudio']?.palette,
+      source: 'custom',
+    });
+    expect(project.themeGallery).toEqual(['theme-localstudio']);
+  });
+
+  it('applies a theme to the deck while preserving slide content', () => {
+    const project = createTemplateProject();
+    const next = new basicCommands.ApplyThemeCommand('theme-ice').execute(project);
+
+    expect(next.themeId).toBe('theme-ice');
+    expect(next.pages[0]?.background).toEqual({ type: 'color', color: '#EAF6FF' });
+    expect(next.pages[0]?.elementIds).toEqual(project.pages[0]?.elementIds);
+    expect(next.elements['text-title']).toMatchObject({
+      type: 'text',
+      fill: '#061319',
+      fontFamily: 'Orbitron',
+    });
+  });
+
+  it('applies a slide layout by replacing only layout-derived objects', () => {
+    const project = createTemplateProject();
+    const next = new basicCommands.ApplySlideLayoutCommand('page-1', 'layout-new').execute(project);
+
+    expect(next.pages[0]?.layoutId).toBe('layout-new');
+    expect(next.pages[0]?.background).toEqual({ type: 'color', color: '#EAF6FF' });
+    expect(next.elements['layout-old-rule']).toBeUndefined();
+    expect(next.elements['layout-new-rule']).toMatchObject({
+      type: 'shape',
+      templateSource: { type: 'layout', layoutId: 'layout-new' },
+    });
+    expect(next.pages[0]?.elementIds).toContain('text-title');
+    expect(next.pages[0]?.elementIds).toContain('image-hero');
+    expect(project.elements['layout-old-rule']).toBeDefined();
+  });
+
   it('aligns an element to page horizontal center immutably', () => {
     const project = sampleProject.createSampleProject();
     const command = new basicCommands.AlignElementCommand(

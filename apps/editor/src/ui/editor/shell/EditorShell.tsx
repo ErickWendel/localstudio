@@ -938,6 +938,7 @@ export function EditorShell({ services }: EditorShellProps) {
               }
             : undefined
         }
+        onSaveTheme={isHistoryReadOnly ? undefined : vm.saveTheme}
         onTranslationSourceLanguageChange={vm.setActiveSlideLanguage}
         onTranslationTargetLanguageChange={(languageCode) => {
           void vm.setTranslationTargetLanguageForSource(languageCode, {
@@ -983,6 +984,11 @@ export function EditorShell({ services }: EditorShellProps) {
           onUpdateTextContent={isHistoryReadOnly ? undefined : vm.updateTextContent}
           onUpdateMediaPlayback={isHistoryReadOnly ? undefined : vm.updateMediaPlayback}
           onUpdatePageBackground={isHistoryReadOnly ? undefined : vm.updatePageBackground}
+          onChangeTheme={() => undefined}
+          onApplyTheme={isHistoryReadOnly ? undefined : vm.applyTheme}
+          onEditTheme={isHistoryReadOnly ? undefined : vm.editTheme}
+          onApplySlideLayout={isHistoryReadOnly ? undefined : vm.applySlideLayout}
+          onEditSlideLayout={isHistoryReadOnly ? undefined : vm.editSlideLayout}
           onReplaceVideoAsset={
             isHistoryReadOnly
               ? undefined
@@ -1191,6 +1197,8 @@ export function EditorShell({ services }: EditorShellProps) {
               isHistoryReadOnly ? undefined : vm.cancelBackgroundSelectionMode
             }
             onClearSelection={isHistoryReadOnly ? undefined : vm.clearSelection}
+            onSelectPresentation={isHistoryReadOnly ? undefined : vm.selectPresentation}
+            onSelectSlide={isHistoryReadOnly ? undefined : vm.selectSlideBackground}
             onDeleteSelectedElement={isHistoryReadOnly ? undefined : vm.deleteSelectedElement}
             onDuplicateSelectedElement={isHistoryReadOnly ? undefined : vm.duplicateSelectedElement}
             onFlipSelectedImage={isHistoryReadOnly ? undefined : vm.flipSelectedImage}

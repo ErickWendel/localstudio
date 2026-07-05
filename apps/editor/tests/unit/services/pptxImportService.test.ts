@@ -39,11 +39,27 @@ const slideRels = `<?xml version="1.0" encoding="UTF-8"?>
 const layoutRels = `<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rIdLayoutImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/layout-icon.png"/>
+  <Relationship Id="rIdMaster" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="../slideMasters/slideMaster1.xml"/>
 </Relationships>`;
+
+const masterXml = `<?xml version="1.0" encoding="UTF-8"?>
+<p:sldMaster xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+      <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm></p:grpSpPr>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="30" name="Master footer"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr><a:xfrm><a:off x="91440" y="4800600"/><a:ext cx="914400" cy="228600"/></a:xfrm></p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr sz="1400"><a:solidFill><a:srgbClr val="37fd76"/></a:solidFill><a:latin typeface="Open Sans"/></a:rPr><a:t>Master footer</a:t></a:r></a:p></p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+</p:sldMaster>`;
 
 const layoutXml = `<?xml version="1.0" encoding="UTF-8"?>
 <p:sldLayout xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-  <p:cSld>
+  <p:cSld name="Title &amp; Photo">
     <p:spTree>
       <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
       <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm></p:grpSpPr>
@@ -168,6 +184,7 @@ function createPptxFixture(slideContents = slideXml) {
     { path: 'ppt/notesSlides/notesSlide1.xml', contents: notesSlideXml },
     { path: 'ppt/slideLayouts/slideLayout1.xml', contents: layoutXml },
     { path: 'ppt/slideLayouts/_rels/slideLayout1.xml.rels', contents: layoutRels },
+    { path: 'ppt/slideMasters/slideMaster1.xml', contents: masterXml },
     { path: 'ppt/media/image1.png', contents: new Uint8Array([137, 80, 78, 71]) },
     { path: 'ppt/media/layout-icon.png', contents: new Uint8Array([137, 80, 78, 71]) },
     { path: 'ppt/media/poster1.png', contents: new Uint8Array([137, 80, 78, 71]) },
@@ -176,6 +193,44 @@ function createPptxFixture(slideContents = slideXml) {
 }
 
 describe('BrowserPptxImportService', () => {
+  it('preserves imported PowerPoint themes and slide layouts as project templates', async () => {
+    const service = new BrowserPptxImportService();
+    const project = await service.importPowerPoint({ file: createPptxFixture() });
+    const page = project.pages[0];
+    const layoutId = page?.layoutId;
+
+    expect(project.themeId).toBe('pptx-theme-1');
+    expect(project.themeGallery).toEqual(['pptx-theme-1']);
+    expect(project.themes?.['pptx-theme-1']).toMatchObject({
+      id: 'pptx-theme-1',
+      name: 'deck Theme',
+      source: 'pptx',
+      palette: {
+        background: '#101010',
+        primary: '#37FD76',
+        text: '#FFFFFF',
+      },
+    });
+    expect(layoutId).toBe('pptx-layout-slideLayout1');
+    expect(project.slideLayouts?.[layoutId ?? '']).toMatchObject({
+      id: 'pptx-layout-slideLayout1',
+      themeId: 'pptx-theme-1',
+      name: 'Title & Photo',
+      placeholderRoles: ['title'],
+    });
+    expect(project.slideLayouts?.[layoutId ?? '']?.elements.length).toBeGreaterThan(0);
+    expect(
+      project.slideLayouts?.[layoutId ?? '']?.elements.some(
+        (element) => element.type === 'shape' && element.templateSource?.layoutId === layoutId,
+      ),
+    ).toBe(true);
+    expect(
+      Object.values(project.elements).some(
+        (element) => element.templateSource?.type === 'layout' && element.templateSource.layoutId === layoutId,
+      ),
+    ).toBe(true);
+  });
+
   it('imports editable text, original images, and playable video assets from PPTX', async () => {
     const service = new BrowserPptxImportService();
     const project = await service.importPowerPoint({ file: createPptxFixture() });

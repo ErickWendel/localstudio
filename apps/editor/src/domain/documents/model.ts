@@ -24,6 +24,10 @@ export type ShapeLineEndpoint =
 export interface ProjectDocument {
   id: string;
   name: string;
+  themeId?: string;
+  themeGallery?: string[];
+  themes?: Record<string, PresentationTheme>;
+  slideLayouts?: Record<string, SlideLayout>;
   pages: Page[];
   assets: Record<string, Asset>;
   fonts?: Record<string, ProjectFont>;
@@ -36,6 +40,7 @@ export interface ProjectDocument {
 export interface Page {
   id: string;
   name: string;
+  layoutId?: string;
   width: number;
   height: number;
   background: PageBackground;
@@ -100,6 +105,43 @@ export interface Asset {
   storage?: 'inline' | 'file' | 'remote';
 }
 
+export interface ThemePalette {
+  background: string;
+  muted: string;
+  primary: string;
+  secondary: string;
+  text: string;
+}
+
+export interface ThemeTypography {
+  bodyFontFamily: string;
+  displayFontFamily: string;
+}
+
+export interface ThemePreview {
+  accents: string[];
+  background: string;
+}
+
+export interface PresentationTheme {
+  id: string;
+  name: string;
+  palette: ThemePalette;
+  preview: ThemePreview;
+  source: 'custom' | 'pptx' | 'system';
+  typography: ThemeTypography;
+}
+
+export interface SlideLayout {
+  id: string;
+  themeId: string;
+  name: string;
+  background: PageBackground;
+  elements: DesignElement[];
+  placeholderRoles: string[];
+  preview: ThemePreview;
+}
+
 export interface ProjectFont {
   id: string;
   family: string;
@@ -127,7 +169,10 @@ export interface BaseElement {
   locked: boolean;
   visible: boolean;
   opacity: number;
+  templateSource?: ElementTemplateSource;
 }
+
+export type ElementTemplateSource = { layoutId: string; type: 'layout' };
 
 export interface TextElement extends BaseElement {
   type: 'text';
@@ -195,4 +240,5 @@ export interface CropRect {
 export interface SelectionState {
   pageId: string;
   elementIds: string[];
+  target?: 'elements' | 'presentation' | 'slide';
 }

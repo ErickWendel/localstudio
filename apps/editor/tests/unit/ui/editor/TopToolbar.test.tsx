@@ -15,6 +15,7 @@ describe('TopToolbar', () => {
     const onNewProject = vi.fn();
     const onSaveLocalAs = vi.fn();
     const onSaveLocal = vi.fn();
+    const onSaveTheme = vi.fn();
     const onSelectLayers = vi.fn();
     const onTranslateDeck = vi.fn();
 
@@ -30,6 +31,7 @@ describe('TopToolbar', () => {
         onNewProject={onNewProject}
         onSaveLocal={onSaveLocal}
         onSaveLocalAs={onSaveLocalAs}
+        onSaveTheme={onSaveTheme}
         onSelectLayers={onSelectLayers}
         onTranslateDeck={onTranslateDeck}
         canTranslateDeck
@@ -51,6 +53,10 @@ describe('TopToolbar', () => {
     await user.click(screen.getByRole('button', { name: 'File' }));
     await user.click(screen.getByRole('menuitem', { name: 'Share' }));
     expect(onShare).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    expect(screen.getByRole('separator', { name: 'Theme actions' })).toBeInTheDocument();
+    await user.click(screen.getByRole('menuitem', { name: 'Save Theme' }));
+    expect(onSaveTheme).toHaveBeenCalledTimes(1);
     await user.click(screen.getByRole('button', { name: 'File' }));
     expect(screen.getByRole('separator', { name: 'File storage actions' })).toBeInTheDocument();
     await user.click(screen.getByRole('menuitem', { name: 'Save' }));

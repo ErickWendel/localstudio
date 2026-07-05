@@ -1,4 +1,12 @@
-import type { Asset, DesignElement, ImportWarning, Page, ProjectDocument } from '../../../domain/documents/model';
+import type {
+  Asset,
+  DesignElement,
+  ImportWarning,
+  Page,
+  PresentationTheme,
+  ProjectDocument,
+  SlideLayout,
+} from '../../../domain/documents/model';
 import { pptxFileUtils } from './pptxFileUtils';
 import type { PptxPackageFile } from './pptxPackageTypes';
 import type { PptxDeck, PptxSlideObject } from './pptxParser';
@@ -182,7 +190,25 @@ function mapObject(
       locked: false,
       visible: true,
       opacity: 1,
+      ...(object.source === 'layout' || object.source === 'master'
+        ? { templateSource: { type: 'layout' as const, layoutId: pageId } }
+        : {}),
       ...object.style,
+    };
+  }
+  if (object.kind === 'placeholder') {
+    return {
+      id: object.id,
+      type: 'shape',
+      shape: 'rect',
+      ...object.frame,
+      rotation: 0,
+      locked: true,
+      visible: true,
+      opacity: 0.95,
+      stroke: object.placeholderType === 'pic' || object.placeholderType === 'obj' ? '#36D7FF' : '#40493F',
+      strokeWidth: 2,
+      templateSource: { type: 'layout' as const, layoutId: pageId },
     };
   }
   const asset = getOrCreateAsset(object.assetPath, files, assets);
@@ -203,6 +229,9 @@ function mapObject(
     locked: false,
     visible: true,
     opacity: 1,
+    ...(object.source === 'layout' || object.source === 'master'
+      ? { templateSource: { type: 'layout' as const, layoutId: pageId } }
+      : {}),
   };
   if (object.kind === 'video') {
     return {
@@ -220,22 +249,70 @@ function mapObject(
   return { ...base, type: 'image' };
 }
 
+function createTheme(deck: PptxDeck): PresentationTheme {
+  const firstSlide = deck.slides[0];
+  const background = firstSlide?.backgroundColor ?? '#050D10';
+  return {
+    id: 'pptx-theme-1',
+    name: `${deck.name} Theme`,
+    palette: {
+      background,
+      text: '#FFFFFF',
+      primary: '#37FD76',
+      secondary: '#36D7FF',
+      muted: '#91999D',
+    },
+    typography: {
+      bodyFontFamily: 'Open Sans',
+      displayFontFamily: 'Orbitron',
+    },
+    preview: { background, accents: ['#37FD76', '#36D7FF'] },
+    source: 'pptx',
+  };
+}
+
+function createLayoutPreview(elements: DesignElement[], background: string) {
+  const accent = elements.find((element) => element.type === 'text')?.type === 'text'
+    ? '#37FD76'
+    : '#36D7FF';
+  return { background, accents: [accent] };
+}
+
 function map(deck: PptxDeck, files: PptxPackageFile[]): ProjectDocument {
   const now = new Date().toISOString();
   const assets: Record<string, Asset> = {};
   const elements: Record<string, DesignElement> = {};
   const warnings: ImportWarning[] = [];
+  const theme = createTheme(deck);
+  const slideLayouts: Record<string, SlideLayout> = {};
   const pages: Page[] = deck.slides.map((slide) => {
     const elementIds: string[] = [];
+    const layoutId = slide.layoutId ?? `${slide.id}-layout`;
     for (const object of slide.objects.sort((left, right) => left.zIndex - right.zIndex)) {
-      const element = mapObject(object, files, assets, warnings, slide.id, deck.width, deck.height);
+      const element = mapObject(object, files, assets, warnings, layoutId, deck.width, deck.height);
       if (!element) continue;
       elements[element.id] = element;
       elementIds.push(element.id);
     }
+    const layoutElements = slide.layoutObjects
+      .sort((left, right) => left.zIndex - right.zIndex)
+      .map((object) => mapObject(object, files, assets, warnings, layoutId, deck.width, deck.height))
+      .filter((element): element is DesignElement => Boolean(element));
+    if (layoutElements.length > 0 || slide.layoutId) {
+      slideLayouts[layoutId] = {
+        id: layoutId,
+        themeId: theme.id,
+        name: slide.layoutName ?? slide.name,
+        background: { type: 'color', color: slide.backgroundColor },
+        elements: layoutElements,
+        placeholderRoles: slide.placeholderRoles,
+        preview: createLayoutPreview(layoutElements, slide.backgroundColor),
+      };
+    }
     return {
       id: slide.id,
       name: slide.name,
+      ...(slide.layoutId ? { layoutId } : {}),
       width: deck.width,
       height: deck.height,
       background: { type: 'color', color: slide.backgroundColor },
@@ -255,6 +332,10 @@ function map(deck: PptxDeck, files: PptxPackageFile[]): ProjectDocument {
   return {
     id: `pptx-project-${Date.now().toString(36)}`,
     name: deck.name,
+    themeId: theme.id,
+    themeGallery: [theme.id],
+    themes: { [theme.id]: theme },
+    ...(Object.keys(slideLayouts).length > 0 ? { slideLayouts } : {}),
     createdAt: now,
     updatedAt: now,
     assets,

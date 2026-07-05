@@ -238,14 +238,14 @@ describe('CanvasWorkspace', () => {
     expect(container.querySelector('.canvas-accessible-text')).not.toBeInTheDocument();
   });
 
-  it('clears selection when the empty canvas background is clicked', () => {
-    const onClearSelection = vi.fn();
+  it('selects the slide when the slide background is clicked', () => {
+    const onSelectSlide = vi.fn();
     const { container } = render(
       <CanvasWorkspace
         project={sampleProject.createSampleProject()}
         activePageId="page-1"
         selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
-        onClearSelection={onClearSelection}
+        onSelectSlide={onSelectSlide}
       />,
     );
 
@@ -253,7 +253,23 @@ describe('CanvasWorkspace', () => {
     expect(canvas).toBeInTheDocument();
     fireEvent.mouseDown(canvas!);
 
-    expect(onClearSelection).toHaveBeenCalledTimes(1);
+    expect(onSelectSlide).toHaveBeenCalledTimes(1);
+  });
+
+  it('selects the presentation when outside the slide is clicked', () => {
+    const onSelectPresentation = vi.fn();
+    render(
+      <CanvasWorkspace
+        project={sampleProject.createSampleProject()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
+        onSelectPresentation={onSelectPresentation}
+      />,
+    );
+
+    fireEvent.pointerDown(screen.getByLabelText('Slide canvas'));
+
+    expect(onSelectPresentation).toHaveBeenCalledTimes(1);
   });
 
   it('marks active animation preview state and advances click-triggered builds', () => {

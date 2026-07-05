@@ -41,8 +41,18 @@ export type PptxSlideObject =
   | {
       frame: PptxRect;
       id: string;
+      kind: 'placeholder';
+      placeholderType: string;
+      sourceShapeId: string;
+      source: 'layout' | 'master' | 'slide';
+      zIndex: number;
+    }
+  | {
+      frame: PptxRect;
+      id: string;
       kind: 'text';
       sourceShapeId: string;
+      source: 'layout' | 'master' | 'slide';
       style: PptxTextStyle;
       text: string;
       textBox: PptxTextBox;
@@ -55,14 +65,19 @@ export type PptxSlideObject =
       kind: 'image' | 'gif' | 'video';
       startTrigger?: AnimationTrigger;
       sourceShapeId: string;
+      source: 'layout' | 'master' | 'slide';
       zIndex: number;
     };
 
 export interface PptxSlide {
   backgroundColor: string;
   id: string;
+  layoutId?: string;
+  layoutName?: string;
+  placeholderRoles: string[];
   name: string;
   animationBuilds: ElementAnimationBuild[];
+  layoutObjects: PptxSlideObject[];
   objects: PptxSlideObject[];
   speakerNotes?: string;
   transitionEffect: AnimationEffect;
@@ -207,6 +222,23 @@ function getPlaceholderType(shape: Element) {
 
 function hasPlaceholder(shape: Element) {
   return Boolean(getPlaceholderType(shape));
+}
+
+function getPlaceholderRoles(document: Document) {
+  return Array.from(
+    new Set(
+      pptxXml
+        .descendants(document, 'ph')
+        .map((placeholder) => placeholder.getAttribute('type'))
+        .filter((type): type is string => Boolean(type)),
+    ),
+  );
+}
+
+function getLayoutName(document: Document | undefined, layoutPath: string | undefined, fallback: string) {
+  const name = document ? pptxXml.firstDescendant(document, 'cSld')?.getAttribute('name') : undefined;
+  if (name?.trim()) return name.trim();
+  return layoutPath?.split('/').at(-1)?.replace(/\.xml$/i, '') ?? fallback;
 }
 
 function getTypeface(...runProperties: Array<Element | undefined>) {
@@ -427,6 +459,7 @@ function parseTextObject(
   scaleY: number,
   textDefaults: PptxTextDefaults,
   idScope = 'slide',
+  source: PptxSlideObject['source'] = 'slide',
 ): PptxSlideObject | undefined {
   const text = getTextParagraphs(shape);
   if (!text) return undefined;
@@ -438,9 +471,34 @@ function parseTextObject(
     id: `${slideId}-${idScope}-text-${shapeId}`,
     kind: 'text',
     sourceShapeId: shapeId,
+    source,
     style: getTextStyle(shape, scaleY, textDefaults),
     text,
     textBox: getTextBox(shape, scaleX, scaleY),
+    zIndex,
+  };
+}
+
+function parsePlaceholderObject(
+  shape: Element,
+  slideId: string,
+  zIndex: number,
+  scaleX: number,
+  scaleY: number,
+  idScope: 'layout' | 'master',
+): PptxSlideObject | undefined {
+  const placeholderType = getPlaceholderType(shape);
+  if (!placeholderType) return undefined;
+  const frame = parseFrame(shape, scaleX, scaleY);
+  if (!frame) return undefined;
+  const shapeId = localShapeId(shape, String(zIndex));
+  return {
+    frame,
+    id: `${slideId}-${idScope}-placeholder-${shapeId}`,
+    kind: 'placeholder',
+    placeholderType,
+    sourceShapeId: shapeId,
+    source: idScope,
     zIndex,
   };
 }
@@ -460,6 +518,7 @@ function parsePictureObject(
   scaleY: number,
   relationships: Map<string, Relationship>,
   idScope = 'slide',
+  source: PptxSlideObject['source'] = 'slide',
 ): PptxSlideObject | undefined {
   const frame = parseFrame(picture, scaleX, scaleY);
   if (!frame) return undefined;
@@ -479,6 +538,7 @@ function parsePictureObject(
     id: `${slideId}-${idScope}-${assetType}-${shapeId}`,
     kind: assetType,
     sourceShapeId: shapeId,
+    source,
     zIndex,
   };
 }
@@ -633,11 +693,62 @@ async function parseInheritedObjects(
   if (tree) {
     for (const child of pptxXml.childElements(tree)) {
       if (child.localName === 'sp' && !hasPlaceholder(child)) {
-        const object = parseTextObject(child, slideId, objects.length, scaleX, scaleY, textDefaults, idScope);
+        const object = parseTextObject(
+          child,
+          slideId,
+          objects.length,
+          scaleX,
+          scaleY,
+          textDefaults,
+          idScope,
+          idScope,
+        );
         if (object) objects.push(object);
       }
       if (child.localName === 'pic') {
-        const object = parsePictureObject(child, slideId, objects.length, scaleX, scaleY, rels, idScope);
+        const object = parsePictureObject(
+          child,
+          slideId,
+          objects.length,
+          scaleX,
+          scaleY,
+          rels,
+          idScope,
+          idScope,
+        );
+        if (object) objects.push(object);
+      }
+    }
+  }
+  return objects;
+}
+
+async function parseLayoutPreviewObjects(
+  files: PptxPackageFile[],
+  sourcePath: string | undefined,
+  slideId: string,
+  scaleX: number,
+  scaleY: number,
+  textDefaults: PptxTextDefaults,
+  idScope: 'layout' | 'master',
+) {
+  if (!sourcePath) return [];
+  const xml = await readText(findFile(files, sourcePath));
+  if (!xml) return [];
+  const document = pptxXml.parseXml(xml);
+  const rels = parseRelationships(await readText(findFile(files, relsPathFor(sourcePath))), sourcePath);
+  const tree = pptxXml.firstDescendant(document, 'spTree');
+  const objects: PptxSlideObject[] = [];
+  if (tree) {
+    for (const child of pptxXml.childElements(tree)) {
+      if (child.localName === 'sp') {
+        const object = hasPlaceholder(child)
+          ? parsePlaceholderObject(child, slideId, objects.length, scaleX, scaleY, idScope)
+          : parseTextObject(child, slideId, objects.length, scaleX, scaleY, textDefaults, idScope, idScope);
+        if (object) objects.push(object);
+      }
+      if (child.localName === 'pic') {
+        const object = parsePictureObject(child, slideId, objects.length, scaleX, scaleY, rels, idScope, idScope);
         if (object) objects.push(object);
       }
     }
@@ -671,9 +782,15 @@ async function parseSlide(
     layoutPath ?? slidePath,
   );
   const masterPath = findRelationshipByType(layoutRels, '/slideMaster')?.target;
+  const layoutXml = await readText(findFile(files, layoutPath ?? ''));
+  const layoutDocument = layoutXml ? pptxXml.parseXml(layoutXml) : undefined;
   const speakerNotes = await parseSpeakerNotes(files, notesPath);
   const masterObjects = await parseInheritedObjects(files, masterPath, slideId, scaleX, scaleY, textDefaults, 'master');
   const layoutObjects = await parseInheritedObjects(files, layoutPath, slideId, scaleX, scaleY, textDefaults, 'layout');
+  const layoutPreviewObjects = [
+    ...(await parseLayoutPreviewObjects(files, masterPath, slideId, scaleX, scaleY, textDefaults, 'master')),
+    ...(await parseLayoutPreviewObjects(files, layoutPath, slideId, scaleX, scaleY, textDefaults, 'layout')),
+  ].map((object, index) => ({ ...object, zIndex: index }));
   const tree = pptxXml.firstDescendant(document, 'spTree');
   const inheritedObjects = [...masterObjects, ...layoutObjects];
   const objects: PptxSlideObject[] = inheritedObjects.map((object, index) => ({
@@ -700,8 +817,12 @@ async function parseSlide(
   return {
     backgroundColor: getBackgroundColor(document),
     id: slideId,
+    ...(layoutPath ? { layoutId: `pptx-layout-${layoutPath.split('/').at(-1)?.replace(/\.xml$/i, '') ?? slideId}` } : {}),
+    ...(layoutPath ? { layoutName: getLayoutName(layoutDocument, layoutPath, 'Imported layout') } : {}),
+    placeholderRoles: layoutDocument ? getPlaceholderRoles(layoutDocument) : [],
     name: `Slide ${slideIndex + 1}`,
     animationBuilds: parseAnimationBuilds(document, slideId, objects),
+    layoutObjects: layoutPreviewObjects,
     objects,
     ...(speakerNotes ? { speakerNotes } : {}),
     transitionEffect: getTransitionEffect(document),

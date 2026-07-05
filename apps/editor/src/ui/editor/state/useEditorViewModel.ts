@@ -610,6 +610,8 @@ export function useEditorViewModel(services: AppServices) {
   const [activePageId, setActivePageId] = useState(initialProject.pages[0]?.id ?? '');
   const activePageIdRef = useRef(activePageId);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
+  const [selectionTarget, setSelectionTarget] =
+    useState<NonNullable<SelectionState['target']>>('presentation');
   const selectedElementIdsRef = useRef(selectedElementIds);
   const [history, setHistory] = useState<EditorHistory>({ past: [], future: [] });
   const [zoomPercent, setZoomPercent] = useState(100);
@@ -735,8 +737,8 @@ export function useEditorViewModel(services: AppServices) {
   const skipNextProjectSaveRef = useRef(shouldRestoreStoredProject);
   const lastVersionProjectRef = useRef<ProjectDocument>(initialProject);
   const selection = useMemo<SelectionState>(
-    () => ({ pageId: activePageId, elementIds: selectedElementIds }),
-    [activePageId, selectedElementIds],
+    () => ({ pageId: activePageId, elementIds: selectedElementIds, target: selectionTarget }),
+    [activePageId, selectedElementIds, selectionTarget],
   );
   const selectedImageElement = useMemo<ImageElement | undefined>(() => {
     if (selectedElementIds.length !== 1) return undefined;
@@ -1572,7 +1574,11 @@ export function useEditorViewModel(services: AppServices) {
 
   function commitProject(
     updater: (currentProject: ProjectDocument) => ProjectDocument,
-    options?: { activePageId?: string; selectedElementIds?: string[] },
+    options?: {
+      activePageId?: string;
+      selectedElementIds?: string[];
+      selectionTarget?: SelectionState['target'];
+    },
   ) {
     if (versionHistoryOpen || previewProject) return;
     setProject((currentProject) => {
@@ -1592,6 +1598,9 @@ export function useEditorViewModel(services: AppServices) {
       if (options?.selectedElementIds !== undefined) {
         selectedElementIdsRef.current = options.selectedElementIds;
         setSelectedElementIds(options.selectedElementIds);
+        setSelectionTarget(options.selectedElementIds.length > 0 ? 'elements' : (options.selectionTarget ?? 'presentation'));
+      } else if (options?.selectionTarget) {
+        setSelectionTarget(options.selectionTarget);
       }
       return nextProject;
     });
@@ -1616,6 +1625,7 @@ export function useEditorViewModel(services: AppServices) {
     clearBackgroundPreview();
     clearBackgroundPreparation();
     clearBackgroundSelectionPoints();
+    setSelectionTarget('elements');
     setSelectedElementIds((currentSelection) => {
       if (!options?.additive) return [elementId];
       if (currentSelection.includes(elementId)) {
@@ -1637,6 +1647,7 @@ export function useEditorViewModel(services: AppServices) {
     clearBackgroundPreview();
     clearBackgroundPreparation();
     clearBackgroundSelectionPoints();
+    setSelectionTarget('elements');
     setSelectedElementIds(selectableElementIds);
   }
 
@@ -1646,6 +1657,27 @@ export function useEditorViewModel(services: AppServices) {
     clearBackgroundPreview();
     clearBackgroundPreparation();
     clearBackgroundSelectionPoints();
+    setSelectionTarget('presentation');
+    setSelectedElementIds([]);
+  }
+
+  function selectSlideBackground() {
+    setBackgroundSelectionMode(false);
+    setBackgroundSelectionNotice(undefined);
+    clearBackgroundPreview();
+    clearBackgroundPreparation();
+    clearBackgroundSelectionPoints();
+    setSelectionTarget('slide');
+    setSelectedElementIds([]);
+  }
+
+  function selectPresentation() {
+    setBackgroundSelectionMode(false);
+    setBackgroundSelectionNotice(undefined);
+    clearBackgroundPreview();
+    clearBackgroundPreparation();
+    clearBackgroundSelectionPoints();
+    setSelectionTarget('presentation');
     setSelectedElementIds([]);
   }
 
@@ -1824,6 +1856,7 @@ export function useEditorViewModel(services: AppServices) {
       setActivePageId(normalizedProject.pages[0]?.id ?? '');
       setPageLanguageCodes({});
       const nextSelectedId = normalizedProject.pages[0]?.elementIds.at(-1);
+      setSelectionTarget(nextSelectedId ? 'elements' : 'presentation');
       setSelectedElementIds(nextSelectedId ? [nextSelectedId] : []);
       setHistory({ past: [], future: [] });
       setBackgroundSelectionMode(false);
@@ -1946,6 +1979,7 @@ export function useEditorViewModel(services: AppServices) {
       setActivePageId(normalizedProject.pages[0]?.id ?? '');
       setPageLanguageCodes({});
       const nextSelectedId = normalizedProject.pages[0]?.elementIds.at(-1);
+      setSelectionTarget(nextSelectedId ? 'elements' : 'presentation');
       setSelectedElementIds(nextSelectedId ? [nextSelectedId] : []);
       setHistory({ past: [], future: [] });
       setBackgroundSelectionMode(false);
@@ -2459,6 +2493,40 @@ export function useEditorViewModel(services: AppServices) {
         currentProject,
       ),
     );
+  }
+
+  function saveTheme() {
+    commitProject((currentProject) =>
+      new basicCommands.SaveThemeCommand(`${currentProject.name} Theme`).execute(currentProject),
+    );
+    setPersistenceNotice('Theme saved to this project.');
+  }
+
+  function changeThemeSelection(themeId: string) {
+    commitProject((currentProject) =>
+      new basicCommands.ChangeThemeSelectionCommand(themeId).execute(currentProject),
+    );
+  }
+
+  function applyTheme(themeId: string) {
+    commitProject((currentProject) =>
+      new basicCommands.ApplyThemeCommand(themeId).execute(currentProject),
+    );
+  }
+
+  function editTheme(themeId: string) {
+    changeThemeSelection(themeId);
+    setPersistenceNotice('Theme editing is ready in the Design panel.');
+  }
+
+  function applySlideLayout(pageId: string, layoutId: string) {
+    commitProject((currentProject) =>
+      new basicCommands.ApplySlideLayoutCommand(pageId, layoutId).execute(currentProject),
+    );
+  }
+
+  function editSlideLayout(layoutId: string) {
+    setPersistenceNotice(`Slide layout ready to edit: ${layoutId}.`);
   }
 
   function setPageTransition(transition: SlideTransition) {
@@ -4214,6 +4282,14 @@ export function useEditorViewModel(services: AppServices) {
     selectElement,
     selectAllElementsOnActivePage,
     clearSelection,
+    selectSlideBackground,
+    selectPresentation,
+    saveTheme,
+    changeThemeSelection,
+    applyTheme,
+    editTheme,
+    applySlideLayout,
+    editSlideLayout,
     selectPage,
     activateScrolledPage,
     addPage,

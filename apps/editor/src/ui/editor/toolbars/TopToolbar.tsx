@@ -41,6 +41,7 @@ interface TopToolbarProps {
   onPersistenceToggle?: ((enabled: boolean) => void) | undefined;
   onSaveLocal?: (() => void) | undefined;
   onSaveLocalAs?: (() => void) | undefined;
+  onSaveTheme?: (() => void) | undefined;
   onProjectNameChange?: ((name: string) => void) | undefined;
   onOpenPresenterView?: (() => void) | undefined;
   onRedo?: (() => void) | undefined;
@@ -160,6 +161,7 @@ export function TopToolbar({
   onStartPresenterMode,
   onSaveLocal,
   onSaveLocalAs,
+  onSaveTheme,
   onTranslationSourceLanguageChange,
   onTranslationTargetLanguageChange,
   onTranslateDeck,
@@ -263,6 +265,8 @@ export function TopToolbar({
       { label: 'Import PowerPoint...', disabled: !onImportPowerPoint, onSelect: onImportPowerPoint },
       { label: 'Import Remote', disabled: !onImportRemoteMirror, onSelect: onImportRemoteMirror },
       { label: 'Share', disabled: !onShare, onSelect: triggerShare },
+      { kind: 'separator', label: 'Theme actions' },
+      { label: 'Save Theme', disabled: !onSaveTheme, onSelect: onSaveTheme },
       { kind: 'separator', label: 'File storage actions' },
       { label: 'Save', disabled: !onSaveLocal, onSelect: onSaveLocal },
       { label: 'Save As...', disabled: !onSaveLocalAs, onSelect: onSaveLocalAs },

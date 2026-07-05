@@ -60,6 +60,11 @@ interface RightPanelProps {
   onUpdateTextContent?: (elementId: string, text: string) => void;
   onUpdateMediaPlayback?: (elementId: string, patch: MediaPlaybackPatch) => void;
   onUpdatePageBackground?: (background: PageBackground) => void;
+  onChangeTheme?: () => void;
+  onApplyTheme?: (themeId: string) => void;
+  onEditTheme?: (themeId: string) => void;
+  onApplySlideLayout?: (pageId: string, layoutId: string) => void;
+  onEditSlideLayout?: (layoutId: string) => void;
   onSetSelectedElementZOrder?: (mode: ZOrderMode) => void;
   onReplaceVideoAsset?: (elementId: string, file: File) => void;
   onSetElementAnimationBuilds?: (elementIds: string[], patch: ElementAnimationPatch) => void;
@@ -108,6 +113,11 @@ export function RightPanel({
   onUpdateTextContent,
   onUpdateMediaPlayback,
   onUpdatePageBackground,
+  onChangeTheme,
+  onApplyTheme,
+  onEditTheme,
+  onApplySlideLayout,
+  onEditSlideLayout,
   onSetSelectedElementZOrder,
   onReplaceVideoAsset,
   onSetElementAnimationBuilds,
@@ -165,6 +175,11 @@ export function RightPanel({
             {...(onUpdateTextContent ? { onUpdateTextContent } : {})}
             {...(onUpdateMediaPlayback ? { onUpdateMediaPlayback } : {})}
             {...(onUpdatePageBackground ? { onUpdatePageBackground } : {})}
+            {...(onChangeTheme ? { onChangeTheme } : {})}
+            {...(onApplyTheme ? { onApplyTheme } : {})}
+            {...(onEditTheme ? { onEditTheme } : {})}
+            {...(onApplySlideLayout ? { onApplySlideLayout } : {})}
+            {...(onEditSlideLayout ? { onEditSlideLayout } : {})}
             {...(onReplaceVideoAsset ? { onReplaceVideoAsset } : {})}
             {...(onSetElementAnimationBuilds ? { onSetElementAnimationBuilds } : {})}
           />

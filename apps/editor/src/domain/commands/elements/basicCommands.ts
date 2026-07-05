@@ -7,8 +7,10 @@ import type {
   ImageElement,
   Page,
   PageBackground,
+  PresentationTheme,
   ProjectDocument,
   ShapeElement,
+  SlideLayout,
   SlideTransition,
   VideoElement,
 } from '../../documents/model';
@@ -69,6 +71,76 @@ interface TextTranslationPatch {
 
 type TextTranslationValue = string | TextTranslationPatch;
 
+function slugifyTemplateName(value: string) {
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 48) || 'theme'
+  );
+}
+
+function createFallbackTheme(project: ProjectDocument): PresentationTheme {
+  const firstPageBackground = project.pages[0]?.background;
+  const background =
+    firstPageBackground?.type === 'color'
+      ? firstPageBackground.color
+      : (firstPageBackground?.colorFallback ?? '#050D10');
+  return {
+    id: project.themeId ?? 'theme-localstudio',
+    name: 'LocalStudio',
+    palette: {
+      background,
+      text: '#FFFFFF',
+      primary: '#37FD76',
+      secondary: '#36D7FF',
+      muted: '#91999D',
+    },
+    typography: {
+      bodyFontFamily: 'Open Sans',
+      displayFontFamily: 'Orbitron',
+    },
+    preview: { background, accents: ['#37FD76', '#36D7FF'] },
+    source: 'system',
+  };
+}
+
+function getProjectTheme(project: ProjectDocument, themeId = project.themeId) {
+  if (themeId && project.themes?.[themeId]) return project.themes[themeId];
+  return createFallbackTheme(project);
+}
+
+function getThemeBackground(theme: PresentationTheme): PageBackground {
+  return { type: 'color', color: theme.palette.background };
+}
+
+function applyThemeToElement(element: DesignElement, theme: PresentationTheme): DesignElement {
+  if (element.templateSource) return element;
+  if (element.type === 'text') {
+    const isDisplayText = element.fontSize >= 64 || element.fontWeight >= 700;
+    return {
+      ...element,
+      fill: theme.palette.text,
+      fontFamily: isDisplayText
+        ? theme.typography.displayFontFamily
+        : theme.typography.bodyFontFamily,
+    };
+  }
+  if (element.type === 'shape' && element.fill) {
+    return { ...element, fill: theme.palette.primary };
+  }
+  return element;
+}
+
+function copyLayoutElement(element: DesignElement, layout: SlideLayout): DesignElement {
+  return {
+    ...element,
+    templateSource: { type: 'layout', layoutId: layout.id },
+  };
+}
+
 class RemoveAssetCommand implements EditorCommand {
   readonly description = 'Remove asset';
 
@@ -83,6 +155,185 @@ class RemoveAssetCommand implements EditorCommand {
     return {
       ...project,
       assets,
+      updatedAt: projectMutationUtils.getProjectUpdatedAt(),
+    };
+  }
+}
+
+class SaveThemeCommand implements EditorCommand {
+  readonly description = 'Save theme';
+
+  constructor(private readonly name?: string) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    const baseTheme = getProjectTheme(project);
+    const themeName = this.name?.trim() || `${baseTheme.name} copy`;
+    const themeId = `theme-${Date.now().toString(36)}-${slugifyTemplateName(themeName)}`;
+    const theme: PresentationTheme = {
+      ...baseTheme,
+      id: themeId,
+      name: themeName,
+      source: 'custom',
+      preview: {
+        background: baseTheme.palette.background,
+        accents: [baseTheme.palette.primary, baseTheme.palette.secondary],
+      },
+    };
+
+    return {
+      ...project,
+      themes: {
+        ...(project.themes ?? {}),
+        [baseTheme.id]: baseTheme,
+        [themeId]: theme,
+      },
+      themeGallery: [...(project.themeGallery ?? [baseTheme.id]).filter((id) => id !== themeId), themeId],
+      updatedAt: projectMutationUtils.getProjectUpdatedAt(),
+    };
+  }
+}
+
+class ChangeThemeSelectionCommand implements EditorCommand {
+  readonly description = 'Change selected theme';
+
+  constructor(private readonly themeId: string) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    if (!project.themes?.[this.themeId] || project.themeId === this.themeId) return project;
+    return {
+      ...project,
+      themeId: this.themeId,
+      updatedAt: projectMutationUtils.getProjectUpdatedAt(),
+    };
+  }
+}
+
+class ApplyThemeCommand implements EditorCommand {
+  readonly description = 'Apply theme';
+
+  constructor(private readonly themeId: string) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    const theme = project.themes?.[this.themeId];
+    if (!theme) return project;
+    const elements = Object.fromEntries(
+      Object.entries(project.elements).map(([elementId, element]) => [
+        elementId,
+        applyThemeToElement(element, theme),
+      ]),
+    ) as ProjectDocument['elements'];
+
+    return {
+      ...project,
+      themeId: this.themeId,
+      elements,
+      pages: project.pages.map((page) => ({
+        ...page,
+        background: getThemeBackground(theme),
+      })),
+      updatedAt: projectMutationUtils.getProjectUpdatedAt(),
+    };
+  }
+}
+
+class EditThemeCommand implements EditorCommand {
+  readonly description = 'Edit theme';
+
+  constructor(
+    private readonly themeId: string,
+    private readonly patch: Partial<Omit<PresentationTheme, 'id'>>,
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    const theme = project.themes?.[this.themeId];
+    if (!theme) return project;
+    return {
+      ...project,
+      themes: {
+        ...(project.themes ?? {}),
+        [this.themeId]: {
+          ...theme,
+          ...this.patch,
+          palette: { ...theme.palette, ...this.patch.palette },
+          typography: { ...theme.typography, ...this.patch.typography },
+          preview: { ...theme.preview, ...this.patch.preview },
+        },
+      },
+      updatedAt: projectMutationUtils.getProjectUpdatedAt(),
+    };
+  }
+}
+
+class ApplySlideLayoutCommand implements EditorCommand {
+  readonly description = 'Apply slide layout';
+
+  constructor(
+    private readonly pageId: string,
+    private readonly layoutId: string,
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    const layout = project.slideLayouts?.[this.layoutId];
+    const page = project.pages.find((item) => item.id === this.pageId);
+    if (!layout || !page) return project;
+
+    const currentPageElementIds = new Set(page.elementIds);
+    const layoutDerivedIds = new Set(
+      page.elementIds.filter((elementId) => project.elements[elementId]?.templateSource?.type === 'layout'),
+    );
+    const userElementIds = page.elementIds.filter((elementId) => !layoutDerivedIds.has(elementId));
+    const nextLayoutElements = layout.elements.map((element) => copyLayoutElement(element, layout));
+    const nextElements = { ...project.elements };
+
+    for (const elementId of layoutDerivedIds) {
+      delete nextElements[elementId];
+    }
+    for (const element of nextLayoutElements) {
+      nextElements[element.id] = element;
+    }
+
+    return {
+      ...project,
+      elements: nextElements,
+      pages: project.pages.map((item) =>
+        item.id === this.pageId
+          ? {
+              ...item,
+              layoutId: layout.id,
+              background: layout.background,
+              elementIds: [
+                ...nextLayoutElements.map((element) => element.id),
+                ...userElementIds.filter((elementId) => currentPageElementIds.has(elementId)),
+              ],
+            }
+          : item,
+      ),
+      updatedAt: projectMutationUtils.getProjectUpdatedAt(),
+    };
+  }
+}
+
+class EditSlideLayoutCommand implements EditorCommand {
+  readonly description = 'Edit slide layout';
+
+  constructor(
+    private readonly layoutId: string,
+    private readonly patch: Partial<Omit<SlideLayout, 'id'>>,
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    const layout = project.slideLayouts?.[this.layoutId];
+    if (!layout) return project;
+    return {
+      ...project,
+      slideLayouts: {
+        ...(project.slideLayouts ?? {}),
+        [this.layoutId]: {
+          ...layout,
+          ...this.patch,
+          preview: { ...layout.preview, ...this.patch.preview },
+        },
+      },
       updatedAt: projectMutationUtils.getProjectUpdatedAt(),
     };
   }
@@ -1055,6 +1306,12 @@ class TranslateTextElementsCommand implements EditorCommand {
 export const basicCommands = {
   AddGeneratedSlideElementCommand: applyGeneratedSlideCommand.AddGeneratedSlideElementCommand,
   PrepareGeneratedSlideCommand: applyGeneratedSlideCommand.PrepareGeneratedSlideCommand,
+  SaveThemeCommand,
+  ChangeThemeSelectionCommand,
+  ApplyThemeCommand,
+  EditThemeCommand,
+  ApplySlideLayoutCommand,
+  EditSlideLayoutCommand,
   RemoveAssetCommand,
   AlignElementCommand,
   SetZOrderCommand,

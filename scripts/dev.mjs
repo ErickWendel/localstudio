@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer } from 'vite';
 
 const host = '0.0.0.0';
-const port = 4173;
+const port = Number.parseInt(process.env.PORT ?? '4173', 10);
 
 const apps = [
   {
