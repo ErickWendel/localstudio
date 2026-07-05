@@ -319,9 +319,12 @@
   width: 100%;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 4px;
-  background: #fbfcfb;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 3px;
+  background: var(--layout-preview-background, #fbfcfb);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--layout-preview-ink, #182124) 14%, transparent),
+    0 6px 16px rgba(0, 0, 0, 0.24);
 }
 
 .layout-choice-thumbnail span {
@@ -335,22 +338,22 @@
 .layout-choice-footer,
 .layout-choice-number,
 .layout-choice-blank {
-  background: #050d10;
+  border: 1px dashed color-mix(in srgb, var(--layout-preview-ink, #182124) 78%, transparent);
+  background: transparent;
 }
 
 .layout-choice-title {
   left: 8%;
   top: 15%;
   width: 42%;
-  height: 8%;
+  height: 14%;
 }
 
 .layout-choice-body {
   left: 8%;
-  top: 34%;
+  top: 36%;
   width: 72%;
-  height: 22%;
-  opacity: 0.24;
+  height: 30%;
 }
 
 .layout-choice-footer {
@@ -374,7 +377,7 @@
   top: 44%;
   width: 18%;
   height: 12%;
-  opacity: 0.12;
+  opacity: 0.42;
 }
 
 .layout-choice-element {
@@ -386,15 +389,81 @@
 }
 
 .layout-choice-text {
-  display: flex;
-  align-items: center;
+  display: block;
   overflow: hidden;
-  background: transparent;
-  color: #050d10;
-  font-size: clamp(3px, 0.48vw, 7px);
-  line-height: 1.05;
-  text-align: left;
-  white-space: nowrap;
+}
+
+.layout-choice-placeholder {
+  border: 1px dashed color-mix(in srgb, var(--layout-preview-ink, #182124) 78%, transparent);
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 36%, transparent),
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 36%, transparent)
+    )
+    8% 24% / 46% 6% no-repeat,
+    linear-gradient(
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 22%, transparent),
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 22%, transparent)
+    )
+    8% 52% / 72% 5% no-repeat;
+}
+
+.layout-choice-placeholder-title {
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 58%, transparent),
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 58%, transparent)
+    )
+    7% 28% / 68% 10% no-repeat,
+    linear-gradient(
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 28%, transparent),
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 28%, transparent)
+    )
+    7% 60% / 88% 7% no-repeat;
+}
+
+.layout-choice-placeholder-body {
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 34%, transparent),
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 34%, transparent)
+    )
+    7% 18% / 58% 5% no-repeat,
+    linear-gradient(
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 24%, transparent),
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 24%, transparent)
+    )
+    7% 40% / 82% 5% no-repeat,
+    linear-gradient(
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 18%, transparent),
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 18%, transparent)
+    )
+    7% 62% / 70% 5% no-repeat;
+}
+
+.layout-choice-placeholder-footer,
+.layout-choice-placeholder-slideNumber {
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 30%, transparent),
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 30%, transparent)
+    )
+    center / 72% 24% no-repeat;
+}
+
+.layout-choice-text-run {
+  border-radius: 1px;
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 68%, transparent),
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 68%, transparent)
+    )
+    0 22% / 72% 9% no-repeat,
+    linear-gradient(
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 34%, transparent),
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 34%, transparent)
+    )
+    0 56% / 92% 7% no-repeat;
 }
 
 .layout-choice-shape {

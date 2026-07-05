@@ -327,7 +327,7 @@ describe('DesignPanel', () => {
     );
 
     expect(screen.getByRole('region', { name: 'Choose a layout' })).toBeInTheDocument();
-    expect(screen.getByText('Presentation Title')).toBeInTheDocument();
+    expect(screen.queryByText('Presentation Title')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Title' }));
 
     expect(onApplySlideLayout).toHaveBeenCalledWith('page-1', 'layout-title');

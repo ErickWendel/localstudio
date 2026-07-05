@@ -715,7 +715,11 @@ function LayoutChoiceThumbnail({ layout }: { layout: SlideLayout }) {
   if (elements.length > 0) {
     const bounds = getLayoutThumbnailBounds(elements);
     return (
-      <span className="layout-choice-thumbnail" aria-hidden="true">
+      <span
+        className="layout-choice-thumbnail"
+        aria-hidden="true"
+        style={getLayoutThumbnailStyle(layout)}
+      >
         {elements.map((element) => (
           <LayoutChoiceElement element={element} key={element.id} bounds={bounds} />
         ))}
@@ -724,7 +728,11 @@ function LayoutChoiceThumbnail({ layout }: { layout: SlideLayout }) {
   }
   const roles = new Set(layout.placeholderRoles);
   return (
-    <span className="layout-choice-thumbnail" aria-hidden="true">
+    <span
+      className="layout-choice-thumbnail"
+      aria-hidden="true"
+      style={getLayoutThumbnailStyle(layout)}
+    >
       {roles.has('title') ? <span className="layout-choice-title" /> : null}
       {roles.has('body') ? <span className="layout-choice-body" /> : null}
       {roles.has('footer') ? <span className="layout-choice-footer" /> : null}
@@ -732,6 +740,31 @@ function LayoutChoiceThumbnail({ layout }: { layout: SlideLayout }) {
       {roles.size === 0 ? <span className="layout-choice-blank" /> : null}
     </span>
   );
+}
+
+function getLayoutPreviewInk(backgroundColor: string) {
+  const normalized = backgroundColor.replace('#', '');
+  const fullHex =
+    normalized.length === 3
+      ? normalized
+          .split('')
+          .map((value) => `${value}${value}`)
+          .join('')
+      : normalized;
+  const red = Number.parseInt(fullHex.slice(0, 2), 16);
+  const green = Number.parseInt(fullHex.slice(2, 4), 16);
+  const blue = Number.parseInt(fullHex.slice(4, 6), 16);
+  if (![red, green, blue].every(Number.isFinite)) return '#182124';
+  const luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255;
+  return luminance > 0.62 ? '#1E2528' : '#F5F7F3';
+}
+
+function getLayoutThumbnailStyle(layout: SlideLayout): CSSProperties {
+  const background = layout.background.type === 'color' ? layout.background.color : '#F8FAF7';
+  return {
+    '--layout-preview-background': background,
+    '--layout-preview-ink': getLayoutPreviewInk(background),
+  } as CSSProperties;
 }
 
 function getLayoutThumbnailBounds(elements: DesignElement[]) {
@@ -772,19 +805,18 @@ function LayoutChoiceElement({
 }) {
   const style = getLayoutElementStyle(element, bounds);
   if (element.type === 'text') {
+    const roleClass = element.placeholderRole
+      ? ` layout-choice-placeholder layout-choice-placeholder-${element.placeholderRole}`
+      : ' layout-choice-text-run';
     return (
       <span
-        className="layout-choice-element layout-choice-text"
+        className={`layout-choice-element layout-choice-text${roleClass}`}
         style={{
           ...style,
-          color: element.fill,
-          fontWeight: element.fontWeight,
           justifyContent:
             element.align === 'center' ? 'center' : element.align === 'right' ? 'flex-end' : 'flex-start',
         }}
-      >
-        {element.text}
-      </span>
+      />
     );
   }
   if (element.type === 'shape') {
