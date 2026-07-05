@@ -12,6 +12,32 @@ function formatExpiry(expiresAt: string) {
   return `${remainingHours}h remaining`;
 }
 
+async function writeTextToClipboard(text: string) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // Fall back to the selection-based copy path below.
+  }
+
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+  textArea.setAttribute('readonly', '');
+  textArea.style.position = 'fixed';
+  textArea.style.top = '0';
+  textArea.style.left = '-9999px';
+  document.body.append(textArea);
+  textArea.focus();
+  textArea.select();
+  try {
+    return document.execCommand('copy');
+  } finally {
+    textArea.remove();
+  }
+}
+
 export function PresenterRemotePanel({ session }: PresenterRemotePanelProps) {
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [copyStatus, setCopyStatus] = useState<'copied' | 'idle'>('idle');
@@ -34,12 +60,8 @@ export function PresenterRemotePanel({ session }: PresenterRemotePanelProps) {
   }, [session.qrUrl]);
 
   async function copyRemoteLink() {
-    try {
-      await navigator.clipboard?.writeText(session.qrUrl);
-      setCopyStatus('copied');
-    } catch {
-      setCopyStatus('idle');
-    }
+    const copied = await writeTextToClipboard(session.qrUrl);
+    setCopyStatus(copied ? 'copied' : 'idle');
   }
 
   return (
@@ -60,15 +82,15 @@ export function PresenterRemotePanel({ session }: PresenterRemotePanelProps) {
           <p>Scan the code or open the link from another device.</p>
         </div>
         {qrCodeUrl ? (
-          <img
-            className="presenter-remote-qr"
-            src={qrCodeUrl}
-            alt="Remote control QR code"
-          />
+          <img className="presenter-remote-qr" src={qrCodeUrl} alt="Remote control QR code" />
         ) : (
           <div className="presenter-remote-qr presenter-remote-qr-loading" aria-hidden="true" />
         )}
-        <button type="button" className="presenter-remote-copy" onClick={() => void copyRemoteLink()}>
+        <button
+          type="button"
+          className="presenter-remote-copy"
+          onClick={() => void copyRemoteLink()}
+        >
           <span className="material-symbols-outlined" aria-hidden="true">
             link
           </span>

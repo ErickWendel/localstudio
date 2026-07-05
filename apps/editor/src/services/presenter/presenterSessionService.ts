@@ -14,6 +14,7 @@ import type { RegisterPresenterRemoteSessionInput } from '@localstudio/presenter
 import type {
   PresenterRemoteCommand,
   PresenterRemotePeerSession,
+  PresenterRemotePreviewBatch,
   PresenterRemoteSlidePreview,
   PresenterRemoteSlidePreviewElement,
   PresenterRemoteUpcomingSlidePreview,
@@ -21,12 +22,14 @@ import type {
   PresenterRemoteState,
   PresenterRemoteTimerState,
 } from '@localstudio/presenter-remote/protocol';
+import { presenterRemoteDebugLog } from '@localstudio/presenter-remote/debug-log';
 
 type OpenPresenterWindow = (url: string, target: string, features: string) => Window | null;
 type ResolveRemoteControlOrigin = (origin: string) => Promise<string | undefined>;
 type PresenterRemotePeerControl = {
   close: () => void;
   open: () => Promise<PresenterRemotePeerSession>;
+  publishPreviewBatch: (batch: PresenterRemotePreviewBatch) => void;
   publishState: (state: PresenterRemoteState) => void;
 };
 type PresenterRemoteSignaling = {
@@ -62,9 +65,10 @@ function createSessionId() {
 }
 
 const presenterDeviceIdKey = 'localstudio.presenter.deviceId';
-const remotePreviewMaxInlineAssetLength = 80_000;
-const remotePreviewThumbnailMaxEdge = 240;
-const remotePreviewThumbnailQuality = 0.55;
+const remotePreviewBatchMaxBytes = 10_000;
+const remotePreviewMaxInlineAssetLength = 10_000;
+const remotePreviewThumbnailMaxEdge = 96;
+const remotePreviewThumbnailQuality = 0.32;
 
 function getOrCreatePresenterDeviceId(targetWindow: Window) {
   try {
@@ -108,6 +112,7 @@ export class BrowserPresenterSessionService {
   private remoteStatePublishSequence = 0;
   private remoteCommandHandler: ((command: PresenterRemoteCommand) => void) | undefined;
   private remotePeerControlHost: PresenterRemotePeerControl | undefined;
+  private remoteSessionOpening: Promise<PresenterRemoteSessionMetadata> | undefined;
   private sessionId: string | undefined;
 
   constructor(options: BrowserPresenterSessionServiceOptions = {}) {
@@ -123,8 +128,7 @@ export class BrowserPresenterSessionService {
     this.resolveRemoteControlOrigin =
       options.resolveRemoteControlOrigin ?? resolveRemoteControlOrigin;
     this.remotePeerControlHostFactory =
-      options.remotePeerControlHostFactory ??
-      createDefaultRemotePeerControlHostFactory();
+      options.remotePeerControlHostFactory ?? createDefaultRemotePeerControlHostFactory();
     this.legacyRemoteSignalingService = options.remoteSignalingService;
   }
 
@@ -166,26 +170,46 @@ export class BrowserPresenterSessionService {
     if (this.remoteSession && this.legacyRemoteSignalingService) {
       const publishSequence = ++this.remoteStatePublishSequence;
       const sessionCode = this.remoteSession.code;
+      void Promise.resolve(
+        this.legacyRemoteSignalingService.publishState(
+          sessionCode,
+          createRemoteStateSkeleton(
+            payload,
+            this.remoteSession.connectedControllerCount,
+            this.getCurrentPresenterTimer(
+              payload.timer,
+              this.remoteSessionStartedAt ? Date.now() - this.remoteSessionStartedAt : 0,
+            ),
+          ),
+        ),
+      );
       void this.createRemoteState(
         payload,
         this.remoteSession.connectedControllerCount,
         this.remoteSessionStartedAt ? Date.now() - this.remoteSessionStartedAt : 0,
-      ).then((remoteState) => {
-        if (publishSequence !== this.remoteStatePublishSequence) return;
-        void Promise.resolve(this.legacyRemoteSignalingService?.publishState(sessionCode, remoteState));
-      });
+      )
+        .then((remoteState) => {
+          if (publishSequence !== this.remoteStatePublishSequence) return;
+          void Promise.resolve(
+            this.legacyRemoteSignalingService?.publishState(sessionCode, remoteState),
+          );
+        })
+        .catch((error: unknown) => {
+          presenterRemoteDebugLog.error('Failed to create legacy remote state.', error);
+        });
       return;
     }
     if (this.remoteSession) {
-      const publishSequence = ++this.remoteStatePublishSequence;
-      void this.createRemoteState(
-        payload,
-        this.remoteSession.connectedControllerCount,
-        this.remoteSessionStartedAt ? Date.now() - this.remoteSessionStartedAt : 0,
-      ).then((remoteState) => {
-        if (publishSequence !== this.remoteStatePublishSequence) return;
-        this.remotePeerControlHost?.publishState(remoteState);
-      });
+      this.remotePeerControlHost?.publishState(
+        createRemoteStateSkeleton(
+          payload,
+          this.remoteSession.connectedControllerCount,
+          this.getCurrentPresenterTimer(
+            payload.timer,
+            this.remoteSessionStartedAt ? Date.now() - this.remoteSessionStartedAt : 0,
+          ),
+        ),
+      );
     }
   }
 
@@ -197,6 +221,7 @@ export class BrowserPresenterSessionService {
     this.remotePeerControlHost?.close();
     this.remotePeerControlHost = undefined;
     this.remoteSession = undefined;
+    this.remoteSessionOpening = undefined;
     this.sessionId = undefined;
   }
 
@@ -204,6 +229,16 @@ export class BrowserPresenterSessionService {
     input: RegisterPresenterRemoteSessionInput,
   ): Promise<PresenterRemoteSessionMetadata> {
     if (this.remoteSession) return this.remoteSession;
+    if (this.remoteSessionOpening) return this.remoteSessionOpening;
+    this.remoteSessionOpening = this.createRemoteControlSession(input).finally(() => {
+      this.remoteSessionOpening = undefined;
+    });
+    return this.remoteSessionOpening;
+  }
+
+  private async createRemoteControlSession(
+    input: RegisterPresenterRemoteSessionInput,
+  ): Promise<PresenterRemoteSessionMetadata> {
     if (this.legacyRemoteSignalingService) {
       const session = await this.legacyRemoteSignalingService.registerSession({
         ...input,
@@ -235,6 +270,7 @@ export class BrowserPresenterSessionService {
       qrUrl: qrUrl.toString(),
     };
     this.remoteSessionStartedAt = Date.now();
+    if (this.lastPresenterPayload) this.publishState(this.lastPresenterPayload);
     return this.remoteSession;
   }
 
@@ -244,6 +280,10 @@ export class BrowserPresenterSessionService {
 
   subscribeToCommands(handler: (command: PresenterWindowCommand) => void) {
     const handleRemoteCommand = (command: PresenterRemoteCommand) => {
+      if (command.command === 'request-previews') {
+        void this.publishPreviewBatch(command.pageIds, command.requestId);
+        return;
+      }
       if (
         command.command === 'pause-timer' ||
         command.command === 'reset-timer' ||
@@ -304,7 +344,9 @@ export class BrowserPresenterSessionService {
           if (!this.remoteSession || !this.legacyRemoteSignalingService) return;
           if (takingRemoteCommands) return;
           takingRemoteCommands = true;
-          void Promise.resolve(this.legacyRemoteSignalingService.takeCommands(this.remoteSession.code))
+          void Promise.resolve(
+            this.legacyRemoteSignalingService.takeCommands(this.remoteSession.code),
+          )
             .then((commands) => {
               for (const command of commands) {
                 handleRemoteCommand(command);
@@ -333,6 +375,20 @@ export class BrowserPresenterSessionService {
       },
       this.origin,
     );
+  }
+
+  private async publishPreviewBatch(pageIds: string[], requestId: string | undefined) {
+    if (!this.lastPresenterPayload || !this.remotePeerControlHost) return;
+    try {
+      const batches = await createRemotePreviewBatches(
+        this.lastPresenterPayload,
+        pageIds,
+        requestId,
+      );
+      for (const batch of batches) this.remotePeerControlHost.publishPreviewBatch(batch);
+    } catch (error) {
+      presenterRemoteDebugLog.error('Failed to create PeerJS preview batch.', error);
+    }
   }
 
   private createRemoteState(
@@ -400,6 +456,11 @@ class TestPresenterRemotePeerControlHost implements PresenterRemotePeerControl {
     this.lastState = state;
   }
 
+  publishPreviewBatch(batch: PresenterRemotePreviewBatch) {
+    void batch;
+    // Test host only records current state; preview transport is covered by host tests.
+  }
+
   close() {
     this.lastState = undefined;
   }
@@ -412,6 +473,59 @@ function createDefaultRemotePeerControlHostFactory(): CreatePresenterRemotePeerC
 
 function isTestRuntime() {
   return import.meta.env.MODE === 'test';
+}
+
+function createRemoteStateSkeleton(
+  payload: PresenterStatePayload,
+  connectedControllerCount: number,
+  timer: PresenterRemoteTimerState,
+): PresenterRemoteState {
+  const activePageIndex = Math.max(
+    0,
+    payload.project.pages.findIndex((page) => page.id === payload.activePageId),
+  );
+  const activePage = payload.project.pages[activePageIndex] ?? payload.project.pages[0];
+  const nextPage = payload.project.pages[activePageIndex + 1];
+  const activePageBuilds = activePage ? getRemoteBuildInfo(payload, activePage) : undefined;
+  return {
+    activePageId: activePage?.id ?? payload.activePageId,
+    activePageIndex,
+    activePageName: activePage?.name,
+    builds: activePageBuilds?.total ? activePageBuilds : undefined,
+    buildsRemaining: activePageBuilds?.remaining ?? 0,
+    connectedControllerCount,
+    deckName: payload.project.name,
+    nextPageName: nextPage?.name,
+    notes: activePage?.speakerNotes ?? '',
+    pageCount: payload.project.pages.length,
+    pages: payload.project.pages.map((page) => ({
+      id: page.id,
+      name: page.name,
+    })),
+    presenterMode: payload.presenterMode ?? 'presenting',
+    commandAvailability: [
+      'previous',
+      'next',
+      'go-to-page',
+      'pause-timer',
+      'resume-timer',
+      'reset-timer',
+      'play-pause-movie',
+    ],
+    previewMode: 'stream',
+    shortcuts: ['previous', 'next', 'pause-timer', 'reset-timer'],
+    stream: {
+      enabled: true,
+      fps: 8,
+      height: 340,
+      peerId: payload.streamPeerId,
+      transport: 'peerjs',
+      width: 390,
+    },
+    timer,
+    type: 'state',
+    upcomingSlidePreviews: [],
+  };
 }
 
 function createRemoteState(
@@ -429,6 +543,7 @@ function createRemoteState(
     activePage && payload.animationPreview?.pageId === activePage.id
       ? new Set(payload.animationPreview.hiddenElementIds)
       : undefined;
+  const activePageBuilds = activePage ? getRemoteBuildInfo(payload, activePage) : undefined;
   const pages = payload.project.pages.map((page) => ({
     id: page.id,
     name: page.name,
@@ -442,53 +557,63 @@ function createRemoteState(
       payload.project.pages.slice(activePageIndex + 1, activePageIndex + 4),
     ),
   ]).then(([slidePreview, upcomingSlidePreviews]) => ({
-      activePageId: activePage?.id ?? payload.activePageId,
-      activePageIndex,
-      activePageName: activePage?.name,
-      buildsRemaining: activePage ? getRemoteBuildsRemaining(payload, activePage) : 0,
-      connectedControllerCount,
-      deckName: payload.project.name,
-      nextPageName: nextPage?.name,
-      nextSlidePreview: upcomingSlidePreviews[0]?.preview,
-      notes: activePage?.speakerNotes ?? '',
-      pageCount: payload.project.pages.length,
-      pages,
-      presenterMode: payload.presenterMode ?? 'presenting',
-      commandAvailability: [
-        'previous',
-        'next',
-        'go-to-page',
-        'pause-timer',
-        'resume-timer',
-        'reset-timer',
-        'play-pause-movie',
-      ],
-      previewMode: 'stream',
-      shortcuts: ['previous', 'next', 'pause-timer', 'reset-timer'],
-      slidePreview,
-      stream: {
-        enabled: true,
-        fps: 8,
-        height: 340,
-        peerId: payload.streamPeerId,
-        transport: 'peerjs',
-        width: 390,
-      },
-      timer,
-      type: 'state',
-      upcomingSlidePreviews,
-    }));
+    activePageId: activePage?.id ?? payload.activePageId,
+    activePageIndex,
+    activePageName: activePage?.name,
+    builds: activePageBuilds?.total ? activePageBuilds : undefined,
+    buildsRemaining: activePageBuilds?.remaining ?? 0,
+    connectedControllerCount,
+    deckName: payload.project.name,
+    nextPageName: nextPage?.name,
+    nextSlidePreview: upcomingSlidePreviews[0]?.preview,
+    notes: activePage?.speakerNotes ?? '',
+    pageCount: payload.project.pages.length,
+    pages,
+    presenterMode: payload.presenterMode ?? 'presenting',
+    commandAvailability: [
+      'previous',
+      'next',
+      'go-to-page',
+      'pause-timer',
+      'resume-timer',
+      'reset-timer',
+      'play-pause-movie',
+    ],
+    previewMode: 'stream',
+    shortcuts: ['previous', 'next', 'pause-timer', 'reset-timer'],
+    slidePreview,
+    stream: {
+      enabled: true,
+      fps: 8,
+      height: 340,
+      peerId: payload.streamPeerId,
+      transport: 'peerjs',
+      width: 390,
+    },
+    timer,
+    type: 'state',
+    upcomingSlidePreviews,
+  }));
 }
 
-function getRemoteBuildsRemaining(payload: PresenterStatePayload, page: Page) {
+function getRemoteBuildInfo(payload: PresenterStatePayload, page: Page) {
   const validBuilds = (page.animationBuilds ?? []).filter((build) =>
     page.elementIds.includes(build.elementId),
   );
-  if (validBuilds.length === 0) return 0;
-  if (payload.animationPreview?.pageId !== page.id) return validBuilds.length;
-  if (payload.animationPreview.phase === 'complete') return 0;
+  if (validBuilds.length === 0) return { current: 0, remaining: 0, total: 0 };
+  if (payload.animationPreview?.pageId !== page.id) {
+    return { current: 1, remaining: validBuilds.length, total: validBuilds.length };
+  }
+  if (payload.animationPreview.phase === 'complete') {
+    return { current: validBuilds.length, remaining: 0, total: validBuilds.length };
+  }
   const hiddenElementIds = new Set(payload.animationPreview.hiddenElementIds);
-  return validBuilds.filter((build) => hiddenElementIds.has(build.elementId)).length;
+  const remaining = validBuilds.filter((build) => hiddenElementIds.has(build.elementId)).length;
+  return {
+    current: Math.min(validBuilds.length, Math.max(1, validBuilds.length - remaining + 1)),
+    remaining,
+    total: validBuilds.length,
+  };
 }
 
 function createUpcomingSlidePreviews(
@@ -504,6 +629,62 @@ function createUpcomingSlidePreviews(
       })),
     ),
   );
+}
+
+async function createRemotePreviewBatches(
+  payload: PresenterStatePayload,
+  requestedPageIds: string[],
+  requestId: string | undefined,
+): Promise<PresenterRemotePreviewBatch[]> {
+  const pageIds = new Set(requestedPageIds.slice(0, 5));
+  const activePageIndex = Math.max(
+    0,
+    payload.project.pages.findIndex((page) => page.id === payload.activePageId),
+  );
+  const activePage = payload.project.pages[activePageIndex];
+  const hiddenElementIds =
+    activePage && payload.animationPreview?.pageId === activePage.id
+      ? new Set(payload.animationPreview.hiddenElementIds)
+      : undefined;
+  const previews = await Promise.all(
+    payload.project.pages
+      .filter((page) => pageIds.has(page.id))
+      .map(async (page) => ({
+        id: page.id,
+        name: page.name,
+        preview: await createSlidePreview(
+          payload.project,
+          page,
+          page.id === activePage?.id ? hiddenElementIds : undefined,
+        ),
+      })),
+  );
+  return createPreviewBatches(previews, requestId);
+}
+
+function createPreviewBatches(
+  previews: PresenterRemotePreviewBatch['previews'],
+  requestId: string | undefined,
+) {
+  const batches: PresenterRemotePreviewBatch[] = [];
+  let currentBatch: PresenterRemotePreviewBatch['previews'] = [];
+  for (const preview of previews) {
+    const candidateBatch = {
+      previews: [...currentBatch, preview],
+      requestId,
+      type: 'preview-batch' as const,
+    };
+    if (currentBatch.length > 0 && getJsonByteLength(candidateBatch) > remotePreviewBatchMaxBytes) {
+      batches.push({ previews: currentBatch, requestId, type: 'preview-batch' });
+      currentBatch = [preview];
+      continue;
+    }
+    currentBatch = candidateBatch.previews;
+  }
+  if (currentBatch.length > 0) {
+    batches.push({ previews: currentBatch, requestId, type: 'preview-batch' });
+  }
+  return batches;
 }
 
 async function createSlidePreview(
@@ -613,30 +794,47 @@ function createThumbnailDataUrl(assetUrl: string) {
     const timeoutId = window.setTimeout(() => resolve(undefined), 250);
     image.onload = () => {
       window.clearTimeout(timeoutId);
-      const sourceWidth = image.naturalWidth || image.width;
-      const sourceHeight = image.naturalHeight || image.height;
-      if (!sourceWidth || !sourceHeight) {
+      try {
+        const sourceWidth = image.naturalWidth || image.width;
+        const sourceHeight = image.naturalHeight || image.height;
+        if (!sourceWidth || !sourceHeight) {
+          resolve(undefined);
+          return;
+        }
+        const scale = Math.min(
+          1,
+          remotePreviewThumbnailMaxEdge / Math.max(sourceWidth, sourceHeight),
+        );
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+        canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+        const context = canvas.getContext('2d');
+        if (!context) {
+          resolve(undefined);
+          return;
+        }
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', remotePreviewThumbnailQuality));
+      } catch (error) {
+        presenterRemoteDebugLog.warn('Remote preview thumbnail generation failed.', error);
         resolve(undefined);
-        return;
       }
-      const scale = Math.min(1, remotePreviewThumbnailMaxEdge / Math.max(sourceWidth, sourceHeight));
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.max(1, Math.round(sourceWidth * scale));
-      canvas.height = Math.max(1, Math.round(sourceHeight * scale));
-      const context = canvas.getContext('2d');
-      if (!context) {
-        resolve(undefined);
-        return;
-      }
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL('image/jpeg', remotePreviewThumbnailQuality));
     };
     image.onerror = () => {
       window.clearTimeout(timeoutId);
+      presenterRemoteDebugLog.warn('Remote preview thumbnail image failed to load.');
       resolve(undefined);
     };
     image.src = assetUrl;
   });
+}
+
+function getJsonByteLength(value: unknown) {
+  try {
+    return new TextEncoder().encode(JSON.stringify(value)).byteLength;
+  } catch {
+    return Number.POSITIVE_INFINITY;
+  }
 }
 
 function isLoopbackOrigin(origin: string) {

@@ -3,23 +3,32 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JoystickApp } from '../../src/app/JoystickApp';
 import { InMemoryPresenterRemoteSignalingService } from '@localstudio/presenter-remote/signaling-service';
-import type { PresenterRemoteState } from '@localstudio/presenter-remote/protocol';
+import type {
+  PresenterRemotePreviewBatch,
+  PresenterRemoteState,
+} from '@localstudio/presenter-remote/protocol';
 
 const peerControlClientMock = vi.hoisted(() => ({
   instances: [] as Array<{
     close: ReturnType<typeof vi.fn>;
+    emitPreviewBatch: (batch: PresenterRemotePreviewBatch) => void;
     emitState: (state: PresenterRemoteState) => void;
     emitStatus: (status: 'connected' | 'connecting' | 'failed') => void;
     sendCommand: ReturnType<typeof vi.fn>;
     start: ReturnType<typeof vi.fn>;
   }>,
-  create: vi.fn(function MockPresenterRemotePeerControlClient(this: unknown, options: {
-    onState: (state: PresenterRemoteState) => void;
-    onStatusChange?: (status: 'connected' | 'connecting' | 'failed') => void;
-    presenterPeerId: string;
-  }) {
+  create: vi.fn(function MockPresenterRemotePeerControlClient(
+    this: unknown,
+    options: {
+      onPreviewBatch?: (batch: PresenterRemotePreviewBatch) => void;
+      onState: (state: PresenterRemoteState) => void;
+      onStatusChange?: (status: 'connected' | 'connecting' | 'failed') => void;
+      presenterPeerId: string;
+    },
+  ) {
     const client = {
       close: vi.fn(),
+      emitPreviewBatch: (batch: PresenterRemotePreviewBatch) => options.onPreviewBatch?.(batch),
       emitState: (state: PresenterRemoteState) => options.onState(state),
       emitStatus: (status: 'connected' | 'connecting' | 'failed') =>
         options.onStatusChange?.(status),
@@ -43,11 +52,14 @@ const peerStreamReceiverMock = vi.hoisted(() => ({
         stop: ReturnType<typeof vi.fn>;
       }
     | undefined,
-  create: vi.fn(function MockPresenterRemotePeerStreamReceiver(this: unknown, options: {
-    onStatusChange: (status: 'connected' | 'connecting' | 'failed') => void;
-    onStream: (stream: MediaStream | undefined) => void;
-    streamPeerId: string;
-  }) {
+  create: vi.fn(function MockPresenterRemotePeerStreamReceiver(
+    this: unknown,
+    options: {
+      onStatusChange: (status: 'connected' | 'connecting' | 'failed') => void;
+      onStream: (stream: MediaStream | undefined) => void;
+      streamPeerId: string;
+    },
+  ) {
     const receiver = {
       emitStatus: (status: 'connected' | 'connecting' | 'failed') => options.onStatusChange(status),
       emitStream: (stream: MediaStream | undefined) => options.onStream(stream),
@@ -221,11 +233,13 @@ describe('JoystickApp', () => {
 
     expect(await screen.findByLabelText('Connected (1)')).toBeInTheDocument();
     expect(getTestLocalStorage().getItem('localstudio.joystick.lastCode')).toBe('ABCD-1234');
-    expect(JSON.parse(getTestLocalStorage().getItem('localstudio.joystick.approvedCodes') ?? '[]')).toEqual([
-      'ABCD-1234',
-    ]);
     expect(
-      JSON.parse(getTestLocalStorage().getItem('localstudio.joystick.trustedPresenterDeviceIds') ?? '[]'),
+      JSON.parse(getTestLocalStorage().getItem('localstudio.joystick.approvedCodes') ?? '[]'),
+    ).toEqual(['ABCD-1234']);
+    expect(
+      JSON.parse(
+        getTestLocalStorage().getItem('localstudio.joystick.trustedPresenterDeviceIds') ?? '[]',
+      ),
     ).toEqual(['presenter-macbook']);
   });
 
@@ -253,7 +267,10 @@ describe('JoystickApp', () => {
       type: 'state',
     });
     getTestLocalStorage().setItem('localstudio.joystick.lastCode', 'ABCD-1234');
-    getTestLocalStorage().setItem('localstudio.joystick.approvedCodes', JSON.stringify(['ABCD-1234']));
+    getTestLocalStorage().setItem(
+      'localstudio.joystick.approvedCodes',
+      JSON.stringify(['ABCD-1234']),
+    );
     getTestLocalStorage().setItem(
       'localstudio.joystick.trustedPresenterDeviceIds',
       JSON.stringify(['presenter-macbook']),
@@ -265,10 +282,9 @@ describe('JoystickApp', () => {
 
     expect(await screen.findByText('Current: Slide 1 of 1')).toBeInTheDocument();
     expect(getTestLocalStorage().getItem('localstudio.joystick.lastCode')).toBe('EFGH-5678');
-    expect(JSON.parse(getTestLocalStorage().getItem('localstudio.joystick.approvedCodes') ?? '[]')).toEqual([
-      'EFGH-5678',
-      'ABCD-1234',
-    ]);
+    expect(
+      JSON.parse(getTestLocalStorage().getItem('localstudio.joystick.approvedCodes') ?? '[]'),
+    ).toEqual(['EFGH-5678', 'ABCD-1234']);
   });
 
   it('requires a remote link even when one legacy presentation is active if the phone is not paired', async () => {
@@ -282,7 +298,9 @@ describe('JoystickApp', () => {
       <JoystickApp initialUrl="https://localstudio.test/joystick" signalingService={service} />,
     );
 
-    expect(await screen.findByText('Open the presenter remote link or paste its peer id.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Open the presenter remote link or paste its peer id.'),
+    ).toBeInTheDocument();
     expect(screen.queryByText('MacBook Pro')).not.toBeInTheDocument();
   });
 
@@ -300,7 +318,9 @@ describe('JoystickApp', () => {
       <JoystickApp initialUrl="https://localstudio.test/joystick" signalingService={service} />,
     );
 
-    expect(await screen.findByText('Open the presenter remote link or paste its peer id.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Open the presenter remote link or paste its peer id.'),
+    ).toBeInTheDocument();
     expect(screen.queryByText('MacBook Pro')).not.toBeInTheDocument();
   });
 
@@ -353,21 +373,21 @@ describe('JoystickApp', () => {
 
     act(() => {
       client?.emitState({
-      activePageId: 'page-1',
-      activePageIndex: 0,
-      buildsRemaining: 0,
-      connectedControllerCount: 1,
-      deckName: 'Launch Deck',
-      notes: '',
-      pageCount: 2,
-      pages: [
-        { id: 'page-1', name: 'Intro' },
-        { id: 'page-2', name: 'Roadmap' },
-      ],
-      presenterMode: 'presenting',
-      shortcuts: ['previous', 'next'],
-      timer: { elapsedMs: 0, paused: false },
-      type: 'state',
+        activePageId: 'page-1',
+        activePageIndex: 0,
+        buildsRemaining: 0,
+        connectedControllerCount: 1,
+        deckName: 'Launch Deck',
+        notes: '',
+        pageCount: 2,
+        pages: [
+          { id: 'page-1', name: 'Intro' },
+          { id: 'page-2', name: 'Roadmap' },
+        ],
+        presenterMode: 'presenting',
+        shortcuts: ['previous', 'next'],
+        timer: { elapsedMs: 0, paused: false },
+        type: 'state',
       });
     });
 
@@ -382,6 +402,94 @@ describe('JoystickApp', () => {
     expect(screen.getByText('Command sent: go-to-page')).toBeInTheDocument();
   });
 
+  it('requests PeerJS previews in batches and applies incoming preview batches', async () => {
+    render(<JoystickApp initialUrl="https://localstudio.test/joystick?peer=control-peer-1" />);
+    const client = peerControlClientMock.instances[0];
+    expect(client).toBeDefined();
+
+    act(() => {
+      client?.emitState({
+        activePageId: 'page-1',
+        activePageIndex: 0,
+        buildsRemaining: 0,
+        connectedControllerCount: 1,
+        deckName: 'Launch Deck',
+        notes: '',
+        pageCount: 6,
+        pages: [
+          { id: 'page-1', name: 'Intro' },
+          { id: 'page-2', name: 'Roadmap' },
+          { id: 'page-3', name: 'Demo' },
+          { id: 'page-4', name: 'Pricing' },
+          { id: 'page-5', name: 'Close' },
+          { id: 'page-6', name: 'Appendix' },
+        ],
+        presenterMode: 'presenting',
+        shortcuts: ['previous', 'next'],
+        timer: { elapsedMs: 0, paused: false },
+        type: 'state',
+      });
+    });
+
+    await waitFor(() =>
+      expect(client?.sendCommand).toHaveBeenCalledWith({
+        command: 'request-previews',
+        pageIds: ['page-2', 'page-3', 'page-4', 'page-5', 'page-6'],
+        requestId: 'Launch Deck:page-2,page-3,page-4,page-5,page-6',
+        type: 'command',
+      }),
+    );
+
+    act(() => {
+      client?.emitPreviewBatch({
+        previews: [
+          {
+            id: 'page-1',
+            name: 'Intro',
+            preview: {
+              backgroundColor: '#000000',
+              elements: [
+                {
+                  align: 'left',
+                  fill: '#ffffff',
+                  fontFamily: 'Inter',
+                  fontSize: 48,
+                  fontWeight: 700,
+                  height: 100,
+                  id: 'title',
+                  kind: 'text',
+                  opacity: 1,
+                  rotation: 0,
+                  text: 'Preview loaded',
+                  width: 800,
+                  x: 0,
+                  y: 0,
+                },
+              ],
+              height: 1080,
+              width: 1920,
+            },
+          },
+        ],
+        requestId: 'Launch Deck:page-1,page-2,page-3,page-4,page-5',
+        type: 'preview-batch',
+      });
+    });
+
+    expect(await screen.findByText('Preview loaded')).toBeInTheDocument();
+  });
+
+  it('shows the PeerJS data connection as connected before the first presenter state arrives', async () => {
+    render(<JoystickApp initialUrl="https://localstudio.test/joystick?peer=control-peer-1" />);
+
+    expect(await screen.findByLabelText('Connected (1)')).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        'Could not connect to that presenter. Check the remote link and try again.',
+      ),
+    ).toBeNull();
+  });
+
   it('starts a PeerJS media receiver when presenter state includes a stream peer', async () => {
     const user = userEvent.setup();
     render(<JoystickApp initialUrl="https://localstudio.test/joystick?peer=control-peer-1" />);
@@ -390,34 +498,36 @@ describe('JoystickApp', () => {
 
     act(() => {
       client?.emitState({
-      activePageId: 'page-1',
-      activePageIndex: 0,
-      buildsRemaining: 0,
-      connectedControllerCount: 1,
-      deckName: 'Launch Deck',
-      notes: '',
-      pageCount: 2,
-      pages: [
-        { id: 'page-1', name: 'Intro' },
-        { id: 'page-2', name: 'Roadmap' },
-      ],
-      presenterMode: 'presenting',
-      previewMode: 'stream',
-      shortcuts: ['previous', 'next'],
-      stream: {
-        enabled: true,
-        fps: 8,
-        height: 340,
-        peerId: 'stream-peer-1',
-        transport: 'peerjs',
-        width: 390,
-      },
-      timer: { elapsedMs: 0, paused: false },
-      type: 'state',
+        activePageId: 'page-1',
+        activePageIndex: 0,
+        buildsRemaining: 0,
+        connectedControllerCount: 1,
+        deckName: 'Launch Deck',
+        notes: '',
+        pageCount: 2,
+        pages: [
+          { id: 'page-1', name: 'Intro' },
+          { id: 'page-2', name: 'Roadmap' },
+        ],
+        presenterMode: 'presenting',
+        previewMode: 'stream',
+        shortcuts: ['previous', 'next'],
+        stream: {
+          enabled: true,
+          fps: 8,
+          height: 340,
+          peerId: 'stream-peer-1',
+          transport: 'peerjs',
+          width: 390,
+        },
+        timer: { elapsedMs: 0, paused: false },
+        type: 'state',
       });
     });
 
-    expect(await screen.findByRole('button', { name: 'Current slide preview' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Current slide preview' }),
+    ).toBeInTheDocument();
     await waitFor(() =>
       expect(peerStreamReceiverMock.create).toHaveBeenCalledWith(
         expect.objectContaining({ streamPeerId: 'stream-peer-1' }),
@@ -447,7 +557,9 @@ describe('JoystickApp', () => {
     });
 
     expect(
-      await screen.findByText('Could not connect to that presenter. Check the remote link and try again.'),
+      await screen.findByText(
+        'Could not connect to that presenter. Check the remote link and try again.',
+      ),
     ).toBeInTheDocument();
   });
 

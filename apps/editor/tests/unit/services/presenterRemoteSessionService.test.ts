@@ -6,6 +6,7 @@ import { PresenterRemotePeerControlHost } from '@localstudio/presenter-remote/pe
 import { InMemoryPresenterRemoteSignalingService } from '@localstudio/presenter-remote/signaling-service';
 import type {
   PresenterRemoteCommand,
+  PresenterRemotePreviewBatch,
   PresenterRemoteState,
 } from '@localstudio/presenter-remote/protocol';
 import type { DataConnection, Peer } from 'peerjs';
@@ -29,7 +30,10 @@ class TestPeer {
   readonly open: boolean = false;
   private readonly listeners = new Map<keyof PeerEventMap, Array<(payload: never) => void>>();
 
-  emit<EventName extends keyof PeerEventMap>(eventName: EventName, payload: PeerEventMap[EventName]) {
+  emit<EventName extends keyof PeerEventMap>(
+    eventName: EventName,
+    payload: PeerEventMap[EventName],
+  ) {
     for (const listener of this.listeners.get(eventName) ?? []) {
       listener(payload as never);
     }
@@ -62,7 +66,10 @@ class TestDataConnection {
     this.open = false;
     this.emit('close', undefined);
   });
-  readonly send = vi.fn(() => Promise.resolve());
+  readonly send = vi.fn((payload?: unknown) => {
+    void payload;
+    return Promise.resolve();
+  });
   open = true;
   private readonly listeners = new Map<
     keyof DataConnectionEventMap,
@@ -207,6 +214,7 @@ describe('BrowserPresenterSessionService remote control', () => {
         stream: { enabled: true, fps: 8, height: 340, width: 390 },
         type: 'state',
       });
+      expect(signalingService.getPublishedState('ABCD-1234')?.slidePreview).toBeDefined();
     });
     const publishedState = signalingService.getPublishedState('ABCD-1234');
     expect(publishedState?.slidePreview?.elements.length).toBeGreaterThan(0);
@@ -219,6 +227,140 @@ describe('BrowserPresenterSessionService remote control', () => {
     expect(publishedState?.upcomingSlidePreviews).toHaveLength(
       Math.min(3, project.pages.length - 1),
     );
+  });
+
+  it('publishes a lightweight PeerJS state before rich slide preview generation completes', async () => {
+    const popup = {
+      location: { href: '' },
+      postMessage: vi.fn(),
+      closed: false,
+    } as unknown as Window;
+    const peerHost = {
+      close: vi.fn(),
+      open: vi.fn(() =>
+        Promise.resolve({
+          code: 'control-peer-1',
+          connectedControllerCount: 0,
+          controlPeerId: 'control-peer-1',
+          expiresAt: '2026-07-04T12:01:00.000Z',
+          presenterDeviceId: 'presenter-device-1',
+          presenterLabel: 'MacBook Pro',
+          sessionId: 'peer-session-1',
+          transport: 'peerjs' as const,
+        }),
+      ),
+      publishPreviewBatch: vi.fn(),
+      publishState: vi.fn(),
+    };
+    const service = new BrowserPresenterSessionService({
+      href: 'https://localstudio.test/editor/?project=Demo',
+      openWindow: vi.fn(() => popup),
+      presenterDeviceId: 'presenter-device-1',
+      randomId: () => 'session-1',
+      remotePeerControlHostFactory: () => peerHost,
+    });
+    const project = sampleProject.createSampleProject();
+
+    service.openPresenterWindow();
+    await service.openRemoteControlSession({ presenterLabel: 'MacBook Pro', ttlMs: 60_000 });
+    service.publishState({
+      activePageId: project.pages[0]!.id,
+      animationPreview: undefined,
+      presenterMode: 'presenting',
+      project,
+      streamPeerId: 'stream-peer-1',
+    });
+
+    const firstPublishedState = peerHost.publishState.mock.calls[0]?.[0] as
+      | PresenterRemoteState
+      | undefined;
+    expect(firstPublishedState).toMatchObject({
+      activePageId: project.pages[0]!.id,
+      pageCount: project.pages.length,
+      previewMode: 'stream',
+      type: 'state',
+    });
+    expect(firstPublishedState?.stream?.peerId).toBe('stream-peer-1');
+    await vi.waitFor(() => {
+      expect(
+        peerHost.publishState.mock.calls.some((call) => {
+          const state = call[0] as PresenterRemoteState | undefined;
+          return Boolean(state?.slidePreview?.elements);
+        }),
+      ).toBe(true);
+    });
+  });
+
+  it('publishes requested PeerJS slide previews in bounded batches', async () => {
+    const popup = {
+      location: { href: '' },
+      postMessage: vi.fn(),
+      closed: false,
+    } as unknown as Window;
+    const peerHost = {
+      close: vi.fn(),
+      open: vi.fn(() =>
+        Promise.resolve({
+          code: 'control-peer-1',
+          connectedControllerCount: 0,
+          controlPeerId: 'control-peer-1',
+          expiresAt: '2026-07-04T12:01:00.000Z',
+          presenterDeviceId: 'presenter-device-1',
+          presenterLabel: 'MacBook Pro',
+          sessionId: 'peer-session-1',
+          transport: 'peerjs' as const,
+        }),
+      ),
+      publishPreviewBatch: vi.fn(),
+      publishState: vi.fn(),
+    };
+    let peerOptions:
+      | { onCommand?: ((command: PresenterRemoteCommand) => void) | undefined }
+      | undefined;
+    const service = new BrowserPresenterSessionService({
+      href: 'https://localstudio.test/editor/?project=Demo',
+      openWindow: vi.fn(() => popup),
+      presenterDeviceId: 'presenter-device-1',
+      randomId: () => 'session-1',
+      remotePeerControlHostFactory: (options) => {
+        peerOptions = options;
+        return peerHost;
+      },
+    });
+    const project = sampleProject.createSampleProject();
+
+    service.openPresenterWindow();
+    const unsubscribe = service.subscribeToCommands(vi.fn());
+    await service.openRemoteControlSession({ presenterLabel: 'MacBook Pro', ttlMs: 60_000 });
+    service.publishState({
+      activePageId: project.pages[0]!.id,
+      animationPreview: undefined,
+      presenterMode: 'presenting',
+      project,
+      streamPeerId: 'stream-peer-1',
+    });
+
+    peerOptions?.onCommand?.({
+      command: 'request-previews',
+      pageIds: project.pages.slice(0, 6).map((page) => page.id),
+      requestId: 'first-five',
+      type: 'command',
+    });
+
+    await vi.waitFor(() => {
+      expect(peerHost.publishPreviewBatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestId: 'first-five',
+          type: 'preview-batch',
+        }),
+      );
+    });
+    const batch = peerHost.publishPreviewBatch.mock.calls[0]?.[0] as
+      | PresenterRemotePreviewBatch
+      | undefined;
+    expect(batch?.previews).toHaveLength(Math.min(5, project.pages.length));
+    expect(batch?.previews[0]?.preview).toBeDefined();
+    unsubscribe();
   });
 
   it('does not publish portable slide preview asset URLs in stream-mode state', async () => {
@@ -256,7 +398,7 @@ describe('BrowserPresenterSessionService remote control', () => {
     });
 
     await vi.waitFor(() => {
-      expect(signalingService.getPublishedState('ABCD-1234')?.previewMode).toBe('stream');
+      expect(signalingService.getPublishedState('ABCD-1234')?.slidePreview).toBeDefined();
     });
     const publishedState = signalingService.getPublishedState('ABCD-1234');
 
@@ -319,7 +461,7 @@ describe('BrowserPresenterSessionService remote control', () => {
     });
 
     await vi.waitFor(() => {
-      expect(signalingService.getPublishedState('ABCD-1234')?.previewMode).toBe('stream');
+      expect(signalingService.getPublishedState('ABCD-1234')?.slidePreview).toBeDefined();
     });
     const publishedState = signalingService.getPublishedState('ABCD-1234');
     const serializedState = JSON.stringify(publishedState);
@@ -410,6 +552,7 @@ describe('BrowserPresenterSessionService remote control', () => {
 
     await vi.waitFor(() => {
       expect(signalingService.getPublishedState('ABCD-1234')?.buildsRemaining).toBe(1);
+      expect(signalingService.getPublishedState('ABCD-1234')?.slidePreview).toBeDefined();
     });
     expect(signalingService.getPublishedState('ABCD-1234')).toMatchObject({
       buildsRemaining: 1,
@@ -595,6 +738,7 @@ describe('PresenterRemotePeerControlHost', () => {
     const session = await openPromise;
     peer.emit('connection', connection as unknown as DataConnection);
     connection.emit('open', undefined);
+    connection.open = false;
 
     expect(session).toMatchObject({
       code: 'control-peer-1',
@@ -616,11 +760,41 @@ describe('PresenterRemotePeerControlHost', () => {
       }),
     );
 
+    host.publishPreviewBatch({
+      previews: [
+        {
+          id: 'page-1',
+          name: 'Slide 1',
+          preview: {
+            backgroundColor: '#000000',
+            elements: [],
+            height: 1080,
+            width: 1920,
+          },
+        },
+      ],
+      requestId: 'preview-window-1',
+      type: 'preview-batch',
+    });
+
+    expect(connection.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestId: 'preview-window-1',
+        type: 'preview-batch',
+      }),
+    );
+
     const commands: PresenterRemoteCommand[] = [
       { command: 'next', type: 'command' },
       { command: 'previous', type: 'command' },
       { command: 'go-to-page', pageId: 'page-1', type: 'command' },
       { command: 'pause-timer', type: 'command' },
+      {
+        command: 'request-previews',
+        pageIds: ['page-1'],
+        requestId: 'preview-window-1',
+        type: 'command',
+      },
       { command: 'update-notes', notes: 'Updated', pageId: 'page-1', type: 'command' },
     ];
     for (const command of commands) connection.emit('data', command);
@@ -632,6 +806,105 @@ describe('PresenterRemotePeerControlHost', () => {
 
     expect(connection.close).toHaveBeenCalled();
     expect(peer.destroy).toHaveBeenCalled();
+  });
+
+  it('strips rich previews from oversized PeerJS state payloads', async () => {
+    const peer = new TestPeer();
+    const connection = new TestDataConnection();
+    const host = new PresenterRemotePeerControlHost({
+      peerFactory: () => peer as unknown as Peer,
+      presenterLabel: 'MacBook Pro',
+      ttlMs: 60_000,
+    });
+
+    const openPromise = host.open();
+    peer.emit('open', 'control-peer-1');
+    await openPromise;
+    peer.emit('connection', connection as unknown as DataConnection);
+    connection.emit('open', undefined);
+
+    host.publishState({
+      ...createRemoteState(),
+      pages: [
+        {
+          id: 'page-1',
+          name: 'Slide 1',
+          preview: {
+            backgroundColor: '#000000',
+            elements: [
+              {
+                height: 1080,
+                id: 'large-image',
+                kind: 'image',
+                opacity: 1,
+                rotation: 0,
+                width: 1920,
+                x: 0,
+                y: 0,
+                assetUrl: `data:image/png;base64,${'a'.repeat(140_000)}`,
+              },
+            ],
+            height: 1080,
+            width: 1920,
+          },
+        },
+      ],
+      slidePreview: {
+        backgroundColor: '#000000',
+        elements: [
+          {
+            fill: '#ffffff',
+            fontFamily: 'Inter',
+            fontSize: 24,
+            fontWeight: 700,
+            height: 100,
+            id: 'large-text',
+            kind: 'text',
+            opacity: 1,
+            rotation: 0,
+            text: 'a'.repeat(140_000),
+            width: 800,
+            x: 0,
+            y: 0,
+            align: 'left',
+          },
+        ],
+        height: 1080,
+        width: 1920,
+      },
+      stream: {
+        enabled: true,
+        fps: 8,
+        height: 340,
+        peerId: 'stream-peer-1',
+        transport: 'peerjs',
+        width: 390,
+      },
+      upcomingSlidePreviews: [
+        {
+          pageId: 'page-2',
+          pageName: 'Next',
+          preview: {
+            backgroundColor: '#000000',
+            elements: [],
+            height: 1080,
+            width: 1920,
+          },
+        },
+      ],
+    });
+
+    const lastSentState = connection.send.mock.calls.at(-1)?.[0] as
+      | PresenterRemoteState
+      | undefined;
+    expect(lastSentState).toMatchObject({
+      activePageId: 'page-1',
+      pages: [{ id: 'page-1', name: 'Slide 1' }],
+      slidePreview: undefined,
+      upcomingSlidePreviews: [],
+    });
+    expect(lastSentState?.pages?.[0]?.preview).toBeUndefined();
+    expect(lastSentState?.stream?.peerId).toBe('stream-peer-1');
   });
 });
 

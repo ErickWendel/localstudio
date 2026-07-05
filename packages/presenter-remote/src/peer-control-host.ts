@@ -2,9 +2,14 @@ import { Peer, type DataConnection, type PeerOptions } from 'peerjs';
 import {
   presenterRemoteProtocol,
   type PresenterRemoteCommand,
+  type PresenterRemoteMessage,
+  type PresenterRemotePreviewBatch,
   type PresenterRemoteSession,
   type PresenterRemoteState,
 } from './protocol';
+import { presenterRemoteDebugLog } from './debug-log';
+
+const peerDataChannelMaxStateBytes = 16_000;
 
 export interface PresenterRemotePeerSession extends PresenterRemoteSession {
   controlPeerId: string;
@@ -58,14 +63,18 @@ export class PresenterRemotePeerControlHost {
 
   async open(): Promise<PresenterRemotePeerSession> {
     if (this.session) return this.session;
-    const peer = this.options.peerFactory?.() ??
+    const peer =
+      this.options.peerFactory?.() ??
       (this.options.peerOptions ? new Peer(this.options.peerOptions) : new Peer());
     this.peer = peer;
+    presenterRemoteDebugLog.info('Opening control host peer.');
     peer.on('connection', (connection) => this.registerConnection(connection));
+    peer.on('error', (error) => presenterRemoteDebugLog.error('Control host peer error.', error));
     const controlPeerId = await Promise.race([
       oncePeerOpen(peer),
       rejectAfter(this.options.connectionTimeoutMs ?? 12_000),
     ]);
+    presenterRemoteDebugLog.info('Control host peer opened.', { controlPeerId });
     this.session = {
       code: controlPeerId,
       connectedControllerCount: 0,
@@ -80,16 +89,34 @@ export class PresenterRemotePeerControlHost {
   }
 
   publishState(state: PresenterRemoteState) {
-    this.lastState = {
+    this.lastState = createDataChannelSafeState({
       ...state,
       connectedControllerCount: this.connections.size,
-    };
+    });
+    presenterRemoteDebugLog.info('Publishing remote state.', {
+      activePageId: this.lastState.activePageId,
+      connectedControllerCount: this.connections.size,
+      hasSlidePreview: Boolean(this.lastState.slidePreview),
+      streamPeerId: this.lastState.stream?.peerId,
+    });
     for (const connection of this.connections) {
-      if (connection.open) void connection.send(this.lastState);
+      this.sendMessage(connection, this.lastState, 'remote state');
+    }
+  }
+
+  publishPreviewBatch(batch: PresenterRemotePreviewBatch) {
+    presenterRemoteDebugLog.info('Publishing preview batch.', {
+      previewCount: batch.previews.length,
+      requestId: batch.requestId,
+      stateBytes: getJsonByteLength(batch),
+    });
+    for (const connection of this.connections) {
+      this.sendMessage(connection, batch, 'preview batch');
     }
   }
 
   close() {
+    presenterRemoteDebugLog.info('Closing control host peer.');
     for (const connection of this.connections) connection.close();
     this.connections.clear();
     this.peer?.destroy();
@@ -99,31 +126,96 @@ export class PresenterRemotePeerControlHost {
   }
 
   private registerConnection(connection: DataConnection) {
+    presenterRemoteDebugLog.info('Control connection received.');
     const addConnection = () => {
       this.connections.add(connection);
+      presenterRemoteDebugLog.info('Control connection opened.', {
+        connectedControllerCount: this.connections.size,
+      });
       if (this.lastState) {
-        void connection.send({
-          ...this.lastState,
-          connectedControllerCount: this.connections.size,
-        });
+        this.sendMessage(
+          connection,
+          {
+            ...this.lastState,
+            connectedControllerCount: this.connections.size,
+          },
+          'initial remote state',
+        );
       }
     };
     connection.on('open', addConnection);
     if (connection.open) addConnection();
     connection.on('data', (data) => {
       if (!presenterRemoteProtocol.isCommand(data)) return;
-      if (data.command === 'request-state' && this.lastState && connection.open) {
-        void connection.send({
-          ...this.lastState,
-          connectedControllerCount: this.connections.size,
-        });
+      presenterRemoteDebugLog.info('Control command received.', { command: data.command });
+      if (data.command === 'request-state' && this.lastState) {
+        this.sendMessage(
+          connection,
+          {
+            ...this.lastState,
+            connectedControllerCount: this.connections.size,
+          },
+          'requested remote state',
+        );
       }
       this.onCommand?.(data);
     });
     const removeConnection = () => {
       this.connections.delete(connection);
+      presenterRemoteDebugLog.info('Control connection closed.', {
+        connectedControllerCount: this.connections.size,
+      });
     };
     connection.on('close', removeConnection);
-    connection.on('error', removeConnection);
+    connection.on('error', (error) => {
+      presenterRemoteDebugLog.error('Control connection error.', error);
+      removeConnection();
+    });
+  }
+
+  private sendMessage(connection: DataConnection, message: PresenterRemoteMessage, label: string) {
+    try {
+      presenterRemoteDebugLog.info(`Sending ${label} over data connection.`, {
+        pagesWithPreviewCount:
+          message.type === 'state'
+            ? (message.pages?.filter((page) => Boolean(page.preview)).length ?? 0)
+            : message.previews.filter((page) => Boolean(page.preview)).length,
+        stateBytes: getJsonByteLength(message),
+      });
+      void connection.send(message);
+    } catch (error) {
+      presenterRemoteDebugLog.error(`Failed to send ${label}.`, error);
+    }
+  }
+}
+
+function createDataChannelSafeState(state: PresenterRemoteState): PresenterRemoteState {
+  const stateBytes = getJsonByteLength(state);
+  if (stateBytes <= peerDataChannelMaxStateBytes) return state;
+  const safeState: PresenterRemoteState = {
+    ...state,
+    nextSlidePreview: undefined,
+    pages: state.pages?.map((page) => ({
+      id: page.id,
+      name: page.name,
+    })),
+    slidePreview: undefined,
+    upcomingSlidePreviews: [],
+  };
+  presenterRemoteDebugLog.warn(
+    'Remote state was too large for PeerJS data channel; using stream-only state.',
+    {
+      safeBytes: getJsonByteLength(safeState),
+      stateBytes,
+    },
+  );
+  return safeState;
+}
+
+function getJsonByteLength(value: unknown) {
+  try {
+    return new TextEncoder().encode(JSON.stringify(value)).byteLength;
+  } catch {
+    return Number.POSITIVE_INFINITY;
   }
 }

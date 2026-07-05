@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./debug-log": "./src/debug-log.ts",
     "./ice": "./src/ice.ts",
     "./peer-control-client": "./src/peer-control-client.ts",
     "./peer-control-host": "./src/peer-control-host.ts",

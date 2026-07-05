@@ -51,8 +51,9 @@ for (const app of apps) {
 
 httpServer.on('request', (request, response) => {
   const app =
-    viteServers.find((candidate) => candidate.base !== '/' && request.url?.startsWith(candidate.base)) ??
-    viteServers.find((candidate) => candidate.base === '/');
+    viteServers.find(
+      (candidate) => candidate.base !== '/' && request.url?.startsWith(candidate.base),
+    ) ?? viteServers.find((candidate) => candidate.base === '/');
   if (shouldServeIndex(request.url)) {
     void serveIndex(app, request, response);
     return;
