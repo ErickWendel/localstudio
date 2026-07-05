@@ -1,6 +1,6 @@
 import { basicCommands } from '../../../../src/domain/commands/elements/basicCommands';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
-import type { ShapeElement } from '../../../../src/domain/documents/model';
+import type { ProjectDocument, ShapeElement } from '../../../../src/domain/documents/model';
 
 function createShapeFixture(overrides: Partial<ShapeElement> = {}) {
   const project = sampleProject.createSampleProject();
@@ -30,6 +30,66 @@ function createShapeFixture(overrides: Partial<ShapeElement> = {}) {
     pages: project.pages.map((page) =>
       page.id === 'page-1' ? { ...page, elementIds: [...page.elementIds, shape.id] } : page,
     ),
+  };
+}
+
+function createTemplateFixture(): ProjectDocument {
+  return {
+    ...sampleProject.createSampleProject(),
+    slideLayouts: {
+      'layout-title': {
+        id: 'layout-title',
+        name: 'Title',
+        background: { type: 'color', color: '#101010' },
+        elementIds: ['layout-title-text'],
+        elements: {
+          'layout-title-text': {
+            id: 'layout-title-text',
+            type: 'text',
+            text: 'Template title',
+            x: 96,
+            y: 96,
+            width: 640,
+            height: 120,
+            rotation: 0,
+            locked: false,
+            visible: true,
+            opacity: 1,
+            fontFamily: 'Inter',
+            fontSize: 52,
+            fontWeight: 700,
+            fill: '#FFFFFF',
+            align: 'left',
+            placeholderRole: 'title',
+            templateSource: { layoutId: 'layout-title', type: 'layout' },
+          },
+        },
+        placeholderRoles: ['title'],
+        placeholderVisibility: {
+          body: true,
+          footer: true,
+          slideNumber: true,
+          title: true,
+        },
+      },
+    },
+    themes: {
+      'theme-studio': {
+        id: 'theme-studio',
+        name: 'Studio',
+        palette: {
+          accent: '#37FD76',
+          background: '#050D10',
+          mutedText: '#91999D',
+          surface: '#0C1417',
+          text: '#FFFFFF',
+        },
+        typography: {
+          bodyFontFamily: 'Inter',
+          headingFontFamily: 'Orbitron',
+        },
+      },
+    },
   };
 }
 
@@ -800,5 +860,31 @@ describe('editor commands', () => {
     expect(renamed.pages[0]?.name).toBe('Launch Slide');
     expect(hidden.pages[0]).toMatchObject({ id: 'page-copy', visible: false });
     expect(project.pages.map((page) => page.id)).toEqual(['page-1', 'page-copy']);
+  });
+
+  it('applies a slide layout without deleting user-authored elements', () => {
+    const project = createTemplateFixture();
+    const next = new basicCommands.ApplySlideLayoutCommand('page-1', 'layout-title').execute(
+      project,
+    );
+
+    expect(next.pages[0]).toMatchObject({
+      id: 'page-1',
+      layoutId: 'layout-title',
+    });
+    expect(next.pages[0]?.elementIds).toEqual(project.pages[0]?.elementIds);
+    expect(next.elements['layout-title-text']).toBeUndefined();
+  });
+
+  it('applies a theme without creating slide elements from template text', () => {
+    const project = createTemplateFixture();
+    const next = new basicCommands.ApplyThemeCommand('theme-studio').execute(project);
+
+    expect(next.themeId).toBe('theme-studio');
+    expect(next.elements['layout-title-text']).toBeUndefined();
+    expect(next.slideLayouts?.['layout-title']?.elements['layout-title-text']).toMatchObject({
+      text: 'Template title',
+      templateSource: { layoutId: 'layout-title', type: 'layout' },
+    });
   });
 });

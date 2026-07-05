@@ -105,7 +105,234 @@ function createProjectWithImportedTextFont(): ProjectDocument {
   };
 }
 
+function createProjectWithTemplates(): ProjectDocument {
+  return {
+    ...sampleProject.createSampleProject(),
+    themeId: 'theme-studio',
+    themeGallery: ['theme-studio'],
+    themes: {
+      'theme-imported': {
+        id: 'theme-imported',
+        name: 'Imported theme',
+        palette: {
+          accent: '#00AEEF',
+          background: '#101820',
+          mutedText: '#9AA6B2',
+          surface: '#17212B',
+          text: '#F7FAFC',
+        },
+        typography: {
+          bodyFontFamily: 'Inter',
+          headingFontFamily: 'Space Grotesk',
+        },
+      },
+      'theme-studio': {
+        id: 'theme-studio',
+        name: 'Studio theme',
+        palette: {
+          accent: '#37FD76',
+          background: '#050D10',
+          mutedText: '#91999D',
+          surface: '#0C1417',
+          text: '#FFFFFF',
+        },
+        typography: {
+          bodyFontFamily: 'Inter',
+          headingFontFamily: 'Orbitron',
+        },
+      },
+    },
+    slideLayouts: {
+      'layout-title': {
+        id: 'layout-title',
+        name: 'Title',
+        background: { type: 'color', color: '#050D10' },
+        elementIds: ['layout-title-text'],
+        elements: {
+          'layout-title-text': {
+            id: 'layout-title-text',
+            type: 'text',
+            text: 'Presentation Title',
+            x: 120,
+            y: 140,
+            width: 720,
+            height: 120,
+            rotation: 0,
+            locked: false,
+            visible: true,
+            opacity: 1,
+            fontFamily: 'Inter',
+            fontSize: 44,
+            fontWeight: 800,
+            fill: '#050D10',
+            align: 'left',
+            placeholderRole: 'title',
+            templateSource: { layoutId: 'layout-title', type: 'layout' },
+          },
+        },
+        placeholderRoles: ['title'],
+        placeholderVisibility: {
+          body: true,
+          footer: true,
+          slideNumber: true,
+          title: true,
+        },
+      },
+      'layout-statement': {
+        id: 'layout-statement',
+        name: 'Statement',
+        background: { type: 'color', color: '#050D10' },
+        elementIds: ['layout-statement-text'],
+        elements: {
+          'layout-statement-text': {
+            id: 'layout-statement-text',
+            type: 'text',
+            text: 'Statement',
+            x: 520,
+            y: 420,
+            width: 480,
+            height: 90,
+            rotation: 0,
+            locked: false,
+            visible: true,
+            opacity: 1,
+            fontFamily: 'Inter',
+            fontSize: 38,
+            fontWeight: 800,
+            fill: '#050D10',
+            align: 'center',
+            placeholderRole: 'title',
+            templateSource: { layoutId: 'layout-statement', type: 'layout' },
+          },
+        },
+        placeholderRoles: ['title', 'body'],
+        placeholderVisibility: {
+          body: true,
+          footer: true,
+          slideNumber: true,
+          title: true,
+        },
+      },
+    },
+    pages: sampleProject.createSampleProject().pages.map((page) =>
+      page.id === 'page-1' ? { ...page, layoutId: 'layout-statement' } : page,
+    ),
+  };
+}
+
 describe('DesignPanel', () => {
+  it('shows presentation theme actions when the presentation is selected', async () => {
+    const user = userEvent.setup();
+    const onApplyTheme = vi.fn();
+    const onChangeTheme = vi.fn();
+    const onEditTheme = vi.fn();
+
+    render(
+      <DesignPanel
+        project={createProjectWithTemplates()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [], target: 'presentation' }}
+        onApplyTheme={onApplyTheme}
+        onChangeTheme={onChangeTheme}
+        onEditTheme={onEditTheme}
+      />,
+    );
+
+    expect(screen.getByText('Studio theme')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Change theme' }));
+    await user.click(screen.getByRole('button', { name: 'Edit theme' }));
+    await user.click(screen.getByRole('button', { name: 'Apply theme' }));
+
+    expect(onChangeTheme).toHaveBeenCalledOnce();
+    expect(onEditTheme).toHaveBeenCalledWith('theme-studio');
+    expect(onApplyTheme).toHaveBeenCalledWith('theme-studio');
+  });
+
+  it('opens a theme picker from the theme preview with default and imported themes', async () => {
+    const user = userEvent.setup();
+    const onApplyTheme = vi.fn();
+
+    render(
+      <DesignPanel
+        project={createProjectWithTemplates()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [], target: 'presentation' }}
+        onApplyTheme={onApplyTheme}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Open theme picker, current theme Studio theme' }),
+    );
+
+    expect(screen.getByRole('region', { name: 'Choose a theme' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Default theme/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Imported theme/ }));
+
+    expect(onApplyTheme).toHaveBeenCalledWith('theme-imported');
+  });
+
+  it('shows slide layout and background controls when the slide background is selected', async () => {
+    const user = userEvent.setup();
+    const onApplySlideLayout = vi.fn();
+    const onEditSlideLayout = vi.fn();
+    const onToggleSlideLayoutPlaceholder = vi.fn();
+    const onUpdatePageBackground = vi.fn();
+
+    render(
+      <DesignPanel
+        project={createProjectWithTemplates()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [], target: 'slide' }}
+        onApplySlideLayout={onApplySlideLayout}
+        onEditSlideLayout={onEditSlideLayout}
+        onToggleSlideLayoutPlaceholder={onToggleSlideLayoutPlaceholder}
+        onUpdatePageBackground={onUpdatePageBackground}
+      />,
+    );
+
+    expect(screen.getByText('Statement')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Edit layout' }));
+    await user.click(screen.getByRole('button', { name: 'Apply layout' }));
+    await user.click(screen.getByLabelText('Title'));
+    fireEvent.change(screen.getByLabelText('Slide background color'), {
+      target: { value: '#112233' },
+    });
+
+    expect(onEditSlideLayout).toHaveBeenCalledWith('layout-statement');
+    expect(onApplySlideLayout).toHaveBeenCalledWith('page-1', 'layout-statement');
+    expect(onToggleSlideLayoutPlaceholder).toHaveBeenCalledWith(
+      'layout-statement',
+      'title',
+      false,
+    );
+    expect(onUpdatePageBackground).toHaveBeenCalledWith({ type: 'color', color: '#112233' });
+  });
+
+  it('opens a slide layout picker from the layout preview and applies the chosen layout', async () => {
+    const user = userEvent.setup();
+    const onApplySlideLayout = vi.fn();
+
+    render(
+      <DesignPanel
+        project={createProjectWithTemplates()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [], target: 'slide' }}
+        onApplySlideLayout={onApplySlideLayout}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Open layout picker, current layout Statement' }),
+    );
+
+    expect(screen.getByRole('region', { name: 'Choose a layout' })).toBeInTheDocument();
+    expect(screen.getByText('Presentation Title')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Title' }));
+
+    expect(onApplySlideLayout).toHaveBeenCalledWith('page-1', 'layout-title');
+  });
+
   it('updates selected shape fill and border modes', async () => {
     const user = userEvent.setup();
     const onUpdateElementStyle = vi.fn();

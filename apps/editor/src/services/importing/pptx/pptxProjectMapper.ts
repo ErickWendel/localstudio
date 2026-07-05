@@ -1,7 +1,15 @@
-import type { Asset, DesignElement, ImportWarning, Page, ProjectDocument } from '../../../domain/documents/model';
+import type {
+  Asset,
+  DesignElement,
+  ImportWarning,
+  Page,
+  PlaceholderRole,
+  ProjectDocument,
+  SlideLayout,
+} from '../../../domain/documents/model';
 import { pptxFileUtils } from './pptxFileUtils';
-import type { PptxPackageFile } from './pptxPackageTypes';
-import type { PptxDeck, PptxSlideObject } from './pptxParser';
+import type { PptxPackage } from './pptxPackage';
+import type { PptxDeck, PptxLayout, PptxSlideObject } from './pptxParser';
 
 const TEXT_FRAME_FIT = {
   averageCharacterWidth: 0.9,
@@ -22,8 +30,8 @@ function createAssetId(path: string, index: number) {
   return `pptx-asset-${index + 1}-${slug || 'asset'}`;
 }
 
-function createAsset(file: PptxPackageFile, index: number): Asset | undefined {
-  const mimeType = pptxFileUtils.getMimeType(file.path, file.blob.type);
+function createAsset(file: NonNullable<ReturnType<PptxPackage['getFile']>>, index: number, pptxPackage: PptxPackage): Asset | undefined {
+  const mimeType = pptxPackage.getContentType(file.path) ?? pptxFileUtils.getMimeType(file.path, file.blob.type);
   const type = pptxFileUtils.getAssetType(file.path, mimeType);
   if (!type) return undefined;
   const fileName = file.path.split('/').at(-1);
@@ -39,13 +47,13 @@ function createAsset(file: PptxPackageFile, index: number): Asset | undefined {
   };
 }
 
-function getOrCreateAsset(assetPath: string, files: PptxPackageFile[], assets: Record<string, Asset>) {
+function getOrCreateAsset(assetPath: string, pptxPackage: PptxPackage, assets: Record<string, Asset>) {
   const existing = Object.values(assets).find((asset) => asset.fileName === assetPath.split('/').at(-1));
   if (existing) return existing;
-  const fileIndex = files.findIndex((file) => file.path === assetPath);
-  const file = files[fileIndex];
+  const fileIndex = pptxPackage.files.findIndex((item) => item.path === assetPath);
+  const file = pptxPackage.getFile(assetPath);
   if (!file) return undefined;
-  const asset = createAsset(file, fileIndex);
+  const asset = createAsset(file, fileIndex, pptxPackage);
   if (!asset) return undefined;
   assets[asset.id] = asset;
   return asset;
@@ -164,12 +172,13 @@ function getFittedTextFrame(
 
 function mapObject(
   object: PptxSlideObject,
-  files: PptxPackageFile[],
+  pptxPackage: PptxPackage,
   assets: Record<string, Asset>,
   warnings: ImportWarning[],
   pageId: string,
   pageWidth: number,
   pageHeight: number,
+  layoutId?: string,
 ): DesignElement | undefined {
   if (object.kind === 'text') {
     const frame = getFittedTextFrame(object, pageWidth, pageHeight);
@@ -178,14 +187,35 @@ function mapObject(
       type: 'text',
       text: object.text,
       ...frame,
-      rotation: 0,
+      rotation: object.rotation ?? 0,
       locked: false,
       visible: true,
-      opacity: 1,
+      opacity: object.opacity ?? 1,
+      ...(layoutId ? { templateSource: { layoutId, type: 'layout' as const } } : {}),
+      ...(object.placeholderRole ? { placeholderRole: object.placeholderRole } : {}),
       ...object.style,
     };
   }
-  const asset = getOrCreateAsset(object.assetPath, files, assets);
+  if (object.kind === 'shape') {
+    return {
+      id: object.id,
+      type: 'shape',
+      ...object.frame,
+      rotation: object.rotation ?? 0,
+      locked: false,
+      visible: true,
+      opacity: object.opacity ?? 1,
+      ...(layoutId ? { templateSource: { layoutId, type: 'layout' as const } } : {}),
+      ...(object.placeholderRole ? { placeholderRole: object.placeholderRole } : {}),
+      shape: object.shape,
+      ...(object.fill ? { fill: object.fill } : {}),
+      ...(object.stroke ? { stroke: object.stroke } : {}),
+      ...(object.strokeWidth !== undefined ? { strokeWidth: object.strokeWidth } : {}),
+      ...(object.startEndpoint ? { startEndpoint: object.startEndpoint } : {}),
+      ...(object.endEndpoint ? { endEndpoint: object.endEndpoint } : {}),
+    };
+  }
+  const asset = getOrCreateAsset(object.assetPath, pptxPackage, assets);
   if (!asset) {
     warnings.push({
       code: 'pptx-missing-asset',
@@ -199,10 +229,12 @@ function mapObject(
     id: object.id,
     assetId: asset.id,
     ...object.frame,
-    rotation: 0,
+    rotation: object.rotation ?? 0,
     locked: false,
     visible: true,
-    opacity: 1,
+    opacity: object.opacity ?? 1,
+    ...(layoutId ? { templateSource: { layoutId, type: 'layout' as const } } : {}),
+    ...(object.placeholderRole ? { placeholderRole: object.placeholderRole } : {}),
   };
   if (object.kind === 'video') {
     return {
@@ -220,15 +252,93 @@ function mapObject(
   return { ...base, type: 'image' };
 }
 
-function map(deck: PptxDeck, files: PptxPackageFile[]): ProjectDocument {
+const defaultPlaceholderVisibility: Record<PlaceholderRole, boolean> = {
+  body: true,
+  footer: true,
+  slideNumber: true,
+  title: true,
+};
+
+function createLayout(
+  layout: PptxLayout,
+  pptxPackage: PptxPackage,
+  assets: Record<string, Asset>,
+  warnings: ImportWarning[],
+  pageWidth: number,
+  pageHeight: number,
+): SlideLayout | undefined {
+  const elementIds: string[] = [];
+  const elements: Record<string, DesignElement> = {};
+  for (const object of layout.objects.sort((left, right) => left.zIndex - right.zIndex)) {
+    const element = mapObject(
+      object,
+      pptxPackage,
+      assets,
+      warnings,
+      layout.id,
+      pageWidth,
+      pageHeight,
+      layout.id,
+    );
+    if (!element) continue;
+    elements[element.id] = element;
+    elementIds.push(element.id);
+  }
+  return {
+    id: layout.id,
+    name: layout.name,
+    background: { type: 'color', color: layout.backgroundColor },
+    elementIds,
+    elements,
+    placeholderRoles: layout.placeholderRoles,
+    placeholderVisibility: defaultPlaceholderVisibility,
+  };
+}
+
+function createSlideFallbackLayout(
+  slide: PptxDeck['slides'][number],
+  pptxPackage: PptxPackage,
+  assets: Record<string, Asset>,
+  warnings: ImportWarning[],
+  pageWidth: number,
+  pageHeight: number,
+): SlideLayout | undefined {
+  if (!slide.layoutId) return undefined;
+  return createLayout(
+    {
+      backgroundColor: slide.backgroundColor,
+      id: slide.layoutId,
+      name: slide.layoutName ?? slide.layoutId,
+      objects: slide.layoutObjects,
+      placeholderRoles: slide.placeholderRoles,
+      sourcePath: slide.layoutId,
+    },
+    pptxPackage,
+    assets,
+    warnings,
+    pageWidth,
+    pageHeight,
+  );
+}
+
+function map(deck: PptxDeck, pptxPackage: PptxPackage): ProjectDocument {
   const now = new Date().toISOString();
   const assets: Record<string, Asset> = {};
   const elements: Record<string, DesignElement> = {};
-  const warnings: ImportWarning[] = [];
+  const warnings: ImportWarning[] = [...deck.warnings];
+  const slideLayouts: Record<string, SlideLayout> = {};
+  for (const layout of deck.layouts) {
+    const mappedLayout = createLayout(layout, pptxPackage, assets, warnings, deck.width, deck.height);
+    if (mappedLayout) slideLayouts[mappedLayout.id] = mappedLayout;
+  }
   const pages: Page[] = deck.slides.map((slide) => {
     const elementIds: string[] = [];
+    const layout = slide.layoutId && slideLayouts[slide.layoutId]
+      ? undefined
+      : createSlideFallbackLayout(slide, pptxPackage, assets, warnings, deck.width, deck.height);
+    if (layout) slideLayouts[layout.id] = layout;
     for (const object of slide.objects.sort((left, right) => left.zIndex - right.zIndex)) {
-      const element = mapObject(object, files, assets, warnings, slide.id, deck.width, deck.height);
+      const element = mapObject(object, pptxPackage, assets, warnings, slide.id, deck.width, deck.height);
       if (!element) continue;
       elements[element.id] = element;
       elementIds.push(element.id);
@@ -241,6 +351,7 @@ function map(deck: PptxDeck, files: PptxPackageFile[]): ProjectDocument {
       background: { type: 'color', color: slide.backgroundColor },
       elementIds,
       transition: { effect: slide.transitionEffect, delayMs: 0, durationMs: 500 },
+      ...(slide.layoutId ? { layoutId: slide.layoutId } : {}),
       ...(slide.animationBuilds.length > 0
         ? {
             animationBuilds: slide.animationBuilds.filter((build) =>
@@ -260,6 +371,7 @@ function map(deck: PptxDeck, files: PptxPackageFile[]): ProjectDocument {
     assets,
     elements,
     pages,
+    ...(Object.keys(slideLayouts).length > 0 ? { slideLayouts } : {}),
     ...(warnings.length > 0 ? { importWarnings: warnings } : {}),
   };
 }

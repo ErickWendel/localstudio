@@ -1,5 +1,6 @@
 import type { ProjectDocument } from '../../../domain/documents/model';
 import { pptxImportLogger } from './pptxImportLogger';
+import { pptxPackage } from './pptxPackage';
 import type { PptxImportInput } from './pptxPackageTypes';
 import { pptxParser } from './pptxParser';
 import { pptxProjectMapper } from './pptxProjectMapper';
@@ -19,8 +20,9 @@ export class BrowserPptxImportService {
       fileCount: files.length,
       samplePaths: files.slice(0, 8).map((file) => file.path),
     });
-    const deck = await pptxParser.parse(files, input.file.name);
-    const project = pptxProjectMapper.map(deck, files);
+    const packageModel = await pptxPackage.create(files);
+    const deck = await pptxParser.parse({ package: packageModel, themeCache: new Map() }, input.file.name);
+    const project = pptxProjectMapper.map(deck, packageModel);
     pptxImportLogger.info('Finished PPTX import service.', {
       assetCount: Object.keys(project.assets).length,
       elementCount: Object.keys(project.elements).length,

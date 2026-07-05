@@ -4,6 +4,7 @@ import {
   AlignRight,
   Bold,
   CaseSensitive,
+  ChevronDown,
   Download,
   FileVideo,
   Film,
@@ -21,14 +22,16 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import type { FormEvent, RefObject } from 'react';
+import type { CSSProperties, FormEvent, RefObject } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   DesignElement,
   ElementAnimationBuild,
   PageBackground,
+  PresentationTheme,
   ProjectDocument,
   SelectionState,
+  SlideLayout,
   ShapeElement,
   ShapeLineEndpoint,
   TextElement,
@@ -52,6 +55,21 @@ type MovieStartTrigger = ElementAnimationBuild['trigger'];
 const palette = ['#37FD76', '#050D10', '#FFFFFF', '#91999D', '#00779A'];
 const regularTextWeight = 400;
 const boldTextWeight = 800;
+const defaultPresentationTheme: PresentationTheme = {
+  id: 'theme-default',
+  name: 'Default theme',
+  palette: {
+    accent: '#37FD76',
+    background: '#050D10',
+    mutedText: '#91999D',
+    surface: '#0C1417',
+    text: '#FFFFFF',
+  },
+  typography: {
+    bodyFontFamily: 'Open Sans',
+    headingFontFamily: 'Orbitron',
+  },
+};
 const videoRepeatOptions: Array<{ value: VideoRepeatMode; label: string }> = [
   { value: 'none', label: 'None' },
   { value: 'loop', label: 'Loop' },
@@ -81,6 +99,16 @@ interface DesignPanelProps {
   onUpdateTextContent?: (elementId: string, text: string) => void;
   onUpdateMediaPlayback?: (elementId: string, patch: MediaPlaybackPatch) => void;
   onUpdatePageBackground?: (background: PageBackground) => void;
+  onApplyTheme?: (themeId: string) => void;
+  onEditTheme?: (themeId: string) => void;
+  onChangeTheme?: () => void;
+  onApplySlideLayout?: (pageId: string, layoutId: string) => void;
+  onEditSlideLayout?: (layoutId: string) => void;
+  onToggleSlideLayoutPlaceholder?: (
+    layoutId: string,
+    role: 'body' | 'footer' | 'slideNumber' | 'title',
+    visible: boolean,
+  ) => void;
   onAlignSelectedElement?: (mode: AlignMode) => void;
   onSetElementLock?: (elementId: string, locked: boolean) => void;
   onSetSelectedElementZOrder?: (mode: ZOrderMode) => void;
@@ -118,6 +146,17 @@ function collectDocumentTextFontFamilies(project: ProjectDocument) {
     .map((element) => element.fontFamily);
 }
 
+function getThemeOptions(project: ProjectDocument) {
+  const importedThemes = Object.values(project.themes ?? {}).filter(
+    (theme) => theme.id !== defaultPresentationTheme.id && theme.palette && theme.typography,
+  );
+  return [defaultPresentationTheme, ...importedThemes];
+}
+
+function getSlideLayoutOptions(project: ProjectDocument) {
+  return Object.values(project.slideLayouts ?? {});
+}
+
 export function DesignPanel({
   project,
   activePageId,
@@ -127,6 +166,12 @@ export function DesignPanel({
   onUpdateTextContent,
   onUpdateMediaPlayback,
   onUpdatePageBackground,
+  onApplyTheme,
+  onEditTheme,
+  onChangeTheme,
+  onApplySlideLayout,
+  onEditSlideLayout,
+  onToggleSlideLayoutPlaceholder,
   onAlignSelectedElement,
   onSetElementLock,
   onSetSelectedElementZOrder,
@@ -144,6 +189,7 @@ export function DesignPanel({
   const [fontDownloadStatus, setFontDownloadStatus] = useState<string | undefined>();
   const page = project.pages.find((item) => item.id === activePageId);
   const selectedElement = getSelectedElement(project, selection);
+  const selectionTarget = selection.target ?? (selectedElement ? 'elements' : 'presentation');
   const backgroundColor = page ? getBackgroundColor(page.background) : '#050D10';
   const projectFontFamilies = useMemo(
     () =>
@@ -210,6 +256,31 @@ export function DesignPanel({
   function submitFontSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFontSearchQuery(fontSearchInput.trim());
+  }
+
+  if (selectionTarget === 'presentation') {
+    return (
+      <PresentationDesignPanel
+        project={project}
+        page={page}
+        onApplyTheme={onApplyTheme}
+        onChangeTheme={onChangeTheme}
+        onEditTheme={onEditTheme}
+      />
+    );
+  }
+
+  if (selectionTarget === 'slide') {
+    return (
+      <SlideDesignPanel
+        page={page}
+        project={project}
+        onApplySlideLayout={onApplySlideLayout}
+        onEditSlideLayout={onEditSlideLayout}
+        onToggleSlideLayoutPlaceholder={onToggleSlideLayoutPlaceholder}
+        onUpdatePageBackground={onUpdatePageBackground}
+      />
+    );
   }
 
   return (
@@ -305,6 +376,431 @@ export function DesignPanel({
       )}
     </div>
   );
+}
+
+interface PresentationDesignPanelProps {
+  page?: ProjectDocument['pages'][number] | undefined;
+  project: ProjectDocument;
+  onApplyTheme: ((themeId: string) => void) | undefined;
+  onChangeTheme: (() => void) | undefined;
+  onEditTheme: ((themeId: string) => void) | undefined;
+}
+
+function PresentationDesignPanel({
+  page,
+  project,
+  onApplyTheme,
+  onChangeTheme,
+  onEditTheme,
+}: PresentationDesignPanelProps) {
+  const [themePickerOpen, setThemePickerOpen] = useState(false);
+  const themeOptions = getThemeOptions(project);
+  const theme =
+    themeOptions.find((item) => item.id === project.themeId) ??
+    (project.themeId ? project.themes?.[project.themeId] : undefined) ??
+    defaultPresentationTheme;
+  const themeId = theme.id;
+  const themeName = theme?.name ?? 'Custom theme';
+  return (
+    <div className="panel-stack">
+      <PanelSection title="Presentation">
+        <button
+          aria-expanded={themePickerOpen}
+          aria-label={`Open theme picker, current theme ${themeName}`}
+          className="template-preview-card template-preview-button"
+          type="button"
+          onClick={() => setThemePickerOpen((current) => !current)}
+        >
+          <div className="template-filmstrip" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className="template-preview-copy">
+            <span>Theme</span>
+            <strong>{themeName}</strong>
+          </div>
+          <ChevronDown size={16} aria-hidden="true" />
+        </button>
+        {themePickerOpen ? (
+          <ThemeChooser
+            activeThemeId={themeId}
+            themes={themeOptions}
+            onApplyTheme={(nextThemeId) => {
+              onApplyTheme?.(nextThemeId);
+              setThemePickerOpen(false);
+            }}
+          />
+        ) : null}
+        <div className="template-action-row">
+          <button type="button" onClick={onChangeTheme}>
+            Change theme
+          </button>
+          <button type="button" disabled={!themeId} onClick={() => themeId && onEditTheme?.(themeId)}>
+            Edit theme
+          </button>
+          <button type="button" disabled={!themeId} onClick={() => themeId && onApplyTheme?.(themeId)}>
+            Apply theme
+          </button>
+        </div>
+      </PanelSection>
+
+      <PanelSection title="Slideshow Settings">
+        <label className="template-checkbox-row">
+          <input type="checkbox" />
+          <span>Automatically play upon open</span>
+        </label>
+        <label className="template-checkbox-row">
+          <input type="checkbox" />
+          <span>Loop slideshow</span>
+        </label>
+        <label className="template-checkbox-row">
+          <input type="checkbox" />
+          <span>Restart show if idle for</span>
+        </label>
+      </PanelSection>
+
+      <PanelSection title="Presentation Type">
+        <label className="design-control ew-field-scope">
+          <span>Type</span>
+          <select aria-label="Presentation type" defaultValue="normal">
+            <option value="normal">Normal</option>
+            <option value="kiosk">Kiosk</option>
+            <option value="self-running">Self-running</option>
+          </select>
+        </label>
+        <div className="property-row ew-surface ew-surface-hover ew-compact-row">
+          <span>Slide size</span>
+          <strong>{page ? `${page.width} x ${page.height}` : 'No slide'}</strong>
+        </div>
+      </PanelSection>
+    </div>
+  );
+}
+
+interface SlideDesignPanelProps {
+  page?: ProjectDocument['pages'][number] | undefined;
+  project: ProjectDocument;
+  onApplySlideLayout: ((pageId: string, layoutId: string) => void) | undefined;
+  onEditSlideLayout: ((layoutId: string) => void) | undefined;
+  onToggleSlideLayoutPlaceholder:
+    | ((
+        layoutId: string,
+        role: 'body' | 'footer' | 'slideNumber' | 'title',
+        visible: boolean,
+      ) => void)
+    | undefined;
+  onUpdatePageBackground: ((background: PageBackground) => void) | undefined;
+}
+
+function SlideDesignPanel({
+  page,
+  project,
+  onApplySlideLayout,
+  onEditSlideLayout,
+  onToggleSlideLayoutPlaceholder,
+  onUpdatePageBackground,
+}: SlideDesignPanelProps) {
+  const layout = page?.layoutId ? project.slideLayouts?.[page.layoutId] : undefined;
+  const layoutOptions = getSlideLayoutOptions(project);
+  const [layoutPickerOpen, setLayoutPickerOpen] = useState(false);
+  const layoutId = layout?.id ?? layoutOptions[0]?.id;
+  const layoutName = layout?.name ?? 'Blank';
+  const backgroundColor = page ? getBackgroundColor(page.background) : '#050D10';
+  const visibility = layout?.placeholderVisibility ?? {
+    body: true,
+    footer: true,
+    slideNumber: true,
+    title: true,
+  };
+  return (
+    <div className="panel-stack">
+      <PanelSection title="Slide">
+        <button
+          aria-expanded={layoutPickerOpen}
+          aria-label={`Open layout picker, current layout ${layoutName}`}
+          className="template-preview-card template-preview-card-slide template-preview-button"
+          type="button"
+          onClick={() => setLayoutPickerOpen((current) => !current)}
+        >
+          <div className="template-slide-thumbnail" aria-hidden="true">
+            <span className="template-slide-title" />
+            <span className="template-slide-body" />
+            <span className="template-slide-footer" />
+          </div>
+          <div className="template-preview-copy">
+            <span>Slide layout</span>
+            <strong>{layoutName}</strong>
+          </div>
+          <ChevronDown size={16} aria-hidden="true" />
+        </button>
+        {layoutPickerOpen ? (
+          <SlideLayoutChooser
+            activeLayoutId={layout?.id}
+            layouts={layoutOptions}
+            pageId={page?.id}
+            onApplySlideLayout={(pageId, nextLayoutId) => {
+              onApplySlideLayout?.(pageId, nextLayoutId);
+              setLayoutPickerOpen(false);
+            }}
+          />
+        ) : null}
+        <div className="template-action-row">
+          <button type="button" disabled={!layoutId} onClick={() => layoutId && onEditSlideLayout?.(layoutId)}>
+            Edit layout
+          </button>
+          <button
+            type="button"
+            disabled={!layoutId || !page}
+            onClick={() => page && layoutId && onApplySlideLayout?.(page.id, layoutId)}
+          >
+            Apply layout
+          </button>
+        </div>
+      </PanelSection>
+
+      <PanelSection title="Appearance">
+        {(
+          [
+            ['title', 'Title'],
+            ['body', 'Body'],
+            ['footer', 'Footer'],
+            ['slideNumber', 'Slide number'],
+          ] as const
+        ).map(([role, label]) => (
+          <label className="template-checkbox-row" key={role}>
+            <input
+              checked={visibility[role]}
+              disabled={!layoutId}
+              type="checkbox"
+              onChange={(event) => {
+                if (layoutId) onToggleSlideLayoutPlaceholder?.(layoutId, role, event.target.checked);
+              }}
+            />
+            <span>{label}</span>
+          </label>
+        ))}
+      </PanelSection>
+
+      <PanelSection title="Background">
+        <div className="template-segmented-control" role="group" aria-label="Background mode">
+          <button className="template-segmented-active" type="button">
+            Standard
+          </button>
+          <button type="button">Dynamic</button>
+        </div>
+        <label className="design-control ew-field-scope">
+          <span>Current fill</span>
+          <input
+            aria-label="Slide background color"
+            type="color"
+            value={backgroundColor}
+            onChange={(event) => {
+              onUpdatePageBackground?.({ type: 'color', color: event.target.value });
+            }}
+          />
+        </label>
+        <label className="design-control ew-field-scope">
+          <span>Fill type</span>
+          <select aria-label="Slide fill type" defaultValue="color">
+            <option value="color">Color fill</option>
+          </select>
+        </label>
+      </PanelSection>
+    </div>
+  );
+}
+
+interface ThemeChooserProps {
+  activeThemeId: string;
+  themes: PresentationTheme[];
+  onApplyTheme: (themeId: string) => void;
+}
+
+function ThemeChooser({ activeThemeId, themes, onApplyTheme }: ThemeChooserProps) {
+  return (
+    <div className="template-chooser-shelf" aria-label="Choose a theme" role="region">
+      <div className="template-chooser-title">Choose a theme</div>
+      <div className="theme-choice-list">
+        {themes.map((theme) => (
+          <button
+            aria-current={theme.id === activeThemeId ? 'true' : undefined}
+            className={
+              theme.id === activeThemeId
+                ? 'theme-choice-card theme-choice-card-active'
+                : 'theme-choice-card'
+            }
+            key={theme.id}
+            type="button"
+            onClick={() => onApplyTheme(theme.id)}
+          >
+            <span
+              className="theme-choice-preview"
+              style={
+                {
+                  '--theme-choice-accent': theme.palette.accent,
+                  '--theme-choice-background': theme.palette.background,
+                  '--theme-choice-surface': theme.palette.surface,
+                  '--theme-choice-text': theme.palette.text,
+                } as CSSProperties
+              }
+            >
+              <span />
+              <span />
+              <span />
+            </span>
+            <span className="theme-choice-copy">
+              <strong>{theme.name}</strong>
+              <span>
+                {theme.typography.headingFontFamily} / {theme.typography.bodyFontFamily}
+              </span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+interface SlideLayoutChooserProps {
+  activeLayoutId?: string | undefined;
+  layouts: SlideLayout[];
+  pageId?: string | undefined;
+  onApplySlideLayout: (pageId: string, layoutId: string) => void;
+}
+
+function SlideLayoutChooser({
+  activeLayoutId,
+  layouts,
+  pageId,
+  onApplySlideLayout,
+}: SlideLayoutChooserProps) {
+  return (
+    <div className="template-chooser-shelf" aria-label="Choose a layout" role="region">
+      <div className="template-chooser-title">Choose a layout</div>
+      {layouts.length > 0 ? (
+        <div className="layout-choice-grid">
+          {layouts.map((layout) => (
+            <button
+              aria-current={layout.id === activeLayoutId ? 'true' : undefined}
+              className={
+                layout.id === activeLayoutId
+                  ? 'layout-choice-card layout-choice-card-active'
+                  : 'layout-choice-card'
+              }
+              disabled={!pageId}
+              key={layout.id}
+              type="button"
+              onClick={() => {
+                if (pageId) onApplySlideLayout(pageId, layout.id);
+              }}
+            >
+              <LayoutChoiceThumbnail layout={layout} />
+              <span>{layout.name}</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="template-chooser-empty">No imported layouts yet.</p>
+      )}
+    </div>
+  );
+}
+
+function LayoutChoiceThumbnail({ layout }: { layout: SlideLayout }) {
+  const elements = layout.elementIds
+    .map((elementId) => layout.elements[elementId])
+    .filter((element): element is DesignElement => Boolean(element))
+    .filter((element) => element.visible !== false);
+  if (elements.length > 0) {
+    const bounds = getLayoutThumbnailBounds(elements);
+    return (
+      <span className="layout-choice-thumbnail" aria-hidden="true">
+        {elements.map((element) => (
+          <LayoutChoiceElement element={element} key={element.id} bounds={bounds} />
+        ))}
+      </span>
+    );
+  }
+  const roles = new Set(layout.placeholderRoles);
+  return (
+    <span className="layout-choice-thumbnail" aria-hidden="true">
+      {roles.has('title') ? <span className="layout-choice-title" /> : null}
+      {roles.has('body') ? <span className="layout-choice-body" /> : null}
+      {roles.has('footer') ? <span className="layout-choice-footer" /> : null}
+      {roles.has('slideNumber') ? <span className="layout-choice-number" /> : null}
+      {roles.size === 0 ? <span className="layout-choice-blank" /> : null}
+    </span>
+  );
+}
+
+function getLayoutThumbnailBounds(elements: DesignElement[]) {
+  const xValues = elements.flatMap((element) => [element.x, element.x + element.width]);
+  const yValues = elements.flatMap((element) => [element.y, element.y + element.height]);
+  const minX = Math.min(...xValues, 0);
+  const minY = Math.min(...yValues, 0);
+  const maxX = Math.max(...xValues, 1920);
+  const maxY = Math.max(...yValues, 1080);
+  return {
+    minX,
+    minY,
+    width: Math.max(1, maxX - minX),
+    height: Math.max(1, maxY - minY),
+  };
+}
+
+function getLayoutElementStyle(
+  element: DesignElement,
+  bounds: ReturnType<typeof getLayoutThumbnailBounds>,
+): CSSProperties {
+  return {
+    left: `${((element.x - bounds.minX) / bounds.width) * 100}%`,
+    top: `${((element.y - bounds.minY) / bounds.height) * 100}%`,
+    width: `${(element.width / bounds.width) * 100}%`,
+    height: `${(element.height / bounds.height) * 100}%`,
+    opacity: element.opacity,
+    transform: element.rotation ? `rotate(${element.rotation}deg)` : undefined,
+  };
+}
+
+function LayoutChoiceElement({
+  bounds,
+  element,
+}: {
+  bounds: ReturnType<typeof getLayoutThumbnailBounds>;
+  element: DesignElement;
+}) {
+  const style = getLayoutElementStyle(element, bounds);
+  if (element.type === 'text') {
+    return (
+      <span
+        className="layout-choice-element layout-choice-text"
+        style={{
+          ...style,
+          color: element.fill,
+          fontWeight: element.fontWeight,
+          justifyContent:
+            element.align === 'center' ? 'center' : element.align === 'right' ? 'flex-end' : 'flex-start',
+        }}
+      >
+        {element.text}
+      </span>
+    );
+  }
+  if (element.type === 'shape') {
+    return (
+      <span
+        className={`layout-choice-element layout-choice-shape layout-choice-shape-${element.shape}`}
+        style={{
+          ...style,
+          background: element.fill ?? 'transparent',
+          borderColor: element.stroke ?? element.fill ?? '#050D10',
+          borderWidth: element.strokeWidth ? 1 : 0,
+        }}
+      />
+    );
+  }
+  return <span className="layout-choice-element layout-choice-media" style={style} />;
 }
 
 interface ElementDesignInspectorProps {

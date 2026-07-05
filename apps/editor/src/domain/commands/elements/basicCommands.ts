@@ -10,6 +10,9 @@ import type {
   ProjectDocument,
   ShapeElement,
   SlideTransition,
+  SlideLayout,
+  PresentationTheme,
+  PlaceholderRole,
   VideoElement,
 } from '../../documents/model';
 import { collectReferencedAssetIds } from '../../assets/assetUsage';
@@ -1052,6 +1055,114 @@ class TranslateTextElementsCommand implements EditorCommand {
   }
 }
 
+class ApplyThemeCommand implements EditorCommand {
+  readonly description = 'Apply theme';
+
+  constructor(private readonly themeId: string) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    if (!project.themes?.[this.themeId]) return project;
+    return {
+      ...project,
+      themeId: this.themeId,
+      themeGallery: Array.from(new Set([...(project.themeGallery ?? []), this.themeId])),
+      updatedAt: projectMutationUtils.getProjectUpdatedAt(),
+    };
+  }
+}
+
+class SaveThemeCommand implements EditorCommand {
+  readonly description: string = 'Save theme';
+
+  constructor(private readonly theme: PresentationTheme) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    return {
+      ...project,
+      themes: {
+        ...(project.themes ?? {}),
+        [this.theme.id]: this.theme,
+      },
+      themeGallery: Array.from(new Set([...(project.themeGallery ?? []), this.theme.id])),
+      updatedAt: projectMutationUtils.getProjectUpdatedAt(),
+    };
+  }
+}
+
+class EditThemeCommand extends SaveThemeCommand {
+  override readonly description: string = 'Edit theme';
+}
+
+class ApplySlideLayoutCommand implements EditorCommand {
+  readonly description = 'Apply slide layout';
+
+  constructor(
+    private readonly pageId: string,
+    private readonly layoutId: string,
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    if (!project.slideLayouts?.[this.layoutId]) return project;
+    return {
+      ...project,
+      pages: project.pages.map((page) =>
+        page.id === this.pageId ? { ...page, layoutId: this.layoutId } : page,
+      ),
+      updatedAt: projectMutationUtils.getProjectUpdatedAt(),
+    };
+  }
+}
+
+class SaveSlideLayoutCommand implements EditorCommand {
+  readonly description: string = 'Save slide layout';
+
+  constructor(private readonly layout: SlideLayout) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    return {
+      ...project,
+      slideLayouts: {
+        ...(project.slideLayouts ?? {}),
+        [this.layout.id]: this.layout,
+      },
+      updatedAt: projectMutationUtils.getProjectUpdatedAt(),
+    };
+  }
+}
+
+class EditSlideLayoutCommand extends SaveSlideLayoutCommand {
+  override readonly description: string = 'Edit slide layout';
+}
+
+class ToggleSlideLayoutPlaceholderVisibilityCommand implements EditorCommand {
+  readonly description = 'Toggle slide layout placeholder visibility';
+
+  constructor(
+    private readonly layoutId: string,
+    private readonly role: PlaceholderRole,
+    private readonly visible: boolean,
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    const layout = project.slideLayouts?.[this.layoutId];
+    if (!layout) return project;
+    return {
+      ...project,
+      slideLayouts: {
+        ...(project.slideLayouts ?? {}),
+        [this.layoutId]: {
+          ...layout,
+          placeholderVisibility: {
+            ...layout.placeholderVisibility,
+            [this.role]: this.visible,
+          },
+        },
+      },
+      updatedAt: projectMutationUtils.getProjectUpdatedAt(),
+    };
+  }
+}
+
 export const basicCommands = {
   AddGeneratedSlideElementCommand: applyGeneratedSlideCommand.AddGeneratedSlideElementCommand,
   PrepareGeneratedSlideCommand: applyGeneratedSlideCommand.PrepareGeneratedSlideCommand,
@@ -1087,4 +1198,11 @@ export const basicCommands = {
   ClearElementAnimationBuildCommand,
   ReorderElementAnimationBuildCommand,
   TranslateTextElementsCommand,
+  ApplyThemeCommand,
+  SaveThemeCommand,
+  EditThemeCommand,
+  ApplySlideLayoutCommand,
+  SaveSlideLayoutCommand,
+  EditSlideLayoutCommand,
+  ToggleSlideLayoutPlaceholderVisibilityCommand,
 };

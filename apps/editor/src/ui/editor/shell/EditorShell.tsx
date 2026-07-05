@@ -983,6 +983,14 @@ export function EditorShell({ services }: EditorShellProps) {
           onUpdateTextContent={isHistoryReadOnly ? undefined : vm.updateTextContent}
           onUpdateMediaPlayback={isHistoryReadOnly ? undefined : vm.updateMediaPlayback}
           onUpdatePageBackground={isHistoryReadOnly ? undefined : vm.updatePageBackground}
+          onApplyTheme={isHistoryReadOnly ? undefined : vm.applyTheme}
+          onEditTheme={isHistoryReadOnly ? undefined : vm.editTheme}
+          onChangeTheme={isHistoryReadOnly ? undefined : vm.changeTheme}
+          onApplySlideLayout={isHistoryReadOnly ? undefined : vm.applySlideLayout}
+          onEditSlideLayout={isHistoryReadOnly ? undefined : vm.editSlideLayout}
+          onToggleSlideLayoutPlaceholder={
+            isHistoryReadOnly ? undefined : vm.toggleSlideLayoutPlaceholder
+          }
           onReplaceVideoAsset={
             isHistoryReadOnly
               ? undefined
@@ -1217,6 +1225,8 @@ export function EditorShell({ services }: EditorShellProps) {
                   }
             }
             onOpenFontPanel={isHistoryReadOnly ? undefined : openDesignFontList}
+            onSelectPresentation={isHistoryReadOnly ? undefined : vm.selectPresentation}
+            onSelectSlide={isHistoryReadOnly ? undefined : vm.selectSlideBackground}
             onSelectElement={isHistoryReadOnly ? undefined : selectElement}
             onSendSelectedElementBackward={
               isHistoryReadOnly

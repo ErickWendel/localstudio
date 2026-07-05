@@ -611,6 +611,9 @@ export function useEditorViewModel(services: AppServices) {
   const activePageIdRef = useRef(activePageId);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   const selectedElementIdsRef = useRef(selectedElementIds);
+  const [selectionTarget, setSelectionTarget] = useState<NonNullable<SelectionState['target']>>(
+    'presentation',
+  );
   const [history, setHistory] = useState<EditorHistory>({ past: [], future: [] });
   const [zoomPercent, setZoomPercent] = useState(100);
   const [pagesPanelOpen, setPagesPanelOpen] = useState(false);
@@ -735,8 +738,8 @@ export function useEditorViewModel(services: AppServices) {
   const skipNextProjectSaveRef = useRef(shouldRestoreStoredProject);
   const lastVersionProjectRef = useRef<ProjectDocument>(initialProject);
   const selection = useMemo<SelectionState>(
-    () => ({ pageId: activePageId, elementIds: selectedElementIds }),
-    [activePageId, selectedElementIds],
+    () => ({ pageId: activePageId, elementIds: selectedElementIds, target: selectionTarget }),
+    [activePageId, selectedElementIds, selectionTarget],
   );
   const selectedImageElement = useMemo<ImageElement | undefined>(() => {
     if (selectedElementIds.length !== 1) return undefined;
@@ -1592,6 +1595,7 @@ export function useEditorViewModel(services: AppServices) {
       if (options?.selectedElementIds !== undefined) {
         selectedElementIdsRef.current = options.selectedElementIds;
         setSelectedElementIds(options.selectedElementIds);
+        setSelectionTarget(options.selectedElementIds.length > 0 ? 'elements' : 'slide');
       }
       return nextProject;
     });
@@ -1616,6 +1620,7 @@ export function useEditorViewModel(services: AppServices) {
     clearBackgroundPreview();
     clearBackgroundPreparation();
     clearBackgroundSelectionPoints();
+    setSelectionTarget('elements');
     setSelectedElementIds((currentSelection) => {
       if (!options?.additive) return [elementId];
       if (currentSelection.includes(elementId)) {
@@ -1637,6 +1642,7 @@ export function useEditorViewModel(services: AppServices) {
     clearBackgroundPreview();
     clearBackgroundPreparation();
     clearBackgroundSelectionPoints();
+    setSelectionTarget('elements');
     setSelectedElementIds(selectableElementIds);
   }
 
@@ -1646,6 +1652,27 @@ export function useEditorViewModel(services: AppServices) {
     clearBackgroundPreview();
     clearBackgroundPreparation();
     clearBackgroundSelectionPoints();
+    setSelectionTarget('presentation');
+    setSelectedElementIds([]);
+  }
+
+  function selectSlideBackground() {
+    setBackgroundSelectionMode(false);
+    setBackgroundSelectionNotice(undefined);
+    clearBackgroundPreview();
+    clearBackgroundPreparation();
+    clearBackgroundSelectionPoints();
+    setSelectionTarget('slide');
+    setSelectedElementIds([]);
+  }
+
+  function selectPresentation() {
+    setBackgroundSelectionMode(false);
+    setBackgroundSelectionNotice(undefined);
+    clearBackgroundPreview();
+    clearBackgroundPreparation();
+    clearBackgroundSelectionPoints();
+    setSelectionTarget('presentation');
     setSelectedElementIds([]);
   }
 
@@ -2458,6 +2485,52 @@ export function useEditorViewModel(services: AppServices) {
       new basicCommands.UpdatePageBackgroundCommand(activePageId, background).execute(
         currentProject,
       ),
+    );
+  }
+
+  function applyTheme(themeId: string) {
+    commitProject((currentProject) =>
+      new basicCommands.ApplyThemeCommand(themeId).execute(currentProject),
+    );
+  }
+
+  function editTheme(themeId: string) {
+    const theme = projectRef.current.themes?.[themeId];
+    if (!theme) return;
+    commitProject((currentProject) => new basicCommands.EditThemeCommand(theme).execute(currentProject));
+  }
+
+  function changeTheme() {
+    const themeId = projectRef.current.themeId ?? Object.keys(projectRef.current.themes ?? {})[0];
+    if (!themeId) return;
+    applyTheme(themeId);
+  }
+
+  function applySlideLayout(pageId: string, layoutId: string) {
+    commitProject((currentProject) =>
+      new basicCommands.ApplySlideLayoutCommand(pageId, layoutId).execute(currentProject),
+    );
+  }
+
+  function editSlideLayout(layoutId: string) {
+    const layout = projectRef.current.slideLayouts?.[layoutId];
+    if (!layout) return;
+    commitProject((currentProject) =>
+      new basicCommands.EditSlideLayoutCommand(layout).execute(currentProject),
+    );
+  }
+
+  function toggleSlideLayoutPlaceholder(
+    layoutId: string,
+    role: 'body' | 'footer' | 'slideNumber' | 'title',
+    visible: boolean,
+  ) {
+    commitProject((currentProject) =>
+      new basicCommands.ToggleSlideLayoutPlaceholderVisibilityCommand(
+        layoutId,
+        role,
+        visible,
+      ).execute(currentProject),
     );
   }
 
@@ -4214,6 +4287,8 @@ export function useEditorViewModel(services: AppServices) {
     selectElement,
     selectAllElementsOnActivePage,
     clearSelection,
+    selectSlideBackground,
+    selectPresentation,
     selectPage,
     activateScrolledPage,
     addPage,
@@ -4252,6 +4327,12 @@ export function useEditorViewModel(services: AppServices) {
     downloadFontForSelection,
     updateMediaPlayback,
     updatePageBackground,
+    applyTheme,
+    editTheme,
+    changeTheme,
+    applySlideLayout,
+    editSlideLayout,
+    toggleSlideLayoutPlaceholder,
     clearPageTransition,
     setPageTransition,
     setElementAnimationBuilds,

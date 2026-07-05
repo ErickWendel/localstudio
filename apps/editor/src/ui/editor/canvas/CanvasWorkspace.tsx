@@ -106,6 +106,8 @@ interface CanvasWorkspaceProps {
   onInsertMedia?: (() => void) | undefined;
   onInsertText?: (() => void) | undefined;
   onOpenAnimations?: (() => void) | undefined;
+  onSelectPresentation?: (() => void) | undefined;
+  onSelectSlide?: (() => void) | undefined;
   onSelectElement?: ((elementId: string, options?: { additive?: boolean }) => void) | undefined;
   onSendSelectedElementBackward?: (() => void) | undefined;
   onTranslateSelectedText?: (() => void) | undefined;
@@ -477,13 +479,14 @@ export function CanvasWorkspace({
   onBackgroundSubjectPick,
   onBringSelectedElementForward,
   onCancelBackgroundSelection,
-  onClearSelection,
   onDeleteSelectedElement,
   onDuplicateSelectedElement,
   onFlipSelectedImage,
   onInsertMedia,
   onInsertText,
   onOpenAnimations,
+  onSelectPresentation,
+  onSelectSlide,
   onSelectElement,
   onSendSelectedElementBackward,
   onTranslateSelectedText,
@@ -1061,11 +1064,16 @@ export function CanvasWorkspace({
       finishCropMode();
       return;
     }
-    onClearSelection?.();
+    onSelectSlide?.();
   }
 
   return (
-    <div className="canvas-workspace ew-viewport-stage">
+    <div
+      className="canvas-workspace ew-viewport-stage"
+      onPointerDown={(event) => {
+        if (event.target === event.currentTarget) onSelectPresentation?.();
+      }}
+    >
       <div
         className="canvas-frame neon-border"
         aria-label={canvasLabel}
