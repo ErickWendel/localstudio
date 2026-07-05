@@ -44,7 +44,11 @@ class MockFileHandle {
 }
 
 class MockDirectoryHandle {
-  constructor(readonly name = 'LocalStudio Project') {}
+  constructor(
+    readonly name = 'LocalStudio Project',
+    private readonly permissionState: PermissionState = 'granted',
+    private readonly childPermissionState: PermissionState = permissionState,
+  ) {}
 
   readonly files = new Map<string, string | Blob>();
   readonly directories = new Map<string, MockDirectoryHandle>();
@@ -59,17 +63,20 @@ class MockDirectoryHandle {
   getDirectoryHandle(name: string, options?: { create?: boolean }): Promise<MockDirectoryHandle> {
     if (!this.directories.has(name)) {
       if (!options?.create) throw new DOMException('Not found', 'NotFoundError');
-      this.directories.set(name, new MockDirectoryHandle(name));
+      this.directories.set(
+        name,
+        new MockDirectoryHandle(name, this.childPermissionState, this.childPermissionState),
+      );
     }
     return Promise.resolve(this.directories.get(name)!);
   }
 
   queryPermission(): Promise<PermissionState> {
-    return Promise.resolve('granted');
+    return Promise.resolve(this.permissionState);
   }
 
   requestPermission(): Promise<PermissionState> {
-    return Promise.resolve('granted');
+    return Promise.resolve(this.permissionState);
   }
 
   removeEntry(name: string): Promise<void> {
@@ -144,6 +151,23 @@ describe('BrowserFileSystemProjectRepository', () => {
 
   it('creates a named child project folder during initial persistence setup', async () => {
     const parentDirectory = new MockDirectoryHandle('Projects');
+    const repository = new BrowserFileSystemProjectRepository({
+      pickDirectory: () => Promise.resolve(parentDirectory as unknown as FileSystemDirectoryHandle),
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
+    });
+    const project = { ...sampleProject.createSampleProject(), name: 'Launch Deck' };
+
+    await repository.saveProject(project, { projectDirectoryName: 'Launch Deck' });
+
+    const projectDirectory = parentDirectory.directories.get('Launch Deck')!;
+    expect(projectDirectory).toBeDefined();
+    expect(JSON.parse(await readMockText(projectDirectory.files.get('project.json')!))).toMatchObject({
+      name: 'Launch Deck',
+    });
+  });
+
+  it('uses the picked parent permission when creating the named project folder', async () => {
+    const parentDirectory = new MockDirectoryHandle('Projects', 'granted', 'denied');
     const repository = new BrowserFileSystemProjectRepository({
       pickDirectory: () => Promise.resolve(parentDirectory as unknown as FileSystemDirectoryHandle),
       recentProjectStore: new MemoryRecentProjectHandleStore(),
