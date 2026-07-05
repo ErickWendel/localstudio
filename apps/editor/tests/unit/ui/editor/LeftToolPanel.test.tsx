@@ -320,6 +320,51 @@ describe('LeftToolPanel', () => {
     expect(screen.getByRole('combobox', { name: 'Animation for Movie start' })).toHaveValue(
       'movie-start',
     );
+    const imageEffectSelect = screen.getByRole('combobox', {
+      name: 'Effect for Image',
+    });
+    expect(
+      Array.from(imageEffectSelect.querySelectorAll('optgroup')).map((group) =>
+        group.getAttribute('label'),
+      ),
+    ).toEqual(['Appear & Move', 'Flip, Spin & Scale']);
+    expect(
+      Array.from(imageEffectSelect.querySelectorAll('option')).map((option) => option.value),
+    ).toEqual([
+      'none',
+      'clothesline',
+      'confetti',
+      'dissolve',
+      'drop',
+      'droplet',
+      'fade-and-move',
+      'fade-through-color',
+      'grid',
+      'iris',
+      'move-in',
+      'push',
+      'radial-wipe',
+      'reveal',
+      'switch',
+      'wipe',
+      'blinds',
+      'color-planes',
+      'cube',
+      'doorway',
+      'fall',
+      'flip',
+      'flop',
+      'mosaic',
+      'page-flip',
+      'pivot',
+      'reflection',
+      'revolving-door',
+      'scale',
+      'swap',
+      'swoosh',
+      'twirl',
+      'twist',
+    ]);
     expect(screen.getByRole('listitem', { name: 'Build 2: AI Design Revolution' })).toHaveAttribute(
       'aria-current',
       'step',
@@ -439,6 +484,36 @@ describe('LeftToolPanel', () => {
     expect(onPlayAnimationPreview).toHaveBeenCalledTimes(1);
   });
 
+  it('uses longer default duration for heavier animation presets', async () => {
+    const user = userEvent.setup();
+    const onSetElementAnimationBuilds = vi.fn();
+
+    render(
+      <LeftToolPanel
+        activeTab="animations"
+        open
+        onTabChange={vi.fn()}
+        project={sampleProject.createSampleProject()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
+        modelStates={modelStates}
+        onSetElementAnimationBuilds={onSetElementAnimationBuilds}
+      />,
+    );
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'New object animation effect' }),
+      'confetti',
+    );
+    await user.click(screen.getByRole('button', { name: 'Add animation' }));
+
+    expect(onSetElementAnimationBuilds).toHaveBeenCalledWith(['image-hero'], {
+      effect: 'confetti',
+      trigger: 'on-click',
+      delayMs: 700,
+    });
+  });
+
   it('applies reveal to selected elements from the whole-slide animation view', async () => {
     const user = userEvent.setup();
     const onSetElementAnimationBuilds = vi.fn();
@@ -466,6 +541,7 @@ describe('LeftToolPanel', () => {
       effect: 'reveal',
       trigger: 'on-click',
       delayMs: 500,
+      direction: 'left',
     });
     expect(onPlayAnimationPreview).toHaveBeenCalledTimes(1);
   });
