@@ -827,7 +827,9 @@ describe('EditorShell', () => {
     await openLeftTab(user, 'Elements');
 
     expect(await screen.findByText('API Key is invalid')).toBeInTheDocument();
-    expect(screen.queryByText('Unsplash image search failed with 401 Unauthorized.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Unsplash image search failed with 401 Unauthorized.'),
+    ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Configure media integrations' }));
 
@@ -1295,7 +1297,10 @@ describe('EditorShell', () => {
     expect(importService.importCalls[0]?.file.name).toBe('deck.pptx');
 
     act(() => {
-      importService.resolveImport?.({ ...services.initialProject, name: 'Imported PowerPoint Deck' });
+      importService.resolveImport?.({
+        ...services.initialProject,
+        name: 'Imported PowerPoint Deck',
+      });
     });
 
     expect(
@@ -2020,10 +2025,12 @@ describe('EditorShell', () => {
       await Promise.resolve();
     });
 
-    expect(screen.queryByRole('region', { name: 'Remote control this presentation' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('region', { name: 'Remote control this presentation' }),
+    ).not.toBeInTheDocument();
   });
 
-  it('opens presenter view with an audience fullscreen prompt and closes the popup on fullscreen exit', async () => {
+  it('opens presenter view with an audience fullscreen prompt and keeps the remote session on fullscreen exit', async () => {
     const user = userEvent.setup();
     let fullscreenElement: Element | null = null;
     const popupClose = vi.fn();
@@ -2061,7 +2068,9 @@ describe('EditorShell', () => {
     expect(openWindow).toHaveBeenCalledTimes(1);
     expect(popup.location.href).toContain('presenter=1');
     expect(screen.getByRole('dialog', { name: 'Audience Window' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Remote control this presentation' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('region', { name: 'Remote control this presentation' }),
+    ).toBeInTheDocument();
     expect(await screen.findByRole('img', { name: 'Remote control QR code' })).toHaveAttribute(
       'src',
       expect.stringContaining('data:image/png'),
@@ -2071,7 +2080,9 @@ describe('EditorShell', () => {
 
     await user.click(screen.getByLabelText('Canvas workspace'));
 
-    expect(screen.queryByRole('region', { name: 'Remote control this presentation' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('region', { name: 'Remote control this presentation' }),
+    ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Enter full screen mode' }));
 
@@ -2084,9 +2095,7 @@ describe('EditorShell', () => {
     fullscreenElement = null;
     document.dispatchEvent(new Event('fullscreenchange'));
 
-    await waitFor(() => {
-      expect(popupClose).toHaveBeenCalledTimes(1);
-    });
+    expect(popupClose).not.toHaveBeenCalled();
   });
 
   it('hides page insert controls in fullscreen presenter mode and restores a clean editor state on exit', async () => {
@@ -2512,7 +2521,9 @@ describe('EditorShell', () => {
     expect(screen.getByText('Supported formats')).toBeInTheDocument();
     expect(screen.getByText('info')).toHaveClass('media-import-info-icon');
     expect(screen.getByText(/Video import supports MP4 and WebM files/)).toBeInTheDocument();
-    expect(screen.queryByRole('progressbar', { name: 'Media import progress' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('progressbar', { name: 'Media import progress' }),
+    ).not.toBeInTheDocument();
     expect(createObjectUrl).not.toHaveBeenCalled();
     expect(
       Object.values(repository.savedProjects.at(-1)?.assets ?? {}).some(
@@ -2798,9 +2809,7 @@ describe('EditorShell', () => {
     const user = userEvent.setup();
     const services = createAppServices();
     const translator = new RecordingTranslatorService();
-    translator.detectLanguage
-      .mockResolvedValueOnce('en')
-      .mockResolvedValueOnce('cy');
+    translator.detectLanguage.mockResolvedValueOnce('en').mockResolvedValueOnce('cy');
     translator.prepareTranslation.mockRejectedValueOnce(
       new Error('Chrome Built-in AI translation is not ready for cy to pt.'),
     );

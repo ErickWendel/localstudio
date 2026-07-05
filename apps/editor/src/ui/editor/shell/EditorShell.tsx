@@ -26,10 +26,7 @@ import { ScrollingCanvasWorkspace } from '../canvas/ScrollingCanvasWorkspace';
 import { SettingsPanel } from '../panels/SettingsPanel';
 import { TopToolbar } from '../toolbars/TopToolbar';
 import { VersionHistoryPanel } from '../panels/VersionHistoryPanel';
-import {
-  presentationMovieControls,
-  type MovieHoldState,
-} from '../media/presentationMovieControls';
+import { presentationMovieControls, type MovieHoldState } from '../media/presentationMovieControls';
 import { useEditorViewModel } from '../state/useEditorViewModel';
 import { SharePanel } from '../../share/SharePanel';
 import {
@@ -83,12 +80,20 @@ export function EditorShell({ services }: EditorShellProps) {
   const [slideNavigatorOpen, setSlideNavigatorOpen] = useState(false);
   const [slideNavigatorIndex, setSlideNavigatorIndex] = useState(0);
   const [presentationPaused, setPresentationPaused] = useState(false);
-  const [presentationBlankScreen, setPresentationBlankScreen] = useState<'black' | 'white' | undefined>();
+  const [presentationBlankScreen, setPresentationBlankScreen] = useState<
+    'black' | 'white' | undefined
+  >();
   const [presentationCursorHidden, setPresentationCursorHidden] = useState(false);
   const [slideNumberVisible, setSlideNumberVisible] = useState(false);
   const [presenterSessionId, setPresenterSessionId] = useState<string | undefined>();
-  const [presenterRemoteSession, setPresenterRemoteSession] = useState<PresenterRemoteSessionMetadata | undefined>();
+  const [presenterRemoteSession, setPresenterRemoteSession] = useState<
+    PresenterRemoteSessionMetadata | undefined
+  >();
   const [presenterRemotePanelOpen, setPresenterRemotePanelOpen] = useState(false);
+  const [presenterRemoteUnavailable, setPresenterRemoteUnavailable] = useState(false);
+  const [presenterRemoteStreamPeerId, setPresenterRemoteStreamPeerId] = useState<
+    string | undefined
+  >();
   const [remotePresenterActive, setRemotePresenterActive] = useState(false);
   const [presenterViewError, setPresenterViewError] = useState<string | undefined>();
   const [sharePanelOpen, setSharePanelOpen] = useState(false);
@@ -163,6 +168,8 @@ export function EditorShell({ services }: EditorShellProps) {
     setAudienceFullscreenPromptOpen(false);
     setPresenterRemoteSession(undefined);
     setPresenterRemotePanelOpen(false);
+    setPresenterRemoteUnavailable(false);
+    setPresenterRemoteStreamPeerId(undefined);
     setRemotePresenterActive(false);
     setPresenterSessionId(undefined);
   }
@@ -178,6 +185,7 @@ export function EditorShell({ services }: EditorShellProps) {
       return;
     }
     setPresenterViewError(undefined);
+    setPresenterRemoteUnavailable(false);
     setRemotePresenterActive(true);
     setPresenterSessionId(result.sessionId);
     setPresenterRemotePanelOpen(true);
@@ -193,7 +201,15 @@ export function EditorShell({ services }: EditorShellProps) {
           animationPreview: vm.animationPreview,
           presenterMode: 'presenting',
           project: vm.project,
+          streamPeerId: presenterRemoteStreamPeerId,
         });
+      })
+      .catch(() => {
+        setPresenterRemoteUnavailable(true);
+        setPresenterRemotePanelOpen(false);
+        setPresenterViewError(
+          'Remote control is unavailable on this host. Presenter view is still active.',
+        );
       });
     presenterFullscreenEnteredRef.current = false;
     setAudienceFullscreenPromptOpen(true);
@@ -204,26 +220,33 @@ export function EditorShell({ services }: EditorShellProps) {
         animationPreview: vm.animationPreview,
         presenterMode: 'presenting',
         project: vm.project,
+        streamPeerId: presenterRemoteStreamPeerId,
       });
     }, 0);
-  }, [presenterSessionId, vm]);
+  }, [presenterRemoteStreamPeerId, presenterSessionId, vm]);
 
   function enterAudienceFullscreen() {
     setAudienceFullscreenPromptOpen(false);
     void vm.toggleFullscreen(workspaceRef.current);
   }
 
-  const playPresentationPageAt = useCallback((index: number) => {
-    const pageId = vm.project.pages[index]?.id;
-    if (!pageId) return false;
-    setSlideNavigatorIndex(index);
-    vm.playPresentationPreview(pageId);
-    return true;
-  }, [vm]);
+  const playPresentationPageAt = useCallback(
+    (index: number) => {
+      const pageId = vm.project.pages[index]?.id;
+      if (!pageId) return false;
+      setSlideNavigatorIndex(index);
+      vm.playPresentationPreview(pageId);
+      return true;
+    },
+    [vm],
+  );
 
-  const playRelativePresentationSlide = useCallback((offset: -1 | 1) => {
-    return playPresentationPageAt(activePageIndex + offset);
-  }, [activePageIndex, playPresentationPageAt]);
+  const playRelativePresentationSlide = useCallback(
+    (offset: -1 | 1) => {
+      return playPresentationPageAt(activePageIndex + offset);
+    },
+    [activePageIndex, playPresentationPageAt],
+  );
 
   function getPresentationVideos() {
     return Array.from(slideFrameRef.current?.querySelectorAll('video') ?? []);
@@ -467,10 +490,7 @@ export function EditorShell({ services }: EditorShellProps) {
           return;
         }
       }
-      if (
-        isPreviewNavigationActive &&
-        !isEditableTarget
-      ) {
+      if (isPreviewNavigationActive && !isEditableTarget) {
         const lowerKey = event.key.toLowerCase();
         if (event.key === '?' || (event.key === '/' && event.shiftKey)) {
           event.preventDefault();
@@ -562,9 +582,7 @@ export function EditorShell({ services }: EditorShellProps) {
           event.key === ' ' ||
           event.key === 'Enter';
         const isPreviousPreviewKey =
-          event.key === 'ArrowLeft' ||
-          event.key === 'ArrowUp' ||
-          event.key === 'PageUp';
+          event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'PageUp';
         if (event.key === '[') {
           event.preventDefault();
           vm.rewindPresentationPreview();
@@ -631,6 +649,7 @@ export function EditorShell({ services }: EditorShellProps) {
   useEffect(() => {
     const pageId = vm.activePageId;
     if (!pageId) return undefined;
+    if (presenterRemoteUnavailable) return undefined;
     let cancelled = false;
     const service = getPresenterSessionService();
     void service
@@ -646,15 +665,29 @@ export function EditorShell({ services }: EditorShellProps) {
           animationPreview: vm.animationPreview,
           presenterMode: presenterSessionId || remotePresenterActive ? 'presenting' : 'ready',
           project: vm.project,
+          streamPeerId: presenterRemoteStreamPeerId,
         });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setPresenterRemoteUnavailable(true);
+        setPresenterRemotePanelOpen(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [presenterSessionId, remotePresenterActive, vm.activePageId, vm.animationPreview, vm.project]);
+  }, [
+    presenterRemoteStreamPeerId,
+    presenterRemoteUnavailable,
+    presenterSessionId,
+    remotePresenterActive,
+    vm.activePageId,
+    vm.animationPreview,
+    vm.project,
+  ]);
 
   useEffect(() => {
-    if (!presenterRemoteSession) return undefined;
+    if (!presenterRemoteSession && !presenterSessionId) return undefined;
     return getPresenterSessionService().subscribeToCommands((message) => {
       if (message.command === 'start-presenting') {
         const firstPageId = vm.project.pages[0]?.id ?? vm.activePageId;
@@ -668,6 +701,7 @@ export function EditorShell({ services }: EditorShellProps) {
           animationPreview: vm.animationPreview,
           presenterMode: 'presenting',
           project: vm.project,
+          streamPeerId: presenterRemoteStreamPeerId,
         });
         return;
       }
@@ -690,12 +724,17 @@ export function EditorShell({ services }: EditorShellProps) {
         vm.updatePageSpeakerNotes(message.pageId, message.notes);
         return;
       }
+      if (message.command === 'update-stream-peer') {
+        setPresenterRemoteStreamPeerId(message.peerId);
+        return;
+      }
       if (message.command === 'request-state') {
         getPresenterSessionService().publishState({
           activePageId: vm.activePageId,
           animationPreview: vm.animationPreview,
           presenterMode: presenterSessionId || remotePresenterActive ? 'presenting' : 'ready',
           project: vm.project,
+          streamPeerId: presenterRemoteStreamPeerId,
         });
         return;
       }
@@ -703,7 +742,14 @@ export function EditorShell({ services }: EditorShellProps) {
         closePresenterViewSession();
       }
     });
-  }, [advancePresentationPreviewFromUserAction, presenterRemoteSession, presenterSessionId, remotePresenterActive, vm]);
+  }, [
+    advancePresentationPreviewFromUserAction,
+    presenterRemoteSession,
+    presenterRemoteStreamPeerId,
+    presenterSessionId,
+    remotePresenterActive,
+    vm,
+  ]);
 
   useEffect(() => {
     if (!presenterSessionId) {
@@ -714,8 +760,12 @@ export function EditorShell({ services }: EditorShellProps) {
       presenterFullscreenEnteredRef.current = true;
       return;
     }
-    if (presenterFullscreenEnteredRef.current) closePresenterViewSession();
-  }, [presenterSessionId, vm.isFullscreen]);
+    if (presenterFullscreenEnteredRef.current) {
+      presenterFullscreenEnteredRef.current = false;
+      if (presenterRemoteSession) return;
+      queueMicrotask(closePresenterViewSession);
+    }
+  }, [presenterRemoteSession, presenterSessionId, vm.isFullscreen]);
 
   useEffect(() => {
     if (!presenterRemoteSession) return;
@@ -724,8 +774,17 @@ export function EditorShell({ services }: EditorShellProps) {
       animationPreview: vm.animationPreview,
       presenterMode: presenterSessionId || remotePresenterActive ? 'presenting' : 'ready',
       project: vm.project,
+      streamPeerId: presenterRemoteStreamPeerId,
     });
-  }, [presenterRemoteSession, presenterSessionId, remotePresenterActive, vm.activePageId, vm.animationPreview, vm.project]);
+  }, [
+    presenterRemoteSession,
+    presenterRemoteStreamPeerId,
+    presenterSessionId,
+    remotePresenterActive,
+    vm.activePageId,
+    vm.animationPreview,
+    vm.project,
+  ]);
 
   useEffect(() => {
     if (!presenterRemotePanelOpen) return;
@@ -1094,7 +1153,12 @@ export function EditorShell({ services }: EditorShellProps) {
             />
           ) : null}
           {slideNavigatorOpen ? (
-            <div className="presentation-slide-navigator" role="dialog" aria-modal="true" aria-label="Slide navigator">
+            <div
+              className="presentation-slide-navigator"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Slide navigator"
+            >
               <div className="presentation-slide-navigator-header">
                 <h2>Slide Navigator</h2>
                 <button
@@ -1299,7 +1363,9 @@ export function EditorShell({ services }: EditorShellProps) {
                       vm.updatePageSpeakerNotes(activePage.id, event.target.value)
                     }
                   />
-                  <span className="speaker-notes-count">{activePage.speakerNotes?.length ?? 0}/5000</span>
+                  <span className="speaker-notes-count">
+                    {activePage.speakerNotes?.length ?? 0}/5000
+                  </span>
                 </div>
               ) : null}
             </section>
@@ -1334,8 +1400,8 @@ export function EditorShell({ services }: EditorShellProps) {
                 </button>
                 <h2 id="audience-fullscreen-title">Audience Window</h2>
                 <p>
-                  This window is what your audience sees. Drag it to the screen your
-                  audience will be looking at and enter full screen mode.
+                  This window is what your audience sees. Drag it to the screen your audience will
+                  be looking at and enter full screen mode.
                 </p>
                 <button
                   className="audience-fullscreen-primary"

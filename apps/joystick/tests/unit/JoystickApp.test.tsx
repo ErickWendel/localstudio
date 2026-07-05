@@ -1,38 +1,82 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JoystickApp } from '../../src/app/JoystickApp';
 import { InMemoryPresenterRemoteSignalingService } from '@localstudio/presenter-remote/signaling-service';
+import type {
+  PresenterRemotePreviewBatch,
+  PresenterRemoteState,
+} from '@localstudio/presenter-remote/protocol';
 
-const streamReceiverMock = vi.hoisted(() => ({
+const peerControlClientMock = vi.hoisted(() => ({
+  instances: [] as Array<{
+    close: ReturnType<typeof vi.fn>;
+    emitPreviewBatch: (batch: PresenterRemotePreviewBatch) => void;
+    emitState: (state: PresenterRemoteState) => void;
+    emitStatus: (status: 'connected' | 'connecting' | 'failed') => void;
+    sendCommand: ReturnType<typeof vi.fn>;
+    start: ReturnType<typeof vi.fn>;
+  }>,
+  create: vi.fn(function MockPresenterRemotePeerControlClient(
+    this: unknown,
+    options: {
+      onPreviewBatch?: (batch: PresenterRemotePreviewBatch) => void;
+      onState: (state: PresenterRemoteState) => void;
+      onStatusChange?: (status: 'connected' | 'connecting' | 'failed') => void;
+      presenterPeerId: string;
+    },
+  ) {
+    const client = {
+      close: vi.fn(),
+      emitPreviewBatch: (batch: PresenterRemotePreviewBatch) => options.onPreviewBatch?.(batch),
+      emitState: (state: PresenterRemoteState) => options.onState(state),
+      emitStatus: (status: 'connected' | 'connecting' | 'failed') =>
+        options.onStatusChange?.(status),
+      sendCommand: vi.fn(() => true),
+      start: vi.fn(() => {
+        options.onStatusChange?.('connected');
+        return Promise.resolve();
+      }),
+    };
+    peerControlClientMock.instances.push(client);
+    return client;
+  }),
+}));
+
+const peerStreamReceiverMock = vi.hoisted(() => ({
   latestReceiver: undefined as
     | {
-        sendCommand: ReturnType<typeof vi.fn>;
-        sendStreamPreference: ReturnType<typeof vi.fn>;
+        emitStatus: (status: 'connected' | 'connecting' | 'failed') => void;
+        emitStream: (stream: MediaStream | undefined) => void;
         start: ReturnType<typeof vi.fn>;
         stop: ReturnType<typeof vi.fn>;
       }
     | undefined,
-  create: vi.fn((options: {
-    onStatusChange: (status: 'connected') => void;
-    onStream: (stream: MediaStream | undefined) => void;
-  }) => {
+  create: vi.fn(function MockPresenterRemotePeerStreamReceiver(
+    this: unknown,
+    options: {
+      onStatusChange: (status: 'connected' | 'connecting' | 'failed') => void;
+      onStream: (stream: MediaStream | undefined) => void;
+      streamPeerId: string;
+    },
+  ) {
     const receiver = {
-      sendCommand: vi.fn(() => true),
-      sendStreamPreference: vi.fn(() => true),
-      start: vi.fn(() => {
-        options.onStream({} as MediaStream);
-        options.onStatusChange('connected');
-      }),
+      emitStatus: (status: 'connected' | 'connecting' | 'failed') => options.onStatusChange(status),
+      emitStream: (stream: MediaStream | undefined) => options.onStream(stream),
+      start: vi.fn(() => Promise.resolve()),
       stop: vi.fn(),
     };
-    streamReceiverMock.latestReceiver = receiver;
+    peerStreamReceiverMock.latestReceiver = receiver;
     return receiver;
   }),
 }));
 
-vi.mock('../../src/app/presenterRemoteStreamReceiver', () => ({
-  presenterRemoteStreamReceiver: streamReceiverMock,
+vi.mock('@localstudio/presenter-remote/peer-control-client', () => ({
+  PresenterRemotePeerControlClient: peerControlClientMock.create,
+}));
+
+vi.mock('@localstudio/presenter-remote/peer-stream-receiver', () => ({
+  PresenterRemotePeerStreamReceiver: peerStreamReceiverMock.create,
 }));
 
 const localStorageDescriptor = Object.getOwnPropertyDescriptor(window, 'localStorage');
@@ -86,8 +130,10 @@ describe('JoystickApp', () => {
   beforeEach(() => {
     restoreLocalStorage();
     getTestLocalStorage().clear();
-    streamReceiverMock.create.mockClear();
-    streamReceiverMock.latestReceiver = undefined;
+    peerControlClientMock.create.mockClear();
+    peerControlClientMock.instances.length = 0;
+    peerStreamReceiverMock.create.mockClear();
+    peerStreamReceiverMock.latestReceiver = undefined;
   });
 
   afterEach(() => {
@@ -187,11 +233,13 @@ describe('JoystickApp', () => {
 
     expect(await screen.findByLabelText('Connected (1)')).toBeInTheDocument();
     expect(getTestLocalStorage().getItem('localstudio.joystick.lastCode')).toBe('ABCD-1234');
-    expect(JSON.parse(getTestLocalStorage().getItem('localstudio.joystick.approvedCodes') ?? '[]')).toEqual([
-      'ABCD-1234',
-    ]);
     expect(
-      JSON.parse(getTestLocalStorage().getItem('localstudio.joystick.trustedPresenterDeviceIds') ?? '[]'),
+      JSON.parse(getTestLocalStorage().getItem('localstudio.joystick.approvedCodes') ?? '[]'),
+    ).toEqual(['ABCD-1234']);
+    expect(
+      JSON.parse(
+        getTestLocalStorage().getItem('localstudio.joystick.trustedPresenterDeviceIds') ?? '[]',
+      ),
     ).toEqual(['presenter-macbook']);
   });
 
@@ -219,7 +267,10 @@ describe('JoystickApp', () => {
       type: 'state',
     });
     getTestLocalStorage().setItem('localstudio.joystick.lastCode', 'ABCD-1234');
-    getTestLocalStorage().setItem('localstudio.joystick.approvedCodes', JSON.stringify(['ABCD-1234']));
+    getTestLocalStorage().setItem(
+      'localstudio.joystick.approvedCodes',
+      JSON.stringify(['ABCD-1234']),
+    );
     getTestLocalStorage().setItem(
       'localstudio.joystick.trustedPresenterDeviceIds',
       JSON.stringify(['presenter-macbook']),
@@ -231,13 +282,12 @@ describe('JoystickApp', () => {
 
     expect(await screen.findByText('Current: Slide 1 of 1')).toBeInTheDocument();
     expect(getTestLocalStorage().getItem('localstudio.joystick.lastCode')).toBe('EFGH-5678');
-    expect(JSON.parse(getTestLocalStorage().getItem('localstudio.joystick.approvedCodes') ?? '[]')).toEqual([
-      'EFGH-5678',
-      'ABCD-1234',
-    ]);
+    expect(
+      JSON.parse(getTestLocalStorage().getItem('localstudio.joystick.approvedCodes') ?? '[]'),
+    ).toEqual(['EFGH-5678', 'ABCD-1234']);
   });
 
-  it('requires a code even when one presentation is active if the phone is not paired', async () => {
+  it('requires a remote link even when one legacy presentation is active if the phone is not paired', async () => {
     const service = new InMemoryPresenterRemoteSignalingService({
       randomCode: () => 'ABCD-1234',
       randomId: () => 'session-1',
@@ -249,12 +299,12 @@ describe('JoystickApp', () => {
     );
 
     expect(
-      await screen.findByText('Enter the code shown on the presenter screen.'),
+      await screen.findByText('Open the presenter remote link or paste its peer id.'),
     ).toBeInTheDocument();
     expect(screen.queryByText('MacBook Pro')).not.toBeInTheDocument();
   });
 
-  it('requires a code when multiple presentations are active', async () => {
+  it('requires a remote link when multiple legacy presentations are active', async () => {
     const codes = ['ABCD-1234', 'EFGH-5678'];
     const ids = ['session-1', 'session-2'];
     const service = new InMemoryPresenterRemoteSignalingService({
@@ -269,7 +319,7 @@ describe('JoystickApp', () => {
     );
 
     expect(
-      await screen.findByText('Enter the code shown on the presenter screen.'),
+      await screen.findByText('Open the presenter remote link or paste its peer id.'),
     ).toBeInTheDocument();
     expect(screen.queryByText('MacBook Pro')).not.toBeInTheDocument();
   });
@@ -315,90 +365,275 @@ describe('JoystickApp', () => {
     ]);
   });
 
-  it('sends slide jump commands through the streamed data channel with signaling backup', async () => {
+  it('connects from a peer URL and sends slide commands over the PeerJS data connection', async () => {
     const user = userEvent.setup();
-    const service = new InMemoryPresenterRemoteSignalingService({
-      randomCode: () => 'ABCD-1234',
-      randomId: () => 'session-1',
-    });
-    service.registerSession({ presenterLabel: 'MacBook Pro', ttlMs: 60_000 });
-    service.publishState('ABCD-1234', {
-      activePageId: 'page-1',
-      activePageIndex: 0,
-      buildsRemaining: 0,
-      connectedControllerCount: 1,
-      deckName: 'Launch Deck',
-      notes: '',
-      pageCount: 2,
-      pages: [
-        { id: 'page-1', name: 'Intro' },
-        { id: 'page-2', name: 'Roadmap' },
-      ],
-      presenterMode: 'presenting',
-      previewMode: 'stream',
-      shortcuts: ['previous', 'next'],
-      stream: { enabled: true, fps: 8, height: 340, width: 390 },
-      timer: { elapsedMs: 0, paused: false },
-      type: 'state',
+    render(<JoystickApp initialUrl="https://localstudio.test/joystick?peer=control-peer-1" />);
+    const client = peerControlClientMock.instances[0];
+    expect(client).toBeDefined();
+
+    act(() => {
+      client?.emitState({
+        activePageId: 'page-1',
+        activePageIndex: 0,
+        buildsRemaining: 0,
+        connectedControllerCount: 1,
+        deckName: 'Launch Deck',
+        notes: '',
+        pageCount: 2,
+        pages: [
+          { id: 'page-1', name: 'Intro' },
+          { id: 'page-2', name: 'Roadmap' },
+        ],
+        presenterMode: 'presenting',
+        shortcuts: ['previous', 'next'],
+        timer: { elapsedMs: 0, paused: false },
+        type: 'state',
+      });
     });
 
-    render(
-      <JoystickApp
-        initialUrl="https://localstudio.test/joystick?code=ABCD-1234"
-        signalingService={service}
-      />,
-    );
-
-    const preview = await screen.findByRole('button', { name: 'Presenter stream preview' });
+    const preview = await screen.findByRole('button', { name: 'Current slide preview' });
     await user.click(preview);
 
-    expect(streamReceiverMock.latestReceiver?.sendCommand).toHaveBeenCalledWith(
-      { command: 'go-to-page', pageId: 'page-2', type: 'command' },
-    );
-    expect(service.takeCommands('ABCD-1234')).toEqual([
-      { command: 'go-to-page', pageId: 'page-2', type: 'command' },
-    ]);
+    expect(client?.sendCommand).toHaveBeenCalledWith({
+      command: 'go-to-page',
+      pageId: 'page-2',
+      type: 'command',
+    });
+    expect(screen.getByText('Command sent: go-to-page')).toBeInTheDocument();
   });
 
-  it('falls back to signaling commands when the streamed data channel is unavailable', async () => {
-    const user = userEvent.setup();
-    const service = new InMemoryPresenterRemoteSignalingService({
-      randomCode: () => 'ABCD-1234',
-      randomId: () => 'session-1',
+  it('requests PeerJS previews in batches and applies incoming preview batches', async () => {
+    render(<JoystickApp initialUrl="https://localstudio.test/joystick?peer=control-peer-1" />);
+    const client = peerControlClientMock.instances[0];
+    expect(client).toBeDefined();
+
+    act(() => {
+      client?.emitState({
+        activePageId: 'page-1',
+        activePageIndex: 0,
+        buildsRemaining: 0,
+        connectedControllerCount: 1,
+        deckName: 'Launch Deck',
+        notes: '',
+        pageCount: 6,
+        pages: [
+          { id: 'page-1', name: 'Intro' },
+          { id: 'page-2', name: 'Roadmap' },
+          { id: 'page-3', name: 'Demo' },
+          { id: 'page-4', name: 'Pricing' },
+          { id: 'page-5', name: 'Close' },
+          { id: 'page-6', name: 'Appendix' },
+        ],
+        presenterMode: 'presenting',
+        shortcuts: ['previous', 'next'],
+        timer: { elapsedMs: 0, paused: false },
+        type: 'state',
+      });
     });
-    service.registerSession({ presenterLabel: 'MacBook Pro', ttlMs: 60_000 });
-    service.publishState('ABCD-1234', {
-      activePageId: 'page-1',
-      activePageIndex: 0,
-      buildsRemaining: 0,
-      connectedControllerCount: 1,
-      deckName: 'Launch Deck',
-      notes: '',
-      pageCount: 2,
-      pages: [
-        { id: 'page-1', name: 'Intro' },
-        { id: 'page-2', name: 'Roadmap' },
-      ],
-      presenterMode: 'presenting',
-      previewMode: 'stream',
-      shortcuts: ['previous', 'next'],
-      stream: { enabled: true, fps: 8, height: 340, width: 390 },
-      timer: { elapsedMs: 0, paused: false },
-      type: 'state',
-    });
 
-    render(<JoystickApp initialUrl="https://localstudio.test/joystick?code=ABCD-1234" signalingService={service} />);
-
-    const preview = await screen.findByRole('button', { name: 'Presenter stream preview' });
-    streamReceiverMock.latestReceiver?.sendCommand.mockReturnValue(false);
-    await user.click(preview);
-
-    expect(streamReceiverMock.latestReceiver?.sendCommand).toHaveBeenCalledWith(
-      { command: 'go-to-page', pageId: 'page-2', type: 'command' },
+    await waitFor(() =>
+      expect(client?.sendCommand).toHaveBeenCalledWith({
+        command: 'request-previews',
+        pageIds: ['page-2', 'page-3', 'page-4', 'page-5', 'page-6'],
+        requestId: 'Launch Deck:page-2,page-3,page-4,page-5,page-6',
+        type: 'command',
+      }),
     );
-    expect(service.takeCommands('ABCD-1234')).toEqual([
-      { command: 'go-to-page', pageId: 'page-2', type: 'command' },
-    ]);
+
+    act(() => {
+      client?.emitPreviewBatch({
+        previews: [
+          {
+            id: 'page-1',
+            name: 'Intro',
+            preview: {
+              backgroundColor: '#000000',
+              elements: [
+                {
+                  align: 'left',
+                  fill: '#ffffff',
+                  fontFamily: 'Inter',
+                  fontSize: 48,
+                  fontWeight: 700,
+                  height: 100,
+                  id: 'title',
+                  kind: 'text',
+                  opacity: 1,
+                  rotation: 0,
+                  text: 'Preview loaded',
+                  width: 800,
+                  x: 0,
+                  y: 0,
+                },
+              ],
+              height: 1080,
+              width: 1920,
+            },
+          },
+        ],
+        requestId: 'Launch Deck:page-1,page-2,page-3,page-4,page-5',
+        type: 'preview-batch',
+      });
+    });
+
+    expect(await screen.findByText('Preview loaded')).toBeInTheDocument();
+  });
+
+  it('shows the PeerJS data connection as connected before the first presenter state arrives', async () => {
+    render(<JoystickApp initialUrl="https://localstudio.test/joystick?peer=control-peer-1" />);
+
+    expect(await screen.findByLabelText('Connected (1)')).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        'Could not connect to that presenter. Check the remote link and try again.',
+      ),
+    ).toBeNull();
+  });
+
+  it('starts a PeerJS media receiver when presenter state includes a stream peer', async () => {
+    const user = userEvent.setup();
+    render(<JoystickApp initialUrl="https://localstudio.test/joystick?peer=control-peer-1" />);
+    const client = peerControlClientMock.instances[0];
+    expect(client).toBeDefined();
+
+    act(() => {
+      client?.emitState({
+        activePageId: 'page-1',
+        activePageIndex: 0,
+        buildsRemaining: 0,
+        connectedControllerCount: 1,
+        deckName: 'Launch Deck',
+        notes: '',
+        pageCount: 2,
+        pages: [
+          { id: 'page-1', name: 'Intro' },
+          { id: 'page-2', name: 'Roadmap' },
+        ],
+        presenterMode: 'presenting',
+        previewMode: 'stream',
+        shortcuts: ['previous', 'next'],
+        stream: {
+          enabled: true,
+          fps: 8,
+          height: 340,
+          peerId: 'stream-peer-1',
+          transport: 'peerjs',
+          width: 390,
+        },
+        timer: { elapsedMs: 0, paused: false },
+        type: 'state',
+      });
+    });
+
+    expect(
+      await screen.findByRole('button', { name: 'Current slide preview' }),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(peerStreamReceiverMock.create).toHaveBeenCalledWith(
+        expect.objectContaining({ streamPeerId: 'stream-peer-1' }),
+      ),
+    );
+
+    act(() => {
+      peerStreamReceiverMock.latestReceiver?.emitStream({} as MediaStream);
+      peerStreamReceiverMock.latestReceiver?.emitStatus('connected');
+    });
+    await user.click(await screen.findByRole('button', { name: 'Presenter stream preview' }));
+
+    expect(client?.sendCommand).toHaveBeenCalledWith({
+      command: 'go-to-page',
+      pageId: 'page-2',
+      type: 'command',
+    });
+  });
+
+  it('keeps the structured slide visible when stream autoplay is blocked', async () => {
+    const playSpy = vi
+      .spyOn(HTMLMediaElement.prototype, 'play')
+      .mockRejectedValue(new Error('Autoplay blocked'));
+    render(<JoystickApp initialUrl="https://localstudio.test/joystick?peer=control-peer-1" />);
+    const client = peerControlClientMock.instances[0];
+    expect(client).toBeDefined();
+
+    act(() => {
+      client?.emitState({
+        activePageId: 'page-1',
+        activePageIndex: 0,
+        buildsRemaining: 0,
+        connectedControllerCount: 1,
+        deckName: 'Launch Deck',
+        notes: '',
+        pageCount: 2,
+        pages: [
+          { id: 'page-1', name: 'Intro' },
+          { id: 'page-2', name: 'Roadmap' },
+        ],
+        presenterMode: 'presenting',
+        previewMode: 'stream',
+        shortcuts: ['previous', 'next'],
+        slidePreview: {
+          backgroundColor: '#050d10',
+          elements: [
+            {
+              align: 'center',
+              fill: '#ffffff',
+              fontFamily: 'Inter',
+              fontSize: 96,
+              fontWeight: 800,
+              height: 160,
+              id: 'title',
+              kind: 'text',
+              opacity: 1,
+              rotation: 0,
+              text: 'Autoplay fallback slide',
+              width: 1200,
+              x: 360,
+              y: 420,
+            },
+          ],
+          height: 1080,
+          width: 1920,
+        },
+        stream: {
+          enabled: true,
+          fps: 8,
+          height: 340,
+          peerId: 'stream-peer-1',
+          transport: 'peerjs',
+          width: 390,
+        },
+        timer: { elapsedMs: 0, paused: false },
+        type: 'state',
+      });
+    });
+
+    act(() => {
+      peerStreamReceiverMock.latestReceiver?.emitStream({} as MediaStream);
+      peerStreamReceiverMock.latestReceiver?.emitStatus('connected');
+    });
+
+    expect(
+      await screen.findByRole('button', { name: 'Presenter stream preview' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Autoplay fallback slide')).toBeInTheDocument();
+    expect(playSpy).toHaveBeenCalled();
+    playSpy.mockRestore();
+  });
+
+  it('shows a retryable message after a PeerJS control error', async () => {
+    render(<JoystickApp initialUrl="https://localstudio.test/joystick?peer=control-peer-1" />);
+    const client = peerControlClientMock.instances[0];
+    expect(client).toBeDefined();
+
+    act(() => {
+      client?.emitStatus('failed');
+    });
+
+    expect(
+      await screen.findByText(
+        'Could not connect to that presenter. Check the remote link and try again.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('sends slide jump commands from horizontal swipes on the slide preview', async () => {
@@ -659,15 +894,9 @@ describe('JoystickApp', () => {
       'src',
       'https://cdn.localstudio.test/demo.mp4',
     );
-    expect(
-      screen.getByRole('button', { name: 'Go to upcoming slide 1: Budget' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Go to upcoming slide 2: Demo' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Go to upcoming slide 3: Close' }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Go to slide 3: Budget' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Go to slide 4: Demo' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Go to slide 5: Close' })).toBeInTheDocument();
     expect(screen.getByLabelText('Slide position')).toHaveTextContent('2 / 5');
     expect(screen.getByText('Talk through the launch timeline.')).toBeInTheDocument();
   });
@@ -732,7 +961,7 @@ describe('JoystickApp', () => {
       />,
     );
 
-    await user.click(await screen.findByRole('button', { name: 'Go to upcoming slide 3: Close' }));
+    await user.click(await screen.findByRole('button', { name: 'Go to slide 4: Close' }));
 
     expect(service.takeCommands('ABCD-1234')).toEqual([
       { command: 'go-to-page', pageId: 'page-4', type: 'command' },
@@ -803,7 +1032,11 @@ describe('JoystickApp', () => {
     expect(
       container.querySelectorAll('.joystick-slide-navigator-thumb .joystick-slide-canvas'),
     ).toHaveLength(3);
-    await user.click(screen.getByRole('button', { name: 'Go to slide 3: Budget' }));
+    await user.click(
+      within(screen.getByRole('dialog', { name: 'Slide navigation' })).getByRole('button', {
+        name: 'Go to slide 3: Budget',
+      }),
+    );
 
     expect(service.takeCommands('ABCD-1234')).toEqual([
       { command: 'go-to-page', pageId: 'page-3', type: 'command' },

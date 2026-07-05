@@ -4,6 +4,7 @@ export type PresenterRemoteCommand =
   | { command: 'next'; type: 'command' }
   | { command: 'pause-timer'; type: 'command' }
   | { command: 'previous'; type: 'command' }
+  | { command: 'request-previews'; pageIds: string[]; requestId?: string; type: 'command' }
   | { command: 'request-state'; type: 'command' }
   | { command: 'reset-timer'; type: 'command' }
   | { command: 'resume-timer'; type: 'command' }
@@ -98,6 +99,13 @@ export interface PresenterRemoteState {
   activePageId: string;
   activePageIndex: number;
   activePageName?: string | undefined;
+  builds?:
+    | {
+        current: number;
+        remaining: number;
+        total: number;
+      }
+    | undefined;
   buildsRemaining: number;
   commandAvailability?: string[] | undefined;
   connectedControllerCount: number;
@@ -116,6 +124,8 @@ export interface PresenterRemoteState {
         enabled: boolean;
         fps: number;
         height: number;
+        peerId?: string | undefined;
+        transport?: 'peerjs' | undefined;
         width: number;
       }
     | undefined;
@@ -124,6 +134,14 @@ export interface PresenterRemoteState {
   upcomingSlidePreviews?: PresenterRemoteUpcomingSlidePreview[] | undefined;
 }
 
+export interface PresenterRemotePreviewBatch {
+  previews: PresenterRemotePageSummary[];
+  requestId?: string | undefined;
+  type: 'preview-batch';
+}
+
+export type PresenterRemoteMessage = PresenterRemotePreviewBatch | PresenterRemoteState;
+
 export interface PresenterRemoteSession {
   code: string;
   connectedControllerCount: number;
@@ -131,6 +149,11 @@ export interface PresenterRemoteSession {
   presenterDeviceId: string;
   presenterLabel: string;
   sessionId: string;
+}
+
+export interface PresenterRemotePeerSession extends PresenterRemoteSession {
+  controlPeerId: string;
+  transport: 'peerjs';
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -147,6 +170,8 @@ function isStreamMetadata(value: unknown) {
     typeof value.enabled === 'boolean' &&
     typeof value.fps === 'number' &&
     typeof value.height === 'number' &&
+    (value.peerId === undefined || typeof value.peerId === 'string') &&
+    (value.transport === undefined || value.transport === 'peerjs') &&
     typeof value.width === 'number'
   );
 }
@@ -232,6 +257,13 @@ function isCommand(value: unknown): value is PresenterRemoteCommand {
     return true;
   }
   if (value.command === 'go-to-page') return typeof value.pageId === 'string';
+  if (value.command === 'request-previews') {
+    return (
+      Array.isArray(value.pageIds) &&
+      value.pageIds.every((pageId) => typeof pageId === 'string') &&
+      (value.requestId === undefined || typeof value.requestId === 'string')
+    );
+  }
   if (value.command === 'update-notes') {
     return typeof value.pageId === 'string' && typeof value.notes === 'string';
   }
@@ -264,6 +296,11 @@ function isState(value: unknown): value is PresenterRemoteState {
     typeof value.activePageId === 'string' &&
     typeof value.activePageIndex === 'number' &&
     (value.activePageName === undefined || typeof value.activePageName === 'string') &&
+    (value.builds === undefined ||
+      (isRecord(value.builds) &&
+        typeof value.builds.current === 'number' &&
+        typeof value.builds.remaining === 'number' &&
+        typeof value.builds.total === 'number')) &&
     typeof value.buildsRemaining === 'number' &&
     (value.commandAvailability === undefined || isStringArray(value.commandAvailability)) &&
     typeof value.connectedControllerCount === 'number' &&
@@ -291,6 +328,16 @@ function isState(value: unknown): value is PresenterRemoteState {
   );
 }
 
+function isPreviewBatch(value: unknown): value is PresenterRemotePreviewBatch {
+  return (
+    isRecord(value) &&
+    value.type === 'preview-batch' &&
+    Array.isArray(value.previews) &&
+    value.previews.every(isPageSummary) &&
+    (value.requestId === undefined || typeof value.requestId === 'string')
+  );
+}
+
 function isSession(value: unknown): value is PresenterRemoteSession {
   if (!isRecord(value)) return false;
   return (
@@ -305,6 +352,7 @@ function isSession(value: unknown): value is PresenterRemoteSession {
 
 export const presenterRemoteProtocol = {
   isCommand,
+  isPreviewBatch,
   isSession,
   isState,
   isStreamPreference,
