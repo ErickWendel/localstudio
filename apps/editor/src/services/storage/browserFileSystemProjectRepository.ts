@@ -339,10 +339,15 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     const requestedProjectDirectoryName =
       options?.projectDirectoryName?.trim() ||
       (this.parentDirectoryHandle && projectName?.trim() ? projectName.trim() : undefined);
+    let hasParentDirectoryPermission = false;
 
     if (!this.directoryHandle) {
       const pickDirectory = this.options.pickDirectory ?? getBrowserDirectoryPicker();
       const selectedDirectoryHandle = await pickDirectory();
+      if (requestedProjectDirectoryName) {
+        await this.ensureReadWritePermission(selectedDirectoryHandle);
+        hasParentDirectoryPermission = true;
+      }
       this.parentDirectoryHandle = requestedProjectDirectoryName ? selectedDirectoryHandle : null;
       this.projectDirectoryName = requestedProjectDirectoryName ?? selectedDirectoryHandle.name ?? null;
       this.directoryHandle = requestedProjectDirectoryName
@@ -355,6 +360,8 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
       this.parentDirectoryHandle &&
       requestedProjectDirectoryName !== this.projectDirectoryName
     ) {
+      await this.ensureReadWritePermission(this.parentDirectoryHandle);
+      hasParentDirectoryPermission = true;
       this.directoryHandle = await this.parentDirectoryHandle.getDirectoryHandle(
         requestedProjectDirectoryName,
         { create: true },
@@ -362,7 +369,9 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
       this.projectDirectoryName = requestedProjectDirectoryName;
     }
     const directoryHandle = this.directoryHandle;
-    await this.ensureReadWritePermission(directoryHandle);
+    if (!hasParentDirectoryPermission) {
+      await this.ensureReadWritePermission(directoryHandle);
+    }
     await this.recentProjectStore.save(directoryHandle, projectName);
     return directoryHandle;
   }
