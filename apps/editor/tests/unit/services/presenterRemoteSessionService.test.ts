@@ -565,6 +565,114 @@ describe('BrowserPresenterSessionService remote control', () => {
     );
   });
 
+  it('publishes generated video thumbnails for remote slide previews', async () => {
+    const originalCreateElement = document.createElement.bind(document);
+    const fakeCanvas = {
+      getContext: vi.fn(() => ({ drawImage: vi.fn() })),
+      height: 0,
+      toDataURL: vi.fn(() => 'data:image/jpeg;base64,video-thumbnail'),
+      width: 0,
+    };
+    const fakeVideo = {
+      crossOrigin: '',
+      currentTime: 0,
+      duration: 12,
+      load: vi.fn(),
+      muted: false,
+      onerror: undefined as (() => void) | undefined,
+      onloadeddata: undefined as (() => void) | undefined,
+      onloadedmetadata: undefined as (() => void) | undefined,
+      onseeked: undefined as (() => void) | undefined,
+      playsInline: false,
+      preload: '',
+      readyState: 2,
+      removeAttribute: vi.fn(),
+      src: '',
+      videoHeight: 720,
+      videoWidth: 1280,
+    };
+    const createElement = vi.spyOn(document, 'createElement');
+    createElement.mockImplementation((tagName: string) => {
+      if (tagName === 'video') return fakeVideo as unknown as HTMLVideoElement;
+      if (tagName === 'canvas') return fakeCanvas as unknown as HTMLCanvasElement;
+      return originalCreateElement(tagName);
+    });
+    const popup = {
+      location: { href: '' },
+      postMessage: vi.fn(),
+      closed: false,
+    } as unknown as Window;
+    const signalingService = new InMemoryPresenterRemoteSignalingService({
+      randomCode: () => 'ABCD-1234',
+      randomId: () => 'remote-session-1',
+    });
+    const service = new BrowserPresenterSessionService({
+      href: 'https://localstudio.test/editor/?project=Demo',
+      openWindow: vi.fn(() => popup),
+      randomId: () => 'session-1',
+      remoteSignalingService: signalingService,
+    });
+    service.openPresenterWindow();
+    await service.openRemoteControlSession({ presenterLabel: 'MacBook Pro', ttlMs: 60_000 });
+    const project = sampleProject.createSampleProject();
+    const page = project.pages[0]!;
+    project.assets['video-thumbnail-asset'] = {
+      id: 'video-thumbnail-asset',
+      mimeType: 'video/mp4',
+      name: 'Thumbnail demo',
+      objectUrl: 'blob:thumbnail-demo',
+      storage: 'remote',
+      type: 'video',
+    };
+    project.elements['video-thumbnail-element'] = {
+      assetId: 'video-thumbnail-asset',
+      autoplayInPreview: false,
+      controls: false,
+      durationSeconds: 12,
+      height: 360,
+      id: 'video-thumbnail-element',
+      locked: false,
+      loop: false,
+      muted: true,
+      opacity: 1,
+      posterFrameSeconds: 4,
+      rotation: 0,
+      trimStartSeconds: 1,
+      type: 'video',
+      visible: true,
+      width: 640,
+      x: 80,
+      y: 90,
+    };
+    page.elementIds = ['video-thumbnail-element'];
+
+    service.publishState({
+      activePageId: page.id,
+      animationPreview: undefined,
+      project,
+    });
+
+    await vi.waitFor(() => expect(fakeVideo.onloadedmetadata).toBeTypeOf('function'));
+    fakeVideo.onloadedmetadata?.();
+    fakeVideo.onseeked?.();
+    await vi.waitFor(() => {
+      expect(signalingService.getPublishedState('ABCD-1234')?.slidePreview).toBeDefined();
+    });
+    const publishedState = signalingService.getPublishedState('ABCD-1234');
+    const videoElement = publishedState?.slidePreview?.elements.find(
+      (element) => element.id === 'video-thumbnail-element',
+    );
+
+    expect(fakeVideo.currentTime).toBe(4);
+    expect(videoElement).toMatchObject({
+      assetUrl: 'data:image/jpeg;base64,video-thumbnail',
+      kind: 'media',
+      mediaType: 'video',
+    });
+    expect(JSON.stringify(publishedState)).not.toContain('blob:thumbnail-demo');
+    createElement.mockRestore();
+  });
+
   it('publishes the presenter timer state received from the presenter window', async () => {
     const popup = {
       location: { href: '' },

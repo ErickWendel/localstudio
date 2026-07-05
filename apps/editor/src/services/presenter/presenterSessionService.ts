@@ -763,8 +763,14 @@ function createSlidePreviewElement(
     }));
   }
   if (element.type === 'gif' || element.type === 'video') {
-    return Promise.resolve({
+    const asset = project.assets[element.assetId];
+    const posterFrameSeconds =
+      element.type === 'video'
+        ? element.posterFrameSeconds ?? element.trimStartSeconds
+        : undefined;
+    return createPreviewMediaAssetUrl(asset?.objectUrl, element.type, posterFrameSeconds).then((assetUrl) => ({
       ...frame,
+      assetUrl,
       autoplay:
         element.type === 'gif' ? element.playing : element.autoplayInPreview || element.playing,
       controls: element.type === 'video' ? element.controls : false,
@@ -772,7 +778,7 @@ function createSlidePreviewElement(
       loop: element.type === 'gif' ? element.playing : element.loop,
       mediaType: element.type,
       muted: element.type === 'video' ? element.muted : true,
-    });
+    }));
   }
   return Promise.resolve({
     ...frame,
@@ -798,6 +804,23 @@ async function createPreviewAssetUrl(assetUrl: string | undefined) {
     return createThumbnailDataUrl(assetUrl).catch(() => undefined);
   }
   return assetUrl;
+}
+
+async function createPreviewMediaAssetUrl(
+  assetUrl: string | undefined,
+  mediaType: 'gif' | 'video',
+  posterFrameSeconds: number | undefined,
+) {
+  if (!assetUrl) return undefined;
+  if (mediaType === 'gif') return createPreviewAssetUrl(assetUrl);
+  if (isTestRuntime() && /^https?:\/\//.test(assetUrl)) {
+    return undefined;
+  }
+  if (assetUrl.startsWith('data:image/')) return createPreviewAssetUrl(assetUrl);
+  if (assetUrl.startsWith('data:') || assetUrl.startsWith('blob:') || /^https?:\/\//.test(assetUrl)) {
+    return createVideoThumbnailDataUrl(assetUrl, posterFrameSeconds).catch(() => undefined);
+  }
+  return undefined;
 }
 
 function createThumbnailDataUrl(assetUrl: string) {
@@ -839,6 +862,97 @@ function createThumbnailDataUrl(assetUrl: string) {
       resolve(undefined);
     };
     image.src = assetUrl;
+  });
+}
+
+function createVideoThumbnailDataUrl(assetUrl: string, posterFrameSeconds: number | undefined) {
+  if (typeof document === 'undefined') return Promise.resolve(undefined);
+  return new Promise<string | undefined>((resolve) => {
+    const video = document.createElement('video');
+    let settled = false;
+    const timeoutId = window.setTimeout(() => {
+      finish(undefined);
+    }, 1500);
+
+    function cleanup() {
+      window.clearTimeout(timeoutId);
+      video.onerror = null;
+      video.onloadeddata = null;
+      video.onloadedmetadata = null;
+      video.onseeked = null;
+      video.removeAttribute('src');
+      try {
+        video.load();
+      } catch {
+        // Some test and embedded browser media implementations expose load() without implementing it.
+      }
+    }
+
+    function finish(dataUrl: string | undefined) {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(dataUrl);
+    }
+
+    function resolveWithFrame() {
+      try {
+        const sourceWidth = video.videoWidth;
+        const sourceHeight = video.videoHeight;
+        if (!sourceWidth || !sourceHeight) {
+          finish(undefined);
+          return;
+        }
+        const scale = Math.min(
+          1,
+          remotePreviewThumbnailMaxEdge / Math.max(sourceWidth, sourceHeight),
+        );
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+        canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+        const context = canvas.getContext('2d');
+        if (!context) {
+          finish(undefined);
+          return;
+        }
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        finish(canvas.toDataURL('image/jpeg', remotePreviewThumbnailQuality));
+      } catch (error) {
+        presenterRemoteDebugLog.warn('Remote preview video thumbnail generation failed.', error);
+        finish(undefined);
+      }
+    }
+
+    function handleLoadedMetadata() {
+      const targetTime = Math.max(0, posterFrameSeconds ?? 0);
+      if (!Number.isFinite(targetTime) || Math.abs(video.currentTime - targetTime) < 0.05) {
+        resolveWithFrame();
+        return;
+      }
+      try {
+        video.currentTime = Math.min(targetTime, video.duration || targetTime);
+      } catch {
+        resolveWithFrame();
+      }
+    }
+
+    video.crossOrigin = 'anonymous';
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'metadata';
+    video.onloadedmetadata = handleLoadedMetadata;
+    video.onseeked = resolveWithFrame;
+    video.onloadeddata = () => {
+      if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.currentTime === 0) {
+        resolveWithFrame();
+      }
+    };
+    video.onerror = () => {
+      presenterRemoteDebugLog.warn('Remote preview video thumbnail failed to load.');
+      finish(undefined);
+    };
+    video.src = assetUrl;
+    video.load();
   });
 }
 
