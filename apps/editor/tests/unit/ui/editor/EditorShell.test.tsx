@@ -1244,7 +1244,8 @@ describe('EditorShell', () => {
     render(<EditorShell services={services} />);
 
     await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Import Project' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Import' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Project' }));
 
     expect(
       await screen.findByRole('button', { name: 'Edit project name Imported LocalStudio Project' }),
@@ -1271,7 +1272,8 @@ describe('EditorShell', () => {
     render(<EditorShell services={services} />);
 
     await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Import PowerPoint...' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Import' }));
+    await user.click(screen.getByRole('menuitem', { name: 'PowerPoint (.pptx)' }));
 
     expect(screen.queryByRole('progressbar', { name: 'PowerPoint import progress' })).toBeNull();
 
@@ -1361,7 +1363,8 @@ describe('EditorShell', () => {
     render(<EditorShell services={services} />);
 
     await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Import PowerPoint...' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Import' }));
+    await user.click(screen.getByRole('menuitem', { name: 'PowerPoint (.pptx)' }));
 
     expect(await screen.findAllByText('Downloading fonts')).toHaveLength(2);
     await waitFor(() => {
@@ -1409,7 +1412,8 @@ describe('EditorShell', () => {
     render(<EditorShell services={services} />);
 
     await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Import PowerPoint...' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Import' }));
+    await user.click(screen.getByRole('menuitem', { name: 'PowerPoint (.pptx)' }));
 
     await waitFor(() => {
       expect(consoleError).toHaveBeenCalled();
@@ -1452,7 +1456,8 @@ describe('EditorShell', () => {
     render(<EditorShell services={services} />);
 
     await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Import Remote' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Import' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Remote' }));
     await user.click(await screen.findByRole('button', { name: 'Import Remote Mirror Deck' }));
 
     expect(
@@ -1483,7 +1488,8 @@ describe('EditorShell', () => {
     render(<EditorShell services={services} />);
 
     await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Import Project' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Import' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Project' }));
 
     await screen.findByRole('button', { name: 'Edit project name Imported Hydrated Project' });
     expect(repository.savedProjects).toHaveLength(0);

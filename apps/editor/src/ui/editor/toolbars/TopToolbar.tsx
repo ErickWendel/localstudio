@@ -272,9 +272,15 @@ export function TopToolbar({
   const menuActions: Record<HeaderMenu, HeaderMenuAction[]> = {
     File: [
       { label: 'New Project', disabled: !onNewProject, onSelect: onNewProject },
-      { label: 'Import Project', disabled: !onImportProject, onSelect: onImportProject },
-      { label: 'Import PowerPoint...', disabled: !onImportPowerPoint, onSelect: onImportPowerPoint },
-      { label: 'Import Remote', disabled: !onImportRemoteMirror, onSelect: onImportRemoteMirror },
+      {
+        kind: 'submenu',
+        label: 'Import',
+        items: [
+          { label: 'Project', disabled: !onImportProject, onSelect: onImportProject },
+          { label: 'PowerPoint (.pptx)', disabled: !onImportPowerPoint, onSelect: onImportPowerPoint },
+          { label: 'Remote', disabled: !onImportRemoteMirror, onSelect: onImportRemoteMirror },
+        ],
+      },
       {
         kind: 'submenu',
         label: 'Export to',
