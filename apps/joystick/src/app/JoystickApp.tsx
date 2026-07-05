@@ -400,14 +400,19 @@ function SlideCanvas({
 }
 
 function StreamPreview({
+  fallbackPreview,
   onNavigate,
   onStreamPreference,
+  renderFallbackMediaAssets = true,
   stream,
 }: {
+  fallbackPreview: PresenterRemoteSlidePreview | undefined;
   onNavigate: (direction: 'next' | 'previous') => void;
   onStreamPreference: (preference: PresenterRemoteStreamPreference) => void;
+  renderFallbackMediaAssets?: boolean;
   stream: MediaStream;
 }) {
+  const [videoPlaying, setVideoPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLButtonElement>(null);
   const playbackBlockedRef = useRef(false);
@@ -423,14 +428,17 @@ function StreamPreview({
     video.muted = true;
     video.playsInline = true;
     video.srcObject = stream;
+    setVideoPlaying(false);
     const requestPlayback = () => {
       const playPromise = video.play();
       void playPromise
         ?.then(() => {
           playbackBlockedRef.current = false;
+          setVideoPlaying(true);
         })
         .catch(() => {
           playbackBlockedRef.current = true;
+          setVideoPlaying(false);
         });
     };
     requestPlayback();
@@ -466,9 +474,11 @@ function StreamPreview({
       void playPromise
         ?.then(() => {
           playbackBlockedRef.current = false;
+          setVideoPlaying(true);
         })
         .catch(() => {
           playbackBlockedRef.current = true;
+          setVideoPlaying(false);
         });
       return;
     }
@@ -479,11 +489,18 @@ function StreamPreview({
     <button
       type="button"
       ref={containerRef}
-      className="joystick-stream-hit-target"
+      className={
+        videoPlaying
+          ? 'joystick-stream-hit-target joystick-stream-hit-target-video-ready'
+          : 'joystick-stream-hit-target'
+      }
       aria-label="Presenter stream preview"
       onClick={handleClick}
       {...swipeHandlers}
     >
+      <span className="joystick-stream-fallback" aria-hidden="true">
+        <SlideCanvas preview={fallbackPreview} renderMediaAssets={renderFallbackMediaAssets} />
+      </span>
       <video
         ref={videoRef}
         autoPlay
@@ -494,17 +511,36 @@ function StreamPreview({
         onCanPlay={() => {
           const video = videoRef.current;
           if (!video || !video.paused) return;
-          void video.play()?.catch(() => {
-            playbackBlockedRef.current = true;
-          });
+          void video
+            .play()
+            ?.then(() => {
+              playbackBlockedRef.current = false;
+              setVideoPlaying(true);
+            })
+            .catch(() => {
+              playbackBlockedRef.current = true;
+              setVideoPlaying(false);
+            });
         }}
         onLoadedMetadata={() => {
           const video = videoRef.current;
           if (!video) return;
-          void video.play()?.catch(() => {
-            playbackBlockedRef.current = true;
-          });
+          void video
+            .play()
+            ?.then(() => {
+              playbackBlockedRef.current = false;
+              setVideoPlaying(true);
+            })
+            .catch(() => {
+              playbackBlockedRef.current = true;
+              setVideoPlaying(false);
+            });
         }}
+        onPlaying={() => {
+          playbackBlockedRef.current = false;
+          setVideoPlaying(true);
+        }}
+        onWaiting={() => setVideoPlaying(false)}
         playsInline
         preload="auto"
       />
@@ -545,10 +581,12 @@ function UpcomingSlideStrip({
   onGoToPage,
   previews,
   renderMediaAssets = true,
+  startSlideNumber,
 }: {
   onGoToPage: (pageId: string) => void;
   previews: NonNullable<PresenterRemoteState['upcomingSlidePreviews']>;
   renderMediaAssets?: boolean;
+  startSlideNumber: number;
 }) {
   if (previews.length === 0) {
     return null;
@@ -556,18 +594,21 @@ function UpcomingSlideStrip({
 
   return (
     <section className="joystick-upcoming-strip" aria-label="Upcoming slides">
-      {previews.map((item, index) => (
-        <button
-          type="button"
-          className="joystick-upcoming-thumb"
-          key={item.pageId}
-          aria-label={`Go to upcoming slide ${index + 1}: ${item.pageName}`}
-          onClick={() => onGoToPage(item.pageId)}
-        >
-          <span>Next {index + 1}</span>
-          <SlideCanvas compact preview={item.preview} renderMediaAssets={renderMediaAssets} />
-        </button>
-      ))}
+      {previews.map((item, index) => {
+        const slideNumber = startSlideNumber + index;
+        return (
+          <button
+            type="button"
+            className="joystick-upcoming-thumb"
+            key={item.pageId}
+            aria-label={`Go to slide ${slideNumber}: ${item.pageName}`}
+            onClick={() => onGoToPage(item.pageId)}
+          >
+            <span>Slide {slideNumber}</span>
+            <SlideCanvas compact preview={item.preview} renderMediaAssets={renderMediaAssets} />
+          </button>
+        );
+      })}
     </section>
   );
 }
@@ -738,6 +779,11 @@ export function JoystickApp({
   const peerControlClientRef = useRef<PresenterRemotePeerControlClient | undefined>(undefined);
   const requestedPreviewBatchKeysRef = useRef(new Set<string>());
   const remoteStreamReceiverRef = useRef<PresenterRemotePeerStreamReceiver | undefined>(undefined);
+  const streamMainRef = useRef<HTMLElement>(null);
+  const streamTopbarRef = useRef<HTMLElement>(null);
+  const streamStageRef = useRef<HTMLElement>(null);
+  const streamUpcomingRef = useRef<HTMLDivElement>(null);
+  const streamResizeRef = useRef<HTMLButtonElement>(null);
   const sessionCode = session?.code;
 
   useEffect(() => {
@@ -1027,6 +1073,37 @@ export function JoystickApp({
     connected && displayedRemoteState?.previewMode === 'stream' && remoteStream;
   const renderStructuredMediaAssets = displayedRemoteState?.previewMode !== 'stream';
   const upcomingSlidePreviews = getUpcomingSlidePreviews(displayedRemoteState);
+  const upcomingStartSlideNumber = (displayedRemoteState?.activePageIndex ?? 0) + 2;
+
+  function getStreamNotesHeightBounds() {
+    const minHeight = 132;
+    const main = streamMainRef.current;
+    if (!main) return { max: Math.max(180, Math.round(window.innerHeight * 0.68)), min: minHeight };
+    const styles = window.getComputedStyle(main);
+    const rowGap = Number.parseFloat(styles.rowGap || styles.gap || '0') || 0;
+    const paddingTop = Number.parseFloat(styles.paddingTop || '0') || 0;
+    const paddingBottom = Number.parseFloat(styles.paddingBottom || '0') || 0;
+    const reservedElements = [
+      streamTopbarRef.current,
+      streamStageRef.current,
+      streamUpcomingRef.current,
+      streamResizeRef.current,
+    ];
+    const reservedHeight = reservedElements.reduce(
+      (total, element) => total + (element?.getBoundingClientRect().height ?? 0),
+      0,
+    );
+    const visibleRows = reservedElements.filter(Boolean).length + 1;
+    const reservedGaps = rowGap * Math.max(0, visibleRows - 1);
+    const maxHeight = Math.floor(
+      main.getBoundingClientRect().height -
+        paddingTop -
+        paddingBottom -
+        reservedHeight -
+        reservedGaps,
+    );
+    return { max: Math.max(minHeight, maxHeight), min: minHeight };
+  }
 
   function handleStreamNotesResizeStart(event: PointerEvent<HTMLButtonElement>) {
     event.preventDefault();
@@ -1038,8 +1115,8 @@ export function JoystickApp({
 
     function handlePointerMove(moveEvent: globalThis.PointerEvent) {
       const nextHeight = startHeight - (moveEvent.clientY - startY);
-      const maxHeight = Math.max(180, Math.round(window.innerHeight * 0.68));
-      setStreamNotesHeight(Math.max(132, Math.min(maxHeight, nextHeight)));
+      const bounds = getStreamNotesHeightBounds();
+      setStreamNotesHeight(Math.max(bounds.min, Math.min(bounds.max, nextHeight)));
     }
 
     function handlePointerEnd() {
@@ -1079,6 +1156,7 @@ export function JoystickApp({
   if (streamModeActive) {
     return (
       <main
+        ref={streamMainRef}
         className="joystick-app joystick-app-stream"
         aria-label="Presentation remote control"
         style={
@@ -1087,7 +1165,7 @@ export function JoystickApp({
           } as CSSProperties
         }
       >
-        <header className="joystick-stream-topbar">
+        <header ref={streamTopbarRef} className="joystick-stream-topbar">
           <span className="joystick-page-count" aria-label="Slide position">
             {slidePosition}
           </span>
@@ -1133,21 +1211,30 @@ export function JoystickApp({
             {buildsIndicatorText}
           </span>
         </header>
-        <section className="joystick-stream-stage" aria-label="Streamed presenter preview">
+        <section
+          ref={streamStageRef}
+          className="joystick-stream-stage"
+          aria-label="Streamed presenter preview"
+        >
           <StreamPreview
+            fallbackPreview={displayedRemoteState?.slidePreview}
             stream={remoteStream}
             onNavigate={navigateSlide}
             onStreamPreference={sendStreamPreference}
           />
         </section>
-        <UpcomingSlideStrip
-          previews={upcomingSlidePreviews}
-          onGoToPage={(pageId) =>
-            sendRemoteCommand({ command: 'go-to-page', pageId, type: 'command' })
-          }
-          renderMediaAssets
-        />
+        <div ref={streamUpcomingRef}>
+          <UpcomingSlideStrip
+            previews={upcomingSlidePreviews}
+            onGoToPage={(pageId) =>
+              sendRemoteCommand({ command: 'go-to-page', pageId, type: 'command' })
+            }
+            renderMediaAssets
+            startSlideNumber={upcomingStartSlideNumber}
+          />
+        </div>
         <button
+          ref={streamResizeRef}
           type="button"
           className="joystick-stream-notes-resize"
           aria-label="Resize presenter notes"
@@ -1303,6 +1390,7 @@ export function JoystickApp({
           sendRemoteCommand({ command: 'go-to-page', pageId, type: 'command' })
         }
         renderMediaAssets={renderStructuredMediaAssets}
+        startSlideNumber={upcomingStartSlideNumber}
       />
 
       <section className="joystick-notes-panel" aria-label="Presenter notes">

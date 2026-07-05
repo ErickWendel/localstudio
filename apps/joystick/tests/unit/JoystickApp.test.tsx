@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JoystickApp } from '../../src/app/JoystickApp';
@@ -547,6 +547,79 @@ describe('JoystickApp', () => {
     });
   });
 
+  it('keeps the structured slide visible when stream autoplay is blocked', async () => {
+    const playSpy = vi
+      .spyOn(HTMLMediaElement.prototype, 'play')
+      .mockRejectedValue(new Error('Autoplay blocked'));
+    render(<JoystickApp initialUrl="https://localstudio.test/joystick?peer=control-peer-1" />);
+    const client = peerControlClientMock.instances[0];
+    expect(client).toBeDefined();
+
+    act(() => {
+      client?.emitState({
+        activePageId: 'page-1',
+        activePageIndex: 0,
+        buildsRemaining: 0,
+        connectedControllerCount: 1,
+        deckName: 'Launch Deck',
+        notes: '',
+        pageCount: 2,
+        pages: [
+          { id: 'page-1', name: 'Intro' },
+          { id: 'page-2', name: 'Roadmap' },
+        ],
+        presenterMode: 'presenting',
+        previewMode: 'stream',
+        shortcuts: ['previous', 'next'],
+        slidePreview: {
+          backgroundColor: '#050d10',
+          elements: [
+            {
+              align: 'center',
+              fill: '#ffffff',
+              fontFamily: 'Inter',
+              fontSize: 96,
+              fontWeight: 800,
+              height: 160,
+              id: 'title',
+              kind: 'text',
+              opacity: 1,
+              rotation: 0,
+              text: 'Autoplay fallback slide',
+              width: 1200,
+              x: 360,
+              y: 420,
+            },
+          ],
+          height: 1080,
+          width: 1920,
+        },
+        stream: {
+          enabled: true,
+          fps: 8,
+          height: 340,
+          peerId: 'stream-peer-1',
+          transport: 'peerjs',
+          width: 390,
+        },
+        timer: { elapsedMs: 0, paused: false },
+        type: 'state',
+      });
+    });
+
+    act(() => {
+      peerStreamReceiverMock.latestReceiver?.emitStream({} as MediaStream);
+      peerStreamReceiverMock.latestReceiver?.emitStatus('connected');
+    });
+
+    expect(
+      await screen.findByRole('button', { name: 'Presenter stream preview' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Autoplay fallback slide')).toBeInTheDocument();
+    expect(playSpy).toHaveBeenCalled();
+    playSpy.mockRestore();
+  });
+
   it('shows a retryable message after a PeerJS control error', async () => {
     render(<JoystickApp initialUrl="https://localstudio.test/joystick?peer=control-peer-1" />);
     const client = peerControlClientMock.instances[0];
@@ -821,15 +894,9 @@ describe('JoystickApp', () => {
       'src',
       'https://cdn.localstudio.test/demo.mp4',
     );
-    expect(
-      screen.getByRole('button', { name: 'Go to upcoming slide 1: Budget' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Go to upcoming slide 2: Demo' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Go to upcoming slide 3: Close' }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Go to slide 3: Budget' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Go to slide 4: Demo' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Go to slide 5: Close' })).toBeInTheDocument();
     expect(screen.getByLabelText('Slide position')).toHaveTextContent('2 / 5');
     expect(screen.getByText('Talk through the launch timeline.')).toBeInTheDocument();
   });
@@ -894,7 +961,7 @@ describe('JoystickApp', () => {
       />,
     );
 
-    await user.click(await screen.findByRole('button', { name: 'Go to upcoming slide 3: Close' }));
+    await user.click(await screen.findByRole('button', { name: 'Go to slide 4: Close' }));
 
     expect(service.takeCommands('ABCD-1234')).toEqual([
       { command: 'go-to-page', pageId: 'page-4', type: 'command' },
@@ -965,7 +1032,11 @@ describe('JoystickApp', () => {
     expect(
       container.querySelectorAll('.joystick-slide-navigator-thumb .joystick-slide-canvas'),
     ).toHaveLength(3);
-    await user.click(screen.getByRole('button', { name: 'Go to slide 3: Budget' }));
+    await user.click(
+      within(screen.getByRole('dialog', { name: 'Slide navigation' })).getByRole('button', {
+        name: 'Go to slide 3: Budget',
+      }),
+    );
 
     expect(service.takeCommands('ABCD-1234')).toEqual([
       { command: 'go-to-page', pageId: 'page-3', type: 'command' },

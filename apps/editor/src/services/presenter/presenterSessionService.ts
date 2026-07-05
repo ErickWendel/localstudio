@@ -200,6 +200,7 @@ export class BrowserPresenterSessionService {
       return;
     }
     if (this.remoteSession) {
+      const publishSequence = ++this.remoteStatePublishSequence;
       this.remotePeerControlHost?.publishState(
         createRemoteStateSkeleton(
           payload,
@@ -210,6 +211,18 @@ export class BrowserPresenterSessionService {
           ),
         ),
       );
+      void this.createRemoteState(
+        payload,
+        this.remoteSession.connectedControllerCount,
+        this.remoteSessionStartedAt ? Date.now() - this.remoteSessionStartedAt : 0,
+      )
+        .then((remoteState) => {
+          if (publishSequence !== this.remoteStatePublishSequence) return;
+          this.remotePeerControlHost?.publishState(remoteState);
+        })
+        .catch((error: unknown) => {
+          presenterRemoteDebugLog.error('Failed to create PeerJS remote state.', error);
+        });
     }
   }
 

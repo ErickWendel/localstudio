@@ -47,7 +47,7 @@ input {
   grid-template-rows:
     auto
     auto
-    minmax(62px, auto)
+    86px
     22px
     minmax(132px, var(--joystick-stream-notes-height, 280px));
   gap: 6px;
@@ -154,8 +154,8 @@ input {
 .joystick-stream-stage {
   width: 100%;
   min-height: 0;
-  max-height: min(32dvh, 340px);
-  aspect-ratio: 390 / 340;
+  max-height: min(36dvh, 360px);
+  aspect-ratio: 16 / 9;
   align-self: start;
   display: grid;
   place-items: stretch;
@@ -168,8 +168,10 @@ input {
 .joystick-stream-hit-target {
   width: 100%;
   min-height: 0;
+  position: relative;
   display: grid;
   place-items: stretch;
+  overflow: hidden;
   padding: 0;
   border: 0;
   background: #020805;
@@ -177,13 +179,43 @@ input {
   touch-action: pan-y;
 }
 
+.joystick-stream-fallback,
 .joystick-stream-video {
+  grid-area: 1 / 1;
   width: 100%;
   height: 100%;
+}
+
+.joystick-stream-fallback {
+  display: grid;
+  place-items: stretch;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.joystick-stream-fallback .joystick-slide-canvas {
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.joystick-stream-video {
   display: block;
   object-fit: contain;
   object-position: center top;
+  opacity: 0;
   background: #020805;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.joystick-stream-hit-target-video-ready .joystick-stream-fallback {
+  opacity: 0;
+}
+
+.joystick-stream-hit-target-video-ready .joystick-stream-video {
+  opacity: 1;
 }
 
 .joystick-stream-notes {
@@ -575,6 +607,7 @@ input {
 .joystick-app-stream .joystick-upcoming-strip {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
+  height: 86px;
   min-height: 0;
   padding: 0;
   overflow: hidden;
@@ -583,14 +616,16 @@ input {
 .joystick-app-stream .joystick-upcoming-thumb {
   grid-template-rows: 16px minmax(0, 1fr);
   gap: 4px;
-  min-height: 70px;
+  height: 86px;
+  min-height: 0;
   padding: 5px;
   border-color: rgba(241, 245, 238, 0.14);
   background: rgba(241, 245, 238, 0.045);
 }
 
 .joystick-app-stream .joystick-upcoming-thumb .joystick-slide-canvas {
-  max-height: 50px;
+  height: 58px;
+  max-height: 58px;
 }
 
 .joystick-notes-panel {
