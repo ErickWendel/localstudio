@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer } from 'vite';
 
 const host = '0.0.0.0';
-const port = 4173;
+const port = getPort();
 
 const apps = [
   {
@@ -135,3 +135,12 @@ async function shutdown(code = 0) {
 
 process.on('SIGINT', () => void shutdown(0));
 process.on('SIGTERM', () => void shutdown(0));
+
+function getPort() {
+  const rawPort = process.env.PORT ?? '4173';
+  const parsedPort = Number.parseInt(rawPort, 10);
+  if (!Number.isInteger(parsedPort) || parsedPort <= 0 || parsedPort > 65_535) {
+    throw new Error(`Invalid PORT value: ${rawPort}`);
+  }
+  return parsedPort;
+}

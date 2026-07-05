@@ -2,7 +2,6 @@ import react from '@vitejs/plugin-react';
 import { defineConfig, type Connect } from 'vite';
 import { localNetworkOriginRoute } from '../../scripts/vite/localNetworkOriginRoute';
 import { localPowerPointSampleRoute } from '../../scripts/vite/localPowerPointSampleRoute';
-import { presenterRemoteSignalingRoute } from '../../scripts/vite/presenterRemoteSignalingRoute';
 
 const siteBase = process.env.LOCALSTUDIO_BASE_PATH ?? '/';
 const editorBase = new URL('editor/', `https://localstudio.invalid${siteBase}`).pathname;
@@ -54,7 +53,6 @@ export default defineConfig({
   plugins: [
     localNetworkOriginRoute(),
     localPowerPointSampleRoute(),
-    presenterRemoteSignalingRoute(),
     webMcpRouteAlias(),
     react(),
   ],

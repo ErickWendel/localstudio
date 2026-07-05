@@ -609,7 +609,6 @@ input {
   font-family: var(--ls-font-display);
   font-size: 14px;
   letter-spacing: 0;
-  text-transform: uppercase;
 }
 
 .joystick-code-row button {

@@ -17,7 +17,8 @@ import {
   InMemoryPresenterRemoteSignalingService,
   type RegisterPresenterRemoteSessionInput,
 } from '@localstudio/presenter-remote/signaling-service';
-import { PresenterRemoteSignalingClient } from '@localstudio/presenter-remote/signaling-client';
+import { PresenterRemotePeerControlClient } from '@localstudio/presenter-remote/peer-control-client';
+import { PresenterRemotePeerStreamReceiver } from '@localstudio/presenter-remote/peer-stream-receiver';
 import type {
   PresenterRemoteCommand,
   PresenterRemoteSlidePreview,
@@ -26,10 +27,6 @@ import type {
   PresenterRemoteState,
   PresenterRemoteStreamPreference,
 } from '@localstudio/presenter-remote/protocol';
-import {
-  presenterRemoteStreamReceiver,
-  type PresenterRemoteStreamSignaling,
-} from './presenterRemoteStreamReceiver';
 
 interface JoystickSignalingService {
   connectController?:
@@ -72,40 +69,29 @@ function getInitialCode(initialUrl: string) {
   return presenterRemoteSessionCode.normalize(url.searchParams.get('code') ?? '');
 }
 
-function createDefaultSignalingService(): JoystickSignalingService {
-  if (typeof fetch === 'function') {
-    return new PresenterRemoteSignalingClient({ endpoint: '/__localstudio/presenter-remote' });
+function normalizePeerInput(value: string) {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) return '';
+  try {
+    const url = new URL(trimmedValue);
+    return url.searchParams.get('peer')?.trim() ?? trimmedValue;
+  } catch {
+    return trimmedValue;
   }
+}
+
+function getInitialPeerId(initialUrl: string) {
+  const url = new URL(initialUrl);
+  return normalizePeerInput(url.searchParams.get('peer') ?? '');
+}
+
+function createFallbackSignalingService(): JoystickSignalingService {
   const service: JoystickSignalingService = new InMemoryPresenterRemoteSignalingService();
   const seedSession: RegisterPresenterRemoteSessionInput | undefined = undefined;
   if (seedSession && service instanceof InMemoryPresenterRemoteSignalingService) {
     service.registerSession(seedSession);
   }
   return service;
-}
-
-function createStreamSignalingAdapter(
-  signalingService: JoystickSignalingService,
-): PresenterRemoteStreamSignaling {
-  const candidate = signalingService as unknown as PresenterRemoteStreamSignaling & {
-    createControllerOffer?: ((...args: unknown[]) => unknown) | undefined;
-  };
-  return {
-    closeController: candidate.closeController?.bind(candidate),
-    createControllerOffer:
-      typeof candidate.createControllerOffer === 'function'
-        ? (code, controllerId, offerSdp) => {
-            if (candidate.createControllerOffer?.length === 1) {
-              void candidate.createControllerOffer({ controllerId, offerSdp, sessionCode: code });
-              return;
-            }
-            void candidate.createControllerOffer?.(code, controllerId, offerSdp);
-          }
-        : undefined,
-    getAnswer: candidate.getAnswer?.bind(candidate),
-    publishIceCandidate: candidate.publishIceCandidate?.bind(candidate),
-    takeIceCandidates: candidate.takeIceCandidates?.bind(candidate),
-  };
 }
 
 function getLocalStorage() {
@@ -605,14 +591,16 @@ export function JoystickApp({
   initialUrl = window.location.href,
   signalingService: providedSignalingService,
 }: JoystickAppProps) {
-  const defaultSignalingService = useMemo(() => createDefaultSignalingService(), []);
-  const signalingService = providedSignalingService ?? defaultSignalingService;
+  const fallbackSignalingService = useMemo(() => createFallbackSignalingService(), []);
+  const signalingService = providedSignalingService ?? fallbackSignalingService;
   const [code, setCode] = useState(() => getInitialCode(initialUrl));
+  const [peerId, setPeerId] = useState(() => getInitialPeerId(initialUrl));
   const [lastCommand, setLastCommand] = useState<string | undefined>();
   const [remoteState, setRemoteState] = useState<PresenterRemoteState | undefined>();
   const [remoteStateReceivedAt, setRemoteStateReceivedAt] = useState(0);
   const [session, setSession] = useState<PresenterRemoteSession | undefined>();
   const [resolvingSession, setResolvingSession] = useState(true);
+  const [peerConnectionFailed, setPeerConnectionFailed] = useState(false);
   const [timerNow, setTimerNow] = useState(() => Date.now());
   const [slideNavigatorOpen, setSlideNavigatorOpen] = useState(false);
   const [notesFontSize, setNotesFontSize] = useState(28);
@@ -621,12 +609,12 @@ export function JoystickApp({
   const [remoteStreamStatus, setRemoteStreamStatus] = useState<
     'connected' | 'connecting' | 'failed' | 'idle'
   >('idle');
-  const remoteStreamReceiverRef = useRef<
-    ReturnType<typeof presenterRemoteStreamReceiver.create> | undefined
-  >(undefined);
+  const peerControlClientRef = useRef<PresenterRemotePeerControlClient | undefined>(undefined);
+  const remoteStreamReceiverRef = useRef<PresenterRemotePeerStreamReceiver | undefined>(undefined);
   const sessionCode = session?.code;
 
   useEffect(() => {
+    if (peerId) return;
     let cancelled = false;
     async function resolveSession() {
       setResolvingSession(true);
@@ -678,17 +666,66 @@ export function JoystickApp({
     return () => {
       cancelled = true;
     };
-  }, [code, controllerId, signalingService]);
+  }, [code, controllerId, peerId, signalingService]);
+
+  useEffect(() => {
+    if (!peerId) return undefined;
+    let cancelled = false;
+    const client = new PresenterRemotePeerControlClient({
+      onState: (nextState) => {
+        if (cancelled) return;
+        setPeerConnectionFailed(false);
+        setRemoteState(nextState);
+        setRemoteStateReceivedAt(Date.now());
+        setSession({
+          code: peerId,
+          connectedControllerCount: nextState.connectedControllerCount,
+          expiresAt: '',
+          presenterDeviceId: peerId,
+          presenterLabel: 'Presenter device',
+          sessionId: peerId,
+        });
+        setResolvingSession(false);
+      },
+      onStatusChange: (nextStatus) => {
+        if (cancelled) return;
+        if (nextStatus === 'connecting') {
+          setPeerConnectionFailed(false);
+          setResolvingSession(true);
+          return;
+        }
+        if (nextStatus === 'failed') {
+          setPeerConnectionFailed(true);
+          setResolvingSession(false);
+          setSession(undefined);
+        }
+      },
+      presenterPeerId: peerId,
+    });
+    peerControlClientRef.current = client;
+    void client.start().catch(() => {
+      if (!cancelled) {
+        setPeerConnectionFailed(true);
+        setResolvingSession(false);
+        setSession(undefined);
+      }
+    });
+    return () => {
+      cancelled = true;
+      client.close();
+      if (peerControlClientRef.current === client) peerControlClientRef.current = undefined;
+    };
+  }, [peerId]);
 
   const status: 'connected' | 'needs-code' = session ? 'connected' : 'needs-code';
-  const displayedCode = code || session?.code || '';
+  const displayedRemoteInput = peerId || code || session?.code || '';
 
   useEffect(() => {
-    if (session) rememberSuccessfulSession(session);
-  }, [session]);
+    if (session && !peerId) rememberSuccessfulSession(session);
+  }, [peerId, session]);
 
   useEffect(() => {
-    if (!sessionCode || !signalingService.getPublishedState) return;
+    if (peerId || !sessionCode || !signalingService.getPublishedState) return;
     const currentSessionCode = sessionCode;
     let cancelled = false;
     async function refreshState() {
@@ -706,33 +743,34 @@ export function JoystickApp({
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [sessionCode, signalingService]);
+  }, [peerId, sessionCode, signalingService]);
 
   useEffect(() => {
-    if (!sessionCode) return;
+    if (!peerId && !sessionCode) return;
     const intervalId = window.setInterval(() => setTimerNow(Date.now()), 1000);
     return () => window.clearInterval(intervalId);
-  }, [sessionCode]);
+  }, [peerId, sessionCode]);
 
   useEffect(() => {
     const shouldUseStream = Boolean(
-      sessionCode &&
+      peerId &&
       remoteState?.presenterMode === 'presenting' &&
       remoteState.previewMode === 'stream' &&
-      remoteState.stream?.enabled,
+      remoteState.stream?.enabled &&
+      remoteState.stream.transport === 'peerjs' &&
+      remoteState.stream.peerId,
     );
-    if (!sessionCode || !shouldUseStream) {
+    const streamPeerId = remoteState?.stream?.peerId;
+    if (!peerId || !streamPeerId || !shouldUseStream) {
       remoteStreamReceiverRef.current?.stop();
       remoteStreamReceiverRef.current = undefined;
       return;
     }
     remoteStreamReceiverRef.current?.stop();
-    const receiver = presenterRemoteStreamReceiver.create({
-      controllerId,
+    const receiver = new PresenterRemotePeerStreamReceiver({
       onStatusChange: setRemoteStreamStatus,
       onStream: setRemoteStream,
-      sessionCode,
-      signaling: createStreamSignalingAdapter(signalingService),
+      streamPeerId,
     });
     remoteStreamReceiverRef.current = receiver;
     void receiver.start();
@@ -741,12 +779,12 @@ export function JoystickApp({
       if (remoteStreamReceiverRef.current === receiver) remoteStreamReceiverRef.current = undefined;
     };
   }, [
-    controllerId,
+    peerId,
     remoteState?.presenterMode,
     remoteState?.previewMode,
     remoteState?.stream?.enabled,
-    sessionCode,
-    signalingService,
+    remoteState?.stream?.peerId,
+    remoteState?.stream?.transport,
   ]);
 
   const connectionLabel = useMemo(() => {
@@ -755,26 +793,25 @@ export function JoystickApp({
       remoteState?.connectedControllerCount ?? session?.connectedControllerCount ?? 0,
     );
     if (status === 'connected') return `Connected (${connectedControllerCount})`;
-    if (status === 'needs-code') return 'Enter code';
+    if (status === 'needs-code') return peerId && resolvingSession ? 'Connecting' : 'Enter remote link';
     return 'Disconnected';
-  }, [remoteState, session, status]);
+  }, [peerId, remoteState, resolvingSession, session, status]);
 
   function sendRemoteCommand(command: PresenterRemoteCommand) {
-    if (!session) return;
-    const sentOverStream = remoteStreamReceiverRef.current?.sendCommand(command) ?? false;
-    if (sentOverStream) {
-      setLastCommand(command.command);
-      if (command.command !== 'go-to-page') return;
+    if (peerId) {
+      if (peerControlClientRef.current?.sendCommand(command)) setLastCommand(command.command);
+      return;
     }
+    if (!session) return;
     void Promise.resolve(signalingService.publishCommand(session.code, command, controllerId)).then(
       () => {
-        if (!sentOverStream) setLastCommand(command.command);
+        setLastCommand(command.command);
       },
     );
   }
 
   const sendStreamPreference = useCallback((preference: PresenterRemoteStreamPreference) => {
-    remoteStreamReceiverRef.current?.sendStreamPreference(preference);
+    void preference;
   }, []);
 
   function sendCommand(command: JoystickSimpleCommand) {
@@ -795,7 +832,7 @@ export function JoystickApp({
   }
 
   const connected = status === 'connected' && Boolean(session);
-  const displayedRemoteState = sessionCode ? remoteState : undefined;
+  const displayedRemoteState = peerId || sessionCode ? remoteState : undefined;
   const slidePosition = displayedRemoteState
     ? `${displayedRemoteState.activePageIndex + 1} / ${displayedRemoteState.pageCount}`
     : connected
@@ -1014,30 +1051,33 @@ export function JoystickApp({
       {!connected ? (
         <section className="joystick-pairing-panel" aria-label="Pair remote">
           <div className="joystick-code-row">
-            <label htmlFor="session-code">Code</label>
+            <label htmlFor="session-code">Remote link</label>
             <input
               id="session-code"
               inputMode="text"
-              maxLength={9}
-              value={displayedCode}
-              onChange={(event) =>
-                setCode(presenterRemoteSessionCode.normalize(event.target.value))
-              }
+              value={displayedRemoteInput}
+              onChange={(event) => {
+                const value = event.target.value;
+                setPeerId(normalizePeerInput(value));
+                setCode(presenterRemoteSessionCode.normalize(value));
+              }}
             />
             <button
               type="button"
-              onClick={() => setCode(displayedCode)}
-              disabled={!presenterRemoteSessionCode.isValid(displayedCode)}
+              onClick={() => setPeerId(normalizePeerInput(displayedRemoteInput))}
+              disabled={!displayedRemoteInput.trim()}
             >
               Join
             </button>
           </div>
           {session ? (
             <p className="joystick-presenter-name">{session.presenterLabel}</p>
+          ) : peerId && peerConnectionFailed ? (
+            <p className="joystick-help">Could not connect to that presenter. Check the remote link and try again.</p>
           ) : resolvingSession ? (
             <p className="joystick-help">Looking for the presenter session...</p>
           ) : (
-            <p className="joystick-help">Enter the code shown on the presenter screen.</p>
+            <p className="joystick-help">Open the presenter remote link or paste its peer id.</p>
           )}
         </section>
       ) : null}

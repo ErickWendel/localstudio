@@ -7,12 +7,13 @@ import type {
   PresenterWindowCommand,
 } from './presenterSessionTypes';
 import {
-  InMemoryPresenterRemoteSignalingService,
-  type RegisterPresenterRemoteSessionInput,
-} from '@localstudio/presenter-remote/signaling-service';
-import { PresenterRemoteSignalingClient } from '@localstudio/presenter-remote/signaling-client';
+  PresenterRemotePeerControlHost,
+  type PresenterRemotePeerControlHostOptions,
+} from '@localstudio/presenter-remote/peer-control-host';
+import type { RegisterPresenterRemoteSessionInput } from '@localstudio/presenter-remote/signaling-service';
 import type {
   PresenterRemoteCommand,
+  PresenterRemotePeerSession,
   PresenterRemoteSlidePreview,
   PresenterRemoteSlidePreviewElement,
   PresenterRemoteUpcomingSlidePreview,
@@ -23,6 +24,11 @@ import type {
 
 type OpenPresenterWindow = (url: string, target: string, features: string) => Window | null;
 type ResolveRemoteControlOrigin = (origin: string) => Promise<string | undefined>;
+type PresenterRemotePeerControl = {
+  close: () => void;
+  open: () => Promise<PresenterRemotePeerSession>;
+  publishState: (state: PresenterRemoteState) => void;
+};
 type PresenterRemoteSignaling = {
   closeSession: (code: string) => boolean | Promise<unknown>;
   publishState: (code: string, state: PresenterRemoteState) => boolean | Promise<unknown>;
@@ -31,12 +37,16 @@ type PresenterRemoteSignaling = {
   ) => PresenterRemoteSession | Promise<PresenterRemoteSession>;
   takeCommands: (code: string) => PresenterRemoteCommand[] | Promise<PresenterRemoteCommand[]>;
 };
+type CreatePresenterRemotePeerControlHost = (
+  options: PresenterRemotePeerControlHostOptions,
+) => PresenterRemotePeerControl;
 
 interface BrowserPresenterSessionServiceOptions {
   href?: string;
   openWindow?: OpenPresenterWindow;
   presenterDeviceId?: string | undefined;
   randomId?: () => string;
+  remotePeerControlHostFactory?: CreatePresenterRemotePeerControlHost | undefined;
   remoteSignalingService?: PresenterRemoteSignaling | undefined;
   resolveRemoteControlOrigin?: ResolveRemoteControlOrigin | undefined;
   targetWindow?: Window;
@@ -86,7 +96,8 @@ export class BrowserPresenterSessionService {
   private readonly presenterDeviceId: string;
   private readonly randomId: () => string;
   private readonly resolveRemoteControlOrigin: ResolveRemoteControlOrigin;
-  private readonly remoteSignalingService: PresenterRemoteSignaling;
+  private readonly legacyRemoteSignalingService: PresenterRemoteSignaling | undefined;
+  private readonly remotePeerControlHostFactory: CreatePresenterRemotePeerControlHost;
   private readonly targetWindow: Window;
   private popupWindow: Window | null = null;
   private presenterTimer: PresenterRemoteTimerState | undefined;
@@ -95,6 +106,8 @@ export class BrowserPresenterSessionService {
   private remoteSession: PresenterRemoteSessionMetadata | undefined;
   private remoteSessionStartedAt = 0;
   private remoteStatePublishSequence = 0;
+  private remoteCommandHandler: ((command: PresenterRemoteCommand) => void) | undefined;
+  private remotePeerControlHost: PresenterRemotePeerControl | undefined;
   private sessionId: string | undefined;
 
   constructor(options: BrowserPresenterSessionServiceOptions = {}) {
@@ -109,8 +122,10 @@ export class BrowserPresenterSessionService {
     this.randomId = options.randomId ?? createSessionId;
     this.resolveRemoteControlOrigin =
       options.resolveRemoteControlOrigin ?? resolveRemoteControlOrigin;
-    this.remoteSignalingService =
-      options.remoteSignalingService ?? createDefaultRemoteSignalingService();
+    this.remotePeerControlHostFactory =
+      options.remotePeerControlHostFactory ??
+      createDefaultRemotePeerControlHostFactory();
+    this.legacyRemoteSignalingService = options.remoteSignalingService;
   }
 
   openPresenterWindow(): PresenterWindowOpenResult {
@@ -148,7 +163,7 @@ export class BrowserPresenterSessionService {
       };
       this.popupWindow.postMessage(message, this.origin);
     }
-    if (this.remoteSession) {
+    if (this.remoteSession && this.legacyRemoteSignalingService) {
       const publishSequence = ++this.remoteStatePublishSequence;
       const sessionCode = this.remoteSession.code;
       void this.createRemoteState(
@@ -157,7 +172,19 @@ export class BrowserPresenterSessionService {
         this.remoteSessionStartedAt ? Date.now() - this.remoteSessionStartedAt : 0,
       ).then((remoteState) => {
         if (publishSequence !== this.remoteStatePublishSequence) return;
-        void Promise.resolve(this.remoteSignalingService.publishState(sessionCode, remoteState));
+        void Promise.resolve(this.legacyRemoteSignalingService?.publishState(sessionCode, remoteState));
+      });
+      return;
+    }
+    if (this.remoteSession) {
+      const publishSequence = ++this.remoteStatePublishSequence;
+      void this.createRemoteState(
+        payload,
+        this.remoteSession.connectedControllerCount,
+        this.remoteSessionStartedAt ? Date.now() - this.remoteSessionStartedAt : 0,
+      ).then((remoteState) => {
+        if (publishSequence !== this.remoteStatePublishSequence) return;
+        this.remotePeerControlHost?.publishState(remoteState);
       });
     }
   }
@@ -165,8 +192,10 @@ export class BrowserPresenterSessionService {
   closePresenterWindow() {
     if (this.popupWindow && !this.popupWindow.closed) this.popupWindow.close();
     this.popupWindow = null;
-    if (this.remoteSession)
-      void Promise.resolve(this.remoteSignalingService.closeSession(this.remoteSession.code));
+    if (this.legacyRemoteSignalingService && this.remoteSession)
+      void Promise.resolve(this.legacyRemoteSignalingService.closeSession(this.remoteSession.code));
+    this.remotePeerControlHost?.close();
+    this.remotePeerControlHost = undefined;
     this.remoteSession = undefined;
     this.sessionId = undefined;
   }
@@ -175,13 +204,32 @@ export class BrowserPresenterSessionService {
     input: RegisterPresenterRemoteSessionInput,
   ): Promise<PresenterRemoteSessionMetadata> {
     if (this.remoteSession) return this.remoteSession;
-    const session = await this.remoteSignalingService.registerSession({
-      ...input,
+    if (this.legacyRemoteSignalingService) {
+      const session = await this.legacyRemoteSignalingService.registerSession({
+        ...input,
+        presenterDeviceId: input.presenterDeviceId ?? this.presenterDeviceId,
+      });
+      const remoteOrigin = (await this.resolveRemoteControlOrigin(this.origin)) ?? this.origin;
+      const qrUrl = new URL('/joystick/', remoteOrigin);
+      qrUrl.searchParams.set('code', session.code);
+      this.remoteSession = {
+        ...session,
+        qrUrl: qrUrl.toString(),
+      };
+      this.remoteSessionStartedAt = Date.now();
+      return this.remoteSession;
+    }
+    const host = this.remotePeerControlHostFactory({
+      onCommand: (command) => this.remoteCommandHandler?.(command),
       presenterDeviceId: input.presenterDeviceId ?? this.presenterDeviceId,
+      presenterLabel: input.presenterLabel,
+      ttlMs: input.ttlMs,
     });
+    this.remotePeerControlHost = host;
+    const session = await host.open();
     const remoteOrigin = (await this.resolveRemoteControlOrigin(this.origin)) ?? this.origin;
     const qrUrl = new URL('/joystick/', remoteOrigin);
-    qrUrl.searchParams.set('code', session.code);
+    qrUrl.searchParams.set('peer', session.controlPeerId);
     this.remoteSession = {
       ...session,
       qrUrl: qrUrl.toString(),
@@ -196,6 +244,13 @@ export class BrowserPresenterSessionService {
 
   subscribeToCommands(handler: (command: PresenterWindowCommand) => void) {
     const handleRemoteCommand = (command: PresenterRemoteCommand) => {
+      if (
+        command.command === 'pause-timer' ||
+        command.command === 'reset-timer' ||
+        command.command === 'resume-timer'
+      ) {
+        this.postPresenterCommand(command);
+      }
       if (command.command === 'update-notes') {
         handler({ command: command.command, notes: command.notes, pageId: command.pageId });
         return;
@@ -206,6 +261,7 @@ export class BrowserPresenterSessionService {
       }
       handler({ command: command.command });
     };
+    this.remoteCommandHandler = handleRemoteCommand;
     const listener = (event: MessageEvent) => {
       if (event.origin !== this.origin) return;
       if (!isPresenterCommandMessage(event.data)) return;
@@ -223,6 +279,11 @@ export class BrowserPresenterSessionService {
         if (this.lastPresenterPayload) this.publishState(this.lastPresenterPayload);
         return;
       }
+      if (command === 'update-stream-peer') {
+        if (event.data.peerId !== undefined && typeof event.data.peerId !== 'string') return;
+        handler({ command, peerId: event.data.peerId });
+        return;
+      }
       if (
         command === 'close' ||
         command === 'next' ||
@@ -238,30 +299,26 @@ export class BrowserPresenterSessionService {
     };
     this.targetWindow.addEventListener('message', listener);
     let takingRemoteCommands = false;
-    const remoteIntervalId = this.targetWindow.setInterval(() => {
-      if (!this.remoteSession) return;
-      if (takingRemoteCommands) return;
-      takingRemoteCommands = true;
-      void Promise.resolve(this.remoteSignalingService.takeCommands(this.remoteSession.code))
-        .then((commands) => {
-          for (const command of commands) {
-            if (
-              command.command === 'pause-timer' ||
-              command.command === 'reset-timer' ||
-              command.command === 'resume-timer'
-            ) {
-              this.postPresenterCommand(command);
-            }
-            handleRemoteCommand(command);
-          }
-        })
-        .finally(() => {
-          takingRemoteCommands = false;
-        });
-    }, 250);
+    const remoteIntervalId = this.legacyRemoteSignalingService
+      ? this.targetWindow.setInterval(() => {
+          if (!this.remoteSession || !this.legacyRemoteSignalingService) return;
+          if (takingRemoteCommands) return;
+          takingRemoteCommands = true;
+          void Promise.resolve(this.legacyRemoteSignalingService.takeCommands(this.remoteSession.code))
+            .then((commands) => {
+              for (const command of commands) {
+                handleRemoteCommand(command);
+              }
+            })
+            .finally(() => {
+              takingRemoteCommands = false;
+            });
+        }, 250)
+      : 0;
     return () => {
+      this.remoteCommandHandler = undefined;
       this.targetWindow.removeEventListener('message', listener);
-      this.targetWindow.clearInterval(remoteIntervalId);
+      if (remoteIntervalId) this.targetWindow.clearInterval(remoteIntervalId);
     };
   }
 
@@ -317,11 +374,40 @@ function isPresenterRemoteTimerState(value: unknown): value is PresenterRemoteTi
   );
 }
 
-function createDefaultRemoteSignalingService(): PresenterRemoteSignaling {
-  if (!isTestRuntime() && typeof fetch === 'function') {
-    return new PresenterRemoteSignalingClient({ endpoint: '/__localstudio/presenter-remote' });
+class TestPresenterRemotePeerControlHost implements PresenterRemotePeerControl {
+  private readonly options: PresenterRemotePeerControlHostOptions;
+  private lastState: PresenterRemoteState | undefined;
+
+  constructor(options: PresenterRemotePeerControlHostOptions) {
+    this.options = options;
   }
-  return new InMemoryPresenterRemoteSignalingService();
+
+  open(): Promise<PresenterRemotePeerSession> {
+    const controlPeerId = 'ABCD-1234';
+    return Promise.resolve({
+      code: controlPeerId,
+      connectedControllerCount: 0,
+      controlPeerId,
+      expiresAt: new Date((this.options.now ?? Date.now)() + this.options.ttlMs).toISOString(),
+      presenterDeviceId: this.options.presenterDeviceId ?? this.options.presenterLabel,
+      presenterLabel: this.options.presenterLabel,
+      sessionId: 'test-peer-session',
+      transport: 'peerjs',
+    });
+  }
+
+  publishState(state: PresenterRemoteState) {
+    this.lastState = state;
+  }
+
+  close() {
+    this.lastState = undefined;
+  }
+}
+
+function createDefaultRemotePeerControlHostFactory(): CreatePresenterRemotePeerControlHost {
+  if (isTestRuntime()) return (hostOptions) => new TestPresenterRemotePeerControlHost(hostOptions);
+  return (hostOptions) => new PresenterRemotePeerControlHost(hostOptions);
 }
 
 function isTestRuntime() {
@@ -380,7 +466,14 @@ function createRemoteState(
       previewMode: 'stream',
       shortcuts: ['previous', 'next', 'pause-timer', 'reset-timer'],
       slidePreview,
-      stream: { enabled: true, fps: 8, height: 340, width: 390 },
+      stream: {
+        enabled: true,
+        fps: 8,
+        height: 340,
+        peerId: payload.streamPeerId,
+        transport: 'peerjs',
+        width: 390,
+      },
       timer,
       type: 'state',
       upcomingSlidePreviews,

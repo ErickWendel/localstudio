@@ -116,6 +116,8 @@ export interface PresenterRemoteState {
         enabled: boolean;
         fps: number;
         height: number;
+        peerId?: string | undefined;
+        transport?: 'peerjs' | undefined;
         width: number;
       }
     | undefined;
@@ -133,6 +135,11 @@ export interface PresenterRemoteSession {
   sessionId: string;
 }
 
+export interface PresenterRemotePeerSession extends PresenterRemoteSession {
+  controlPeerId: string;
+  transport: 'peerjs';
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object';
 }
@@ -147,6 +154,8 @@ function isStreamMetadata(value: unknown) {
     typeof value.enabled === 'boolean' &&
     typeof value.fps === 'number' &&
     typeof value.height === 'number' &&
+    (value.peerId === undefined || typeof value.peerId === 'string') &&
+    (value.transport === undefined || value.transport === 'peerjs') &&
     typeof value.width === 'number'
   );
 }

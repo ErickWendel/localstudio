@@ -34,13 +34,18 @@ export function PresenterRemotePanel({ session }: PresenterRemotePanelProps) {
   }, [session.qrUrl]);
 
   async function copyRemoteLink() {
-    await navigator.clipboard?.writeText(session.qrUrl);
-    setCopyStatus('copied');
+    try {
+      await navigator.clipboard?.writeText(session.qrUrl);
+      setCopyStatus('copied');
+    } catch {
+      setCopyStatus('idle');
+    }
   }
 
   return (
     <section
       className="presenter-remote-panel"
+      data-remote-url={session.qrUrl}
       aria-label="Remote control this presentation"
     >
       <header className="presenter-remote-header">

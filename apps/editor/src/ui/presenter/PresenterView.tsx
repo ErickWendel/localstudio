@@ -19,10 +19,6 @@ import {
 import { PresenterRemotePanel } from './PresenterRemotePanel';
 import { presenterRemoteMirror } from './presenterRemoteMirror';
 import { presenterRemoteStreamPublisher } from './presenterRemoteStreamPublisher';
-import type {
-  PresenterRemoteCommand,
-  PresenterRemoteStreamPreference,
-} from '@localstudio/presenter-remote/protocol';
 import { presenterRemoteTimerFormat } from '@localstudio/presenter-remote/timer-format';
 
 interface PresenterViewProps {
@@ -38,7 +34,6 @@ const notesMinWidthPx = 280;
 const notesMaxWidthPx = 760;
 const presenterMainMinWidthPx = 520;
 const defaultRemoteStreamSize = presenterRemoteMirror.size;
-const maxRemoteStreamSize = { height: 1120, width: 1280 };
 const presenterShortcutActions = [
   'next-build',
   'previous-build',
@@ -168,7 +163,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
   const [notesPanelWidth, setNotesPanelWidth] = useState(getInitialNotesWidth);
   const [keyboardShortcutsMode, setKeyboardShortcutsMode] = useState<'dialog' | 'popover' | undefined>();
   const [remotePanelOpen, setRemotePanelOpen] = useState(false);
-  const [remoteStreamSize, setRemoteStreamSize] = useState(defaultRemoteStreamSize);
+  const remoteStreamSize = defaultRemoteStreamSize;
   const [slideNavigatorOpen, setSlideNavigatorOpen] = useState(false);
   const [slideNavigatorIndex, setSlideNavigatorIndex] = useState(0);
   const [introDismissed, setIntroDismissed] = useState(getInitialIntroDismissed);
@@ -386,39 +381,6 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     postCommand({ command: 'reset-timer' });
     publishTimerState({ elapsedMs: 0, paused: false });
   }, [postCommand, publishTimerState]);
-
-  const handleRemoteStreamCommand = useCallback((command: PresenterRemoteCommand) => {
-    if (command.command === 'go-to-page') {
-      postCommand({ command: 'go-to-page', pageId: command.pageId });
-      return;
-    }
-    if (command.command === 'update-notes') {
-      postCommand({ command: 'update-notes', notes: command.notes, pageId: command.pageId });
-      return;
-    }
-    if (
-      command.command === 'pause-timer' ||
-      command.command === 'reset-timer' ||
-      command.command === 'resume-timer'
-    ) {
-      applyTimerCommand(command.command);
-      return;
-    }
-    postCommand({ command: command.command });
-  }, [applyTimerCommand, postCommand]);
-
-  const handleRemoteStreamPreference = useCallback((preference: PresenterRemoteStreamPreference) => {
-    setRemoteStreamSize({
-      height: Math.max(
-        defaultRemoteStreamSize.height,
-        Math.min(maxRemoteStreamSize.height, Math.round(preference.height)),
-      ),
-      width: Math.max(
-        defaultRemoteStreamSize.width,
-        Math.min(maxRemoteStreamSize.width, Math.round(preference.width)),
-      ),
-    });
-  }, []);
 
   function getPresenterVideos() {
     return Array.from(presenterStageRef.current?.querySelectorAll('video') ?? []);
@@ -736,9 +698,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     remoteStreamPublisherRef.current?.stop();
     const publisher = presenterRemoteStreamPublisher.create({
       canvas,
-      onCommand: handleRemoteStreamCommand,
-      onStreamPreference: handleRemoteStreamPreference,
-      sessionCode,
+      onPeerId: (peerId) => postCommand({ command: 'update-stream-peer', peerId }),
     });
     remoteStreamPublisherRef.current = publisher;
     publisher.start();
@@ -746,7 +706,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
       publisher.stop();
       if (remoteStreamPublisherRef.current === publisher) remoteStreamPublisherRef.current = undefined;
     };
-  }, [handleRemoteStreamCommand, handleRemoteStreamPreference, snapshot?.remoteSession?.code]);
+  }, [postCommand, snapshot?.remoteSession?.code]);
 
   const introOverlay = !introDismissed ? (
     <div className="presenter-intro-backdrop" role="presentation">

@@ -5,6 +5,10 @@
   "type": "module",
   "exports": {
     "./ice": "./src/ice.ts",
+    "./peer-control-client": "./src/peer-control-client.ts",
+    "./peer-control-host": "./src/peer-control-host.ts",
+    "./peer-stream-publisher": "./src/peer-stream-publisher.ts",
+    "./peer-stream-receiver": "./src/peer-stream-receiver.ts",
     "./protocol": "./src/protocol.ts",
     "./session-code": "./src/session-code.ts",
     "./signaling-client": "./src/signaling-client.ts",
@@ -14,5 +18,8 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit --pretty false"
+  },
+  "dependencies": {
+    "peerjs": "^1.5.5"
   }
 }

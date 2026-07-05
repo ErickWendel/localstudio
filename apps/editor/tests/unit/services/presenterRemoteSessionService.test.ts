@@ -1,7 +1,109 @@
 import { describe, expect, it, vi } from 'vitest';
 import { sampleProject } from '../../../src/domain/projects/sampleProject';
 import { BrowserPresenterSessionService } from '../../../src/services/presenter/presenterSessionService';
+import { PresenterRemotePeerControlClient } from '@localstudio/presenter-remote/peer-control-client';
+import { PresenterRemotePeerControlHost } from '@localstudio/presenter-remote/peer-control-host';
 import { InMemoryPresenterRemoteSignalingService } from '@localstudio/presenter-remote/signaling-service';
+import type {
+  PresenterRemoteCommand,
+  PresenterRemoteState,
+} from '@localstudio/presenter-remote/protocol';
+import type { DataConnection, Peer } from 'peerjs';
+
+type PeerEventMap = {
+  connection: DataConnection;
+  error: Error;
+  open: string;
+};
+
+type DataConnectionEventMap = {
+  close: undefined;
+  data: unknown;
+  error: Error;
+  open: undefined;
+};
+
+class TestPeer {
+  readonly destroy = vi.fn();
+  readonly id = '';
+  readonly open: boolean = false;
+  private readonly listeners = new Map<keyof PeerEventMap, Array<(payload: never) => void>>();
+
+  emit<EventName extends keyof PeerEventMap>(eventName: EventName, payload: PeerEventMap[EventName]) {
+    for (const listener of this.listeners.get(eventName) ?? []) {
+      listener(payload as never);
+    }
+  }
+
+  on<EventName extends keyof PeerEventMap>(
+    eventName: EventName,
+    listener: (payload: PeerEventMap[EventName]) => void,
+  ) {
+    const listeners = this.listeners.get(eventName) ?? [];
+    listeners.push(listener);
+    this.listeners.set(eventName, listeners);
+    return this as unknown as Peer;
+  }
+}
+
+class TestClientPeer extends TestPeer {
+  readonly connection = new TestDataConnection();
+  readonly connect = vi.fn(() => this.connection as unknown as DataConnection);
+  override readonly open = true;
+}
+
+class TestClosedClientPeer extends TestPeer {
+  readonly connection = new TestDataConnection();
+  readonly connect = vi.fn(() => this.connection as unknown as DataConnection);
+}
+
+class TestDataConnection {
+  readonly close = vi.fn(() => {
+    this.open = false;
+    this.emit('close', undefined);
+  });
+  readonly send = vi.fn(() => Promise.resolve());
+  open = true;
+  private readonly listeners = new Map<
+    keyof DataConnectionEventMap,
+    Array<(payload: never) => void>
+  >();
+
+  emit<EventName extends keyof DataConnectionEventMap>(
+    eventName: EventName,
+    payload: DataConnectionEventMap[EventName],
+  ) {
+    for (const listener of this.listeners.get(eventName) ?? []) {
+      listener(payload as never);
+    }
+  }
+
+  on<EventName extends keyof DataConnectionEventMap>(
+    eventName: EventName,
+    listener: (payload: DataConnectionEventMap[EventName]) => void,
+  ) {
+    const listeners = this.listeners.get(eventName) ?? [];
+    listeners.push(listener);
+    this.listeners.set(eventName, listeners);
+    return this as unknown as DataConnection;
+  }
+}
+
+function createRemoteState(): PresenterRemoteState {
+  return {
+    activePageId: 'page-1',
+    activePageIndex: 0,
+    buildsRemaining: 0,
+    connectedControllerCount: 0,
+    deckName: 'Launch Deck',
+    notes: '',
+    pageCount: 1,
+    presenterMode: 'presenting',
+    shortcuts: ['previous', 'next'],
+    timer: { elapsedMs: 0, paused: false },
+    type: 'state',
+  };
+}
 
 describe('BrowserPresenterSessionService remote control', () => {
   it('registers a remote control session with QR metadata', async () => {
@@ -452,6 +554,130 @@ describe('BrowserPresenterSessionService remote control', () => {
 
     expect(commandHandler).toHaveBeenCalledWith({ command: 'next' });
     unsubscribe();
+    vi.useRealTimers();
+  });
+});
+
+describe('PresenterRemotePeerControlHost', () => {
+  it('fails opening when PeerJS Cloud does not assign a control peer id', async () => {
+    vi.useFakeTimers();
+    const peer = new TestPeer();
+    const host = new PresenterRemotePeerControlHost({
+      connectionTimeoutMs: 25,
+      peerFactory: () => peer as unknown as Peer,
+      presenterLabel: 'MacBook Pro',
+      ttlMs: 60_000,
+    });
+
+    const openPromise = host.open();
+    const handledOpenPromise = openPromise.catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(25);
+
+    expect(await handledOpenPromise).toEqual(new Error('PeerJS host connection timed out.'));
+    vi.useRealTimers();
+  });
+
+  it('opens a PeerJS control peer, broadcasts state, receives commands, and closes cleanly', async () => {
+    const peer = new TestPeer();
+    const connection = new TestDataConnection();
+    const onCommand = vi.fn();
+    const host = new PresenterRemotePeerControlHost({
+      now: () => new Date('2026-07-04T12:00:00.000Z').getTime(),
+      onCommand,
+      peerFactory: () => peer as unknown as Peer,
+      presenterDeviceId: 'presenter-device-1',
+      presenterLabel: 'MacBook Pro',
+      ttlMs: 60_000,
+    });
+
+    const openPromise = host.open();
+    peer.emit('open', 'control-peer-1');
+    const session = await openPromise;
+    peer.emit('connection', connection as unknown as DataConnection);
+    connection.emit('open', undefined);
+
+    expect(session).toMatchObject({
+      code: 'control-peer-1',
+      controlPeerId: 'control-peer-1',
+      expiresAt: '2026-07-04T12:01:00.000Z',
+      presenterDeviceId: 'presenter-device-1',
+      presenterLabel: 'MacBook Pro',
+      transport: 'peerjs',
+    });
+
+    const state = createRemoteState();
+    host.publishState(state);
+
+    expect(connection.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        activePageId: 'page-1',
+        connectedControllerCount: 1,
+        type: 'state',
+      }),
+    );
+
+    const commands: PresenterRemoteCommand[] = [
+      { command: 'next', type: 'command' },
+      { command: 'previous', type: 'command' },
+      { command: 'go-to-page', pageId: 'page-1', type: 'command' },
+      { command: 'pause-timer', type: 'command' },
+      { command: 'update-notes', notes: 'Updated', pageId: 'page-1', type: 'command' },
+    ];
+    for (const command of commands) connection.emit('data', command);
+
+    expect(onCommand).toHaveBeenCalledTimes(commands.length);
+    for (const command of commands) expect(onCommand).toHaveBeenCalledWith(command);
+
+    host.close();
+
+    expect(connection.close).toHaveBeenCalled();
+    expect(peer.destroy).toHaveBeenCalled();
+  });
+});
+
+describe('PresenterRemotePeerControlClient', () => {
+  it('requests state when the PeerJS data connection is already open', async () => {
+    const peer = new TestClientPeer();
+    const onStatusChange = vi.fn();
+    const client = new PresenterRemotePeerControlClient({
+      onState: vi.fn(),
+      onStatusChange,
+      peerFactory: () => peer as unknown as Peer,
+      presenterPeerId: 'control-peer-1',
+    });
+
+    await client.start();
+
+    expect(peer.connect).toHaveBeenCalledWith(
+      'control-peer-1',
+      expect.objectContaining({ label: 'localstudio-presenter-control' }),
+    );
+    expect(peer.connection.send).toHaveBeenCalledWith({
+      command: 'request-state',
+      type: 'command',
+    });
+    expect(onStatusChange).toHaveBeenCalledWith('connected');
+  });
+
+  it('reports a failed status when the PeerJS control connection times out', async () => {
+    vi.useFakeTimers();
+    const peer = new TestClosedClientPeer();
+    const onStatusChange = vi.fn();
+    const client = new PresenterRemotePeerControlClient({
+      connectionTimeoutMs: 25,
+      onState: vi.fn(),
+      onStatusChange,
+      peerFactory: () => peer as unknown as Peer,
+      presenterPeerId: 'missing-peer',
+    });
+
+    const startPromise = client.start();
+    const handledStartPromise = startPromise.catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(25);
+
+    expect(await handledStartPromise).toEqual(new Error('PeerJS connection timed out.'));
+    expect(onStatusChange).toHaveBeenCalledWith('connecting');
+    expect(onStatusChange).toHaveBeenCalledWith('failed');
     vi.useRealTimers();
   });
 });
