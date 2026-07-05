@@ -866,7 +866,7 @@ export function EditorShell({ services }: EditorShellProps) {
         mirrorState={vm.mirrorState}
         mirrorDisabledBySettings={vm.mirrorDisabledBySettings}
         persistenceAttention={vm.persistenceAttention}
-        persistenceNotice={vm.persistenceNotice}
+        operationNotice={vm.operationNotice}
         localProjectSetupPanel={
           vm.localProjectSetupOpen ? (
             <LocalProjectSetupPanel
@@ -883,6 +883,7 @@ export function EditorShell({ services }: EditorShellProps) {
         canTranslateDeck={vm.canTranslateDeck}
         deckTranslationStatus={deckTranslationStatus}
         isTranslatingDeck={Boolean(vm.deckTranslationProgress)}
+        isExportingPowerPoint={vm.isExportingPowerPoint}
         translationLanguageOptions={vm.translationLanguageOptions}
         translationSourceLanguage={vm.activeSlideLanguage.code}
         translationTargetLanguage={vm.translationTargetLanguage}
@@ -902,6 +903,9 @@ export function EditorShell({ services }: EditorShellProps) {
         }
         onImportPowerPoint={() => {
           void vm.importPowerPoint();
+        }}
+        onExportPowerPoint={() => {
+          void vm.exportPowerPoint();
         }}
         onMirrorNow={() => {
           vm.requestMirrorNow();

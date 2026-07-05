@@ -12,6 +12,18 @@ export class BrowserExportService implements ExportService {
     return `${project.name}.pdf`;
   }
 
+  getPowerPointFileName(project: ProjectDocument): string {
+    return `${project.name}.pptx`;
+  }
+
+  downloadBlob(blob: Blob, fileName: string): void {
+    const anchor = document.createElement('a');
+    anchor.href = URL.createObjectURL(blob);
+    anchor.download = fileName;
+    anchor.click();
+    URL.revokeObjectURL(anchor.href);
+  }
+
   downloadDataUrl(dataUrl: string, fileName: string): void {
     const anchor = document.createElement('a');
     anchor.href = dataUrl;
