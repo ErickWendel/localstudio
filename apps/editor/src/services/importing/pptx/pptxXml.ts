@@ -22,6 +22,12 @@ function getAttr(element: Element | undefined, name: string) {
   return element.getAttribute(name) ?? element.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', name);
 }
 
+function getRelationshipAttr(element: Element | undefined, name: string) {
+  if (!element) return undefined;
+  return element.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', name) ??
+    element.getAttribute(`r:${name}`);
+}
+
 function textContent(element: ParentNode, localName: string) {
   return descendants(element, localName)
     .map((item) => item.textContent ?? '')
@@ -33,6 +39,7 @@ export const pptxXml = {
   descendants,
   firstDescendant,
   getAttr,
+  getRelationshipAttr,
   parseXml,
   textContent,
 };

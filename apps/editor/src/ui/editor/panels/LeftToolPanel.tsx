@@ -108,6 +108,18 @@ interface LeftToolPanelProps {
   onUpdateTextContent?: ((elementId: string, text: string) => void) | undefined;
   onUpdateMediaPlayback?: ((elementId: string, patch: MediaPlaybackPatch) => void) | undefined;
   onUpdatePageBackground?: ((background: PageBackground) => void) | undefined;
+  onApplyTheme?: ((themeId: string) => void) | undefined;
+  onEditTheme?: ((themeId: string) => void) | undefined;
+  onChangeTheme?: (() => void) | undefined;
+  onApplySlideLayout?: ((pageId: string, layoutId: string) => void) | undefined;
+  onEditSlideLayout?: ((layoutId: string) => void) | undefined;
+  onToggleSlideLayoutPlaceholder?:
+    | ((
+        layoutId: string,
+        role: 'body' | 'footer' | 'slideNumber' | 'title',
+        visible: boolean,
+      ) => void)
+    | undefined;
   onReplaceVideoAsset?: ((elementId: string, file: File) => void) | undefined;
   onClearPageTransition?: (() => void) | undefined;
   onSetPageTransition?: ((transition: SlideTransition) => void) | undefined;
@@ -192,6 +204,12 @@ export function LeftToolPanel({
   onUpdateTextContent,
   onUpdateMediaPlayback,
   onUpdatePageBackground,
+  onApplyTheme,
+  onEditTheme,
+  onChangeTheme,
+  onApplySlideLayout,
+  onEditSlideLayout,
+  onToggleSlideLayoutPlaceholder,
   onReplaceVideoAsset,
   onClearPageTransition,
   onSetPageTransition,
@@ -308,6 +326,12 @@ export function LeftToolPanel({
             {...(onUpdateTextContent ? { onUpdateTextContent } : {})}
             {...(onUpdateMediaPlayback ? { onUpdateMediaPlayback } : {})}
             {...(onUpdatePageBackground ? { onUpdatePageBackground } : {})}
+            {...(onApplyTheme ? { onApplyTheme } : {})}
+            {...(onEditTheme ? { onEditTheme } : {})}
+            {...(onChangeTheme ? { onChangeTheme } : {})}
+            {...(onApplySlideLayout ? { onApplySlideLayout } : {})}
+            {...(onEditSlideLayout ? { onEditSlideLayout } : {})}
+            {...(onToggleSlideLayoutPlaceholder ? { onToggleSlideLayoutPlaceholder } : {})}
             {...(onReplaceVideoAsset ? { onReplaceVideoAsset } : {})}
             {...(onSetElementAnimationBuilds ? { onSetElementAnimationBuilds } : {})}
           />

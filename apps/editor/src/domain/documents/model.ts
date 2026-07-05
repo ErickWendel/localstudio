@@ -28,6 +28,10 @@ export interface ProjectDocument {
   assets: Record<string, Asset>;
   fonts?: Record<string, ProjectFont>;
   elements: Record<string, DesignElement>;
+  themes?: Record<string, PresentationTheme>;
+  themeId?: string;
+  themeGallery?: string[];
+  slideLayouts?: Record<string, SlideLayout>;
   createdAt: string;
   updatedAt: string;
   importWarnings?: ImportWarning[];
@@ -42,6 +46,7 @@ export interface Page {
   elementIds: string[];
   transition?: SlideTransition;
   animationBuilds?: ElementAnimationBuild[];
+  layoutId?: string;
   speakerNotes?: string;
   visible?: boolean;
 }
@@ -144,6 +149,46 @@ export interface ProjectFont {
 
 export type DesignElement = TextElement | ImageElement | GifElement | VideoElement | ShapeElement;
 
+export type ElementTemplateSource = { layoutId: string; type: 'layout' };
+export type PlaceholderRole = 'body' | 'footer' | 'slideNumber' | 'title';
+
+export interface PresentationTheme {
+  id: string;
+  name: string;
+  palette: ThemePalette;
+  typography: ThemeTypography;
+  preview?: ThemePreview;
+}
+
+export interface ThemePalette {
+  accent: string;
+  background: string;
+  surface: string;
+  text: string;
+  mutedText: string;
+}
+
+export interface ThemeTypography {
+  bodyFontFamily: string;
+  headingFontFamily: string;
+}
+
+export interface ThemePreview {
+  background: string;
+  foreground: string;
+}
+
+export interface SlideLayout {
+  id: string;
+  name: string;
+  background: PageBackground;
+  elementIds: string[];
+  elements: Record<string, DesignElement>;
+  placeholderRoles: PlaceholderRole[];
+  placeholderVisibility: Record<PlaceholderRole, boolean>;
+  thumbnail?: ThemePreview;
+}
+
 export interface BaseElement {
   id: string;
   type: ElementType;
@@ -155,6 +200,8 @@ export interface BaseElement {
   locked: boolean;
   visible: boolean;
   opacity: number;
+  templateSource?: ElementTemplateSource;
+  placeholderRole?: PlaceholderRole;
 }
 
 export interface TextElement extends BaseElement {
@@ -223,4 +270,5 @@ export interface CropRect {
 export interface SelectionState {
   pageId: string;
   elementIds: string[];
+  target?: 'elements' | 'presentation' | 'slide';
 }

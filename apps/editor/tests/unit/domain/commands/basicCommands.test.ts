@@ -1,6 +1,6 @@
 import { basicCommands } from '../../../../src/domain/commands/elements/basicCommands';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
-import type { ShapeElement } from '../../../../src/domain/documents/model';
+import type { ProjectDocument, ShapeElement } from '../../../../src/domain/documents/model';
 
 function createShapeFixture(overrides: Partial<ShapeElement> = {}) {
   const project = sampleProject.createSampleProject();
@@ -30,6 +30,88 @@ function createShapeFixture(overrides: Partial<ShapeElement> = {}) {
     pages: project.pages.map((page) =>
       page.id === 'page-1' ? { ...page, elementIds: [...page.elementIds, shape.id] } : page,
     ),
+  };
+}
+
+function createTemplateFixture(): ProjectDocument {
+  return {
+    ...sampleProject.createSampleProject(),
+    slideLayouts: {
+      'layout-title': {
+        id: 'layout-title',
+        name: 'Title',
+        background: { type: 'color', color: '#101010' },
+        elementIds: ['layout-title-text', 'layout-body-text'],
+        elements: {
+          'layout-title-text': {
+            id: 'layout-title-text',
+            type: 'text',
+            text: 'Template title',
+            x: 96,
+            y: 96,
+            width: 640,
+            height: 120,
+            rotation: 0,
+            locked: false,
+            visible: true,
+            opacity: 1,
+            fontFamily: 'Inter',
+            fontSize: 52,
+            fontWeight: 700,
+            fill: '#FFFFFF',
+            align: 'left',
+            placeholderRole: 'title',
+            templateSource: { layoutId: 'layout-title', type: 'layout' },
+          },
+          'layout-body-text': {
+            id: 'layout-body-text',
+            type: 'text',
+            text: 'Template body',
+            x: 128,
+            y: 300,
+            width: 980,
+            height: 180,
+            rotation: 0,
+            locked: false,
+            visible: true,
+            opacity: 0.86,
+            fontFamily: 'Open Sans',
+            fontSize: 34,
+            fontWeight: 500,
+            fill: '#CFE6D6',
+            align: 'center',
+            lineHeight: 1.2,
+            verticalAlign: 'middle',
+            placeholderRole: 'body',
+            templateSource: { layoutId: 'layout-title', type: 'layout' },
+          },
+        },
+        placeholderRoles: ['title', 'body'],
+        placeholderVisibility: {
+          body: true,
+          footer: true,
+          slideNumber: true,
+          title: true,
+        },
+      },
+    },
+    themes: {
+      'theme-studio': {
+        id: 'theme-studio',
+        name: 'Studio',
+        palette: {
+          accent: '#37FD76',
+          background: '#050D10',
+          mutedText: '#91999D',
+          surface: '#0C1417',
+          text: '#FFFFFF',
+        },
+        typography: {
+          bodyFontFamily: 'Inter',
+          headingFontFamily: 'Orbitron',
+        },
+      },
+    },
   };
 }
 
@@ -800,5 +882,162 @@ describe('editor commands', () => {
     expect(renamed.pages[0]?.name).toBe('Launch Slide');
     expect(hidden.pages[0]).toMatchObject({ id: 'page-copy', visible: false });
     expect(project.pages.map((page) => page.id)).toEqual(['page-1', 'page-copy']);
+  });
+
+  it('applies a slide layout without deleting user-authored elements', () => {
+    const project = createTemplateFixture();
+    const next = new basicCommands.ApplySlideLayoutCommand('page-1', 'layout-title').execute(
+      project,
+    );
+
+    expect(next.pages[0]).toMatchObject({
+      id: 'page-1',
+      layoutId: 'layout-title',
+    });
+    expect(next.pages[0]?.elementIds).toEqual(project.pages[0]?.elementIds);
+    expect(next.elements['layout-title-text']).toBeUndefined();
+    expect(next.elements['layout-body-text']).toBeUndefined();
+  });
+
+  it('fits slide title and subtitle text into the applied layout placeholders', () => {
+    const project = createTemplateFixture();
+    const next = new basicCommands.ApplySlideLayoutCommand('page-1', 'layout-title').execute(
+      project,
+    );
+
+    expect(next.pages[0]?.elementIds).toEqual(project.pages[0]?.elementIds);
+    expect(next.elements['text-title']).toMatchObject({
+      id: 'text-title',
+      type: 'text',
+      text: 'AI Design Revolution',
+      x: 96,
+      y: 96,
+      width: 640,
+      height: 120,
+      fontFamily: 'Orbitron',
+      fontSize: 96,
+      fontWeight: 800,
+      fill: '#37FD76',
+      align: 'left',
+      placeholderRole: 'title',
+    });
+    expect(next.elements['text-subtitle']).toMatchObject({
+      id: 'text-subtitle',
+      type: 'text',
+      text: 'Browser-native creative automation',
+      x: 128,
+      y: 300,
+      width: 980,
+      height: 180,
+      opacity: 0.86,
+      fontFamily: 'Open Sans',
+      fontSize: 40,
+      fontWeight: 600,
+      fill: '#FFFFFF',
+      align: 'center',
+      verticalAlign: 'middle',
+      placeholderRole: 'body',
+    });
+    expect(next.elements['image-hero']).toEqual(project.elements['image-hero']);
+  });
+
+  it('creates editable placeholder text when applying a layout to an empty slide', () => {
+    const project = {
+      ...createTemplateFixture(),
+      pages: [
+        {
+          id: 'page-empty',
+          name: 'Empty slide',
+          width: 1920,
+          height: 1080,
+          background: { type: 'color' as const, color: '#000000' },
+          elementIds: [],
+        },
+      ],
+      elements: {},
+    };
+    const next = new basicCommands.ApplySlideLayoutCommand('page-empty', 'layout-title').execute(
+      project,
+    );
+
+    expect(next.pages[0]).toMatchObject({
+      id: 'page-empty',
+      layoutId: 'layout-title',
+      elementIds: ['page-empty-layout-title-text', 'page-empty-layout-body-text'],
+    });
+    expect(next.elements['page-empty-layout-title-text']).toMatchObject({
+      type: 'text',
+      text: 'Template title',
+      x: 96,
+      y: 96,
+      width: 640,
+      height: 120,
+      placeholderRole: 'title',
+    });
+    expect(next.elements['page-empty-layout-title-text']).not.toHaveProperty('templateSource');
+    expect(next.elements['page-empty-layout-body-text']).toMatchObject({
+      type: 'text',
+      text: 'Template body',
+      x: 128,
+      y: 300,
+      width: 980,
+      height: 180,
+      placeholderRole: 'body',
+    });
+    expect(next.slideLayouts?.['layout-title']?.elements['layout-title-text']).toHaveProperty(
+      'templateSource',
+    );
+  });
+
+  it('adds editable text placeholders for layout slots missing from a populated slide', () => {
+    const project = createTemplateFixture();
+    const { 'text-subtitle': removedSubtitle, ...elements } = project.elements;
+    void removedSubtitle;
+    const partialProject = {
+      ...project,
+      elements,
+      pages: project.pages.map((page) =>
+        page.id === 'page-1'
+          ? { ...page, elementIds: page.elementIds.filter((elementId) => elementId !== 'text-subtitle') }
+          : page,
+      ),
+    };
+    const next = new basicCommands.ApplySlideLayoutCommand('page-1', 'layout-title').execute(
+      partialProject,
+    );
+
+    expect(next.pages[0]?.elementIds).toEqual([
+      'image-hero',
+      'text-title',
+      'page-1-layout-body-text',
+    ]);
+    expect(next.elements['text-title']).toMatchObject({
+      text: 'AI Design Revolution',
+      x: 96,
+      y: 96,
+      placeholderRole: 'title',
+    });
+    expect(next.elements['page-1-layout-body-text']).toMatchObject({
+      type: 'text',
+      text: 'Template body',
+      x: 128,
+      y: 300,
+      width: 980,
+      height: 180,
+      placeholderRole: 'body',
+    });
+    expect(next.elements['page-1-layout-title-text']).toBeUndefined();
+  });
+
+  it('applies a theme without creating slide elements from template text', () => {
+    const project = createTemplateFixture();
+    const next = new basicCommands.ApplyThemeCommand('theme-studio').execute(project);
+
+    expect(next.themeId).toBe('theme-studio');
+    expect(next.elements['layout-title-text']).toBeUndefined();
+    expect(next.slideLayouts?.['layout-title']?.elements['layout-title-text']).toMatchObject({
+      text: 'Template title',
+      templateSource: { layoutId: 'layout-title', type: 'layout' },
+    });
   });
 });
