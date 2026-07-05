@@ -1,0 +1,218 @@
+.layout-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 10px;
+}
+
+.layout-choice-card {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ew-muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+}
+
+.layout-choice-card > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layout-choice-card:hover,
+.layout-choice-card:focus-visible,
+.layout-choice-card-active {
+  color: var(--ew-text);
+  outline: none;
+}
+
+.layout-choice-card:hover .layout-choice-thumbnail,
+.layout-choice-card:focus-visible .layout-choice-thumbnail,
+.layout-choice-card-active .layout-choice-thumbnail {
+  border-color: rgba(55, 253, 118, 0.62);
+  box-shadow: 0 0 0 1px rgba(55, 253, 118, 0.16), 0 10px 28px rgba(0, 0, 0, 0.36);
+}
+
+.layout-choice-thumbnail {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 3px;
+  background: var(--layout-preview-background, #fbfcfb);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--layout-preview-ink, #182124) 14%, transparent),
+    0 6px 16px rgba(0, 0, 0, 0.24);
+}
+
+.layout-choice-thumbnail span {
+  position: absolute;
+  display: block;
+  border-radius: 2px;
+}
+
+.layout-choice-title,
+.layout-choice-body,
+.layout-choice-footer,
+.layout-choice-number,
+.layout-choice-blank {
+  border: 1px dashed color-mix(in srgb, var(--layout-preview-ink, #182124) 78%, transparent);
+  background: transparent;
+}
+
+.layout-choice-title {
+  left: 8%;
+  top: 15%;
+  width: 42%;
+  height: 14%;
+}
+
+.layout-choice-body {
+  left: 8%;
+  top: 36%;
+  width: 72%;
+  height: 30%;
+}
+
+.layout-choice-footer {
+  left: 8%;
+  bottom: 14%;
+  width: 26%;
+  height: 5%;
+  opacity: 0.38;
+}
+
+.layout-choice-number {
+  right: 8%;
+  bottom: 13%;
+  width: 10%;
+  height: 7%;
+  opacity: 0.42;
+}
+
+.layout-choice-blank {
+  left: 41%;
+  top: 44%;
+  width: 18%;
+  height: 12%;
+  opacity: 0.42;
+}
+
+.layout-choice-element {
+  position: absolute;
+  box-sizing: border-box;
+  min-width: 2px;
+  min-height: 2px;
+  transform-origin: center;
+}
+
+.layout-choice-text {
+  display: block;
+  overflow: hidden;
+}
+
+.layout-choice-placeholder {
+  border: 1px dashed color-mix(in srgb, var(--layout-preview-ink, #182124) 78%, transparent);
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 36%, transparent),
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 36%, transparent)
+    )
+    8% 24% / 46% 6% no-repeat,
+    linear-gradient(
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 22%, transparent),
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 22%, transparent)
+    )
+    8% 52% / 72% 5% no-repeat;
+}
+
+.layout-choice-placeholder-title {
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 58%, transparent),
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 58%, transparent)
+    )
+    7% 28% / 68% 10% no-repeat,
+    linear-gradient(
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 28%, transparent),
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 28%, transparent)
+    )
+    7% 60% / 88% 7% no-repeat;
+}
+
+.layout-choice-placeholder-body {
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 34%, transparent),
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 34%, transparent)
+    )
+    7% 18% / 58% 5% no-repeat,
+    linear-gradient(
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 24%, transparent),
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 24%, transparent)
+    )
+    7% 40% / 82% 5% no-repeat,
+    linear-gradient(
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 18%, transparent),
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 18%, transparent)
+    )
+    7% 62% / 70% 5% no-repeat;
+}
+
+.layout-choice-placeholder-footer,
+.layout-choice-placeholder-slideNumber {
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 30%, transparent),
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 30%, transparent)
+    )
+    center / 72% 24% no-repeat;
+}
+
+.layout-choice-text-run {
+  border-radius: 1px;
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 68%, transparent),
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 68%, transparent)
+    )
+    0 22% / 72% 9% no-repeat,
+    linear-gradient(
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 34%, transparent),
+      color-mix(in srgb, var(--layout-preview-ink, #182124) 34%, transparent)
+    )
+    0 56% / 92% 7% no-repeat;
+}
+
+.layout-choice-shape {
+  border-style: solid;
+}
+
+.layout-choice-shape-ellipse {
+  border-radius: 999px;
+}
+
+.layout-choice-shape-rounded-rect {
+  border-radius: 5px;
+}
+
+.layout-choice-shape-line,
+.layout-choice-shape-arrow {
+  height: 2px !important;
+  min-height: 2px;
+}
+
+.layout-choice-media {
+  border: 1px solid rgba(5, 13, 16, 0.22);
+  background:
+    linear-gradient(135deg, rgba(5, 13, 16, 0.12), rgba(5, 13, 16, 0.02)),
+    #eef3f0;
+}

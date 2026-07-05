@@ -38,6 +38,8 @@
 @import './styles/media-panel.css';
 @import './styles/animation-panel.css';
 @import './styles/design-panel.css';
+@import './styles/layout-choice.css';
+@import './styles/theme-choice.css';
 @import './styles/text-inspector.css';
 @import './styles/font-controls.css';
 @import './styles/movie-inspector.css';
