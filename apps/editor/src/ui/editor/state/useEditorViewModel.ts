@@ -32,6 +32,9 @@ import type {
   MirrorState,
   ModelDownloadProgressDetails,
   ModelState,
+  PresentationExportProgress,
+  PresentationExportResult,
+  PresentationExportWarning,
   PromptApiAvailability,
   StockMediaConfig,
   StockMediaItem,
@@ -69,6 +72,15 @@ export type TextPreset = 'title' | 'subtitle' | 'body';
 interface EditorHistory {
   past: ProjectDocument[];
   future: ProjectDocument[];
+}
+
+export type OperationNoticeTone = 'error' | 'info' | 'success' | 'warning';
+
+export interface OperationNoticeState {
+  detail?: string | undefined;
+  message: string;
+  progress?: { current: number; total: number } | undefined;
+  tone: OperationNoticeTone;
 }
 
 interface BackgroundPreviewState {
@@ -482,6 +494,7 @@ type TranslationPatch = {
 };
 
 const DECK_TRANSLATION_CONCURRENCY = 3;
+const OPERATION_NOTICE_CLEAR_MS = 3000;
 
 interface DeckTranslationProgressState {
   activePageIds: string[];
@@ -531,6 +544,77 @@ function estimateSingleLineTextWidth(text: string, fontSize: number) {
     if (/[ilI.,'’|]/.test(character)) return width + fontSize * 0.34;
     return width + fontSize * 0.58;
   }, 0);
+}
+
+function pluralizeCount(count: number, singular: string, plural = `${singular}s`) {
+  return `${count.toLocaleString()} ${count === 1 ? singular : plural}`;
+}
+
+function getPowerPointWarningCategory(warning: PresentationExportWarning) {
+  if (warning.category === 'animation') return 'animation';
+  if (warning.category === 'transition') return 'transition';
+  if (
+    warning.category === 'content-type' ||
+    warning.category === 'fidelity' ||
+    warning.category === 'media' ||
+    warning.category === 'relationship'
+  ) {
+    return 'media';
+  }
+  if (warning.code.includes('animation')) return 'animation';
+  if (warning.code.includes('transition')) return 'transition';
+  if (warning.code.includes('media') || warning.code.includes('video') || warning.code.includes('asset')) {
+    return 'media';
+  }
+  return 'other';
+}
+
+function summarizePowerPointExport(result: PresentationExportResult) {
+  const stats = [
+    pluralizeCount(result.stats.slideCount, 'slide'),
+    pluralizeCount(result.stats.mediaElementCount, 'media item'),
+    pluralizeCount(result.stats.animationBuildCount, 'animation build'),
+  ];
+  if (result.warnings.length === 0) return `PowerPoint exported: ${stats.join(', ')}.`;
+
+  const counts = result.warnings.reduce(
+    (summary, warning) => {
+      summary[getPowerPointWarningCategory(warning)] += 1;
+      return summary;
+    },
+    { animation: 0, media: 0, other: 0, transition: 0 },
+  );
+  const fallbackParts = [
+    counts.animation > 0 ? pluralizeCount(counts.animation, 'animation fallback') : undefined,
+    counts.transition > 0 ? pluralizeCount(counts.transition, 'transition fallback') : undefined,
+    counts.media > 0 ? pluralizeCount(counts.media, 'media fallback') : undefined,
+    counts.other > 0 ? pluralizeCount(counts.other, 'fallback') : undefined,
+  ].filter(Boolean);
+
+  return `PowerPoint exported: ${stats.join(', ')}; ${fallbackParts.join(', ')}.`;
+}
+
+function getExportProgressValue(progress: PresentationExportProgress) {
+  if (
+    progress.current === undefined ||
+    progress.total === undefined ||
+    progress.total <= 0
+  ) {
+    return undefined;
+  }
+  return {
+    current: Math.min(progress.total, Math.max(0, progress.current)),
+    total: progress.total,
+  };
+}
+
+function formatPowerPointExportProgress(progress: PresentationExportProgress): OperationNoticeState {
+  return {
+    detail: progress.detail,
+    message: progress.label,
+    progress: getExportProgressValue(progress),
+    tone: 'info',
+  };
 }
 
 function fitTranslatedTextToOriginalFrame(
@@ -701,7 +785,8 @@ export function useEditorViewModel(services: AppServices) {
   const [remoteImportOpen, setRemoteImportOpen] = useState(false);
   const [localProjectSetupOpen, setLocalProjectSetupOpen] = useState(false);
   const [persistenceAttention, setPersistenceAttention] = useState(false);
-  const [persistenceNotice, setPersistenceNotice] = useState<string | undefined>();
+  const [operationNotice, setOperationNotice] = useState<OperationNoticeState | undefined>();
+  const [isExportingPowerPoint, setIsExportingPowerPoint] = useState(false);
   const [remoteImportStatus, setRemoteImportStatus] = useState<RemoteImportStatus>('loading');
   const [remoteImportProjects, setRemoteImportProjects] = useState<MirrorProjectSummary[]>([]);
   const [remoteImportError, setRemoteImportError] = useState<string | undefined>();
@@ -727,7 +812,32 @@ export function useEditorViewModel(services: AppServices) {
   };
   const backgroundSelectionPointsRef = useRef<Record<string, BackgroundSelectionPoint[]>>({});
   const backgroundPreviewTimeoutRef = useRef<number | undefined>(undefined);
+  const operationNoticeTimeoutRef = useRef<number | undefined>(undefined);
   const wasFullscreenRef = useRef(false);
+
+  function clearOperationNoticeTimer() {
+    if (operationNoticeTimeoutRef.current === undefined) return;
+    window.clearTimeout(operationNoticeTimeoutRef.current);
+    operationNoticeTimeoutRef.current = undefined;
+  }
+
+  function showOperationNotice(notice: OperationNoticeState | undefined, options?: { persistent?: boolean }) {
+    clearOperationNoticeTimer();
+    setOperationNotice(notice);
+    if (!notice || options?.persistent) return;
+    operationNoticeTimeoutRef.current = window.setTimeout(() => {
+      setOperationNotice(undefined);
+      operationNoticeTimeoutRef.current = undefined;
+    }, OPERATION_NOTICE_CLEAR_MS);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (operationNoticeTimeoutRef.current === undefined) return;
+      window.clearTimeout(operationNoticeTimeoutRef.current);
+      operationNoticeTimeoutRef.current = undefined;
+    };
+  }, []);
   const presenterPageIdRef = useRef<string | undefined>(undefined);
   const backgroundPreviewSequenceRef = useRef(0);
   const backgroundPreparationSequenceRef = useRef(0);
@@ -1664,7 +1774,7 @@ export function useEditorViewModel(services: AppServices) {
       setPersistenceEnabled(false);
       setLocalProjectSetupOpen(false);
       setPersistenceAttention(false);
-      setPersistenceNotice(undefined);
+      showOperationNotice(undefined);
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(false);
       }
@@ -1695,7 +1805,7 @@ export function useEditorViewModel(services: AppServices) {
       skipNextProjectSaveRef.current = true;
       setPersistenceEnabled(true);
       setPersistenceAttention(false);
-      setPersistenceNotice(undefined);
+      showOperationNotice(undefined);
       setLocalProjectSetupOpen(false);
       writeProjectNameToUrl(projectToSave.name);
       if (typeof window !== 'undefined') {
@@ -1760,7 +1870,7 @@ export function useEditorViewModel(services: AppServices) {
       setHasPersistedLocalProject(true);
       setPersistenceEnabled(true);
       setPersistenceAttention(false);
-      setPersistenceNotice(undefined);
+      showOperationNotice(undefined);
       setLocalProjectSetupOpen(false);
       setLastEditedAt(projectToSave.updatedAt);
       setSaveAnimationKey((current) => current + 1);
@@ -1799,7 +1909,7 @@ export function useEditorViewModel(services: AppServices) {
       setHasPersistedLocalProject(true);
       setPersistenceEnabled(true);
       setPersistenceAttention(false);
-      setPersistenceNotice(undefined);
+      showOperationNotice(undefined);
       setLocalProjectSetupOpen(false);
       writeProjectNameToUrl(nextProject.name);
       if (typeof window !== 'undefined') {
@@ -1856,7 +1966,7 @@ export function useEditorViewModel(services: AppServices) {
 
   async function importPowerPoint(input?: PptxImportInput) {
     try {
-      setPersistenceNotice(undefined);
+      showOperationNotice(undefined);
       const pptxInput = input ?? (await pickPowerPointImportInput());
       if (!pptxInput) return;
       setPresentationImportProgress({
@@ -1978,17 +2088,60 @@ export function useEditorViewModel(services: AppServices) {
               }`
             : undefined,
         ].filter(Boolean);
-        setPersistenceNotice(`PowerPoint imported with ${parts.join(' and ')}.`);
+        showOperationNotice({
+          message: `PowerPoint imported with ${parts.join(' and ')}.`,
+          tone: 'warning',
+        });
       }
     } catch (error) {
       setPresentationImportProgress(undefined);
       pptxImportLogger.error('PowerPoint import failed.', error);
       const message = pptxImportLogger.describeError(error).message;
-      setPersistenceNotice(`PowerPoint import failed: ${message}`);
+      showOperationNotice({ message: `PowerPoint import failed: ${message}`, tone: 'error' });
+    }
+  }
+
+  async function exportPowerPoint() {
+    if (isExportingPowerPoint) return;
+    setIsExportingPowerPoint(true);
+    try {
+      showOperationNotice(
+        { message: 'Exporting PowerPoint...', tone: 'info' },
+        { persistent: true },
+      );
+      await waitForNextPaint();
+      const result = await services.presentationExportService.exportPowerPoint(project, {
+        onProgress: (progress) => {
+          showOperationNotice(formatPowerPointExportProgress(progress), { persistent: true });
+        },
+      });
+      showOperationNotice(
+        {
+          detail: 'Saving the file from the browser.',
+          message: 'Downloading PowerPoint',
+          tone: 'info',
+        },
+        { persistent: true },
+      );
+      services.exportService.downloadBlob(
+        result.blob,
+        services.exportService.getPowerPointFileName(project),
+      );
+      showOperationNotice({
+        message: summarizePowerPointExport(result),
+        tone: result.warnings.length > 0 ? 'warning' : 'success',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown export error.';
+      showOperationNotice({ message: `PowerPoint export failed: ${message}`, tone: 'error' });
+    } finally {
+      setIsExportingPowerPoint(false);
     }
   }
 
   const importPowerPointRef = useRef(importPowerPoint);
+  const showOperationNoticeRef = useRef(showOperationNotice);
+  showOperationNoticeRef.current = showOperationNotice;
 
   useEffect(() => {
     if (!consumeLocalPowerPointSampleImportRequest()) return;
@@ -1997,7 +2150,10 @@ export function useEditorViewModel(services: AppServices) {
       .catch((error: unknown) => {
         pptxImportLogger.error('Local PowerPoint sample import failed.', error);
         const message = pptxImportLogger.describeError(error).message;
-        setPersistenceNotice(`PowerPoint import failed: ${message}`);
+        showOperationNoticeRef.current({
+          message: `PowerPoint import failed: ${message}`,
+          tone: 'error',
+        });
       });
   }, []);
 
@@ -2162,7 +2318,7 @@ export function useEditorViewModel(services: AppServices) {
   function requestMirrorNow() {
     if (!persistenceEnabled) {
       setPersistenceAttention(true);
-      setPersistenceNotice('Save the project before mirroring.');
+      showOperationNotice({ message: 'Save the project before mirroring.', tone: 'warning' });
       return;
     }
     if (!mirrorConfigRef.current) {
@@ -4088,7 +4244,8 @@ export function useEditorViewModel(services: AppServices) {
     presentationImportProgress,
     mediaImportProgress,
     persistenceAttention,
-    persistenceNotice,
+    operationNotice,
+    isExportingPowerPoint,
     mirrorState,
     mirrorDisabledBySettings,
     mirrorConfig,
@@ -4157,6 +4314,7 @@ export function useEditorViewModel(services: AppServices) {
     closeRemoteImport,
     importProject,
     importPowerPoint,
+    exportPowerPoint,
     openVersionHistory,
     closeVersionHistory,
     selectVersion,

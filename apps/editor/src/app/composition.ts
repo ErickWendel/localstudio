@@ -11,6 +11,7 @@ import type {
   ModelSetupService,
   PaletteService,
   PresentationImportService,
+  PresentationExportService,
   PersistenceStorageMode,
   PromptService,
   ProjectRepository,
@@ -32,6 +33,7 @@ import { localSetupService } from '../services/browser/localSetupService';
 import { modelSetupService } from '../services/model-setup/modelSetupService';
 import { BrowserShareService } from '../services/sharing/shareService';
 import { BrowserPptxImportService } from '../services/importing/pptx/pptxImportService';
+import { BrowserPptxExportService } from '../services/exporting/pptxExportService';
 import { BrowserStockMediaService } from '../services/stock-media/stockMediaService';
 import { BrowserGoogleFontsImportService } from '../services/fonts/googleFontsImportService';
 import { webGpuLanguageDetectionRuntime } from '../services/translation/webGpuLanguageDetectionRuntime';
@@ -49,6 +51,7 @@ export interface AppServices {
   exportService: ExportService;
   fontImportService: FontImportService;
   presentationImportService: PresentationImportService;
+  presentationExportService: PresentationExportService;
   shareService: ShareService;
   stockMediaService: StockMediaService;
   localSetupService: LocalSetupService;
@@ -93,6 +96,7 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     exportService: new BrowserExportService(),
     fontImportService: new BrowserGoogleFontsImportService(),
     presentationImportService: new BrowserPptxImportService(),
+    presentationExportService: new BrowserPptxExportService(),
     shareService: new BrowserShareService({ mirrorService }),
     stockMediaService: new BrowserStockMediaService(),
     localSetupService: new localSetupService.BrowserLocalSetupService(),

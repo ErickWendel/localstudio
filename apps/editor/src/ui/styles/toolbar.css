@@ -103,6 +103,22 @@
   cursor: not-allowed;
 }
 
+.toolbar-dropdown-submenu {
+  position: relative;
+}
+
+.toolbar-dropdown-submenu-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.toolbar-dropdown-nested {
+  top: -8px;
+  left: calc(100% + 6px);
+}
+
 .toolbar-dropdown-separator {
   height: 1px;
   margin: 6px 2px;

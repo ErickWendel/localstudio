@@ -11,21 +11,72 @@
   animation: persistencePulse 900ms ease-in-out infinite;
 }
 
-.persistence-notice {
+.operation-notice {
   position: absolute;
   top: 42px;
   left: 0;
   z-index: 151;
+  display: grid;
+  gap: 5px;
   width: max-content;
-  max-width: 260px;
-  border: 1px solid rgba(246, 196, 83, 0.34);
+  max-width: 360px;
+  border: 1px solid var(--ew-border);
   border-radius: 6px;
-  background: rgba(18, 16, 8, 0.98);
-  color: #f6c453;
+  background: rgba(8, 17, 11, 0.98);
+  color: var(--ew-text);
   font-size: 12px;
   line-height: 1.35;
   padding: 8px 10px;
-  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.42);
+  box-shadow:
+    0 16px 42px rgba(0, 0, 0, 0.42),
+    0 0 18px rgba(55, 253, 118, 0.08);
+}
+
+.operation-notice-message {
+  color: inherit;
+  font-weight: 700;
+}
+
+.operation-notice-detail {
+  color: var(--ew-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.operation-notice-progress {
+  position: relative;
+  overflow: hidden;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(230, 255, 241, 0.12);
+}
+
+.operation-notice-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(122, 255, 199, 0.4), var(--ew-green-fixed));
+  transition: width 160ms ease;
+}
+
+.operation-notice-info {
+  border-color: rgba(122, 255, 199, 0.26);
+  color: var(--ew-muted);
+}
+
+.operation-notice-success {
+  border-color: rgba(55, 253, 118, 0.34);
+  color: var(--ew-green-fixed);
+}
+
+.operation-notice-warning {
+  border-color: rgba(246, 196, 83, 0.34);
+  color: #f6c453;
+}
+
+.operation-notice-error {
+  border-color: rgba(255, 180, 171, 0.4);
+  color: #ffb4ab;
 }
 
 .mirror-status-button {

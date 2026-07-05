@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ProjectDocument } from '../../../domain/documents/model';
 import type { MirrorState, PersistenceStorageMode } from '../../../services/contracts/interfaces';
+import type { OperationNoticeState } from '../state/useEditorViewModel';
 import type { TranslationLanguageOption } from '../translation/translationLanguages';
 
 interface TopToolbarProps {
@@ -19,16 +20,18 @@ interface TopToolbarProps {
   mirrorDisabledBySettings?: boolean;
   localProjectSetupPanel?: ReactNode;
   persistenceAttention?: boolean;
-  persistenceNotice?: string | undefined;
+  operationNotice?: OperationNoticeState | undefined;
   saveAnimationKey?: number;
   canTranslateDeck?: boolean;
   deckTranslationStatus?: string | undefined;
   isTranslatingDeck?: boolean;
+  isExportingPowerPoint?: boolean;
   translationLanguageOptions?: TranslationLanguageOption[];
   translationSourceLanguage?: string;
   translationTargetLanguage?: string;
   onDelete?: (() => void) | undefined;
   onDuplicate?: (() => void) | undefined;
+  onExportPowerPoint?: (() => void) | undefined;
   onImportPowerPoint?: (() => void) | undefined;
   onImportProject?: (() => void) | undefined;
   onImportRemoteMirror?: (() => void) | undefined;
@@ -70,7 +73,13 @@ interface HeaderMenuSeparator {
   label: string;
 }
 
-type HeaderMenuAction = HeaderMenuActionItem | HeaderMenuSeparator;
+interface HeaderMenuSubmenu {
+  kind: 'submenu';
+  label: string;
+  items: HeaderMenuActionItem[];
+}
+
+type HeaderMenuAction = HeaderMenuActionItem | HeaderMenuSeparator | HeaderMenuSubmenu;
 
 const menuLabels: HeaderMenu[] = ['File', 'Edit', 'View', 'Help'];
 const githubUrl = 'https://github.com/ErickWendel/localstudio';
@@ -131,16 +140,18 @@ export function TopToolbar({
   mirrorDisabledBySettings = false,
   localProjectSetupPanel,
   persistenceAttention = false,
-  persistenceNotice,
+  operationNotice,
   saveAnimationKey = 0,
   canTranslateDeck = false,
   deckTranslationStatus,
   isTranslatingDeck = false,
+  isExportingPowerPoint = false,
   translationLanguageOptions = [],
   translationSourceLanguage = language.toLowerCase(),
   translationTargetLanguage = '',
   onDelete,
   onDuplicate,
+  onExportPowerPoint,
   onImportPowerPoint,
   onImportProject,
   onImportRemoteMirror,
@@ -168,6 +179,7 @@ export function TopToolbar({
   onZoomOut,
 }: TopToolbarProps) {
   const [openMenu, setOpenMenu] = useState<HeaderMenu | null>(null);
+  const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
   const [playMenuOpen, setPlayMenuOpen] = useState(false);
   const [translationMenuOpen, setTranslationMenuOpen] = useState(false);
   const [isEditingProjectName, setIsEditingProjectName] = useState(false);
@@ -226,6 +238,7 @@ export function TopToolbar({
 
   function closeMenu() {
     setOpenMenu(null);
+    setOpenSubmenu(null);
   }
 
   function startPresenterMode(options?: { fromBeginning?: boolean }) {
@@ -262,6 +275,17 @@ export function TopToolbar({
       { label: 'Import Project', disabled: !onImportProject, onSelect: onImportProject },
       { label: 'Import PowerPoint...', disabled: !onImportPowerPoint, onSelect: onImportPowerPoint },
       { label: 'Import Remote', disabled: !onImportRemoteMirror, onSelect: onImportRemoteMirror },
+      {
+        kind: 'submenu',
+        label: 'Export to',
+        items: [
+          {
+            label: isExportingPowerPoint ? 'Exporting PowerPoint...' : 'Powerpoint (.pptx)',
+            disabled: isExportingPowerPoint || !onExportPowerPoint,
+            onSelect: onExportPowerPoint,
+          },
+        ],
+      },
       { label: 'Share', disabled: !onShare, onSelect: triggerShare },
       { kind: 'separator', label: 'File storage actions' },
       { label: 'Save', disabled: !onSaveLocal, onSelect: onSaveLocal },
@@ -295,6 +319,10 @@ export function TopToolbar({
 
   function handleMenuAction(action: HeaderMenuAction) {
     if (action.kind === 'separator') return;
+    if (action.kind === 'submenu') {
+      setOpenSubmenu((current) => (current === action.label ? null : action.label));
+      return;
+    }
     if (action.disabled) return;
     action.onSelect?.();
     closeMenu();
@@ -384,6 +412,7 @@ export function TopToolbar({
                 onClick={() => {
                   setPlayMenuOpen(false);
                   setTranslationMenuOpen(false);
+                  setOpenSubmenu(null);
                   setOpenMenu((current) => (current === item ? null : item));
                 }}
               >
@@ -399,6 +428,39 @@ export function TopToolbar({
                         key={action.label}
                         role="separator"
                       />
+                    ) : action.kind === 'submenu' ? (
+                      <div className="toolbar-dropdown-submenu" key={action.label}>
+                        <button
+                          aria-expanded={openSubmenu === action.label}
+                          className="toolbar-dropdown-item toolbar-dropdown-submenu-trigger"
+                          role="menuitem"
+                          type="button"
+                          onClick={() => {
+                            handleMenuAction(action);
+                          }}
+                        >
+                          <span>{action.label}</span>
+                          <span aria-hidden="true">›</span>
+                        </button>
+                        {openSubmenu === action.label ? (
+                          <div className="toolbar-dropdown toolbar-dropdown-nested" role="menu" aria-label={action.label}>
+                            {action.items.map((item) => (
+                              <button
+                                className="toolbar-dropdown-item"
+                                disabled={item.disabled}
+                                key={item.label}
+                                role="menuitem"
+                                type="button"
+                                onClick={() => {
+                                  handleMenuAction(item);
+                                }}
+                              >
+                                {item.label}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
                     ) : (
                       <button
                         className="toolbar-dropdown-item"
@@ -565,9 +627,30 @@ export function TopToolbar({
               </span>
             ) : null}
           </button>
-          {persistenceNotice ? (
-            <div className="persistence-notice" role="status">
-              {persistenceNotice}
+          {operationNotice ? (
+            <div
+              className={`operation-notice operation-notice-${operationNotice.tone}`}
+              role="status"
+            >
+              <span className="operation-notice-message">{operationNotice.message}</span>
+              {operationNotice.detail ? (
+                <span className="operation-notice-detail">{operationNotice.detail}</span>
+              ) : null}
+              {operationNotice.progress ? (
+                <span
+                  className="operation-notice-progress"
+                  aria-label={`${operationNotice.progress.current} of ${operationNotice.progress.total}`}
+                >
+                  <span
+                    className="operation-notice-progress-fill"
+                    style={{
+                      width: `${Math.round(
+                        (operationNotice.progress.current / operationNotice.progress.total) * 100,
+                      )}%`,
+                    }}
+                  />
+                </span>
+              ) : null}
             </div>
           ) : null}
           {localProjectSetupPanel}

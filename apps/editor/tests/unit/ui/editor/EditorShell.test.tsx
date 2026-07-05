@@ -13,6 +13,9 @@ import type {
   MirrorProjectSummary,
   MirrorService,
   MirrorState,
+  PresentationExportProgress,
+  PresentationExportResult,
+  PresentationExportService,
   ProjectRepository,
   PresentationImportService,
   ShareMetadata,
@@ -2964,6 +2967,8 @@ describe('EditorShell', () => {
     services.exportService = {
       getPageImageFileName: () => 'slide.png',
       getPdfFileName: () => 'deck.pdf',
+      getPowerPointFileName: () => 'deck.pptx',
+      downloadBlob: vi.fn(),
       downloadDataUrl,
     };
 
@@ -2976,6 +2981,91 @@ describe('EditorShell', () => {
     expect(downloadDataUrl).toHaveBeenCalledWith(
       expect.stringMatching(/^data:image\/png/),
       'slide.png',
+    );
+  });
+
+  it('exports PowerPoint with stats and clears the operation notice', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const downloadBlob = vi.fn();
+    services.exportService = {
+      getPageImageFileName: () => 'slide.png',
+      getPdfFileName: () => 'deck.pdf',
+      getPowerPointFileName: () => 'deck.pptx',
+      downloadBlob,
+      downloadDataUrl: vi.fn(),
+    };
+    let resolvePowerPointExport: ((value: PresentationExportResult) => void) | undefined;
+    let reportPowerPointProgress: ((progress: PresentationExportProgress) => void) | undefined;
+    services.presentationExportService = {
+      exportPowerPoint: vi.fn<PresentationExportService['exportPowerPoint']>((_project, options) => {
+        reportPowerPointProgress = options?.onProgress;
+        options?.onProgress?.({
+          current: 2,
+          detail: 'Hero slide',
+          label: 'Building slide 2 of 4',
+          stage: 'building-slides',
+          total: 4,
+        });
+        return new Promise<PresentationExportResult>((resolve) => {
+          resolvePowerPointExport = resolve;
+        });
+      }),
+    } satisfies PresentationExportService;
+
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Export to' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Powerpoint (.pptx)' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Exporting PowerPoint...');
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent('Building slide 2 of 4');
+      expect(screen.getByRole('status')).toHaveTextContent('Hero slide');
+      expect(screen.getByLabelText('2 of 4')).toBeInTheDocument();
+    });
+    reportPowerPointProgress?.({
+      detail: 'Checking media targets, content types, and timing targets.',
+      label: 'Validating PowerPoint package',
+      stage: 'validating-package',
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent('Validating PowerPoint package');
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Checking media targets, content types, and timing targets.',
+      );
+    });
+    resolvePowerPointExport?.({
+      blob: new Blob(['pptx']),
+      stats: {
+        animationBuildCount: 2,
+        mediaElementCount: 3,
+        slideCount: 4,
+      },
+      warnings: [
+        {
+          code: 'pptx-animation-effect-downgraded',
+          message: 'Animation was downgraded.',
+        },
+        {
+          code: 'pptx-video-playback-downgraded',
+          message: 'Video playback was downgraded.',
+        },
+      ],
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'PowerPoint exported: 4 slides, 3 media items, 2 animation builds; 1 animation fallback, 1 media fallback.',
+      );
+    });
+    expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), 'deck.pptx');
+
+    await waitFor(
+      () => {
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      },
+      { timeout: 4000 },
     );
   });
 

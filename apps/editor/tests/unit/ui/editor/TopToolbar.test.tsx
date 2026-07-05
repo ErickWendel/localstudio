@@ -76,6 +76,54 @@ describe('TopToolbar', () => {
     expect(onTranslateDeck).toHaveBeenCalledTimes(1);
   });
 
+  it('opens the PowerPoint export action from the File menu', async () => {
+    const user = userEvent.setup();
+    const onExportPowerPoint = vi.fn();
+
+    render(
+      <TopToolbar
+        project={sampleProject.createSampleProject()}
+        language="PT-BR"
+        onExportPowerPoint={onExportPowerPoint}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Export to' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Powerpoint (.pptx)' }));
+
+    expect(onExportPowerPoint).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows operation notices and disables PowerPoint export while exporting', async () => {
+    const user = userEvent.setup();
+    const onExportPowerPoint = vi.fn();
+
+    render(
+      <TopToolbar
+        project={sampleProject.createSampleProject()}
+        language="PT-BR"
+        isExportingPowerPoint
+        operationNotice={{
+          detail: 'Slide 1',
+          message: 'Exporting PowerPoint...',
+          progress: { current: 1, total: 4 },
+          tone: 'info',
+        }}
+        onExportPowerPoint={onExportPowerPoint}
+      />,
+    );
+
+    expect(screen.getByRole('status')).toHaveClass('operation-notice-info');
+    expect(screen.getByRole('status')).toHaveTextContent('Exporting PowerPoint...');
+    expect(screen.getByRole('status')).toHaveTextContent('Slide 1');
+    expect(screen.getByLabelText('1 of 4')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Export to' }));
+    expect(screen.getByRole('menuitem', { name: 'Exporting PowerPoint...' })).toBeDisabled();
+  });
+
   it('toggles persistence from the toolbar status icon', async () => {
     const user = userEvent.setup();
     const onPersistenceToggle = vi.fn();

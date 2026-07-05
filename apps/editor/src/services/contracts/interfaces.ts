@@ -127,11 +127,61 @@ export interface VersionSnapshotMetadata {
 export interface ExportService {
   getPageImageFileName(project: ProjectDocument, pageId: string, extension: 'png' | 'jpeg'): string;
   getPdfFileName(project: ProjectDocument): string;
+  getPowerPointFileName(project: ProjectDocument): string;
+  downloadBlob(blob: Blob, fileName: string): void;
   downloadDataUrl(dataUrl: string, fileName: string): void;
 }
 
 export interface PresentationImportService {
   importPowerPoint(input: PptxImportInput): Promise<ProjectDocument>;
+}
+
+export interface PresentationExportWarning {
+  category?: 'animation' | 'content-type' | 'fidelity' | 'media' | 'relationship' | 'transition';
+  code: string;
+  elementId?: string;
+  message: string;
+  pageId?: string;
+}
+
+export interface PresentationExportResult {
+  blob: Blob;
+  stats: PresentationExportStats;
+  warnings: PresentationExportWarning[];
+}
+
+export interface PresentationExportStats {
+  animationBuildCount: number;
+  mediaElementCount: number;
+  slideCount: number;
+}
+
+export type PresentationExportProgressStage =
+  | 'building-slides'
+  | 'downloading'
+  | 'embedding-media'
+  | 'patching-package'
+  | 'preparing'
+  | 'validating-package'
+  | 'writing-package';
+
+export interface PresentationExportProgress {
+  current?: number | undefined;
+  detail?: string | undefined;
+  label: string;
+  stage: PresentationExportProgressStage;
+  total?: number | undefined;
+}
+
+export interface PresentationExportOptions {
+  onProgress?: (progress: PresentationExportProgress) => void;
+}
+
+export interface PresentationExportService {
+  exportPowerPoint(
+    project: ProjectDocument,
+    options?: PresentationExportOptions,
+  ): Promise<PresentationExportResult>;
 }
 
 export interface FontImportRequest {
