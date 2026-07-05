@@ -43,6 +43,10 @@ import { imageCrop } from './imageCrop';
 import type { ImageCropHandle } from './imageCrop';
 import { canvasWorkspaceUtils } from './canvasWorkspaceUtils';
 import { movieStartPlayback } from '../media/movieStartPlayback';
+import {
+  animationPresetEngine,
+  type AnimationPresetRenderState,
+} from '../animation/animationPresetEngine';
 
 const TEXT_FRAME_PADDING = 6;
 
@@ -114,8 +118,15 @@ interface CanvasWorkspaceProps {
 interface CommonElementProps {
   draggable: boolean;
   height: number;
+  name?: string;
+  offsetX: number;
+  offsetY: number;
   opacity: number;
   rotation: number;
+  scaleX: number;
+  scaleY: number;
+  skewX: number;
+  skewY: number;
   width: number;
   x: number;
   y: number;
@@ -135,6 +146,7 @@ interface CommonElementProps {
 interface ElementAnimationRenderState {
   activeBuild: ElementAnimationPreviewBuild | undefined;
   hidden: boolean;
+  preset: AnimationPresetRenderState | undefined;
   progress: number;
 }
 
@@ -148,10 +160,7 @@ function easeOutCubic(value: number) {
 
 function getAnimationOpacity(baseOpacity: number, state: ElementAnimationRenderState) {
   if (state.activeBuild?.mediaAction === 'play') return baseOpacity;
-  if (state.activeBuild?.effect === 'dissolve') return baseOpacity * easeOutCubic(state.progress);
-  if (state.activeBuild?.effect === 'keyboard-typing') return baseOpacity;
-  if (state.activeBuild?.effect === 'line-draw') return baseOpacity;
-  if (state.hidden && state.activeBuild?.mediaAction === 'play') return baseOpacity;
+  if (state.activeBuild) return baseOpacity * (state.preset?.opacity ?? 1);
   return state.hidden ? 0 : baseOpacity;
 }
 
@@ -862,20 +871,28 @@ export function CanvasWorkspace({
     const isBackgroundSelectionTarget = element.id === backgroundSelectionTargetId;
     const isProcessing = processingElementIds.includes(element.id);
     const animationState = getElementAnimationState(element);
+    const animationTransform = animationState.preset?.transform;
 
     return {
       draggable: !readOnly && !element.locked && !backgroundSelectionMode && !isProcessing,
       height: element.height * scaleY,
+      ...(animationState.activeBuild ? { name: `animated-element-${element.id}` } : {}),
+      offsetX: animationTransform?.offsetX ?? 0,
+      offsetY: animationTransform?.offsetY ?? 0,
       opacity:
         animationPreviewHiddenElementIds.includes(element.id) || animationState.activeBuild
           ? getAnimationOpacity(element.opacity, animationState)
           : isProcessing && activeProcessingBlink
             ? 0.38
             : element.opacity,
-      rotation: element.rotation,
+      rotation: element.rotation + (animationTransform?.rotation ?? 0),
+      scaleX: animationTransform?.scaleX ?? 1,
+      scaleY: animationTransform?.scaleY ?? 1,
+      skewX: animationTransform?.skewX ?? 0,
+      skewY: animationTransform?.skewY ?? 0,
       width: element.width * scaleX,
-      x: element.x * scaleX,
-      y: element.y * scaleY,
+      x: element.x * scaleX + (animationTransform?.x ?? 0),
+      y: element.y * scaleY + (animationTransform?.y ?? 0),
       onClick: (event: Konva.KonvaEventObject<MouseEvent>) => {
         if (canAdvanceAnimationPreviewByClick) {
           event.cancelBubble = true;
@@ -949,11 +966,84 @@ export function CanvasWorkspace({
   function getElementAnimationState(element: DesignElement): ElementAnimationRenderState {
     const activeBuild =
       activeAnimationBuild?.elementId === element.id ? activeAnimationBuild : undefined;
+    const progress = activeBuild ? clampAnimationProgress(animationPreview?.animationProgress) : 1;
     return {
       activeBuild,
       hidden: animationPreviewHiddenElementIds.includes(element.id),
-      progress: activeBuild ? clampAnimationProgress(animationPreview?.animationProgress) : 1,
+      preset: activeBuild
+        ? animationPresetEngine.getRenderState({
+            bounds: {
+              height: element.height * scaleY,
+              width: element.width * scaleX,
+              x: element.x * scaleX,
+              y: element.y * scaleY,
+            },
+            direction: activeBuild.direction,
+            effect: activeBuild.effect,
+            progress,
+            seed: `${activeBuild.id}-${element.id}`,
+          })
+        : undefined,
+      progress,
     };
+  }
+
+  function getAnimationMaskFill(fill: string) {
+    if (fill !== '#ffffff') return fill;
+    return pageBackground.startsWith('#') || pageBackground.startsWith('rgb')
+      ? pageBackground
+      : '#050D10';
+  }
+
+  function renderAnimationOverlays(element: DesignElement) {
+    const animationState = getElementAnimationState(element);
+    const preset = animationState.preset;
+    if (!animationState.activeBuild || !preset) return null;
+    const baseX = element.x * scaleX;
+    const baseY = element.y * scaleY;
+    return (
+      <Group key={`${element.id}-animation-overlays`} listening={false}>
+        {preset.masks.map((mask, index) => (
+          <Rect
+            fill={getAnimationMaskFill(mask.fill)}
+            height={mask.height}
+            key={`${element.id}-animation-mask-${index}`}
+            name="animation-mask"
+            opacity={mask.opacity}
+            rotation={mask.rotation}
+            width={mask.width}
+            x={baseX + mask.x}
+            y={baseY + mask.y}
+          />
+        ))}
+        {preset.particles.map((particle, index) =>
+          particle.radius > 0 ? (
+            <Circle
+              fill={particle.fill}
+              key={`${element.id}-animation-particle-${index}`}
+              name="animation-particle"
+              opacity={particle.opacity}
+              radius={particle.radius}
+              rotation={particle.rotation}
+              x={baseX + particle.x}
+              y={baseY + particle.y}
+            />
+          ) : (
+            <Rect
+              fill={particle.fill}
+              height={particle.height}
+              key={`${element.id}-animation-particle-${index}`}
+              name="animation-particle"
+              opacity={particle.opacity}
+              rotation={particle.rotation}
+              width={particle.width}
+              x={baseX + particle.x}
+              y={baseY + particle.y}
+            />
+          ),
+        )}
+      </Group>
+    );
   }
 
   function handleStagePointerDown(event: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
@@ -1241,6 +1331,7 @@ export function CanvasWorkspace({
                   />
                 );
               })}
+              {visibleElements.map((element) => renderAnimationOverlays(element))}
               {showEditorOverlays &&
               backgroundSelectionTargetId &&
               selectedElement?.type === 'image' ? (

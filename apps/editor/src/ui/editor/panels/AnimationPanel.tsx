@@ -1,5 +1,6 @@
 import { useState, type DragEvent } from 'react';
 import type {
+  AnimationDirection,
   AnimationEffect,
   AnimationLineDrawDirection,
   DesignElement,
@@ -10,6 +11,7 @@ import type {
   SlideTransition,
 } from '../../../domain/documents/model';
 import type { MediaPlaybackPatch } from '../../../domain/commands/elements/basicCommands';
+import { animationEffectCatalog } from '../animation/animationEffectCatalog';
 
 type ElementAnimationPatch = Omit<ElementAnimationPatchSource, 'elementId' | 'id'>;
 type DurationChangeHandler = (durationMs: number) => void;
@@ -54,14 +56,18 @@ const DEFAULT_SLIDE_TRANSITION: SlideTransition = {
 };
 
 const ANIMATION_BUILD_DRAG_TYPE = 'application/x-localstudio-animation-build-element-id';
-const ANIMATION_EFFECT_OPTIONS = [
-  { label: 'Reveal', value: 'reveal' },
-  { label: 'Fade', value: 'fade' },
-  { label: 'Dissolve', value: 'dissolve' },
-  { label: 'Push', value: 'push' },
-  { label: 'Wipe', value: 'wipe' },
-] as const;
 const DEFAULT_LINE_DRAW_DIRECTION: AnimationLineDrawDirection = 'start-to-end';
+const DEFAULT_ANIMATION_DIRECTION: AnimationDirection = 'left';
+const DIRECTIONAL_ANIMATION_EFFECTS = new Set<AnimationEffect>([
+  'doorway',
+  'fade-and-move',
+  'move-in',
+  'pivot',
+  'push',
+  'reveal',
+  'revolving-door',
+  'wipe',
+]);
 
 function getElementLabel(project: ProjectDocument, elementId: string) {
   const element = project.elements[elementId];
@@ -81,7 +87,7 @@ function getBuildLabel(project: ProjectDocument, build: ElementAnimationBuild) {
 function getBuildPatch(build: ElementAnimationBuild | undefined): ElementAnimationPatch {
   return build
     ? {
-        effect: build.effect,
+        effect: build.effect === 'fade' ? 'fade-and-move' : build.effect,
         trigger: build.trigger,
         delayMs: build.delayMs,
         ...(build.direction ? { direction: build.direction } : {}),
@@ -112,16 +118,36 @@ function toAnimationEffect(
   availableEffects: ReturnType<typeof getAvailableEffects>,
 ): AnimationEffect {
   if (
-    value === 'dissolve' ||
-    value === 'fade' ||
-    value === 'push' ||
-    value === 'wipe'
+    animationEffectCatalog.hasEffect(value)
   ) {
-    return value;
+    return value === 'fade' ? 'fade-and-move' : value;
   }
   if (value === 'line-draw' && availableEffects.canLineDraw) return 'line-draw';
   if (value === 'keyboard-typing' && availableEffects.canKeyboardType) return 'keyboard-typing';
   return 'reveal';
+}
+
+function toAnimationDirection(value: string): AnimationDirection {
+  if (value === 'right') return 'right';
+  if (value === 'up') return 'up';
+  if (value === 'down') return 'down';
+  return 'left';
+}
+
+function usesAnimationDirection(effect: AnimationEffect) {
+  return DIRECTIONAL_ANIMATION_EFFECTS.has(effect);
+}
+
+function renderAnimationEffectGroups() {
+  return animationEffectCatalog.groupedOptions.map((group) => (
+    <optgroup key={group.label} label={group.label}>
+      {group.options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </optgroup>
+  ));
 }
 
 function toLineDrawDirection(value: string): AnimationLineDrawDirection {
@@ -143,7 +169,16 @@ function getAnimationEffectPatch(
   }
   const { lineDrawDirection, ...nextPatch } = patch;
   void lineDrawDirection;
-  return { ...nextPatch, effect };
+  if (usesAnimationDirection(effect)) {
+    return {
+      ...nextPatch,
+      direction: nextPatch.direction ?? DEFAULT_ANIMATION_DIRECTION,
+      effect,
+    };
+  }
+  const { direction, ...patchWithoutDirection } = nextPatch;
+  void direction;
+  return { ...patchWithoutDirection, effect };
 }
 
 function toDurationMs(value: string) {
@@ -216,6 +251,9 @@ export function AnimationPanel({
     { elementId: string; position: DropPosition } | undefined
   >();
   const [newAnimationEffect, setNewAnimationEffect] = useState<AnimationEffect>('reveal');
+  const [newAnimationDirection, setNewAnimationDirection] = useState<AnimationDirection>(
+    DEFAULT_ANIMATION_DIRECTION,
+  );
   const [newLineDrawDirection, setNewLineDrawDirection] = useState<AnimationLineDrawDirection>(
     DEFAULT_LINE_DRAW_DIRECTION,
   );
@@ -311,11 +349,7 @@ export function AnimationPanel({
             }}
           >
             <option value="none">None</option>
-            {ANIMATION_EFFECT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
+            {renderAnimationEffectGroups()}
           </select>
         </label>
         <DurationField
@@ -477,11 +511,7 @@ export function AnimationPanel({
                       }}
                     >
                       <option value="none">None</option>
-                      {ANIMATION_EFFECT_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
+                      {renderAnimationEffectGroups()}
                       {availableEffects.canLineDraw ? (
                         <option value="line-draw">Line draw</option>
                       ) : null}
@@ -507,6 +537,26 @@ export function AnimationPanel({
                       <option value="start-to-end">Start to end</option>
                       <option value="end-to-start">End to start</option>
                       <option value="middle-to-ends">Middle to ends</option>
+                    </select>
+                  </label>
+                ) : null}
+                {!isMovieStartBuild && usesAnimationDirection(patch.effect) ? (
+                  <label className="animation-field ew-field-scope ew-compact-row">
+                    <span>Direction</span>
+                    <select
+                      aria-label={`Animation direction for ${label}`}
+                      value={patch.direction ?? DEFAULT_ANIMATION_DIRECTION}
+                      onChange={(event) => {
+                        onSetElementAnimationBuilds?.([elementId], {
+                          ...patch,
+                          direction: toAnimationDirection(event.target.value),
+                        });
+                      }}
+                    >
+                      <option value="left">Left</option>
+                      <option value="right">Right</option>
+                      <option value="up">Up</option>
+                      <option value="down">Down</option>
                     </select>
                   </label>
                 ) : null}
@@ -559,11 +609,7 @@ export function AnimationPanel({
                   );
                 }}
               >
-                {ANIMATION_EFFECT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
+                {renderAnimationEffectGroups()}
                 {selectedAvailableEffects.canLineDraw ? (
                   <option value="line-draw">Line draw</option>
                 ) : null}
@@ -588,6 +634,23 @@ export function AnimationPanel({
                 </select>
               </label>
             ) : null}
+            {usesAnimationDirection(selectedNewAnimationEffect) ? (
+              <label className="animation-field ew-field-scope ew-compact-row">
+                <span>Direction</span>
+                <select
+                  aria-label="New animation direction"
+                  value={newAnimationDirection}
+                  onChange={(event) => {
+                    setNewAnimationDirection(toAnimationDirection(event.target.value));
+                  }}
+                >
+                  <option value="left">Left</option>
+                  <option value="right">Right</option>
+                  <option value="up">Up</option>
+                  <option value="down">Down</option>
+                </select>
+              </label>
+            ) : null}
           </>
         ) : null}
         <button
@@ -599,6 +662,8 @@ export function AnimationPanel({
               selectedElementIds,
               getAnimationEffectPatch(selectedNewAnimationEffect, {
                 ...DEFAULT_ELEMENT_ANIMATION,
+                direction: newAnimationDirection,
+                delayMs: animationEffectCatalog.getDefaultDurationMs(selectedNewAnimationEffect),
                 lineDrawDirection: newLineDrawDirection,
               }),
             )

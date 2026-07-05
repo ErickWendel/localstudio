@@ -1,8 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { createRef } from 'react';
+import type Konva from 'konva';
 import { vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 import type {
+  AnimationEffect,
   ProjectDocument,
   ShapeElement,
   VideoElement,
@@ -379,6 +382,46 @@ describe('CanvasWorkspace', () => {
 
     expect(screen.queryByRole('button', { name: 'Insert Text' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Insert Media' })).not.toBeInTheDocument();
+  });
+
+  it.each<{ effect: AnimationEffect; expectedNodeName: string }>([
+    { effect: 'move-in', expectedNodeName: '.animated-element-image-hero' },
+    { effect: 'wipe', expectedNodeName: '.animation-mask' },
+    { effect: 'confetti', expectedNodeName: '.animation-particle' },
+  ])('renders $effect animation preview nodes on the Konva stage', async ({ effect, expectedNodeName }) => {
+    const project = sampleProject.createSampleProject();
+    const build = {
+      id: `build-${effect}`,
+      elementId: 'image-hero',
+      effect,
+      trigger: 'on-click' as const,
+      delayMs: 700,
+      direction: 'left' as const,
+    };
+    const stageRef = createRef<Konva.Stage>();
+
+    render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        stageRef={stageRef}
+        animationPreview={{
+          activeBuild: build,
+          activeBuildElementId: 'image-hero',
+          animationProgress: 0.5,
+          hiddenElementIds: ['image-hero'],
+          pageId: 'page-1',
+          phase: 'animation',
+          playing: true,
+          waitingForClick: false,
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(stageRef.current?.find(expectedNodeName).length).toBeGreaterThan(0);
+    });
   });
 
   it('shows canvas quick actions after animation preview completes', () => {
