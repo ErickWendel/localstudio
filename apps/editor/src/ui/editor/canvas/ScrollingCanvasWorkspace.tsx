@@ -14,6 +14,7 @@ import { TextSelectionToolbar } from '../toolbars/TextSelectionToolbar';
 type CanvasWorkspaceProps = ComponentProps<typeof CanvasWorkspace>;
 
 interface ScrollingCanvasWorkspaceProps extends CanvasWorkspaceProps {
+  activePageFocusKey?: number | undefined;
   canTranslateCurrentSlide?: boolean;
   children?: ReactNode;
   onAddPage?: ((afterPageId?: string) => void) | undefined;
@@ -33,6 +34,7 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
   function ScrollingCanvasWorkspace(
     {
       activePageId,
+      activePageFocusKey,
       canTranslateCurrentSlide,
       children,
       onActivePageFromScroll,
@@ -89,7 +91,7 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
         programmaticScrollRef.current = false;
         programmaticScrollReleaseRef.current = undefined;
       }, 120);
-    }, [activePageId, project.pages.length]);
+    }, [activePageFocusKey, activePageId, project.pages.length]);
 
     useEffect(
       () => () => {

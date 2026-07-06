@@ -692,6 +692,7 @@ export function useEditorViewModel(services: AppServices) {
     shouldRestoreStoredProject,
   );
   const [activePageId, setActivePageId] = useState(initialProject.pages[0]?.id ?? '');
+  const [activePageFocusKey, setActivePageFocusKey] = useState(0);
   const activePageIdRef = useRef(activePageId);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   const selectedElementIdsRef = useRef(selectedElementIds);
@@ -847,6 +848,7 @@ export function useEditorViewModel(services: AppServices) {
   const languageDetectionSequenceRef = useRef(0);
   const skipNextProjectSaveRef = useRef(shouldRestoreStoredProject);
   const lastVersionProjectRef = useRef<ProjectDocument>(initialProject);
+  const needsFreshPersistenceTargetRef = useRef(false);
   const selection = useMemo<SelectionState>(
     () => ({ pageId: activePageId, elementIds: selectedElementIds, target: selectionTarget }),
     [activePageId, selectedElementIds, selectionTarget],
@@ -986,6 +988,7 @@ export function useEditorViewModel(services: AppServices) {
           setPageLanguageCodes({});
           setSelectedElementIds([]);
           lastVersionProjectRef.current = normalizedProject;
+          needsFreshPersistenceTargetRef.current = false;
           setLastEditedAt(normalizedProject.updatedAt);
           if (services.projectRepository.getVersionHistory) {
             void services.projectRepository
@@ -1824,8 +1827,15 @@ export function useEditorViewModel(services: AppServices) {
   async function reenablePersistence() {
     try {
       const projectToSave = projectRef.current;
-      await services.projectRepository.saveProject(projectToSave);
+      if (needsFreshPersistenceTargetRef.current && services.projectRepository.saveProjectAs) {
+        await services.projectRepository.saveProjectAs(projectToSave, {
+          projectDirectoryName: projectToSave.name,
+        });
+      } else {
+        await services.projectRepository.saveProject(projectToSave);
+      }
       lastVersionProjectRef.current = projectToSave;
+      needsFreshPersistenceTargetRef.current = false;
       setHasPersistedLocalProject(true);
       setLastEditedAt(projectToSave.updatedAt);
       setSaveAnimationKey((current) => current + 1);
@@ -1894,6 +1904,7 @@ export function useEditorViewModel(services: AppServices) {
         });
       }
       lastVersionProjectRef.current = projectToSave;
+      needsFreshPersistenceTargetRef.current = false;
       setHasPersistedLocalProject(true);
       setPersistenceEnabled(true);
       setPersistenceAttention(false);
@@ -1927,9 +1938,16 @@ export function useEditorViewModel(services: AppServices) {
       updatedAt: new Date().toISOString(),
     };
     try {
-      await services.projectRepository.saveProject(nextProject, { projectDirectoryName: nextName });
+      if (needsFreshPersistenceTargetRef.current && services.projectRepository.saveProjectAs) {
+        await services.projectRepository.saveProjectAs(nextProject, {
+          projectDirectoryName: nextName,
+        });
+      } else {
+        await services.projectRepository.saveProject(nextProject, { projectDirectoryName: nextName });
+      }
       setProject(nextProject);
       lastVersionProjectRef.current = nextProject;
+      needsFreshPersistenceTargetRef.current = false;
       setLastEditedAt(nextProject.updatedAt);
       setSaveAnimationKey((current) => current + 1);
       skipNextProjectSaveRef.current = true;
@@ -1972,6 +1990,7 @@ export function useEditorViewModel(services: AppServices) {
       setHasPersistedLocalProject(true);
       setPersistenceEnabled(true);
       lastVersionProjectRef.current = normalizedProject;
+      needsFreshPersistenceTargetRef.current = false;
       setLastEditedAt(normalizedProject.updatedAt);
       if (services.projectRepository.getVersionHistory) {
         void services.projectRepository
@@ -2094,6 +2113,7 @@ export function useEditorViewModel(services: AppServices) {
       setHasPersistedLocalProject(false);
       setPersistenceEnabled(false);
       lastVersionProjectRef.current = normalizedProject;
+      needsFreshPersistenceTargetRef.current = true;
       setLastEditedAt(normalizedProject.updatedAt);
       setVersionHistoryEntries([]);
       writeProjectNameToUrl(normalizedProject.name);
@@ -2414,6 +2434,7 @@ export function useEditorViewModel(services: AppServices) {
       setHasPersistedLocalProject(true);
       setPersistenceEnabled(true);
       lastVersionProjectRef.current = normalizedProject;
+      needsFreshPersistenceTargetRef.current = false;
       setLastEditedAt(normalizedProject.updatedAt);
       if (services.projectRepository.getVersionHistory) {
         void services.projectRepository
@@ -2490,7 +2511,9 @@ export function useEditorViewModel(services: AppServices) {
     setSelectedVersionId(versionId);
     setPreviewProject(normalizedVersionProject);
     const nextPageId = entry?.firstChangedPageId ?? normalizedVersionProject.pages[0]?.id ?? '';
+    activePageIdRef.current = nextPageId;
     setActivePageId(nextPageId);
+    setActivePageFocusKey((current) => current + 1);
     setSelectedElementIds(entry?.firstChangedElementId ? [entry.firstChangedElementId] : []);
   }
 
@@ -4310,6 +4333,7 @@ export function useEditorViewModel(services: AppServices) {
     project: previewProject ?? project,
     automation,
     activePageId,
+    activePageFocusKey,
     zoomPercent,
     pagesPanelOpen,
     isFullscreen,

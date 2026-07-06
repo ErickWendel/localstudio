@@ -26,6 +26,7 @@ import type {
   StockMediaProviderState,
   StockMediaService,
   TranslatorService,
+  VersionHistoryEntry,
 } from '../../../../src/services/contracts/interfaces';
 import type { PptxImportInput } from '../../../../src/services/importing/pptx/pptxImportService';
 import type { MinioMirrorConfig } from '../../../../src/services/mirror/minioMirrorService';
@@ -226,6 +227,28 @@ class SavingProjectRepository implements ProjectRepository {
   saveProjectAs(project: ProjectDocument): Promise<void> {
     this.savedProjectsAs.push(project);
     return Promise.resolve();
+  }
+}
+
+class VersionHistoryProjectRepository extends SavingProjectRepository {
+  constructor(
+    private readonly project: ProjectDocument,
+    private readonly versionProject: ProjectDocument,
+    private readonly entries: VersionHistoryEntry[],
+  ) {
+    super();
+  }
+
+  override loadProject(): Promise<ProjectDocument | null> {
+    return Promise.resolve(this.project);
+  }
+
+  getVersionHistory(): Promise<VersionHistoryEntry[]> {
+    return Promise.resolve(this.entries);
+  }
+
+  loadVersion(): Promise<ProjectDocument | null> {
+    return Promise.resolve(this.versionProject);
   }
 }
 
@@ -1310,6 +1333,61 @@ describe('EditorShell', () => {
     ).toBeInTheDocument();
   });
 
+  it('chooses a fresh persistence target after importing PowerPoint over a saved project', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const repository = new SavingProjectRepository();
+    const importService = new PendingPresentationImportService();
+    services.projectRepository = repository;
+    services.presentationImportService = importService;
+    vi.stubGlobal(
+      'showOpenFilePicker',
+      vi.fn(() =>
+        Promise.resolve([
+          createPowerPointFileHandle(
+            new File(['pptx'], 'deck.pptx', {
+              type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            }),
+          ),
+        ] as FileSystemFileHandle[]),
+      ),
+    );
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+    expect(repository.savedProjects).toHaveLength(1);
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Import' }));
+    await user.click(screen.getByRole('menuitem', { name: 'PowerPoint (.pptx)' }));
+    await waitFor(() => {
+      expect(importService.importCalls).toHaveLength(1);
+    });
+
+    act(() => {
+      importService.resolveImport?.({
+        ...services.initialProject,
+        id: 'imported-powerpoint-project',
+        name: 'Imported PowerPoint Deck',
+      });
+    });
+
+    expect(
+      await screen.findByRole('button', { name: 'Edit project name Imported PowerPoint Deck' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Persistence disabled' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+
+    expect(repository.savedProjectsAs).toHaveLength(1);
+    expect(repository.savedProjectsAs[0]).toMatchObject({
+      id: 'imported-powerpoint-project',
+      name: 'Imported PowerPoint Deck',
+    });
+  });
+
   it('downloads PPTX fonts during import without blocking the deck when fonts fail', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
@@ -1524,6 +1602,76 @@ describe('EditorShell', () => {
     render(<EditorShell services={secondServices} />);
 
     expect(await screen.findByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
+  });
+
+  it('refocuses the changed slide when selecting a history version on the active page', async () => {
+    const user = userEvent.setup();
+    const scrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      'scrollIntoView',
+    );
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    const project = sampleProject.createSampleProject();
+    const firstPageId = project.pages[0]!.id;
+    const titleElement = project.elements['text-title'];
+    if (titleElement?.type !== 'text') {
+      throw new Error('Expected sample project to include a text-title text element.');
+    }
+    const versionProject: ProjectDocument = {
+      ...project,
+      elements: {
+        ...project.elements,
+        'text-title': {
+          ...titleElement,
+          text: 'Changed title in history',
+        },
+      },
+    };
+    const versionEntry: VersionHistoryEntry = {
+      id: 'version-1',
+      authorName: 'Local user',
+      changeCount: 1,
+      createdAt: '2026-07-06T12:00:00.000Z',
+      fileName: 'version-1.json',
+      firstChangedElementId: 'text-title',
+      firstChangedPageId: firstPageId,
+      projectName: project.name,
+      summary: 'Version with title edit',
+    };
+    const services = createAppServices({ initialProject: project });
+    services.projectRepository = new VersionHistoryProjectRepository(project, versionProject, [
+      versionEntry,
+    ]);
+    window.localStorage.setItem('ew-canvas-ai.persistence-enabled', 'true');
+
+    try {
+      render(<EditorShell services={services} />);
+
+      expect(await screen.findByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Version history' }));
+      await screen.findByText('Version with title edit');
+      scrollIntoView.mockClear();
+
+      await user.click(screen.getByText('Version with title edit').closest('button')!);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+          'data-selected-elements',
+          'text-title',
+        );
+      });
+      expect(scrollIntoView).toHaveBeenCalled();
+    } finally {
+      if (scrollIntoViewDescriptor) {
+        Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', scrollIntoViewDescriptor);
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
+      }
+    }
   });
 
   it('loads the last project before autosaving on startup', async () => {
