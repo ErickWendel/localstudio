@@ -670,11 +670,14 @@ export function useEditorViewModel(services: AppServices) {
     () => services.mirrorService.loadConfig(),
     [services.mirrorService],
   );
+  const storedMirrorPreference = useMemo(() => editorPreferences.readMirrorPreference(), []);
+  const shouldEnableStoredMirror = storedMirrorPreference ?? Boolean(storedMirrorConfig);
   const shouldRestoreStoredProject = useMemo(
     () =>
       !services.skipStoredProjectLoad &&
-      (editorPreferences.readPersistencePreference() || Boolean(storedMirrorConfig)),
-    [services.skipStoredProjectLoad, storedMirrorConfig],
+      (editorPreferences.readPersistencePreference() ||
+        (Boolean(storedMirrorConfig) && shouldEnableStoredMirror)),
+    [services.skipStoredProjectLoad, shouldEnableStoredMirror, storedMirrorConfig],
   );
   const [project, setProject] = useState<ProjectDocument>(initialProject);
   const projectRef = useRef(project);
@@ -765,8 +768,8 @@ export function useEditorViewModel(services: AppServices) {
   const [lastEditedAt, setLastEditedAt] = useState<string | undefined>(initialProject.updatedAt);
   const [saveAnimationKey, setSaveAnimationKey] = useState(0);
   const [mirrorState, setMirrorState] = useState<MirrorState>(() => ({
-    enabled: Boolean(storedMirrorConfig),
-    status: storedMirrorConfig ? 'idle' : 'disabled',
+    enabled: Boolean(storedMirrorConfig) && shouldEnableStoredMirror,
+    status: storedMirrorConfig && shouldEnableStoredMirror ? 'idle' : 'disabled',
   }));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mirrorSettingsOpen, setMirrorSettingsOpen] = useState(false);
@@ -998,7 +1001,9 @@ export function useEditorViewModel(services: AppServices) {
           }
           writeProjectNameToUrl(normalizedProject.name);
           setHasPersistedLocalProject(true);
-          if (storedMirrorConfig) syncMirrorNowRef.current(normalizedProject);
+          if (storedMirrorConfig && shouldEnableStoredMirror) {
+            syncMirrorNowRef.current(normalizedProject);
+          }
         }
         setHasLoadedProject(true);
       })
@@ -1019,6 +1024,7 @@ export function useEditorViewModel(services: AppServices) {
     services.fontImportService,
     services.projectRepository,
     services.storedProjectName,
+    shouldEnableStoredMirror,
     storedMirrorConfig,
   ]);
 
@@ -2236,6 +2242,7 @@ export function useEditorViewModel(services: AppServices) {
 
   function saveMirrorConfig(config: MinioMirrorConfig) {
     services.mirrorService.saveConfig(config);
+    editorPreferences.writeMirrorPreference(true);
     setMirrorConfig(config);
     setHasMirrorConfig(true);
     setMirrorDisabledBySettings(false);
@@ -2272,11 +2279,13 @@ export function useEditorViewModel(services: AppServices) {
         openMirrorSettings();
         return;
       }
+      editorPreferences.writeMirrorPreference(true);
       setMirrorDisabledBySettings(false);
       setMirrorState({ enabled: true, status: 'idle' });
       void syncMirrorNow();
       return;
     }
+    editorPreferences.writeMirrorPreference(false);
     setMirrorDisabledBySettings(Boolean(options?.fromSettings));
     setMirrorState({ enabled: false, status: 'disabled' });
   }
@@ -2373,6 +2382,7 @@ export function useEditorViewModel(services: AppServices) {
       return;
     }
     if (!mirrorState.enabled) {
+      editorPreferences.writeMirrorPreference(true);
       setMirrorState({ enabled: true, status: 'idle' });
     }
     void syncMirrorNow();
