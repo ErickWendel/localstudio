@@ -150,6 +150,14 @@ jobs:
         env:
           E2E_SERVER: dist
 
+      - name: Upload Playwright coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-coverage
+          path: playwright-coverage
+          if-no-files-found: ignore
+
   build:
     name: Build
     runs-on: ubuntu-latest

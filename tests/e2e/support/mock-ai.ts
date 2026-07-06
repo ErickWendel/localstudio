@@ -143,21 +143,75 @@ export async function installMockAiProviders(page: Page) {
     });
 
     const originalWorker = window.Worker;
-    class MockBonsaiWorker {
+    class MockLocalStudioWorker {
       onerror: ((event: ErrorEvent) => void) | null = null;
       onmessage: ((event: MessageEvent) => void) | null = null;
       readonly url: string;
 
       constructor(url: string | URL) {
         this.url = String(url);
-        if (!this.url.includes('bonsaiImageRuntime.worker')) {
-          return new originalWorker(url);
+        if (
+          !this.url.includes('bonsaiImageRuntime.worker') &&
+          !this.url.includes('transformersRuntime.worker')
+        ) {
+          return new originalWorker(url) as unknown as MockLocalStudioWorker;
         }
       }
 
-      postMessage(message: { id?: string; options?: { steps?: number }; type?: string }) {
-        if (!this.url.includes('bonsaiImageRuntime.worker')) return;
+      postMessage(message: { id?: string; modelId?: string; options?: { steps?: number }; type?: string }) {
         const requestId = message.id ?? 'bonsai-e2e';
+        if (this.url.includes('transformersRuntime.worker')) {
+          queueMicrotask(() => {
+            this.onmessage?.(
+              new MessageEvent('message', {
+                data: {
+                  details: { file: message.modelId ?? message.type ?? 'local-model', loaded: 1, total: 1 },
+                  id: requestId,
+                  progress: 100,
+                  type: 'progress',
+                },
+              }),
+            );
+            if (
+              message.type === 'preload-image-editing' ||
+              message.type === 'prepare-background-removal' ||
+              message.type === 'remove-image-editing'
+            ) {
+              this.onmessage?.(
+                new MessageEvent('message', {
+                  data: { id: requestId, result: undefined, type: 'result' },
+                }),
+              );
+              return;
+            }
+            if (message.type === 'segment-background-removal') {
+              this.onmessage?.(
+                new MessageEvent('message', {
+                  data: {
+                    id: requestId,
+                    result: {
+                      imageInput: {
+                        channels: 4,
+                        data: [55, 253, 118, 255, 5, 13, 16, 255, 255, 255, 255, 255, 0, 119, 154, 255],
+                        height: 2,
+                        width: 2,
+                      },
+                      subjectMask: {
+                        data: [1, 0, 0, 1],
+                        height: 2,
+                        score: 0.92,
+                        width: 2,
+                      },
+                    },
+                    type: 'result',
+                  },
+                }),
+              );
+            }
+          });
+          return;
+        }
+        if (!this.url.includes('bonsaiImageRuntime.worker')) return;
         queueMicrotask(() => {
           this.onmessage?.(
             new MessageEvent('message', {
@@ -194,6 +248,6 @@ export async function installMockAiProviders(page: Page) {
         return undefined;
       }
     }
-    Object.defineProperty(window, 'Worker', { configurable: true, value: MockBonsaiWorker });
+    Object.defineProperty(window, 'Worker', { configurable: true, value: MockLocalStudioWorker });
   }, Array.from(generatedImagePng));
 }

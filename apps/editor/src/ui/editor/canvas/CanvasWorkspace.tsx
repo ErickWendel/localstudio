@@ -1098,6 +1098,7 @@ export function CanvasWorkspace({
           animationPreview?.pageId === activePageId ? animationPreview.phase : 'idle'
         }
         data-animation-preview-waiting={animationPreview?.waitingForClick ? 'true' : 'false'}
+        data-testid="slide-canvas-frame"
         style={{ '--canvas-zoom': `${zoomPercent / 100}` } as CSSProperties}
       >
         <div className="canvas-artboard" ref={artboardRef} style={{ background: pageBackground }}>

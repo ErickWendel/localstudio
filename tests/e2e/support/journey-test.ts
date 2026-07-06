@@ -1,15 +1,18 @@
-import { test as base, expect, type TestType } from '@playwright/test';
+import { test as base, expect } from '@playwright/test';
+import { collectBrowserCoverage } from './browser-coverage';
 import { startIsolatedDevServer, type IsolatedDevServer } from './isolated-dev-server';
 
-type JourneyFixtures = Record<string, never>;
-type JourneyWorkerFixtures = Record<string, never>;
+type JourneyFixtures = {
+  browserCoverage: void;
+};
+type ServerLifecycle = Pick<typeof test, 'afterAll' | 'beforeAll'>;
 
-export const test = base;
+export const test = base.extend<JourneyFixtures>({
+  browserCoverage: [collectBrowserCoverage, { auto: true }],
+});
 export { expect };
 
-export function withIsolatedDevServer(
-  testType: TestType<JourneyFixtures, JourneyWorkerFixtures> = test,
-) {
+export function withIsolatedDevServer(testType: ServerLifecycle = test) {
   let server: IsolatedDevServer | undefined;
 
   testType.beforeAll(async () => {

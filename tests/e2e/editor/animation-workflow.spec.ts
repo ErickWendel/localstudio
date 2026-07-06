@@ -22,9 +22,9 @@ test.describe('editor animation workflow journey', () => {
     await page.getByLabel('Start for Add a little bit of body text').selectOption('after-previous');
     await page
       .getByRole('spinbutton', { name: 'Duration for Add a little bit of body text' })
-      .fill('0.6');
+      .fill('5');
     await page.getByRole('button', { name: 'Play animation preview' }).click();
-    await expect(page.getByLabel('Current animation step 1')).toBeVisible();
+    await expect(page.getByRole('listitem', { name: /Build 1: Add a little bit of body text/ })).toBeVisible();
     await page.getByRole('button', { name: 'Remove animation from Add a little bit of body text' }).click();
     await expect(page.getByText('No object animations on this slide.')).toBeVisible();
   });

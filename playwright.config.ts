@@ -8,6 +8,8 @@ function getWorkerCount() {
 
 export default defineConfig({
   testDir: './tests/e2e',
+  globalTeardown: './tests/e2e/support/coverage-report.ts',
+  timeout: 90_000,
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,

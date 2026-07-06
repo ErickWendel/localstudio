@@ -68,6 +68,15 @@ test.describe('joystick connected peer journey', () => {
 
     await expect(presenterPage.getByLabel('Presenter status')).toContainText('Current: Slide 2 of 2');
     await expect(joystickPage.getByLabel('Slide position')).toContainText('2 / 2');
+
+    await joystickPage.reload();
+    await expect(joystickPage.getByRole('main', { name: 'Presentation remote control' })).toBeVisible();
+    await expect(joystickPage.getByLabel('Connected (1)')).toBeVisible({ timeout: 45_000 });
+    await expect(joystickPage.getByLabel('Slide position')).toContainText('2 / 2');
+    await joystickPage.getByRole('button', { name: 'Previous slide' }).click();
+    await expect(presenterPage.getByLabel('Presenter status')).toContainText('Current: Slide 1 of 2');
+    await expect(joystickPage.getByLabel('Slide position')).toContainText('1 / 2');
+
     await testInfo.attach('presenter-remote-diagnostics', {
       body: diagnostics.join('\n') || 'No presenter remote diagnostics captured.',
       contentType: 'text/plain',

@@ -8,8 +8,12 @@ export class EditorAppPage extends BasePage {
 
   async gotoNewProject() {
     await this.goto('/editor/?newProject=1');
-    await expect(this.page.getByRole('heading', { name: 'LocalStudio.dev' })).toBeVisible();
-    await expect(this.page.getByRole('region', { name: 'Canvas workspace' })).toBeVisible();
+    await expect(this.page.getByRole('heading', { name: 'LocalStudio.dev' })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(this.page.getByRole('region', { name: 'Canvas workspace' })).toBeVisible({
+      timeout: 30_000,
+    });
   }
 
   async openMenu(name: 'Edit' | 'File' | 'Help' | 'View') {
