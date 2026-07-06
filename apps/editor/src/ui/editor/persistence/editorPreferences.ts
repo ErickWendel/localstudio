@@ -2,6 +2,7 @@ import { browserStorage } from '../../../services/browser/browserStorage';
 import { translationLanguageUtils } from '../translation/translationLanguageUtils';
 
 const PERSISTENCE_PREFERENCE_KEY = 'ew-canvas-ai.persistence-enabled';
+const MIRROR_PREFERENCE_KEY = 'ew-canvas-ai.mirror-enabled';
 const TRANSLATION_TARGET_LANGUAGE_KEY = 'localstudio.ai.translation-target-language';
 
 function readPersistencePreference() {
@@ -10,6 +11,17 @@ function readPersistencePreference() {
 
 function writePersistencePreference(enabled: boolean) {
   browserStorage.getBrowserLocalStorage()?.setItem(PERSISTENCE_PREFERENCE_KEY, enabled ? 'true' : 'false');
+}
+
+function readMirrorPreference() {
+  const storedValue = browserStorage.getBrowserLocalStorage()?.getItem(MIRROR_PREFERENCE_KEY);
+  if (storedValue === 'true') return true;
+  if (storedValue === 'false') return false;
+  return undefined;
+}
+
+function writeMirrorPreference(enabled: boolean) {
+  browserStorage.getBrowserLocalStorage()?.setItem(MIRROR_PREFERENCE_KEY, enabled ? 'true' : 'false');
 }
 
 function readTranslationTargetLanguage() {
@@ -26,7 +38,9 @@ function writeTranslationTargetLanguage(languageCode: string) {
 }
 
 export const editorPreferences = {
+  readMirrorPreference,
   readPersistencePreference,
+  writeMirrorPreference,
   writePersistencePreference,
   readTranslationTargetLanguage,
   writeTranslationTargetLanguage,

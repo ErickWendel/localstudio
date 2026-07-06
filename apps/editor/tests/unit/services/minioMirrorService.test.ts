@@ -139,6 +139,33 @@ describe('minioMirrorService.createMirrorFiles', () => {
 });
 
 describe('minioMirrorService.MinioMirrorService', () => {
+  it('persists MinIO mirror config in browser key-value storage', () => {
+    const records = new Map<string, string>();
+    const storage = {
+      getItem: vi.fn((key: string) => records.get(key) ?? null),
+      removeItem: vi.fn((key: string) => {
+        records.delete(key);
+      }),
+      setItem: vi.fn((key: string, value: string) => {
+        records.set(key, value);
+      }),
+    };
+    const service = new minioMirrorService.MinioMirrorService({ storage });
+
+    service.saveConfig(config);
+
+    expect(storage.setItem).toHaveBeenCalledWith(
+      'localstudio.minioMirror.config',
+      JSON.stringify(config),
+    );
+    expect(service.loadConfig()).toEqual(config);
+
+    service.clearConfig();
+
+    expect(storage.removeItem).toHaveBeenCalledWith('localstudio.minioMirror.config');
+    expect(service.loadConfig()).toBeNull();
+  });
+
   it('binds the browser fetch function when no fetch override is provided', async () => {
     const project = sampleProject.createSampleProject();
     const originalFetch = globalThis.fetch;

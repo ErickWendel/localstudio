@@ -1220,6 +1220,51 @@ describe('EditorShell', () => {
     expect(await screen.findByRole('button', { name: 'Mirror up to date' })).toBeInTheDocument();
   });
 
+  it('keeps saved mirror config disabled after refreshing the page', async () => {
+    const user = userEvent.setup();
+    const firstServices = createAppServices();
+    const firstRepository = new DeferredLoadingProjectRepository();
+    firstServices.projectRepository = firstRepository;
+    firstServices.mirrorService = new RecordingMirrorService();
+    const firstRender = render(<EditorShell services={firstServices} />);
+
+    act(() => {
+      firstRepository.resolveLoadedProject({
+        ...firstServices.initialProject,
+        name: 'Mirrored Folder',
+      });
+    });
+
+    expect(await screen.findByRole('button', { name: 'Mirror up to date' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Mirror settings' }));
+    await user.click(
+      within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('button', {
+        name: 'Mirror settings',
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Disable mirroring' }));
+
+    expect(window.localStorage.getItem('ew-canvas-ai.mirror-enabled')).toBe('false');
+    firstRender.unmount();
+
+    const secondServices = createAppServices();
+    const secondRepository = new DeferredLoadingProjectRepository();
+    const secondMirrorService = new RecordingMirrorService();
+    secondServices.projectRepository = secondRepository;
+    secondServices.mirrorService = secondMirrorService;
+    render(<EditorShell services={secondServices} />);
+
+    act(() => {
+      secondRepository.resolveLoadedProject({
+        ...secondServices.initialProject,
+        name: 'Mirrored Folder',
+      });
+    });
+
+    expect(await screen.findByRole('button', { name: 'Mirror disabled' })).toBeInTheDocument();
+    expect(secondMirrorService.syncProject).not.toHaveBeenCalled();
+  });
+
   it('opens mirror settings from the disabled mirror icon after mirroring is disabled in settings', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
