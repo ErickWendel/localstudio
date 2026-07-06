@@ -12,7 +12,8 @@ test.describe('editor local persistence journey', () => {
     await editor.gotoNewProject();
     await editor.renameProject('E2E Persisted Deck');
 
-    await page.getByRole('button', { name: 'Browser storage disabled' }).click();
+    await page.getByRole('button', { name: 'Browser storage disabled' }).focus();
+    await page.keyboard.press('Enter');
     await expect(page.getByRole('button', { name: 'Browser storage enabled' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Version history' })).toBeEnabled();
 

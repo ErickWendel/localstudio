@@ -26,15 +26,22 @@ test.describe('joystick connected peer journey', () => {
     await page.getByRole('menuitem', { name: /Presenter view/i }).click();
     const presenterPage = await presenterPopupPromise;
     await expect(presenterPage.getByRole('main', { name: 'Presenter view' })).toBeVisible();
-    await page.getByRole('button', { name: 'Close audience fullscreen prompt' }).click();
 
     const remotePanel = page.getByRole('region', { name: 'Remote control this presentation' });
     await expect(remotePanel).toBeVisible({ timeout: 45_000 });
     const remoteUrl = await remotePanel.evaluate((element) => element.getAttribute('data-remote-url'));
     expect(remoteUrl).toContain('/joystick/?peer=');
+    const localRemoteUrl = new URL(remoteUrl!);
+    const localBaseUrl = new URL(getServer().baseURL);
+    localRemoteUrl.protocol = localBaseUrl.protocol;
+    localRemoteUrl.host = localBaseUrl.host;
+    await page.getByRole('button', { name: 'Enter full screen mode' }).click();
+
+    const introDismissButton = presenterPage.getByRole('button', { name: 'Got it' });
+    if (await introDismissButton.isVisible().catch(() => false)) await introDismissButton.click();
 
     const joystickPage = await context.newPage();
-    await joystickPage.goto(remoteUrl!);
+    await joystickPage.goto(localRemoteUrl.toString());
     await expect(joystickPage.getByRole('main', { name: 'Presentation remote control' })).toBeVisible();
     await expect(joystickPage.getByLabel('Connected (1)')).toBeVisible({ timeout: 45_000 });
     await expect(joystickPage.getByLabel('Slide position')).toContainText('1 / 2');

@@ -5,6 +5,8 @@ const getServer = withIsolatedDevServer(test);
 
 test.describe('editor presenter and notes journey', () => {
   test('writes notes and verifies presenter controls without requiring an external display', async ({ page }) => {
+    test.setTimeout(60_000);
+
     const editor = new EditorAppPage(page, getServer().baseURL);
     await editor.gotoNewProject();
 

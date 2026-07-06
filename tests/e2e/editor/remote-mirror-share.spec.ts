@@ -5,16 +5,12 @@ import { expect, test, withIsolatedDevServer } from '../support/journey-test';
 const getServer = withIsolatedDevServer(test);
 
 test.describe('editor remote mirror and public share journey', () => {
-  test('syncs to mocked S3-compatible storage and creates public share/embed links', async ({ page }) => {
+  test('syncs to mocked S3-compatible storage and creates public share/embed links', async ({
+    context,
+    page,
+  }) => {
     await page.addInitScript(installFakeOpfs);
-    await page.addInitScript(() => {
-      Object.defineProperty(navigator, 'clipboard', {
-        configurable: true,
-        value: {
-          writeText: () => Promise.resolve(undefined),
-        },
-      });
-    });
+    await context.grantPermissions(['clipboard-write'], { origin: getServer().baseURL });
     await page.route('http://localhost:9000/**', async (route) => {
       const request = route.request();
       const url = new URL(request.url());
@@ -35,7 +31,8 @@ test.describe('editor remote mirror and public share journey', () => {
     const editor = new EditorAppPage(page, getServer().baseURL);
     await editor.gotoNewProject();
     await editor.renameProject('E2E Mirrored Deck');
-    await page.getByRole('button', { name: 'Browser storage disabled' }).click();
+    await page.getByRole('button', { name: 'Browser storage disabled' }).focus();
+    await page.keyboard.press('Enter');
     await expect(page.getByRole('button', { name: 'Browser storage enabled' })).toBeVisible();
 
     await page.getByRole('contentinfo', { name: 'Editor footer controls' }).getByRole('button', { name: 'Mirror settings' }).click();
