@@ -11,12 +11,5 @@
     "target": "ES2022",
     "types": ["node"]
   },
-  "files": ["playwright.config.ts"],
-  "references": [
-    { "path": "./packages/brand" },
-    { "path": "./packages/presenter-remote" },
-    { "path": "./apps/landing" },
-    { "path": "./apps/editor" },
-    { "path": "./apps/joystick" }
-  ]
+  "include": ["**/*.ts"]
 }

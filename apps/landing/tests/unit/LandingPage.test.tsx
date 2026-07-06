@@ -333,7 +333,7 @@ describe('LandingPage', () => {
     );
     expect(screen.getByRole('img', { name: /WebMCP showcase page/i })).toHaveAttribute('loading', 'lazy');
     expect(screen.getByRole('img', { name: /WebMCP showcase page/i })).toHaveAttribute('decoding', 'async');
-    expect(screen.getByRole('link', { name: /Open WebMCP demo/i })).toHaveAttribute('href', '/webmcp/');
+    expect(screen.getByRole('link', { name: /Open WebMCP demo/i })).toHaveAttribute('href', '/editor/webmcp');
     expect(screen.getByRole('heading', { name: 'Chrome browser' })).toBeInTheDocument();
     expect(screen.getByText(/10GB free storage/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Built on the work of the browser AI community/i })).toBeInTheDocument();

@@ -18,7 +18,7 @@ export function WebMcpSection() {
             <li>Prompt, image, translate, and snapshot actions</li>
             <li>Same local-first editor surface behind every call</li>
           </ul>
-          <a className="inline-section-link" href="/webmcp/">
+          <a className="inline-section-link" href="/editor/webmcp">
             Open WebMCP demo
             <ArrowRight size={16} aria-hidden="true" />
           </a>

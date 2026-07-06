@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer } from 'vite';
 
-const host = '0.0.0.0';
+const host = process.env.HOST ?? '0.0.0.0';
 const port = getPort();
 
 const apps = [
@@ -67,9 +67,10 @@ httpServer.on('request', (request, response) => {
 });
 
 httpServer.listen(port, host, () => {
-  const networkUrls = getNetworkUrls();
+  const actualPort = getListeningPort();
+  const networkUrls = getNetworkUrls(actualPort);
   console.log(`LocalStudio dev server ready on one origin:`);
-  console.log(`  Local:   http://localhost:${port}/`);
+  console.log(`  Local:   http://localhost:${actualPort}/`);
   for (const url of networkUrls) console.log(`  Network: ${url}`);
   console.log('');
   console.log(`Routes:`);
@@ -80,9 +81,9 @@ httpServer.listen(port, host, () => {
 
 let shuttingDown = false;
 
-function getNetworkUrls() {
+function getNetworkUrls(actualPort) {
   const interfaces = getNetworkInterfaces();
-  return interfaces.map((address) => `http://${address}:${port}/`);
+  return interfaces.map((address) => `http://${address}:${actualPort}/`);
 }
 
 function getNetworkInterfaces() {
@@ -140,8 +141,14 @@ process.on('SIGTERM', () => void shutdown(0));
 function getPort() {
   const rawPort = process.env.PORT ?? '4173';
   const parsedPort = Number.parseInt(rawPort, 10);
-  if (!Number.isInteger(parsedPort) || parsedPort <= 0 || parsedPort > 65_535) {
+  if (!Number.isInteger(parsedPort) || parsedPort < 0 || parsedPort > 65_535) {
     throw new Error(`Invalid PORT value: ${rawPort}`);
   }
   return parsedPort;
+}
+
+function getListeningPort() {
+  const address = httpServer.address();
+  if (!address || typeof address === 'string') return port;
+  return address.port;
 }
