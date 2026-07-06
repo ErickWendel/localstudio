@@ -18,6 +18,7 @@ import {
   type RegisterPresenterRemoteSessionInput,
 } from '@localstudio/presenter-remote/signaling-service';
 import { PresenterRemotePeerControlClient } from '@localstudio/presenter-remote/peer-control-client';
+import { getRuntimePeerOptions } from '@localstudio/presenter-remote/peer-options';
 import { PresenterRemotePeerStreamReceiver } from '@localstudio/presenter-remote/peer-stream-receiver';
 import type {
   PresenterRemoteCommand,
@@ -878,6 +879,7 @@ export function JoystickApp({
           setSession(undefined);
         }
       },
+      peerOptions: getRuntimePeerOptions(),
       presenterPeerId: peerId,
     });
     peerControlClientRef.current = client;
@@ -970,6 +972,7 @@ export function JoystickApp({
     const receiver = new PresenterRemotePeerStreamReceiver({
       onStatusChange: setRemoteStreamStatus,
       onStream: setRemoteStream,
+      peerOptions: getRuntimePeerOptions(),
       streamPeerId,
     });
     remoteStreamReceiverRef.current = receiver;

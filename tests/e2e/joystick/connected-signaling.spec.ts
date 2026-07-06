@@ -7,8 +7,20 @@ test.describe('joystick connected peer journey', () => {
   test('pairs with the real presenter PeerJS session and controls the presenter view', async ({
     context,
     page,
-  }) => {
+  }, testInfo) => {
     test.setTimeout(90_000);
+    const diagnostics: string[] = [];
+    const captureDiagnostics = (source: string) => (message: { text: () => string }) => {
+      const text = message.text();
+      if (text.includes('LocalStudio presenter remote') || text.includes('PeerJS')) {
+        diagnostics.push(`${source}: ${text}`);
+        if (/error|failed|timed out|lost connection/i.test(text)) {
+          console.log(`${source}: ${text}`);
+        }
+      }
+    };
+    page.on('console', captureDiagnostics('editor console'));
+    page.on('pageerror', (error) => diagnostics.push(`editor pageerror: ${error.message}`));
 
     const editor = new EditorAppPage(page, getServer().baseURL);
     await editor.gotoNewProject();
@@ -41,6 +53,8 @@ test.describe('joystick connected peer journey', () => {
     if (await introDismissButton.isVisible().catch(() => false)) await introDismissButton.click();
 
     const joystickPage = await context.newPage();
+    joystickPage.on('console', captureDiagnostics('joystick console'));
+    joystickPage.on('pageerror', (error) => diagnostics.push(`joystick pageerror: ${error.message}`));
     await joystickPage.goto(localRemoteUrl.toString());
     await expect(joystickPage.getByRole('main', { name: 'Presentation remote control' })).toBeVisible();
     await expect(joystickPage.getByLabel('Connected (1)')).toBeVisible({ timeout: 45_000 });
@@ -54,5 +68,9 @@ test.describe('joystick connected peer journey', () => {
 
     await expect(presenterPage.getByLabel('Presenter status')).toContainText('Current: Slide 2 of 2');
     await expect(joystickPage.getByLabel('Slide position')).toContainText('2 / 2');
+    await testInfo.attach('presenter-remote-diagnostics', {
+      body: diagnostics.join('\n') || 'No presenter remote diagnostics captured.',
+      contentType: 'text/plain',
+    });
   });
 });

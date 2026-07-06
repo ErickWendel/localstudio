@@ -102,7 +102,9 @@ async function serveIndex(app, request, response) {
   try {
     const indexPath = fileURLToPath(new URL(app.indexFile, import.meta.url));
     const html = await readFile(indexPath, 'utf8');
-    const transformedHtml = await app.server.transformIndexHtml(request.url ?? app.base, html);
+    const transformedHtml = injectRuntimeConfig(
+      await app.server.transformIndexHtml(request.url ?? app.base, html),
+    );
     response.statusCode = 200;
     response.setHeader('Content-Type', 'text/html');
     response.end(transformedHtml);
@@ -125,6 +127,24 @@ function shouldServeIndex(url) {
     !pathname.includes('/src/') &&
     !pathname.includes('/node_modules/')
   );
+}
+
+function injectRuntimeConfig(html) {
+  const script = getRuntimeConfigScript();
+  if (!script) return html;
+  return html.includes('</head>') ? html.replace('</head>', `${script}</head>`) : `${script}${html}`;
+}
+
+function getRuntimeConfigScript() {
+  const peerPort = Number.parseInt(process.env.LOCALSTUDIO_PEERJS_PORT ?? '', 10);
+  if (!Number.isInteger(peerPort) || peerPort <= 0) return '';
+  const options = {
+    host: process.env.LOCALSTUDIO_PEERJS_HOST ?? '127.0.0.1',
+    path: process.env.LOCALSTUDIO_PEERJS_PATH ?? '/peerjs',
+    port: peerPort,
+    secure: process.env.LOCALSTUDIO_PEERJS_SECURE === '1',
+  };
+  return `<script>globalThis.__LOCALSTUDIO_PEERJS_OPTIONS__=${JSON.stringify(options)};</script>`;
 }
 
 async function shutdown(code = 0) {
