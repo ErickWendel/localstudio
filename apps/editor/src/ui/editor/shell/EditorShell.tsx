@@ -1215,6 +1215,7 @@ export function EditorShell({ services }: EditorShellProps) {
           <ScrollingCanvasWorkspace
             project={vm.project}
             activePageId={vm.activePageId}
+            activePageFocusKey={vm.activePageFocusKey}
             selection={vm.selection}
             slideFrameRef={slideFrameRef}
             stageRef={stageRef}
