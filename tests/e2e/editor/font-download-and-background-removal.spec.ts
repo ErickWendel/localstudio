@@ -26,24 +26,34 @@ async function mockGoogleFontDownload(page: Page) {
           font-family: 'Montserrat';
           font-style: normal;
           font-weight: 700;
-          src: url(https://fonts.gstatic.com/s/montserrat/v30/e2e.woff2) format('woff2');
+          src: url(https://fonts.gstatic.com/s/montserrat/v30/e2e.ttf) format('truetype');
         }
       `,
     });
   });
   await page.route('https://fonts.gstatic.com/**', async (route) => {
     await route.fulfill({
-      contentType: 'font/woff2',
       headers: { 'access-control-allow-origin': '*' },
-      body: Buffer.from([0x77, 0x4f, 0x46, 0x32, 0, 1, 0, 0]),
+      status: 503,
+      body: 'Font fixture intentionally unavailable in E2E.',
+    });
+  });
+}
+
+async function forceDownloadableFontPath(page: Page) {
+  await page.addInitScript(() => {
+    Object.defineProperty(document.fonts, 'check', {
+      configurable: true,
+      value: () => false,
     });
   });
 }
 
 test.describe('editor font download and background removal journeys', () => {
-  test('searches downloadable fonts and reports a font load failure without crashing', async ({
+  test('searches downloadable fonts and reports a font download failure without crashing', async ({
     page,
   }) => {
+    await forceDownloadableFontPath(page);
     await mockGoogleFontDownload(page);
 
     const editor = new EditorAppPage(page, getServer().baseURL);
@@ -56,7 +66,9 @@ test.describe('editor font download and background removal journeys', () => {
     await page.getByLabel('Search downloadable fonts').fill('Montserrat');
     await page.getByRole('button', { name: 'Download Montserrat' }).click();
 
-    await expect(page.getByRole('status')).toContainText('Font download failed.');
+    await expect(page.getByRole('status')).toContainText(
+      'Could not download Montserrat 700: no downloadable woff2 file was found',
+    );
     await expect(page.getByRole('heading', { name: 'LocalStudio.dev' })).toBeVisible();
     await expect(page.getByLabel('Selected text font', { exact: true })).toBeVisible();
   });
