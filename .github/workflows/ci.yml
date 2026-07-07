@@ -8,9 +8,11 @@ on:
       - 'apps/**'
       - 'packages/**'
       - 'scripts/**'
+      - 'tests/**'
       - 'eslint.config.js'
       - 'package.json'
       - 'package-lock.json'
+      - 'playwright.config.ts'
       - 'prettier.config.cjs'
       - 'tsconfig.json'
       - '!**/*.md'
@@ -21,9 +23,11 @@ on:
       - 'apps/**'
       - 'packages/**'
       - 'scripts/**'
+      - 'tests/**'
       - 'eslint.config.js'
       - 'package.json'
       - 'package-lock.json'
+      - 'playwright.config.ts'
       - 'prettier.config.cjs'
       - 'tsconfig.json'
       - '!**/*.md'
@@ -34,8 +38,149 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  checks:
-    name: Lint, typecheck, test, and build
+  lint:
+    name: Lint
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: localstudio-dist
+          path: dist
+
+      - name: Lint
+        run: npm run lint
+
+  typecheck:
+    name: Typecheck
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: localstudio-dist
+          path: dist
+
+      - name: Typecheck
+        run: npm run typecheck
+
+  test:
+    name: Unit tests
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: localstudio-dist
+          path: dist
+
+      - name: Test
+        run: npm run test
+
+  e2e:
+    name: Playwright E2E
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: localstudio-dist
+          path: dist
+
+      - name: Restore Playwright browser cache
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Install Playwright Chromium system dependencies
+        run: npx playwright install-deps chromium
+
+      - name: Install Playwright Chromium browser
+        run: npx playwright install chromium
+
+      - name: End-to-end test
+        run: npm run test:e2e
+        env:
+          E2E_SERVER: dist
+
+      - name: Upload Playwright coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-coverage
+          path: playwright-coverage
+          if-no-files-found: ignore
+
+  build:
+    name: Build
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -55,15 +200,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Test
-        run: npm run test
-
       - name: Setup Pages
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: actions/configure-pages@v5
@@ -72,6 +208,13 @@ jobs:
         run: npm run build
         env:
           LOCALSTUDIO_BASE_PATH: /
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: localstudio-dist
+          path: dist
+          if-no-files-found: error
 
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
@@ -82,7 +225,7 @@ jobs:
   deploy:
     name: Deploy site
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: checks
+    needs: [lint, typecheck, test, e2e, build]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

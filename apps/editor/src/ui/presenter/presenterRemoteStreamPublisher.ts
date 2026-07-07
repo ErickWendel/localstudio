@@ -1,4 +1,5 @@
 import { PresenterRemotePeerStreamPublisher } from '@localstudio/presenter-remote/peer-stream-publisher';
+import { getRuntimePeerOptions } from '@localstudio/presenter-remote/peer-options';
 
 interface PresenterRemoteStreamPublisherOptions {
   canvas: HTMLCanvasElement;
@@ -20,7 +21,10 @@ class PresenterRemoteStreamPublisher {
   start() {
     if (typeof this.canvas.captureStream !== 'function') return;
     this.stream = this.canvas.captureStream(this.fps);
-    this.publisher = new PresenterRemotePeerStreamPublisher({ stream: this.stream });
+    this.publisher = new PresenterRemotePeerStreamPublisher({
+      peerOptions: getRuntimePeerOptions(),
+      stream: this.stream,
+    });
     void this.publisher.start().then((peerId) => {
       this.onPeerId(peerId);
     }).catch(() => {

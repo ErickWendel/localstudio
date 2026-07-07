@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer } from 'vite';
 
-const host = '0.0.0.0';
+const host = process.env.HOST ?? '0.0.0.0';
 const port = getPort();
 
 const apps = [
@@ -67,9 +67,10 @@ httpServer.on('request', (request, response) => {
 });
 
 httpServer.listen(port, host, () => {
-  const networkUrls = getNetworkUrls();
+  const actualPort = getListeningPort();
+  const networkUrls = getNetworkUrls(actualPort);
   console.log(`LocalStudio dev server ready on one origin:`);
-  console.log(`  Local:   http://localhost:${port}/`);
+  console.log(`  Local:   http://localhost:${actualPort}/`);
   for (const url of networkUrls) console.log(`  Network: ${url}`);
   console.log('');
   console.log(`Routes:`);
@@ -80,9 +81,9 @@ httpServer.listen(port, host, () => {
 
 let shuttingDown = false;
 
-function getNetworkUrls() {
+function getNetworkUrls(actualPort) {
   const interfaces = getNetworkInterfaces();
-  return interfaces.map((address) => `http://${address}:${port}/`);
+  return interfaces.map((address) => `http://${address}:${actualPort}/`);
 }
 
 function getNetworkInterfaces() {
@@ -101,7 +102,9 @@ async function serveIndex(app, request, response) {
   try {
     const indexPath = fileURLToPath(new URL(app.indexFile, import.meta.url));
     const html = await readFile(indexPath, 'utf8');
-    const transformedHtml = await app.server.transformIndexHtml(request.url ?? app.base, html);
+    const transformedHtml = injectRuntimeConfig(
+      await app.server.transformIndexHtml(request.url ?? app.base, html),
+    );
     response.statusCode = 200;
     response.setHeader('Content-Type', 'text/html');
     response.end(transformedHtml);
@@ -126,6 +129,24 @@ function shouldServeIndex(url) {
   );
 }
 
+function injectRuntimeConfig(html) {
+  const script = getRuntimeConfigScript();
+  if (!script) return html;
+  return html.includes('</head>') ? html.replace('</head>', `${script}</head>`) : `${script}${html}`;
+}
+
+function getRuntimeConfigScript() {
+  const peerPort = Number.parseInt(process.env.LOCALSTUDIO_PEERJS_PORT ?? '', 10);
+  if (!Number.isInteger(peerPort) || peerPort <= 0) return '';
+  const options = {
+    host: process.env.LOCALSTUDIO_PEERJS_HOST ?? '127.0.0.1',
+    path: process.env.LOCALSTUDIO_PEERJS_PATH ?? '/peerjs',
+    port: peerPort,
+    secure: process.env.LOCALSTUDIO_PEERJS_SECURE === '1',
+  };
+  return `<script>globalThis.__LOCALSTUDIO_PEERJS_OPTIONS__=${JSON.stringify(options)};</script>`;
+}
+
 async function shutdown(code = 0) {
   if (shuttingDown) return;
   shuttingDown = true;
@@ -140,8 +161,14 @@ process.on('SIGTERM', () => void shutdown(0));
 function getPort() {
   const rawPort = process.env.PORT ?? '4173';
   const parsedPort = Number.parseInt(rawPort, 10);
-  if (!Number.isInteger(parsedPort) || parsedPort <= 0 || parsedPort > 65_535) {
+  if (!Number.isInteger(parsedPort) || parsedPort < 0 || parsedPort > 65_535) {
     throw new Error(`Invalid PORT value: ${rawPort}`);
   }
   return parsedPort;
+}
+
+function getListeningPort() {
+  const address = httpServer.address();
+  if (!address || typeof address === 'string') return port;
+  return address.port;
 }

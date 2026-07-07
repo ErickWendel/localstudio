@@ -10,6 +10,7 @@ import {
   PresenterRemotePeerControlHost,
   type PresenterRemotePeerControlHostOptions,
 } from '@localstudio/presenter-remote/peer-control-host';
+import { getRuntimePeerOptions } from '@localstudio/presenter-remote/peer-options';
 import type { RegisterPresenterRemoteSessionInput } from '@localstudio/presenter-remote/signaling-service';
 import type {
   PresenterRemoteCommand,
@@ -481,7 +482,11 @@ class TestPresenterRemotePeerControlHost implements PresenterRemotePeerControl {
 
 function createDefaultRemotePeerControlHostFactory(): CreatePresenterRemotePeerControlHost {
   if (isTestRuntime()) return (hostOptions) => new TestPresenterRemotePeerControlHost(hostOptions);
-  return (hostOptions) => new PresenterRemotePeerControlHost(hostOptions);
+  return (hostOptions) =>
+    new PresenterRemotePeerControlHost({
+      ...hostOptions,
+      peerOptions: getRuntimePeerOptions(),
+    });
 }
 
 function isTestRuntime() {
