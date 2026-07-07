@@ -1309,6 +1309,37 @@ export function CanvasWorkspace({
 
                 if (element.type === 'gif' || element.type === 'video') {
                   const selected = selection.elementIds.includes(element.id);
+                  const asset = project.assets[element.assetId];
+                  if (readOnly) {
+                    const label = asset?.name ?? (element.type === 'video' ? 'Imported video' : 'Imported GIF');
+                    return (
+                      <Group {...commonProps} key={element.id} ref={nodeRef}>
+                        <Rect
+                          fill="#153A2D"
+                          height={commonProps.height}
+                          stroke="#37FD76"
+                          strokeWidth={Math.max(2, Math.min(commonProps.width, commonProps.height) * 0.006)}
+                          width={commonProps.width}
+                          x={0}
+                          y={0}
+                        />
+                        <Text
+                          align="center"
+                          fill="#FFFFFF"
+                          fontFamily="Open Sans"
+                          fontSize={Math.max(18, Math.min(48, commonProps.height * 0.12))}
+                          fontStyle="bold"
+                          height={commonProps.height}
+                          padding={Math.max(12, commonProps.height * 0.04)}
+                          text={label}
+                          verticalAlign="middle"
+                          width={commonProps.width}
+                          x={0}
+                          y={0}
+                        />
+                      </Group>
+                    );
+                  }
                   return (
                     <Rect
                       {...commonProps}

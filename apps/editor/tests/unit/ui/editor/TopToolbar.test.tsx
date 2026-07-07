@@ -98,6 +98,25 @@ describe('TopToolbar', () => {
     expect(onExportPowerPoint).toHaveBeenCalledTimes(1);
   });
 
+  it('opens the image archive export action from the File menu', async () => {
+    const user = userEvent.setup();
+    const onExportImages = vi.fn();
+
+    render(
+      <TopToolbar
+        project={sampleProject.createSampleProject()}
+        language="PT-BR"
+        onExportImages={onExportImages}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Export to' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Images (.zip)' }));
+
+    expect(onExportImages).toHaveBeenCalledTimes(1);
+  });
+
   it('shows operation notices and disables PowerPoint export while exporting', async () => {
     const user = userEvent.setup();
     const onExportPowerPoint = vi.fn();
@@ -125,6 +144,25 @@ describe('TopToolbar', () => {
     await user.click(screen.getByRole('button', { name: 'File' }));
     await user.click(screen.getByRole('menuitem', { name: 'Export to' }));
     expect(screen.getByRole('menuitem', { name: 'Exporting PowerPoint...' })).toBeDisabled();
+  });
+
+  it('disables image export while exporting images', async () => {
+    const user = userEvent.setup();
+    const onExportImages = vi.fn();
+
+    render(
+      <TopToolbar
+        project={sampleProject.createSampleProject()}
+        language="PT-BR"
+        isExportingImages
+        onExportImages={onExportImages}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Export to' }));
+
+    expect(screen.getByRole('menuitem', { name: 'Exporting images...' })).toBeDisabled();
   });
 
   it('toggles persistence from the toolbar status icon', async () => {

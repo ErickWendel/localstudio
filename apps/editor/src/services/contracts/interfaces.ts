@@ -126,6 +126,7 @@ export interface VersionSnapshotMetadata {
 
 export interface ExportService {
   getPageImageFileName(project: ProjectDocument, pageId: string, extension: 'png' | 'jpeg'): string;
+  getImagesArchiveFileName(project: ProjectDocument): string;
   getPdfFileName(project: ProjectDocument): string;
   getPowerPointFileName(project: ProjectDocument): string;
   downloadBlob(blob: Blob, fileName: string): void;

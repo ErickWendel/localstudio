@@ -1,0 +1,4 @@
+interface:
+  display_name: "LocalStudio Finish Checks"
+  short_description: "Verify and serve LocalStudio changes"
+  default_prompt: "Use $localstudio-finish-checks before handing off this LocalStudio change."

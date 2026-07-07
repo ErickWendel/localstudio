@@ -25,12 +25,14 @@ interface TopToolbarProps {
   canTranslateDeck?: boolean;
   deckTranslationStatus?: string | undefined;
   isTranslatingDeck?: boolean;
+  isExportingImages?: boolean;
   isExportingPowerPoint?: boolean;
   translationLanguageOptions?: TranslationLanguageOption[];
   translationSourceLanguage?: string;
   translationTargetLanguage?: string;
   onDelete?: (() => void) | undefined;
   onDuplicate?: (() => void) | undefined;
+  onExportImages?: (() => void) | undefined;
   onExportPowerPoint?: (() => void) | undefined;
   onImportPowerPoint?: (() => void) | undefined;
   onImportProject?: (() => void) | undefined;
@@ -145,12 +147,14 @@ export function TopToolbar({
   canTranslateDeck = false,
   deckTranslationStatus,
   isTranslatingDeck = false,
+  isExportingImages = false,
   isExportingPowerPoint = false,
   translationLanguageOptions = [],
   translationSourceLanguage = language.toLowerCase(),
   translationTargetLanguage = '',
   onDelete,
   onDuplicate,
+  onExportImages,
   onExportPowerPoint,
   onImportPowerPoint,
   onImportProject,
@@ -285,6 +289,11 @@ export function TopToolbar({
         kind: 'submenu',
         label: 'Export to',
         items: [
+          {
+            label: isExportingImages ? 'Exporting images...' : 'Images (.zip)',
+            disabled: isExportingImages || !onExportImages,
+            onSelect: onExportImages,
+          },
           {
             label: isExportingPowerPoint ? 'Exporting PowerPoint...' : 'Powerpoint (.pptx)',
             disabled: isExportingPowerPoint || !onExportPowerPoint,

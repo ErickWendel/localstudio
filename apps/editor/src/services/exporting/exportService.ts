@@ -8,6 +8,10 @@ export class BrowserExportService implements ExportService {
     return `${project.name}-${pageName}.${extension}`;
   }
 
+  getImagesArchiveFileName(project: ProjectDocument): string {
+    return `${project.name}-images.zip`;
+  }
+
   getPdfFileName(project: ProjectDocument): string {
     return `${project.name}.pdf`;
   }

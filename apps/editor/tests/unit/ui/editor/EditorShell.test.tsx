@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { unzipSync } from 'fflate';
 import { vi } from 'vitest';
 import { createAppServices as createRealAppServices } from '../../../../src/app/composition';
 import type { Asset, ProjectDocument } from '../../../../src/domain/documents/model';
@@ -3173,6 +3174,7 @@ describe('EditorShell', () => {
     enableSyncedSharing(services);
     const downloadDataUrl = vi.fn();
     services.exportService = {
+      getImagesArchiveFileName: () => 'deck-images.zip',
       getPageImageFileName: () => 'slide.png',
       getPdfFileName: () => 'deck.pdf',
       getPowerPointFileName: () => 'deck.pptx',
@@ -3192,11 +3194,187 @@ describe('EditorShell', () => {
     );
   });
 
+  it('exports all slides as PNG files in one ZIP archive from the File menu', async () => {
+    const user = userEvent.setup();
+    const project = sampleProject.createSampleProject();
+    const firstPage = project.pages[0];
+    if (!firstPage) throw new Error('Sample project must contain a page.');
+    const multiSlideProject: ProjectDocument = {
+      ...project,
+      pages: [
+        firstPage,
+        {
+          ...firstPage,
+          id: 'page-2',
+          name: 'Hidden Summary',
+          visible: false,
+        },
+      ],
+    };
+    const services = createAppServices({ initialProject: multiSlideProject });
+    const downloadBlob = vi.fn();
+    services.exportService = {
+      getImagesArchiveFileName: () => 'deck-images.zip',
+      getPageImageFileName: (_project, pageId) =>
+        pageId === 'page-1' ? 'deck-slide-1.png' : 'deck-hidden-summary.png',
+      getPdfFileName: () => 'deck.pdf',
+      getPowerPointFileName: () => 'deck.pptx',
+      downloadBlob,
+      downloadDataUrl: vi.fn(),
+    };
+
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Export to' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Images (.zip)' }));
+
+    expect(screen.getByRole('dialog', { name: 'Export images' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'All' })).toBeChecked();
+    expect(
+      screen.getByRole('checkbox', { name: 'Create an image for each animation' }),
+    ).not.toBeChecked();
+    expect(screen.getByRole('combobox', { name: 'Image format' })).toHaveValue('png');
+    await user.click(screen.getByRole('button', { name: 'Export images' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Exporting slide images...');
+    await waitFor(() => {
+      expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), 'deck-images.zip');
+    });
+    const [archiveBlob] = downloadBlob.mock.calls[0] as [Blob, string];
+    const archiveFiles = unzipSync(new Uint8Array(await archiveBlob.arrayBuffer()));
+
+    expect(Object.keys(archiveFiles).sort()).toEqual([
+      'deck-hidden-summary.png',
+      'deck-slide-1.png',
+    ]);
+  });
+
+  it('exports a single readable final-state image when animation images are disabled', async () => {
+    const user = userEvent.setup();
+    const project = sampleProject.createSampleProject();
+    const firstPage = project.pages[0];
+    if (!firstPage) throw new Error('Sample project must contain a page.');
+    const configuredProject: ProjectDocument = {
+      ...project,
+      pages: [
+        {
+          ...firstPage,
+          animationBuilds: [
+            {
+              id: 'build-title',
+              delayMs: 0,
+              effect: 'fade',
+              elementId: 'text-title',
+              trigger: 'on-click',
+            },
+            {
+              id: 'build-subtitle-out',
+              delayMs: 0,
+              effect: 'fade',
+              elementId: 'text-subtitle',
+              kind: 'build-out',
+              trigger: 'on-click',
+            },
+          ],
+        },
+      ],
+    };
+    const services = createAppServices({ initialProject: configuredProject });
+    const downloadBlob = vi.fn();
+    services.exportService = {
+      getImagesArchiveFileName: () => 'deck-images.zip',
+      getPageImageFileName: (_project, _pageId, extension) => `deck-slide-1.${extension}`,
+      getPdfFileName: () => 'deck.pdf',
+      getPowerPointFileName: () => 'deck.pptx',
+      downloadBlob,
+      downloadDataUrl: vi.fn(),
+    };
+
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Export to' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Images (.zip)' }));
+    await user.click(screen.getByRole('button', { name: 'Export images' }));
+
+    await waitFor(() => {
+      expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), 'deck-images.zip');
+    });
+    const [archiveBlob] = downloadBlob.mock.calls[0] as [Blob, string];
+    const archiveFiles = unzipSync(new Uint8Array(await archiveBlob.arrayBuffer()));
+
+    expect(Object.keys(archiveFiles)).toEqual(['deck-slide-1.png']);
+  });
+
+  it('applies image export range, format, and animation options', async () => {
+    const user = userEvent.setup();
+    const project = sampleProject.createSampleProject();
+    const firstPage = project.pages[0];
+    if (!firstPage) throw new Error('Sample project must contain a page.');
+    const configuredProject: ProjectDocument = {
+      ...project,
+      pages: [
+        {
+          ...firstPage,
+          animationBuilds: [
+            {
+              id: 'build-title',
+              delayMs: 0,
+              effect: 'fade',
+              elementId: 'text-title',
+              trigger: 'on-click',
+            },
+          ],
+        },
+        {
+          ...firstPage,
+          id: 'page-2',
+          name: 'Appendix',
+        },
+      ],
+    };
+    const services = createAppServices({ initialProject: configuredProject });
+    const downloadBlob = vi.fn();
+    services.exportService = {
+      getImagesArchiveFileName: () => 'deck-images.zip',
+      getPageImageFileName: (_project, pageId, extension) =>
+        pageId === 'page-1' ? `deck-slide-1.${extension}` : `deck-appendix.${extension}`,
+      getPdfFileName: () => 'deck.pdf',
+      getPowerPointFileName: () => 'deck.pptx',
+      downloadBlob,
+      downloadDataUrl: vi.fn(),
+    };
+
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Export to' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Images (.zip)' }));
+    await user.click(screen.getByRole('radio', { name: /From:/ }));
+    await user.clear(screen.getByRole('spinbutton', { name: 'From slide' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'From slide' }), '1');
+    await user.clear(screen.getByRole('spinbutton', { name: 'To slide' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'To slide' }), '1');
+    await user.click(screen.getByRole('checkbox', { name: 'Create an image for each animation' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Image format' }), 'jpeg');
+    await user.click(screen.getByRole('button', { name: 'Export images' }));
+
+    await waitFor(() => {
+      expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), 'deck-images.zip');
+    });
+    const [archiveBlob] = downloadBlob.mock.calls[0] as [Blob, string];
+    const archiveFiles = unzipSync(new Uint8Array(await archiveBlob.arrayBuffer()));
+
+    expect(Object.keys(archiveFiles)).toEqual(['deck-slide-1-animation-01.jpeg']);
+  });
+
   it('exports PowerPoint with stats and clears the operation notice', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
     const downloadBlob = vi.fn();
     services.exportService = {
+      getImagesArchiveFileName: () => 'deck-images.zip',
       getPageImageFileName: () => 'slide.png',
       getPdfFileName: () => 'deck.pdf',
       getPowerPointFileName: () => 'deck.pptx',

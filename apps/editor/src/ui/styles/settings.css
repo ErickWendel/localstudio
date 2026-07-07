@@ -25,6 +25,10 @@
   width: min(420px, calc(100vw - 32px));
 }
 
+.image-export-panel {
+  width: min(420px, calc(100vw - 32px));
+}
+
 .remote-import-panel {
   width: min(360px, calc(100vw - 32px));
 }
@@ -108,4 +112,66 @@
 
 .settings-panel-header p {
   margin: 4px 0 0;
+}
+
+.image-export-form {
+  display: grid;
+  gap: 14px;
+}
+
+.image-export-fieldset {
+  border: 0;
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+}
+
+.image-export-fieldset legend,
+.image-export-format-row span {
+  color: var(--ew-text);
+  font-weight: 700;
+}
+
+.image-export-radio-row,
+.image-export-checkbox-row,
+.image-export-format-row {
+  align-items: center;
+  color: var(--ew-text);
+  display: flex;
+  gap: 10px;
+}
+
+.image-export-range-row input[type='number'] {
+  max-width: 82px;
+}
+
+.image-export-form input,
+.image-export-form select {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: var(--ew-text);
+  min-height: 34px;
+  padding: 0 10px;
+}
+
+.image-export-form input:disabled,
+.image-export-form select:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.image-export-format-row select {
+  flex: 1;
+}
+
+.image-export-renderer {
+  left: -200vw;
+  opacity: 0;
+  pointer-events: none;
+  position: fixed;
+  top: 0;
+  width: 1180px;
+  z-index: -1;
 }

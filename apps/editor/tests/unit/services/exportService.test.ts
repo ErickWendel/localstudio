@@ -9,6 +9,7 @@ describe('BrowserExportService', () => {
     expect(service.getPageImageFileName(project, 'page-1', 'png')).toBe(
       'Untitled AI Deck-Slide 1.png',
     );
+    expect(service.getImagesArchiveFileName(project)).toBe('Untitled AI Deck-images.zip');
     expect(service.getPdfFileName(project)).toBe('Untitled AI Deck.pdf');
   });
 });

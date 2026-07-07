@@ -1,0 +1,4 @@
+interface:
+  display_name: "LocalStudio Worktree Refresh"
+  short_description: "Refresh new worktrees from main"
+  default_prompt: "Use $localstudio-worktree-refresh before starting work in this LocalStudio worktree."

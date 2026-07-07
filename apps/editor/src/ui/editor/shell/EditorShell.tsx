@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react';
 import type Konva from 'konva';
+import { zipSync } from 'fflate';
 import type { AppServices } from '../../../app/composition';
 import type { ShareMetadata } from '../../../services/contracts/interfaces';
 import { editorAutomationController } from '../../../services/automation/editorAutomationController';
@@ -10,6 +11,7 @@ import {
   type WebMcpDemoWindow,
 } from '../../../services/webmcp/webMcpToolAdapter';
 import { EditorFooter } from './EditorFooter';
+import { ImageExportPanel, type ImageExportOptions } from '../panels/ImageExportPanel';
 import { MediaImportProgressOverlay } from './MediaImportProgressOverlay';
 import { PresentationImportProgressOverlay } from './PresentationImportProgressOverlay';
 import { LeftToolPanel } from '../panels/LeftToolPanel';
@@ -22,17 +24,20 @@ import { localMediaImportConfig } from '../media/localMediaImportConfig';
 import { movieStartPlayback } from '../media/movieStartPlayback';
 import { PromptBar } from '../prompting/PromptBar';
 import { RemoteImportPanel } from '../panels/RemoteImportPanel';
+import { CanvasWorkspace } from '../canvas/CanvasWorkspace';
 import { ScrollingCanvasWorkspace } from '../canvas/ScrollingCanvasWorkspace';
 import { SettingsPanel } from '../panels/SettingsPanel';
 import { TopToolbar } from '../toolbars/TopToolbar';
 import { VersionHistoryPanel } from '../panels/VersionHistoryPanel';
 import { presentationMovieControls, type MovieHoldState } from '../media/presentationMovieControls';
-import { useEditorViewModel } from '../state/useEditorViewModel';
+import { useEditorViewModel, type OperationNoticeState } from '../state/useEditorViewModel';
 import { SharePanel } from '../../share/SharePanel';
 import {
   KeyboardShortcutsDialog,
   type KeyboardShortcutAction,
 } from '../../components/KeyboardShortcutsDialog';
+import { canvasWorkspaceUtils } from '../canvas/canvasWorkspaceUtils';
+import type { ImageElement } from '../../../domain/documents/model';
 import { editorShellBrowserUtils } from '../browser/editorShellBrowserUtils';
 import { BrowserPresenterSessionService } from '../../../services/presenter/presenterSessionService';
 import type { PresenterRemoteSessionMetadata } from '../../../services/presenter/presenterSessionTypes';
@@ -40,6 +45,67 @@ import { PresenterRemotePanel } from '../../presenter/PresenterRemotePanel';
 
 interface EditorShellProps {
   services: AppServices;
+}
+
+type ImageExportAnimationPreview = ComponentProps<typeof CanvasWorkspace>['animationPreview'];
+
+interface ImageExportFrame {
+  animationPreview?: ImageExportAnimationPreview | undefined;
+  fileName: string;
+  pageId: string;
+}
+
+function waitForNextPaint() {
+  if (typeof window === 'undefined') return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        resolve();
+      });
+    });
+  });
+}
+
+function bytesToBlobPart(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
+function dataUrlToBytes(dataUrl: string) {
+  const commaIndex = dataUrl.indexOf(',');
+  if (commaIndex === -1) throw new Error('Could not read exported slide image.');
+  const metadata = dataUrl.slice(0, commaIndex);
+  const payload = dataUrl.slice(commaIndex + 1);
+  if (!metadata.includes(';base64')) {
+    return new TextEncoder().encode(decodeURIComponent(payload));
+  }
+  const binary = window.atob(payload);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+function appendFileNameSuffix(fileName: string, suffix: string) {
+  const extensionIndex = fileName.lastIndexOf('.');
+  if (extensionIndex <= 0) return `${fileName}${suffix}`;
+  return `${fileName.slice(0, extensionIndex)}${suffix}${fileName.slice(extensionIndex)}`;
+}
+
+function createImageExportAnimationPreview(
+  pageId: string,
+  hiddenElementIds: string[],
+): ImageExportAnimationPreview {
+  return {
+    activeBuildElementId: undefined,
+    animationProgress: 1,
+    hiddenElementIds,
+    mode: 'editor',
+    pageId,
+    phase: 'waiting',
+    playing: false,
+    waitingForClick: false,
+  };
 }
 
 const editorShortcutActions = [
@@ -96,13 +162,19 @@ export function EditorShell({ services }: EditorShellProps) {
   >();
   const [remotePresenterActive, setRemotePresenterActive] = useState(false);
   const [presenterViewError, setPresenterViewError] = useState<string | undefined>();
+  const [imageExportPanelOpen, setImageExportPanelOpen] = useState(false);
+  const [imageExportNotice, setImageExportNotice] = useState<OperationNoticeState | undefined>();
+  const [imageExportFrame, setImageExportFrame] = useState<ImageExportFrame | undefined>();
+  const [isExportingImages, setIsExportingImages] = useState(false);
   const [sharePanelOpen, setSharePanelOpen] = useState(false);
   const [shareMetadata, setShareMetadata] = useState<ShareMetadata | undefined>();
   const stageRef = useRef<Konva.Stage>(null);
+  const imageExportStageRef = useRef<Konva.Stage>(null);
   const workspaceRef = useRef<HTMLElement>(null);
   const slideFrameRef = useRef<HTMLDivElement>(null);
   const presenterSessionServiceRef = useRef<BrowserPresenterSessionService | undefined>(undefined);
   const presenterRemotePanelRef = useRef<HTMLDivElement>(null);
+  const imageExportNoticeTimeoutRef = useRef<number | undefined>(undefined);
   const presenterFullscreenEnteredRef = useRef(false);
   const toolbarImageInputRef = useRef<HTMLInputElement>(null);
   const hasSelection = vm.selection.elementIds.length > 0;
@@ -126,6 +198,150 @@ export function EditorShell({ services }: EditorShellProps) {
       dataUrl,
       services.exportService.getPageImageFileName(vm.project, vm.activePageId, 'png'),
     );
+  }
+
+  function showImageExportNotice(
+    notice: OperationNoticeState | undefined,
+    options?: { persistent?: boolean },
+  ) {
+    if (imageExportNoticeTimeoutRef.current !== undefined) {
+      window.clearTimeout(imageExportNoticeTimeoutRef.current);
+      imageExportNoticeTimeoutRef.current = undefined;
+    }
+    setImageExportNotice(notice);
+    if (!notice || options?.persistent) return;
+    imageExportNoticeTimeoutRef.current = window.setTimeout(() => {
+      setImageExportNotice(undefined);
+      imageExportNoticeTimeoutRef.current = undefined;
+    }, 3500);
+  }
+
+  function getImageExportFrames(options: ImageExportOptions): ImageExportFrame[] {
+    const extension = options.format;
+    const pages =
+      options.slideRange === 'all'
+        ? vm.project.pages
+        : vm.project.pages.slice(options.slideRange.from - 1, options.slideRange.to);
+
+    return pages.flatMap((page) => {
+      const pageFileName = services.exportService.getPageImageFileName(
+        vm.project,
+        page.id,
+        extension,
+      );
+      const builds =
+        page.animationBuilds?.filter((build) => {
+          const element = vm.project.elements[build.elementId];
+          return element && element.visible !== false;
+        }) ?? [];
+      if (!options.includeAnimationFrames || builds.length === 0) {
+        return [
+          {
+            animationPreview: createImageExportAnimationPreview(page.id, []),
+            fileName: pageFileName,
+            pageId: page.id,
+          },
+        ];
+      }
+
+      const buildInElementIds = builds
+        .filter((build) => build.kind === undefined || build.kind === 'build-in')
+        .map((build) => build.elementId);
+      const hiddenElementIds = new Set(buildInElementIds);
+      const frames: ImageExportFrame[] = [];
+
+      builds.forEach((build, index) => {
+        if (build.kind === 'build-out') {
+          hiddenElementIds.add(build.elementId);
+        } else if (build.kind === undefined || build.kind === 'build-in') {
+          hiddenElementIds.delete(build.elementId);
+        }
+        frames.push({
+          animationPreview: createImageExportAnimationPreview(page.id, Array.from(hiddenElementIds)),
+          fileName: appendFileNameSuffix(
+            pageFileName,
+            `-animation-${String(index + 1).padStart(2, '0')}`,
+          ),
+          pageId: page.id,
+        });
+      });
+
+      return frames;
+    });
+  }
+
+  async function renderImageExportFrame(frame: ImageExportFrame, format: ImageExportOptions['format']) {
+    const page = vm.project.pages.find((item) => item.id === frame.pageId);
+    const imageUrls =
+      page?.elementIds
+        .map((elementId) => vm.project.elements[elementId])
+        .filter(
+          (element): element is ImageElement =>
+            element?.type === 'image' && element.visible !== false,
+        )
+        .map((element) => vm.project.assets[element.assetId]?.objectUrl)
+        .filter((assetUrl): assetUrl is string => Boolean(assetUrl)) ?? [];
+    await Promise.allSettled(
+      imageUrls.map((assetUrl) => canvasWorkspaceUtils.preloadCanvasImage(assetUrl)),
+    );
+    setImageExportFrame(frame);
+    await waitForNextPaint();
+    const dataUrl = imageExportStageRef.current?.toDataURL(
+      format === 'jpeg'
+        ? { mimeType: 'image/jpeg', pixelRatio: 2, quality: 0.92 }
+        : { mimeType: 'image/png', pixelRatio: 2 },
+    );
+    if (!dataUrl) throw new Error(`Could not render ${frame.fileName}.`);
+    return dataUrlToBytes(dataUrl);
+  }
+
+  async function exportImages(options: ImageExportOptions) {
+    if (isExportingImages) return;
+    const frames = getImageExportFrames(options);
+    if (frames.length === 0) return;
+    setIsExportingImages(true);
+    showImageExportNotice(
+      {
+        detail: `Preparing 1 of ${frames.length}`,
+        message: 'Exporting slide images...',
+        progress: { current: 1, total: frames.length },
+        tone: 'info',
+      },
+      { persistent: true },
+    );
+
+    try {
+      const archiveFiles: Record<string, Uint8Array> = {};
+      for (const [index, frame] of frames.entries()) {
+        showImageExportNotice(
+          {
+            detail: `${frame.fileName}`,
+            message: 'Exporting slide images...',
+            progress: { current: index + 1, total: frames.length },
+            tone: 'info',
+          },
+          { persistent: true },
+        );
+        archiveFiles[frame.fileName] = await renderImageExportFrame(frame, options.format);
+      }
+      setImageExportFrame(undefined);
+      const archiveBytes = zipSync(archiveFiles);
+      services.exportService.downloadBlob(
+        new Blob([bytesToBlobPart(archiveBytes)], { type: 'application/zip' }),
+        services.exportService.getImagesArchiveFileName(vm.project),
+      );
+      setImageExportPanelOpen(false);
+      showImageExportNotice({
+        message: `Images exported: ${frames.length} file${frames.length === 1 ? '' : 's'}.`,
+        tone: 'success',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown export error.';
+      showImageExportNotice({ message: `Image export failed: ${message}`, tone: 'error' });
+    } finally {
+      setImageExportFrame(undefined);
+      setIsExportingImages(false);
+    }
   }
 
   function openBlankProjectInNewTab() {
@@ -881,6 +1097,15 @@ export function EditorShell({ services }: EditorShellProps) {
     };
   }, []);
 
+  useEffect(
+    () => () => {
+      if (imageExportNoticeTimeoutRef.current === undefined) return;
+      window.clearTimeout(imageExportNoticeTimeoutRef.current);
+      imageExportNoticeTimeoutRef.current = undefined;
+    },
+    [],
+  );
+
   useEffect(() => {
     const shareId = shareMetadata?.shareId;
     if (!shareId) return undefined;
@@ -925,7 +1150,7 @@ export function EditorShell({ services }: EditorShellProps) {
         mirrorState={vm.mirrorState}
         mirrorDisabledBySettings={vm.mirrorDisabledBySettings}
         persistenceAttention={vm.persistenceAttention}
-        operationNotice={vm.operationNotice}
+        operationNotice={imageExportNotice ?? vm.operationNotice}
         localProjectSetupPanel={
           vm.localProjectSetupOpen ? (
             <LocalProjectSetupPanel
@@ -942,6 +1167,7 @@ export function EditorShell({ services }: EditorShellProps) {
         canTranslateDeck={vm.canTranslateDeck}
         deckTranslationStatus={deckTranslationStatus}
         isTranslatingDeck={Boolean(vm.deckTranslationProgress)}
+        isExportingImages={isExportingImages}
         isExportingPowerPoint={vm.isExportingPowerPoint}
         translationLanguageOptions={vm.translationLanguageOptions}
         translationSourceLanguage={vm.activeSlideLanguage.code}
@@ -965,6 +1191,9 @@ export function EditorShell({ services }: EditorShellProps) {
         }}
         onExportPowerPoint={() => {
           void vm.exportPowerPoint();
+        }}
+        onExportImages={() => {
+          setImageExportPanelOpen(true);
         }}
         onMirrorNow={() => {
           vm.requestMirrorNow();
@@ -1497,6 +1726,18 @@ export function EditorShell({ services }: EditorShellProps) {
           onPresent={presentFromSharePanel}
         />
       ) : null}
+      {imageExportPanelOpen ? (
+        <ImageExportPanel
+          isExporting={isExportingImages}
+          pageCount={vm.project.pages.length}
+          onClose={() => {
+            setImageExportPanelOpen(false);
+          }}
+          onExport={(options) => {
+            void exportImages(options);
+          }}
+        />
+      ) : null}
       {vm.settingsOpen ? (
         <SettingsPanel
           onClose={vm.closeSettings}
@@ -1568,6 +1809,20 @@ export function EditorShell({ services }: EditorShellProps) {
         onZoomIn={vm.zoomIn}
         onZoomOut={vm.zoomOut}
       />
+      {imageExportFrame ? (
+        <div className="image-export-renderer" aria-hidden="true">
+          <CanvasWorkspace
+            project={vm.project}
+            activePageId={imageExportFrame.pageId}
+            animationPreview={imageExportFrame.animationPreview}
+            canvasLabel="Image export canvas"
+            readOnly
+            selection={{ elementIds: [], pageId: imageExportFrame.pageId }}
+            stageRef={imageExportStageRef}
+            zoomPercent={100}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
