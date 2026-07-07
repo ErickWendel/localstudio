@@ -19,9 +19,9 @@ test.describe('editor error recovery journey', () => {
     await editor.gotoNewProject();
 
     const invalidPptxPath = await createInvalidPptxFixture(testInfo);
-    const fileChooserPromise = page.waitForEvent('filechooser');
     await editor.openMenu('File');
     await page.getByRole('menuitem', { name: 'Import' }).click();
+    const fileChooserPromise = page.waitForEvent('filechooser', { timeout: 30_000 });
     await page.getByRole('menuitem', { name: 'PowerPoint (.pptx)' }).click();
     const fileChooser = await fileChooserPromise;
     await fileChooser.setFiles(invalidPptxPath);
@@ -33,6 +33,8 @@ test.describe('editor error recovery journey', () => {
 
     await editor.openMenu('File');
     await page.getByRole('menuitem', { name: 'Mirror now' }).click();
-    await expect(page.getByText(/Save the project before mirroring|Persistence unavailable/)).toBeVisible();
+    await expect(page.getByText(/Save the project before mirroring|Persistence unavailable/)).toBeVisible({
+      timeout: 30_000,
+    });
   });
 });

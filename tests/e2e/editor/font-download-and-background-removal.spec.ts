@@ -20,6 +20,7 @@ async function mockGoogleFontDownload(page: Page) {
   await page.route('https://fonts.googleapis.com/**', async (route) => {
     await route.fulfill({
       contentType: 'text/css',
+      headers: { 'access-control-allow-origin': '*' },
       body: `
         @font-face {
           font-family: 'Montserrat';
@@ -33,6 +34,7 @@ async function mockGoogleFontDownload(page: Page) {
   await page.route('https://fonts.gstatic.com/**', async (route) => {
     await route.fulfill({
       contentType: 'font/woff2',
+      headers: { 'access-control-allow-origin': '*' },
       body: Buffer.from([0x77, 0x4f, 0x46, 0x32, 0, 1, 0, 0]),
     });
   });
