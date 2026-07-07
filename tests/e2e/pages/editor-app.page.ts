@@ -22,7 +22,11 @@ export class EditorAppPage extends BasePage {
   }
 
   async openTool(tab: 'AI Tools' | 'Animate' | 'Assets' | 'Design' | 'Elements' | 'Layout' | 'Text') {
-    await this.page.getByRole('tab', { name: tab }).click();
+    const toolTab = this.page.getByRole('tab', { name: tab });
+    if ((await toolTab.getAttribute('aria-expanded')) !== 'true') {
+      await toolTab.click();
+    }
+    await expect(toolTab).toHaveAttribute('aria-expanded', 'true');
   }
 
   async renameProject(name: string) {

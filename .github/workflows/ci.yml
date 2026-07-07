@@ -40,6 +40,7 @@ concurrency:
 jobs:
   lint:
     name: Lint
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -56,12 +57,19 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: localstudio-dist
+          path: dist
 
       - name: Lint
         run: npm run lint
 
   typecheck:
     name: Typecheck
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -78,12 +86,19 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: localstudio-dist
+          path: dist
 
       - name: Typecheck
         run: npm run typecheck
 
   test:
     name: Unit tests
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -100,6 +115,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: localstudio-dist
+          path: dist
 
       - name: Test
         run: npm run test
