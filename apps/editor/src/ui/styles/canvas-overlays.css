@@ -67,6 +67,16 @@
   font-size: 18px;
 }
 
+.marquee-selection-box {
+  position: absolute;
+  z-index: 11;
+  box-sizing: border-box;
+  border: 1.5px solid #37fd76;
+  background: rgba(55, 253, 118, 0.14);
+  box-shadow: 0 0 12px rgba(55, 253, 118, 0.42);
+  pointer-events: none;
+}
+
 .background-selection-progress {
   width: 96px;
   height: 6px;
