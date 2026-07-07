@@ -11,7 +11,6 @@ describe('App', () => {
     vi.stubGlobal('Translator', {
       availability: vi.fn().mockResolvedValue('available'),
     });
-    window.localStorage.setItem('localstudio.ai.setup-complete', 'true');
   });
 
   afterEach(() => {
@@ -61,36 +60,17 @@ describe('App', () => {
     expect(window.location.search).toBe('');
   });
 
-  it('shows first-run setup and opens the editor after continuing', async () => {
-    const user = userEvent.setup();
-    window.localStorage.clear();
-    vi.stubGlobal('showDirectoryPicker', vi.fn());
-    vi.stubGlobal('Translator', {
-      availability: vi.fn().mockResolvedValue('available'),
-    });
-
-    render(<App />);
-
-    expect(
-      await screen.findByRole('heading', { name: 'LocalStudio.dev runs locally in this browser.' }),
-    ).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Continue to editor' }));
-    expect(await screen.findByText('Untitled Project')).toBeInTheDocument();
-    expect(window.localStorage.getItem('localstudio.ai.setup-complete')).toBe('true');
-  });
-
-  it('keeps first-run setup blocked when browser capabilities are unavailable', async () => {
+  it('opens the editor without a first-run setup gate when browser capabilities are unavailable', async () => {
     window.localStorage.clear();
     vi.stubGlobal('showDirectoryPicker', undefined);
     vi.stubGlobal('Translator', undefined);
 
     render(<App />);
 
+    expect(await screen.findByText('Untitled Project')).toBeInTheDocument();
     expect(
-      await screen.findByRole('heading', { name: 'LocalStudio.dev runs locally in this browser.' }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Continue to editor' })).toBeDisabled();
-    expect(screen.queryByText('Untitled Project')).not.toBeInTheDocument();
+      screen.queryByRole('heading', { name: 'LocalStudio.dev runs locally in this browser.' }),
+    ).not.toBeInTheDocument();
   });
 
   it('renders the WebMCP showcase page at /webmcp', async () => {

@@ -305,25 +305,7 @@ export interface ModelSetupService {
   removeModel?(id: string): Promise<ModelState>;
 }
 
-export type SetupCapabilityStatus = 'unavailable' | 'needs-setup' | 'ready';
 export type PersistenceStorageMode = 'directory' | 'opfs' | 'none';
-
-export interface SetupCapabilityState {
-  label: string;
-  status: SetupCapabilityStatus;
-  detail: string;
-}
-
-export interface LocalSetupState {
-  fileSystem: SetupCapabilityState;
-  chromeTranslation: SetupCapabilityState;
-}
-
-export interface LocalSetupService {
-  checkReadiness(): Promise<LocalSetupState>;
-  markSetupComplete(): void;
-  hasCompletedSetup(): boolean;
-}
 
 export interface TranslatorService {
   getProviderStates?(): Promise<AiProviderState[]>;

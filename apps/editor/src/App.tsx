@@ -1,9 +1,7 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo } from 'react';
 import { createAppServices } from './app/composition';
 import { publicBasePath } from './app/routing/publicBasePath';
 import { sampleProject } from './domain/projects/sampleProject';
-import type { LocalSetupState } from './services/contracts/interfaces';
-import { FirstRunSetupScreen } from './ui/setup/FirstRunSetupScreen';
 
 const EditorShell = lazy(() =>
   import('./ui/editor/shell/EditorShell').then((module) => ({ default: module.EditorShell })),
@@ -131,49 +129,6 @@ function EditorApp() {
           })(),
     );
   }, []);
-  const [isSetupComplete, setIsSetupComplete] = useState(() =>
-    services.localSetupService.hasCompletedSetup(),
-  );
-  const [setupState, setSetupState] = useState<LocalSetupState>();
-
-  const refreshSetupState = useCallback(() => {
-    services.localSetupService
-      .checkReadiness()
-      .then(setSetupState)
-      .catch(() => {
-        setSetupState({
-          fileSystem: {
-            label: 'Project Files',
-            status: 'unavailable',
-            detail: 'Local project persistence could not be checked.',
-          },
-          chromeTranslation: {
-            label: 'Local AI Providers',
-            status: 'unavailable',
-            detail: 'Local AI readiness could not be checked.',
-          },
-        });
-      });
-  }, [services.localSetupService]);
-
-  useEffect(() => {
-    if (isSetupComplete) return;
-    refreshSetupState();
-  }, [isSetupComplete, refreshSetupState]);
-
-  if (!isSetupComplete) {
-    if (!setupState) return null;
-    return (
-      <FirstRunSetupScreen
-        setupState={setupState}
-        onRefresh={refreshSetupState}
-        onContinue={() => {
-          services.localSetupService.markSetupComplete();
-          setIsSetupComplete(true);
-        }}
-      />
-    );
-  }
 
   return (
     <Suspense fallback={null}>

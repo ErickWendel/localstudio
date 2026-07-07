@@ -5,7 +5,6 @@ import type {
   ExportService,
   FontImportService,
   ImageGenerationService,
-  LocalSetupService,
   MagicEraserService,
   MirrorService,
   ModelSetupService,
@@ -29,7 +28,6 @@ import { BrowserImageGenerationService } from '../services/image-generation/brow
 import { BrowserFileSystemProjectRepository } from '../services/storage/browserFileSystemProjectRepository';
 import { DisabledProjectRepository } from '../services/storage/disabledProjectRepository';
 import { OpfsProjectRepository } from '../services/storage/opfsProjectRepository';
-import { localSetupService } from '../services/browser/localSetupService';
 import { modelSetupService } from '../services/model-setup/modelSetupService';
 import { BrowserShareService } from '../services/sharing/shareService';
 import { BrowserPptxImportService } from '../services/importing/pptx/pptxImportService';
@@ -54,7 +52,6 @@ export interface AppServices {
   presentationExportService: PresentationExportService;
   shareService: ShareService;
   stockMediaService: StockMediaService;
-  localSetupService: LocalSetupService;
   modelSetupService: ModelSetupService;
   translatorService: TranslatorService;
   promptService: PromptService;
@@ -99,7 +96,6 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     presentationExportService: new BrowserPptxExportService(),
     shareService: new BrowserShareService({ mirrorService }),
     stockMediaService: new BrowserStockMediaService(),
-    localSetupService: new localSetupService.BrowserLocalSetupService(),
     modelSetupService: browserModelSetupService,
     translatorService: new browserTranslatorService.BrowserTranslatorService(
       browserModelSetupService,

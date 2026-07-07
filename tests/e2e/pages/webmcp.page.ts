@@ -7,9 +7,6 @@ export class WebMcpPage extends BasePage {
   }
 
   async gotoShowcase() {
-    await this.page.addInitScript(() => {
-      window.localStorage.setItem('localstudio.ai.setup-complete', 'true');
-    });
     await this.goto('/editor/webmcp');
     await expect(this.page.getByRole('heading', { name: /WebMCP/i })).toBeVisible();
   }
