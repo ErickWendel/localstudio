@@ -23,7 +23,6 @@ test.describe('landing public funnel journey', () => {
 
     await page.getByRole('link', { name: 'Open editor' }).first().click();
     await expect(page).toHaveURL(/\/editor\/$/);
-    await expect(page.getByRole('heading', { name: 'LocalStudio.dev' })).toBeVisible();
 
     await page.goto(new URL('/', getServer().baseURL).toString());
     await page.getByRole('link', { name: 'Open WebMCP demo' }).click();

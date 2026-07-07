@@ -7,6 +7,9 @@ export class EditorAppPage extends BasePage {
   }
 
   async gotoNewProject() {
+    await this.page.addInitScript(() => {
+      window.localStorage.setItem('localstudio.ai.setup-complete', 'true');
+    });
     await this.goto('/editor/?newProject=1');
     await expect(this.page.getByRole('heading', { name: 'LocalStudio.dev' })).toBeVisible({
       timeout: 30_000,

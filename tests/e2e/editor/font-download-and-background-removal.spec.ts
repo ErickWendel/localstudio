@@ -49,6 +49,51 @@ async function forceDownloadableFontPath(page: Page) {
   });
 }
 
+async function mockSuccessfulGoogleFontDownload(page: Page) {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'FontFace', {
+      configurable: true,
+      value: class MockFontFace {
+        constructor(
+          readonly family: string,
+          readonly source: string,
+          readonly descriptors: FontFaceDescriptors,
+        ) {}
+
+        async load() {
+          await Promise.resolve();
+          return this;
+        }
+      },
+    });
+    Object.defineProperty(document.fonts, 'add', {
+      configurable: true,
+      value: () => undefined,
+    });
+  });
+  await page.route('https://fonts.googleapis.com/**', async (route) => {
+    await route.fulfill({
+      contentType: 'text/css',
+      headers: { 'access-control-allow-origin': '*' },
+      body: `
+        @font-face {
+          font-family: 'Montserrat';
+          font-style: normal;
+          font-weight: 700;
+          src: url(https://fonts.gstatic.com/s/montserrat/v31/montserrat-700.woff2) format('woff2');
+        }
+      `,
+    });
+  });
+  await page.route('https://fonts.gstatic.com/**', async (route) => {
+    await route.fulfill({
+      body: Buffer.from('localstudio-e2e-woff2-fixture'),
+      contentType: 'font/woff2',
+      headers: { 'access-control-allow-origin': '*' },
+    });
+  });
+}
+
 test.describe('editor font download and background removal journeys', () => {
   test('searches downloadable fonts and reports a font download failure without crashing', async ({
     page,
@@ -71,6 +116,24 @@ test.describe('editor font download and background removal journeys', () => {
     );
     await expect(page.getByRole('heading', { name: 'LocalStudio.dev' })).toBeVisible();
     await expect(page.getByLabel('Selected text font', { exact: true })).toBeVisible();
+  });
+
+  test('downloads and applies a Google Font through the real font importer path', async ({ page }) => {
+    await forceDownloadableFontPath(page);
+    await mockSuccessfulGoogleFontDownload(page);
+
+    const editor = new EditorAppPage(page, getServer().baseURL);
+    await editor.gotoNewProject();
+    await editor.openTool('Text');
+    await page.getByRole('button', { name: 'Add a text box' }).click();
+    await editor.openTool('Design');
+    await page.getByRole('button', { name: 'Bold selected text' }).click();
+    await page.getByRole('button', { name: 'Download additional font' }).click();
+    await page.getByLabel('Search downloadable fonts').fill('Montserrat');
+    await page.getByRole('button', { name: 'Download Montserrat' }).click();
+
+    await expect(page.getByRole('status')).toContainText('Montserrat downloaded and applied');
+    await expect(page.getByLabel('Selected text font', { exact: true })).toHaveValue('Montserrat');
   });
 
   test('prepares image editing models and removes an imported image background', async ({

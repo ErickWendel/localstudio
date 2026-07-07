@@ -11,6 +11,7 @@ describe('App', () => {
     vi.stubGlobal('Translator', {
       availability: vi.fn().mockResolvedValue('available'),
     });
+    window.localStorage.setItem('localstudio.ai.setup-complete', 'true');
   });
 
   afterEach(() => {
@@ -60,7 +61,8 @@ describe('App', () => {
     expect(window.location.search).toBe('');
   });
 
-  it('opens the editor without requiring first-run setup', async () => {
+  it('shows first-run setup and opens the editor after continuing', async () => {
+    const user = userEvent.setup();
     window.localStorage.clear();
     vi.stubGlobal('showDirectoryPicker', vi.fn());
     vi.stubGlobal('Translator', {
@@ -69,18 +71,26 @@ describe('App', () => {
 
     render(<App />);
 
+    expect(
+      await screen.findByRole('heading', { name: 'LocalStudio.dev runs locally in this browser.' }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Continue to editor' }));
     expect(await screen.findByText('Untitled Project')).toBeInTheDocument();
-    expect(screen.queryByText('LocalStudio.dev runs locally in this browser.')).not.toBeInTheDocument();
+    expect(window.localStorage.getItem('localstudio.ai.setup-complete')).toBe('true');
   });
 
-  it('opens the editor even when browser capabilities are unavailable', async () => {
+  it('keeps first-run setup blocked when browser capabilities are unavailable', async () => {
+    window.localStorage.clear();
     vi.stubGlobal('showDirectoryPicker', undefined);
     vi.stubGlobal('Translator', undefined);
 
     render(<App />);
 
-    expect(await screen.findByText('Untitled Project')).toBeInTheDocument();
-    expect(screen.queryByText('LocalStudio.dev runs locally in this browser.')).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'LocalStudio.dev runs locally in this browser.' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continue to editor' })).toBeDisabled();
+    expect(screen.queryByText('Untitled Project')).not.toBeInTheDocument();
   });
 
   it('renders the WebMCP showcase page at /webmcp', async () => {
