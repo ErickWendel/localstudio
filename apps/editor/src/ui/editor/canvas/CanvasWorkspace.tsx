@@ -152,6 +152,18 @@ interface ElementAnimationRenderState {
   progress: number;
 }
 
+interface MarqueeSelection {
+  anchor: { x: number; y: number };
+  current: { x: number; y: number };
+}
+
+interface StageRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 function clampAnimationProgress(value: number | undefined) {
   return Math.max(0, Math.min(1, value ?? 0));
 }
@@ -238,6 +250,24 @@ function getShapeLineDrawState(element: ShapeElement, state: ElementAnimationRen
 function getShapeEndpoint(element: ShapeElement, position: 'end' | 'start') {
   if (position === 'end' && element.shape === 'arrow') return element.endEndpoint ?? 'arrow';
   return (position === 'start' ? element.startEndpoint : element.endEndpoint) ?? 'none';
+}
+
+function getNormalizedStageRect(start: { x: number; y: number }, end: { x: number; y: number }) {
+  return {
+    height: Math.abs(end.y - start.y),
+    width: Math.abs(end.x - start.x),
+    x: Math.min(start.x, end.x),
+    y: Math.min(start.y, end.y),
+  };
+}
+
+function stageRectsIntersect(first: StageRect, second: StageRect) {
+  return (
+    first.x <= second.x + second.width &&
+    first.x + first.width >= second.x &&
+    first.y <= second.y + second.height &&
+    first.y + first.height >= second.y
+  );
 }
 
 function getEndpointStrokeWidth(element: ShapeElement) {
@@ -509,6 +539,7 @@ export function CanvasWorkspace({
     y: number;
   } | null>(null);
   const [dragGuide, setDragGuide] = useState<{ x: number; y: number } | null>(null);
+  const [marqueeSelection, setMarqueeSelection] = useState<MarqueeSelection | null>(null);
   const [cropModeElementId, setCropModeElementId] = useState<string | null>(null);
   const [cropDraft, setCropDraft] = useState<
     | {
@@ -687,6 +718,50 @@ export function CanvasWorkspace({
 
   function toDocumentY(value: number) {
     return value / scaleY;
+  }
+
+  function getStagePoint(event: MouseEvent) {
+    const artboard = artboardRef.current;
+    if (!artboard) return null;
+    const stageBounds = artboard.getBoundingClientRect();
+    return {
+      x: event.clientX - stageBounds.left,
+      y: event.clientY - stageBounds.top,
+    };
+  }
+
+  function getElementStageRect(element: DesignElement) {
+    const nodeRect = nodeRefs.current[element.id]?.getClientRect({
+      skipShadow: true,
+      skipStroke: true,
+    });
+    if (nodeRect) {
+      return {
+        height: nodeRect.height,
+        width: nodeRect.width,
+        x: nodeRect.x,
+        y: nodeRect.y,
+      };
+    }
+    return {
+      height: element.height * scaleY,
+      width: element.width * scaleX,
+      x: element.x * scaleX,
+      y: element.y * scaleY,
+    };
+  }
+
+  function selectElementsInMarquee(rect: StageRect) {
+    const selectedElementIds = visibleElements
+      .filter((element) => stageRectsIntersect(rect, getElementStageRect(element)))
+      .map((element) => element.id);
+    selectedElementIds.forEach((elementId, index) => {
+      if (index === 0) {
+        onSelectElement?.(elementId);
+        return;
+      }
+      onSelectElement?.(elementId, { additive: true });
+    });
   }
 
   function handleDragEnd(elementId: string, event: Konva.KonvaEventObject<DragEvent>) {
@@ -1065,7 +1140,35 @@ export function CanvasWorkspace({
       return;
     }
     onSelectSlide?.();
+    if (readOnly || !onSelectElement || !(event.evt instanceof MouseEvent)) return;
+    const startPoint = getStagePoint(event.evt);
+    if (!startPoint) return;
+    setMarqueeSelection({ anchor: startPoint, current: startPoint });
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const currentPoint = getStagePoint(moveEvent);
+      if (!currentPoint) return;
+      setMarqueeSelection({ anchor: startPoint, current: currentPoint });
+    };
+
+    const handleMouseUp = (upEvent: MouseEvent) => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      setMarqueeSelection(null);
+      const endPoint = getStagePoint(upEvent);
+      if (!endPoint) return;
+      const marqueeRect = getNormalizedStageRect(startPoint, endPoint);
+      if (marqueeRect.width < 4 || marqueeRect.height < 4) return;
+      selectElementsInMarquee(marqueeRect);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
   }
+
+  const marqueeRect = marqueeSelection
+    ? getNormalizedStageRect(marqueeSelection.anchor, marqueeSelection.current)
+    : undefined;
 
   return (
     <div
@@ -1088,6 +1191,7 @@ export function CanvasWorkspace({
           : {})}
         data-selected-elements={selection.elementIds.join(',')}
         data-drag-guide={dragGuide ? 'active' : 'idle'}
+        data-marquee-selection={marqueeSelection ? 'active' : 'idle'}
         data-animation-preview={
           animationPreview?.playing && animationPreview.pageId === activePageId ? 'playing' : 'idle'
         }
@@ -1495,6 +1599,19 @@ export function CanvasWorkspace({
               element={selectedElement}
               scale={{ x: scaleX, y: scaleY }}
               onHandlePointerDown={beginCropDrag}
+            />
+          ) : null}
+          {showEditorOverlays && marqueeRect ? (
+            <div
+              aria-hidden="true"
+              className="marquee-selection-box"
+              data-testid="marquee-selection-box"
+              style={{
+                height: `${marqueeRect.height}px`,
+                left: `${marqueeRect.x}px`,
+                top: `${marqueeRect.y}px`,
+                width: `${marqueeRect.width}px`,
+              }}
             />
           ) : null}
           {showEditorOverlays

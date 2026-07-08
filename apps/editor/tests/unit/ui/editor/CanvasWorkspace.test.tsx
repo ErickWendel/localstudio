@@ -263,6 +263,71 @@ describe('CanvasWorkspace', () => {
     expect(onSelectPresentation).toHaveBeenCalledTimes(1);
   });
 
+  it('draws a green marquee and selects elements intersecting it', async () => {
+    const onSelectElement = vi.fn();
+    const stageRef = createRef<Konva.Stage>();
+    const { container } = render(
+      <CanvasWorkspace
+        project={sampleProject.createSampleProject()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        stageRef={stageRef}
+        onSelectElement={onSelectElement}
+      />,
+    );
+
+    const canvas = container.querySelector('canvas');
+    expect(canvas).toBeInTheDocument();
+
+    fireEvent.mouseDown(canvas!, { clientX: 450, clientY: 170 });
+    fireEvent.mouseMove(window, { clientX: 735, clientY: 315 });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('marquee-selection-box')).toHaveStyle({
+        height: '145px',
+        left: '450px',
+        top: '170px',
+        width: '285px',
+      });
+    });
+    expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+      'data-marquee-selection',
+      'active',
+    );
+
+    fireEvent.mouseUp(window, { clientX: 735, clientY: 315 });
+
+    expect(onSelectElement).toHaveBeenCalledTimes(2);
+    expect(onSelectElement).toHaveBeenNthCalledWith(1, 'text-subtitle');
+    expect(onSelectElement).toHaveBeenNthCalledWith(2, 'text-title', { additive: true });
+  });
+
+  it('keeps the marquee origin at the initial mouse position when dragging upward', async () => {
+    const { container } = render(
+      <CanvasWorkspace
+        project={sampleProject.createSampleProject()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        onSelectElement={() => undefined}
+      />,
+    );
+
+    const canvas = container.querySelector('canvas');
+    expect(canvas).toBeInTheDocument();
+
+    fireEvent.mouseDown(canvas!, { clientX: 735, clientY: 315 });
+    fireEvent.mouseMove(window, { clientX: 450, clientY: 170 });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('marquee-selection-box')).toHaveStyle({
+        height: '145px',
+        left: '450px',
+        top: '170px',
+        width: '285px',
+      });
+    });
+  });
+
   it('marks active animation preview state and advances click-triggered builds', () => {
     const onAnimationPreviewAdvance = vi.fn();
     const { container } = render(
