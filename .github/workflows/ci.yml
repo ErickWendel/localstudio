@@ -135,6 +135,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: Setup Node
         uses: actions/setup-node@v4

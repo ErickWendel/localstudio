@@ -7,6 +7,13 @@ import { extname, normalize, resolve, sep } from 'node:path';
 const host = process.env.HOST ?? '0.0.0.0';
 const port = getPort();
 const root = resolve(process.cwd(), process.env.DIST_DIR ?? 'dist');
+const localPowerPointSampleConfig = {
+  fileName: 'fullstack-monitoring-jsnation-11062026.pptx',
+  path:
+    process.env.LOCALSTUDIO_E2E_PPTX_SAMPLE_PATH ??
+    resolve(process.cwd(), 'tests/e2e/fixtures/pptx/fullstack-monitoring-jsnation-11062026.pptx'),
+  route: '/__localstudio/pptx-sample',
+};
 const server = createServer((request, response) => {
   void handleRequest(request.url, response);
 });
@@ -25,6 +32,10 @@ server.listen(port, host, () => {
 async function handleRequest(rawUrl, response) {
   const url = new URL(rawUrl ?? '/', 'http://localstudio.invalid');
   const pathname = decodeURIComponent(url.pathname);
+  if (pathname === `${localPowerPointSampleConfig.route}/file`) {
+    await serveLocalPowerPointSample(response);
+    return;
+  }
   if (pathname === '/__localstudio/network-origin') {
     serveLocalNetworkOrigin(response);
     return;
@@ -44,6 +55,27 @@ async function handleRequest(rawUrl, response) {
     return;
   }
   createReadStream(filePath).pipe(response);
+}
+
+async function serveLocalPowerPointSample(response) {
+  const fileStat = await stat(localPowerPointSampleConfig.path).catch(() => undefined);
+  if (!fileStat?.isFile()) {
+    response.statusCode = 404;
+    response.end(`Sample PowerPoint not found: ${localPowerPointSampleConfig.path}`);
+    return;
+  }
+
+  response.statusCode = 200;
+  response.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  );
+  response.setHeader('Content-Length', String(fileStat.size));
+  response.setHeader(
+    'Content-Disposition',
+    `inline; filename="${localPowerPointSampleConfig.fileName}"`,
+  );
+  createReadStream(localPowerPointSampleConfig.path).pipe(response);
 }
 
 async function resolveFilePath(pathname) {

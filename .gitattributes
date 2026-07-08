@@ -1,0 +1,1 @@
+tests/e2e/fixtures/pptx/*.pptx filter=lfs diff=lfs merge=lfs -text

@@ -1,11 +1,14 @@
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import type { ServerResponse } from 'node:http';
+import { resolve } from 'node:path';
 import type { Connect } from 'vite';
 
 const localPowerPointSampleConfig = {
   fileName: 'fullstack-monitoring-jsnation-11062026.pptx',
-  path: '/Users/erickwendel/Downloads/fullstack-monitoring-jsnation-11062026.pptx',
+  path:
+    process.env.LOCALSTUDIO_E2E_PPTX_SAMPLE_PATH ??
+    resolve(process.cwd(), 'tests/e2e/fixtures/pptx/fullstack-monitoring-jsnation-11062026.pptx'),
   route: '/__localstudio/pptx-sample',
 };
 
