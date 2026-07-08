@@ -1,8 +1,8 @@
 import { createReadStream } from 'node:fs';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { networkInterfaces } from 'node:os';
-import { extname, normalize, resolve, sep } from 'node:path';
+import { basename, dirname, extname, join, normalize, resolve, sep } from 'node:path';
 
 const host = process.env.HOST ?? '0.0.0.0';
 const port = getPort();
@@ -58,8 +58,8 @@ async function handleRequest(rawUrl, response) {
 }
 
 async function serveLocalPowerPointSample(response) {
-  const fileStat = await stat(localPowerPointSampleConfig.path).catch(() => undefined);
-  if (!fileStat?.isFile()) {
+  const sampleFiles = await getLocalPowerPointSampleFiles();
+  if (sampleFiles.length === 0) {
     response.statusCode = 404;
     response.end(`Sample PowerPoint not found: ${localPowerPointSampleConfig.path}`);
     return;
@@ -70,12 +70,51 @@ async function serveLocalPowerPointSample(response) {
     'Content-Type',
     'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   );
-  response.setHeader('Content-Length', String(fileStat.size));
+  response.setHeader('Content-Length', String(getTotalSize(sampleFiles)));
   response.setHeader(
     'Content-Disposition',
     `inline; filename="${localPowerPointSampleConfig.fileName}"`,
   );
-  createReadStream(localPowerPointSampleConfig.path).pipe(response);
+  await pipeFiles(
+    sampleFiles.map((file) => file.path),
+    response,
+  );
+}
+
+async function getLocalPowerPointSampleFiles() {
+  const fileStat = await stat(localPowerPointSampleConfig.path).catch(() => undefined);
+  if (fileStat?.isFile()) {
+    return [{ path: localPowerPointSampleConfig.path, size: fileStat.size }];
+  }
+
+  const partPrefix = `${basename(localPowerPointSampleConfig.path)}.part-`;
+  const partDirectory = dirname(localPowerPointSampleConfig.path);
+  const entries = await readdir(partDirectory).catch(() => []);
+  const partNames = entries.filter((entry) => entry.startsWith(partPrefix)).sort();
+  const files = await Promise.all(
+    partNames.map(async (partName) => {
+      const partPath = join(partDirectory, partName);
+      const partStat = await stat(partPath);
+      return { path: partPath, size: partStat.size };
+    }),
+  );
+  return files.filter((file) => file.size > 0);
+}
+
+function getTotalSize(files) {
+  return files.reduce((total, file) => total + file.size, 0);
+}
+
+async function pipeFiles(filePaths, response) {
+  for (const filePath of filePaths) {
+    await new Promise((resolvePipe, reject) => {
+      const stream = createReadStream(filePath);
+      stream.on('error', reject);
+      stream.on('end', resolvePipe);
+      stream.pipe(response, { end: false });
+    });
+  }
+  response.end();
 }
 
 async function resolveFilePath(pathname) {
