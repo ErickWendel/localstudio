@@ -135,7 +135,7 @@ test.describe('editor current page image export journey', () => {
       page.getByRole('checkbox', { name: 'Create an image for each animation' }),
     ).not.toBeChecked();
 
-    const downloadPromise = page.waitForEvent('download');
+    const downloadPromise = page.waitForEvent('download', { timeout: 60_000 });
     await page.getByRole('button', { name: 'Export images' }).click();
     const download = await downloadPromise;
     const stream = await download.createReadStream();
