@@ -42,7 +42,7 @@ test.describe('editor progress and loading states journey', () => {
     await fileChooser.setFiles(pptxPath);
     await expect(page.getByRole('progressbar', { name: 'PowerPoint import progress' })).toBeVisible();
     await expect(page.getByRole('status')).toContainText(
-      /Reading PowerPoint package|Inspecting PPTX structure|Extracting text and images|Downloading fonts|Mapping animations|Opening deck/i,
+      /Reading PowerPoint package|Inspecting PPTX structure|Extracting text and images|Downloading fonts|Extracting videos|Mapping animations|Opening deck/i,
     );
     await expect(page.getByRole('button', { name: 'Edit project name localstudio-e2e-import' })).toBeVisible({
       timeout: 60_000,

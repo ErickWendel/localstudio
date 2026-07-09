@@ -47,10 +47,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 26
           cache: npm
@@ -59,7 +59,7 @@ jobs:
         run: npm ci
 
       - name: Download build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: localstudio-dist
           path: dist
@@ -76,10 +76,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 26
           cache: npm
@@ -88,7 +88,7 @@ jobs:
         run: npm ci
 
       - name: Download build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: localstudio-dist
           path: dist
@@ -105,10 +105,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 26
           cache: npm
@@ -117,36 +117,13 @@ jobs:
         run: npm ci
 
       - name: Download build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: localstudio-dist
           path: dist
 
-      - name: Test with coverage
-        run: npm run test:coverage
-
-      - name: Add coverage report to job summary
-        if: always()
-        run: cat coverage-report/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload unit coverage report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: unit-coverage-report
-          path: coverage-report
-          if-no-files-found: error
-
-      - name: Upload unit coverage data
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: unit-coverage-data
-          path: |
-            apps/landing/coverage/coverage-summary.json
-            apps/editor/coverage/coverage-summary.json
-            apps/joystick/coverage/coverage-summary.json
-          if-no-files-found: error
+      - name: Test
+        run: npm run test
 
   e2e:
     name: Playwright E2E
@@ -157,10 +134,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 26
           cache: npm
@@ -169,14 +146,14 @@ jobs:
         run: npm ci
 
       - name: Download build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: localstudio-dist
           path: dist
 
       - name: Restore Playwright browser cache
         id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -196,11 +173,27 @@ jobs:
 
       - name: Upload Playwright coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: playwright-coverage
           path: playwright-coverage
           if-no-files-found: ignore
+
+      - name: Generate E2E coverage report
+        if: always()
+        run: node scripts/coverage-report.mjs
+
+      - name: Add E2E coverage report to job summary
+        if: always()
+        run: cat coverage-report/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload E2E coverage report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: e2e-coverage-report
+          path: coverage-report
+          if-no-files-found: error
 
   build:
     name: Build
@@ -212,10 +205,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 26
           cache: npm
@@ -229,7 +222,7 @@ jobs:
           LOCALSTUDIO_BASE_PATH: /
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: localstudio-dist
           path: dist
@@ -247,33 +240,24 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 26
 
       - name: Download build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: localstudio-dist
           path: dist
 
-      - name: Download unit coverage data
-        uses: actions/download-artifact@v4
+      - name: Download E2E coverage report
+        uses: actions/download-artifact@v5
         with:
-          name: unit-coverage-data
-          path: apps
-
-      - name: Download Playwright coverage
-        uses: actions/download-artifact@v4
-        with:
-          name: playwright-coverage
-          path: playwright-coverage
-
-      - name: Generate coverage report
-        run: node scripts/coverage-report.mjs
+          name: e2e-coverage-report
+          path: coverage-report
 
       - name: Add coverage report to job summary
         run: cat coverage-report/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
@@ -282,10 +266,10 @@ jobs:
         run: mkdir -p dist/coverage && cp -R coverage-report/. dist/coverage/
 
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: dist
 
@@ -307,7 +291,7 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment_attempt_1
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
         continue-on-error: true
 
       - name: Wait before retry
@@ -317,7 +301,7 @@ jobs:
       - name: Retry deploy to GitHub Pages
         id: deployment_attempt_2
         if: steps.deployment_attempt_1.outcome == 'failure'
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 
       - name: Resolve deployment URL
         id: deployment_result
