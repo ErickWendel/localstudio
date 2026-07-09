@@ -2,6 +2,7 @@
 node_modules/
 dist/
 coverage/
+coverage-report/
 playwright-report/
 playwright-coverage/
 test-results/

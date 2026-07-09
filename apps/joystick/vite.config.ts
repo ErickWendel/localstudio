@@ -11,6 +11,9 @@ export default defineConfig({
     outDir: '../../dist/joystick',
   },
   test: {
+    coverage: {
+      include: ['src/**/*.{ts,tsx}'],
+    },
     environment: 'jsdom',
     exclude: ['../../.worktrees/**', '../../dist/**', 'node_modules/**'],
     globals: true,

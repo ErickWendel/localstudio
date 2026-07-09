@@ -1,6 +1,7 @@
 # LocalStudio.dev
 
 [![CI](https://github.com/ErickWendel/localstudio/actions/workflows/ci.yml/badge.svg)](https://github.com/ErickWendel/localstudio/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://erickwendel.github.io/localstudio/coverage/coverage-badge.json)](https://erickwendel.github.io/localstudio/coverage/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Node 26](https://img.shields.io/badge/Node-26-5FA04E?logo=nodedotjs&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=111)

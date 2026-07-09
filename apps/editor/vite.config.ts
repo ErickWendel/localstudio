@@ -78,6 +78,10 @@ export default defineConfig({
     },
   },
   test: {
+    coverage: {
+      exclude: ['src/vendor/**'],
+      include: ['src/**/*.{ts,tsx}'],
+    },
     environment: 'jsdom',
     exclude: ['../../.worktrees/**', '../../dist/**', 'node_modules/**', 'tests/e2e/**'],
     globals: true,
