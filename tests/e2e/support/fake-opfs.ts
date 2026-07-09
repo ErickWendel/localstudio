@@ -1,5 +1,11 @@
-export function installFakeOpfs() {
+interface FakeOpfsOptions {
+  directoryPicker?: boolean;
+  directoryPermission?: PermissionState;
+}
+
+export function installFakeOpfs(options: FakeOpfsOptions = {}) {
   const filePrefix = 'localstudio.e2e.opfs.file:';
+  const directoryPermission = options.directoryPermission ?? 'granted';
 
   function normalizePath(path: string) {
     return path
@@ -50,6 +56,16 @@ export function installFakeOpfs() {
       readonly name: string,
       private readonly path = '',
     ) {}
+
+    async queryPermission() {
+      await Promise.resolve();
+      return directoryPermission;
+    }
+
+    async requestPermission() {
+      await Promise.resolve();
+      return directoryPermission;
+    }
 
     async getDirectoryHandle(name: string, options: { create?: boolean } = {}) {
       await Promise.resolve();
@@ -112,13 +128,19 @@ export function installFakeOpfs() {
     return false;
   }
 
+  const showDirectoryPicker = options.directoryPicker
+    ? async () => {
+        await Promise.resolve();
+        return new FakeDirectoryHandle('localstudio-e2e-root', 'localstudio-e2e-root');
+      }
+    : undefined;
   Object.defineProperty(window, 'showDirectoryPicker', {
     configurable: true,
-    value: undefined,
+    value: showDirectoryPicker,
   });
   Object.defineProperty(globalThis, 'showDirectoryPicker', {
     configurable: true,
-    value: undefined,
+    value: showDirectoryPicker,
   });
   const getDirectory = async () => {
     await Promise.resolve();

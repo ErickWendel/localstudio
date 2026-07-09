@@ -32,6 +32,11 @@ test.describe('joystick connected peer journey', () => {
     await page.getByLabel('Page 2 title').fill('Close');
     await page.getByLabel('Page 2 title').press('Enter');
     await pagesPanel.getByRole('button', { name: 'Select Slide 1' }).click();
+    await page.getByRole('button', { name: 'Toggle notes panel' }).click();
+    await page
+      .getByRole('textbox', { name: 'Speaker notes' })
+      .fill('Use this space to capture presenter notes');
+    await page.getByRole('button', { name: 'Close notes panel' }).click();
 
     const presenterPopupPromise = page.waitForEvent('popup');
     await page.getByRole('button', { name: 'Presentation play options' }).click();
@@ -59,6 +64,17 @@ test.describe('joystick connected peer journey', () => {
     await expect(joystickPage.getByRole('main', { name: 'Presentation remote control' })).toBeVisible();
     await expect(joystickPage.getByLabel('Connected (1)')).toBeVisible({ timeout: 45_000 });
     await expect(joystickPage.getByLabel('Slide position')).toContainText('1 / 2');
+    await expect(joystickPage.getByLabel('Presenter notes content')).toContainText(
+      'Use this space to capture presenter notes',
+    );
+    await joystickPage.getByRole('button', { name: 'Increase notes size' }).click();
+    await joystickPage.getByRole('button', { name: 'Decrease notes size' }).click();
+    await joystickPage.getByRole('button', { name: 'Pause timer' }).click();
+    await expect(joystickPage.getByRole('button', { name: 'Resume timer' })).toBeVisible({
+      timeout: 10_000,
+    });
+    await joystickPage.getByRole('button', { name: 'Reset timer' }).click();
+    await expect(joystickPage.getByLabel('Presentation timer')).toContainText('00:00');
 
     await joystickPage.getByRole('button', { name: 'Show slide navigation' }).click();
     await joystickPage

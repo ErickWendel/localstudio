@@ -25,4 +25,46 @@ test.describe('editor local persistence journey', () => {
     await page.keyboard.press('Enter');
     await expect(page.getByRole('complementary', { name: 'Version history' })).toBeVisible();
   });
+
+  test('saves a named project into a picked local folder and keeps Save As usable', async ({
+    page,
+  }) => {
+    await page.addInitScript(installFakeOpfs, { directoryPicker: true });
+
+    const editor = new EditorAppPage(page, getServer().baseURL);
+    await editor.gotoNewProject();
+
+    await page.getByRole('button', { name: 'Persistence disabled' }).click();
+    const setupPanel = page.getByRole('dialog', { name: 'Save local project' });
+    await expect(setupPanel).toBeVisible();
+    await setupPanel.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(setupPanel).toBeHidden();
+
+    await page.getByRole('button', { name: 'Persistence disabled' }).click();
+    await setupPanel.getByLabel('Project folder name').fill('');
+    await expect(setupPanel.getByRole('button', { name: 'Choose folder' })).toBeDisabled();
+    await setupPanel.getByLabel('Project folder name').fill('E2E Folder Deck');
+    await setupPanel.getByRole('button', { name: 'Choose folder' }).click();
+
+    await expect(page.getByRole('button', { name: 'Persistence enabled' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Edit project name E2E Folder Deck' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Version history' })).toBeEnabled();
+
+    await editor.renameProject('E2E Folder Deck Renamed');
+    await editor.openMenu('File');
+    await page.getByRole('menuitem', { name: 'Save As...' }).click();
+    await expect(page.getByRole('button', { name: 'Persistence enabled' })).toBeVisible();
+
+    const persistedKeys = await page.evaluate(() =>
+      Array.from({ length: window.localStorage.length }, (_, index) => window.localStorage.key(index))
+        .filter((key): key is string => Boolean(key))
+        .filter((key) => key.includes('localstudio.e2e.opfs.file:')),
+    );
+    expect(persistedKeys).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('E2E Folder Deck Renamed/project.json'),
+        expect.stringContaining('E2E Folder Deck Renamed/config/localstudio.json'),
+      ]),
+    );
+  });
 });

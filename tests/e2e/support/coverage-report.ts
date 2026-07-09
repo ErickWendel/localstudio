@@ -1,104 +1,67 @@
+import MCR from 'monocart-coverage-reports';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import process from 'node:process';
 
-interface CoverageRange {
-  count: number;
-  endOffset: number;
-  startOffset: number;
-}
-
-interface FunctionCoverage {
-  functionName: string;
-  ranges: CoverageRange[];
-}
-
-interface ScriptCoverage {
-  functions: FunctionCoverage[];
-  url: string;
-}
+const coverageThreshold = 80;
+const coverageOutputDir = join(process.cwd(), 'coverage-report');
 
 interface TestCoverageFile {
-  entries: ScriptCoverage[];
+  entries: MCR.V8CoverageEntry[];
   titlePath: string[];
-}
-
-interface ScriptSummary {
-  testCount: number;
-  totalBytes: number;
-  usedBytes: number;
-  url: string;
 }
 
 export default async function reportPlaywrightCoverage() {
   if (process.env.E2E_COVERAGE === '0') return;
 
   const coverageFiles = await findCoverageFiles(join(process.cwd(), 'test-results'));
-  const summaries = new Map<string, ScriptSummary>();
+  if (coverageFiles.length === 0) {
+    throw new Error('No browser coverage files were collected from Playwright.');
+  }
+
+  await mkdir(coverageOutputDir, { recursive: true });
+
+  const coverageReport = MCR({
+    name: 'LocalStudio E2E Coverage',
+    outputDir: coverageOutputDir,
+    reports: [
+      ['v8', { outputFile: 'index.html' }],
+      ['v8-json', { outputFile: 'coverage-report.json' }],
+      ['json-summary', { file: 'coverage-summary.json' }],
+      ['lcovonly', { file: 'lcov.info' }],
+      ['markdown-summary', { outputFile: 'coverage-summary.md' }],
+      ['markdown-details', { outputFile: 'coverage-details.md', skipPercent: 90 }],
+      ['console-summary'],
+    ],
+    clean: true,
+    cleanCache: true,
+    entryFilter: isLocalScript,
+    sourcePath: normalizeCoverageSourcePath,
+    sourceFilter: isReportableSourceFile,
+    watermarks: {
+      bytes: [coverageThreshold, 90],
+      branches: [coverageThreshold, 90],
+      functions: [coverageThreshold, 90],
+      lines: [coverageThreshold, 90],
+      statements: [coverageThreshold, 90],
+    },
+    onEnd: async (coverageResults) => {
+      if (!coverageResults) {
+        throw new Error('Monocart did not produce E2E coverage results.');
+      }
+
+      await writeBadge(coverageResults);
+      await writeCoverageMetadata(coverageResults, coverageFiles);
+      enforceCoverageThreshold(coverageResults);
+    },
+  });
 
   for (const file of coverageFiles) {
     const payload = JSON.parse(await readFile(file, 'utf8')) as TestCoverageFile;
-    const seenInTest = new Set<string>();
-    for (const entry of payload.entries) {
-      if (!isLocalScript(entry.url)) continue;
-      const summary = summarizeScript(entry);
-      if (summary.totalBytes <= 0) continue;
-      const url = normalizeScriptUrl(entry.url);
-      const current = summaries.get(url) ?? {
-        testCount: 0,
-        totalBytes: 0,
-        usedBytes: 0,
-        url,
-      };
-      current.totalBytes += summary.totalBytes;
-      current.usedBytes += summary.usedBytes;
-      if (!seenInTest.has(url)) {
-        current.testCount += 1;
-        seenInTest.add(url);
-      }
-      summaries.set(url, current);
-    }
+    await coverageReport.add(payload.entries);
   }
 
-  const scriptSummaries = Array.from(summaries.values())
-    .map((summary) => ({
-      ...summary,
-      percent: summary.totalBytes === 0 ? 0 : (summary.usedBytes / summary.totalBytes) * 100,
-    }))
-    .sort((a, b) => a.percent - b.percent || b.totalBytes - a.totalBytes);
-
-  const totalBytes = scriptSummaries.reduce((total, summary) => total + summary.totalBytes, 0);
-  const usedBytes = scriptSummaries.reduce((total, summary) => total + summary.usedBytes, 0);
-  const totalPercent = totalBytes === 0 ? 0 : (usedBytes / totalBytes) * 100;
-  const outputDir = join(process.cwd(), 'playwright-coverage');
-  await mkdir(outputDir, { recursive: true });
-  await writeFile(
-    join(outputDir, 'coverage-summary.json'),
-    JSON.stringify(
-      {
-        generatedAt: new Date().toISOString(),
-        localScriptCount: scriptSummaries.length,
-        totals: {
-          percent: Number(totalPercent.toFixed(2)),
-          totalBytes,
-          usedBytes,
-        },
-        scripts: scriptSummaries.map((summary) => ({
-          ...summary,
-          percent: Number(summary.percent.toFixed(2)),
-        })),
-      },
-      null,
-      2,
-    ),
-  );
-  await writeFile(join(outputDir, 'coverage-summary.md'), renderMarkdownReport({
-    coverageFiles,
-    scriptSummaries,
-    totalBytes,
-    totalPercent,
-    usedBytes,
-  }));
+  await coverageReport.generate();
 }
 
 async function findCoverageFiles(root: string): Promise<string[]> {
@@ -120,120 +83,198 @@ async function findCoverageFiles(root: string): Promise<string[]> {
     }
   }
   await walk(root);
-  return files;
+  return files.sort();
 }
 
-function summarizeScript(entry: ScriptCoverage) {
-  const totalBytes = getScriptLength(entry);
-  const functionRanges = entry.functions
-    .map((fn) => getFunctionRange(fn))
-    .filter((range): range is CoverageRange => {
-      if (!range) return false;
-      const isWholeScriptTopLevel =
-        range.startOffset === 0 && range.endOffset === totalBytes && range.count > 0;
-      return !isWholeScriptTopLevel;
-    });
-  const coveredRanges = functionRanges
-    .filter((range) => range.count > 0)
-    .map((range) => ({
-      end: range.endOffset,
-      start: range.startOffset,
-    }));
-  return {
-    totalBytes:
-      functionRanges.length > 0
-        ? measureCoveredBytes(
-            functionRanges.map((range) => ({
-              end: range.endOffset,
-              start: range.startOffset,
-            })),
-          )
-        : totalBytes,
-    usedBytes: measureCoveredBytes(coveredRanges),
-  };
+function isLocalScript(entry: MCR.V8CoverageEntry) {
+  if (!entry.url) return false;
+  if (entry.url.startsWith('file:')) return isSourceFileInCoverageScope(entry.url);
+  let parsed: URL;
+  try {
+    parsed = new URL(entry.url);
+  } catch {
+    return isSourceFileInCoverageScope(entry.url);
+  }
+  if (!['localhost', '127.0.0.1'].includes(parsed.hostname)) return false;
+  return isSourceFileInCoverageScope(parsed.pathname);
 }
 
-function getFunctionRange(fn: FunctionCoverage) {
-  return fn.ranges
-    .filter((range) => range.endOffset > range.startOffset)
-    .sort((a, b) => b.endOffset - b.startOffset - (a.endOffset - a.startOffset))[0];
+function isSourceFileInCoverageScope(sourcePath: string) {
+  const normalized = normalizeCoverageSourcePath(sourcePath);
+  if (!normalized) return false;
+  return isReportableSourceFile(normalized) && isImplementedSourcePath(normalized);
 }
 
-function getScriptLength(entry: ScriptCoverage) {
-  return Math.max(
-    0,
-    ...entry.functions.flatMap((fn) => fn.ranges.map((range) => range.endOffset)),
+function isReportableSourceFile(sourcePath: string) {
+  const normalized = normalizeCoverageSourcePath(sourcePath);
+  if (!normalized) return false;
+  if (
+    normalized.includes('/node_modules/') ||
+    normalized.includes('/test-results/') ||
+    normalized.includes('/tests/') ||
+    normalized.includes('/dist/') ||
+    normalized.includes('/@vite/') ||
+    normalized.includes('/@react-refresh') ||
+    normalized.includes('/coverage-report/') ||
+    normalized.includes('/playwright-report/') ||
+    normalized.includes('/virtual:')
+  ) {
+    return false;
+  }
+
+  return /\.(c|m)?(t|j)sx?$/.test(normalized) || normalized.endsWith('.css');
+}
+
+function isImplementedSourcePath(normalized: string) {
+  const isImplementedSource =
+    normalized.startsWith('apps/') ||
+    normalized.startsWith('packages/') ||
+    normalized.startsWith('src/') ||
+    normalized.includes('/apps/') ||
+    normalized.includes('/packages/') ||
+    normalized.includes('/src/');
+  return isImplementedSource;
+}
+
+function normalizeCoverageSourcePath(
+  sourcePath: string,
+  info?: {
+    distFile?: string;
+  },
+) {
+  const source = sourcePath.includes('/') ? sourcePath : (info?.distFile ?? sourcePath);
+  let normalized = source.replaceAll('\\', '/').split('?')[0] ?? '';
+  normalized = normalized.replace(/^https?:\/\/(?:localhost|127\.0\.0\.1):\d+\//, '');
+  normalized = normalized.replace(/^localhost-\d+\//, '');
+  normalized = normalized.replace(/^@fs\//, '');
+  const workspaceMarker = '/canva-webai-clone/';
+  const workspaceIndex = normalized.indexOf(workspaceMarker);
+  if (workspaceIndex >= 0) {
+    normalized = normalized.slice(workspaceIndex + workspaceMarker.length);
+  }
+  normalized = normalized.replace(/^\/+/, '');
+
+  if (normalized.startsWith('editor/src/')) return `apps/${normalized}`;
+  if (normalized.startsWith('joystick/src/')) return `apps/${normalized}`;
+  if (normalized.startsWith('landing/src/')) return `apps/${normalized}`;
+  return normalized;
+}
+
+async function writeBadge(coverageResults: MCR.CoverageResults) {
+  const coveragePercent = getCoveragePercent(coverageResults);
+  await writeFile(
+    join(coverageOutputDir, 'coverage-badge.json'),
+    `${JSON.stringify(
+      {
+        schemaVersion: 1,
+        label: 'e2e coverage',
+        message: `${coveragePercent.toFixed(2)}%`,
+        color: getBadgeColor(coverageResults),
+      },
+      null,
+      2,
+    )}\n`,
   );
 }
 
-function measureCoveredBytes(ranges: Array<{ end: number; start: number }>) {
-  const sorted = ranges
-    .filter((range) => range.end > range.start)
-    .sort((a, b) => a.start - b.start || a.end - b.end);
-  let covered = 0;
-  let current: { end: number; start: number } | undefined;
-  for (const range of sorted) {
-    if (!current) {
-      current = { ...range };
-      continue;
-    }
-    if (range.start <= current.end) {
-      current.end = Math.max(current.end, range.end);
-      continue;
-    }
-    covered += current.end - current.start;
-    current = { ...range };
-  }
-  if (current) covered += current.end - current.start;
-  return covered;
-}
+async function writeCoverageMetadata(
+  coverageResults: MCR.CoverageResults,
+  coverageFiles: string[],
+) {
+  const lowCoverageFiles = getLowestCoveredSourceFiles(coverageResults);
+  await writeFile(
+    join(coverageOutputDir, 'coverage-metadata.json'),
+    `${JSON.stringify(
+      {
+        generatedAt: new Date().toISOString(),
+        rawCoverageFiles: coverageFiles.map((file) => relative(process.cwd(), file)),
+        threshold: {
+          metric: 'bytes',
+          percent: coverageThreshold,
+        },
+        total: coverageResults.summary,
+        lowestCoveredSourceFiles: lowCoverageFiles,
+      },
+      null,
+      2,
+    )}\n`,
+  );
 
-function isLocalScript(url: string) {
-  if (!url) return false;
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    return false;
-  }
-  if (!['localhost', '127.0.0.1'].includes(parsed.hostname)) return false;
-  if (parsed.pathname.includes('/node_modules/')) return false;
-  if (parsed.pathname.includes('/@vite/') || parsed.pathname.includes('/@react-refresh')) return false;
-  return parsed.pathname.endsWith('.js') || parsed.pathname.includes('/src/');
-}
-
-function normalizeScriptUrl(url: string) {
-  const parsed = new URL(url);
-  return parsed.pathname;
-}
-
-function renderMarkdownReport(input: {
-  coverageFiles: string[];
-  scriptSummaries: Array<ScriptSummary & { percent: number }>;
-  totalBytes: number;
-  totalPercent: number;
-  usedBytes: number;
-}) {
-  const lowestCovered = input.scriptSummaries.slice(0, 40);
   const lines = [
-    '# Playwright Browser Coverage',
+    '# LocalStudio E2E Coverage',
     '',
-    `Collected ${input.coverageFiles.length} per-test coverage files.`,
-    `Local browser JavaScript coverage: ${input.totalPercent.toFixed(2)}% (${input.usedBytes} / ${input.totalBytes} bytes).`,
+    `Monocart total byte coverage: ${getCoveragePercent(coverageResults).toFixed(2)}%.`,
+    `Threshold: ${coverageThreshold}%.`,
     '',
-    '## Lowest Covered Local Scripts',
+    '## Reports',
     '',
-    '| Script | Coverage | Tests |',
+    '- HTML: `coverage-report/index.html`',
+    '- JSON: `coverage-report/coverage-report.json`',
+    '- Summary JSON: `coverage-report/coverage-summary.json`',
+    '- LCOV: `coverage-report/lcov.info`',
+    '',
+    '## Lowest Covered Source Files',
+    '',
+    '| Source | Bytes | Lines |',
     '| --- | ---: | ---: |',
-    ...lowestCovered.map(
-      (summary) =>
-        `| \`${summary.url}\` | ${summary.percent.toFixed(2)}% | ${summary.testCount} |`,
+    ...lowCoverageFiles.map(
+      (file) =>
+        `| \`${file.sourcePath}\` | ${formatPercent(file.bytes)} | ${formatPercent(file.lines)} |`,
     ),
     '',
-    '## Raw Files',
+    '## Raw Playwright Coverage Files',
     '',
-    ...input.coverageFiles.map((file) => `- \`${relative(process.cwd(), file)}\``),
+    ...coverageFiles.map((file) => `- \`${relative(process.cwd(), file)}\``),
     '',
   ];
-  return `${lines.join('\n')}\n`;
+  await writeFile(join(coverageOutputDir, 'coverage-ci-summary.md'), `${lines.join('\n')}\n`);
+}
+
+function enforceCoverageThreshold(coverageResults: MCR.CoverageResults) {
+  const coveragePercent = getCoveragePercent(coverageResults);
+  if (coveragePercent < coverageThreshold) {
+    throw new Error(
+      `E2E coverage threshold not met: ${coveragePercent.toFixed(2)}% bytes < ${coverageThreshold}%.`,
+    );
+  }
+}
+
+function getCoveragePercent(coverageResults: MCR.CoverageResults) {
+  const pct = coverageResults.summary.bytes?.pct;
+  return typeof pct === 'number' ? pct : 0;
+}
+
+function getBadgeColor(coverageResults: MCR.CoverageResults) {
+  switch (coverageResults.summary.bytes?.status) {
+    case 'high':
+      return 'brightgreen';
+    case 'medium':
+      return 'yellow';
+    case 'low':
+      return 'red';
+    default:
+      return 'lightgrey';
+  }
+}
+
+function getLowestCoveredSourceFiles(coverageResults: MCR.CoverageResults) {
+  return coverageResults.files
+    .map((file) => ({
+      bytes: file.summary.bytes?.pct ?? '',
+      lines: file.summary.lines.pct,
+      sourcePath: file.sourcePath,
+    }))
+    .filter((file) => typeof file.bytes === 'number' || typeof file.lines === 'number')
+    .sort((a, b) => getSortPercent(a.bytes, a.lines) - getSortPercent(b.bytes, b.lines))
+    .slice(0, 20);
+}
+
+function getSortPercent(bytes: number | '', lines: number | '') {
+  if (typeof bytes === 'number') return bytes;
+  if (typeof lines === 'number') return lines;
+  return Number.POSITIVE_INFINITY;
+}
+
+function formatPercent(percent: number | '') {
+  return typeof percent === 'number' ? `${percent.toFixed(2)}%` : 'n/a';
 }

@@ -145,12 +145,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Download build artifact
-        uses: actions/download-artifact@v5
-        with:
-          name: localstudio-dist
-          path: dist
-
       - name: Restore Playwright browser cache
         id: playwright-cache
         uses: actions/cache@v5
@@ -166,26 +160,23 @@ jobs:
       - name: Install Playwright Chromium browser
         run: npx playwright install chromium
 
-      - name: End-to-end test
-        run: npm run test:e2e
-        env:
-          E2E_SERVER: dist
+      - name: End-to-end coverage test
+        run: npm run test:e2e:coverage
 
-      - name: Upload Playwright coverage
+      - name: Upload raw Playwright coverage
         if: always()
         uses: actions/upload-artifact@v5
         with:
-          name: playwright-coverage
-          path: playwright-coverage
+          name: playwright-browser-coverage
+          path: test-results/**/browser-coverage.json
           if-no-files-found: ignore
-
-      - name: Generate E2E coverage report
-        if: always()
-        run: node scripts/coverage-report.mjs
 
       - name: Add E2E coverage report to job summary
         if: always()
-        run: cat coverage-report/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          cat coverage-report/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+          printf '\n' >> "$GITHUB_STEP_SUMMARY"
+          cat coverage-report/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload E2E coverage report
         if: always()
@@ -260,7 +251,10 @@ jobs:
           path: coverage-report
 
       - name: Add coverage report to job summary
-        run: cat coverage-report/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          cat coverage-report/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+          printf '\n' >> "$GITHUB_STEP_SUMMARY"
+          cat coverage-report/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish coverage report with site
         run: mkdir -p dist/coverage && cp -R coverage-report/. dist/coverage/

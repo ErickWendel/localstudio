@@ -2,6 +2,13 @@ import type { CDPSession, BrowserContext, Page, TestInfo } from '@playwright/tes
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
+interface ScriptCoverageEntry {
+  functions: unknown[];
+  scriptId: string;
+  source?: string;
+  url: string;
+}
+
 interface BrowserCoverageFixtureInput {
   browserName: string;
   context: BrowserContext;
@@ -22,6 +29,7 @@ export async function collectBrowserCoverage(
     if (sessions.has(page)) return;
     try {
       const client = await context.newCDPSession(page);
+      await client.send('Debugger.enable');
       await client.send('Profiler.enable');
       await client.send('Profiler.startPreciseCoverage', {
         callCount: true,
@@ -43,10 +51,19 @@ export async function collectBrowserCoverage(
   const entries: unknown[] = [];
   for (const client of sessions.values()) {
     try {
-      const coverage = await client.send('Profiler.takePreciseCoverage');
-      entries.push(...coverage.result);
+      const coverage = (await client.send('Profiler.takePreciseCoverage')) as {
+        result: ScriptCoverageEntry[];
+      };
+      const entriesWithSource = await Promise.all(
+        coverage.result.map(async (entry) => ({
+          ...entry,
+          source: await getScriptSource(client, entry),
+        })),
+      );
+      entries.push(...entriesWithSource);
       await client.send('Profiler.stopPreciseCoverage');
       await client.send('Profiler.disable');
+      await client.send('Debugger.disable');
       await client.detach();
     } catch {
       // Closed popups still contribute through earlier pages; ignore late teardown races.
@@ -69,6 +86,17 @@ export async function collectBrowserCoverage(
       2,
     ),
   );
+}
+
+async function getScriptSource(client: CDPSession, entry: ScriptCoverageEntry) {
+  try {
+    const scriptSource = (await client.send('Debugger.getScriptSource', {
+      scriptId: entry.scriptId,
+    })) as { scriptSource?: string };
+    return scriptSource.scriptSource ?? entry.source;
+  } catch {
+    return entry.source;
+  }
 }
 
 function shouldCollectBrowserCoverage(browserName: string) {
