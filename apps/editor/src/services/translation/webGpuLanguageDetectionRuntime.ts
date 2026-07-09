@@ -1,7 +1,7 @@
 import { TransformersRuntimeClient } from '../model-setup/transformersRuntimeClient';
-import { transformersOperations } from '../model-setup/transformersOperations';
+import { transformersResultParsing } from '../model-setup/transformersResultParsing';
 import type { ModelDownloadProgressDetails } from '../contracts/interfaces';
-import type { LanguageDetectionResult } from '../model-setup/transformersOperations';
+import type { LanguageDetectionResult } from '../model-setup/transformersRuntimeTypes';
 
 export interface LanguageDetectionRuntime {
   preload(
@@ -34,6 +34,6 @@ class TransformersLanguageDetectionRuntime implements LanguageDetectionRuntime {
 }
 
 export const webGpuLanguageDetectionRuntime = {
-  extractDetectedLanguage: transformersOperations.extractDetectedLanguage,
+  extractDetectedLanguage: transformersResultParsing.extractDetectedLanguage,
   TransformersLanguageDetectionRuntime,
 };

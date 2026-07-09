@@ -197,4 +197,33 @@ describe('BrowserPresenterSessionService', () => {
     expect(commandHandler).toHaveBeenCalledWith({ command: 'request-state' });
     unsubscribe();
   });
+
+  it('forwards go-to-page commands from the active presenter session', () => {
+    const popup = { location: { href: '' }, postMessage: vi.fn(), closed: false } as unknown as Window;
+    const commandHandler = vi.fn();
+    const service = new BrowserPresenterSessionService({
+      href: 'https://localstudio.test/editor/',
+      openWindow: vi.fn(() => popup),
+      randomId: () => 'session-6',
+      targetWindow: window,
+    });
+    service.openPresenterWindow();
+    const unsubscribe = service.subscribeToCommands(commandHandler);
+
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        origin: 'https://localstudio.test',
+        data: {
+          command: 'go-to-page',
+          pageId: 'page-2',
+          sessionId: 'session-6',
+          source: 'localstudio-presenter-window',
+          type: 'command',
+        },
+      }),
+    );
+
+    expect(commandHandler).toHaveBeenCalledWith({ command: 'go-to-page', pageId: 'page-2' });
+    unsubscribe();
+  });
 });

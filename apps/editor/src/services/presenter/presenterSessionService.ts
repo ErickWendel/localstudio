@@ -338,6 +338,11 @@ export class BrowserPresenterSessionService {
         handler({ command, peerId: event.data.peerId });
         return;
       }
+      if (command === 'go-to-page') {
+        if (typeof event.data.pageId !== 'string') return;
+        handler({ command, pageId: event.data.pageId });
+        return;
+      }
       if (
         command === 'close' ||
         command === 'next' ||

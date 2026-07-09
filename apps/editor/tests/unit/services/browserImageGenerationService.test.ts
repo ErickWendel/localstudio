@@ -1,5 +1,6 @@
 import { bonsaiImageRuntime } from '../../../src/services/image-generation/bonsaiImageRuntime';
 import type { BonsaiImageRuntime, BonsaiImageWorkerRequest, BonsaiImageWorkerResponse } from '../../../src/services/image-generation/bonsaiImageRuntime';
+import { directBonsaiImageRuntime } from '../../../src/services/image-generation/directBonsaiImageRuntime';
 import { BrowserImageGenerationService } from '../../../src/services/image-generation/browserImageGenerationService';
 import { imageGenerationModel } from '../../../src/services/image-generation/imageGenerationModel';
 
@@ -58,7 +59,7 @@ describe('BrowserImageGenerationService', () => {
   });
 });
 
-describe('bonsaiImageRuntime.BrowserBonsaiImageRuntime', () => {
+describe('directBonsaiImageRuntime.BrowserBonsaiImageRuntime', () => {
   it('preloads the Bonsai runtime with from_pretrained and maps component progress', async () => {
     const pipeline = {
       generate: vi.fn(() =>
@@ -78,7 +79,7 @@ describe('bonsaiImageRuntime.BrowserBonsaiImageRuntime', () => {
     const progress: number[] = [];
     const progressDetails: Array<unknown> = [];
 
-    await new bonsaiImageRuntime.BrowserBonsaiImageRuntime({
+    await new directBonsaiImageRuntime.BrowserBonsaiImageRuntime({
       cacheName: 'test-cache',
       importRuntime: () =>
         Promise.resolve({
@@ -119,7 +120,7 @@ describe('bonsaiImageRuntime.BrowserBonsaiImageRuntime', () => {
     expect('destroyBonsaiDemoScene' in runtimeModule).toBe(false);
     expect(document.body.children).toHaveLength(1);
 
-    await new bonsaiImageRuntime.BrowserBonsaiImageRuntime({
+    await new directBonsaiImageRuntime.BrowserBonsaiImageRuntime({
       importRuntime: () =>
         Promise.resolve({
           BonsaiImagePipeline: {
@@ -158,7 +159,7 @@ describe('bonsaiImageRuntime.BrowserBonsaiImageRuntime', () => {
       });
     });
     const progress: number[] = [];
-    const preloadPromise = new bonsaiImageRuntime.BrowserBonsaiImageRuntime({
+    const preloadPromise = new directBonsaiImageRuntime.BrowserBonsaiImageRuntime({
       importRuntime: () =>
         Promise.resolve({
           BonsaiImagePipeline: {
@@ -186,7 +187,7 @@ describe('bonsaiImageRuntime.BrowserBonsaiImageRuntime', () => {
       ),
     };
     const fromPretrained = vi.fn(() => Promise.resolve(pipeline));
-    const runtime = new bonsaiImageRuntime.BrowserBonsaiImageRuntime({
+    const runtime = new directBonsaiImageRuntime.BrowserBonsaiImageRuntime({
       importRuntime: () =>
         Promise.resolve({
           BonsaiImagePipeline: {

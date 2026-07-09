@@ -1246,6 +1246,9 @@ export function useEditorViewModel(services: AppServices) {
     const selectedTranslationProviderId = translationProviderStates.find(
       (provider) => provider.modelId === id && provider.selected,
     )?.id;
+    const selectedLanguageDetectionProviderId = languageDetectionProviderStates.find(
+      (provider) => provider.modelId === id && provider.selected,
+    )?.id;
     const next = await services.modelSetupService.removeModel(id);
     setModelStates((currentStates) =>
       currentStates.map((state) => (state.id === id ? next : state)),
@@ -1263,6 +1266,15 @@ export function useEditorViewModel(services: AppServices) {
           ? await services.translatorService.setSelectedProvider(selectedTranslationProviderId)
           : await services.translatorService.getProviderStates();
       setTranslationProviderStates(nextTranslationProviders);
+    }
+    if (services.translatorService.getLanguageDetectionProviderStates) {
+      const nextLanguageDetectionProviders =
+        selectedLanguageDetectionProviderId && services.translatorService.setLanguageDetectionProvider
+          ? await services.translatorService.setLanguageDetectionProvider(
+              selectedLanguageDetectionProviderId,
+            )
+          : await services.translatorService.getLanguageDetectionProviderStates();
+      setLanguageDetectionProviderStates(nextLanguageDetectionProviders);
     }
     if (id === aiModelCatalog.GEMMA_LLM_MODEL_ID) {
       setPromptPreparation({ availability: 'downloadable', progress: 0, status: 'idle' });

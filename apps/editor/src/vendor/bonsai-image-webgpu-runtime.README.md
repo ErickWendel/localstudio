@@ -20,7 +20,7 @@ BonsaiImagePipeline.from_pretrained(modelId, options)
 pipeline.generate(options)
 ```
 
-LocalStudio imports this module through `BrowserBonsaiImageRuntime`. Production image generation uses
+LocalStudio imports this module through `directBonsaiImageRuntime.BrowserBonsaiImageRuntime`. Production image generation uses
 `WorkerBackedBonsaiImageRuntime` by default so model loading and generation run off the editor shell
 thread. Direct runtime fallback is reserved for tests and browsers that cannot construct module
 workers.

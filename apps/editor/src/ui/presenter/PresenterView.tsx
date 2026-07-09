@@ -950,14 +950,20 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
                     ? 'presentation-slide-navigator-item presentation-slide-navigator-item-active'
                     : 'presentation-slide-navigator-item'
                 }
-                key={page.id}
-                type="button"
-                role="option"
-                onClick={() => setSlideNavigatorIndex(index)}
-                onDoubleClick={() => {
-                  goToPage(index);
-                  setSlideNavigatorOpen(false);
-                }}
+	                key={page.id}
+	                type="button"
+	                role="option"
+	                onClick={() => setSlideNavigatorIndex(index)}
+	                onKeyDown={(event) => {
+	                  if (event.key !== 'Enter' && event.key !== ' ') return;
+	                  event.preventDefault();
+	                  goToPage(index);
+	                  setSlideNavigatorOpen(false);
+	                }}
+	                onDoubleClick={() => {
+	                  goToPage(index);
+	                  setSlideNavigatorOpen(false);
+	                }}
               >
                 <span>Slide {index + 1}</span>
                 <strong>{page.name}</strong>

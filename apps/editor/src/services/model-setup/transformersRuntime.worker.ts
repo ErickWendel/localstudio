@@ -1,10 +1,10 @@
-import { transformersOperations } from './transformersOperations';
+import { directTransformersOperations } from './directTransformersOperations';
 import type {
   TransformersWorkerRequest,
   TransformersWorkerResponse,
 } from './transformersRuntimeClient';
 
-const operations = new transformersOperations.DirectTransformersOperations();
+const operations = new directTransformersOperations.DirectTransformersOperations();
 
 function postResponse(response: TransformersWorkerResponse) {
   self.postMessage(response);

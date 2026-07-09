@@ -417,6 +417,67 @@ class TranslationModelSetupService extends modelSetupService.InMemoryModelSetupS
   }
 }
 
+class LanguageDetectionProviderSelectionService extends PreparingTranslatorService {
+  private selectedProviderId = 'chrome-language-detector-api';
+  private languageDetectionReady = false;
+
+  prepareLanguageDetection = vi.fn((options?: { onProgress?: (progress: number) => void }) => {
+    options?.onProgress?.(45);
+    options?.onProgress?.(100);
+    this.languageDetectionReady = true;
+    return Promise.resolve();
+  });
+
+  getLanguageDetectionProviderStates = vi.fn((): Promise<AiProviderState[]> =>
+    Promise.resolve([
+      {
+        id: 'chrome-language-detector-api',
+        label: 'Chrome Built-in Language Detector',
+        description: 'Detect text language using Chrome Built-in AI.',
+        capability: 'language-detection',
+        runtime: 'chrome-built-in',
+        compatibility: 'compatible',
+        readiness: 'ready',
+        selected: this.selectedProviderId === 'chrome-language-detector-api',
+      },
+      {
+        id: 'language-detection-webgpu',
+        label: 'XLM-RoBERTa Language Detection',
+        description: 'Browser-local language detection model.',
+        capability: 'language-detection',
+        runtime: 'webgpu-huggingface',
+        compatibility: 'compatible',
+        modelId: aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID,
+        readiness: this.languageDetectionReady ? 'ready' : 'needs-download',
+        selected: this.selectedProviderId === 'language-detection-webgpu',
+      },
+    ]),
+  );
+
+  markLanguageDetectionNeedsDownload() {
+    this.languageDetectionReady = false;
+  }
+
+  setLanguageDetectionProvider(providerId: string) {
+    this.selectedProviderId = providerId;
+    return this.getLanguageDetectionProviderStates();
+  }
+}
+
+class LanguageDetectionModelSetupService extends modelSetupService.InMemoryModelSetupService implements ModelSetupService {
+  constructor(private readonly onLanguageDetectionRemoved?: () => void) {
+    super();
+  }
+
+  override async removeModel(id: string): Promise<ModelState> {
+    const next = await super.removeModel(id);
+    if (id === aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID) {
+      this.onLanguageDetectionRemoved?.();
+    }
+    return next;
+  }
+}
+
 class DeferredImageGenerationService implements ImageGenerationService {
   resolve!: (asset: Asset) => void;
 
@@ -649,6 +710,27 @@ describe('mocked AI flows', () => {
 
     expect(screen.getByLabelText('Translation Model')).toHaveValue('translategemma-webgpu');
     expect(screen.getByRole('button', { name: 'Download Translation Model' })).toBeInTheDocument();
+  });
+
+  it('keeps the WebGPU language detector selected after removing its cached model', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const translatorService = new LanguageDetectionProviderSelectionService();
+    services.translatorService = translatorService;
+    services.modelSetupService = new LanguageDetectionModelSetupService(() =>
+      translatorService.markLanguageDetectionNeedsDownload(),
+    );
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
+    await user.selectOptions(screen.getByLabelText('Language Detection Model'), 'language-detection-webgpu');
+    await waitFor(() => {
+      expect(translatorService.prepareLanguageDetection).toHaveBeenCalled();
+    });
+    await user.click(screen.getByRole('button', { name: 'Remove Language Detection Model' }));
+
+    expect(screen.getByLabelText('Language Detection Model')).toHaveValue('language-detection-webgpu');
+    expect(screen.getByRole('button', { name: 'Download Language Detection Model' })).toBeInTheDocument();
   });
 
   it('generates an image from create image mode and inserts it into the active slide', async () => {

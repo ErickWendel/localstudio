@@ -521,6 +521,59 @@ describe('PresenterView', () => {
     );
   });
 
+  it('activates the focused slide navigator option with Enter', () => {
+    const opener = { postMessage: vi.fn() };
+    Object.defineProperty(window, 'opener', {
+      configurable: true,
+      value: opener,
+    });
+    window.localStorage.setItem('localstudio.presenterWindowIntroDismissed', '1');
+    render(<PresenterView sessionId="session-1" />);
+    const project = sampleProject.createSampleProject();
+    project.pages.push({
+      background: { type: 'color', color: '#111111' },
+      elementIds: [],
+      height: 1080,
+      id: 'page-2',
+      name: 'Slide 2',
+      width: 1920,
+    });
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          origin: window.location.origin,
+          data: {
+            payload: {
+              activePageId: 'page-1',
+              animationPreview: undefined,
+              project,
+            },
+            sessionId: 'session-1',
+            source: 'localstudio-presenter-main',
+            type: 'state',
+          },
+        }),
+      );
+    });
+
+    fireEvent.keyDown(window, { key: '#' });
+    const slideTwoOption = screen.getByRole('option', { name: /Slide 2/ });
+    fireEvent.click(slideTwoOption);
+    fireEvent.keyDown(slideTwoOption, { key: 'Enter' });
+
+    expect(opener.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: 'go-to-page',
+        pageId: 'page-2',
+        sessionId: 'session-1',
+        source: 'localstudio-presenter-window',
+        type: 'command',
+      }),
+      window.location.origin,
+    );
+    expect(screen.queryByRole('dialog', { name: 'Slide navigator' })).not.toBeInTheDocument();
+  });
+
   it('opens the remote control QR panel from the presenter toolbar', async () => {
     window.localStorage.setItem('localstudio.presenterWindowIntroDismissed', '1');
     render(<PresenterView sessionId="session-1" />);

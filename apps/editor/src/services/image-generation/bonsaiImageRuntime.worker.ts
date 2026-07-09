@@ -1,7 +1,7 @@
-import { bonsaiImageRuntime } from './bonsaiImageRuntime';
+import { directBonsaiImageRuntime } from './directBonsaiImageRuntime';
 import type { BonsaiImageWorkerRequest, BonsaiImageWorkerResponse } from './bonsaiImageRuntime';
 
-const runtime = new bonsaiImageRuntime.BrowserBonsaiImageRuntime();
+const runtime = new directBonsaiImageRuntime.BrowserBonsaiImageRuntime();
 
 function postResponse(response: BonsaiImageWorkerResponse) {
   self.postMessage(response);

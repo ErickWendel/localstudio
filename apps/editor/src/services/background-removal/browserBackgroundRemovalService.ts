@@ -6,7 +6,7 @@ import type {
   SamImageInput,
   SegmentationPoint,
   SubjectMask,
-} from '../model-setup/transformersOperations';
+} from '../model-setup/transformersRuntimeTypes';
 
 function createObjectUrlFromImageData(imageData: ImageData) {
   return new Promise<string>((resolve, reject) => {

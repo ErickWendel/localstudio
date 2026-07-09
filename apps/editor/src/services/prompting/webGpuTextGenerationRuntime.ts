@@ -1,10 +1,10 @@
 import { TransformersRuntimeClient } from '../model-setup/transformersRuntimeClient';
-import { transformersOperations } from '../model-setup/transformersOperations';
+import { transformersResultParsing } from '../model-setup/transformersResultParsing';
 import type { ModelDownloadProgressDetails } from '../contracts/interfaces';
 import type {
   TextGenerationInput,
   TextGenerationOptions,
-} from '../model-setup/transformersOperations';
+} from '../model-setup/transformersRuntimeTypes';
 
 export type { TextGenerationInput, TextGenerationOptions };
 
@@ -56,6 +56,6 @@ class TransformersTextGenerationRuntime implements TextGenerationRuntime {
 }
 
 export const webGpuTextGenerationRuntime = {
-  extractGeneratedText: transformersOperations.extractGeneratedText,
+  extractGeneratedText: transformersResultParsing.extractGeneratedText,
   TransformersTextGenerationRuntime,
 };

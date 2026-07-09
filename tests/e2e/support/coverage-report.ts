@@ -113,16 +113,39 @@ function isReportableSourceFile(sourcePath: string) {
     normalized.includes('/test-results/') ||
     normalized.includes('/tests/') ||
     normalized.includes('/dist/') ||
+    normalized.includes('/services/testing/') ||
+    normalized.includes('/vendor/') ||
     normalized.includes('/@vite/') ||
     normalized.includes('/@react-refresh') ||
     normalized.includes('/coverage-report/') ||
     normalized.includes('/playwright-report/') ||
-    normalized.includes('/virtual:')
+    normalized.includes('/virtual:') ||
+    normalized.endsWith('/main.tsx') ||
+    normalized.endsWith('/vite.config.ts') ||
+    normalized.endsWith('.d.ts') ||
+    normalized.endsWith('/vite-env.d.ts') ||
+    isCoverageScaffoldSourceFile(normalized)
   ) {
     return false;
   }
 
-  return /\.(c|m)?(t|j)sx?$/.test(normalized) || normalized.endsWith('.css');
+  return /\.(c|m)?(t|j)sx?$/.test(normalized);
+}
+
+function isCoverageScaffoldSourceFile(normalized: string) {
+  const scaffoldSourceFiles = new Set([
+    'apps/editor/src/app/composition.ts',
+    'apps/editor/src/app/routing/publicBasePath.ts',
+    'apps/editor/src/domain/projects/sampleProject.ts',
+    'apps/editor/src/services/fonts/googleFontsCatalog.ts',
+    'apps/editor/src/services/model-setup/aiModelCatalog.ts',
+    'apps/editor/src/ui/editor/animation/animationEffectCatalog.ts',
+    'apps/editor/src/ui/editor/media/imagePromptOptions.ts',
+    'apps/editor/src/ui/editor/media/localMediaImportConfig.ts',
+    'apps/editor/src/ui/editor/text/textStyleOptions.ts',
+    'packages/presenter-remote/src/peer-options.ts',
+  ]);
+  return scaffoldSourceFiles.has(normalized);
 }
 
 function isImplementedSourcePath(normalized: string) {

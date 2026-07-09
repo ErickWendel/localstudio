@@ -11,7 +11,16 @@ function getElementLabel(element: DesignElement | undefined) {
   if (element.type === 'image') return 'Image';
   if (element.type === 'gif') return 'GIF';
   if (element.type === 'video') return 'Video';
-  return element.shape === 'ellipse' ? 'Ellipse' : 'Rectangle';
+  if (element.shape === 'arc') return 'Arc';
+  if (element.shape === 'arrow') return 'Arrow';
+  if (element.shape === 'diamond') return 'Diamond';
+  if (element.shape === 'ellipse') return 'Ellipse';
+  if (element.shape === 'line') return 'Line';
+  if (element.shape === 'parallelogram') return 'Parallelogram';
+  if (element.shape === 'pentagon') return 'Pentagon';
+  if (element.shape === 'rounded-rect') return 'Rounded rectangle';
+  if (element.shape === 'triangle') return 'Triangle';
+  return 'Rectangle';
 }
 
 const canvasImageCache = new Map<string, HTMLImageElement | Promise<HTMLImageElement>>();
