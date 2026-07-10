@@ -60,6 +60,7 @@ import type { ElementClipboardState } from './editorViewModelElements';
 import { editorViewModelHistory } from './editorViewModelHistory';
 import type { EditorHistory } from './editorViewModelHistory';
 import { editorViewModelPages } from './editorViewModelPages';
+import { editorViewModelSelection } from './editorViewModelSelection';
 import { editorViewModelText } from './editorViewModelText';
 
 export type RightPanelTab =
@@ -1146,7 +1147,9 @@ export function useEditorViewModel(services: AppServices) {
       if (options?.selectedElementIds !== undefined) {
         selectedElementIdsRef.current = options.selectedElementIds;
         setSelectedElementIds(options.selectedElementIds);
-        setSelectionTarget(options.selectedElementIds.length > 0 ? 'elements' : 'slide');
+        setSelectionTarget(
+          editorViewModelSelection.getSelectionTargetForElements(options.selectedElementIds),
+        );
       }
       return nextProject;
     });
@@ -1157,20 +1160,19 @@ export function useEditorViewModel(services: AppServices) {
     cancelBackgroundSelectionMode();
     setSelectionTarget('elements');
     setSelectedElementIds((currentSelection) => {
-      if (!options?.additive) return [elementId];
-      if (currentSelection.includes(elementId)) {
-        return currentSelection.filter((id) => id !== elementId);
-      }
-      return [...currentSelection, elementId];
+      return editorViewModelSelection.getNextElementSelection({
+        additive: Boolean(options?.additive),
+        currentSelection,
+        elementId,
+      });
     });
   }
 
   function selectAllElementsOnActivePage() {
-    const page = project.pages.find((item) => item.id === activePageId);
-    if (!page) return;
-    const selectableElementIds = page.elementIds.filter((elementId) => {
-      const element = project.elements[elementId];
-      return element && element.visible !== false && !processingElementIds.includes(elementId);
+    const selectableElementIds = editorViewModelSelection.getSelectableElementIdsOnPage({
+      pageId: activePageId,
+      processingElementIds,
+      project,
     });
     cancelBackgroundSelectionMode();
     setSelectionTarget('elements');
