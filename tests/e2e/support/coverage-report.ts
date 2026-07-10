@@ -15,8 +15,9 @@ interface TestCoverageFile {
 
 export default async function reportPlaywrightCoverage() {
   if (process.env.E2E_COVERAGE === '0') return;
+  if (process.env.E2E_COVERAGE_REPORT === '0') return;
 
-  const coverageFiles = await findCoverageFiles(join(process.cwd(), 'test-results'));
+  const coverageFiles = await findCoverageFiles(getCoverageInputDir());
   if (coverageFiles.length === 0) {
     throw new Error('No browser coverage files were collected from Playwright.');
   }
@@ -316,6 +317,10 @@ function getCoverageOutputDir(scope: ReturnType<typeof getCoverageScope>) {
   return scope === 'all'
     ? join(process.cwd(), 'coverage-report')
     : join(process.cwd(), 'coverage-report', scope);
+}
+
+function getCoverageInputDir() {
+  return process.env.E2E_COVERAGE_INPUT_DIR ?? join(process.cwd(), 'test-results');
 }
 
 function getCoverageScopeLabel(scope: ReturnType<typeof getCoverageScope>) {

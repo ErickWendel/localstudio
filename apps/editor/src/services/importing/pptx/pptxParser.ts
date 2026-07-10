@@ -1,177 +1,33 @@
+import type { PlaceholderRole, ShapeKind, ShapeLineEndpoint } from '../../../domain/documents/model';
+import { pptxAnimationBuilds } from './pptx-animation-builds';
 import type {
-  AnimationEffect,
-  AnimationTrigger,
-  ElementAnimationBuild,
-  ElementAnimationKind,
-  ImportWarning,
-  PlaceholderRole,
-  ShapeKind,
-  ShapeLineEndpoint,
-} from '../../../domain/documents/model';
+  ParseContext,
+  ParseScope,
+  PptxDeck,
+  PptxLayout,
+  PptxSlideObject,
+  PptxTextBox,
+  PptxTextDefaults,
+  PptxTextStyle,
+  PptxTheme,
+  PptxTransform,
+} from './pptx-parser-model';
+import { pptxParserDefaults } from './pptx-parser-model';
+import { pptxVisualStyle } from './pptx-visual-style';
 import { pptxFileUtils } from './pptxFileUtils';
-import type { PptxPackage, PptxRelationship } from './pptxPackage';
+import type { PptxRelationship } from './pptxPackage';
 import { pptxXml } from './pptxXml';
 
-export interface PptxRect {
-  height: number;
-  width: number;
-  x: number;
-  y: number;
-}
-
-export interface PptxTransform extends PptxRect {
-  flipX?: boolean;
-  rotation: number;
-}
-
-export interface PptxTextStyle {
-  align: 'left' | 'center' | 'right';
-  fill: string;
-  fontFamily: string;
-  fontSize: number;
-  fontWeight: number;
-  lineHeight: number;
-  verticalAlign: 'bottom' | 'middle' | 'top';
-}
-
-export interface PptxTextInsets {
-  bottom: number;
-  left: number;
-  right: number;
-  top: number;
-}
-
-export interface PptxTextBox {
-  insets: PptxTextInsets;
-  verticalAlign: 'bottom' | 'middle' | 'top';
-}
-
-export type PptxSlideObject =
-  | {
-      frame: PptxRect;
-      id: string;
-      kind: 'text';
-      opacity?: number;
-      placeholderRole?: PlaceholderRole;
-      rotation?: number;
-      source: 'layout' | 'master' | 'slide';
-      sourceShapeId: string;
-      style: PptxTextStyle;
-      text: string;
-      textBox: PptxTextBox;
-      zIndex: number;
-    }
-  | {
-      assetPath: string;
-      frame: PptxRect;
-      id: string;
-      kind: 'image' | 'gif' | 'video';
-      opacity?: number;
-      placeholderRole?: PlaceholderRole;
-      rotation?: number;
-      source: 'layout' | 'master' | 'slide';
-      startTrigger?: AnimationTrigger;
-      sourceShapeId: string;
-      zIndex: number;
-    }
-  | {
-      endEndpoint?: ShapeLineEndpoint;
-      fill?: string;
-      frame: PptxRect;
-      id: string;
-      kind: 'shape';
-      opacity?: number;
-      placeholderRole?: PlaceholderRole;
-      rotation?: number;
-      shape: ShapeKind;
-      source: 'layout' | 'master' | 'slide';
-      sourceShapeId: string;
-      startEndpoint?: ShapeLineEndpoint;
-      stroke?: string;
-      strokeWidth?: number;
-      zIndex: number;
-    };
-
-export interface PptxSlide {
-  backgroundColor: string;
-  id: string;
-  layoutId?: string;
-  layoutName?: string;
-  layoutObjects: PptxSlideObject[];
-  name: string;
-  animationBuilds: ElementAnimationBuild[];
-  objects: PptxSlideObject[];
-  placeholderRoles: PlaceholderRole[];
-  speakerNotes?: string;
-  transitionEffect: AnimationEffect;
-}
-
-export interface PptxLayout {
-  backgroundColor: string;
-  id: string;
-  name: string;
-  objects: PptxSlideObject[];
-  placeholderRoles: PlaceholderRole[];
-  sourcePath: string;
-}
-
-export interface PptxDeck {
-  height: number;
-  layouts: PptxLayout[];
-  name: string;
-  slides: PptxSlide[];
-  warnings: ImportWarning[];
-  width: number;
-}
-
-interface PptxTextDefaults {
-  defaultParagraphProperties: Element | undefined;
-  defaultRunProperties: Element | undefined;
-  listParagraphProperties: Element | undefined;
-  listRunProperties: Element | undefined;
-}
-
-interface PptxTheme {
-  colors: Map<string, string>;
-}
-
-interface ParseContext {
-  package: PptxPackage;
-  themeCache: Map<string, PptxTheme>;
-}
-
-interface ParseScope {
-  groupTransform?: PptxTransform;
-  theme: PptxTheme | undefined;
-}
-
-const DEFAULT_PAGE_WIDTH = 1920;
-const DEFAULT_PAGE_HEIGHT = 1080;
-const DEFAULT_TEXT_STYLE: PptxTextStyle = {
-  align: 'left',
-  fill: '#ffffff',
-  fontFamily: 'Open Sans',
-  fontSize: 32,
-  fontWeight: 400,
-  lineHeight: 1.05,
-  verticalAlign: 'top',
-};
 const EMUS_PER_POINT = 12700;
-const DEFAULT_TEXT_INSETS_EMU = {
-  bottom: 45720,
-  left: 91440,
-  right: 91440,
-  top: 45720,
-};
 
 function getPresentationSize(document: Document) {
   const size = pptxXml.firstDescendant(document, 'sldSz');
   const cx = Number(size?.getAttribute('cx'));
   const cy = Number(size?.getAttribute('cy'));
   if (!Number.isFinite(cx) || !Number.isFinite(cy) || cx <= 0 || cy <= 0) {
-    return { width: DEFAULT_PAGE_WIDTH, height: DEFAULT_PAGE_HEIGHT, scaleX: 1, scaleY: 1 };
+    return { width: pptxParserDefaults.pageWidth, height: pptxParserDefaults.pageHeight, scaleX: 1, scaleY: 1 };
   }
-  const width = DEFAULT_PAGE_WIDTH;
+  const width = pptxParserDefaults.pageWidth;
   const height = Math.round((cy / cx) * width);
   return {
     width,
@@ -236,77 +92,6 @@ function parseFrame(element: Element, scaleX: number, scaleY: number, groupTrans
     height: Math.round(localFrame.height),
     rotation: groupTransform.rotation + localFrame.rotation,
   };
-}
-
-function normalizeColor(value: string) {
-  return `#${value.replace(/^#/, '').toUpperCase()}`;
-}
-
-function clampColor(value: number) {
-  return Math.max(0, Math.min(255, Math.round(value)));
-}
-
-function applyColorModifier(color: string, element: Element) {
-  const hex = color.replace(/^#/, '');
-  let red = Number.parseInt(hex.slice(0, 2), 16);
-  let green = Number.parseInt(hex.slice(2, 4), 16);
-  let blue = Number.parseInt(hex.slice(4, 6), 16);
-  const shade = Number(pptxXml.firstDescendant(element, 'shade')?.getAttribute('val'));
-  const tint = Number(pptxXml.firstDescendant(element, 'tint')?.getAttribute('val'));
-  const lumMod = Number(pptxXml.firstDescendant(element, 'lumMod')?.getAttribute('val'));
-  const lumOff = Number(pptxXml.firstDescendant(element, 'lumOff')?.getAttribute('val'));
-  if (Number.isFinite(shade) && shade >= 0) {
-    red = (red * shade) / 100000;
-    green = (green * shade) / 100000;
-    blue = (blue * shade) / 100000;
-  }
-  if (Number.isFinite(tint) && tint >= 0) {
-    red += (255 - red) * (tint / 100000);
-    green += (255 - green) * (tint / 100000);
-    blue += (255 - blue) * (tint / 100000);
-  }
-  if (Number.isFinite(lumMod) && lumMod >= 0) {
-    red *= lumMod / 100000;
-    green *= lumMod / 100000;
-    blue *= lumMod / 100000;
-  }
-  if (Number.isFinite(lumOff) && lumOff >= 0) {
-    red += 255 * (lumOff / 100000);
-    green += 255 * (lumOff / 100000);
-    blue += 255 * (lumOff / 100000);
-  }
-  return normalizeColor(
-    [red, green, blue].map((channel) => clampColor(channel).toString(16).padStart(2, '0')).join(''),
-  );
-}
-
-function getThemeColor(theme: PptxTheme | undefined, name: string) {
-  const aliases = new Map([
-    ['bg1', 'lt1'],
-    ['tx1', 'dk1'],
-    ['bg2', 'lt2'],
-    ['tx2', 'dk2'],
-  ]);
-  return theme?.colors.get(name) ?? theme?.colors.get(aliases.get(name) ?? '');
-}
-
-function getHexColor(element: ParentNode | undefined, fallback: string, theme?: PptxTheme) {
-  if (!element) return fallback;
-  const color = pptxXml.firstDescendant(element, 'srgbClr');
-  const schemeColor = pptxXml.firstDescendant(element, 'schemeClr');
-  const systemColor = pptxXml.firstDescendant(element, 'sysClr');
-  const rawColor =
-    color?.getAttribute('val') ??
-    systemColor?.getAttribute('lastClr') ??
-    (schemeColor ? getThemeColor(theme, schemeColor.getAttribute('val') ?? '') : undefined);
-  const sourceElement = color ?? schemeColor ?? systemColor;
-  return rawColor && sourceElement ? applyColorModifier(normalizeColor(rawColor), sourceElement) : fallback;
-}
-
-function getOpacity(element: ParentNode | undefined) {
-  if (!element) return undefined;
-  const alpha = Number(pptxXml.firstDescendant(element, 'alpha')?.getAttribute('val'));
-  return Number.isFinite(alpha) ? Math.max(0, Math.min(1, alpha / 100000)) : undefined;
 }
 
 function getRotation(transform: Element | undefined) {
@@ -389,7 +174,7 @@ function hasEnabledBold(...elements: Array<Element | undefined>) {
 function getFontSize(rawSize: number, scaleY: number) {
   return Number.isFinite(rawSize) && rawSize > 0
     ? Math.max(8, Math.round((rawSize / 100) * EMUS_PER_POINT * scaleY))
-    : DEFAULT_TEXT_STYLE.fontSize;
+    : pptxParserDefaults.textStyle.fontSize;
 }
 
 function getVerticalAlign(shape: Element): PptxTextStyle['verticalAlign'] {
@@ -410,7 +195,7 @@ function getLineHeight(...paragraphProperties: Array<Element | undefined>) {
       return Math.max(0.7, Math.min(2, percentage / 100000));
     }
   }
-  return DEFAULT_TEXT_STYLE.lineHeight;
+  return pptxParserDefaults.textStyle.lineHeight;
 }
 
 function getTextAlign(
@@ -435,7 +220,7 @@ function getTextAlign(
   if (align === 'r') return 'right';
   if (align === 'l') return 'left';
   if (verticalAlign === 'middle' && fontSize >= 80) return 'center';
-  return DEFAULT_TEXT_STYLE.align;
+  return pptxParserDefaults.textStyle.align;
 }
 
 function getTextStyle(
@@ -484,18 +269,18 @@ function getTextStyle(
   const fontSize = getFontSize(size, scaleY);
   return {
     align: getTextAlign(paragraphProperties, listParagraphProperties, textDefaults, fontSize, verticalAlign),
-    fill: getHexColor(
+    fill: pptxVisualStyle.getHexColor(
       runProperties ??
         paragraphDefaultRunProperties ??
         listDefaultRunProperties ??
         inheritedRunProperties ??
         shape,
-      DEFAULT_TEXT_STYLE.fill,
+      pptxParserDefaults.textStyle.fill,
       theme,
     ),
-    fontFamily: font && !font.startsWith('+') ? font : DEFAULT_TEXT_STYLE.fontFamily,
+    fontFamily: font && !font.startsWith('+') ? font : pptxParserDefaults.textStyle.fontFamily,
     fontSize,
-    fontWeight: bold ? 700 : DEFAULT_TEXT_STYLE.fontWeight,
+    fontWeight: bold ? 700 : pptxParserDefaults.textStyle.fontWeight,
     lineHeight: getLineHeight(paragraphProperties, listParagraphProperties, inheritedParagraphProperties),
     verticalAlign,
   };
@@ -542,10 +327,10 @@ function getTextBox(shape: Element, scaleX: number, scaleY: number): PptxTextBox
   const anchor = bodyProperties?.getAttribute('anchor');
   return {
     insets: {
-      bottom: getTextInset(bodyProperties, 'bIns', DEFAULT_TEXT_INSETS_EMU.bottom, scaleY),
-      left: getTextInset(bodyProperties, 'lIns', DEFAULT_TEXT_INSETS_EMU.left, scaleX),
-      right: getTextInset(bodyProperties, 'rIns', DEFAULT_TEXT_INSETS_EMU.right, scaleX),
-      top: getTextInset(bodyProperties, 'tIns', DEFAULT_TEXT_INSETS_EMU.top, scaleY),
+      bottom: getTextInset(bodyProperties, 'bIns', pptxParserDefaults.textInsetsEmu.bottom, scaleY),
+      left: getTextInset(bodyProperties, 'lIns', pptxParserDefaults.textInsetsEmu.left, scaleX),
+      right: getTextInset(bodyProperties, 'rIns', pptxParserDefaults.textInsetsEmu.right, scaleX),
+      top: getTextInset(bodyProperties, 'tIns', pptxParserDefaults.textInsetsEmu.top, scaleY),
     },
     verticalAlign: anchor === 'b' ? 'bottom' : anchor === 'ctr' ? 'middle' : 'top',
   };
@@ -567,7 +352,7 @@ function parseTextObject(
   const frame = parseFrame(shape, scaleX, scaleY, scope.groupTransform);
   if (!frame) return undefined;
   const shapeId = localShapeId(shape, String(zIndex));
-  const opacity = getOpacity(shape);
+  const opacity = pptxVisualStyle.getOpacity(shape);
   return {
     frame,
     id: `${slideId}-${idScope}-text-${shapeId}`,
@@ -638,7 +423,7 @@ function parsePictureObject(
   }
   if (!assetType) return undefined;
   const shapeId = localShapeId(picture, String(zIndex));
-  const opacity = getOpacity(picture);
+  const opacity = pptxVisualStyle.getOpacity(picture);
   return {
     assetPath,
     frame,
@@ -652,135 +437,9 @@ function parsePictureObject(
   };
 }
 
-function getBackgroundColor(document: Document, theme: PptxTheme | undefined, fallback = '#000000') {
+function getBackgroundColor(document: Document, theme: ParseScope['theme'], fallback = '#000000') {
   const background = pptxXml.firstDescendant(document, 'bgPr');
-  return getHexColor(background, fallback, theme);
-}
-
-function getTransitionEffect(document: Document): AnimationEffect {
-  const transition = pptxXml.firstDescendant(document, 'transition');
-  if (!transition) return 'dissolve';
-  if (pptxXml.firstDescendant(transition, 'fade')) return 'fade';
-  if (pptxXml.firstDescendant(transition, 'push')) return 'push';
-  if (pptxXml.firstDescendant(transition, 'wipe')) return 'wipe';
-  return 'dissolve';
-}
-
-function toBuildKind(value: string | null): ElementAnimationKind {
-  if (value === 'exit') return 'build-out';
-  if (value === 'emph') return 'emphasis';
-  return 'build-in';
-}
-
-function toBuildTrigger(value: string | null, index: number): AnimationTrigger {
-  if (value === 'clickEffect') return 'on-click';
-  if (value === 'afterEffect') return index === 0 ? 'after-transition' : 'after-previous';
-  return index === 0 ? 'after-transition' : 'on-click';
-}
-
-function toMilliseconds(value: string | null, fallback: number) {
-  if (!value || value === 'indefinite') return fallback;
-  const numericValue = Number(value);
-  return Number.isFinite(numericValue) && numericValue >= 0 ? numericValue : fallback;
-}
-
-function findBuildSourceShapeId(behavior: Element) {
-  return pptxXml.firstDescendant(behavior, 'spTgt')?.getAttribute('spid');
-}
-
-function findNearestAnimationTimingNode(behavior: Element) {
-  let current: Element | null = behavior;
-  while (current) {
-    if (current.localName === 'cTn' && current.hasAttribute('nodeType')) return current;
-    current = current.parentElement;
-  }
-  return undefined;
-}
-
-function getBuildDurationMs(timingNode: Element | undefined) {
-  const childDuration = timingNode
-    ? pptxXml.descendants(timingNode, 'cTn').find((item) => item.hasAttribute('dur'))?.getAttribute('dur')
-    : undefined;
-  return toMilliseconds(childDuration ?? timingNode?.getAttribute('dur') ?? null, 500);
-}
-
-function isMediaControlTiming(timingNode: Element | undefined) {
-  return timingNode?.getAttribute('presetClass') === 'mediacall';
-}
-
-function getVideoStartTriggers(document: Document, objects: PptxSlideObject[]) {
-  const videoObjectsByShapeId = new Map(
-    objects
-      .filter((object) => object.kind === 'video' && object.id.includes('-slide-'))
-      .map((object) => [object.sourceShapeId, object]),
-  );
-  const triggers = new Map<string, AnimationTrigger>();
-  let mediaBuildIndex = 0;
-  pptxXml.descendants(document, 'cBhvr').forEach((behavior) => {
-    const sourceShapeId = findBuildSourceShapeId(behavior);
-    if (!sourceShapeId || !videoObjectsByShapeId.has(sourceShapeId)) return;
-    const timingNode = findNearestAnimationTimingNode(behavior);
-    if (!isMediaControlTiming(timingNode)) return;
-    triggers.set(
-      sourceShapeId,
-      toBuildTrigger(timingNode?.getAttribute('nodeType') ?? null, mediaBuildIndex),
-    );
-    mediaBuildIndex += 1;
-  });
-  return triggers;
-}
-
-function parseAnimationBuilds(
-  document: Document,
-  slideId: string,
-  objects: PptxSlideObject[],
-): ElementAnimationBuild[] {
-  const slideObjectsByShapeId = new Map(
-    objects
-      .filter((object) => object.id.includes('-slide-'))
-      .map((object) => [object.sourceShapeId, object]),
-  );
-  const builds: ElementAnimationBuild[] = [];
-  const seenShapeIds = new Set<string>();
-  pptxXml.descendants(document, 'cBhvr').forEach((behavior) => {
-    const sourceShapeId = findBuildSourceShapeId(behavior);
-    if (!sourceShapeId) return;
-    if (seenShapeIds.has(sourceShapeId)) return;
-    const object = slideObjectsByShapeId.get(sourceShapeId);
-    if (!object) return;
-    const timingNode = findNearestAnimationTimingNode(behavior);
-    if (isMediaControlTiming(timingNode) && object.kind !== 'video') return;
-    const buildIndex = builds.length;
-    builds.push({
-      id: `${slideId}-build-${buildIndex + 1}-${object.id}`,
-      elementId: object.id,
-      effect: 'reveal',
-      trigger: toBuildTrigger(timingNode?.getAttribute('nodeType') ?? null, buildIndex),
-      delayMs: 0,
-      durationMs: isMediaControlTiming(timingNode) ? 0 : getBuildDurationMs(timingNode),
-      kind: toBuildKind(timingNode?.getAttribute('presetClass') ?? null),
-      ...(isMediaControlTiming(timingNode) ? { mediaAction: 'play' as const } : {}),
-    });
-    seenShapeIds.add(sourceShapeId);
-  });
-  pptxXml.descendants(document, 'bldP').forEach((build) => {
-    const sourceShapeId = build.getAttribute('spid');
-    if (!sourceShapeId || seenShapeIds.has(sourceShapeId)) return;
-    const object = slideObjectsByShapeId.get(sourceShapeId);
-    if (!object) return;
-    const buildIndex = builds.length;
-    builds.push({
-      id: `${slideId}-build-${buildIndex + 1}-${object.id}`,
-      elementId: object.id,
-      effect: 'reveal',
-      trigger: toBuildTrigger(null, buildIndex),
-      delayMs: 0,
-      durationMs: 500,
-      kind: 'build-in',
-    });
-    seenShapeIds.add(sourceShapeId);
-  });
-  return builds;
+  return pptxVisualStyle.getHexColor(background, fallback, theme);
 }
 
 function findRelationshipByType(relationships: Map<string, PptxRelationship>, typeSuffix: string) {
@@ -836,9 +495,9 @@ function parseShapeObject(
   const line = shapeProperties ? pptxXml.firstDescendant(shapeProperties, 'ln') : undefined;
   const shapeId = localShapeId(shape, String(zIndex));
   const placeholderRole = getPlaceholderRole(shape);
-  const fill = shapeProperties ? getHexColor(pptxXml.firstDescendant(shapeProperties, 'solidFill'), '', scope.theme) : '';
-  const stroke = line ? getHexColor(pptxXml.firstDescendant(line, 'solidFill'), '', scope.theme) : '';
-  const opacity = getOpacity(shapeProperties);
+  const fill = shapeProperties ? pptxVisualStyle.getHexColor(pptxXml.firstDescendant(shapeProperties, 'solidFill'), '', scope.theme) : '';
+  const stroke = line ? pptxVisualStyle.getHexColor(pptxXml.firstDescendant(line, 'solidFill'), '', scope.theme) : '';
+  const opacity = pptxVisualStyle.getOpacity(shapeProperties);
   const startEndpoint = getLineEndpoint(pptxXml.firstDescendant(line ?? shape, 'headEnd')?.getAttribute('type'));
   const endEndpoint = getLineEndpoint(pptxXml.firstDescendant(line ?? shape, 'tailEnd')?.getAttribute('type'));
   const strokeWidth = getStrokeWidth(line, scaleY);
@@ -896,7 +555,7 @@ function parseTableObjects(
     pptxXml.childElements(row, 'tc').forEach((cell, columnIndex) => {
       const columnWidth = Math.round((columnWidths[columnIndex] ?? 0) * scaleX) || Math.round(frame.width / Math.max(1, columnWidths.length));
       const cellId = `${slideId}-slide-table-${rowIndex + 1}-${columnIndex + 1}`;
-      const fill = getHexColor(pptxXml.firstDescendant(cell, 'solidFill'), '#FFFFFF', scope.theme);
+      const fill = pptxVisualStyle.getHexColor(pptxXml.firstDescendant(cell, 'solidFill'), '#FFFFFF', scope.theme);
       objects.push({
         fill,
         frame: { x, y, width: columnWidth, height: rowHeight },
@@ -1033,7 +692,7 @@ async function loadTheme(context: ParseContext, masterPath: string | undefined) 
   const colorScheme = pptxXml.firstDescendant(document, 'clrScheme');
   if (colorScheme) {
     for (const child of pptxXml.childElements(colorScheme)) {
-      const color = getHexColor(child, '');
+      const color = pptxVisualStyle.getHexColor(child, '');
       if (color) colors.set(child.localName, color);
     }
   }
@@ -1231,7 +890,7 @@ async function parseSlide(
       scope,
     ),
   );
-  const videoStartTriggers = getVideoStartTriggers(document, objects);
+  const videoStartTriggers = pptxAnimationBuilds.getVideoStartTriggers(document, objects);
   for (const object of objects) {
     const startTrigger = videoStartTriggers.get(object.sourceShapeId);
     if (object.kind === 'video' && startTrigger) object.startTrigger = startTrigger;
@@ -1244,11 +903,11 @@ async function parseSlide(
     ...(parsedLayout?.name ? { layoutName: parsedLayout.name } : {}),
     layoutObjects: inheritedObjects,
     name: `Slide ${slideIndex + 1}`,
-    animationBuilds: parseAnimationBuilds(document, slideId, objects),
+    animationBuilds: pptxAnimationBuilds.parse(document, slideId, objects),
     objects,
     placeholderRoles: parsedLayout?.placeholderRoles ?? getPlaceholderRoles(inheritedObjects),
     ...(speakerNotes ? { speakerNotes } : {}),
-    transitionEffect: getTransitionEffect(document),
+    transitionEffect: pptxAnimationBuilds.getTransitionEffect(document),
   };
 }
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, MouseEvent, PointerEvent, TouchEvent } from 'react';
+import type { CSSProperties, PointerEvent } from 'react';
 import {
   ChevronLeft,
   List,
@@ -9,7 +9,6 @@ import {
   Play,
   Plus,
   TimerReset,
-  X,
 } from 'lucide-react';
 import { presenterRemoteSessionCode } from '@localstudio/presenter-remote/session-code';
 import { presenterRemoteTimerFormat } from '@localstudio/presenter-remote/timer-format';
@@ -22,13 +21,16 @@ import { getRuntimePeerOptions } from '@localstudio/presenter-remote/peer-option
 import { PresenterRemotePeerStreamReceiver } from '@localstudio/presenter-remote/peer-stream-receiver';
 import type {
   PresenterRemoteCommand,
-  PresenterRemotePreviewBatch,
-  PresenterRemoteSlidePreview,
-  PresenterRemoteSlidePreviewElement,
   PresenterRemoteSession,
   PresenterRemoteState,
   PresenterRemoteStreamPreference,
 } from '@localstudio/presenter-remote/protocol';
+import { joystickRemotePreviews } from './joystick-remote-previews';
+import { joystickSessionStorage } from './joystick-session-storage';
+import { SlideNavigatorSheet } from './SlideNavigatorSheet';
+import { SlidePreview } from './SlidePreview';
+import { StreamPreview } from './StreamPreview';
+import { UpcomingSlideStrip } from './UpcomingSlideStrip';
 
 export interface JoystickSignalingService {
   connectController?:
@@ -58,13 +60,7 @@ interface JoystickAppProps {
   signalingService?: JoystickSignalingService | undefined;
 }
 
-const rememberedCodeKey = 'localstudio.joystick.lastCode';
-const approvedCodesKey = 'localstudio.joystick.approvedCodes';
-const controllerIdKey = 'localstudio.joystick.controllerId';
-const trustedPresenterDeviceIdsKey = 'localstudio.joystick.trustedPresenterDeviceIds';
 type JoystickSimpleCommand = 'next' | 'pause-timer' | 'previous' | 'reset-timer';
-const swipeThresholdPx = 44;
-const streamPreferenceAspectRatio = 390 / 340;
 
 function getInitialCode(initialUrl: string) {
   const url = new URL(initialUrl);
@@ -107,653 +103,6 @@ function createFallbackSignalingService(): JoystickSignalingService {
   return service;
 }
 
-function getLocalStorage() {
-  try {
-    return typeof window === 'undefined' ? undefined : window.localStorage;
-  } catch {
-    return undefined;
-  }
-}
-
-function getStoredValue(key: string) {
-  return getLocalStorage()?.getItem(key) ?? undefined;
-}
-
-function setStoredValue(key: string, value: string) {
-  getLocalStorage()?.setItem(key, value);
-}
-
-function getStoredStringList(key: string) {
-  const value = getStoredValue(key);
-  if (!value) return [];
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item): item is string => typeof item === 'string' && item.length > 0);
-  } catch {
-    return [];
-  }
-}
-
-function setStoredStringList(key: string, values: string[]) {
-  getLocalStorage()?.setItem(key, JSON.stringify(values));
-}
-
-function addStoredStringListValue(key: string, value: string) {
-  if (!value) return;
-  const existingValues = getStoredStringList(key);
-  const values = [
-    value,
-    ...existingValues.filter((existingValue) => existingValue !== value),
-  ].slice(0, 20);
-  setStoredStringList(key, values);
-}
-
-function getTrustedPresenterDeviceIds() {
-  return new Set(getStoredStringList(trustedPresenterDeviceIdsKey));
-}
-
-function rememberSuccessfulSession(session: PresenterRemoteSession) {
-  const code = presenterRemoteSessionCode.normalize(session.code);
-  setStoredValue(rememberedCodeKey, code);
-  addStoredStringListValue(approvedCodesKey, code);
-  addStoredStringListValue(trustedPresenterDeviceIdsKey, session.presenterDeviceId);
-}
-
-function getNewestTrustedSession(sessions: PresenterRemoteSession[]) {
-  const trustedPresenterDeviceIds = getTrustedPresenterDeviceIds();
-  if (trustedPresenterDeviceIds.size === 0) return undefined;
-  return sessions
-    .filter((session) => trustedPresenterDeviceIds.has(session.presenterDeviceId))
-    .sort((left, right) => Date.parse(right.expiresAt) - Date.parse(left.expiresAt))[0];
-}
-
-function getControllerId() {
-  const existingId = getStoredValue(controllerIdKey);
-  if (existingId) return existingId;
-  const id =
-    typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? crypto.randomUUID()
-      : `controller-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-  setStoredValue(controllerIdKey, id);
-  return id;
-}
-
-function getElementStyle(
-  element: PresenterRemoteSlidePreviewElement,
-  preview: PresenterRemoteSlidePreview,
-) {
-  return {
-    height: `${(element.height / preview.height) * 100}%`,
-    left: `${(element.x / preview.width) * 100}%`,
-    opacity: element.opacity,
-    top: `${(element.y / preview.height) * 100}%`,
-    transform: `rotate(${element.rotation}deg)`,
-    width: `${(element.width / preview.width) * 100}%`,
-  };
-}
-
-function getNetworkQualityHint(): PresenterRemoteStreamPreference['quality'] {
-  const connection = (
-    navigator as Navigator & {
-      connection?:
-        | { effectiveType?: string | undefined; saveData?: boolean | undefined }
-        | undefined;
-    }
-  ).connection;
-  if (connection?.saveData) return 'low';
-  if (connection?.effectiveType === '2g' || connection?.effectiveType === 'slow-2g') return 'low';
-  if (connection?.effectiveType === '3g') return 'medium';
-  return window.devicePixelRatio >= 2 ? 'high' : 'medium';
-}
-
-function createStreamPreference(element: HTMLElement): PresenterRemoteStreamPreference {
-  const bounds = element.getBoundingClientRect();
-  const quality = getNetworkQualityHint();
-  const multiplier =
-    quality === 'high' ? Math.min(window.devicePixelRatio || 1, 3) : quality === 'medium' ? 1.5 : 1;
-  const width = Math.max(390, Math.min(1280, Math.round(bounds.width * multiplier)));
-  const height = Math.max(340, Math.min(1120, Math.round(width / streamPreferenceAspectRatio)));
-  return {
-    fps: quality === 'high' ? 12 : quality === 'medium' ? 8 : 6,
-    height,
-    quality,
-    type: 'stream-preference',
-    width,
-  };
-}
-
-function useHorizontalSwipeNavigation(onNavigate: (direction: 'next' | 'previous') => void) {
-  const touchStartX = useRef<number | undefined>(undefined);
-  const pointerStartX = useRef<number | undefined>(undefined);
-
-  function handleTouchStart(event: TouchEvent<HTMLButtonElement>) {
-    touchStartX.current = event.changedTouches[0]?.clientX;
-  }
-
-  function handleTouchEnd(event: TouchEvent<HTMLButtonElement>) {
-    const startX = touchStartX.current;
-    touchStartX.current = undefined;
-    const endX = event.changedTouches[0]?.clientX;
-    if (startX === undefined || endX === undefined) return;
-    const deltaX = endX - startX;
-    if (Math.abs(deltaX) < swipeThresholdPx) return;
-    onNavigate(deltaX < 0 ? 'next' : 'previous');
-  }
-
-  function handlePointerDown(event: PointerEvent<HTMLButtonElement>) {
-    if (event.pointerType === 'mouse') return;
-    pointerStartX.current = event.clientX;
-  }
-
-  function handlePointerUp(event: PointerEvent<HTMLButtonElement>) {
-    if (event.pointerType === 'mouse') return;
-    const startX = pointerStartX.current;
-    pointerStartX.current = undefined;
-    if (startX === undefined) return;
-    const deltaX = event.clientX - startX;
-    if (Math.abs(deltaX) < swipeThresholdPx) return;
-    onNavigate(deltaX < 0 ? 'next' : 'previous');
-  }
-
-  return {
-    onPointerDown: handlePointerDown,
-    onPointerUp: handlePointerUp,
-    onTouchEnd: handleTouchEnd,
-    onTouchStart: handleTouchStart,
-  };
-}
-
-function SlideCanvas({
-  compact = false,
-  preview,
-  renderMediaAssets = true,
-}: {
-  compact?: boolean;
-  preview: PresenterRemoteSlidePreview | undefined;
-  renderMediaAssets?: boolean;
-}) {
-  if (!preview) {
-    return (
-      <span
-        className={
-          compact
-            ? 'joystick-slide-canvas joystick-slide-canvas-empty joystick-slide-canvas-compact'
-            : 'joystick-slide-canvas joystick-slide-canvas-empty'
-        }
-      >
-        <NotebookText size={compact ? 24 : 38} />
-      </span>
-    );
-  }
-
-  return (
-    <span
-      className={
-        compact ? 'joystick-slide-canvas joystick-slide-canvas-compact' : 'joystick-slide-canvas'
-      }
-      style={{
-        aspectRatio: `${preview.width} / ${preview.height}`,
-        backgroundColor: preview.backgroundColor,
-      }}
-    >
-      {preview.backgroundImageUrl ? (
-        <img alt="" className="joystick-slide-bg" src={preview.backgroundImageUrl} />
-      ) : null}
-      {preview.elements.map((element) => {
-        const style = getElementStyle(element, preview);
-        if (element.kind === 'image') {
-          if (!element.assetUrl) return null;
-          return (
-            <img
-              alt=""
-              className="joystick-slide-element joystick-slide-image"
-              key={element.id}
-              src={element.assetUrl}
-              style={style}
-            />
-          );
-        }
-        if (element.kind === 'media') {
-          if (renderMediaAssets && element.assetUrl && element.mediaType === 'gif') {
-            return (
-              <img
-                alt=""
-                className="joystick-slide-element joystick-slide-image"
-                key={element.id}
-                src={element.assetUrl}
-                style={style}
-              />
-            );
-          }
-          if (renderMediaAssets && element.assetUrl && element.mediaType === 'video') {
-            return (
-              <video
-                aria-label="Slide video"
-                autoPlay={element.autoplay}
-                className="joystick-slide-element joystick-slide-video"
-                key={element.id}
-                loop={element.loop}
-                muted={element.muted}
-                playsInline
-                src={element.assetUrl}
-                style={style}
-              />
-            );
-          }
-          return (
-            <span
-              className="joystick-slide-element joystick-slide-media"
-              key={element.id}
-              style={style}
-            >
-              <span aria-hidden="true">play_arrow</span>
-            </span>
-          );
-        }
-        if (element.kind === 'text') {
-          return (
-            <span
-              className="joystick-slide-element joystick-slide-text"
-              key={element.id}
-              style={{
-                ...style,
-                alignItems:
-                  element.verticalAlign === 'bottom'
-                    ? 'flex-end'
-                    : element.verticalAlign === 'middle'
-                      ? 'center'
-                      : 'flex-start',
-                color: element.fill,
-                fontFamily: element.fontFamily,
-                fontSize: `${Math.max(compact ? 3 : 5, (element.fontSize / preview.width) * 100)}cqw`,
-                fontWeight: element.fontWeight,
-                justifyContent:
-                  element.align === 'right'
-                    ? 'flex-end'
-                    : element.align === 'center'
-                      ? 'center'
-                      : 'flex-start',
-                lineHeight: element.lineHeight ?? 1.05,
-                textAlign: element.align,
-              }}
-            >
-              {element.text}
-            </span>
-          );
-        }
-        if (element.kind !== 'shape') return null;
-        return (
-          <span
-            className={`joystick-slide-element joystick-slide-shape joystick-slide-shape-${element.shape}`}
-            key={element.id}
-            style={{
-              ...style,
-              backgroundColor: element.fill ?? 'transparent',
-              borderColor: element.stroke,
-              borderWidth: element.strokeWidth,
-            }}
-          />
-        );
-      })}
-    </span>
-  );
-}
-
-function StreamPreview({
-  fallbackPreview,
-  onNavigate,
-  onStreamPreference,
-  renderFallbackMediaAssets = true,
-  stream,
-}: {
-  fallbackPreview: PresenterRemoteSlidePreview | undefined;
-  onNavigate: (direction: 'next' | 'previous') => void;
-  onStreamPreference: (preference: PresenterRemoteStreamPreference) => void;
-  renderFallbackMediaAssets?: boolean;
-  stream: MediaStream;
-}) {
-  const [videoPlaying, setVideoPlaying] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const containerRef = useRef<HTMLButtonElement>(null);
-  const playbackBlockedRef = useRef(false);
-  const swipeHandlers = useHorizontalSwipeNavigation(onNavigate);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    video.autoplay = true;
-    video.controls = false;
-    video.defaultMuted = true;
-    video.disablePictureInPicture = true;
-    video.muted = true;
-    video.playsInline = true;
-    video.srcObject = stream;
-    setVideoPlaying(false);
-    const requestPlayback = () => {
-      const playPromise = video.play();
-      void playPromise
-        ?.then(() => {
-          playbackBlockedRef.current = false;
-          setVideoPlaying(true);
-        })
-        .catch(() => {
-          playbackBlockedRef.current = true;
-          setVideoPlaying(false);
-        });
-    };
-    requestPlayback();
-    const frameId = window.requestAnimationFrame(requestPlayback);
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      if (video.srcObject === stream) video.srcObject = null;
-    };
-  }, [stream]);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    let lastPreferenceKey = '';
-    const publishPreference = () => {
-      const preference = createStreamPreference(container);
-      const preferenceKey = `${preference.width}x${preference.height}@${preference.fps}:${preference.quality}`;
-      if (preferenceKey === lastPreferenceKey) return;
-      lastPreferenceKey = preferenceKey;
-      onStreamPreference(preference);
-    };
-    publishPreference();
-    if (typeof ResizeObserver === 'undefined') return undefined;
-    const observer = new ResizeObserver(publishPreference);
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, [onStreamPreference, stream]);
-
-  function handleClick() {
-    const video = videoRef.current;
-    if (video && playbackBlockedRef.current) {
-      const playPromise = video.play();
-      void playPromise
-        ?.then(() => {
-          playbackBlockedRef.current = false;
-          setVideoPlaying(true);
-        })
-        .catch(() => {
-          playbackBlockedRef.current = true;
-          setVideoPlaying(false);
-        });
-      return;
-    }
-    onNavigate('next');
-  }
-
-  return (
-    <button
-      type="button"
-      ref={containerRef}
-      className={
-        videoPlaying
-          ? 'joystick-stream-hit-target joystick-stream-hit-target-video-ready'
-          : 'joystick-stream-hit-target'
-      }
-      aria-label="Presenter stream preview"
-      onClick={handleClick}
-      {...swipeHandlers}
-    >
-      <span className="joystick-stream-fallback" aria-hidden="true">
-        <SlideCanvas preview={fallbackPreview} renderMediaAssets={renderFallbackMediaAssets} />
-      </span>
-      <video
-        ref={videoRef}
-        autoPlay
-        className="joystick-stream-video"
-        controls={false}
-        disablePictureInPicture
-        muted
-        onCanPlay={() => {
-          const video = videoRef.current;
-          if (!video || !video.paused) return;
-          void video
-            .play()
-            ?.then(() => {
-              playbackBlockedRef.current = false;
-              setVideoPlaying(true);
-            })
-            .catch(() => {
-              playbackBlockedRef.current = true;
-              setVideoPlaying(false);
-            });
-        }}
-        onLoadedMetadata={() => {
-          const video = videoRef.current;
-          if (!video) return;
-          void video
-            .play()
-            ?.then(() => {
-              playbackBlockedRef.current = false;
-              setVideoPlaying(true);
-            })
-            .catch(() => {
-              playbackBlockedRef.current = true;
-              setVideoPlaying(false);
-            });
-        }}
-        onPlaying={() => {
-          playbackBlockedRef.current = false;
-          setVideoPlaying(true);
-        }}
-        onWaiting={() => setVideoPlaying(false)}
-        playsInline
-        preload="auto"
-      />
-    </button>
-  );
-}
-
-function SlidePreview({
-  renderMediaAssets = true,
-  onNavigate,
-  preview,
-}: {
-  renderMediaAssets?: boolean;
-  onNavigate: (direction: 'next' | 'previous') => void;
-  preview: PresenterRemoteSlidePreview | undefined;
-}) {
-  const swipeHandlers = useHorizontalSwipeNavigation(onNavigate);
-
-  function handleStageClick(event: MouseEvent<HTMLButtonElement>) {
-    const bounds = event.currentTarget.getBoundingClientRect();
-    onNavigate(event.clientX - bounds.left < bounds.width / 2 ? 'previous' : 'next');
-  }
-
-  return (
-    <button
-      type="button"
-      className="joystick-stage-button"
-      aria-label="Current slide preview"
-      onClick={handleStageClick}
-      {...swipeHandlers}
-    >
-      <SlideCanvas preview={preview} renderMediaAssets={renderMediaAssets} />
-    </button>
-  );
-}
-
-function UpcomingSlideStrip({
-  onGoToPage,
-  previews,
-  renderMediaAssets = true,
-  startSlideNumber,
-}: {
-  onGoToPage: (pageId: string) => void;
-  previews: NonNullable<PresenterRemoteState['upcomingSlidePreviews']>;
-  renderMediaAssets?: boolean;
-  startSlideNumber: number;
-}) {
-  if (previews.length === 0) {
-    return null;
-  }
-
-  return (
-    <section className="joystick-upcoming-strip" aria-label="Upcoming slides">
-      {previews.map((item, index) => {
-        const slideNumber = startSlideNumber + index;
-        return (
-          <button
-            type="button"
-            className="joystick-upcoming-thumb"
-            key={item.pageId}
-            aria-label={`Go to slide ${slideNumber}: ${item.pageName}`}
-            onClick={() => onGoToPage(item.pageId)}
-          >
-            <span>Slide {slideNumber}</span>
-            <SlideCanvas compact preview={item.preview} renderMediaAssets={renderMediaAssets} />
-          </button>
-        );
-      })}
-    </section>
-  );
-}
-
-function getSlideNavigatorPreview(
-  page: NonNullable<PresenterRemoteState['pages']>[number],
-  displayedRemoteState: PresenterRemoteState | undefined,
-  upcomingSlidePreviews: NonNullable<PresenterRemoteState['upcomingSlidePreviews']>,
-) {
-  if (page.preview) return page.preview;
-  if (page.id === displayedRemoteState?.activePageId) return displayedRemoteState.slidePreview;
-  return upcomingSlidePreviews.find((item) => item.pageId === page.id)?.preview;
-}
-
-function SlideNavigatorSheet({
-  displayedRemoteState,
-  onClose,
-  onGoToPage,
-  pages,
-  renderMediaAssets,
-  upcomingSlidePreviews,
-}: {
-  displayedRemoteState: PresenterRemoteState | undefined;
-  onClose: () => void;
-  onGoToPage: (pageId: string) => void;
-  pages: NonNullable<PresenterRemoteState['pages']>;
-  renderMediaAssets: boolean;
-  upcomingSlidePreviews: NonNullable<PresenterRemoteState['upcomingSlidePreviews']>;
-}) {
-  return (
-    <section
-      className="joystick-slide-navigator"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Slide navigation"
-    >
-      <header>
-        <div>
-          <h2>Go to slide</h2>
-          <p>{displayedRemoteState?.deckName ?? 'Presentation'}</p>
-        </div>
-        <button type="button" aria-label="Close slide navigation" onClick={onClose}>
-          <X size={20} />
-        </button>
-      </header>
-      <div className="joystick-slide-navigator-list">
-        {pages.map((page, index) => {
-          const preview = getSlideNavigatorPreview(
-            page,
-            displayedRemoteState,
-            upcomingSlidePreviews,
-          );
-          const active = page.id === displayedRemoteState?.activePageId;
-          return (
-            <button
-              type="button"
-              key={page.id}
-              aria-current={active ? 'page' : undefined}
-              aria-label={`Go to slide ${index + 1}: ${page.name}`}
-              onClick={() => {
-                onGoToPage(page.id);
-                onClose();
-              }}
-            >
-              <span className="joystick-slide-navigator-thumb" aria-hidden="true">
-                <SlideCanvas compact preview={preview} renderMediaAssets={renderMediaAssets} />
-              </span>
-              <span className="joystick-slide-navigator-meta">
-                <span>{active ? 'Current' : `Slide ${index + 1}`}</span>
-                <strong>{page.name}</strong>
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-function mergePreviewBatchIntoState(
-  state: PresenterRemoteState,
-  batch: PresenterRemotePreviewBatch,
-): PresenterRemoteState {
-  if (batch.previews.length === 0) return state;
-  const previewsByPageId = new Map(batch.previews.map((page) => [page.id, page.preview]));
-  const pages = state.pages?.map((page) => {
-    if (!previewsByPageId.has(page.id)) return page;
-    return {
-      ...page,
-      preview: previewsByPageId.get(page.id),
-    };
-  });
-  const activePagePreview = previewsByPageId.get(state.activePageId) ?? state.slidePreview;
-  const upcomingSlidePreviews =
-    pages?.slice(state.activePageIndex + 1, state.activePageIndex + 4).flatMap((page) => {
-      const preview =
-        page.preview ??
-        state.upcomingSlidePreviews?.find((upcomingPreview) => upcomingPreview.pageId === page.id)
-          ?.preview;
-      if (!preview) return [];
-      return [
-        {
-          pageId: page.id,
-          pageName: page.name,
-          preview,
-        },
-      ];
-    }) ?? state.upcomingSlidePreviews;
-  return {
-    ...state,
-    nextSlidePreview: upcomingSlidePreviews?.[0]?.preview ?? state.nextSlidePreview,
-    pages,
-    slidePreview: activePagePreview,
-    upcomingSlidePreviews,
-  };
-}
-
-function getUpcomingSlidePreviews(
-  displayedRemoteState: PresenterRemoteState | undefined,
-): NonNullable<PresenterRemoteState['upcomingSlidePreviews']> {
-  if (!displayedRemoteState) return [];
-  const pages = displayedRemoteState.pages ?? [];
-  const existingPreviews = displayedRemoteState.upcomingSlidePreviews ?? [];
-  if (pages.length === 0) return existingPreviews;
-  const upcomingPages = pages.slice(
-    displayedRemoteState.activePageIndex + 1,
-    displayedRemoteState.activePageIndex + 4,
-  );
-  if (upcomingPages.length === 0) return existingPreviews;
-  const derivedPreviews = upcomingPages.map((page, index) => ({
-    pageId: page.id,
-    pageName: page.name,
-    preview:
-      page.preview ??
-      existingPreviews.find((preview) => preview.pageId === page.id)?.preview ??
-      (index === 0 ? displayedRemoteState.nextSlidePreview : undefined),
-  }));
-  const derivedPageIds = new Set(derivedPreviews.map((preview) => preview.pageId));
-  return [
-    ...derivedPreviews,
-    ...existingPreviews.filter((preview) => !derivedPageIds.has(preview.pageId)),
-  ];
-}
-
 export function JoystickApp({
   initialUrl = window.location.href,
   signalingService: providedSignalingService,
@@ -771,7 +120,7 @@ export function JoystickApp({
   const [timerNow, setTimerNow] = useState(() => Date.now());
   const [slideNavigatorOpen, setSlideNavigatorOpen] = useState(false);
   const [notesFontSize, setNotesFontSize] = useState(28);
-  const [controllerId] = useState(() => getControllerId());
+  const [controllerId] = useState(() => joystickSessionStorage.getControllerId());
   const [remoteStream, setRemoteStream] = useState<MediaStream | undefined>();
   const [remoteStreamStatus, setRemoteStreamStatus] = useState<
     'connected' | 'connecting' | 'failed' | 'idle'
@@ -792,9 +141,7 @@ export function JoystickApp({
     let cancelled = false;
     async function resolveSession() {
       setResolvingSession(true);
-      const rememberedCode = presenterRemoteSessionCode.normalize(
-        getStoredValue(rememberedCodeKey) ?? '',
-      );
+      const rememberedCode = joystickSessionStorage.getRememberedCode();
       const requestedCode = presenterRemoteSessionCode.isValid(code) ? code : rememberedCode;
       if (requestedCode && presenterRemoteSessionCode.isValid(requestedCode)) {
         const foundSession = await signalingService.lookupSession(requestedCode);
@@ -811,7 +158,7 @@ export function JoystickApp({
         }
       }
 
-      const trustedSession = getNewestTrustedSession(
+      const trustedSession = joystickSessionStorage.getNewestTrustedSession(
         await (signalingService.listSessions?.() ?? []),
       );
       if (trustedSession) {
@@ -849,7 +196,9 @@ export function JoystickApp({
       onPreviewBatch: (batch) => {
         if (cancelled) return;
         setRemoteState((currentState) =>
-          currentState ? mergePreviewBatchIntoState(currentState, batch) : currentState,
+          currentState
+            ? joystickRemotePreviews.mergePreviewBatchIntoState(currentState, batch)
+            : currentState,
         );
       },
       onState: (nextState) => {
@@ -903,7 +252,7 @@ export function JoystickApp({
   const displayedRemoteInput = peerId || code || session?.code || '';
 
   useEffect(() => {
-    if (session && !peerId) rememberSuccessfulSession(session);
+    if (session && !peerId) joystickSessionStorage.rememberSuccessfulSession(session);
   }, [peerId, session]);
 
   useEffect(() => {
@@ -1075,7 +424,7 @@ export function JoystickApp({
   const streamModeActive =
     connected && displayedRemoteState?.previewMode === 'stream' && remoteStream;
   const renderStructuredMediaAssets = displayedRemoteState?.previewMode !== 'stream';
-  const upcomingSlidePreviews = getUpcomingSlidePreviews(displayedRemoteState);
+  const upcomingSlidePreviews = joystickRemotePreviews.getUpcomingSlidePreviews(displayedRemoteState);
   const upcomingStartSlideNumber = (displayedRemoteState?.activePageIndex ?? 0) + 2;
 
   function getStreamNotesHeightBounds() {

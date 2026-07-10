@@ -9,6 +9,7 @@ import type {
 import { modelSetupService } from '../../../services/model-setup/modelSetupService';
 import { IconButton } from '../../components/IconButton';
 import { StatusPill } from '../../components/StatusPill';
+import { AiToolsDownloadProgress } from './AiToolsDownloadProgress';
 import { AiToolsSetupAction } from './AiToolsSetupAction';
 import type { CreateImagePromptOptions } from '../media/imagePromptOptions';
 import { imagePromptOptions } from '../media/imagePromptOptions';
@@ -97,49 +98,6 @@ function getPreparationTone(status: 'idle' | 'downloading' | 'ready' | 'failed')
   return 'neutral';
 }
 
-function hasByteProgress(details: ModelDownloadProgressDetails) {
-  return (
-    typeof details.loadedBytes === 'number' &&
-    typeof details.totalBytes === 'number' &&
-    Number.isFinite(details.loadedBytes) &&
-    Number.isFinite(details.totalBytes) &&
-    details.totalBytes > 0
-  );
-}
-
-function formatGigabytes(bytes: number) {
-  return `${(bytes / 1_000_000_000).toFixed(1)} GB`;
-}
-
-function formatRemainingTime(estimatedRemainingMs: number | undefined) {
-  if (
-    typeof estimatedRemainingMs !== 'number' ||
-    !Number.isFinite(estimatedRemainingMs) ||
-    estimatedRemainingMs <= 0
-  ) {
-    return undefined;
-  }
-
-  const totalSeconds = Math.max(1, Math.ceil(estimatedRemainingMs / 1_000));
-  if (totalSeconds < 60) return 'Less than 1 min remaining';
-
-  const minutes = Math.ceil(totalSeconds / 60);
-  return `About ${minutes} min remaining`;
-}
-
-function getPrimaryProgressText(
-  status: 'idle' | 'downloading' | 'ready' | 'failed',
-  details: ModelDownloadProgressDetails & { progress: number },
-) {
-  if (status !== 'downloading') return undefined;
-  const progress = Math.max(0, Math.min(100, Math.round(details.progress)));
-  if (hasByteProgress(details)) {
-    return `${formatGigabytes(details.loadedBytes!)} / ${formatGigabytes(details.totalBytes!)} (${progress}%)`;
-  }
-  if (status === 'downloading' && progress >= 98) return undefined;
-  return `${progress}%`;
-}
-
 function getModelProgressStatus(
   status: ModelState['status'],
 ): 'idle' | 'downloading' | 'ready' | 'failed' {
@@ -155,34 +113,6 @@ function getModelSetupTaskStatus(
 ): 'idle' | 'downloading' | 'ready' | 'failed' {
   return getModelProgressStatus(
     modelStates.find((model) => model.id === modelId)?.status ?? 'needs-download',
-  );
-}
-
-function getSecondaryProgressText(
-  status: 'idle' | 'downloading' | 'ready' | 'failed',
-  details: ModelDownloadProgressDetails & { progress: number },
-) {
-  if (status !== 'downloading') return undefined;
-  if (details.progress >= 98) return 'Finalizing...';
-  return formatRemainingTime(details.estimatedRemainingMs);
-}
-
-function DownloadProgressCopy({
-  details,
-  status,
-}: {
-  details: ModelDownloadProgressDetails & { progress: number };
-  status: 'idle' | 'downloading' | 'ready' | 'failed';
-}) {
-  const primary = getPrimaryProgressText(status, details);
-  const secondary = getSecondaryProgressText(status, details);
-  if (!primary && !secondary) return null;
-
-  return (
-    <span className="download-progress-copy">
-      {primary ? <span className="download-progress-primary">{primary}</span> : null}
-      {secondary ? <span className="download-progress-secondary">{secondary}</span> : null}
-    </span>
   );
 }
 
@@ -471,7 +401,7 @@ export function AiToolsPanel({
                   label={getPreparationLabel(promptStatus)}
                   tone={getPreparationTone(promptStatus)}
                 />
-                <DownloadProgressCopy
+                <AiToolsDownloadProgress
                   details={{ ...promptPreparation, progress: promptProgress }}
                   status={promptStatus}
                 />
@@ -570,7 +500,7 @@ export function AiToolsPanel({
                   label={getPreparationLabel(languageDetectionStatus)}
                   tone={getPreparationTone(languageDetectionStatus)}
                 />
-                <DownloadProgressCopy
+                <AiToolsDownloadProgress
                   details={{ ...languageDetectionPreparation, progress: languageDetectionProgress }}
                   status={languageDetectionStatus}
                 />
@@ -665,7 +595,7 @@ export function AiToolsPanel({
                     label={getPreparationLabel(translationProviderStatus)}
                     tone={getPreparationTone(translationProviderStatus)}
                   />
-                  <DownloadProgressCopy
+                  <AiToolsDownloadProgress
                     details={{ ...translationPreparation, progress: translationProviderProgress }}
                     status={translationProviderStatus}
                   />
@@ -714,7 +644,7 @@ export function AiToolsPanel({
                         label={getPreparationLabel(translationProviderStatus)}
                         tone={getPreparationTone(translationProviderStatus)}
                       />
-                      <DownloadProgressCopy
+                      <AiToolsDownloadProgress
                         details={{
                           ...translationPreparation,
                           progress: translationProviderProgress,
@@ -803,7 +733,7 @@ export function AiToolsPanel({
               </label>
               <div className="model-row-meta ew-compact-row">
                 <StatusPill label={formatStatus(model.status)} tone={statusTone(model.status)} />
-                <DownloadProgressCopy
+                <AiToolsDownloadProgress
                   details={model}
                   status={getModelProgressStatus(model.status)}
                 />

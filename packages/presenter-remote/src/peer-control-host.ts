@@ -7,9 +7,9 @@ import {
   type PresenterRemoteSession,
   type PresenterRemoteState,
 } from './protocol';
+import { presenterRemoteDataChannelState } from './data-channel-state.ts';
 import { presenterRemoteDebugLog } from './debug-log';
-
-const peerDataChannelMaxStateBytes = 16_000;
+import { presenterRemotePeerOpen } from './peer-open.ts';
 
 export interface PresenterRemotePeerSession extends PresenterRemoteSession {
   controlPeerId: string;
@@ -30,20 +30,6 @@ export interface PresenterRemotePeerControlHostOptions {
 function createSessionId() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
   return `peer-session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function oncePeerOpen(peer: Peer) {
-  if (peer.open && peer.id) return Promise.resolve(peer.id);
-  return new Promise<string>((resolve, reject) => {
-    peer.on('open', resolve);
-    peer.on('error', reject);
-  });
-}
-
-function rejectAfter(timeoutMs: number) {
-  return new Promise<never>((_, reject) => {
-    window.setTimeout(() => reject(new Error('PeerJS host connection timed out.')), timeoutMs);
-  });
 }
 
 export class PresenterRemotePeerControlHost {
@@ -71,8 +57,11 @@ export class PresenterRemotePeerControlHost {
     peer.on('connection', (connection) => this.registerConnection(connection));
     peer.on('error', (error) => presenterRemoteDebugLog.error('Control host peer error.', error));
     const controlPeerId = await Promise.race([
-      oncePeerOpen(peer),
-      rejectAfter(this.options.connectionTimeoutMs ?? 12_000),
+      presenterRemotePeerOpen.waitForPeerId(peer),
+      presenterRemotePeerOpen.rejectAfter(
+        this.options.connectionTimeoutMs ?? 12_000,
+        'PeerJS host connection timed out.',
+      ),
     ]);
     presenterRemoteDebugLog.info('Control host peer opened.', { controlPeerId });
     this.session = {
@@ -89,7 +78,7 @@ export class PresenterRemotePeerControlHost {
   }
 
   publishState(state: PresenterRemoteState) {
-    this.lastState = createDataChannelSafeState({
+    this.lastState = presenterRemoteDataChannelState.createSafeState({
       ...state,
       connectedControllerCount: this.connections.size,
     });
@@ -108,7 +97,7 @@ export class PresenterRemotePeerControlHost {
     presenterRemoteDebugLog.info('Publishing preview batch.', {
       previewCount: batch.previews.length,
       requestId: batch.requestId,
-      stateBytes: getJsonByteLength(batch),
+      stateBytes: presenterRemoteDataChannelState.getJsonByteLength(batch),
     });
     for (const connection of this.connections) {
       this.sendMessage(connection, batch, 'preview batch');
@@ -180,42 +169,11 @@ export class PresenterRemotePeerControlHost {
           message.type === 'state'
             ? (message.pages?.filter((page) => Boolean(page.preview)).length ?? 0)
             : message.previews.filter((page) => Boolean(page.preview)).length,
-        stateBytes: getJsonByteLength(message),
+        stateBytes: presenterRemoteDataChannelState.getJsonByteLength(message),
       });
       void connection.send(message);
     } catch (error) {
       presenterRemoteDebugLog.error(`Failed to send ${label}.`, error);
     }
-  }
-}
-
-function createDataChannelSafeState(state: PresenterRemoteState): PresenterRemoteState {
-  const stateBytes = getJsonByteLength(state);
-  if (stateBytes <= peerDataChannelMaxStateBytes) return state;
-  const safeState: PresenterRemoteState = {
-    ...state,
-    nextSlidePreview: undefined,
-    pages: state.pages?.map((page) => ({
-      id: page.id,
-      name: page.name,
-    })),
-    slidePreview: undefined,
-    upcomingSlidePreviews: [],
-  };
-  presenterRemoteDebugLog.warn(
-    'Remote state was too large for PeerJS data channel; using stream-only state.',
-    {
-      safeBytes: getJsonByteLength(safeState),
-      stateBytes,
-    },
-  );
-  return safeState;
-}
-
-function getJsonByteLength(value: unknown) {
-  try {
-    return new TextEncoder().encode(JSON.stringify(value)).byteLength;
-  } catch {
-    return Number.POSITIVE_INFINITY;
   }
 }

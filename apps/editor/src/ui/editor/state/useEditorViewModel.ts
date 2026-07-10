@@ -32,13 +32,7 @@ import type {
   MirrorState,
   ModelDownloadProgressDetails,
   ModelState,
-  PresentationExportProgress,
-  PresentationExportResult,
-  PresentationExportWarning,
   PromptApiAvailability,
-  StockMediaConfig,
-  StockMediaItem,
-  StockMediaProviderState,
   VersionHistoryEntry,
 } from '../../../services/contracts/interfaces';
 import type { PptxImportInput } from '../../../services/importing/pptx/pptxImportService';
@@ -53,11 +47,15 @@ import { createPrefixedId } from '../../../services/ids/idUtils';
 import { slideTaskPrompt } from '../../../services/prompting/slideTaskPrompt';
 import { imagePromptOptions } from '../media/imagePromptOptions';
 import type { CreateImagePromptOptions } from '../media/imagePromptOptions';
-import { localMediaImportConfig } from '../media/localMediaImportConfig';
 import { TRANSLATION_LANGUAGE_OPTIONS } from '../translation/translationLanguages';
 import { translationLanguageUtils } from '../translation/translationLanguageUtils';
 import { editorPreferences } from '../persistence/editorPreferences';
 import { useAnimationPreviewController } from '../animation/useAnimationPreviewController';
+import { useLocalMediaImport } from './use-local-media-import';
+import { powerPointIo } from './power-point-io';
+import { textTranslationLayout } from './text-translation-layout';
+import type { TranslationPatch } from './text-translation-layout';
+import { useStockMediaLibrary } from './use-stock-media-library';
 
 export type RightPanelTab =
   | 'layout'
@@ -128,25 +126,9 @@ export interface PresentationImportProgressState {
   title: string;
 }
 
-export interface MediaImportProgressState {
-  detail: string;
-  title: string;
-  tone: 'loading' | 'error';
-}
-
 interface ElementClipboardState {
   assets: ProjectDocument['assets'];
   elements: DesignElement[];
-}
-
-interface StockMediaSearchState {
-  gifs: boolean;
-  images: boolean;
-}
-
-export interface StockMediaErrorState {
-  gifs?: string | undefined;
-  images?: string | undefined;
 }
 
 function getDownloadProgressPatch(
@@ -169,18 +151,6 @@ export type RemoteImportStatus =
   | 'deleting'
   | 'failed';
 
-type WindowWithPowerPointPicker = Window &
-  typeof globalThis & {
-    showOpenFilePicker?: (options?: {
-      excludeAcceptAllOption?: boolean;
-      multiple?: boolean;
-      types?: Array<{
-        description: string;
-        accept: Record<string, string[]>;
-      }>;
-    }) => Promise<FileSystemFileHandle[]>;
-  };
-
 const IMAGE_EDITING_MODEL_REQUIRED_MESSAGE = 'You must download the image editing tools first.';
 const PROMPT_API_REQUIRED_MESSAGE = 'LLM model must be prepared before using prompt-to-slides.';
 const IMAGE_GENERATION_MODEL_REQUIRED_MESSAGE =
@@ -189,10 +159,6 @@ const IMAGE_PROMPT_MODE_REQUIRED_MESSAGE = 'Use Create image from the + menu to 
 const IMAGE_GENERATION_DIMENSION_MULTIPLE = 16;
 const BACKGROUND_PREVIEW_DEBOUNCE_MS = 120;
 const PASTED_ELEMENT_OFFSET = 32;
-const STOCK_MEDIA_RECENT_LIMIT = 12;
-const LOCAL_PPTX_SAMPLE_IMPORT_PARAM = 'importPptxSample';
-const LOCAL_PPTX_SAMPLE_IMPORT_ROUTE = '/__localstudio/pptx-sample/file';
-const LOCAL_PPTX_SAMPLE_FILE_NAME = 'fullstack-monitoring-jsnation-11062026.pptx';
 
 function normalizeImageGenerationDimension(value: number) {
   return Math.max(
@@ -289,88 +255,6 @@ async function loadProjectFonts(project: ProjectDocument, fontImportService: Fon
   await fontImportService.loadProjectFonts(project).catch(() => undefined);
 }
 
-function readImageFileAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener('load', () => {
-      if (typeof reader.result === 'string') {
-        resolve(reader.result);
-        return;
-      }
-      reject(new Error('Image file could not be read as a data URL.'));
-    });
-    reader.addEventListener('error', () => {
-      reject(reader.error ?? new Error('Image file could not be read.'));
-    });
-    reader.readAsDataURL(file);
-  });
-}
-
-type MediaSize = { height: number; width: number };
-type VideoSize = MediaSize & { durationSeconds?: number };
-
-function readImageSize(src: string) {
-  return new Promise<MediaSize>((resolve, reject) => {
-    const image = new Image();
-    image.addEventListener('load', () => {
-      resolve({ width: image.naturalWidth, height: image.naturalHeight });
-    });
-    image.addEventListener('error', () => {
-      reject(new Error('Image dimensions could not be read.'));
-    });
-    image.src = src;
-  });
-}
-
-function readVideoSize(src: string) {
-  return new Promise<VideoSize>((resolve, reject) => {
-    const video = document.createElement('video');
-    video.preload = 'metadata';
-    video.addEventListener('loadedmetadata', () => {
-      resolve({
-        ...(Number.isFinite(video.duration) && video.duration > 0
-          ? { durationSeconds: video.duration }
-          : {}),
-        width: video.videoWidth || 16,
-        height: video.videoHeight || 9,
-      });
-    });
-    video.addEventListener('error', () => {
-      reject(new Error('Video dimensions could not be read.'));
-    });
-    video.src = src;
-  });
-}
-
-function getFileExtension(fileName: string) {
-  const extension = fileName.trim().toLowerCase().split('.').pop();
-  return extension && extension !== fileName.toLowerCase() ? extension : '';
-}
-
-function isSupportedLocalVideoFile(file: File) {
-  const extension = getFileExtension(file.name);
-  return (
-    localMediaImportConfig.supportedVideoMimeTypes.has(file.type) ||
-    localMediaImportConfig.supportedVideoExtensions.has(extension)
-  );
-}
-
-function createMediaObjectUrl(file: File) {
-  if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
-    throw new Error('This browser cannot import video files from disk.');
-  }
-  return URL.createObjectURL(file);
-}
-
-function getMediaAssetType(file: File): 'image' | 'gif' | 'video' {
-  const extension = getFileExtension(file.name);
-  if (file.type === 'image/gif') return 'gif';
-  if (file.type.startsWith('video/') || localMediaImportConfig.localVideoExtensions.has(extension)) {
-    return 'video';
-  }
-  return 'image';
-}
-
 function waitForNextPaint() {
   if (typeof window === 'undefined') return Promise.resolve();
   return new Promise<void>((resolve) => {
@@ -382,116 +266,7 @@ function waitForNextPaint() {
   });
 }
 
-function isDomError(error: unknown, name: string) {
-  return (
-    (error instanceof DOMException && error.name === name) ||
-    (typeof error === 'object' && error !== null && 'name' in error && error.name === name)
-  );
-}
-
-async function pickPowerPointImportInput(): Promise<PptxImportInput | null> {
-  if (typeof window === 'undefined') return null;
-  const pickerWindow = window as WindowWithPowerPointPicker;
-  if (pickerWindow.showOpenFilePicker) {
-    try {
-      pptxImportLogger.info('Opening PowerPoint file picker.');
-      const handles = await pickerWindow.showOpenFilePicker({
-        excludeAcceptAllOption: false,
-        multiple: false,
-        types: [
-          {
-            description: 'PowerPoint presentation',
-            accept: {
-              'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
-              'application/zip': ['.pptx'],
-            },
-          },
-        ],
-      });
-      const handle = handles[0];
-      if (!handle) return null;
-      pptxImportLogger.info('PowerPoint file handle selected.', { name: handle.name });
-      const file = await handle.getFile();
-      pptxImportLogger.info('PowerPoint file handle read.', {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-      });
-      return { file };
-    } catch (error) {
-      if (isDomError(error, 'AbortError')) {
-        pptxImportLogger.info('PowerPoint file picker was cancelled.');
-        return null;
-      }
-      pptxImportLogger.error('PowerPoint file picker failed.', error);
-      throw error;
-    }
-  }
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation';
-  const file = await new Promise<File | undefined>((resolve) => {
-    input.addEventListener('change', () => resolve(input.files?.[0]));
-    input.click();
-  });
-  if (file) return { file };
-  return null;
-}
-
-async function loadLocalPowerPointSampleInput(): Promise<PptxImportInput> {
-  const response = await fetch(LOCAL_PPTX_SAMPLE_IMPORT_ROUTE);
-  if (!response.ok) {
-    throw new Error(`Sample PowerPoint could not be loaded (${response.status}).`);
-  }
-  const blob = await response.blob();
-  return {
-    file: new File([blob], LOCAL_PPTX_SAMPLE_FILE_NAME, {
-      type:
-        blob.type ||
-        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    }),
-  };
-}
-
-function consumeLocalPowerPointSampleImportRequest() {
-  if (typeof window === 'undefined') return false;
-  const nextUrl = new URL(window.location.href);
-  if (nextUrl.searchParams.get(LOCAL_PPTX_SAMPLE_IMPORT_PARAM) !== '1') return false;
-  nextUrl.searchParams.delete(LOCAL_PPTX_SAMPLE_IMPORT_PARAM);
-  window.history.replaceState(
-    window.history.state,
-    '',
-    `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`,
-  );
-  return true;
-}
-
-function getMinimumTextHeight(text: string, fontSize: number) {
-  const lineCount = Math.max(1, text.split('\n').length);
-  return Math.ceil(lineCount * fontSize * 1.08 + Math.max(12, fontSize * 0.18));
-}
-
-function getPageTextSample(project: ProjectDocument, pageId: string) {
-  const page = project.pages.find((item) => item.id === pageId);
-  if (!page) return '';
-  return page.elementIds
-    .map((elementId) => project.elements[elementId])
-    .filter((element): element is Extract<ProjectDocument['elements'][string], { type: 'text' }> =>
-      Boolean(element && element.type === 'text' && element.visible !== false && !element.locked),
-    )
-    .map((element) => element.text.trim())
-    .filter(Boolean)
-    .join('\n');
-}
-
 type TranslationScope = 'selection' | 'slide' | 'deck';
-type TranslationPatch = {
-  fontSize?: number;
-  height?: number;
-  text: string;
-  width?: number;
-  x?: number;
-};
 
 const DECK_TRANSLATION_CONCURRENCY = 3;
 const OPERATION_NOTICE_CLEAR_MS = 3000;
@@ -501,164 +276,6 @@ interface DeckTranslationProgressState {
   completedPages: number;
   currentPageName: string;
   totalPages: number;
-}
-
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  concurrency: number,
-  mapper: (item: T, index: number) => Promise<R>,
-) {
-  const results = new Array<R>(items.length);
-  let nextIndex = 0;
-  let firstError: unknown;
-  const workerCount = Math.max(1, Math.min(concurrency, items.length));
-  const workers = Array.from({ length: workerCount }, async () => {
-    while (nextIndex < items.length) {
-      const currentIndex = nextIndex;
-      nextIndex += 1;
-      try {
-        results[currentIndex] = await mapper(items[currentIndex]!, currentIndex);
-      } catch (error) {
-        firstError ??= error;
-        nextIndex = items.length;
-      }
-    }
-  });
-
-  await Promise.all(workers);
-  if (firstError !== undefined) {
-    throw firstError instanceof Error ? firstError : new Error('Concurrent task failed.');
-  }
-  return results;
-}
-
-function normalizeTranslatedText(originalText: string, translatedText: string) {
-  if (originalText.includes('\n')) return translatedText.trim();
-  return translatedText.replace(/\s+/g, ' ').trim();
-}
-
-function estimateSingleLineTextWidth(text: string, fontSize: number) {
-  return Array.from(text).reduce((width, character) => {
-    if (character === ' ') return width + fontSize * 0.32;
-    if (/[A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÄËÏÖÜÇÑ]/.test(character)) return width + fontSize * 0.68;
-    if (/[ilI.,'’|]/.test(character)) return width + fontSize * 0.34;
-    return width + fontSize * 0.58;
-  }, 0);
-}
-
-function pluralizeCount(count: number, singular: string, plural = `${singular}s`) {
-  return `${count.toLocaleString()} ${count === 1 ? singular : plural}`;
-}
-
-function getPowerPointWarningCategory(warning: PresentationExportWarning) {
-  if (warning.category === 'animation') return 'animation';
-  if (warning.category === 'transition') return 'transition';
-  if (
-    warning.category === 'content-type' ||
-    warning.category === 'fidelity' ||
-    warning.category === 'media' ||
-    warning.category === 'relationship'
-  ) {
-    return 'media';
-  }
-  if (warning.code.includes('animation')) return 'animation';
-  if (warning.code.includes('transition')) return 'transition';
-  if (warning.code.includes('media') || warning.code.includes('video') || warning.code.includes('asset')) {
-    return 'media';
-  }
-  return 'other';
-}
-
-function summarizePowerPointExport(result: PresentationExportResult) {
-  const stats = [
-    pluralizeCount(result.stats.slideCount, 'slide'),
-    pluralizeCount(result.stats.mediaElementCount, 'media item'),
-    pluralizeCount(result.stats.animationBuildCount, 'animation build'),
-  ];
-  if (result.warnings.length === 0) return `PowerPoint exported: ${stats.join(', ')}.`;
-
-  const counts = result.warnings.reduce(
-    (summary, warning) => {
-      summary[getPowerPointWarningCategory(warning)] += 1;
-      return summary;
-    },
-    { animation: 0, media: 0, other: 0, transition: 0 },
-  );
-  const fallbackParts = [
-    counts.animation > 0 ? pluralizeCount(counts.animation, 'animation fallback') : undefined,
-    counts.transition > 0 ? pluralizeCount(counts.transition, 'transition fallback') : undefined,
-    counts.media > 0 ? pluralizeCount(counts.media, 'media fallback') : undefined,
-    counts.other > 0 ? pluralizeCount(counts.other, 'fallback') : undefined,
-  ].filter(Boolean);
-
-  return `PowerPoint exported: ${stats.join(', ')}; ${fallbackParts.join(', ')}.`;
-}
-
-function getExportProgressValue(progress: PresentationExportProgress) {
-  if (
-    progress.current === undefined ||
-    progress.total === undefined ||
-    progress.total <= 0
-  ) {
-    return undefined;
-  }
-  return {
-    current: Math.min(progress.total, Math.max(0, progress.current)),
-    total: progress.total,
-  };
-}
-
-function formatPowerPointExportProgress(progress: PresentationExportProgress): OperationNoticeState {
-  return {
-    detail: progress.detail,
-    message: progress.label,
-    progress: getExportProgressValue(progress),
-    tone: 'info',
-  };
-}
-
-function fitTranslatedTextToOriginalFrame(
-  element: Extract<ProjectDocument['elements'][string], { type: 'text' }>,
-  translatedText: string,
-  page?: Page,
-): TranslationPatch {
-  const normalizedText = normalizeTranslatedText(element.text, translatedText);
-  if (normalizedText.includes('\n')) return { text: normalizedText };
-
-  const horizontalPadding = 12;
-  const availableWidth = Math.max(1, element.width - horizontalPadding);
-  const estimatedWidth = estimateSingleLineTextWidth(normalizedText, element.fontSize);
-  if (estimatedWidth <= availableWidth) return { text: normalizedText };
-
-  const desiredWidth = Math.ceil(estimatedWidth + horizontalPadding);
-  const originalCenter = element.x + element.width / 2;
-  const pageWidth =
-    page?.width ?? Math.max(element.x + desiredWidth, originalCenter + desiredWidth / 2);
-  const maxWidthAroundCenter = Math.max(
-    1,
-    2 * Math.min(originalCenter, pageWidth - originalCenter),
-  );
-  const nextWidth = Math.max(element.width, Math.min(desiredWidth, maxWidthAroundCenter));
-  const nextX = Math.max(0, Math.min(pageWidth - nextWidth, originalCenter - nextWidth / 2));
-
-  if (nextWidth >= desiredWidth) {
-    return {
-      text: normalizedText,
-      width: nextWidth,
-      x: nextX,
-    };
-  }
-
-  const estimatedLineCount = Math.max(
-    1,
-    Math.ceil(estimatedWidth / Math.max(1, nextWidth - horizontalPadding)),
-  );
-  return {
-    text: normalizedText,
-    width: nextWidth,
-    x: nextX,
-    height: Math.max(element.height, Math.ceil(estimatedLineCount * element.fontSize * 1.08)),
-  };
 }
 
 export function useEditorViewModel(services: AppServices) {
@@ -687,9 +304,6 @@ export function useEditorViewModel(services: AppServices) {
   const [persistenceEnabled, setPersistenceEnabled] = useState(shouldRestoreStoredProject);
   const [presentationImportProgress, setPresentationImportProgress] = useState<
     PresentationImportProgressState | undefined
-  >();
-  const [mediaImportProgress, setMediaImportProgress] = useState<
-    MediaImportProgressState | undefined
   >();
   const [hasPersistedLocalProject, setHasPersistedLocalProject] = useState(
     shouldRestoreStoredProject,
@@ -774,20 +388,6 @@ export function useEditorViewModel(services: AppServices) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mirrorSettingsOpen, setMirrorSettingsOpen] = useState(false);
   const [mediaSettingsOpen, setMediaSettingsOpen] = useState(false);
-  const [stockMediaConfig, setStockMediaConfig] = useState<StockMediaConfig | null>(() =>
-    services.stockMediaService.loadConfig(),
-  );
-  const [stockMediaProviderState, setStockMediaProviderState] = useState<StockMediaProviderState>(
-    () => services.stockMediaService.getProviderState(),
-  );
-  const [stockImageResults, setStockImageResults] = useState<StockMediaItem[]>([]);
-  const [stockGifResults, setStockGifResults] = useState<StockMediaItem[]>([]);
-  const [stockMediaRecentItems, setStockMediaRecentItems] = useState<StockMediaItem[]>([]);
-  const [stockMediaSearching, setStockMediaSearching] = useState<StockMediaSearchState>({
-    gifs: false,
-    images: false,
-  });
-  const [stockMediaError, setStockMediaError] = useState<StockMediaErrorState>({});
   const [mirrorDisabledBySettings, setMirrorDisabledBySettings] = useState(false);
   const [remoteImportOpen, setRemoteImportOpen] = useState(false);
   const [localProjectSetupOpen, setLocalProjectSetupOpen] = useState(false);
@@ -801,6 +401,36 @@ export function useEditorViewModel(services: AppServices) {
     () => storedMirrorConfig ?? minioMirrorService.DEFAULT_MINIO_MIRROR_CONFIG,
   );
   const [hasMirrorConfig, setHasMirrorConfig] = useState(Boolean(storedMirrorConfig));
+  const {
+    clearStockMediaConfig,
+    insertStockMedia,
+    saveStockMediaConfig,
+    searchStockGifs,
+    searchStockImages,
+    stockGifResults,
+    stockImageResults,
+    stockMediaConfig,
+    stockMediaError,
+    stockMediaProviderState,
+    stockMediaRecentItems,
+    stockMediaSearching,
+  } = useStockMediaLibrary({
+    activePageId,
+    commitProject,
+    project,
+    setMediaSettingsOpen,
+    stockMediaService: services.stockMediaService,
+  });
+  const {
+    clearMediaImportProgress,
+    importImageFile,
+    mediaImportProgress,
+    replaceVideoAsset,
+  } = useLocalMediaImport({
+    activePageId,
+    commitProject,
+    project,
+  });
   const mirrorConfigRef = useRef<MinioMirrorConfig | null>(storedMirrorConfig);
   const mirrorSyncInFlightRef = useRef(false);
   const mirrorSyncQueuedRef = useRef(false);
@@ -865,22 +495,6 @@ export function useEditorViewModel(services: AppServices) {
     () => services.fontImportService.listDownloadableFonts(),
     [services.fontImportService],
   );
-  useEffect(() => {
-    if (stockMediaProviderState.images.configured && stockImageResults.length === 0) {
-      void searchStockImages('');
-    }
-    if (stockMediaProviderState.gifs.configured && stockGifResults.length === 0) {
-      void searchStockGifs('');
-    }
-  // The stock search functions are declared later in this hook and intentionally not dependencies:
-  // adding them would rerun this bootstrap effect on every render.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    stockGifResults.length,
-    stockImageResults.length,
-    stockMediaProviderState.gifs.configured,
-    stockMediaProviderState.images.configured,
-  ]);
   const activeSlideLanguage = useMemo(() => {
     const option = translationLanguageUtils.getLanguageOption(pageLanguageCodes[activePageId]);
     return {
@@ -1073,7 +687,7 @@ export function useEditorViewModel(services: AppServices) {
 
   useEffect(() => {
     if (pageLanguageCodes[activePageId]) return;
-    const sampleText = getPageTextSample(project, activePageId);
+    const sampleText = textTranslationLayout.getPageTextSample(project, activePageId);
     if (!sampleText) return;
 
     const sequence = languageDetectionSequenceRef.current + 1;
@@ -2031,7 +1645,7 @@ export function useEditorViewModel(services: AppServices) {
   async function importPowerPoint(input?: PptxImportInput) {
     try {
       showOperationNotice(undefined);
-      const pptxInput = input ?? (await pickPowerPointImportInput());
+      const pptxInput = input ?? (await powerPointIo.pickImportInput());
       if (!pptxInput) return;
       setPresentationImportProgress({
         detail: `Reading ${pptxInput.file.name}.`,
@@ -2177,7 +1791,7 @@ export function useEditorViewModel(services: AppServices) {
       await waitForNextPaint();
       const result = await services.presentationExportService.exportPowerPoint(project, {
         onProgress: (progress) => {
-          showOperationNotice(formatPowerPointExportProgress(progress), { persistent: true });
+          showOperationNotice(powerPointIo.formatExportProgress(progress), { persistent: true });
         },
       });
       showOperationNotice(
@@ -2193,7 +1807,7 @@ export function useEditorViewModel(services: AppServices) {
         services.exportService.getPowerPointFileName(project),
       );
       showOperationNotice({
-        message: summarizePowerPointExport(result),
+        message: powerPointIo.summarizeExport(result),
         tone: result.warnings.length > 0 ? 'warning' : 'success',
       });
     } catch (error) {
@@ -2209,8 +1823,8 @@ export function useEditorViewModel(services: AppServices) {
   showOperationNoticeRef.current = showOperationNotice;
 
   useEffect(() => {
-    if (!consumeLocalPowerPointSampleImportRequest()) return;
-    void loadLocalPowerPointSampleInput()
+    if (!powerPointIo.consumeLocalSampleImportRequest()) return;
+    void powerPointIo.loadLocalSampleInput()
       .then((input) => importPowerPointRef.current(input))
       .catch((error: unknown) => {
         pptxImportLogger.error('Local PowerPoint sample import failed.', error);
@@ -2262,27 +1876,6 @@ export function useEditorViewModel(services: AppServices) {
     setMirrorState({ enabled: true, status: 'idle' });
     setMirrorSettingsOpen(false);
     void syncMirrorNow();
-  }
-
-  function refreshStockMediaConfig() {
-    setStockMediaConfig(services.stockMediaService.loadConfig());
-    setStockMediaProviderState(services.stockMediaService.getProviderState());
-  }
-
-  function saveStockMediaConfig(config: StockMediaConfig) {
-    services.stockMediaService.saveConfig(config);
-    refreshStockMediaConfig();
-    setMediaSettingsOpen(false);
-    void searchStockImages('');
-    void searchStockGifs('');
-  }
-
-  function clearStockMediaConfig() {
-    services.stockMediaService.clearConfig();
-    refreshStockMediaConfig();
-    setStockImageResults([]);
-    setStockGifResults([]);
-    setStockMediaError({});
   }
 
   function setMirrorEnabled(enabled: boolean, options?: { fromSettings?: boolean }) {
@@ -2594,7 +2187,7 @@ export function useEditorViewModel(services: AppServices) {
                 ...patch,
                 height: Math.max(
                   patch.height,
-                  getMinimumTextHeight(element.text, element.fontSize),
+                  textTranslationLayout.getMinimumTextHeight(element.text, element.fontSize),
                 ),
               }
           : patch;
@@ -2617,7 +2210,10 @@ export function useEditorViewModel(services: AppServices) {
       );
       const element = nextProject.elements[elementId];
       if (!element || element.type !== 'text') return nextProject;
-      const minimumHeight = getMinimumTextHeight(element.text, element.fontSize);
+      const minimumHeight = textTranslationLayout.getMinimumTextHeight(
+        element.text,
+        element.fontSize,
+      );
       if (element.height >= minimumHeight) return nextProject;
       return new basicCommands.UpdateElementFrameCommand(elementId, {
         height: minimumHeight,
@@ -2632,7 +2228,10 @@ export function useEditorViewModel(services: AppServices) {
       );
       const element = nextProject.elements[elementId];
       if (!element || element.type !== 'text') return nextProject;
-      const minimumHeight = getMinimumTextHeight(element.text, element.fontSize);
+      const minimumHeight = textTranslationLayout.getMinimumTextHeight(
+        element.text,
+        element.fontSize,
+      );
       if (element.height >= minimumHeight) return nextProject;
       return new basicCommands.UpdateElementFrameCommand(elementId, {
         height: minimumHeight,
@@ -2673,7 +2272,10 @@ export function useEditorViewModel(services: AppServices) {
       }).execute(projectWithFont);
       const nextElement = nextProject.elements[selectedElementId];
       if (!nextElement || nextElement.type !== 'text') return nextProject;
-      const minimumHeight = getMinimumTextHeight(nextElement.text, nextElement.fontSize);
+      const minimumHeight = textTranslationLayout.getMinimumTextHeight(
+        nextElement.text,
+        nextElement.fontSize,
+      );
       if (nextElement.height >= minimumHeight) return nextProject;
       return new basicCommands.UpdateElementFrameCommand(selectedElementId, {
         height: minimumHeight,
@@ -2853,7 +2455,7 @@ export function useEditorViewModel(services: AppServices) {
       });
     };
 
-    const translatedEntries = await mapWithConcurrency(
+    const translatedEntries = await textTranslationLayout.mapWithConcurrency(
       elementIds,
       concurrency,
       async (elementId) => {
@@ -2891,7 +2493,7 @@ export function useEditorViewModel(services: AppServices) {
         const page = pageById.get(pageId ?? '');
         return [
           elementId,
-          fitTranslatedTextToOriginalFrame(element, translatedText, page),
+          textTranslationLayout.fitTranslatedTextToOriginalFrame(element, translatedText, page),
         ] as const;
       },
     );
@@ -3931,424 +3533,10 @@ export function useEditorViewModel(services: AppServices) {
     }
   }
 
-  async function importImageFile(file: File) {
-    const assetType = getMediaAssetType(file);
-    if (assetType === 'video' && !isSupportedLocalVideoFile(file)) {
-      setMediaImportProgress({
-        detail:
-          'Video import supports MP4 and WebM files. Convert this clip to MP4 or WebM and import it again.',
-        title: 'Unsupported video format',
-        tone: 'error',
-      });
-      return;
-    }
-
-    setMediaImportProgress({
-      detail:
-        assetType === 'video'
-          ? 'Loading video metadata without copying the full file into memory.'
-          : assetType === 'gif'
-            ? 'Loading animated media from disk.'
-            : 'Loading image from disk.',
-      title: 'Loading media',
-      tone: 'loading',
-    });
-    await waitForNextPaint();
-
-    let imported = false;
-    let objectUrl: string | undefined;
-    try {
-      objectUrl =
-        assetType === 'video' || assetType === 'gif' ? createMediaObjectUrl(file) : undefined;
-      const mediaUrl = objectUrl ?? (await readImageFileAsDataUrl(file));
-      const mediaSize =
-        assetType === 'video' ? await readVideoSize(mediaUrl) : await readImageSize(mediaUrl);
-      const videoDurationSeconds =
-        assetType === 'video' ? (mediaSize as VideoSize).durationSeconds : undefined;
-      const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
-      if (!page) {
-        setMediaImportProgress(undefined);
-        return;
-      }
-
-      const assetId = createPrefixedId('asset');
-      const elementId = createPrefixedId(assetType);
-      const mediaName =
-        file.name.trim() ||
-        (assetType === 'video'
-          ? 'Pasted video'
-          : assetType === 'gif'
-            ? 'Pasted GIF'
-            : 'Pasted image');
-      const fittedMedia = fitImageWithinPage({
-        imageWidth: mediaSize.width,
-        imageHeight: mediaSize.height,
-        pageWidth: page.width,
-        pageHeight: page.height,
-      });
-
-      if (assetType === 'gif') {
-        commitProject(
-          (currentProject) =>
-            new basicCommands.AddMediaElementCommand(activePageId, {
-              asset: {
-                id: assetId,
-                type: 'gif',
-                name: mediaName,
-                mimeType: file.type || 'image/gif',
-                objectUrl: mediaUrl,
-              },
-              element: {
-                id: elementId,
-                type: 'gif',
-                assetId,
-                x: fittedMedia.x,
-                y: fittedMedia.y,
-                width: fittedMedia.width,
-                height: fittedMedia.height,
-                rotation: 0,
-                locked: false,
-                visible: true,
-                opacity: 1,
-                playing: true,
-              },
-            }).execute(currentProject),
-          { selectedElementIds: [elementId] },
-        );
-        imported = true;
-        return;
-      }
-
-      if (assetType === 'video') {
-        commitProject(
-          (currentProject) =>
-            new basicCommands.AddMediaElementCommand(activePageId, {
-              asset: {
-                id: assetId,
-                type: 'video',
-                name: mediaName,
-                mimeType: file.type || 'video/mp4',
-                objectUrl: mediaUrl,
-              },
-              element: {
-                id: elementId,
-                type: 'video',
-                assetId,
-                x: fittedMedia.x,
-                y: fittedMedia.y,
-                width: fittedMedia.width,
-                height: fittedMedia.height,
-                rotation: 0,
-                locked: false,
-                visible: true,
-                opacity: 1,
-                loop: false,
-                controls: true,
-                muted: true,
-                autoplayInPreview: true,
-                playing: true,
-                trimStartSeconds: 0,
-                ...(videoDurationSeconds !== undefined
-                  ? {
-                      durationSeconds: videoDurationSeconds,
-                      trimEndSeconds: videoDurationSeconds,
-                    }
-                  : {}),
-              },
-            }).execute(currentProject),
-          { selectedElementIds: [elementId] },
-        );
-        imported = true;
-        return;
-      }
-
-      commitProject(
-        (currentProject) =>
-          new basicCommands.AddImageElementCommand(activePageId, {
-            asset: {
-              id: assetId,
-              type: 'image',
-              name: mediaName,
-              mimeType: file.type || 'image/*',
-              objectUrl: mediaUrl,
-            },
-            element: {
-              id: elementId,
-              type: 'image',
-              assetId,
-              x: fittedMedia.x,
-              y: fittedMedia.y,
-              width: fittedMedia.width,
-              height: fittedMedia.height,
-              rotation: 0,
-              locked: false,
-              visible: true,
-              opacity: 1,
-            },
-        }).execute(currentProject),
-        { selectedElementIds: [elementId] },
-      );
-      imported = true;
-    } catch (error) {
-      setMediaImportProgress({
-        detail:
-          error instanceof Error
-            ? error.message
-            : 'The selected media file could not be loaded.',
-        title: 'Media import failed',
-        tone: 'error',
-      });
-      return;
-    } finally {
-      if (!imported && objectUrl && typeof URL.revokeObjectURL === 'function') {
-        URL.revokeObjectURL(objectUrl);
-      }
-      if (imported) setMediaImportProgress(undefined);
-    }
-  }
-
-  async function replaceVideoAsset(elementId: string, file: File) {
-    if (getMediaAssetType(file) !== 'video') return;
-    const dataUrl = await readImageFileAsDataUrl(file);
-    const mediaSize = await readVideoSize(dataUrl);
-    const videoDurationSeconds = mediaSize.durationSeconds;
-    const assetId = createPrefixedId('asset');
-    const mediaName = file.name.trim() || 'Replacement video';
-
-    commitProject(
-      (currentProject) =>
-        new basicCommands.ReplaceVideoAssetCommand(
-          elementId,
-          {
-            id: assetId,
-            type: 'video',
-            name: mediaName,
-            mimeType: file.type || 'video/mp4',
-            objectUrl: dataUrl,
-          },
-          videoDurationSeconds !== undefined ? { durationSeconds: videoDurationSeconds } : {},
-        ).execute(currentProject),
-      { selectedElementIds: [elementId] },
-    );
-  }
-
-  function addRecentStockMedia(item: StockMediaItem) {
-    setStockMediaRecentItems((currentItems) => [
-      item,
-      ...currentItems.filter(
-        (currentItem) => currentItem.provider !== item.provider || currentItem.id !== item.id,
-      ),
-    ].slice(0, STOCK_MEDIA_RECENT_LIMIT));
-  }
-
-  async function searchStockImages(query: string) {
-    setStockMediaSearching((current) => ({ ...current, images: true }));
-    setStockMediaError((current) => ({ ...current, images: undefined }));
-    try {
-      const results = await services.stockMediaService.searchImages(query);
-      setStockImageResults(results);
-      setStockMediaError((current) => ({ ...current, images: undefined }));
-    } catch {
-      setStockImageResults([]);
-      setStockMediaError((current) => ({
-        ...current,
-        images: 'API Key is invalid',
-      }));
-    } finally {
-      setStockMediaSearching((current) => ({ ...current, images: false }));
-    }
-  }
-
-  async function searchStockGifs(query: string) {
-    setStockMediaSearching((current) => ({ ...current, gifs: true }));
-    setStockMediaError((current) => ({ ...current, gifs: undefined }));
-    try {
-      const results = await services.stockMediaService.searchGifs(query);
-      setStockGifResults(results);
-      setStockMediaError((current) => ({ ...current, gifs: undefined }));
-    } catch {
-      setStockGifResults([]);
-      setStockMediaError((current) => ({
-        ...current,
-        gifs: 'API Key is invalid',
-      }));
-    } finally {
-      setStockMediaSearching((current) => ({ ...current, gifs: false }));
-    }
-  }
-
-  async function insertRemoteImage(item: StockMediaItem) {
-    if (item.kind !== 'image') return;
-    const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
-    if (!page) return;
-    await services.stockMediaService.trackImageDownload(item).catch(() => undefined);
-
-    const assetId = createPrefixedId('asset');
-    const elementId = createPrefixedId('image');
-    const fittedMedia = fitImageWithinPage({
-      imageWidth: item.width,
-      imageHeight: item.height,
-      pageWidth: page.width,
-      pageHeight: page.height,
-    });
-
-    commitProject(
-      (currentProject) =>
-        new basicCommands.AddImageElementCommand(activePageId, {
-          asset: {
-            id: assetId,
-            type: 'image',
-            name: item.title,
-            mimeType: 'image/jpeg',
-            objectUrl: item.mediaUrl,
-            storage: 'remote',
-          },
-          element: {
-            id: elementId,
-            type: 'image',
-            assetId,
-            x: fittedMedia.x,
-            y: fittedMedia.y,
-            width: fittedMedia.width,
-            height: fittedMedia.height,
-            rotation: 0,
-            locked: false,
-            visible: true,
-            opacity: 1,
-          },
-        }).execute(currentProject),
-      { selectedElementIds: [elementId] },
-    );
-    addRecentStockMedia(item);
-  }
-
-  function commitRemoteGifElement(item: StockMediaItem) {
-    if (item.kind !== 'gif') return;
-    const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
-    if (!page) return;
-
-    const assetId = createPrefixedId('asset');
-    const elementId = createPrefixedId('gif');
-    const fittedMedia = fitImageWithinPage({
-      imageWidth: item.width,
-      imageHeight: item.height,
-      pageWidth: page.width,
-      pageHeight: page.height,
-    });
-
-    commitProject(
-      (currentProject) =>
-        new basicCommands.AddMediaElementCommand(activePageId, {
-          asset: {
-            id: assetId,
-            type: 'gif',
-            name: item.title,
-            mimeType: 'image/gif',
-            objectUrl: item.mediaUrl,
-            storage: 'remote',
-          },
-          element: {
-            id: elementId,
-            type: 'gif',
-            assetId,
-            x: fittedMedia.x,
-            y: fittedMedia.y,
-            width: fittedMedia.width,
-            height: fittedMedia.height,
-            rotation: 0,
-            locked: false,
-            visible: true,
-            opacity: 1,
-            playing: true,
-          },
-        }).execute(currentProject),
-      { selectedElementIds: [elementId] },
-    );
-    addRecentStockMedia(item);
-  }
-
-  async function insertRemoteGif(item: StockMediaItem) {
-    if (item.kind !== 'gif') return;
-    if (!item.videoUrl) {
-      commitRemoteGifElement(item);
-      return;
-    }
-    const videoUrl = item.videoUrl;
-    const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
-    if (!page) return;
-
-    try {
-      const mediaSize = await readVideoSize(videoUrl);
-      const assetId = createPrefixedId('asset');
-      const elementId = createPrefixedId('video');
-      const fittedMedia = fitImageWithinPage({
-        imageWidth: item.width || mediaSize.width,
-        imageHeight: item.height || mediaSize.height,
-        pageWidth: page.width,
-        pageHeight: page.height,
-      });
-
-      commitProject(
-        (currentProject) =>
-          new basicCommands.AddMediaElementCommand(activePageId, {
-            asset: {
-              id: assetId,
-              type: 'video',
-              name: item.title,
-              mimeType: 'video/mp4',
-              objectUrl: videoUrl,
-              storage: 'remote',
-            },
-            element: {
-              id: elementId,
-              type: 'video',
-              assetId,
-              x: fittedMedia.x,
-              y: fittedMedia.y,
-              width: fittedMedia.width,
-              height: fittedMedia.height,
-              rotation: 0,
-              locked: false,
-              visible: true,
-              opacity: 1,
-              loop: true,
-              controls: true,
-              muted: true,
-              autoplayInPreview: true,
-              trimStartSeconds: 0,
-              repeatMode: 'loop',
-              ...(mediaSize.durationSeconds !== undefined
-                ? {
-                    durationSeconds: mediaSize.durationSeconds,
-                    trimEndSeconds: mediaSize.durationSeconds,
-                  }
-                : {}),
-            },
-          }).execute(currentProject),
-        { selectedElementIds: [elementId] },
-      );
-      addRecentStockMedia(item);
-    } catch {
-      commitRemoteGifElement(item);
-    }
-  }
-
-  function insertStockMedia(item: StockMediaItem) {
-    if (item.kind === 'gif') {
-      void insertRemoteGif(item);
-      return;
-    }
-    void insertRemoteImage(item);
-  }
-
   function updateMediaPlayback(elementId: string, patch: MediaPlaybackPatch) {
     commitProject((currentProject) =>
       new basicCommands.UpdateMediaPlaybackCommand(elementId, patch).execute(currentProject),
     );
-  }
-
-  function clearMediaImportProgress() {
-    setMediaImportProgress(undefined);
   }
 
   return {

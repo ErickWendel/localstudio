@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type Konva from 'konva';
-import { zipSync } from 'fflate';
 import type { AppServices } from '../../../app/composition';
 import type { ShareMetadata } from '../../../services/contracts/interfaces';
 import { editorAutomationController } from '../../../services/automation/editorAutomationController';
@@ -32,12 +31,7 @@ import { VersionHistoryPanel } from '../panels/VersionHistoryPanel';
 import { presentationMovieControls, type MovieHoldState } from '../media/presentationMovieControls';
 import { useEditorViewModel, type OperationNoticeState } from '../state/useEditorViewModel';
 import { SharePanel } from '../../share/SharePanel';
-import {
-  KeyboardShortcutsDialog,
-  type KeyboardShortcutAction,
-} from '../../components/KeyboardShortcutsDialog';
-import { canvasWorkspaceUtils } from '../canvas/canvasWorkspaceUtils';
-import type { ImageElement } from '../../../domain/documents/model';
+import { KeyboardShortcutsDialog, type KeyboardShortcutAction } from '../../components/KeyboardShortcutsDialog';
 import { editorShellBrowserUtils } from '../browser/editorShellBrowserUtils';
 import { BrowserPresenterSessionService } from '../../../services/presenter/presenterSessionService';
 import type { PresenterRemoteSessionMetadata } from '../../../services/presenter/presenterSessionTypes';
@@ -46,97 +40,13 @@ import {
   EditorAiWorkflowTour,
   type EditorAiWorkflowTourHandle,
 } from '../tour/EditorAiWorkflowTour';
+import { editorImageExport } from './editor-image-export';
+import type { ImageExportFrame } from './editor-image-export';
+import { editorShortcutActions } from './editor-shortcut-actions';
 
 interface EditorShellProps {
   services: AppServices;
 }
-
-type ImageExportAnimationPreview = ComponentProps<typeof CanvasWorkspace>['animationPreview'];
-
-interface ImageExportFrame {
-  animationPreview?: ImageExportAnimationPreview | undefined;
-  fileName: string;
-  pageId: string;
-}
-
-function waitForNextPaint() {
-  if (typeof window === 'undefined') return Promise.resolve();
-  return new Promise<void>((resolve) => {
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        resolve();
-      });
-    });
-  });
-}
-
-function bytesToBlobPart(bytes: Uint8Array): ArrayBuffer {
-  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-}
-
-function dataUrlToBytes(dataUrl: string) {
-  const commaIndex = dataUrl.indexOf(',');
-  if (commaIndex === -1) throw new Error('Could not read exported slide image.');
-  const metadata = dataUrl.slice(0, commaIndex);
-  const payload = dataUrl.slice(commaIndex + 1);
-  if (!metadata.includes(';base64')) {
-    return new TextEncoder().encode(decodeURIComponent(payload));
-  }
-  const binary = window.atob(payload);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return bytes;
-}
-
-function appendFileNameSuffix(fileName: string, suffix: string) {
-  const extensionIndex = fileName.lastIndexOf('.');
-  if (extensionIndex <= 0) return `${fileName}${suffix}`;
-  return `${fileName.slice(0, extensionIndex)}${suffix}${fileName.slice(extensionIndex)}`;
-}
-
-function createImageExportAnimationPreview(
-  pageId: string,
-  hiddenElementIds: string[],
-): ImageExportAnimationPreview {
-  return {
-    activeBuildElementId: undefined,
-    animationProgress: 1,
-    hiddenElementIds,
-    mode: 'editor',
-    pageId,
-    phase: 'waiting',
-    playing: false,
-    waitingForClick: false,
-  };
-}
-
-const editorShortcutActions = [
-  'next-build',
-  'previous-build',
-  'next-slide',
-  'previous-slide',
-  'first-slide',
-  'last-slide',
-  'quit-presentation',
-  'shortcut-toggle',
-  'pause-presentation',
-  'black-screen',
-  'white-screen',
-  'cursor-toggle',
-  'show-slide-number',
-  'open-slide-navigator',
-  'next-navigator-slide',
-  'previous-navigator-slide',
-  'select-navigator-slide',
-  'close-slide-navigator',
-  'play-pause-movie',
-  'rewind-movie',
-  'fast-forward-movie',
-  'jump-movie-start',
-  'jump-movie-end',
-] satisfies KeyboardShortcutAction[];
 
 export function EditorShell({ services }: EditorShellProps) {
   const vm = useEditorViewModel(services);
@@ -222,88 +132,24 @@ export function EditorShell({ services }: EditorShellProps) {
   }
 
   function getImageExportFrames(options: ImageExportOptions): ImageExportFrame[] {
-    const extension = options.format;
-    const pages =
-      options.slideRange === 'all'
-        ? vm.project.pages
-        : vm.project.pages.slice(options.slideRange.from - 1, options.slideRange.to);
-
-    return pages.flatMap((page) => {
-      const pageFileName = services.exportService.getPageImageFileName(
-        vm.project,
-        page.id,
-        extension,
-      );
-      const builds =
-        page.animationBuilds?.filter((build) => {
-          const element = vm.project.elements[build.elementId];
-          return element && element.visible !== false;
-        }) ?? [];
-      if (!options.includeAnimationFrames || builds.length === 0) {
-        return [
-          {
-            animationPreview: createImageExportAnimationPreview(page.id, []),
-            fileName: pageFileName,
-            pageId: page.id,
-          },
-        ];
-      }
-
-      const buildInElementIds = builds
-        .filter((build) => build.kind === undefined || build.kind === 'build-in')
-        .map((build) => build.elementId);
-      const hiddenElementIds = new Set(buildInElementIds);
-      const frames: ImageExportFrame[] = [];
-
-      builds.forEach((build, index) => {
-        if (build.kind === 'build-out') {
-          hiddenElementIds.add(build.elementId);
-        } else if (build.kind === undefined || build.kind === 'build-in') {
-          hiddenElementIds.delete(build.elementId);
-        }
-        frames.push({
-          animationPreview: createImageExportAnimationPreview(
-            page.id,
-            Array.from(hiddenElementIds),
-          ),
-          fileName: appendFileNameSuffix(
-            pageFileName,
-            `-animation-${String(index + 1).padStart(2, '0')}`,
-          ),
-          pageId: page.id,
-        });
-      });
-
-      return frames;
+    return editorImageExport.getFrames({
+      getPageImageFileName: services.exportService.getPageImageFileName.bind(services.exportService),
+      options,
+      project: vm.project,
     });
   }
 
-  async function renderImageExportFrame(
-    frame: ImageExportFrame,
-    format: ImageExportOptions['format'],
-  ) {
-    const page = vm.project.pages.find((item) => item.id === frame.pageId);
-    const imageUrls =
-      page?.elementIds
-        .map((elementId) => vm.project.elements[elementId])
-        .filter(
-          (element): element is ImageElement =>
-            element?.type === 'image' && element.visible !== false,
-        )
-        .map((element) => vm.project.assets[element.assetId]?.objectUrl)
-        .filter((assetUrl): assetUrl is string => Boolean(assetUrl)) ?? [];
-    await Promise.allSettled(
-      imageUrls.map((assetUrl) => canvasWorkspaceUtils.preloadCanvasImage(assetUrl)),
-    );
+  async function renderImageExportFrame(frame: ImageExportFrame, format: ImageExportOptions['format']) {
+    await editorImageExport.preloadFrameImages(vm.project, frame.pageId);
     setImageExportFrame(frame);
-    await waitForNextPaint();
+    await editorImageExport.waitForNextPaint();
     const dataUrl = imageExportStageRef.current?.toDataURL(
       format === 'jpeg'
         ? { mimeType: 'image/jpeg', pixelRatio: 2, quality: 0.92 }
         : { mimeType: 'image/png', pixelRatio: 2 },
     );
     if (!dataUrl) throw new Error(`Could not render ${frame.fileName}.`);
-    return dataUrlToBytes(dataUrl);
+    return editorImageExport.dataUrlToBytes(dataUrl);
   }
 
   async function exportImages(options: ImageExportOptions) {
@@ -336,9 +182,8 @@ export function EditorShell({ services }: EditorShellProps) {
         archiveFiles[frame.fileName] = await renderImageExportFrame(frame, options.format);
       }
       setImageExportFrame(undefined);
-      const archiveBytes = zipSync(archiveFiles);
       services.exportService.downloadBlob(
-        new Blob([bytesToBlobPart(archiveBytes)], { type: 'application/zip' }),
+        editorImageExport.createZipBlob(archiveFiles),
         services.exportService.getImagesArchiveFileName(vm.project),
       );
       setImageExportPanelOpen(false);

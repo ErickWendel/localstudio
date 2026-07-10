@@ -1,4 +1,4 @@
-import type { MediaImportProgressState } from '../state/useEditorViewModel';
+import type { MediaImportProgressState } from '../state/use-local-media-import';
 
 interface MediaImportProgressOverlayProps {
   onDismiss?: () => void;

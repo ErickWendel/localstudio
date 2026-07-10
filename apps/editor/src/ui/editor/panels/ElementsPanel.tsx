@@ -16,7 +16,7 @@ import type {
   StockMediaItem,
   StockMediaProviderState,
 } from '../../../services/contracts/interfaces';
-import type { StockMediaErrorState } from '../state/useEditorViewModel';
+import type { StockMediaErrorState } from '../state/use-stock-media-library';
 
 const elementShapeCatalog: Array<{
   icon?: LucideIcon;

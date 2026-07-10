@@ -9,7 +9,7 @@ import type {
 } from '../../../domain/documents/model';
 import { pptxFileUtils } from './pptxFileUtils';
 import type { PptxPackage } from './pptxPackage';
-import type { PptxDeck, PptxLayout, PptxSlideObject } from './pptxParser';
+import type { PptxDeck, PptxLayout, PptxSlideObject } from './pptx-parser-model';
 
 const TEXT_FRAME_FIT = {
   averageCharacterWidth: 0.9,
