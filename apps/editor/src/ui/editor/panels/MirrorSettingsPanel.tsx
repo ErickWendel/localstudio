@@ -55,7 +55,9 @@ export function MirrorSettingsPanel({
       setConnectionStatus('ready');
     } catch (error) {
       setConnectionStatus('failed');
-      setConnectionError(error instanceof Error ? error.message : 'MinIO connection failed.');
+      setConnectionError(
+        error instanceof Error ? error.message : 'S3-compatible connection failed.',
+      );
     }
   }
 
@@ -81,6 +83,7 @@ export function MirrorSettingsPanel({
       role="dialog"
       aria-modal="false"
       aria-label="Mirror settings"
+      data-tour-id="mirror-settings-panel"
     >
       <div className="mirror-settings-header ew-split-row-start">
         <div className="settings-panel-title-row">
@@ -98,7 +101,7 @@ export function MirrorSettingsPanel({
           ) : null}
           <div>
             <h2>Mirror settings</h2>
-            <p>Sync this local project folder to MinIO.</p>
+            <p>Sync this local project folder to S3-compatible storage.</p>
           </div>
         </div>
         <button
@@ -113,7 +116,7 @@ export function MirrorSettingsPanel({
         </button>
       </div>
 
-      <div className="mirror-settings-grid ew-field-scope">
+      <div className="mirror-settings-grid ew-field-scope" data-tour-id="mirror-settings-fields">
         <label>
           <span>Endpoint</span>
           <input
@@ -199,36 +202,36 @@ export function MirrorSettingsPanel({
             <span className="material-symbols-outlined" aria-hidden="true">
               check_circle
             </span>
-            Connection is ready.
+            S3-compatible connection is ready.
           </>
         ) : connectionStatus === 'failed' ? (
           connectionError
         ) : mirrorState.status === 'failed' ? (
-          (mirrorState.error ?? 'MinIO connection failed.')
+          (mirrorState.error ?? 'S3-compatible connection failed.')
         ) : mirrorState.status === 'syncing' || connectionStatus === 'testing' ? (
-          'Checking MinIO connection...'
+          'Checking S3-compatible connection...'
         ) : mirrorState.status === 'synced' ? (
-          'MinIO connection is ready.'
+          'S3-compatible connection is ready.'
         ) : (
           'Keys are stored in this browser profile.'
         )}
       </p>
 
       <div className="mirror-settings-help">
-        <p>Default MinIO login: localstudio / localstudio123</p>
+        <p>Local S3-compatible default login: localstudio / localstudio123</p>
         {connectionStatus === 'ready' ? (
           <div className="mirror-settings-links">
             <a href={publicBucketUrl} target="_blank" rel="noreferrer">
               Open public bucket
             </a>
             <a href={consoleUrl} target="_blank" rel="noreferrer">
-              Open MinIO console
+              Open storage console
             </a>
           </div>
         ) : null}
       </div>
 
-      <div className="mirror-settings-actions">
+      <div className="mirror-settings-actions" data-tour-id="mirror-settings-actions">
         <button
           className={
             mirrorState.enabled
@@ -245,7 +248,9 @@ export function MirrorSettingsPanel({
           {mirrorState.enabled ? 'Disable mirroring' : 'Enable mirroring'}
         </button>
         <button className="footer-toggle" type="button" onClick={() => void testConnection()}>
-          {connectionStatus === 'testing' ? 'Checking MinIO connection...' : 'Test connection'}
+          {connectionStatus === 'testing'
+            ? 'Checking S3-compatible connection...'
+            : 'Test connection'}
         </button>
         <button
           className="export-button font-orbitron"

@@ -42,6 +42,10 @@ import { editorShellBrowserUtils } from '../browser/editorShellBrowserUtils';
 import { BrowserPresenterSessionService } from '../../../services/presenter/presenterSessionService';
 import type { PresenterRemoteSessionMetadata } from '../../../services/presenter/presenterSessionTypes';
 import { PresenterRemotePanel } from '../../presenter/PresenterRemotePanel';
+import {
+  EditorAiWorkflowTour,
+  type EditorAiWorkflowTourHandle,
+} from '../tour/EditorAiWorkflowTour';
 
 interface EditorShellProps {
   services: AppServices;
@@ -174,6 +178,7 @@ export function EditorShell({ services }: EditorShellProps) {
   const slideFrameRef = useRef<HTMLDivElement>(null);
   const presenterSessionServiceRef = useRef<BrowserPresenterSessionService | undefined>(undefined);
   const presenterRemotePanelRef = useRef<HTMLDivElement>(null);
+  const aiWorkflowTourRef = useRef<EditorAiWorkflowTourHandle>(null);
   const imageExportNoticeTimeoutRef = useRef<number | undefined>(undefined);
   const presenterFullscreenEnteredRef = useRef(false);
   const toolbarImageInputRef = useRef<HTMLInputElement>(null);
@@ -257,7 +262,10 @@ export function EditorShell({ services }: EditorShellProps) {
           hiddenElementIds.delete(build.elementId);
         }
         frames.push({
-          animationPreview: createImageExportAnimationPreview(page.id, Array.from(hiddenElementIds)),
+          animationPreview: createImageExportAnimationPreview(
+            page.id,
+            Array.from(hiddenElementIds),
+          ),
           fileName: appendFileNameSuffix(
             pageFileName,
             `-animation-${String(index + 1).padStart(2, '0')}`,
@@ -270,7 +278,10 @@ export function EditorShell({ services }: EditorShellProps) {
     });
   }
 
-  async function renderImageExportFrame(frame: ImageExportFrame, format: ImageExportOptions['format']) {
+  async function renderImageExportFrame(
+    frame: ImageExportFrame,
+    format: ImageExportOptions['format'],
+  ) {
     const page = vm.project.pages.find((item) => item.id === frame.pageId);
     const imageUrls =
       page?.elementIds
@@ -608,6 +619,28 @@ export function EditorShell({ services }: EditorShellProps) {
   function openLeftPanel() {
     if (vm.pagesPanelOpen) vm.togglePagesPanel();
     setLeftPanelOpen(true);
+  }
+
+  function openAiToolsPanel() {
+    vm.setActiveTab('ai-tools');
+    openLeftPanel();
+  }
+
+  function startAiWorkflowTour() {
+    aiWorkflowTourRef.current?.start();
+  }
+
+  function closeTourSurfaces() {
+    setLeftPanelOpen(false);
+    setKeyboardShortcutsOpen(false);
+    setSlideNavigatorOpen(false);
+    setPresenterRemotePanelOpen(false);
+    setAudienceFullscreenPromptOpen(false);
+    setSharePanelOpen(false);
+    setImageExportPanelOpen(false);
+    vm.closeSettings();
+    vm.closeMediaSettings();
+    vm.closeMirrorSettings();
   }
 
   function handleLeftPanelOpenChange(open: boolean) {
@@ -1142,6 +1175,13 @@ export function EditorShell({ services }: EditorShellProps) {
 
   return (
     <div className="app-shell">
+      <EditorAiWorkflowTour
+        ref={aiWorkflowTourRef}
+        onCloseTourSurfaces={closeTourSurfaces}
+        onOpenAiTools={openAiToolsPanel}
+        onOpenMirrorSettings={vm.openMirrorSettings}
+        onOpenSettings={vm.openSettings}
+      />
       <TopToolbar
         project={vm.project}
         language={vm.activeSlideLanguage.displayCode}
@@ -1206,6 +1246,7 @@ export function EditorShell({ services }: EditorShellProps) {
         onNewProject={openBlankProjectInNewTab}
         onOpenMirrorSettings={vm.openMirrorSettings}
         onOpenKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
+        onStartAiSetupTour={startAiWorkflowTour}
         onOpenVersionHistory={() => {
           void vm.openVersionHistory();
         }}
@@ -1376,6 +1417,7 @@ export function EditorShell({ services }: EditorShellProps) {
             .filter(Boolean)
             .join(' ')}
           aria-label="Canvas workspace"
+          data-tour-id="canvas-workspace"
           ref={workspaceRef}
         >
           {keyboardShortcutsOpen ? (

@@ -29,6 +29,7 @@ export function MediaIntegrationSettingsPanel({
       role="dialog"
       aria-modal="false"
       aria-label="Media integrations"
+      data-tour-id="media-integrations-panel"
     >
       <div className="settings-panel-header ew-split-row-start">
         <div className="settings-panel-title-row">
@@ -49,7 +50,12 @@ export function MediaIntegrationSettingsPanel({
             <p>Connect Unsplash images and GIPHY GIFs in the Elements panel.</p>
           </div>
         </div>
-        <button className="stitch-icon-button" type="button" aria-label="Close media integrations" onClick={onClose}>
+        <button
+          className="stitch-icon-button"
+          type="button"
+          aria-label="Close media integrations"
+          onClick={onClose}
+        >
           <span className="material-symbols-outlined" aria-hidden="true">
             close
           </span>
@@ -65,7 +71,7 @@ export function MediaIntegrationSettingsPanel({
           });
         }}
       >
-        <label className="media-key-field ew-field-scope">
+        <label className="media-key-field ew-field-scope" data-tour-id="unsplash-config">
           <span className="media-key-label">
             <span>Unsplash access key</span>
             <a
@@ -101,7 +107,7 @@ export function MediaIntegrationSettingsPanel({
           </span>
           <small>{unsplashConfigured ? 'Unsplash configured' : 'Unsplash not configured'}</small>
         </label>
-        <label className="media-key-field ew-field-scope">
+        <label className="media-key-field ew-field-scope" data-tour-id="giphy-config">
           <span className="media-key-label">
             <span>GIPHY API key</span>
             <a
@@ -140,7 +146,7 @@ export function MediaIntegrationSettingsPanel({
         <div className="mirror-settings-help">
           <p>Provider keys stay in this browser profile.</p>
         </div>
-        <div className="media-integration-actions">
+        <div className="media-integration-actions" data-tour-id="media-integrations-actions">
           <button className="export-button font-orbitron" type="submit">
             Save media integrations
           </button>

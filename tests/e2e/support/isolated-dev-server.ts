@@ -13,7 +13,8 @@ export async function startIsolatedDevServer(): Promise<IsolatedDevServer> {
   const serverEnv = { ...process.env };
   delete serverEnv.FORCE_COLOR;
   const peerServer = await startPeerServer();
-  const serverScript = process.env.E2E_SERVER === 'dist' ? 'scripts/serve-dist.mjs' : 'scripts/dev.mjs';
+  const serverScript =
+    process.env.E2E_SERVER === 'dist' ? 'scripts/serve-dist.mjs' : 'scripts/dev.mjs';
   const child = spawn(process.execPath, [serverScript], {
     cwd: process.cwd(),
     env: {
@@ -23,6 +24,7 @@ export async function startIsolatedDevServer(): Promise<IsolatedDevServer> {
       LOCALSTUDIO_PEERJS_PATH: peerServer.path,
       LOCALSTUDIO_PEERJS_PORT: String(peerServer.port),
       PORT: '0',
+      VITE_DISABLE_EDITOR_TOUR: serverEnv.VITE_DISABLE_EDITOR_TOUR ?? 'true',
     },
   });
   let output = '';

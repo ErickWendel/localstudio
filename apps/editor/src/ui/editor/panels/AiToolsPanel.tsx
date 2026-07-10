@@ -9,6 +9,7 @@ import type {
 import { modelSetupService } from '../../../services/model-setup/modelSetupService';
 import { IconButton } from '../../components/IconButton';
 import { StatusPill } from '../../components/StatusPill';
+import { AiToolsSetupAction } from './AiToolsSetupAction';
 import type { CreateImagePromptOptions } from '../media/imagePromptOptions';
 import { imagePromptOptions } from '../media/imagePromptOptions';
 
@@ -76,7 +77,7 @@ function formatStatus(status: ModelState['status']) {
 function getPreparationStatus(
   provider: AiProviderState | undefined,
   preparationStatus: 'idle' | 'downloading' | 'ready' | 'failed',
-) {
+): 'idle' | 'downloading' | 'ready' | 'failed' {
   if (preparationStatus === 'downloading' || preparationStatus === 'failed')
     return preparationStatus;
   if (provider?.readiness === 'ready') return 'ready';
@@ -146,6 +147,15 @@ function getModelProgressStatus(
   if (status === 'ready') return 'ready';
   if (status === 'failed') return 'failed';
   return 'idle';
+}
+
+function getModelSetupTaskStatus(
+  modelStates: ModelState[],
+  modelId: string,
+): 'idle' | 'downloading' | 'ready' | 'failed' {
+  return getModelProgressStatus(
+    modelStates.find((model) => model.id === modelId)?.status ?? 'needs-download',
+  );
 }
 
 function getSecondaryProgressText(
@@ -328,9 +338,66 @@ export function AiToolsPanel({
       model.id !== aiModelCatalog.TRANSLATEGEMMA_MODEL_ID &&
       model.id !== aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID,
   );
+  const hiddenModelSetupTasks = [
+    {
+      id: aiModelCatalog.GEMMA_LLM_MODEL_ID,
+      label: aiModelCatalog.GEMMA_LLM_DISPLAY_NAME,
+      onPrepare: onDownloadModel
+        ? () => onDownloadModel(aiModelCatalog.GEMMA_LLM_MODEL_ID)
+        : undefined,
+      status: getModelSetupTaskStatus(modelStates, aiModelCatalog.GEMMA_LLM_MODEL_ID),
+    },
+    {
+      id: aiModelCatalog.TRANSLATEGEMMA_MODEL_ID,
+      label: aiModelCatalog.TRANSLATEGEMMA_DISPLAY_NAME,
+      onPrepare: onDownloadModel
+        ? () => onDownloadModel(aiModelCatalog.TRANSLATEGEMMA_MODEL_ID)
+        : undefined,
+      status: getModelSetupTaskStatus(modelStates, aiModelCatalog.TRANSLATEGEMMA_MODEL_ID),
+    },
+  ];
+  const setupTasks = [
+    ...(selectedPromptProvider?.modelId === aiModelCatalog.GEMMA_LLM_MODEL_ID
+      ? []
+      : [
+          {
+            disabled: selectedPromptProvider?.compatibility === 'incompatible',
+            id: selectedPromptProvider?.id ?? 'prompt-provider',
+            label: selectedPromptProvider?.label ?? 'LLM model',
+            onPrepare: onPreparePromptApi,
+            status: promptStatus,
+          },
+        ]),
+    {
+      disabled: selectedLanguageDetectionProvider?.compatibility === 'incompatible',
+      id: selectedLanguageDetectionProvider?.id ?? 'language-detection-provider',
+      label: selectedLanguageDetectionProvider?.label ?? 'Language detection model',
+      onPrepare: onPrepareLanguageDetectionProvider,
+      status: languageDetectionStatus,
+    },
+    ...(selectedTranslationProvider?.modelId === aiModelCatalog.TRANSLATEGEMMA_MODEL_ID
+      ? []
+      : [
+          {
+            disabled: selectedTranslationProvider?.compatibility === 'incompatible',
+            id: selectedTranslationProvider?.id ?? 'translation-provider',
+            label: selectedTranslationProvider?.label ?? 'Translation model',
+            onPrepare: onPrepareTranslationProvider,
+            status: translationProviderStatus,
+          },
+        ]),
+    ...hiddenModelSetupTasks,
+    ...visibleModelStates.map((model) => ({
+      id: model.id,
+      label: model.label,
+      onPrepare: onDownloadModel ? () => onDownloadModel(model.id) : undefined,
+      status: getModelProgressStatus(model.status),
+    })),
+  ];
 
   return (
-    <div className="panel-stack">
+    <div className="panel-stack" data-tour-id="ai-tools-panel">
+      <AiToolsSetupAction tasks={setupTasks} />
       <div className="tool-card-list ew-panel-card">
         <article
           className={
@@ -339,6 +406,7 @@ export function AiToolsPanel({
               : 'tool-card ew-surface ew-surface-hover'
           }
           aria-label="LLM Model"
+          data-tour-id="ai-llm-model"
         >
           <div className="tool-card-heading ew-compact-row">
             <ImagePlus size={18} />
@@ -422,7 +490,11 @@ export function AiToolsPanel({
           </div>
         </article>
 
-        <article className="tool-card ew-surface ew-surface-hover" aria-label="Language Detection">
+        <article
+          className="tool-card ew-surface ew-surface-hover"
+          aria-label="Language Detection"
+          data-tour-id="ai-language-detection"
+        >
           <div className="tool-card-heading ew-compact-row">
             <ScanSearch size={18} />
             <strong>Language Detection</strong>
@@ -519,6 +591,7 @@ export function AiToolsPanel({
               : 'tool-card ew-surface ew-surface-hover'
           }
           aria-label="Translate Design"
+          data-tour-id="ai-translate-design"
         >
           <div className="tool-card-heading ew-compact-row">
             <Languages size={18} />
@@ -677,6 +750,11 @@ export function AiToolsPanel({
                   : 'model-row ew-surface ew-surface-hover'
               }
               key={model.id}
+              data-tour-id={
+                model.id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID
+                  ? 'ai-image-generation-model'
+                  : undefined
+              }
             >
               <div className="model-row-main ew-compact-row">
                 <ScanSearch size={17} />

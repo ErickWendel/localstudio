@@ -46,7 +46,9 @@ interface LeftToolPanelProps {
         waitingForClick: boolean;
       }
     | undefined;
-  activeSlideLanguage?: { code: string; displayCode: string; flag: string; label: string } | undefined;
+  activeSlideLanguage?:
+    | { code: string; displayCode: string; flag: string; label: string }
+    | undefined;
   focusFontControlKey?: number | undefined;
   onTabChange: (tab: RightPanelTab) => void;
   open?: boolean;
@@ -59,13 +61,25 @@ interface LeftToolPanelProps {
   languageDetectionProviderStates?: AiProviderState[];
   translationLanguageOptions?: Array<{ code: string; flag: string; label: string }>;
   availableFonts?: FontCatalogItem[];
-  languageDetectionPreparation?: { progress: number; sourceLanguage?: string; status: 'idle' | 'downloading' | 'ready' | 'failed' };
-  translationPreparation?: { progress: number; sourceLanguage?: string; status: 'idle' | 'downloading' | 'ready' | 'failed' };
+  languageDetectionPreparation?: {
+    progress: number;
+    sourceLanguage?: string;
+    status: 'idle' | 'downloading' | 'ready' | 'failed';
+  };
+  translationPreparation?: {
+    progress: number;
+    sourceLanguage?: string;
+    status: 'idle' | 'downloading' | 'ready' | 'failed';
+  };
   translationTargetAttention?: boolean;
   translationTargetLanguage?: string;
   promptApiAttention?: boolean;
   promptApiNotice?: string | undefined;
-  promptPreparation?: { availability: string; progress: number; status: 'idle' | 'downloading' | 'ready' | 'failed' };
+  promptPreparation?: {
+    availability: string;
+    progress: number;
+    status: 'idle' | 'downloading' | 'ready' | 'failed';
+  };
   onDownloadModel?: ((id: string) => Promise<void>) | undefined;
   onDownloadFont?: ((family: string) => Promise<void>) | undefined;
   onRemoveModel?: ((id: string) => Promise<void>) | undefined;
@@ -100,7 +114,9 @@ interface LeftToolPanelProps {
   onSetElementVisibility?: ((elementId: string, visible: boolean) => void) | undefined;
   onSetElementLock?: ((elementId: string, locked: boolean) => void) | undefined;
   onDeleteElement?: ((elementId: string) => void) | undefined;
-  onReorderElement?: ((elementId: string, targetElementId: string, position?: 'before' | 'after') => void) | undefined;
+  onReorderElement?:
+    | ((elementId: string, targetElementId: string, position?: 'before' | 'after') => void)
+    | undefined;
   onAlignSelectedElement?: ((mode: AlignMode) => void) | undefined;
   onSetSelectedElementZOrder?: ((mode: ZOrderMode) => void) | undefined;
   onUpdateElementFrame?: ((elementId: string, patch: ElementFramePatch) => void) | undefined;
@@ -123,7 +139,9 @@ interface LeftToolPanelProps {
   onReplaceVideoAsset?: ((elementId: string, file: File) => void) | undefined;
   onClearPageTransition?: (() => void) | undefined;
   onSetPageTransition?: ((transition: SlideTransition) => void) | undefined;
-  onSetElementAnimationBuilds?: ((elementIds: string[], patch: Omit<ElementAnimationBuild, 'elementId' | 'id'>) => void) | undefined;
+  onSetElementAnimationBuilds?:
+    | ((elementIds: string[], patch: Omit<ElementAnimationBuild, 'elementId' | 'id'>) => void)
+    | undefined;
   onClearElementAnimationBuild?: ((elementId: string) => void) | undefined;
   onReorderElementAnimationBuild?: ((elementId: string, targetIndex: number) => void) | undefined;
   onPlayAnimationPreview?: (() => void) | undefined;
@@ -222,7 +240,9 @@ export function LeftToolPanel({
   const resizeStartRef = useRef<{ pointerX: number; width: number } | undefined>(undefined);
   const [contentWidth, setContentWidth] = useState(266);
   const [resizing, setResizing] = useState(false);
-  const isAttentionOpen = Boolean(attentionModelId || promptApiAttention || translationTargetAttention);
+  const isAttentionOpen = Boolean(
+    attentionModelId || promptApiAttention || translationTargetAttention,
+  );
   const panelOpen = open || isAttentionOpen;
   const assetRows = useMemo(() => {
     if (!panelOpen || activeTab !== 'assets') return [];
@@ -241,7 +261,9 @@ export function LeftToolPanel({
     function handlePointerMove(event: PointerEvent) {
       const resizeStart = resizeStartRef.current;
       if (!resizeStart) return;
-      setContentWidth(Math.min(520, Math.max(240, resizeStart.width + event.clientX - resizeStart.pointerX)));
+      setContentWidth(
+        Math.min(520, Math.max(240, resizeStart.width + event.clientX - resizeStart.pointerX)),
+      );
     }
 
     function handlePointerUp() {
@@ -267,9 +289,10 @@ export function LeftToolPanel({
           : 'left-tool-panel'
       }
       aria-label="Editor tools"
+      data-tour-id="left-tool-panel"
       style={{ '--left-tool-content-width': `${contentWidth}px` } as CSSProperties}
     >
-      <nav className="left-tool-rail" aria-label="Tool menu">
+      <nav className="left-tool-rail" aria-label="Tool menu" data-tour-id="left-tool-rail">
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = panelOpen && item.id === activeTab;
@@ -279,6 +302,7 @@ export function LeftToolPanel({
               aria-expanded={isActive}
               aria-selected={isActive}
               className={isActive ? 'left-tool-button left-tool-button-active' : 'left-tool-button'}
+              data-tour-id={`left-tool-tab-${item.id}`}
               key={item.id}
               role="tab"
               type="button"
@@ -480,16 +504,23 @@ function AssetRow({
   used: boolean;
 }) {
   const detail = asset.fileName ?? asset.id;
-  const storageLabel = asset.storage === 'file' ? 'Saved file' : asset.storage === 'remote' ? 'Remote' : 'Inline';
+  const storageLabel =
+    asset.storage === 'file' ? 'Saved file' : asset.storage === 'remote' ? 'Remote' : 'Inline';
   return (
     <div className="asset-row ew-surface ew-surface-hover">
       <div className="asset-thumb" aria-hidden="true">
-        {asset.objectUrl ? <img alt="" src={asset.objectUrl} /> : <span className="material-symbols-outlined">image</span>}
+        {asset.objectUrl ? (
+          <img alt="" src={asset.objectUrl} />
+        ) : (
+          <span className="material-symbols-outlined">image</span>
+        )}
       </div>
       <div className="asset-row-body">
         <div className="asset-row-title-line ew-compact-row">
           <h3 className="asset-row-title ew-ellipsis">{asset.name}</h3>
-          <span className={used ? 'asset-status asset-status-used' : 'asset-status asset-status-unused'}>
+          <span
+            className={used ? 'asset-status asset-status-used' : 'asset-status asset-status-unused'}
+          >
             {used ? 'Used' : 'Unused'}
           </span>
         </div>

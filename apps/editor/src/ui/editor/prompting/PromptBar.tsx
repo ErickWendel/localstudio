@@ -39,7 +39,10 @@ export function PromptBar({
   const [localSubmissionActive, setLocalSubmissionActive] = useState(false);
   const [value, setValue] = useState('');
   const activeMode = selectedImageElementId ? 'create-image' : mode;
-  const examples = activeMode === 'create-image' ? promptRecipes.imagePromptExamples : promptRecipes.slidePromptExamples;
+  const examples =
+    activeMode === 'create-image'
+      ? promptRecipes.imagePromptExamples
+      : promptRecipes.slidePromptExamples;
   const isProcessing = isGeneratingSlide || isGeneratingImage || localSubmissionActive;
 
   useLayoutEffect(() => {
@@ -85,8 +88,14 @@ export function PromptBar({
   }
 
   return (
-    <div className="prompt-stack">
-      <div className="prompt-examples" aria-label={activeMode === 'create-image' ? 'Image prompt examples' : 'Slide prompt examples'}>
+    <div className="prompt-stack" data-tour-id="prompt-workflow">
+      <div
+        className="prompt-examples"
+        aria-label={
+          activeMode === 'create-image' ? 'Image prompt examples' : 'Slide prompt examples'
+        }
+        data-tour-id="prompt-examples"
+      >
         {examples.map((example) => (
           <button
             key={example}
@@ -133,6 +142,7 @@ export function PromptBar({
             aria-expanded={menuOpen}
             aria-label="Prompt actions"
             className="prompt-action-button"
+            data-tour-id="prompt-actions"
             disabled={isProcessing}
             type="button"
             onClick={() => {
@@ -161,6 +171,7 @@ export function PromptBar({
             <button
               aria-label="Remove Create image mode"
               className="prompt-mode-token"
+              data-tour-id="prompt-create-image-token"
               disabled={isProcessing || Boolean(selectedImageElementId)}
               type="button"
               onClick={() => {
@@ -175,8 +186,14 @@ export function PromptBar({
           ) : null}
           <textarea
             ref={inputRef}
-            placeholder={activeMode === 'create-image' ? '' : 'Describe slide structure or organize current content...'}
-            aria-label={activeMode === 'create-image' ? 'Create image prompt' : 'Slide structure prompt'}
+            placeholder={
+              activeMode === 'create-image'
+                ? ''
+                : 'Describe slide structure or organize current content...'
+            }
+            aria-label={
+              activeMode === 'create-image' ? 'Create image prompt' : 'Slide structure prompt'
+            }
             disabled={isProcessing}
             rows={1}
             value={value}
@@ -191,7 +208,12 @@ export function PromptBar({
             }}
             onChange={(event) => {
               const nextValue = event.target.value;
-              if (activeMode === 'create-image' && !selectedImageElementId && value.length > 0 && nextValue.length === 0) {
+              if (
+                activeMode === 'create-image' &&
+                !selectedImageElementId &&
+                value.length > 0 &&
+                nextValue.length === 0
+              ) {
                 setMode(null);
                 setValue('');
                 return;
@@ -202,7 +224,7 @@ export function PromptBar({
             }}
           />
         </div>
-        <div className="prompt-submit-actions">
+        <div className="prompt-submit-actions" data-tour-id="prompt-submit-actions">
           <IconButton disabled={isProcessing} label="Record voice prompt">
             <Mic size={16} />
           </IconButton>
