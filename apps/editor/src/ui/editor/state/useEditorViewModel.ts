@@ -14,7 +14,6 @@ import type { GeneratedSlideElement } from '../../../domain/generated-slides/gen
 import { fitImageWithinPage } from '../../../domain/images/imageSizing';
 import type {
   ImageElement,
-  Page,
   PageBackground,
   ProjectDocument,
   SelectionState,
@@ -58,6 +57,9 @@ import { editorViewModelProject } from './editorViewModelProject';
 import { editorViewModelRuntime } from './editorViewModelRuntime';
 import { editorViewModelElements } from './editorViewModelElements';
 import type { ElementClipboardState } from './editorViewModelElements';
+import { editorViewModelHistory } from './editorViewModelHistory';
+import type { EditorHistory } from './editorViewModelHistory';
+import { editorViewModelPages } from './editorViewModelPages';
 
 export type RightPanelTab =
   | 'layout'
@@ -68,11 +70,6 @@ export type RightPanelTab =
   | 'assets'
   | 'animations';
 export type TextPreset = 'title' | 'subtitle' | 'body';
-
-interface EditorHistory {
-  past: ProjectDocument[];
-  future: ProjectDocument[];
-}
 
 export type OperationNoticeTone = 'error' | 'info' | 'success' | 'warning';
 
@@ -1152,18 +1149,6 @@ export function useEditorViewModel(services: AppServices) {
       }
       return nextProject;
     });
-  }
-
-  function getSelectionForProject(
-    nextProject: ProjectDocument,
-    pageId: string,
-    currentSelection: string[],
-  ) {
-    const page = nextProject.pages.find((item) => item.id === pageId) ?? nextProject.pages[0];
-    const retainedSelection = currentSelection.filter((id) => page?.elementIds.includes(id));
-    if (retainedSelection.length > 0) return retainedSelection;
-    const nextSelectedId = page?.elementIds.at(-1);
-    return nextSelectedId ? [nextSelectedId] : [];
   }
 
   function selectElement(elementId: string, options?: { additive?: boolean }) {
@@ -2778,33 +2763,17 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function addPage(afterPageId = activePageId) {
-    const sourcePage =
-      project.pages.find((item) => item.id === afterPageId) ??
-      project.pages.find((item) => item.id === activePageId) ??
-      project.pages[0];
-    if (!sourcePage) return;
     const pageId = createPrefixedId('page');
-    const nextPage: Page = {
-      id: pageId,
-      name: `Slide ${project.pages.length + 1}`,
-      width: sourcePage.width,
-      height: sourcePage.height,
-      background: sourcePage.background,
-      elementIds: [],
-    };
+    const nextPage = editorViewModelPages.createInsertedPage({
+      activePageId,
+      afterPageId,
+      pageId,
+      project,
+    });
+    if (!nextPage) return;
 
     commitProject(
-      (currentProject) => {
-        const afterIndex = currentProject.pages.findIndex((page) => page.id === afterPageId);
-        const insertIndex = afterIndex >= 0 ? afterIndex + 1 : currentProject.pages.length;
-        const pages = [...currentProject.pages];
-        pages.splice(insertIndex, 0, nextPage);
-        return {
-          ...currentProject,
-          pages,
-          updatedAt: new Date().toISOString(),
-        };
-      },
+      (currentProject) => editorViewModelPages.insertPageAfter(currentProject, afterPageId, nextPage),
       { activePageId: pageId, selectedElementIds: [] },
     );
   }
@@ -2823,14 +2792,8 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function deletePage(pageId: string) {
-    if (project.pages.length <= 1) return;
-    const pageIndex = project.pages.findIndex((page) => page.id === pageId);
-    if (pageIndex < 0) return;
-    const nextPageId =
-      project.pages[pageIndex + 1]?.id ??
-      project.pages[pageIndex - 1]?.id ??
-      project.pages[0]?.id ??
-      '';
+    const nextPageId = editorViewModelPages.getNextPageIdAfterDelete(project, pageId);
+    if (nextPageId === undefined) return;
     commitProject(
       (currentProject) => new basicCommands.DeletePageCommand(pageId).execute(currentProject),
       {
@@ -2906,12 +2869,17 @@ export function useEditorViewModel(services: AppServices) {
       future: [project, ...currentHistory.future],
     }));
     setProject(previousProject);
-    const nextActivePageId = previousProject.pages.some((page) => page.id === activePageId)
-      ? activePageId
-      : (previousProject.pages[0]?.id ?? '');
+    const nextActivePageId = editorViewModelHistory.getActivePageIdForProject(
+      previousProject,
+      activePageId,
+    );
     setActivePageId(nextActivePageId);
     setSelectedElementIds(
-      getSelectionForProject(previousProject, nextActivePageId, selectedElementIds),
+      editorViewModelHistory.getSelectionForProject({
+        currentSelection: selectedElementIds,
+        pageId: nextActivePageId,
+        project: previousProject,
+      }),
     );
   }
 
@@ -2924,12 +2892,17 @@ export function useEditorViewModel(services: AppServices) {
       future: currentHistory.future.slice(1),
     }));
     setProject(nextProject);
-    const nextActivePageId = nextProject.pages.some((page) => page.id === activePageId)
-      ? activePageId
-      : (nextProject.pages[0]?.id ?? '');
+    const nextActivePageId = editorViewModelHistory.getActivePageIdForProject(
+      nextProject,
+      activePageId,
+    );
     setActivePageId(nextActivePageId);
     setSelectedElementIds(
-      getSelectionForProject(nextProject, nextActivePageId, selectedElementIds),
+      editorViewModelHistory.getSelectionForProject({
+        currentSelection: selectedElementIds,
+        pageId: nextActivePageId,
+        project: nextProject,
+      }),
     );
   }
 
