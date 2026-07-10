@@ -96,18 +96,12 @@ function createPowerPointFileHandle(file: File | Error) {
   };
 }
 
-function waitForAnimationFrames(count: number) {
-  return new Promise<void>((resolve) => {
-    function nextFrame(remainingFrames: number) {
-      if (remainingFrames <= 0) {
-        resolve();
-        return;
-      }
-      window.requestAnimationFrame(() => nextFrame(remainingFrames - 1));
-    }
-
-    nextFrame(count);
-  });
+function findProjectNameButton(projectName: string) {
+  return screen.findByRole(
+    'button',
+    { name: `Edit project name ${projectName}` },
+    { timeout: 5_000 },
+  );
 }
 
 describe('EditorShell PowerPoint import', () => {
@@ -160,17 +154,14 @@ describe('EditorShell PowerPoint import', () => {
     });
     expect(importService.importCalls[0]?.file.name).toBe('deck.pptx');
 
-    await act(async () => {
+    act(() => {
       importService.resolveImport?.({
         ...services.initialProject,
         name: 'Imported PowerPoint Deck',
       });
-      await waitForAnimationFrames(8);
     });
 
-    expect(
-      await screen.findByRole('button', { name: 'Edit project name Imported PowerPoint Deck' }),
-    ).toBeInTheDocument();
+    expect(await findProjectNameButton('Imported PowerPoint Deck')).toBeInTheDocument();
   });
 
   it('chooses a fresh persistence target after importing PowerPoint over a saved project', async () => {
@@ -205,18 +196,15 @@ describe('EditorShell PowerPoint import', () => {
       expect(importService.importCalls).toHaveLength(1);
     });
 
-    await act(async () => {
+    act(() => {
       importService.resolveImport?.({
         ...services.initialProject,
         id: 'imported-powerpoint-project',
         name: 'Imported PowerPoint Deck',
       });
-      await waitForAnimationFrames(8);
     });
 
-    expect(
-      await screen.findByRole('button', { name: 'Edit project name Imported PowerPoint Deck' }),
-    ).toBeInTheDocument();
+    expect(await findProjectNameButton('Imported PowerPoint Deck')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Persistence disabled' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
@@ -301,9 +289,7 @@ describe('EditorShell PowerPoint import', () => {
         });
       });
     });
-    expect(
-      await screen.findByRole('button', { name: 'Edit project name Imported Font Deck' }),
-    ).toBeInTheDocument();
+    expect(await findProjectNameButton('Imported Font Deck')).toBeInTheDocument();
     expect(fontImportService.requests).toEqual([
       { family: 'Montserrat', fontStyle: 'normal', fontWeight: 700 },
     ]);
