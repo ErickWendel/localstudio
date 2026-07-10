@@ -4,7 +4,9 @@ import { join, relative } from 'node:path';
 import process from 'node:process';
 
 const coverageThreshold = 80;
-const coverageOutputDir = join(process.cwd(), 'coverage-report');
+const coverageScope = getCoverageScope();
+const coverageOutputDir = getCoverageOutputDir(coverageScope);
+const coverageOutputPath = relative(process.cwd(), coverageOutputDir) || 'coverage-report';
 
 interface TestCoverageFile {
   entries: MCR.V8CoverageEntry[];
@@ -22,7 +24,7 @@ export default async function reportPlaywrightCoverage() {
   await mkdir(coverageOutputDir, { recursive: true });
 
   const coverageReport = MCR({
-    name: 'LocalStudio E2E Coverage',
+    name: `LocalStudio ${getCoverageScopeLabel(coverageScope)} E2E Coverage`,
     outputDir: coverageOutputDir,
     reports: [
       ['v8', { outputFile: 'index.html' }],
@@ -129,7 +131,7 @@ function isReportableSourceFile(sourcePath: string) {
     return false;
   }
 
-  return /\.(c|m)?(t|j)sx?$/.test(normalized);
+  return /\.(c|m)?(t|j)sx?$/.test(normalized) && isSourceInCoverageScope(normalized);
 }
 
 function isCoverageScaffoldSourceFile(normalized: string) {
@@ -190,7 +192,7 @@ async function writeBadge(coverageResults: MCR.CoverageResults) {
     `${JSON.stringify(
       {
         schemaVersion: 1,
-        label: 'e2e coverage',
+        label: `${getCoverageScopeLabel(coverageScope).toLowerCase()} e2e coverage`,
         message: `${coveragePercent.toFixed(2)}%`,
         color: getBadgeColor(coverageResults),
       },
@@ -224,17 +226,17 @@ async function writeCoverageMetadata(
   );
 
   const lines = [
-    '# LocalStudio E2E Coverage',
+    `# LocalStudio ${getCoverageScopeLabel(coverageScope)} E2E Coverage`,
     '',
     `Monocart total byte coverage: ${getCoveragePercent(coverageResults).toFixed(2)}%.`,
     `Threshold: ${coverageThreshold}%.`,
     '',
     '## Reports',
     '',
-    '- HTML: `coverage-report/index.html`',
-    '- JSON: `coverage-report/coverage-report.json`',
-    '- Summary JSON: `coverage-report/coverage-summary.json`',
-    '- LCOV: `coverage-report/lcov.info`',
+    `- HTML: \`${coverageOutputPath}/index.html\``,
+    `- JSON: \`${coverageOutputPath}/coverage-report.json\``,
+    `- Summary JSON: \`${coverageOutputPath}/coverage-summary.json\``,
+    `- LCOV: \`${coverageOutputPath}/lcov.info\``,
     '',
     '## Lowest Covered Source Files',
     '',
@@ -257,7 +259,9 @@ function enforceCoverageThreshold(coverageResults: MCR.CoverageResults) {
   const coveragePercent = getCoveragePercent(coverageResults);
   if (coveragePercent < coverageThreshold) {
     throw new Error(
-      `E2E coverage threshold not met: ${coveragePercent.toFixed(2)}% bytes < ${coverageThreshold}%.`,
+      `${getCoverageScopeLabel(coverageScope)} E2E coverage threshold not met: ${coveragePercent.toFixed(
+        2,
+      )}% bytes < ${coverageThreshold}%.`,
     );
   }
 }
@@ -300,4 +304,32 @@ function getSortPercent(bytes: number | '', lines: number | '') {
 
 function formatPercent(percent: number | '') {
   return typeof percent === 'number' ? `${percent.toFixed(2)}%` : 'n/a';
+}
+
+function getCoverageScope() {
+  const scope = process.env.E2E_COVERAGE_SCOPE;
+  if (scope === 'editor' || scope === 'joystick') return scope;
+  return 'all';
+}
+
+function getCoverageOutputDir(scope: ReturnType<typeof getCoverageScope>) {
+  return scope === 'all'
+    ? join(process.cwd(), 'coverage-report')
+    : join(process.cwd(), 'coverage-report', scope);
+}
+
+function getCoverageScopeLabel(scope: ReturnType<typeof getCoverageScope>) {
+  if (scope === 'editor') return 'Editor';
+  if (scope === 'joystick') return 'Joystick';
+  return 'Aggregate';
+}
+
+function isSourceInCoverageScope(normalized: string) {
+  if (coverageScope === 'editor') {
+    return normalized.startsWith('apps/editor/') || normalized.startsWith('packages/presenter-remote/');
+  }
+  if (coverageScope === 'joystick') {
+    return normalized.startsWith('apps/joystick/') || normalized.startsWith('packages/presenter-remote/');
+  }
+  return true;
 }

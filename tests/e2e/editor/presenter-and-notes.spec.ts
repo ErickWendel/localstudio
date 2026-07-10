@@ -103,10 +103,11 @@ test.describe('editor presenter and notes journey', () => {
     await expect
       .poll(() => video.evaluate((element) => (element as HTMLVideoElement).currentTime))
       .toBeLessThan(0.2);
-    await shortcuts.getByRole('button', { name: 'Hold to fast forward movie' }).click();
+    await page.keyboard.down('l');
     await expect
       .poll(() => video.evaluate((element) => (element as HTMLVideoElement).playbackRate))
       .toBe(2);
+    await page.keyboard.up('l');
     await expect
       .poll(() => video.evaluate((element) => (element as HTMLVideoElement).playbackRate))
       .toBe(1);
@@ -369,6 +370,10 @@ test.describe('editor presenter and notes journey', () => {
     await expect(page.getByLabel('Presenter status')).toContainText('Current: Slide 1 of 3');
     await page.keyboard.press('End');
     await expect(page.getByLabel('Presenter status')).toContainText('Current: Slide 3 of 3');
+    await expect
+      .poll(() => page.evaluate(() => window.__LOCALSTUDIO_E2E_PRESENTER__?.activePageId()))
+      .toBe('slide-3');
+    await page.getByRole('main', { name: 'Presenter view' }).click({ position: { x: 24, y: 24 } });
     await page.keyboard.press('ArrowLeft');
     await expect(page.getByLabel('Presenter status')).toContainText('Current: Slide 2 of 3');
     await page.keyboard.press('Shift+ArrowDown');
@@ -393,6 +398,7 @@ test.describe('editor presenter and notes journey', () => {
 });
 
 type E2EPresenterHarness = {
+  activePageId: () => string;
   commands: string[];
   notesFor: (pageId: string) => string | undefined;
   sendCommand: (command: 'pause-timer' | 'reset-timer' | 'resume-timer') => void;
@@ -476,6 +482,7 @@ async function installPresenterWindowHarness(page: PlaywrightPage) {
     });
 
     window.__LOCALSTUDIO_E2E_PRESENTER__ = {
+      activePageId: () => currentPayload.activePageId,
       commands,
       notesFor: (pageId: string) =>
         currentPayload.project.pages.find((projectPage) => projectPage.id === pageId)?.speakerNotes,
