@@ -1,3 +1,63 @@
+.ai-setup-card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border-color: rgba(55, 253, 118, 0.36);
+  background: linear-gradient(135deg, rgba(55, 253, 118, 0.14), transparent 46%), #000;
+}
+
+.ai-setup-card-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ai-setup-card-main svg {
+  flex: 0 0 auto;
+  color: var(--ew-green);
+}
+
+.ai-setup-card h2 {
+  margin: 0;
+  color: var(--ew-text);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.ai-setup-card p {
+  margin: 4px 0 0;
+  color: var(--ew-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.ai-setup-button {
+  min-height: 32px;
+  border: 1px solid rgba(55, 253, 118, 0.54);
+  border-radius: 4px;
+  background: var(--ew-green);
+  color: #001406;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+  transition:
+    filter 140ms ease,
+    transform 140ms ease;
+}
+
+.ai-setup-button:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.ai-setup-button:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.45);
+  opacity: 0.68;
+}
+
 .tool-card,
 .model-row {
   display: grid;

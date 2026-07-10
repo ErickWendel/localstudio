@@ -74,15 +74,15 @@ describe('MirrorSettingsPanel', () => {
     expect(onTestConnection).toHaveBeenCalledWith(
       expect.objectContaining({ prefix: 'public-projects' }),
     );
-    expect(await screen.findByText('Connection is ready.')).toBeInTheDocument();
+    expect(await screen.findByText('S3-compatible connection is ready.')).toBeInTheDocument();
     expect(
-      screen.getByText('Default MinIO login: localstudio / localstudio123'),
+      screen.getByText('Local S3-compatible default login: localstudio / localstudio123'),
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open public bucket' })).toHaveAttribute(
       'href',
       'http://localhost:9000/localstudio',
     );
-    expect(screen.getByRole('link', { name: 'Open MinIO console' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Open storage console' })).toHaveAttribute(
       'href',
       'http://localhost:9000',
     );
@@ -155,6 +155,6 @@ describe('MirrorSettingsPanel', () => {
 
     expect(onEnabledChange).toHaveBeenLastCalledWith(true);
     expect(onTestConnection).toHaveBeenCalledWith(config);
-    expect(await screen.findByText('Connection is ready.')).toBeInTheDocument();
+    expect(await screen.findByText('S3-compatible connection is ready.')).toBeInTheDocument();
   });
 });

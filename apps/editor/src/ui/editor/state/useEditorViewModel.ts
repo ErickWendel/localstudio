@@ -2312,7 +2312,7 @@ export function useEditorViewModel(services: AppServices) {
       await services.mirrorService.listProjects(config);
       setMirrorState({ enabled: true, status: 'idle' });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'MinIO connection failed.';
+      const message = error instanceof Error ? error.message : 'S3-compatible connection failed.';
       setMirrorState({
         enabled: true,
         status: 'failed',

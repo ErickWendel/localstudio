@@ -1,5 +1,6 @@
 @import '@localstudio/brand/brand.css';
 @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
+@import 'driver.js/dist/driver.css';
 
 @import './styles/foundation.css';
 @import './styles/shared-patterns.css';
@@ -46,6 +47,7 @@
 @import './styles/palette-controls.css';
 @import './styles/layers-panel.css';
 @import './styles/ai-tools.css';
+@import './styles/editor-tour.css';
 @import './styles/translation-target.css';
 @import './styles/image-generation-settings.css';
 @import './styles/settings.css';

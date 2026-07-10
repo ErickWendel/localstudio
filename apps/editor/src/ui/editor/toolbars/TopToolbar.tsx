@@ -41,6 +41,7 @@ interface TopToolbarProps {
   onMirrorToggle?: ((enabled: boolean) => void) | undefined;
   onOpenMirrorSettings?: (() => void) | undefined;
   onOpenKeyboardShortcuts?: (() => void) | undefined;
+  onStartAiSetupTour?: (() => void) | undefined;
   onOpenVersionHistory?: (() => void) | undefined;
   onNewProject?: (() => void) | undefined;
   onPersistenceToggle?: ((enabled: boolean) => void) | undefined;
@@ -163,6 +164,7 @@ export function TopToolbar({
   onMirrorToggle,
   onOpenMirrorSettings,
   onOpenKeyboardShortcuts,
+  onStartAiSetupTour,
   onOpenVersionHistory,
   onNewProject,
   onPersistenceToggle,
@@ -281,7 +283,11 @@ export function TopToolbar({
         label: 'Import',
         items: [
           { label: 'Project', disabled: !onImportProject, onSelect: onImportProject },
-          { label: 'PowerPoint (.pptx)', disabled: !onImportPowerPoint, onSelect: onImportPowerPoint },
+          {
+            label: 'PowerPoint (.pptx)',
+            disabled: !onImportPowerPoint,
+            onSelect: onImportPowerPoint,
+          },
           { label: 'Remote', disabled: !onImportRemoteMirror, onSelect: onImportRemoteMirror },
         ],
       },
@@ -327,7 +333,12 @@ export function TopToolbar({
         : { label: 'Toggle Layers Panel', disabled: true },
     ],
     Help: [
-      { label: 'Keyboard Shortcuts', disabled: !onOpenKeyboardShortcuts, onSelect: onOpenKeyboardShortcuts },
+      { label: 'AI Setup Tour', disabled: !onStartAiSetupTour, onSelect: onStartAiSetupTour },
+      {
+        label: 'Keyboard Shortcuts',
+        disabled: !onOpenKeyboardShortcuts,
+        onSelect: onOpenKeyboardShortcuts,
+      },
       { label: 'Local AI Setup', disabled: true },
     ],
   };
@@ -355,18 +366,18 @@ export function TopToolbar({
       ? persistenceEnabled
         ? 'Browser storage enabled'
         : 'Browser storage disabled'
-    : persistenceEnabled
-      ? 'Persistence enabled'
-      : 'Persistence disabled';
+      : persistenceEnabled
+        ? 'Persistence enabled'
+        : 'Persistence disabled';
   const persistenceTitle = !persistenceAvailable
     ? 'Local project persistence is not available in this browser.'
     : persistenceMode === 'opfs'
       ? persistenceEnabled
         ? 'Browser-private project storage is enabled. Files are stored by this browser profile and are not visible in Finder.'
         : 'Save this deck in browser-private storage. Files are scoped to this browser profile and are not visible in Finder.'
-    : persistenceEnabled
-      ? 'Local folder persistence is enabled'
-      : 'Save this deck to a local folder';
+      : persistenceEnabled
+        ? 'Local folder persistence is enabled'
+        : 'Save this deck to a local folder';
   const mirrorLabel = !persistenceEnabled
     ? 'Unsaved deck'
     : !mirrorState.enabled
@@ -410,7 +421,7 @@ export function TopToolbar({
     .join(' ');
 
   return (
-    <header className="top-toolbar">
+    <header className="top-toolbar" data-tour-id="top-toolbar">
       <div className="toolbar-left">
         <h1 className="toolbar-product-title font-orbitron">LocalStudio.dev</h1>
         <nav className="toolbar-menu" aria-label="Application menu" ref={toolbarMenuRef}>
@@ -424,6 +435,7 @@ export function TopToolbar({
                     : 'toolbar-menu-item font-orbitron'
                 }
                 type="button"
+                data-tour-id={`${item.toLowerCase()}-menu-button`}
                 onClick={() => {
                   setPlayMenuOpen(false);
                   setTranslationMenuOpen(false);
@@ -448,6 +460,9 @@ export function TopToolbar({
                         <button
                           aria-expanded={openSubmenu === action.label}
                           className="toolbar-dropdown-item toolbar-dropdown-submenu-trigger"
+                          data-tour-id={
+                            action.label === 'Import' ? 'file-import-menu-item' : undefined
+                          }
                           role="menuitem"
                           type="button"
                           onClick={() => {
@@ -458,10 +473,19 @@ export function TopToolbar({
                           <span aria-hidden="true">›</span>
                         </button>
                         {openSubmenu === action.label ? (
-                          <div className="toolbar-dropdown toolbar-dropdown-nested" role="menu" aria-label={action.label}>
+                          <div
+                            className="toolbar-dropdown toolbar-dropdown-nested"
+                            role="menu"
+                            aria-label={action.label}
+                          >
                             {action.items.map((item) => (
                               <button
                                 className="toolbar-dropdown-item"
+                                data-tour-id={
+                                  item.label === 'PowerPoint (.pptx)'
+                                    ? 'file-import-pptx-item'
+                                    : undefined
+                                }
                                 disabled={item.disabled}
                                 key={item.label}
                                 role="menuitem"
@@ -525,6 +549,7 @@ export function TopToolbar({
               title={project.name}
               type="button"
               aria-label={`Edit project name ${project.name}`}
+              data-tour-id="project-name"
               onClick={() => {
                 setProjectNameDraft(project.name);
                 setIsEditingProjectName(true);
@@ -538,6 +563,7 @@ export function TopToolbar({
               className="project-play-button project-play-main"
               type="button"
               aria-label="Play presentation"
+              data-tour-id="play-presentation"
               title="Open presenter view"
               onClick={startDefaultPresentation}
             >
@@ -628,6 +654,7 @@ export function TopToolbar({
             title={persistenceTitle}
             type="button"
             aria-label={persistenceLabel}
+            data-tour-id="storage-toggle"
             onClick={() => {
               if (!persistenceAvailable) return;
               onPersistenceToggle?.(!persistenceEnabled);
@@ -675,6 +702,7 @@ export function TopToolbar({
             title={mirrorState.error ?? mirrorStatusLabel}
             type="button"
             aria-label={mirrorStatusLabel}
+            data-tour-id="mirror-status"
             onClick={() => {
               if (mirrorDisabledBySettings) {
                 onOpenMirrorSettings?.();
@@ -697,6 +725,7 @@ export function TopToolbar({
             title={lastEditedLabel}
             type="button"
             aria-label="Version history"
+            data-tour-id="version-history"
             onClick={onOpenVersionHistory}
           >
             <span className="material-symbols-outlined" aria-hidden="true" key={saveAnimationKey}>
@@ -734,6 +763,7 @@ export function TopToolbar({
               title={deckTranslationStatus ?? 'Translate deck using the selected target language'}
               type="button"
               aria-label="Translate deck"
+              data-tour-id="translate-deck"
               onClick={onTranslateDeck}
             >
               <span className="material-symbols-outlined" aria-hidden="true">
@@ -825,6 +855,7 @@ export function TopToolbar({
           disabled={!onShare}
           title={shareTitle}
           type="button"
+          data-tour-id="share-button"
           onClick={triggerShare}
         >
           <span className="material-symbols-outlined" aria-hidden="true">
