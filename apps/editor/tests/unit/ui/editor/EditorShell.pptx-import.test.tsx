@@ -96,6 +96,20 @@ function createPowerPointFileHandle(file: File | Error) {
   };
 }
 
+function waitForAnimationFrames(count: number) {
+  return new Promise<void>((resolve) => {
+    function nextFrame(remainingFrames: number) {
+      if (remainingFrames <= 0) {
+        resolve();
+        return;
+      }
+      window.requestAnimationFrame(() => nextFrame(remainingFrames - 1));
+    }
+
+    nextFrame(count);
+  });
+}
+
 describe('EditorShell PowerPoint import', () => {
   afterEach(() => {
     window.history.pushState({}, '', '/editor/');
@@ -146,11 +160,12 @@ describe('EditorShell PowerPoint import', () => {
     });
     expect(importService.importCalls[0]?.file.name).toBe('deck.pptx');
 
-    act(() => {
+    await act(async () => {
       importService.resolveImport?.({
         ...services.initialProject,
         name: 'Imported PowerPoint Deck',
       });
+      await waitForAnimationFrames(8);
     });
 
     expect(
@@ -190,12 +205,13 @@ describe('EditorShell PowerPoint import', () => {
       expect(importService.importCalls).toHaveLength(1);
     });
 
-    act(() => {
+    await act(async () => {
       importService.resolveImport?.({
         ...services.initialProject,
         id: 'imported-powerpoint-project',
         name: 'Imported PowerPoint Deck',
       });
+      await waitForAnimationFrames(8);
     });
 
     expect(
