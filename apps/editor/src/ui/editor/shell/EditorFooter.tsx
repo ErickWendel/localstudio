@@ -33,6 +33,7 @@ export function EditorFooter({
           type="button"
           aria-label="Mirror settings"
           title="Mirror settings"
+          data-tour-id="footer-settings"
           onClick={onOpenSettings}
         >
           <span className="material-symbols-outlined" aria-hidden="true">
@@ -44,6 +45,7 @@ export function EditorFooter({
           type="button"
           aria-label="Toggle notes panel"
           aria-pressed={notesOpen}
+          data-tour-id="speaker-notes-toggle"
           onClick={onToggleNotes}
         >
           <span className="material-symbols-outlined" aria-hidden="true">
@@ -89,6 +91,7 @@ export function EditorFooter({
           className={pagesPanelOpen ? 'footer-toggle footer-toggle-active' : 'footer-toggle'}
           type="button"
           aria-label="Toggle pages panel"
+          data-tour-id="pages-panel-toggle"
           onClick={onTogglePagesPanel}
         >
           <span className="material-symbols-outlined" aria-hidden="true">

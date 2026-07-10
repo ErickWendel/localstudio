@@ -162,6 +162,15 @@ npm run dev
 The dev server starts the landing, editor, and joystick apps together. Use the landing URL as the public entry point;
 `/editor/` and `/joystick/` are proxied to the connected app servers.
 
+Disable the editor onboarding tour during local testing with:
+
+```bash
+VITE_DISABLE_EDITOR_TOUR=true npm run dev
+```
+
+The tour is already disabled in the automated E2E server so tests do not need to close it before interacting with the
+editor.
+
 Quality checks:
 
 ```bash

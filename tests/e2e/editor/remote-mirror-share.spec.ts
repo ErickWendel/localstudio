@@ -52,14 +52,24 @@ test.describe('editor remote mirror and public share journey', () => {
     await page.keyboard.press('Enter');
     await expect(page.getByRole('button', { name: 'Browser storage enabled' })).toBeVisible();
 
-    await page.getByRole('contentinfo', { name: 'Editor footer controls' }).getByRole('button', { name: 'Mirror settings' }).click();
-    await page.getByRole('dialog', { name: 'Settings' }).getByRole('button', { name: 'Mirror settings' }).click();
+    await page
+      .getByRole('contentinfo', { name: 'Editor footer controls' })
+      .getByRole('button', { name: 'Mirror settings' })
+      .click();
+    await page
+      .getByRole('dialog', { name: 'Settings' })
+      .getByRole('button', { name: 'Mirror settings' })
+      .click();
     await expect(page.getByRole('dialog', { name: 'Mirror settings' })).toBeVisible();
     await page.getByRole('button', { name: 'Enable mirroring' }).click();
-    await expect(page.getByText(/Connection is ready|MinIO connection is ready/)).toBeVisible();
+    await expect(
+      page.getByText(/S3-compatible connection is ready|Connection is ready/),
+    ).toBeVisible();
     await page.getByRole('button', { name: 'Save settings' }).click();
     await expect(page.getByRole('dialog', { name: 'Mirror settings' })).toBeHidden();
-    await expect(page.getByRole('button', { name: /Mirror up to date|Mirror syncing|Mirror ready/ })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /Mirror up to date|Mirror syncing|Mirror ready/ }),
+    ).toBeVisible();
 
     await page.getByRole('button', { name: 'Share' }).click();
     await page.getByRole('button', { name: 'Copy link' }).click();
@@ -68,7 +78,11 @@ test.describe('editor remote mirror and public share journey', () => {
     await expect(page.getByRole('button', { name: 'Public view link', exact: true })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Embed code', exact: true })).toBeEnabled();
 
-    const publicUrl = await page.getByLabel('Published share links').getByRole('textbox').first().inputValue();
+    const publicUrl = await page
+      .getByLabel('Published share links')
+      .getByRole('textbox')
+      .first()
+      .inputValue();
     expect(publicUrl).toContain('share=');
     expect(publicUrl).toContain('src=');
 
@@ -79,7 +93,11 @@ test.describe('editor remote mirror and public share journey', () => {
     });
     await expect(publicPage.getByText('1 / 1')).toBeVisible();
 
-    const embedHtml = await page.getByLabel('Published share links').getByRole('textbox').nth(1).inputValue();
+    const embedHtml = await page
+      .getByLabel('Published share links')
+      .getByRole('textbox')
+      .nth(1)
+      .inputValue();
     const embedSrc = embedHtml.match(/src="([^"]+)"/)?.[1]?.replaceAll('&amp;', '&');
     expect(embedSrc).toBeTruthy();
     const embedPage = await context.newPage();

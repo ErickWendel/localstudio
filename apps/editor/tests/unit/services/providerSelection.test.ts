@@ -1,7 +1,9 @@
 import type { AiProviderState } from '../../../src/services/contracts/interfaces';
 import { providerSelection } from '../../../src/services/model-setup/providerSelection';
 
-function provider(patch: Partial<AiProviderState> & Pick<AiProviderState, 'id' | 'runtime'>): AiProviderState {
+function provider(
+  patch: Partial<AiProviderState> & Pick<AiProviderState, 'id' | 'runtime'>,
+): AiProviderState {
   return {
     ...patch,
     label: patch.id,
@@ -18,7 +20,11 @@ describe('providerSelection.selectDefaultProvider', () => {
     const selected = providerSelection.selectDefaultProvider(
       [
         provider({ id: 'chrome-translator-api', runtime: 'chrome-built-in', readiness: 'ready' }),
-        provider({ id: 'translategemma-webgpu', runtime: 'webgpu-huggingface', readiness: 'needs-download' }),
+        provider({
+          id: 'translategemma-webgpu',
+          runtime: 'webgpu-huggingface',
+          readiness: 'needs-download',
+        }),
       ],
       'translategemma-webgpu',
     );
@@ -26,23 +32,31 @@ describe('providerSelection.selectDefaultProvider', () => {
     expect(selected?.id).toBe('chrome-translator-api');
   });
 
-  it('keeps a stored external provider when its model is ready', () => {
+  it('keeps ready Chrome as the default even when a stored external provider is ready', () => {
     const selected = providerSelection.selectDefaultProvider(
       [
         provider({ id: 'chrome-translator-api', runtime: 'chrome-built-in', readiness: 'ready' }),
-        provider({ id: 'translategemma-webgpu', runtime: 'webgpu-huggingface', readiness: 'ready' }),
+        provider({
+          id: 'translategemma-webgpu',
+          runtime: 'webgpu-huggingface',
+          readiness: 'ready',
+        }),
       ],
       'translategemma-webgpu',
     );
 
-    expect(selected?.id).toBe('translategemma-webgpu');
+    expect(selected?.id).toBe('chrome-translator-api');
   });
 
   it('keeps an explicit external click even when the model still needs download', () => {
     const selected = providerSelection.selectDefaultProvider(
       [
         provider({ id: 'chrome-translator-api', runtime: 'chrome-built-in', readiness: 'ready' }),
-        provider({ id: 'translategemma-webgpu', runtime: 'webgpu-huggingface', readiness: 'needs-download' }),
+        provider({
+          id: 'translategemma-webgpu',
+          runtime: 'webgpu-huggingface',
+          readiness: 'needs-download',
+        }),
       ],
       'translategemma-webgpu',
       { forcePreferred: true },

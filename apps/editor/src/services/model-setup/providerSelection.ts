@@ -7,10 +7,15 @@ function getBrowserProviderStorage(): BrowserKeyValueStorage | undefined {
 }
 
 function isWebGpuCompatible() {
-  return typeof navigator !== 'undefined' && Boolean((navigator as Navigator & { gpu?: unknown }).gpu);
+  return (
+    typeof navigator !== 'undefined' && Boolean((navigator as Navigator & { gpu?: unknown }).gpu)
+  );
 }
 
-function getModelReadiness(modelStates: ModelState[], modelId: string | undefined): AiProviderState['readiness'] {
+function getModelReadiness(
+  modelStates: ModelState[],
+  modelId: string | undefined,
+): AiProviderState['readiness'] {
   if (!modelId) return 'ready';
   return modelStates.find((state) => state.id === modelId)?.status ?? 'needs-download';
 }
@@ -20,15 +25,20 @@ function selectDefaultProvider(
   preferredProviderId: string | null | undefined,
   options: { forcePreferred?: boolean } = {},
 ) {
-  const compatibleProviders = providers.filter((provider) => provider.compatibility === 'compatible');
-  const preferredProvider = compatibleProviders.find((provider) => provider.id === preferredProviderId);
-  const chromeProvider = compatibleProviders.find((provider) => provider.runtime === 'chrome-built-in');
+  const compatibleProviders = providers.filter(
+    (provider) => provider.compatibility === 'compatible',
+  );
+  const preferredProvider = compatibleProviders.find(
+    (provider) => provider.id === preferredProviderId,
+  );
+  const chromeProvider = compatibleProviders.find(
+    (provider) => provider.runtime === 'chrome-built-in',
+  );
 
   if (
     preferredProvider &&
     (options.forcePreferred ||
       preferredProvider.runtime === 'chrome-built-in' ||
-      preferredProvider.readiness === 'ready' ||
       chromeProvider?.readiness !== 'ready')
   ) {
     return preferredProvider;

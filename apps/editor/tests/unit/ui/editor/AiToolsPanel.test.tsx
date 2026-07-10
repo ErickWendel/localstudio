@@ -1,4 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { vi } from 'vitest';
 import { aiModelCatalog } from '../../../../src/services/model-setup/aiModelCatalog';
 import type { AiProviderState, ModelState } from '../../../../src/services/contracts/interfaces';
 import { AiToolsPanel } from '../../../../src/ui/editor/panels/AiToolsPanel';
@@ -40,6 +42,94 @@ const languageDetectionProvider: AiProviderState = {
 };
 
 describe('AiToolsPanel', () => {
+  it('downloads all pending AI features from one setup action', async () => {
+    const user = userEvent.setup();
+    const calls: string[] = [];
+    const onPreparePromptApi = vi.fn().mockImplementation(() => {
+      calls.push('prompt');
+      return Promise.resolve();
+    });
+    const onPrepareLanguageDetectionProvider = vi.fn().mockImplementation(() => {
+      calls.push('language-detection');
+      return Promise.resolve();
+    });
+    const onPrepareTranslationProvider = vi.fn().mockImplementation(() => {
+      calls.push('translation');
+      return Promise.resolve();
+    });
+    const onDownloadModel = vi.fn().mockImplementation((modelId: string) => {
+      calls.push(modelId);
+      return Promise.resolve();
+    });
+    const imageGenerationState: ModelState = {
+      id: 'image-generation-models',
+      label: 'Image Generation Models',
+      description: 'Text-to-image model for generated slide assets.',
+      progress: 0,
+      provider: 'transformers',
+      required: false,
+      status: 'needs-download',
+    };
+
+    render(
+      <AiToolsPanel
+        languageDetectionProviderStates={[languageDetectionProvider]}
+        modelStates={[imageGenerationState]}
+        promptProviderStates={[gemmaProvider]}
+        translationProviderStates={[translateGemmaProvider]}
+        onDownloadModel={onDownloadModel}
+        onPrepareLanguageDetectionProvider={onPrepareLanguageDetectionProvider}
+        onPreparePromptApi={onPreparePromptApi}
+        onPrepareTranslationProvider={onPrepareTranslationProvider}
+      />,
+    );
+
+    expect(screen.getByLabelText('AI feature setup')).toHaveTextContent(
+      '4 features need setup before the AI workflows feel instant.',
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Download all' }));
+
+    expect(calls).toEqual([
+      'language-detection',
+      aiModelCatalog.GEMMA_LLM_MODEL_ID,
+      aiModelCatalog.TRANSLATEGEMMA_MODEL_ID,
+      'image-generation-models',
+    ]);
+    expect(onPreparePromptApi).not.toHaveBeenCalled();
+    expect(onPrepareTranslationProvider).not.toHaveBeenCalled();
+  });
+
+  it('hides the setup action when all downloadable AI features are ready', () => {
+    render(
+      <AiToolsPanel
+        languageDetectionProviderStates={[{ ...languageDetectionProvider, readiness: 'ready' }]}
+        modelStates={[
+          {
+            id: aiModelCatalog.GEMMA_LLM_MODEL_ID,
+            label: aiModelCatalog.GEMMA_LLM_DISPLAY_NAME,
+            progress: 100,
+            provider: 'transformers',
+            required: false,
+            status: 'ready',
+          },
+          {
+            id: aiModelCatalog.TRANSLATEGEMMA_MODEL_ID,
+            label: aiModelCatalog.TRANSLATEGEMMA_DISPLAY_NAME,
+            progress: 100,
+            provider: 'transformers',
+            required: false,
+            status: 'ready',
+          },
+        ]}
+        promptProviderStates={[{ ...gemmaProvider, readiness: 'ready' }]}
+        translationProviderStates={[{ ...translateGemmaProvider, readiness: 'ready' }]}
+      />,
+    );
+
+    expect(screen.queryByLabelText('AI feature setup')).not.toBeInTheDocument();
+  });
+
   it('does not show ready for an uncached selected LLM model even if previous preparation was ready', () => {
     render(
       <AiToolsPanel

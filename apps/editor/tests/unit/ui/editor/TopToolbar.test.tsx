@@ -68,7 +68,9 @@ describe('TopToolbar', () => {
     await user.click(screen.getByRole('button', { name: 'File' }));
     expect(screen.queryByRole('menuitem', { name: 'Save Local' })).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Export' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: 'MinIO Mirror Settings' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('menuitem', { name: 'MinIO Mirror Settings' }),
+    ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'View' }));
     await user.click(screen.getByRole('menuitem', { name: 'Toggle Layers Panel' }));
@@ -198,6 +200,24 @@ describe('TopToolbar', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Keyboard Shortcuts' }));
 
     expect(onOpenKeyboardShortcuts).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts the AI setup tour from the Help menu', async () => {
+    const user = userEvent.setup();
+    const onStartAiSetupTour = vi.fn();
+
+    render(
+      <TopToolbar
+        project={sampleProject.createSampleProject()}
+        language="PT-BR"
+        onStartAiSetupTour={onStartAiSetupTour}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Help' }));
+    await user.click(screen.getByRole('menuitem', { name: 'AI Setup Tour' }));
+
+    expect(onStartAiSetupTour).toHaveBeenCalledTimes(1);
   });
 
   it('closes header menus when clicking outside them', async () => {
