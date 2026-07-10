@@ -13,7 +13,6 @@ import {
   Circle,
   Group,
   Layer,
-  Line,
   Rect,
   Stage,
   Text,
@@ -44,8 +43,10 @@ import { animationPresetEngine } from '../animation/animationPresetEngine';
 import { BackgroundSelectionPreview } from './BackgroundSelectionPreview';
 import { CanvasImageElement } from './CanvasImageElement';
 import { CanvasMediaElement } from './CanvasMediaElement';
+import { CanvasReadOnlyMediaElement } from './CanvasReadOnlyMediaElement';
 import { CanvasShapeElement } from './CanvasShapeElement';
 import { CanvasStatusHint } from './CanvasStatusHint';
+import { CanvasDragGuide } from './CanvasDragGuide';
 import { CropFrameOverlay } from './CropFrameOverlay';
 import type { CommonElementProps, ElementAnimationRenderState } from './canvas-element-props';
 import { shapeLineDraw } from './shape-line-draw';
@@ -958,33 +959,14 @@ export function CanvasWorkspace({
                   const selected = selection.elementIds.includes(element.id);
                   const asset = project.assets[element.assetId];
                   if (readOnly) {
-                    const label = asset?.name ?? (element.type === 'video' ? 'Imported video' : 'Imported GIF');
                     return (
-                      <Group {...commonProps} key={element.id} ref={nodeRef}>
-                        <Rect
-                          fill="#153A2D"
-                          height={commonProps.height}
-                          stroke="#37FD76"
-                          strokeWidth={Math.max(2, Math.min(commonProps.width, commonProps.height) * 0.006)}
-                          width={commonProps.width}
-                          x={0}
-                          y={0}
-                        />
-                        <Text
-                          align="center"
-                          fill="#FFFFFF"
-                          fontFamily="Open Sans"
-                          fontSize={Math.max(18, Math.min(48, commonProps.height * 0.12))}
-                          fontStyle="bold"
-                          height={commonProps.height}
-                          padding={Math.max(12, commonProps.height * 0.04)}
-                          text={label}
-                          verticalAlign="middle"
-                          width={commonProps.width}
-                          x={0}
-                          y={0}
-                        />
-                      </Group>
+                      <CanvasReadOnlyMediaElement
+                        commonProps={commonProps}
+                        element={element}
+                        key={element.id}
+                        label={asset?.name ?? (element.type === 'video' ? 'Imported video' : 'Imported GIF')}
+                        nodeRef={nodeRef}
+                      />
                     );
                   }
                   return (
@@ -1054,32 +1036,13 @@ export function CanvasWorkspace({
                 </>
               ) : null}
               {showEditorOverlays && !backgroundSelectionMode && !processingSelectedImageId ? (
-                <>
-                  {dragGuide ? (
-                    <>
-                      <Line
-                        listening={false}
-                        points={[dragGuide.x, 0, dragGuide.x, stageHeight]}
-                        stroke="#37FD76"
-                        strokeWidth={1}
-                        opacity={0.78}
-                        dash={[2, 7]}
-                        shadowBlur={10}
-                        shadowColor="#37FD76"
-                      />
-                      <Line
-                        listening={false}
-                        points={[0, dragGuide.y, stageWidth, dragGuide.y]}
-                        stroke="#37FD76"
-                        strokeWidth={1}
-                        opacity={0.78}
-                        dash={[2, 7]}
-                        shadowBlur={10}
-                        shadowColor="#37FD76"
-                      />
-                    </>
-                  ) : null}
-                </>
+                dragGuide ? (
+                  <CanvasDragGuide
+                    guide={dragGuide}
+                    stageHeight={stageHeight}
+                    stageWidth={stageWidth}
+                  />
+                ) : null
               ) : null}
               {showEditorOverlays &&
               !backgroundSelectionMode &&
