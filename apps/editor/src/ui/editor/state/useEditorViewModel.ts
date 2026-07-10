@@ -60,6 +60,7 @@ import type { ElementClipboardState } from './editorViewModelElements';
 import { editorViewModelHistory } from './editorViewModelHistory';
 import type { EditorHistory } from './editorViewModelHistory';
 import { editorViewModelPages } from './editorViewModelPages';
+import { editorViewModelText } from './editorViewModelText';
 
 export type RightPanelTab =
   | 'layout'
@@ -1934,24 +1935,12 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function updateElementFrame(elementId: string, patch: ElementFramePatch) {
-    commitProject((currentProject) => {
-      const element = currentProject.elements[elementId];
-      const nextPatch =
-        element?.type === 'text'
-          ? patch.height === undefined
-            ? patch
-            : {
-                ...patch,
-                height: Math.max(
-                  patch.height,
-                  textTranslationLayout.getMinimumTextHeight(element.text, element.fontSize),
-                ),
-              }
-          : patch;
-      return new basicCommands.UpdateElementFrameCommand(elementId, nextPatch).execute(
-        currentProject,
-      );
-    });
+    commitProject((currentProject) =>
+      new basicCommands.UpdateElementFrameCommand(
+        elementId,
+        editorViewModelText.getFramePatchWithTextMinimum(currentProject, elementId, patch),
+      ).execute(currentProject),
+    );
   }
 
   function updateElementFrames(patches: Record<string, ElementFramePatch>) {
@@ -1961,39 +1950,15 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function updateTextContent(elementId: string, text: string) {
-    commitProject((currentProject) => {
-      const nextProject = new basicCommands.UpdateTextContentCommand(elementId, text).execute(
-        currentProject,
-      );
-      const element = nextProject.elements[elementId];
-      if (!element || element.type !== 'text') return nextProject;
-      const minimumHeight = textTranslationLayout.getMinimumTextHeight(
-        element.text,
-        element.fontSize,
-      );
-      if (element.height >= minimumHeight) return nextProject;
-      return new basicCommands.UpdateElementFrameCommand(elementId, {
-        height: minimumHeight,
-      }).execute(nextProject);
-    });
+    commitProject((currentProject) =>
+      editorViewModelText.updateTextContent(currentProject, elementId, text),
+    );
   }
 
   function updateElementStyle(elementId: string, patch: ElementStylePatch) {
-    commitProject((currentProject) => {
-      const nextProject = new basicCommands.UpdateElementStyleCommand(elementId, patch).execute(
-        currentProject,
-      );
-      const element = nextProject.elements[elementId];
-      if (!element || element.type !== 'text') return nextProject;
-      const minimumHeight = textTranslationLayout.getMinimumTextHeight(
-        element.text,
-        element.fontSize,
-      );
-      if (element.height >= minimumHeight) return nextProject;
-      return new basicCommands.UpdateElementFrameCommand(elementId, {
-        height: minimumHeight,
-      }).execute(nextProject);
-    });
+    commitProject((currentProject) =>
+      editorViewModelText.updateElementStyle(currentProject, elementId, patch),
+    );
   }
 
   async function downloadFontForSelection(family: string) {
@@ -2017,26 +1982,12 @@ export function useEditorViewModel(services: AppServices) {
     }
 
     commitProject((currentProject) => {
-      const projectWithFont: ProjectDocument = {
-        ...currentProject,
-        fonts: {
-          ...(currentProject.fonts ?? {}),
-          ...result.fonts,
-        },
-      };
-      const nextProject = new basicCommands.UpdateElementStyleCommand(selectedElementId, {
-        fontFamily: font.family,
-      }).execute(projectWithFont);
-      const nextElement = nextProject.elements[selectedElementId];
-      if (!nextElement || nextElement.type !== 'text') return nextProject;
-      const minimumHeight = textTranslationLayout.getMinimumTextHeight(
-        nextElement.text,
-        nextElement.fontSize,
-      );
-      if (nextElement.height >= minimumHeight) return nextProject;
-      return new basicCommands.UpdateElementFrameCommand(selectedElementId, {
-        height: minimumHeight,
-      }).execute(nextProject);
+      return editorViewModelText.applyFontFamilyWithFonts({
+        elementId: selectedElementId,
+        font,
+        fonts: result.fonts,
+        project: currentProject,
+      });
     });
   }
 
