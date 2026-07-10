@@ -3,6 +3,7 @@ import type { ProjectDocument } from '../../../domain/documents/model';
 import type { MirrorState, PersistenceStorageMode } from '../../../services/contracts/interfaces';
 import type { OperationNoticeState } from '../state/useEditorViewModel';
 import type { TranslationLanguageOption } from '../translation/translationLanguages';
+import { DeckTranslationControl } from './DeckTranslationControl';
 import { ProjectPlayControl } from './ProjectPlayControl';
 
 interface TopToolbarProps {
@@ -393,14 +394,6 @@ export function TopToolbar({
     .filter(Boolean)
     .join(' ');
   const shareTitle = 'Share';
-  const deckTranslateButtonClassName = [
-    'stitch-icon-button',
-    'deck-translate-button',
-    isTranslatingDeck ? 'deck-translate-button-active' : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
-
   return (
     <header className="top-toolbar" data-tour-id="top-toolbar">
       <div className="toolbar-left">
@@ -672,76 +665,24 @@ export function TopToolbar({
               redo
             </span>
           </button>
-          <div className="deck-translation-shell" ref={translationMenuRef}>
-            <button
-              className={`${deckTranslateButtonClassName} deck-translation-main`}
-              disabled={!canTranslateDeck || !onTranslateDeck}
-              title={deckTranslationStatus ?? 'Translate deck using the selected target language'}
-              type="button"
-              aria-label="Translate deck"
-              data-tour-id="translate-deck"
-              onClick={onTranslateDeck}
-            >
-              <span className="material-symbols-outlined" aria-hidden="true">
-                translate
-              </span>
-            </button>
-            <button
-              className="stitch-icon-button deck-translation-menu-button"
-              type="button"
-              aria-expanded={translationMenuOpen}
-              aria-label="Translation path options"
-              title="Translation path options"
-              onClick={() => {
-                setOpenMenu(null);
-                setPlayMenuOpen(false);
-                setTranslationMenuOpen((current) => !current);
-              }}
-            >
-              <span className="material-symbols-outlined" aria-hidden="true">
-                keyboard_arrow_down
-              </span>
-            </button>
-            {translationMenuOpen ? (
-              <div className="translation-path-dropdown" role="group" aria-label="Translation path">
-                <label className="translation-path-field ew-field-scope">
-                  <span>From</span>
-                  <select
-                    value={translationSourceLanguage}
-                    aria-label="Translate from"
-                    onChange={(event) => onTranslationSourceLanguageChange?.(event.target.value)}
-                  >
-                    {translationLanguageOptions.map((option) => (
-                      <option value={option.code} key={option.code}>
-                        {option.label} ({option.code}) {option.flag}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="translation-path-field ew-field-scope">
-                  <span>To</span>
-                  <select
-                    value={translationTargetLanguage}
-                    aria-label="Translate to"
-                    onChange={(event) => onTranslationTargetLanguageChange?.(event.target.value)}
-                  >
-                    <option value="">Choose language</option>
-                    {translationLanguageOptions.map((option) => (
-                      <option value={option.code} key={option.code}>
-                        {option.label} ({option.code}) {option.flag}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            ) : null}
-          </div>
-          {deckTranslationStatus ? (
-            <div className="deck-translation-status" role="status" aria-live="polite">
-              <span className="deck-translation-status-orbit" aria-hidden="true" />
-              <span className="ew-truncate">{deckTranslationStatus}</span>
-            </div>
-          ) : null}
+          <DeckTranslationControl
+            canTranslateDeck={canTranslateDeck}
+            deckTranslationStatus={deckTranslationStatus}
+            isMenuOpen={translationMenuOpen}
+            isTranslatingDeck={isTranslatingDeck}
+            menuRef={translationMenuRef}
+            translationLanguageOptions={translationLanguageOptions}
+            translationSourceLanguage={translationSourceLanguage}
+            translationTargetLanguage={translationTargetLanguage}
+            onMenuOpenChange={(isOpen) => {
+              setOpenMenu(null);
+              setPlayMenuOpen(false);
+              setTranslationMenuOpen(isOpen);
+            }}
+            onTranslationSourceLanguageChange={onTranslationSourceLanguageChange}
+            onTranslationTargetLanguageChange={onTranslationTargetLanguageChange}
+            onTranslateDeck={onTranslateDeck}
+          />
         </div>
         <button
           className="language-chip"
