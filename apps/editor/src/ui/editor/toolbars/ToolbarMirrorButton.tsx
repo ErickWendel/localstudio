@@ -1,0 +1,68 @@
+import type { MirrorState } from '../../../services/contracts/interfaces';
+
+interface ToolbarMirrorButtonProps {
+  mirrorDisabledBySettings: boolean;
+  mirrorState: MirrorState;
+  persistenceEnabled: boolean;
+  onMirrorNow: (() => void) | undefined;
+  onMirrorToggle: ((enabled: boolean) => void) | undefined;
+  onOpenMirrorSettings: (() => void) | undefined;
+}
+
+export function ToolbarMirrorButton({
+  mirrorDisabledBySettings,
+  mirrorState,
+  persistenceEnabled,
+  onMirrorNow,
+  onMirrorToggle,
+  onOpenMirrorSettings,
+}: ToolbarMirrorButtonProps) {
+  const disabled = !persistenceEnabled;
+  const label = disabled
+    ? 'Mirror disabled'
+    : !mirrorState.enabled
+      ? 'Mirror disabled'
+      : mirrorState.status === 'syncing'
+        ? 'Mirror syncing'
+        : mirrorState.status === 'synced'
+          ? 'Mirror up to date'
+          : mirrorState.status === 'failed'
+            ? 'Mirror failed'
+            : 'Mirror ready';
+  const className = [
+    'stitch-icon-button',
+    'mirror-status-button',
+    disabled || !mirrorState.enabled ? 'mirror-disabled' : '',
+    !disabled && mirrorState.status === 'syncing' ? 'mirror-syncing' : '',
+    !disabled && mirrorState.status === 'synced' ? 'mirror-synced' : '',
+    !disabled && mirrorState.status === 'failed' ? 'mirror-failed' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    <button
+      className={className}
+      disabled={disabled}
+      title={mirrorState.error ?? label}
+      type="button"
+      aria-label={label}
+      data-tour-id="mirror-status"
+      onClick={() => {
+        if (mirrorDisabledBySettings) {
+          onOpenMirrorSettings?.();
+          return;
+        }
+        if (mirrorState.enabled) {
+          onMirrorToggle?.(false);
+          return;
+        }
+        onMirrorNow?.();
+      }}
+    >
+      <span className="material-symbols-outlined" aria-hidden="true">
+        {mirrorState.status === 'syncing' ? 'sync' : 'cloud_sync'}
+      </span>
+    </button>
+  );
+}
