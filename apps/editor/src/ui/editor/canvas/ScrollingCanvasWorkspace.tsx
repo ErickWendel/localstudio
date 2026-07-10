@@ -201,6 +201,9 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
                     canvasLabel={isActive ? 'Slide canvas' : `Preloaded ${page.name} canvas`}
                     project={project}
                     readOnly={Boolean(canvasProps.readOnly || !isActive)}
+                    {...(isActive && canvasProps.slideFrameRef
+                      ? { slideFrameRef: canvasProps.slideFrameRef }
+                      : {})}
                   />
                 </div>
               ) : (

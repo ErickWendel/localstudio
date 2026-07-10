@@ -311,7 +311,7 @@ describe('LeftToolPanel', () => {
     expect(screen.getByText('Object Animations')).toBeInTheDocument();
     expect(screen.getByText('Image')).toBeInTheDocument();
     expect(screen.getByText('AI Design Revolution')).toBeInTheDocument();
-    expect(screen.getByText('Rectangle')).toBeInTheDocument();
+    expect(screen.getByText('Line')).toBeInTheDocument();
     expect(screen.getByLabelText('Build 1')).toBeInTheDocument();
     expect(screen.getByLabelText('Build 2')).toBeInTheDocument();
     expect(screen.getByLabelText('Build 3')).toBeInTheDocument();
@@ -415,15 +415,15 @@ describe('LeftToolPanel', () => {
       'keyboard-typing',
     );
     await user.selectOptions(
-      screen.getByRole('combobox', { name: 'Effect for Rectangle' }),
+      screen.getByRole('combobox', { name: 'Effect for Line' }),
       'dissolve',
     );
     await user.selectOptions(
-      screen.getByRole('combobox', { name: 'Effect for Rectangle' }),
+      screen.getByRole('combobox', { name: 'Effect for Line' }),
       'line-draw',
     );
     await user.selectOptions(
-      screen.getByRole('combobox', { name: 'Line draw direction for Rectangle' }),
+      screen.getByRole('combobox', { name: 'Line draw direction for Line' }),
       'middle-to-ends',
     );
     await user.selectOptions(

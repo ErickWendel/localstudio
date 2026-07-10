@@ -4,27 +4,45 @@ import { startIsolatedDevServer, type IsolatedDevServer } from './isolated-dev-s
 
 type JourneyFixtures = {
   browserCoverage: void;
+  isolatedDevServer: IsolatedDevServer;
 };
-type ServerLifecycle = Pick<typeof test, 'afterAll' | 'beforeAll'>;
+type JourneyWorkerFixtures = {
+  workerDevServer: IsolatedDevServer;
+};
 
-export const test = base.extend<JourneyFixtures>({
-  browserCoverage: [collectBrowserCoverage, { auto: true }],
+let currentServer: IsolatedDevServer | undefined;
+
+export const test = base.extend<JourneyFixtures, JourneyWorkerFixtures>({
+  workerDevServer: [
+    async ({ browser }, use) => {
+      void browser;
+      const server = await startIsolatedDevServer();
+      await use(server);
+      await server.stop();
+    },
+    { scope: 'worker' },
+  ],
+  isolatedDevServer: [
+    async ({ workerDevServer }, use) => {
+      currentServer = workerDevServer;
+      await use(workerDevServer);
+    },
+    { auto: true },
+  ],
+  browserCoverage: [
+    async ({ browserName, context, isolatedDevServer }, use, testInfo) => {
+      void isolatedDevServer;
+      await collectBrowserCoverage({ browserName, context }, use, testInfo);
+    },
+    { auto: true },
+  ],
 });
 export { expect };
 
-export function withIsolatedDevServer(testType: ServerLifecycle = test) {
-  let server: IsolatedDevServer | undefined;
-
-  testType.beforeAll(async () => {
-    server = await startIsolatedDevServer();
-  });
-
-  testType.afterAll(async () => {
-    await server?.stop();
-  });
-
+export function withIsolatedDevServer(_testType: unknown = test) {
+  void _testType;
   return () => {
-    if (!server) throw new Error('Isolated dev server has not started yet.');
-    return server;
+    if (!currentServer) throw new Error('Isolated dev server has not started yet.');
+    return currentServer;
   };
 }

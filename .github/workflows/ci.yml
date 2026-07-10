@@ -160,23 +160,46 @@ jobs:
       - name: Install Playwright Chromium browser
         run: npx playwright install chromium
 
-      - name: End-to-end coverage test
-        run: npm run test:e2e:coverage
+      - name: Editor E2E coverage test
+        run: npm run test:e2e:coverage:editor
 
-      - name: Upload raw Playwright coverage
+      - name: Upload editor raw Playwright coverage
         if: always()
         uses: actions/upload-artifact@v5
         with:
-          name: playwright-browser-coverage
+          name: playwright-browser-coverage-editor
           path: test-results/**/browser-coverage.json
           if-no-files-found: ignore
 
-      - name: Add E2E coverage report to job summary
+      - name: Add editor E2E coverage report to job summary
         if: always()
         run: |
-          cat coverage-report/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
-          printf '\n' >> "$GITHUB_STEP_SUMMARY"
-          cat coverage-report/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
+          if [ -f coverage-report/editor/coverage-summary.md ]; then
+            cat coverage-report/editor/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            cat coverage-report/editor/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Joystick E2E coverage test
+        if: always()
+        run: npm run test:e2e:coverage:joystick
+
+      - name: Upload joystick raw Playwright coverage
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-browser-coverage-joystick
+          path: test-results/**/browser-coverage.json
+          if-no-files-found: ignore
+
+      - name: Add joystick E2E coverage report to job summary
+        if: always()
+        run: |
+          if [ -f coverage-report/joystick/coverage-summary.md ]; then
+            cat coverage-report/joystick/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            cat coverage-report/joystick/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Upload E2E coverage report
         if: always()
@@ -252,9 +275,17 @@ jobs:
 
       - name: Add coverage report to job summary
         run: |
-          cat coverage-report/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
-          printf '\n' >> "$GITHUB_STEP_SUMMARY"
-          cat coverage-report/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
+          if [ -f coverage-report/editor/coverage-summary.md ]; then
+            cat coverage-report/editor/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            cat coverage-report/editor/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f coverage-report/joystick/coverage-summary.md ]; then
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            cat coverage-report/joystick/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            cat coverage-report/joystick/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Publish coverage report with site
         run: mkdir -p dist/coverage && cp -R coverage-report/. dist/coverage/

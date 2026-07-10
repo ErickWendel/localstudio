@@ -465,7 +465,11 @@ export function EditorShell({ services }: EditorShellProps) {
   );
 
   function getPresentationVideos() {
-    return Array.from(slideFrameRef.current?.querySelectorAll('video') ?? []);
+    const activeSlideRoot =
+      workspaceRef.current?.querySelector('.scroll-page-active') ?? slideFrameRef.current;
+    return Array.from(
+      activeSlideRoot?.querySelectorAll<HTMLVideoElement>('video.canvas-media-element') ?? [],
+    );
   }
 
   const controlPresentationMovies = useCallback((action: 'end' | 'play-toggle' | 'start') => {

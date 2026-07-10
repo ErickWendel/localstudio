@@ -20,5 +20,18 @@ test.describe('WebMCP discover tools journey', () => {
     await expect(page.getByRole('button', { name: 'create_project' })).toBeVisible();
     await page.getByRole('button', { name: 'Create project' }).click();
     await expect(page.getByLabel('Create project command input')).toBeVisible();
+    await page.getByLabel('Create project command input').fill('E2E WebMCP project');
+    await page.getByRole('button', { name: 'Send Create project' }).click();
+    await expect(page.getByText('Create project completed.')).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Last WebMCP result' })).toContainText(
+      'E2E WebMCP project',
+    );
+
+    await page.getByRole('button', { name: 'get_project_snapshot' }).click();
+    await page.getByRole('button', { name: 'Read snapshot' }).click();
+    await expect(page.getByText('Read snapshot completed.')).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Last WebMCP result' })).toContainText(
+      'E2E WebMCP project',
+    );
   });
 });

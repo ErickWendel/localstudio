@@ -445,7 +445,7 @@ class DirectTransformersOperations {
   }
 }
 
-export const transformersOperations = {
+export const directTransformersOperations = {
   extractGeneratedText,
   extractDetectedLanguage,
   DirectTransformersOperations,

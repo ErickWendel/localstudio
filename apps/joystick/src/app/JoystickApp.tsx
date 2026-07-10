@@ -30,7 +30,7 @@ import type {
   PresenterRemoteStreamPreference,
 } from '@localstudio/presenter-remote/protocol';
 
-interface JoystickSignalingService {
+export interface JoystickSignalingService {
   connectController?:
     | ((
         code: string,

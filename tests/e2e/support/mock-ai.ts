@@ -7,8 +7,12 @@ const generatedImagePng = new Uint8Array([
   73, 69, 78, 68, 174, 66, 96, 130,
 ]);
 
-export async function installMockAiProviders(page: Page) {
-  await page.addInitScript((pngBytes) => {
+interface MockAiProviderOptions {
+  bonsaiGenerateFailures?: number;
+}
+
+export async function installMockAiProviders(page: Page, options: MockAiProviderOptions = {}) {
+  await page.addInitScript(({ pngBytes, mockOptions }) => {
     const slideTasks = JSON.stringify({
       language: 'en',
       page: {
@@ -69,6 +73,12 @@ export async function installMockAiProviders(page: Page) {
     ];
     let promptResponseIndex = 0;
     let elementResponseIndex = 0;
+    let bonsaiGenerateFailuresRemaining = mockOptions.bonsaiGenerateFailures ?? 0;
+
+    Object.defineProperty(navigator, 'gpu', {
+      configurable: true,
+      value: {},
+    });
 
     type MonitorOptions = { monitor?: ((target: EventTarget) => void) | undefined };
 
@@ -158,20 +168,101 @@ export async function installMockAiProviders(page: Page) {
         }
       }
 
-      postMessage(message: { id?: string; modelId?: string; options?: { steps?: number }; type?: string }) {
+      postMessage(message: {
+        id?: string;
+        modelId?: string;
+        options?: { steps?: number };
+        prompt?: unknown;
+        text?: string;
+        type?: string;
+      }) {
         const requestId = message.id ?? 'bonsai-e2e';
         if (this.url.includes('transformersRuntime.worker')) {
           queueMicrotask(() => {
             this.onmessage?.(
               new MessageEvent('message', {
                 data: {
-                  details: { file: message.modelId ?? message.type ?? 'local-model', loaded: 1, total: 1 },
+                  details: {
+                    file: message.modelId ?? message.type ?? 'local-model',
+                    loaded: 1,
+                    total: 1,
+                  },
                   id: requestId,
                   progress: 100,
                   type: 'progress',
                 },
               }),
             );
+            if (
+              message.type === 'preload-text-generation' ||
+              message.type === 'release-text-generation' ||
+              message.type === 'remove-text-generation' ||
+              message.type === 'preload-language-detection'
+            ) {
+              this.onmessage?.(
+                new MessageEvent('message', {
+                  data: { id: requestId, result: undefined, type: 'result' },
+                }),
+              );
+              return;
+            }
+            if (message.type === 'generate-text') {
+              const promptText = extractPromptText(message.prompt);
+              if (String(message.modelId).includes('translategemma')) {
+                this.onmessage?.(
+                  new MessageEvent('message', {
+                    data: {
+                      id: requestId,
+                      result: `[pt] ${promptText}`,
+                      type: 'result',
+                    },
+                  }),
+                );
+                return;
+              }
+              const promptResponse = getGemmaPromptResponse(promptText);
+              if (promptResponse) {
+                this.onmessage?.(
+                  new MessageEvent('message', {
+                    data: { id: requestId, result: promptResponse, type: 'result' },
+                  }),
+                );
+                return;
+              }
+              if (promptResponseIndex === 0) {
+                promptResponseIndex += 1;
+                this.onmessage?.(
+                  new MessageEvent('message', {
+                    data: { id: requestId, result: slideTasks, type: 'result' },
+                  }),
+                );
+                return;
+              }
+              promptResponseIndex += 1;
+              const response = slideElements[elementResponseIndex] ?? slideElements.at(-1)!;
+              elementResponseIndex += 1;
+              this.onmessage?.(
+                new MessageEvent('message', {
+                  data: { id: requestId, result: response, type: 'result' },
+                }),
+              );
+              return;
+            }
+            if (message.type === 'detect-language') {
+              this.onmessage?.(
+                new MessageEvent('message', {
+                  data: {
+                    id: requestId,
+                    result: {
+                      language: message.text?.includes('olá') ? 'pt' : 'en',
+                      score: 0.93,
+                    },
+                    type: 'result',
+                  },
+                }),
+              );
+              return;
+            }
             if (
               message.type === 'preload-image-editing' ||
               message.type === 'prepare-background-removal' ||
@@ -192,7 +283,10 @@ export async function installMockAiProviders(page: Page) {
                     result: {
                       imageInput: {
                         channels: 4,
-                        data: [55, 253, 118, 255, 5, 13, 16, 255, 255, 255, 255, 255, 0, 119, 154, 255],
+                        data: [
+                          55, 253, 118, 255, 5, 13, 16, 255, 255, 255, 255, 255, 0, 119,
+                          154, 255,
+                        ],
                         height: 2,
                         width: 2,
                       },
@@ -218,6 +312,19 @@ export async function installMockAiProviders(page: Page) {
               data: { id: requestId, progress: 100, type: 'progress' },
             }),
           );
+          if (message.type === 'generate' && bonsaiGenerateFailuresRemaining > 0) {
+            bonsaiGenerateFailuresRemaining -= 1;
+            this.onmessage?.(
+              new MessageEvent('message', {
+                data: {
+                  id: requestId,
+                  message: 'Mock Bonsai image generation failed.',
+                  type: 'error',
+                },
+              }),
+            );
+            return;
+          }
           const steps = Math.max(1, message.options?.steps ?? 1);
           this.onmessage?.(
             new MessageEvent('message', {
@@ -249,5 +356,33 @@ export async function installMockAiProviders(page: Page) {
       }
     }
     Object.defineProperty(window, 'Worker', { configurable: true, value: MockLocalStudioWorker });
-  }, Array.from(generatedImagePng));
+
+    function extractPromptText(prompt: unknown) {
+      if (typeof prompt === 'string') return prompt;
+      if (!Array.isArray(prompt)) return 'translated text';
+      const firstMessage = prompt[0] as { content?: unknown } | undefined;
+      const content = firstMessage?.content;
+      if (Array.isArray(content)) {
+        const textItem = content.find(
+          (item): item is { text: string } =>
+            Boolean(
+              item &&
+                typeof item === 'object' &&
+                typeof (item as { text?: unknown }).text === 'string',
+            ),
+        );
+        return textItem?.text ?? 'translated text';
+      }
+      return typeof content === 'string' ? content : 'translated text';
+    }
+
+    function getGemmaPromptResponse(prompt: string) {
+      if (prompt.includes('GENERATED_SLIDE_TASKS_RESPONSE_SCHEMA') || prompt.includes('"tasks"')) {
+        return slideTasks;
+      }
+      if (prompt.includes('"type":"add-title"')) return slideElements[0];
+      if (prompt.includes('"type":"add-subtitle"')) return slideElements[1];
+      return undefined;
+    }
+  }, { mockOptions: options, pngBytes: Array.from(generatedImagePng) });
 }

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, vi } from 'vitest';
 import type { Asset } from '../../../src/domain/documents/model';
 import { BrowserBackgroundRemovalService } from '../../../src/services/background-removal/browserBackgroundRemovalService';
-import type { BackgroundSegmentationResult } from '../../../src/services/model-setup/transformersOperations';
+import type { BackgroundSegmentationResult } from '../../../src/services/model-setup/transformersRuntimeTypes';
 
 type MutableGlobal = typeof globalThis & { ImageData?: typeof ImageData };
 

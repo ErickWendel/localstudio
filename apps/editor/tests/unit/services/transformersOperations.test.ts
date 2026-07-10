@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { transformersOperations } from '../../../src/services/model-setup/transformersOperations';
+import { directTransformersOperations } from '../../../src/services/model-setup/directTransformersOperations';
 import type { ModelDownloadProgressDetails } from '../../../src/services/contracts/interfaces';
 
 const mockProcessor = Object.assign(
@@ -81,13 +81,13 @@ vi.mock('@huggingface/transformers', () => ({
   env: {},
 }));
 
-describe('transformersOperations.DirectTransformersOperations', () => {
+describe('directTransformersOperations.DirectTransformersOperations', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('reports byte-aware progress while preloading image editing models', async () => {
-    const operations = new transformersOperations.DirectTransformersOperations();
+    const operations = new directTransformersOperations.DirectTransformersOperations();
     const details: Array<ModelDownloadProgressDetails | undefined> = [];
 
     await operations.preloadImageEditing({
@@ -103,7 +103,7 @@ describe('transformersOperations.DirectTransformersOperations', () => {
   });
 
   it('disposes the loaded image editing model when removed', async () => {
-    const operations = new transformersOperations.DirectTransformersOperations();
+    const operations = new directTransformersOperations.DirectTransformersOperations();
 
     await operations.preloadImageEditing();
     await operations.removeImageEditing();

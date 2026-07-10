@@ -22,7 +22,7 @@ export class EditorAppPage extends BasePage {
   }
 
   async openTool(tab: 'AI Tools' | 'Animate' | 'Assets' | 'Design' | 'Elements' | 'Layout' | 'Text') {
-    const toolTab = this.page.getByRole('tab', { name: tab });
+    const toolTab = this.page.getByLabel('Tool menu').getByRole('tab', { name: tab });
     if ((await toolTab.getAttribute('aria-expanded')) !== 'true') {
       await toolTab.click();
     }
