@@ -27,7 +27,6 @@ import { sampleProject } from '../../../domain/projects/sampleProject';
 import type { EditorAutomationDelegate } from '../../../services/automation/editorAutomationController';
 import type {
   AiProviderState,
-  FontImportService,
   MirrorProjectSummary,
   MirrorState,
   ModelDownloadProgressDetails,
@@ -56,6 +55,9 @@ import { powerPointIo } from './power-point-io';
 import { textTranslationLayout } from './text-translation-layout';
 import type { TranslationPatch } from './text-translation-layout';
 import { useStockMediaLibrary } from './use-stock-media-library';
+import { editorViewModelProgress } from './editorViewModelProgress';
+import { editorViewModelProject } from './editorViewModelProject';
+import { editorViewModelRuntime } from './editorViewModelRuntime';
 
 export type RightPanelTab =
   | 'layout'
@@ -131,18 +133,6 @@ interface ElementClipboardState {
   elements: DesignElement[];
 }
 
-function getDownloadProgressPatch(
-  progress: number,
-  details: ModelDownloadProgressDetails | undefined,
-): ModelDownloadProgressDetails & { progress: number } {
-  return {
-    estimatedRemainingMs: details?.estimatedRemainingMs,
-    loadedBytes: details?.loadedBytes,
-    progress,
-    totalBytes: details?.totalBytes,
-  };
-}
-
 export type RemoteImportStatus =
   | 'loading'
   | 'ready'
@@ -156,115 +146,8 @@ const PROMPT_API_REQUIRED_MESSAGE = 'LLM model must be prepared before using pro
 const IMAGE_GENERATION_MODEL_REQUIRED_MESSAGE =
   'Download image generation models before creating images.';
 const IMAGE_PROMPT_MODE_REQUIRED_MESSAGE = 'Use Create image from the + menu to generate images.';
-const IMAGE_GENERATION_DIMENSION_MULTIPLE = 16;
 const BACKGROUND_PREVIEW_DEBOUNCE_MS = 120;
 const PASTED_ELEMENT_OFFSET = 32;
-
-function normalizeImageGenerationDimension(value: number) {
-  return Math.max(
-    IMAGE_GENERATION_DIMENSION_MULTIPLE,
-    Math.round(value / IMAGE_GENERATION_DIMENSION_MULTIPLE) * IMAGE_GENERATION_DIMENSION_MULTIPLE,
-  );
-}
-
-function writeProjectNameToUrl(projectName: string) {
-  if (typeof window === 'undefined') return;
-  const nextUrl = new URL(window.location.href);
-  nextUrl.searchParams.set('project', projectName);
-  window.history.replaceState(
-    window.history.state,
-    '',
-    `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`,
-  );
-}
-
-function normalizeProjectDocument(project: ProjectDocument): ProjectDocument {
-  const shouldRestoreHeroImage =
-    Boolean(project.assets['asset-hero']) && !project.elements['image-hero'];
-  const pageId = project.pages[0]?.id;
-  const elements: ProjectDocument['elements'] = {};
-
-  for (const [id, element] of Object.entries(project.elements)) {
-    const isLegacyScaledHero =
-      id === 'image-hero' &&
-      element.type === 'image' &&
-      element.assetId === 'asset-hero' &&
-      element.width === 1200 &&
-      element.height === 650;
-    elements[id] = {
-      ...element,
-      ...(isLegacyScaledHero ? sampleProject.SAMPLE_HERO_IMAGE_SIZE : {}),
-      visible: element.visible ?? true,
-    };
-  }
-
-  if (shouldRestoreHeroImage) {
-    elements['image-hero'] = {
-      id: 'image-hero',
-      type: 'image',
-      assetId: 'asset-hero',
-      x: sampleProject.SAMPLE_HERO_IMAGE_SIZE.x,
-      y: sampleProject.SAMPLE_HERO_IMAGE_SIZE.y,
-      width: sampleProject.SAMPLE_HERO_IMAGE_SIZE.width,
-      height: sampleProject.SAMPLE_HERO_IMAGE_SIZE.height,
-      rotation: 0,
-      locked: false,
-      visible: true,
-      opacity: 1,
-    };
-  }
-
-  return {
-    ...project,
-    assets: {
-      ...project.assets,
-      ...(project.assets['asset-hero']
-        ? {
-            'asset-hero': {
-              ...project.assets['asset-hero'],
-              objectUrl:
-                project.assets['asset-hero'].objectUrl ?? sampleProject.SAMPLE_HERO_IMAGE_URL,
-            },
-          }
-        : {}),
-    },
-    elements,
-    pages: (shouldRestoreHeroImage
-      ? project.pages.map((page) =>
-          page.id === pageId
-            ? {
-                ...page,
-                elementIds: (() => {
-                  const nextElementIds = page.elementIds.filter((id) => id !== 'image-hero');
-                  nextElementIds.splice(0, 0, 'image-hero');
-                  return nextElementIds;
-                })(),
-              }
-            : page,
-        )
-      : project.pages
-    ).map((page) => ({
-      ...page,
-      animationBuilds: page.animationBuilds ?? [],
-      visible: page.visible ?? true,
-    })),
-  };
-}
-
-async function loadProjectFonts(project: ProjectDocument, fontImportService: FontImportService) {
-  await fontImportService.loadProjectFonts(project).catch(() => undefined);
-}
-
-function waitForNextPaint() {
-  if (typeof window === 'undefined') return Promise.resolve();
-  return new Promise<void>((resolve) => {
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        resolve();
-      });
-    });
-  });
-}
 
 type TranslationScope = 'selection' | 'slide' | 'deck';
 
@@ -280,7 +163,7 @@ interface DeckTranslationProgressState {
 
 export function useEditorViewModel(services: AppServices) {
   const initialProject = useMemo(
-    () => normalizeProjectDocument(services.initialProject),
+    () => editorViewModelProject.normalizeProjectDocument(services.initialProject),
     [services.initialProject],
   );
   const storedMirrorConfig = useMemo(
@@ -597,8 +480,8 @@ export function useEditorViewModel(services: AppServices) {
       .then(async (savedProject) => {
         if (!isMounted) return;
         if (savedProject) {
-          const normalizedProject = normalizeProjectDocument(savedProject);
-          await loadProjectFonts(normalizedProject, services.fontImportService);
+          const normalizedProject = editorViewModelProject.normalizeProjectDocument(savedProject);
+          await editorViewModelRuntime.loadProjectFonts(normalizedProject, services.fontImportService);
           if (!isMounted) return;
           setProject(normalizedProject);
           setActivePageId(normalizedProject.pages[0]?.id ?? '');
@@ -613,7 +496,7 @@ export function useEditorViewModel(services: AppServices) {
               .then(setVersionHistoryEntries)
               .catch(() => undefined);
           }
-          writeProjectNameToUrl(normalizedProject.name);
+          editorViewModelProject.writeProjectNameToUrl(normalizedProject.name);
           setHasPersistedLocalProject(true);
           if (storedMirrorConfig && shouldEnableStoredMirror) {
             syncMirrorNowRef.current(normalizedProject);
@@ -667,7 +550,7 @@ export function useEditorViewModel(services: AppServices) {
       })
       .then(() => {
         queueMirrorSyncRef.current();
-        writeProjectNameToUrl(project.name);
+        editorViewModelProject.writeProjectNameToUrl(project.name);
       })
       .catch(() => {
         setPersistenceEnabled(false);
@@ -822,7 +705,7 @@ export function useEditorViewModel(services: AppServices) {
         setModelStates((currentStates) =>
           currentStates.map((state) =>
             state.id === id
-              ? { ...state, status: 'downloading', ...getDownloadProgressPatch(progress, details) }
+              ? { ...state, status: 'downloading', ...editorViewModelProgress.getDownloadProgressPatch(progress, details) }
               : state,
           ),
         );
@@ -951,7 +834,7 @@ export function useEditorViewModel(services: AppServices) {
           setPromptPreparation((current) => ({
             ...current,
             availability: progress >= 100 ? 'ready' : current.availability,
-            ...getDownloadProgressPatch(
+            ...editorViewModelProgress.getDownloadProgressPatch(
               Math.max(current.progress, 4, Math.min(100, Math.round(progress))),
               details,
             ),
@@ -1046,7 +929,7 @@ export function useEditorViewModel(services: AppServices) {
       await services.translatorService.prepareLanguageDetection?.({
         onProgress: (progress, details) => {
           setLanguageDetectionPreparation((current) => ({
-            ...getDownloadProgressPatch(
+            ...editorViewModelProgress.getDownloadProgressPatch(
               Math.max(current.progress, 4, Math.min(100, Math.round(progress))),
               details,
             ),
@@ -1081,7 +964,7 @@ export function useEditorViewModel(services: AppServices) {
           {
             onProgress: (progress, details) => {
               setTranslationPreparation((current) => ({
-                ...getDownloadProgressPatch(
+                ...editorViewModelProgress.getDownloadProgressPatch(
                   Math.max(current.progress, 4, Math.min(100, Math.round(progress))),
                   details,
                 ),
@@ -1233,14 +1116,14 @@ export function useEditorViewModel(services: AppServices) {
     setIsGeneratingImage(true);
     try {
       const generationOptions = {
-        height: normalizeImageGenerationDimension(
+        height: editorViewModelProgress.normalizeImageGenerationDimension(
           imageToReplace?.height ??
             options?.height ??
             imageGenerationModel.DEFAULT_IMAGE_GENERATION_SIZE,
         ),
         ...(options?.seed !== undefined ? { seed: options.seed } : {}),
         ...(options?.steps !== undefined ? { steps: options.steps } : {}),
-        width: normalizeImageGenerationDimension(
+        width: editorViewModelProgress.normalizeImageGenerationDimension(
           imageToReplace?.width ??
             options?.width ??
             imageGenerationModel.DEFAULT_IMAGE_GENERATION_SIZE,
@@ -1476,7 +1359,7 @@ export function useEditorViewModel(services: AppServices) {
       setPersistenceAttention(false);
       showOperationNotice(undefined);
       setLocalProjectSetupOpen(false);
-      writeProjectNameToUrl(projectToSave.name);
+      editorViewModelProject.writeProjectNameToUrl(projectToSave.name);
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(true);
       }
@@ -1514,7 +1397,7 @@ export function useEditorViewModel(services: AppServices) {
     }
     try {
       await persistCurrentProject();
-      writeProjectNameToUrl(projectRef.current.name);
+      editorViewModelProject.writeProjectNameToUrl(projectRef.current.name);
     } catch {
       setPersistenceEnabled(false);
       if (typeof window !== 'undefined') {
@@ -1545,7 +1428,7 @@ export function useEditorViewModel(services: AppServices) {
       setLastEditedAt(projectToSave.updatedAt);
       setSaveAnimationKey((current) => current + 1);
       skipNextProjectSaveRef.current = true;
-      writeProjectNameToUrl(projectToSave.name);
+      editorViewModelProject.writeProjectNameToUrl(projectToSave.name);
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(true);
       }
@@ -1588,7 +1471,7 @@ export function useEditorViewModel(services: AppServices) {
       setPersistenceAttention(false);
       showOperationNotice(undefined);
       setLocalProjectSetupOpen(false);
-      writeProjectNameToUrl(nextProject.name);
+      editorViewModelProject.writeProjectNameToUrl(nextProject.name);
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(true);
       }
@@ -1605,8 +1488,8 @@ export function useEditorViewModel(services: AppServices) {
     try {
       const importedProject = await services.projectRepository.importProject();
       if (!importedProject) return;
-      const normalizedProject = normalizeProjectDocument(importedProject);
-      await loadProjectFonts(normalizedProject, services.fontImportService);
+      const normalizedProject = editorViewModelProject.normalizeProjectDocument(importedProject);
+      await editorViewModelRuntime.loadProjectFonts(normalizedProject, services.fontImportService);
       setProject(normalizedProject);
       setActivePageId(normalizedProject.pages[0]?.id ?? '');
       setPageLanguageCodes({});
@@ -1630,7 +1513,7 @@ export function useEditorViewModel(services: AppServices) {
           .then(setVersionHistoryEntries)
           .catch(() => undefined);
       }
-      writeProjectNameToUrl(normalizedProject.name);
+      editorViewModelProject.writeProjectNameToUrl(normalizedProject.name);
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(true);
       }
@@ -1653,14 +1536,14 @@ export function useEditorViewModel(services: AppServices) {
         stage: 'reading',
         title: 'Reading PowerPoint package',
       });
-      await waitForNextPaint();
+      await editorViewModelRuntime.waitForNextPaint();
       setPresentationImportProgress({
         detail: 'Inspecting slide order, dimensions, and package relationships.',
         progress: 34,
         stage: 'inspecting',
         title: 'Inspecting PPTX structure',
       });
-      await waitForNextPaint();
+      await editorViewModelRuntime.waitForNextPaint();
       const importedProject = await services.presentationImportService.importPowerPoint(pptxInput);
       setPresentationImportProgress({
         detail: `Extracting text and image objects for ${importedProject.pages.length.toLocaleString()} slides.`,
@@ -1668,14 +1551,14 @@ export function useEditorViewModel(services: AppServices) {
         stage: 'extracting-objects',
         title: 'Extracting text and images',
       });
-      await waitForNextPaint();
+      await editorViewModelRuntime.waitForNextPaint();
       setPresentationImportProgress({
         detail: 'Matching imported text styles with downloadable Google Fonts.',
         progress: 68,
         stage: 'downloading-fonts',
         title: 'Downloading fonts',
       });
-      await waitForNextPaint();
+      await editorViewModelRuntime.waitForNextPaint();
       const fontRequests = pptxFontRequests.collect(importedProject);
       const fontImportResult =
         fontRequests.length > 0
@@ -1713,23 +1596,23 @@ export function useEditorViewModel(services: AppServices) {
         stage: 'extracting-media',
         title: 'Extracting videos',
       });
-      await waitForNextPaint();
+      await editorViewModelRuntime.waitForNextPaint();
       setPresentationImportProgress({
         detail: 'Mapping imported transitions and object builds into preview playback.',
         progress: 84,
         stage: 'mapping-animations',
         title: 'Mapping animations',
       });
-      await waitForNextPaint();
-      const normalizedProject = normalizeProjectDocument(importedProjectWithFonts);
-      await loadProjectFonts(normalizedProject, services.fontImportService);
+      await editorViewModelRuntime.waitForNextPaint();
+      const normalizedProject = editorViewModelProject.normalizeProjectDocument(importedProjectWithFonts);
+      await editorViewModelRuntime.loadProjectFonts(normalizedProject, services.fontImportService);
       setPresentationImportProgress({
         detail: 'Opening the imported project in the editor.',
         progress: 94,
         stage: 'opening',
         title: 'Opening deck',
       });
-      await waitForNextPaint();
+      await editorViewModelRuntime.waitForNextPaint();
       setProject(normalizedProject);
       setActivePageId(normalizedProject.pages[0]?.id ?? '');
       setPageLanguageCodes({});
@@ -1748,7 +1631,7 @@ export function useEditorViewModel(services: AppServices) {
       needsFreshPersistenceTargetRef.current = true;
       setLastEditedAt(normalizedProject.updatedAt);
       setVersionHistoryEntries([]);
-      writeProjectNameToUrl(normalizedProject.name);
+      editorViewModelProject.writeProjectNameToUrl(normalizedProject.name);
       setPresentationImportProgress(undefined);
       const missingFontCount = fontImportResult.warnings.filter(
         (warning) => warning.code === 'font-missing',
@@ -1788,7 +1671,7 @@ export function useEditorViewModel(services: AppServices) {
         { message: 'Exporting PowerPoint...', tone: 'info' },
         { persistent: true },
       );
-      await waitForNextPaint();
+      await editorViewModelRuntime.waitForNextPaint();
       const result = await services.presentationExportService.exportPowerPoint(project, {
         onProgress: (progress) => {
           showOperationNotice(powerPointIo.formatExportProgress(progress), { persistent: true });
@@ -2033,8 +1916,8 @@ export function useEditorViewModel(services: AppServices) {
     try {
       const files = await services.mirrorService.downloadProject(projectId, config);
       const importedProject = await services.projectRepository.importMirrorFiles(files);
-      const normalizedProject = normalizeProjectDocument(importedProject);
-      await loadProjectFonts(normalizedProject, services.fontImportService);
+      const normalizedProject = editorViewModelProject.normalizeProjectDocument(importedProject);
+      await editorViewModelRuntime.loadProjectFonts(normalizedProject, services.fontImportService);
       setProject(normalizedProject);
       setActivePageId(normalizedProject.pages[0]?.id ?? '');
       setPageLanguageCodes({});
@@ -2057,7 +1940,7 @@ export function useEditorViewModel(services: AppServices) {
           .then(setVersionHistoryEntries)
           .catch(() => undefined);
       }
-      writeProjectNameToUrl(normalizedProject.name);
+      editorViewModelProject.writeProjectNameToUrl(normalizedProject.name);
       editorPreferences.writePersistencePreference(true);
       setMirrorState({ enabled: true, status: 'synced', lastSyncedAt: new Date().toISOString() });
       setRemoteImportOpen(false);
@@ -2121,8 +2004,8 @@ export function useEditorViewModel(services: AppServices) {
     const entry = entryOverride ?? versionHistoryEntries.find((item) => item.id === versionId);
     const versionProject = await services.projectRepository.loadVersion(versionId);
     if (!versionProject) return;
-    const normalizedVersionProject = normalizeProjectDocument(versionProject);
-    await loadProjectFonts(normalizedVersionProject, services.fontImportService);
+    const normalizedVersionProject = editorViewModelProject.normalizeProjectDocument(versionProject);
+    await editorViewModelRuntime.loadProjectFonts(normalizedVersionProject, services.fontImportService);
     setSelectedVersionId(versionId);
     setPreviewProject(normalizedVersionProject);
     const nextPageId = entry?.firstChangedPageId ?? normalizedVersionProject.pages[0]?.id ?? '';
@@ -2136,11 +2019,11 @@ export function useEditorViewModel(services: AppServices) {
     if (!services.projectRepository.loadVersion) return;
     const restoredProject = await services.projectRepository.loadVersion(versionId);
     if (!restoredProject) return;
-    const normalizedProject = normalizeProjectDocument({
+    const normalizedProject = editorViewModelProject.normalizeProjectDocument({
       ...restoredProject,
       updatedAt: new Date().toISOString(),
     });
-    await loadProjectFonts(normalizedProject, services.fontImportService);
+    await editorViewModelRuntime.loadProjectFonts(normalizedProject, services.fontImportService);
     await services.projectRepository.saveProject(normalizedProject);
     setSaveAnimationKey((current) => current + 1);
     if (services.projectRepository.saveVersion) {
@@ -2569,7 +2452,7 @@ export function useEditorViewModel(services: AppServices) {
             await services.translatorService.detectLanguage(sampleText, {
               onProgress: (progress, details) => {
                 setTranslationPreparation((current) => ({
-                  ...getDownloadProgressPatch(
+                  ...editorViewModelProgress.getDownloadProgressPatch(
                     Math.max(current.progress, 4, Math.min(45, Math.round(progress * 0.45))),
                     details,
                   ),
@@ -2589,7 +2472,7 @@ export function useEditorViewModel(services: AppServices) {
         await services.translatorService.prepareTranslation(sourceLanguage, nextLanguage, {
           onProgress: (progress, details) => {
             setTranslationPreparation((current) => ({
-              ...getDownloadProgressPatch(
+              ...editorViewModelProgress.getDownloadProgressPatch(
                 Math.max(current.progress, 8, Math.min(100, Math.round(progress))),
                 details,
               ),
@@ -2711,7 +2594,7 @@ export function useEditorViewModel(services: AppServices) {
 
   function createProjectForAutomation(input: { name?: string }) {
     const blankProject = sampleProject.createBlankProject();
-    const nextProject = normalizeProjectDocument({
+    const nextProject = editorViewModelProject.normalizeProjectDocument({
       ...blankProject,
       name: input.name?.trim() || blankProject.name,
       updatedAt: new Date().toISOString(),
@@ -3498,7 +3381,7 @@ export function useEditorViewModel(services: AppServices) {
     setProcessingElementIds((currentIds) =>
       currentIds.includes(elementId) ? currentIds : [...currentIds, elementId],
     );
-    await waitForNextPaint();
+    await editorViewModelRuntime.waitForNextPaint();
 
     try {
       const result = await services.backgroundRemovalService.removeBackground(asset, { points });
