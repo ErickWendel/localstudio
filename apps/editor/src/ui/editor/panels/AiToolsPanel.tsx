@@ -10,6 +10,7 @@ import { modelSetupService } from '../../../services/model-setup/modelSetupServi
 import { IconButton } from '../../components/IconButton';
 import { StatusPill } from '../../components/StatusPill';
 import { AiToolsDownloadProgress } from './AiToolsDownloadProgress';
+import { aiToolsProviderFallbacks } from './AiToolsProviderFallbacks';
 import { AiToolsSetupAction } from './AiToolsSetupAction';
 import type { CreateImagePromptOptions } from '../media/imagePromptOptions';
 import { imagePromptOptions } from '../media/imagePromptOptions';
@@ -174,54 +175,15 @@ export function AiToolsPanel({
   const promptProviders =
     promptProviderStates.length > 0
       ? promptProviderStates
-      : [
-          {
-            id: 'chrome-prompt-api',
-            label: 'Chrome Built-in Prompt API',
-            description: 'Prompt to slides using Chrome Built-in AI.',
-            capability: 'prompt' as const,
-            runtime: 'chrome-built-in' as const,
-            compatibility: 'compatible' as const,
-            readiness:
-              promptPreparation.status === 'ready'
-                ? ('ready' as const)
-                : ('needs-download' as const),
-            selected: true,
-          },
-        ];
+      : [aiToolsProviderFallbacks.prompt(promptPreparation.status === 'ready')];
   const translationProviders =
     translationProviderStates.length > 0
       ? translationProviderStates
-      : [
-          {
-            id: 'chrome-translator-api',
-            label: 'Chrome Built-in Translator',
-            description: 'Translate visible text using Chrome Built-in AI.',
-            capability: 'translation' as const,
-            runtime: 'chrome-built-in' as const,
-            compatibility: 'compatible' as const,
-            readiness:
-              translationPreparation.status === 'ready'
-                ? ('ready' as const)
-                : ('needs-download' as const),
-            selected: true,
-          },
-        ];
+      : [aiToolsProviderFallbacks.translation(translationPreparation.status === 'ready')];
   const languageDetectionProviders =
     languageDetectionProviderStates.length > 0
       ? languageDetectionProviderStates
-      : [
-          {
-            id: 'chrome-language-detector-api',
-            label: 'Chrome Built-in Language Detector',
-            description: 'Detect slide language using Chrome Built-in AI.',
-            capability: 'language-detection' as const,
-            runtime: 'chrome-built-in' as const,
-            compatibility: 'compatible' as const,
-            readiness: 'ready' as const,
-            selected: true,
-          },
-        ];
+      : [aiToolsProviderFallbacks.languageDetection()];
   const selectedPromptProvider =
     promptProviders.find((provider) => provider.selected) ?? promptProviders[0];
   const selectedTranslationProvider =
