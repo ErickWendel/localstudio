@@ -4,7 +4,6 @@ import type { AppServices } from '../../../app/composition';
 import type { ShareMetadata } from '../../../services/contracts/interfaces';
 import { editorAutomationController } from '../../../services/automation/editorAutomationController';
 import type { EditorAutomationDelegate } from '../../../services/automation/editorAutomationController';
-import { modelSetupService } from '../../../services/model-setup/modelSetupService';
 import {
   WebMcpToolAdapter,
   type WebMcpDemoWindow,
@@ -13,8 +12,6 @@ import { EditorFooter } from './EditorFooter';
 import { ImageExportPanel, type ImageExportOptions } from '../panels/ImageExportPanel';
 import { MediaImportProgressOverlay } from './MediaImportProgressOverlay';
 import { PresentationImportProgressOverlay } from './PresentationImportProgressOverlay';
-import { LeftToolPanel } from '../panels/LeftToolPanel';
-import { LocalProjectSetupPanel } from '../panels/LocalProjectSetupPanel';
 import { MediaIntegrationSettingsPanel } from '../panels/MediaIntegrationSettingsPanel';
 import { MirrorSettingsPanel } from '../panels/MirrorSettingsPanel';
 import { PagesPanel } from '../panels/PagesPanel';
@@ -26,7 +23,6 @@ import { RemoteImportPanel } from '../panels/RemoteImportPanel';
 import { CanvasWorkspace } from '../canvas/CanvasWorkspace';
 import { ScrollingCanvasWorkspace } from '../canvas/ScrollingCanvasWorkspace';
 import { SettingsPanel } from '../panels/SettingsPanel';
-import { TopToolbar } from '../toolbars/TopToolbar';
 import { VersionHistoryPanel } from '../panels/VersionHistoryPanel';
 import { presentationMovieControls, type MovieHoldState } from '../media/presentationMovieControls';
 import { useEditorViewModel, type OperationNoticeState } from '../state/useEditorViewModel';
@@ -41,6 +37,8 @@ import {
   type EditorAiWorkflowTourHandle,
 } from '../tour/EditorAiWorkflowTour';
 import { AudienceFullscreenPrompt } from './AudienceFullscreenPrompt';
+import { EditorLeftPanelSurface } from './EditorLeftPanelSurface';
+import { EditorToolbarSurface } from './EditorToolbarSurface';
 import { editorImageExport } from './editor-image-export';
 import type { ImageExportFrame } from './editor-image-export';
 import { editorShortcutActions } from './editor-shortcut-actions';
@@ -1030,80 +1028,21 @@ export function EditorShell({ services }: EditorShellProps) {
         onOpenMirrorSettings={vm.openMirrorSettings}
         onOpenSettings={vm.openSettings}
       />
-      <TopToolbar
-        project={vm.project}
-        language={vm.activeSlideLanguage.displayCode}
-        languageFlag={vm.activeSlideLanguage.flag}
-        languageLabel={vm.activeSlideLanguage.label}
-        canRedo={!isHistoryReadOnly && vm.canRedo}
-        canUndo={!isHistoryReadOnly && vm.canUndo}
-        hasSelection={!isHistoryReadOnly && hasSelection}
-        persistenceEnabled={vm.persistenceEnabled}
-        mirrorState={vm.mirrorState}
-        mirrorDisabledBySettings={vm.mirrorDisabledBySettings}
-        persistenceAttention={vm.persistenceAttention}
-        operationNotice={imageExportNotice ?? vm.operationNotice}
-        localProjectSetupPanel={
-          vm.localProjectSetupOpen ? (
-            <LocalProjectSetupPanel
-              initialName={vm.project.name}
-              onCancel={vm.closeLocalProjectSetup}
-              onConfirm={(projectName) => {
-                void vm.confirmLocalProjectSetup(projectName);
-              }}
-            />
-          ) : null
-        }
-        lastEditedAt={vm.lastEditedAt}
-        saveAnimationKey={vm.saveAnimationKey}
-        canTranslateDeck={vm.canTranslateDeck}
+      <EditorToolbarSurface
         deckTranslationStatus={deckTranslationStatus}
-        isTranslatingDeck={Boolean(vm.deckTranslationProgress)}
+        hasDirectoryPersistence={hasDirectoryPersistence}
+        hasSelection={hasSelection}
+        imageExportNotice={imageExportNotice}
         isExportingImages={isExportingImages}
-        isExportingPowerPoint={vm.isExportingPowerPoint}
-        translationLanguageOptions={vm.translationLanguageOptions}
-        translationSourceLanguage={vm.activeSlideLanguage.code}
-        translationTargetLanguage={vm.translationTargetLanguage}
-        persistenceAvailable={services.persistenceAvailable}
-        persistenceMode={services.persistenceMode}
-        onDelete={isHistoryReadOnly ? undefined : vm.deleteSelectedElement}
-        onDuplicate={isHistoryReadOnly ? undefined : vm.duplicateSelectedElement}
-        onImportRemoteMirror={() => {
-          void vm.importRemoteMirror();
-        }}
-        onImportProject={
-          hasDirectoryPersistence
-            ? () => {
-                void vm.importProject();
-              }
-            : undefined
-        }
-        onImportPowerPoint={() => {
-          void vm.importPowerPoint();
-        }}
-        onExportPowerPoint={() => {
-          void vm.exportPowerPoint();
-        }}
+        isHistoryReadOnly={isHistoryReadOnly}
+        services={services}
+        vm={vm}
         onExportImages={() => {
           setImageExportPanelOpen(true);
         }}
-        onMirrorNow={() => {
-          vm.requestMirrorNow();
-        }}
-        onMirrorToggle={vm.setMirrorEnabled}
         onNewProject={openBlankProjectInNewTab}
-        onOpenMirrorSettings={vm.openMirrorSettings}
         onOpenKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
         onStartAiSetupTour={startAiWorkflowTour}
-        onOpenVersionHistory={() => {
-          void vm.openVersionHistory();
-        }}
-        onPersistenceToggle={(enabled) => {
-          void vm.setPersistence(enabled);
-        }}
-        onProjectNameChange={isHistoryReadOnly ? undefined : vm.setProjectName}
-        onRedo={isHistoryReadOnly ? undefined : vm.redo}
-        onResetZoom={vm.resetZoom}
         onSelectLayers={() => {
           vm.setActiveTab('layout');
           openLeftPanel();
@@ -1113,147 +1052,18 @@ export function EditorShell({ services }: EditorShellProps) {
         }}
         onOpenPresenterView={openPresenterView}
         onStartPresenterMode={startPresenterMode}
-        onSaveLocal={() => {
-          void vm.saveLocalNow();
-        }}
-        onSaveLocalAs={
-          hasDirectoryPersistence
-            ? () => {
-                void vm.saveLocalAs();
-              }
-            : undefined
-        }
-        onTranslationSourceLanguageChange={vm.setActiveSlideLanguage}
-        onTranslationTargetLanguageChange={(languageCode) => {
-          void vm.setTranslationTargetLanguageForSource(languageCode, {
-            sourceLanguage: vm.activeSlideLanguage.code,
-          });
-        }}
-        onTranslateDeck={
-          isHistoryReadOnly
-            ? undefined
-            : () => {
-                void vm.translateDeck();
-              }
-        }
-        onUndo={isHistoryReadOnly ? undefined : vm.undo}
-        onZoomIn={vm.zoomIn}
-        onZoomOut={vm.zoomOut}
       />
       <div
         className={vm.pagesPanelOpen ? 'editor-grid' : 'editor-grid editor-grid-pages-collapsed'}
       >
-        <LeftToolPanel
-          activeTab={vm.activeTab}
-          animationPreview={vm.animationPreview}
-          activeSlideLanguage={vm.activeSlideLanguage}
-          focusFontControlKey={designFontFocusKey}
-          onTabChange={vm.setActiveTab}
-          open={leftPanelOpen}
+        <EditorLeftPanelSurface
+          designFontFocusKey={designFontFocusKey}
+          isHistoryReadOnly={isHistoryReadOnly}
+          leftPanelOpen={leftPanelOpen}
+          vm={vm}
+          onImportMedia={importMediaFile}
           onOpenChange={handleLeftPanelOpenChange}
-          project={vm.project}
-          activePageId={vm.activePageId}
-          selection={vm.selection}
-          availableFonts={vm.availableFonts}
-          onDownloadFont={isHistoryReadOnly ? undefined : vm.downloadFontForSelection}
-          onSelectElement={isHistoryReadOnly ? undefined : selectElement}
-          onSetElementVisibility={isHistoryReadOnly ? undefined : vm.setElementVisibility}
-          onSetElementLock={isHistoryReadOnly ? undefined : vm.setElementLock}
-          onDeleteElement={isHistoryReadOnly ? undefined : vm.deleteElement}
-          onReorderElement={isHistoryReadOnly ? undefined : vm.reorderElement}
-          onAlignSelectedElement={isHistoryReadOnly ? undefined : vm.alignSelectedElement}
-          onSetSelectedElementZOrder={isHistoryReadOnly ? undefined : vm.setSelectedElementZOrder}
-          onUpdateElementFrame={isHistoryReadOnly ? undefined : vm.updateElementFrame}
-          onUpdateElementStyle={isHistoryReadOnly ? undefined : vm.updateElementStyle}
-          onUpdateTextContent={isHistoryReadOnly ? undefined : vm.updateTextContent}
-          onUpdateMediaPlayback={isHistoryReadOnly ? undefined : vm.updateMediaPlayback}
-          onUpdatePageBackground={isHistoryReadOnly ? undefined : vm.updatePageBackground}
-          onApplyTheme={isHistoryReadOnly ? undefined : vm.applyTheme}
-          onEditTheme={isHistoryReadOnly ? undefined : vm.editTheme}
-          onChangeTheme={isHistoryReadOnly ? undefined : vm.changeTheme}
-          onApplySlideLayout={isHistoryReadOnly ? undefined : vm.applySlideLayout}
-          onEditSlideLayout={isHistoryReadOnly ? undefined : vm.editSlideLayout}
-          onToggleSlideLayoutPlaceholder={
-            isHistoryReadOnly ? undefined : vm.toggleSlideLayoutPlaceholder
-          }
-          onReplaceVideoAsset={
-            isHistoryReadOnly
-              ? undefined
-              : (elementId, file) => {
-                  void vm.replaceVideoAsset(elementId, file);
-                }
-          }
-          onClearPageTransition={isHistoryReadOnly ? undefined : vm.clearPageTransition}
-          onSetPageTransition={isHistoryReadOnly ? undefined : vm.setPageTransition}
-          onSetElementAnimationBuilds={isHistoryReadOnly ? undefined : vm.setElementAnimationBuilds}
-          onClearElementAnimationBuild={
-            isHistoryReadOnly ? undefined : vm.clearElementAnimationBuild
-          }
-          onReorderElementAnimationBuild={
-            isHistoryReadOnly ? undefined : vm.reorderElementAnimationBuild
-          }
-          onPlayAnimationPreview={vm.playAnimationPreview}
-          onImportImage={
-            isHistoryReadOnly
-              ? undefined
-              : (file) => {
-                  void vm.importImageFile(file);
-                }
-          }
-          stockGifResults={vm.stockGifResults}
-          stockImageResults={vm.stockImageResults}
-          stockMediaError={vm.stockMediaError}
-          stockMediaProviderState={vm.stockMediaProviderState}
-          stockMediaRecentItems={vm.stockMediaRecentItems}
-          stockMediaSearchingGifs={vm.stockMediaSearching.gifs}
-          stockMediaSearchingImages={vm.stockMediaSearching.images}
-          onConfigureStockMedia={vm.openMediaSettings}
-          onRemoveAsset={isHistoryReadOnly ? undefined : vm.removeAsset}
-          onImportMedia={isHistoryReadOnly ? undefined : importMediaFile}
-          onInsertStockMedia={isHistoryReadOnly ? undefined : vm.insertStockMedia}
-          onInsertText={isHistoryReadOnly ? undefined : vm.insertTextElement}
-          onInsertShape={isHistoryReadOnly ? undefined : vm.insertShapeElement}
-          onSearchStockGifs={(query) => {
-            void vm.searchStockGifs(query);
-          }}
-          onSearchStockImages={(query) => {
-            void vm.searchStockImages(query);
-          }}
-          modelStates={vm.modelStates}
-          attentionModelId={
-            vm.aiToolsAttentionModelId ??
-            (vm.backgroundSelectionNotice ? modelSetupService.IMAGE_EDITING_MODEL_ID : undefined)
-          }
-          createImageOptions={vm.createImageOptions}
-          translationLanguageOptions={vm.translationLanguageOptions}
-          promptProviderStates={vm.promptProviderStates}
-          translationProviderStates={vm.translationProviderStates}
-          languageDetectionProviderStates={vm.languageDetectionProviderStates}
-          languageDetectionPreparation={vm.languageDetectionPreparation}
-          translationPreparation={vm.translationPreparation}
-          translationTargetAttention={vm.translationTargetAttention}
-          translationTargetLanguage={vm.translationTargetLanguage}
-          promptApiAttention={vm.promptApiAttention}
-          promptApiNotice={vm.promptApiNotice}
-          promptPreparation={vm.promptPreparation}
-          onDownloadModel={vm.downloadModel}
-          onRemoveModel={vm.removeModel}
-          onCreateImageOptionsChange={vm.setCreateImageOptions}
-          onPreparePromptApi={vm.preparePromptApi}
-          onPrepareLanguageDetectionProvider={vm.prepareSelectedLanguageDetectionProvider}
-          onPrepareTranslationProvider={vm.prepareSelectedTranslationProvider}
-          onPromptProviderChange={(providerId) => {
-            void vm.setPromptProvider(providerId);
-          }}
-          onLanguageDetectionProviderChange={(providerId) => {
-            void vm.setLanguageDetectionProvider(providerId);
-          }}
-          onTranslationTargetLanguageChange={(languageCode) => {
-            void vm.setTranslationTargetLanguage(languageCode);
-          }}
-          onTranslationProviderChange={(providerId) => {
-            void vm.setTranslationProvider(providerId);
-          }}
+          onSelectElement={selectElement}
         />
         <section
           className={[
