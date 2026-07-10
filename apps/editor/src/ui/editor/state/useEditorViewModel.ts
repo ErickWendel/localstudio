@@ -13,13 +13,11 @@ import type {
 import type { GeneratedSlideElement } from '../../../domain/generated-slides/generatedSlide';
 import { fitImageWithinPage } from '../../../domain/images/imageSizing';
 import type {
-  DesignElement,
   ImageElement,
   Page,
   PageBackground,
   ProjectDocument,
   SelectionState,
-  ShapeElement,
   ShapeKind,
   SlideTransition,
 } from '../../../domain/documents/model';
@@ -58,6 +56,8 @@ import { useStockMediaLibrary } from './use-stock-media-library';
 import { editorViewModelProgress } from './editorViewModelProgress';
 import { editorViewModelProject } from './editorViewModelProject';
 import { editorViewModelRuntime } from './editorViewModelRuntime';
+import { editorViewModelElements } from './editorViewModelElements';
+import type { ElementClipboardState } from './editorViewModelElements';
 
 export type RightPanelTab =
   | 'layout'
@@ -109,11 +109,6 @@ export interface PresentationImportProgressState {
   title: string;
 }
 
-interface ElementClipboardState {
-  assets: ProjectDocument['assets'];
-  elements: DesignElement[];
-}
-
 export type RemoteImportStatus =
   | 'loading'
   | 'ready'
@@ -126,8 +121,6 @@ const PROMPT_API_REQUIRED_MESSAGE = 'LLM model must be prepared before using pro
 const IMAGE_GENERATION_MODEL_REQUIRED_MESSAGE =
   'Download image generation models before creating images.';
 const IMAGE_PROMPT_MODE_REQUIRED_MESSAGE = 'Use Create image from the + menu to generate images.';
-const PASTED_ELEMENT_OFFSET = 32;
-
 type TranslationScope = 'selection' | 'slide' | 'deck';
 
 const DECK_TRANSLATION_CONCURRENCY = 3;
@@ -2588,38 +2581,28 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function getSelectedElementsForClipboard() {
-    const page = project.pages.find((item) => item.id === activePageId);
-    if (!page) return [];
-    return page.elementIds
-      .filter((elementId) => selectedElementIds.includes(elementId))
-      .map((elementId) => project.elements[elementId])
-      .filter((element): element is DesignElement => Boolean(element));
+    return editorViewModelElements.getSelectedElementsForClipboard({
+      activePageId,
+      project,
+      selectedElementIds,
+    });
   }
 
   function copySelectedElements() {
     const selectedElements = getSelectedElementsForClipboard();
     if (selectedElements.length === 0) return;
-    const copiedAssets: ProjectDocument['assets'] = {};
-    for (const element of selectedElements) {
-      if (element.type !== 'image' && element.type !== 'gif' && element.type !== 'video') continue;
-      const asset = project.assets[element.assetId];
-      if (asset) copiedAssets[element.assetId] = asset;
-    }
     setElementClipboard({
-      assets: copiedAssets,
+      assets: editorViewModelElements.collectClipboardAssets(project, selectedElements),
       elements: selectedElements.map((element) => ({ ...element })),
     });
   }
 
   function pasteCopiedElements() {
     if (elementClipboard.elements.length === 0) return false;
-    const pastedElements = elementClipboard.elements.map((element) => ({
-      ...element,
-      id: createPrefixedId(`${element.id}-copy`),
-      x: element.x + PASTED_ELEMENT_OFFSET,
-      y: element.y + PASTED_ELEMENT_OFFSET,
-      locked: false,
-    }));
+    const pastedElements = editorViewModelElements.createPastedElements({
+      createElementId: (sourceElementId) => createPrefixedId(`${sourceElementId}-copy`),
+      elements: elementClipboard.elements,
+    });
 
     commitProject(
       (currentProject) =>
@@ -2701,96 +2684,14 @@ export function useEditorViewModel(services: AppServices) {
     const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
     if (!page) return;
     const selectedElement = project.elements[selectedElementIds[0] ?? ''];
-    const titleTemplate = project.elements['text-title'];
-    const subtitleTemplate = project.elements['text-subtitle'];
-    const presetStyles: Record<
-      TextPreset,
-      Omit<
-        Extract<DesignElement, { type: 'text' }>,
-        'id' | 'locked' | 'opacity' | 'rotation' | 'type' | 'visible' | 'x' | 'y'
-      >
-    > = {
-      title:
-        titleTemplate?.type === 'text'
-          ? {
-              text: 'Add a heading',
-              width: titleTemplate.width,
-              height: titleTemplate.height,
-              fontFamily: titleTemplate.fontFamily,
-              fontSize: titleTemplate.fontSize,
-              fontWeight: titleTemplate.fontWeight,
-              fill: titleTemplate.fill,
-              align: titleTemplate.align,
-            }
-          : {
-              text: 'Add a heading',
-              width: 680,
-              height: 220,
-              fontFamily: 'Orbitron',
-              fontSize: 96,
-              fontWeight: 800,
-              fill: '#37FD76',
-              align: 'center',
-            },
-      subtitle:
-        subtitleTemplate?.type === 'text'
-          ? {
-              text: 'Add a subheading',
-              width: subtitleTemplate.width,
-              height: subtitleTemplate.height,
-              fontFamily: subtitleTemplate.fontFamily,
-              fontSize: subtitleTemplate.fontSize,
-              fontWeight: subtitleTemplate.fontWeight,
-              fill: subtitleTemplate.fill,
-              align: subtitleTemplate.align,
-            }
-          : {
-              text: 'Add a subheading',
-              width: 720,
-              height: 92,
-              fontFamily: 'Open Sans',
-              fontSize: 44,
-              fontWeight: 700,
-              fill: '#FFFFFF',
-              align: 'center',
-            },
-      body: {
-        text: 'Add a little bit of body text',
-        width: 760,
-        height: 120,
-        fontFamily: 'Open Sans',
-        fontSize: 32,
-        fontWeight: 500,
-        fill: '#FFFFFF',
-        align: 'left',
-      },
-    };
-    const style = presetStyles[preset];
-    const width = style.width;
-    const height = style.height;
     const elementId = createPrefixedId('text');
-    const nextElement: DesignElement = {
-      id: elementId,
-      type: 'text',
-      text: style.text,
-      x: selectedElement
-        ? Math.min(page.width - width, selectedElement.x + PASTED_ELEMENT_OFFSET)
-        : (page.width - width) / 2,
-      y: selectedElement
-        ? Math.min(page.height - height, selectedElement.y + PASTED_ELEMENT_OFFSET)
-        : (page.height - height) / 2,
-      width,
-      height,
-      rotation: 0,
-      locked: false,
-      visible: true,
-      opacity: 1,
-      fontFamily: style.fontFamily,
-      fontSize: style.fontSize,
-      fontWeight: style.fontWeight,
-      fill: style.fill,
-      align: style.align,
-    };
+    const nextElement = editorViewModelElements.createTextElement({
+      elementId,
+      page,
+      preset,
+      project,
+      selectedElement,
+    });
 
     commitProject(
       (currentProject) =>
@@ -2803,39 +2704,13 @@ export function useEditorViewModel(services: AppServices) {
     const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
     if (!page) return;
     const selectedElement = project.elements[selectedElementIds[0] ?? ''];
-    const isLinearShape = shape === 'line' || shape === 'arc';
-    const defaultFrame: Record<ShapeKind, { width: number; height: number }> = {
-      arc: { width: 260, height: 180 },
-      arrow: { width: 260, height: 140 },
-      diamond: { width: 180, height: 180 },
-      ellipse: { width: 180, height: 180 },
-      line: { width: 260, height: 120 },
-      parallelogram: { width: 240, height: 150 },
-      pentagon: { width: 190, height: 190 },
-      rect: { width: 180, height: 180 },
-      'rounded-rect': { width: 240, height: 150 },
-      triangle: { width: 190, height: 180 },
-    };
-    const { width, height } = defaultFrame[shape];
     const elementId = createPrefixedId('shape');
-    const nextElement: ShapeElement = {
-      id: elementId,
-      type: 'shape',
+    const nextElement = editorViewModelElements.createShapeElement({
+      elementId,
+      page,
+      selectedElement,
       shape,
-      x: selectedElement
-        ? Math.min(page.width - width, selectedElement.x + PASTED_ELEMENT_OFFSET)
-        : (page.width - width) / 2,
-      y: selectedElement
-        ? Math.min(page.height - height, selectedElement.y + PASTED_ELEMENT_OFFSET)
-        : (page.height - height) / 2,
-      width,
-      height,
-      rotation: 0,
-      locked: false,
-      visible: true,
-      opacity: 1,
-      ...(isLinearShape ? { stroke: '#37FD76', strokeWidth: 4 } : { fill: '#37FD76' }),
-    };
+    });
 
     commitProject(
       (currentProject) =>
