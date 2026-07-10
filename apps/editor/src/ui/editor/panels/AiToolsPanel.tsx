@@ -1,15 +1,16 @@
-import { Download, ImagePlus, Languages, ScanSearch, X } from 'lucide-react';
+import { ImagePlus, Languages, ScanSearch } from 'lucide-react';
 import { aiModelCatalog } from '../../../services/model-setup/aiModelCatalog';
 import type {
   AiProviderState,
   ModelDownloadProgressDetails,
   ModelState,
 } from '../../../services/contracts/interfaces';
-import { IconButton } from '../../components/IconButton';
 import { StatusPill } from '../../components/StatusPill';
 import { AiToolsDownloadProgress } from './AiToolsDownloadProgress';
+import { AiToolsHelpTip } from './AiToolsHelpTip';
 import { AiToolsModelRow } from './AiToolsModelRow';
 import { aiToolsProviderFallbacks } from './AiToolsProviderFallbacks';
+import { AiToolsProviderCard } from './AiToolsProviderCard';
 import { AiToolsSetupAction } from './AiToolsSetupAction';
 import type { CreateImagePromptOptions } from '../media/imagePromptOptions';
 import { imagePromptOptions } from '../media/imagePromptOptions';
@@ -100,19 +101,6 @@ function getModelSetupTaskStatus(
 ): 'idle' | 'downloading' | 'ready' | 'failed' {
   return getModelProgressStatus(
     modelStates.find((model) => model.id === modelId)?.status ?? 'needs-download',
-  );
-}
-
-function ToolHelp({ id, text }: { id: string; text: string }) {
-  return (
-    <span className="translation-target-help">
-      <span aria-describedby={id} className="material-symbols-outlined" tabIndex={0}>
-        info
-      </span>
-      <span id={id} className="translation-target-tooltip" role="tooltip">
-        {text}
-      </span>
-    </span>
   );
 }
 
@@ -262,289 +250,88 @@ export function AiToolsPanel({
     <div className="panel-stack" data-tour-id="ai-tools-panel">
       <AiToolsSetupAction tasks={setupTasks} />
       <div className="tool-card-list ew-panel-card">
-        <article
-          className={
-            promptApiAttention
-              ? 'tool-card ew-surface ew-surface-hover tool-card-attention'
-              : 'tool-card ew-surface ew-surface-hover'
-          }
-          aria-label="LLM Model"
-          data-tour-id="ai-llm-model"
-        >
-          <div className="tool-card-heading ew-compact-row">
-            <ImagePlus size={18} />
-            <strong>LLM Model</strong>
-            <StatusPill
-              label={selectedPromptProvider?.runtime === 'chrome-built-in' ? 'CHROME' : 'EXTERNAL'}
-              tone={selectedPromptProvider?.compatibility === 'compatible' ? 'success' : 'neutral'}
-            />
-            {promptStatus === 'downloading' ? null : selectedPromptNeedsDownload ? (
-              <IconButton
-                label="Download LLM Model"
-                attention
-                disabled={selectedPromptProvider?.compatibility === 'incompatible'}
-                onClick={() => {
-                  void onPreparePromptApi?.();
-                }}
-              >
-                <Download size={14} />
-              </IconButton>
-            ) : selectedPromptCanRemove ? (
-              <IconButton
-                label="Remove LLM Model"
-                tone="danger"
-                onClick={() => {
-                  void onRemoveModel?.(selectedPromptProvider.modelId!);
-                }}
-              >
-                <X size={14} />
-              </IconButton>
-            ) : null}
-          </div>
-          <p>Choose the local model used for prompt-to-slides.</p>
-          <label className="translation-target-control ew-field-scope">
-            <span className="translation-target-label ew-inline-row">Model</span>
-            <select
-              aria-label="LLM Model"
-              disabled={promptPreparation.status === 'downloading'}
-              value={selectedPromptProvider?.id ?? ''}
-              onChange={(event) => onPromptProviderChange?.(event.target.value)}
-            >
-              {promptProviders.map((provider) => (
-                <option
-                  key={provider.id}
-                  value={provider.id}
-                  disabled={provider.compatibility === 'incompatible'}
-                >
-                  {provider.label}
-                  {provider.compatibility === 'incompatible' ? ' - unavailable' : ''}
-                </option>
-              ))}
-            </select>
-            {selectedPromptProvider?.disabledReason ? (
-              <span className="translation-source-note">
-                {selectedPromptProvider.disabledReason}
-              </span>
-            ) : null}
-          </label>
-          <div className="translation-target-control ew-field-scope">
-            <div className="translation-preparation ew-grid-compact" aria-label="LLM preparation">
-              <div className="translation-preparation-meta">
-                <StatusPill
-                  label={getPreparationLabel(promptStatus)}
-                  tone={getPreparationTone(promptStatus)}
-                />
-                <AiToolsDownloadProgress
-                  details={{ ...promptPreparation, progress: promptProgress }}
-                  status={promptStatus}
-                />
-              </div>
-              {promptStatus === 'downloading' ? (
-                <>
-                  <div className="model-progress">
-                    <span style={{ width: `${promptProgress}%` }} />
-                  </div>
-                  <span className="translation-source-note">
-                    {promptApiNotice ?? `Availability: ${promptPreparation.availability}`}
-                  </span>
-                </>
-              ) : null}
-            </div>
-          </div>
-        </article>
+        <AiToolsProviderCard
+          actionLabel="LLM Model"
+          ariaLabel="LLM Model"
+          attention={promptApiAttention}
+          canRemove={Boolean(selectedPromptCanRemove)}
+          description="Choose the local model used for prompt-to-slides."
+          disabledReason={selectedPromptProvider?.disabledReason}
+          icon={ImagePlus}
+          isActionDisabled={selectedPromptProvider?.compatibility === 'incompatible'}
+          needsDownload={selectedPromptNeedsDownload}
+          onPrepare={onPreparePromptApi}
+          onProviderChange={onPromptProviderChange}
+          onRemove={onRemoveModel}
+          preparationAriaLabel="LLM preparation"
+          preparationDetails={promptPreparation}
+          preparationNote={promptApiNotice ?? `Availability: ${promptPreparation.availability}`}
+          preparationProgress={promptProgress}
+          preparationStatus={promptStatus}
+          providerModelId={selectedPromptProvider?.modelId}
+          providers={promptProviders}
+          runtime={selectedPromptProvider?.runtime}
+          selectedProviderId={selectedPromptProvider?.id ?? ''}
+          selectLabel="Model"
+          title="LLM Model"
+          tourId="ai-llm-model"
+        />
 
-        <article
-          className="tool-card ew-surface ew-surface-hover"
-          aria-label="Language Detection"
-          data-tour-id="ai-language-detection"
-        >
-          <div className="tool-card-heading ew-compact-row">
-            <ScanSearch size={18} />
-            <strong>Language Detection</strong>
-            <StatusPill
-              label={
-                selectedLanguageDetectionProvider?.runtime === 'chrome-built-in'
-                  ? 'CHROME'
-                  : 'EXTERNAL'
-              }
-              tone={
-                selectedLanguageDetectionProvider?.compatibility === 'compatible'
-                  ? 'success'
-                  : 'neutral'
-              }
-            />
-            {languageDetectionStatus ===
-            'downloading' ? null : selectedLanguageDetectionNeedsDownload ? (
-              <IconButton
-                label="Download Language Detection Model"
-                attention
-                disabled={selectedLanguageDetectionProvider?.compatibility === 'incompatible'}
-                onClick={() => {
-                  void onPrepareLanguageDetectionProvider?.();
-                }}
-              >
-                <Download size={14} />
-              </IconButton>
-            ) : selectedLanguageDetectionCanRemove ? (
-              <IconButton
-                label="Remove Language Detection Model"
-                tone="danger"
-                onClick={() => {
-                  void onRemoveModel?.(selectedLanguageDetectionProvider.modelId!);
-                }}
-              >
-                <X size={14} />
-              </IconButton>
-            ) : null}
-          </div>
-          <p>Choose how LocalStudio.dev detects source text language before translation.</p>
-          <label className="translation-target-control ew-field-scope">
-            <span className="translation-target-label ew-inline-row">Detection Model</span>
-            <select
-              aria-label="Language Detection Model"
-              disabled={languageDetectionPreparation.status === 'downloading'}
-              value={selectedLanguageDetectionProvider?.id ?? ''}
-              onChange={(event) => onLanguageDetectionProviderChange?.(event.target.value)}
-            >
-              {languageDetectionProviders.map((provider) => (
-                <option
-                  key={provider.id}
-                  value={provider.id}
-                  disabled={provider.compatibility === 'incompatible'}
-                >
-                  {provider.label}
-                  {provider.compatibility === 'incompatible' ? ' - unavailable' : ''}
-                </option>
-              ))}
-            </select>
-            {selectedLanguageDetectionProvider?.disabledReason ? (
-              <span className="translation-source-note">
-                {selectedLanguageDetectionProvider.disabledReason}
-              </span>
-            ) : null}
-          </label>
-          <div className="translation-target-control ew-field-scope">
-            <div
-              className="translation-preparation ew-grid-compact"
-              aria-label="Language detection preparation"
-            >
-              <div className="translation-preparation-meta">
-                <StatusPill
-                  label={getPreparationLabel(languageDetectionStatus)}
-                  tone={getPreparationTone(languageDetectionStatus)}
-                />
-                <AiToolsDownloadProgress
-                  details={{ ...languageDetectionPreparation, progress: languageDetectionProgress }}
-                  status={languageDetectionStatus}
-                />
-              </div>
-              {languageDetectionStatus === 'downloading' ? (
-                <div className="model-progress">
-                  <span style={{ width: `${languageDetectionProgress}%` }} />
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </article>
+        <AiToolsProviderCard
+          actionLabel="Language Detection Model"
+          ariaLabel="Language Detection"
+          canRemove={Boolean(selectedLanguageDetectionCanRemove)}
+          description="Choose how LocalStudio.dev detects source text language before translation."
+          disabledReason={selectedLanguageDetectionProvider?.disabledReason}
+          icon={ScanSearch}
+          isActionDisabled={selectedLanguageDetectionProvider?.compatibility === 'incompatible'}
+          needsDownload={selectedLanguageDetectionNeedsDownload}
+          onPrepare={onPrepareLanguageDetectionProvider}
+          onProviderChange={onLanguageDetectionProviderChange}
+          onRemove={onRemoveModel}
+          preparationAriaLabel="Language detection preparation"
+          preparationDetails={languageDetectionPreparation}
+          preparationProgress={languageDetectionProgress}
+          preparationStatus={languageDetectionStatus}
+          providerModelId={selectedLanguageDetectionProvider?.modelId}
+          providers={languageDetectionProviders}
+          runtime={selectedLanguageDetectionProvider?.runtime}
+          selectedProviderId={selectedLanguageDetectionProvider?.id ?? ''}
+          selectLabel="Detection Model"
+          title="Language Detection"
+          tourId="ai-language-detection"
+        />
 
-        <article
-          className={
-            translationTargetAttention
-              ? 'tool-card ew-surface ew-surface-hover tool-card-attention'
-              : 'tool-card ew-surface ew-surface-hover'
-          }
-          aria-label="Translate Design"
-          data-tour-id="ai-translate-design"
+        <AiToolsProviderCard
+          actionLabel="Translation Model"
+          ariaLabel="Translate Design"
+          attention={translationTargetAttention}
+          canRemove={Boolean(selectedTranslationCanRemove)}
+          description="Translate visible text using the selected local translation model."
+          disabledReason={selectedTranslationProvider?.disabledReason}
+          icon={Languages}
+          isActionDisabled={selectedTranslationProvider?.compatibility === 'incompatible'}
+          needsDownload={selectedTranslationNeedsDownload}
+          onPrepare={onPrepareTranslationProvider}
+          onProviderChange={onTranslationProviderChange}
+          onRemove={onRemoveModel}
+          preparationAriaLabel="Translation model preparation"
+          preparationDetails={translationPreparation}
+          preparationProgress={translationProviderProgress}
+          preparationStatus={translationProviderStatus}
+          providerModelId={selectedTranslationProvider?.modelId}
+          providers={translationProviders}
+          runtime={selectedTranslationProvider?.runtime}
+          selectedProviderId={selectedTranslationProvider?.id ?? ''}
+          selectLabel="Translation Model"
+          shouldShowPreparation={Boolean(selectedTranslationProvider?.modelId)}
+          title="Translate Design"
+          tourId="ai-translate-design"
         >
-          <div className="tool-card-heading ew-compact-row">
-            <Languages size={18} />
-            <strong>Translate Design</strong>
-            <StatusPill
-              label={
-                selectedTranslationProvider?.runtime === 'chrome-built-in' ? 'CHROME' : 'EXTERNAL'
-              }
-              tone={
-                selectedTranslationProvider?.compatibility === 'compatible' ? 'success' : 'neutral'
-              }
-            />
-            {translationProviderStatus ===
-            'downloading' ? null : selectedTranslationNeedsDownload ? (
-              <IconButton
-                label="Download Translation Model"
-                attention
-                disabled={selectedTranslationProvider?.compatibility === 'incompatible'}
-                onClick={() => {
-                  void onPrepareTranslationProvider?.();
-                }}
-              >
-                <Download size={14} />
-              </IconButton>
-            ) : selectedTranslationCanRemove ? (
-              <IconButton
-                label="Remove Translation Model"
-                tone="danger"
-                onClick={() => {
-                  void onRemoveModel?.(selectedTranslationProvider.modelId!);
-                }}
-              >
-                <X size={14} />
-              </IconButton>
-            ) : null}
-          </div>
-          <p>Translate visible text using the selected local translation model.</p>
-          <label className="translation-target-control ew-field-scope">
-            <span className="translation-target-label ew-inline-row">Translation Model</span>
-            <select
-              aria-label="Translation Model"
-              disabled={translationPreparation.status === 'downloading'}
-              value={selectedTranslationProvider?.id ?? ''}
-              onChange={(event) => onTranslationProviderChange?.(event.target.value)}
-            >
-              {translationProviders.map((provider) => (
-                <option
-                  key={provider.id}
-                  value={provider.id}
-                  disabled={provider.compatibility === 'incompatible'}
-                >
-                  {provider.label}
-                  {provider.compatibility === 'incompatible' ? ' - unavailable' : ''}
-                </option>
-              ))}
-            </select>
-            {selectedTranslationProvider?.disabledReason ? (
-              <span className="translation-source-note">
-                {selectedTranslationProvider.disabledReason}
-              </span>
-            ) : null}
-          </label>
-          {selectedTranslationProvider?.modelId ? (
-            <div className="translation-target-control ew-field-scope">
-              <div
-                className="translation-preparation ew-grid-compact"
-                aria-label="Translation model preparation"
-              >
-                <div className="translation-preparation-meta">
-                  <StatusPill
-                    label={getPreparationLabel(translationProviderStatus)}
-                    tone={getPreparationTone(translationProviderStatus)}
-                  />
-                  <AiToolsDownloadProgress
-                    details={{ ...translationPreparation, progress: translationProviderProgress }}
-                    status={translationProviderStatus}
-                  />
-                </div>
-                {translationProviderStatus === 'downloading' ? (
-                  <div className="model-progress">
-                    <span style={{ width: `${translationProviderProgress}%` }} />
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
           <label className="translation-target-control ew-field-scope">
             <span className="translation-target-label ew-inline-row">
               Translate to:
-              <ToolHelp
+              <AiToolsHelpTip
                 id="translation-target-tooltip"
                 text="Choose the language that will be used for all translations in this deck."
               />
@@ -600,7 +387,7 @@ export function AiToolsPanel({
               </div>
             ) : null}
           </label>
-        </article>
+        </AiToolsProviderCard>
 
         {visibleModelStates.map((model) => (
           <AiToolsModelRow
