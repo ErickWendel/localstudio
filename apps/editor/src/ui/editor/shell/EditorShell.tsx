@@ -40,9 +40,12 @@ import {
   EditorAiWorkflowTour,
   type EditorAiWorkflowTourHandle,
 } from '../tour/EditorAiWorkflowTour';
+import { AudienceFullscreenPrompt } from './AudienceFullscreenPrompt';
 import { editorImageExport } from './editor-image-export';
 import type { ImageExportFrame } from './editor-image-export';
 import { editorShortcutActions } from './editor-shortcut-actions';
+import { PresentationSlideNavigator } from './PresentationSlideNavigator';
+import { SpeakerNotesEditor } from './SpeakerNotesEditor';
 
 interface EditorShellProps {
   services: AppServices;
@@ -1273,49 +1276,16 @@ export function EditorShell({ services }: EditorShellProps) {
             />
           ) : null}
           {slideNavigatorOpen ? (
-            <div
-              className="presentation-slide-navigator"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Slide navigator"
-            >
-              <div className="presentation-slide-navigator-header">
-                <h2>Slide Navigator</h2>
-                <button
-                  className="stitch-icon-button"
-                  type="button"
-                  aria-label="Close slide navigator"
-                  onClick={() => setSlideNavigatorOpen(false)}
-                >
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    close
-                  </span>
-                </button>
-              </div>
-              <div className="presentation-slide-navigator-list" role="listbox" aria-label="Slides">
-                {vm.project.pages.map((page, index) => (
-                  <button
-                    aria-selected={index === slideNavigatorIndex}
-                    className={
-                      index === slideNavigatorIndex
-                        ? 'presentation-slide-navigator-item presentation-slide-navigator-item-active'
-                        : 'presentation-slide-navigator-item'
-                    }
-                    key={page.id}
-                    type="button"
-                    role="option"
-                    onClick={() => setSlideNavigatorIndex(index)}
-                    onDoubleClick={() => {
-                      playPresentationPageAt(index);
-                      setSlideNavigatorOpen(false);
-                    }}
-                  >
-                    <span>Slide {index + 1}</span>
-                    <strong>{page.name}</strong>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <PresentationSlideNavigator
+              project={vm.project}
+              selectedIndex={slideNavigatorIndex}
+              onClose={() => setSlideNavigatorOpen(false)}
+              onPlayPageAt={(index) => {
+                playPresentationPageAt(index);
+                setSlideNavigatorOpen(false);
+              }}
+              onSelectIndex={setSlideNavigatorIndex}
+            />
           ) : null}
           {presentationBlankScreen ? (
             <div
@@ -1452,44 +1422,13 @@ export function EditorShell({ services }: EditorShellProps) {
             onSetPageVisibility={isHistoryReadOnly ? undefined : vm.setPageVisibility}
           />
           {activePage ? (
-            <section className="speaker-notes-editor" aria-label="Speaker notes editor">
-              {speakerNotesOpen ? (
-                <div className="speaker-notes-card">
-                  <header className="speaker-notes-header">
-                    <h2>
-                      Page {activePageIndex + 1} - {activePage.name}
-                    </h2>
-                    <div className="speaker-notes-actions ew-compact-row">
-                      <button type="button" aria-label="Change notes text size">
-                        aA
-                      </button>
-                      <button
-                        type="button"
-                        aria-label="Close notes panel"
-                        onClick={() => setSpeakerNotesOpen(false)}
-                      >
-                        <span className="material-symbols-outlined" aria-hidden="true">
-                          close
-                        </span>
-                      </button>
-                    </div>
-                  </header>
-                  <textarea
-                    id="speaker-notes-textarea"
-                    aria-label="Speaker notes"
-                    maxLength={5000}
-                    placeholder="Add notes to your design"
-                    value={activePage.speakerNotes ?? ''}
-                    onChange={(event) =>
-                      vm.updatePageSpeakerNotes(activePage.id, event.target.value)
-                    }
-                  />
-                  <span className="speaker-notes-count">
-                    {activePage.speakerNotes?.length ?? 0}/5000
-                  </span>
-                </div>
-              ) : null}
-            </section>
+            <SpeakerNotesEditor
+              page={activePage}
+              pageIndex={activePageIndex}
+              open={speakerNotesOpen}
+              onClose={() => setSpeakerNotesOpen(false)}
+              onUpdateNotes={vm.updatePageSpeakerNotes}
+            />
           ) : null}
           {presenterViewError ? (
             <p className="presenter-view-error" role="alert">
@@ -1502,37 +1441,10 @@ export function EditorShell({ services }: EditorShellProps) {
             </div>
           ) : null}
           {audienceFullscreenPromptOpen ? (
-            <div className="audience-fullscreen-backdrop" role="presentation">
-              <section
-                className="audience-fullscreen-dialog"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="audience-fullscreen-title"
-              >
-                <button
-                  className="audience-fullscreen-close"
-                  type="button"
-                  aria-label="Close audience fullscreen prompt"
-                  onClick={closePresenterViewSession}
-                >
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    close
-                  </span>
-                </button>
-                <h2 id="audience-fullscreen-title">Audience Window</h2>
-                <p>
-                  This window is what your audience sees. Drag it to the screen your audience will
-                  be looking at and enter full screen mode.
-                </p>
-                <button
-                  className="audience-fullscreen-primary"
-                  type="button"
-                  onClick={enterAudienceFullscreen}
-                >
-                  Enter full screen mode
-                </button>
-              </section>
-            </div>
+            <AudienceFullscreenPrompt
+              onClose={closePresenterViewSession}
+              onEnterFullscreen={enterAudienceFullscreen}
+            />
           ) : null}
           <input
             ref={toolbarImageInputRef}

@@ -42,11 +42,11 @@ import { canvasWorkspaceUtils } from './canvasWorkspaceUtils';
 import { movieStartPlayback } from '../media/movieStartPlayback';
 import { animationPresetEngine } from '../animation/animationPresetEngine';
 import { BackgroundSelectionPreview } from './BackgroundSelectionPreview';
-import { backgroundSelectionMessage } from './background-selection-message';
 import { CanvasImageElement } from './CanvasImageElement';
 import { CanvasMediaElement } from './CanvasMediaElement';
+import { CanvasShapeElement } from './CanvasShapeElement';
+import { CanvasStatusHint } from './CanvasStatusHint';
 import { CropFrameOverlay } from './CropFrameOverlay';
-import { LinearShapeElement } from './LinearShapeElement';
 import type { CommonElementProps, ElementAnimationRenderState } from './canvas-element-props';
 import { shapeLineDraw } from './shape-line-draw';
 
@@ -894,51 +894,16 @@ export function CanvasWorkspace({
             processingSelectedImageId ||
             isTranslating ||
             translationNotice) ? (
-            <div
-              className={`background-selection-hint ${
-                isTranslating || translationNotice ? 'background-selection-hint-translation' : ''
-              }`}
-              role="status"
-            >
-              <span className="material-symbols-outlined" aria-hidden="true">
-                {isTranslating || translationNotice
-                  ? 'translate'
-                  : processingSelectedImageId
-                    ? 'auto_fix_high'
-                    : backgroundSelectionNotice
-                      ? 'download'
-                      : 'ads_click'}
-              </span>
-              <span>
-                {isTranslating
-                  ? 'Translating text...'
-                  : (translationNotice ??
-                    backgroundSelectionMessage.getMessage({
-                      backgroundPreparation: activeBackgroundPreparation,
-                      backgroundPreview,
-                      backgroundSelectionTargetId,
-                      backgroundSelectionNotice,
-                      processingSelectedImageId,
-                    }))}
-              </span>
-              {activeBackgroundPreparation?.status === 'preparing' && !isTranslating ? (
-                <span
-                  aria-label="Image extraction progress"
-                  aria-valuemax={100}
-                  aria-valuemin={0}
-                  aria-valuenow={activeBackgroundPreparation.progress}
-                  className="background-selection-progress"
-                  role="progressbar"
-                >
-                  <span style={{ width: `${activeBackgroundPreparation.progress}%` }} />
-                </span>
-              ) : null}
-              {processingSelectedImageId || isTranslating ? null : (
-                <button type="button" onClick={onCancelBackgroundSelection}>
-                  Esc
-                </button>
-              )}
-            </div>
+            <CanvasStatusHint
+              backgroundPreparation={activeBackgroundPreparation}
+              backgroundPreview={backgroundPreview}
+              backgroundSelectionNotice={backgroundSelectionNotice}
+              backgroundSelectionTargetId={backgroundSelectionTargetId}
+              isTranslating={isTranslating}
+              processingSelectedImageId={processingSelectedImageId}
+              translationNotice={translationNotice}
+              onCancelBackgroundSelection={onCancelBackgroundSelection}
+            />
           ) : null}
           <Stage
             ref={stageRef}
@@ -964,118 +929,14 @@ export function CanvasWorkspace({
                 };
 
                 if (element.type === 'shape') {
-                  const paint = canvasWorkspaceUtils.getShapePaint(element);
                   const lineDrawState = shapeLineDraw.getState(element, animationState);
-                  if (element.shape === 'ellipse') {
-                    return (
-                      <Rect
-                        {...commonProps}
-                        {...paint}
-                        key={element.id}
-                        cornerRadius={Math.min(commonProps.width, commonProps.height) / 2}
-                        {...(lineDrawState.direction
-                          ? shapeLineDraw.getDash(
-                              shapeLineDraw.getPerimeter(commonProps.width, commonProps.height),
-                              lineDrawState.progress,
-                              lineDrawState.direction,
-                            )
-                          : {})}
-                        ref={nodeRef}
-                      />
-                    );
-                  }
-                  if (element.shape === 'rounded-rect') {
-                    return (
-                      <Rect
-                        {...commonProps}
-                        {...paint}
-                        key={element.id}
-                        cornerRadius={Math.min(commonProps.width, commonProps.height) * 0.18}
-                        {...(lineDrawState.direction
-                          ? shapeLineDraw.getDash(
-                              shapeLineDraw.getPerimeter(commonProps.width, commonProps.height),
-                              lineDrawState.progress,
-                              lineDrawState.direction,
-                            )
-                          : {})}
-                        ref={nodeRef}
-                      />
-                    );
-                  }
-                  if (element.shape === 'line') {
-                    return (
-                      <LinearShapeElement
-                        commonProps={commonProps}
-                        element={element}
-                        key={element.id}
-                        lineDrawState={lineDrawState}
-                        nodeRef={nodeRef}
-                      />
-                    );
-                  }
-                  if (element.shape === 'arrow') {
-                    return (
-                      <LinearShapeElement
-                        commonProps={commonProps}
-                        element={element}
-                        key={element.id}
-                        lineDrawState={lineDrawState}
-                        nodeRef={nodeRef}
-                      />
-                    );
-                  }
-                  if (element.shape === 'arc') {
-                    return (
-                      <LinearShapeElement
-                        commonProps={commonProps}
-                        element={element}
-                        key={element.id}
-                        lineDrawState={lineDrawState}
-                        nodeRef={nodeRef}
-                      />
-                    );
-                  }
-                  if (
-                    element.shape === 'triangle' ||
-                    element.shape === 'pentagon' ||
-                    element.shape === 'diamond' ||
-                    element.shape === 'parallelogram'
-                  ) {
-                    return (
-                      <Line
-                        {...commonProps}
-                        {...paint}
-                        closed
-                        key={element.id}
-                        points={canvasWorkspaceUtils.getPolygonPoints(
-                          element.shape,
-                          commonProps.width,
-                          commonProps.height,
-                        )}
-                        {...(lineDrawState.direction
-                          ? shapeLineDraw.getDash(
-                              shapeLineDraw.getPerimeter(commonProps.width, commonProps.height),
-                              lineDrawState.progress,
-                              lineDrawState.direction,
-                            )
-                          : {})}
-                        ref={nodeRef}
-                      />
-                    );
-                  }
                   return (
-                    <Rect
-                      {...commonProps}
-                      {...paint}
+                    <CanvasShapeElement
+                      commonProps={commonProps}
+                      element={element}
                       key={element.id}
-                      {...(lineDrawState.direction
-                        ? shapeLineDraw.getDash(
-                            shapeLineDraw.getPerimeter(commonProps.width, commonProps.height),
-                            lineDrawState.progress,
-                            lineDrawState.direction,
-                          )
-                        : {})}
-                      ref={nodeRef}
+                      lineDrawState={lineDrawState}
+                      nodeRef={nodeRef}
                     />
                   );
                 }
