@@ -3,6 +3,7 @@ import type { ProjectDocument } from '../../../domain/documents/model';
 import type { MirrorState, PersistenceStorageMode } from '../../../services/contracts/interfaces';
 import type { OperationNoticeState } from '../state/useEditorViewModel';
 import type { TranslationLanguageOption } from '../translation/translationLanguages';
+import { ProjectPlayControl } from './ProjectPlayControl';
 
 interface TopToolbarProps {
   project: ProjectDocument;
@@ -186,8 +187,8 @@ export function TopToolbar({
 }: TopToolbarProps) {
   const [openMenu, setOpenMenu] = useState<HeaderMenu | null>(null);
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
-  const [playMenuOpen, setPlayMenuOpen] = useState(false);
   const [translationMenuOpen, setTranslationMenuOpen] = useState(false);
+  const [playMenuOpen, setPlayMenuOpen] = useState(false);
   const [isEditingProjectName, setIsEditingProjectName] = useState(false);
   const [projectNameDraft, setProjectNameDraft] = useState(project.name);
   const projectNameInputRef = useRef<HTMLInputElement>(null);
@@ -245,26 +246,6 @@ export function TopToolbar({
   function closeMenu() {
     setOpenMenu(null);
     setOpenSubmenu(null);
-  }
-
-  function startPresenterMode(options?: { fromBeginning?: boolean }) {
-    if (options) {
-      onStartPresenterMode?.(options);
-    } else {
-      onStartPresenterMode?.();
-    }
-    setPlayMenuOpen(false);
-    setTranslationMenuOpen(false);
-  }
-
-  function startDefaultPresentation() {
-    if (onOpenPresenterView) {
-      onOpenPresenterView();
-    } else {
-      onStartPresenterMode?.();
-    }
-    setPlayMenuOpen(false);
-    setTranslationMenuOpen(false);
   }
 
   function commitProjectName() {
@@ -437,8 +418,8 @@ export function TopToolbar({
                 type="button"
                 data-tour-id={`${item.toLowerCase()}-menu-button`}
                 onClick={() => {
-                  setPlayMenuOpen(false);
                   setTranslationMenuOpen(false);
+                  setPlayMenuOpen(false);
                   setOpenSubmenu(null);
                   setOpenMenu((current) => (current === item ? null : item));
                 }}
@@ -558,81 +539,16 @@ export function TopToolbar({
               {project.name}
             </button>
           )}
-          <div className="project-play-shell">
-            <button
-              className="project-play-button project-play-main"
-              type="button"
-              aria-label="Play presentation"
-              data-tour-id="play-presentation"
-              title="Open presenter view"
-              onClick={startDefaultPresentation}
-            >
-              <span className="material-symbols-outlined" aria-hidden="true">
-                play_arrow
-              </span>
-              <span>Play</span>
-            </button>
-            <button
-              className="project-play-button project-play-menu-button"
-              type="button"
-              aria-expanded={playMenuOpen}
-              aria-label="Presentation play options"
-              title="Presentation play options"
-              onClick={() => {
-                setOpenMenu(null);
-                setTranslationMenuOpen(false);
-                setPlayMenuOpen((current) => !current);
-              }}
-            >
-              <span className="material-symbols-outlined" aria-hidden="true">
-                keyboard_arrow_down
-              </span>
-            </button>
-            {playMenuOpen ? (
-              <div
-                className="toolbar-dropdown project-play-dropdown"
-                role="menu"
-                aria-label="Presentation play menu"
-              >
-                <button
-                  className="toolbar-dropdown-item project-play-dropdown-item"
-                  role="menuitem"
-                  type="button"
-                  onClick={() => startPresenterMode()}
-                >
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    fullscreen
-                  </span>
-                  <span>Present in fullscreen</span>
-                </button>
-                <button
-                  className="toolbar-dropdown-item project-play-dropdown-item"
-                  role="menuitem"
-                  type="button"
-                  onClick={() => {
-                    setPlayMenuOpen(false);
-                    onOpenPresenterView?.();
-                  }}
-                >
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    co_present
-                  </span>
-                  <span>Presenter view</span>
-                </button>
-                <button
-                  className="toolbar-dropdown-item project-play-dropdown-item"
-                  role="menuitem"
-                  type="button"
-                  onClick={() => startPresenterMode({ fromBeginning: true })}
-                >
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    skip_previous
-                  </span>
-                  <span>Play from beginning</span>
-                </button>
-              </div>
-            ) : null}
-          </div>
+          <ProjectPlayControl
+            isMenuOpen={playMenuOpen}
+            onMenuOpenChange={(isOpen) => {
+              setOpenMenu(null);
+              setTranslationMenuOpen(false);
+              setPlayMenuOpen(isOpen);
+            }}
+            onOpenPresenterView={onOpenPresenterView}
+            onStartPresenterMode={onStartPresenterMode}
+          />
           <span className="local-only-badge" title={mirrorState.error}>
             {mirrorLabel}
           </span>
