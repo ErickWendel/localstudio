@@ -3,6 +3,8 @@ import { installFakeOpfs } from '../support/fake-opfs';
 import { expect, test, withIsolatedDevServer } from '../support/journey-test';
 
 const getServer = withIsolatedDevServer(test);
+const workspaceRoot = process.cwd().replaceAll('\\', '/');
+const presenterRemoteSourceRoot = `/@fs${workspaceRoot}/packages/presenter-remote/src`;
 
 test.describe('editor service contracts', () => {
   test('executes mocked AI, progress, and automation controller contracts in the browser runtime', async ({
@@ -777,14 +779,12 @@ test.describe('editor service contracts', () => {
   }) => {
     await page.goto(new URL('/editor/?newProject=1', getServer().baseURL).toString());
 
-    const result = await page.evaluate(async () => {
+    const result = await page.evaluate(async ({ presenterRemoteSourceRoot }) => {
       const [{ animationPresetEngine }, { sampleProject }, { InMemoryPresenterRemoteSignalingService }] =
         (await Promise.all([
           import('/editor/src/ui/editor/animation/animationPresetEngine.ts'),
           import('/editor/src/domain/projects/sampleProject.ts'),
-          import(
-            '/@fs/Users/erickwendel/Downloads/projetos/canva-webai-clone/packages/presenter-remote/src/signaling-service.ts'
-          ),
+          import(`${presenterRemoteSourceRoot}/signaling-service.ts`),
         ])) as [
           typeof import('../../../apps/editor/src/ui/editor/animation/animationPresetEngine'),
           typeof import('../../../apps/editor/src/domain/projects/sampleProject'),
@@ -993,7 +993,7 @@ test.describe('editor service contracts', () => {
         untrustedCommandPublished,
         untrustedOffer,
       };
-    });
+    }, { presenterRemoteSourceRoot });
 
     expect(result).toMatchObject({
       activeAfterExpiryCount: 0,
@@ -1280,25 +1280,17 @@ test.describe('editor service contracts', () => {
   test('executes presenter protocol utility contracts in the browser runtime', async ({ page }) => {
     await page.goto(new URL('/editor/?newProject=1', getServer().baseURL).toString());
 
-    const result = await page.evaluate(async () => {
+    const result = await page.evaluate(async ({ presenterRemoteSourceRoot }) => {
       const [
         { presenterRemoteDebugLog },
         { getRuntimePeerOptions },
         { presenterRemoteProtocol },
         { presenterRemoteTimerFormat },
       ] = (await Promise.all([
-        import(
-          '/@fs/Users/erickwendel/Downloads/projetos/canva-webai-clone/packages/presenter-remote/src/debug-log.ts'
-        ),
-        import(
-          '/@fs/Users/erickwendel/Downloads/projetos/canva-webai-clone/packages/presenter-remote/src/peer-options.ts'
-        ),
-        import(
-          '/@fs/Users/erickwendel/Downloads/projetos/canva-webai-clone/packages/presenter-remote/src/protocol.ts'
-        ),
-        import(
-          '/@fs/Users/erickwendel/Downloads/projetos/canva-webai-clone/packages/presenter-remote/src/timer-format.ts'
-        ),
+        import(`${presenterRemoteSourceRoot}/debug-log.ts`),
+        import(`${presenterRemoteSourceRoot}/peer-options.ts`),
+        import(`${presenterRemoteSourceRoot}/protocol.ts`),
+        import(`${presenterRemoteSourceRoot}/timer-format.ts`),
       ])) as [
         typeof import('../../../packages/presenter-remote/src/debug-log'),
         typeof import('../../../packages/presenter-remote/src/peer-options'),
@@ -1478,7 +1470,7 @@ test.describe('editor service contracts', () => {
           presenterRemoteTimerFormat.formatElapsed(3_661_000),
         ],
       };
-    });
+    }, { presenterRemoteSourceRoot });
 
     expect(result).toMatchObject({
       invalidCommand: false,
