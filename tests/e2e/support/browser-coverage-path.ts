@@ -1,4 +1,4 @@
-import { coverageSourceFilter } from './coverage-source-filter';
+import { isCoverageReportableSourceFile } from './coverage-reportable-source-file';
 
 export const browserCoveragePath = {
   fromUrl(url: string): string {
@@ -30,6 +30,6 @@ export const browserCoveragePath = {
 
   shouldFetchSource(url: string): boolean {
     const path = this.fromUrl(url);
-    return path ? coverageSourceFilter.isReportableSourceFile(path, 'all') : false;
+    return path ? isCoverageReportableSourceFile(path, 'all') : false;
   },
 };

@@ -3,8 +3,10 @@ import { mkdir, readFile } from 'node:fs/promises';
 
 import { coverageArtifacts } from './coverage-artifacts';
 import { coverageFiles } from './coverage-files';
+import { isCoverageLocalScript } from './coverage-local-script-filter';
+import { isCoverageReportableSourceFile } from './coverage-reportable-source-file';
 import { coverageReportConfig } from './coverage-report-config';
-import { coverageSourceFilter } from './coverage-source-filter';
+import { normalizeCoverageSourcePath } from './coverage-source-path-normalizer';
 
 interface TestCoverageFile {
   entries: MCR.V8CoverageEntry[];
@@ -38,10 +40,9 @@ export default async function reportPlaywrightCoverage() {
     ],
     clean: true,
     cleanCache: true,
-    entryFilter: (entry) => coverageSourceFilter.isLocalScript(entry, coverageScope),
-    sourcePath: (sourcePath, info) => coverageSourceFilter.normalizeSourcePath(sourcePath, info),
-    sourceFilter: (sourcePath) =>
-      coverageSourceFilter.isReportableSourceFile(sourcePath, coverageScope),
+    entryFilter: (entry) => isCoverageLocalScript(entry, coverageScope),
+    sourcePath: (sourcePath, info) => normalizeCoverageSourcePath(sourcePath, info),
+    sourceFilter: (sourcePath) => isCoverageReportableSourceFile(sourcePath, coverageScope),
     watermarks: {
       bytes: [coverageReportConfig.threshold, 90],
       branches: [coverageReportConfig.threshold, 90],
