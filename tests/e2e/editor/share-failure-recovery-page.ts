@@ -7,7 +7,7 @@ import { shareFailureMirrorRoute } from './share-failure-mirror-route';
 
 export const shareFailureRecoveryPage = {
   async recoverMirrorAndReportClipboardFailure(page: Page, baseURL: string) {
-    await page.addInitScript(installFakeOpfs);
+    await installFakeOpfs(page);
     await page.addInitScript(() => {
       Object.defineProperty(navigator, 'clipboard', {
         configurable: true,

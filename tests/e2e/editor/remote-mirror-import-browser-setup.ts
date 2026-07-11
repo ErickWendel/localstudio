@@ -5,7 +5,7 @@ import { remoteMirrorImportConfig } from './remote-mirror-import-config';
 
 export const remoteMirrorImportBrowserSetup = {
   async install(page: Page): Promise<void> {
-    await page.addInitScript(installFakeOpfs);
+    await installFakeOpfs(page);
     await page.addInitScript((config) => {
       window.localStorage.setItem('localstudio.minioMirror.config', JSON.stringify(config));
     }, remoteMirrorImportConfig);

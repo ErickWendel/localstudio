@@ -7,7 +7,7 @@ import { createStorageContractProject } from './storage-contract-project';
 
 export const storageContractRuntimePage = {
   async run(page: Page, baseURL: string) {
-    await page.addInitScript(installFakeOpfs, { directoryPicker: true });
+    await installFakeOpfs(page, { directoryPicker: true });
     const editor = new EditorAppPage(page, baseURL);
     await editor.gotoNewProject();
 

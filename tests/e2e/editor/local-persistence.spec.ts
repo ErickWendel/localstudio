@@ -6,7 +6,7 @@ const getServer = withIsolatedDevServer(test);
 
 test.describe('editor local persistence journey', () => {
   test('saves a browser-private project, reloads it, and opens version history', async ({ page }) => {
-    await page.addInitScript(installFakeOpfs);
+    await installFakeOpfs(page);
 
     const editor = new EditorAppPage(page, getServer().baseURL);
     await editor.gotoNewProject();
@@ -29,7 +29,7 @@ test.describe('editor local persistence journey', () => {
   test('saves a named project into a picked local folder and keeps Save As usable', async ({
     page,
   }) => {
-    await page.addInitScript(installFakeOpfs, { directoryPicker: true });
+    await installFakeOpfs(page, { directoryPicker: true });
 
     const editor = new EditorAppPage(page, getServer().baseURL);
     await editor.gotoNewProject();

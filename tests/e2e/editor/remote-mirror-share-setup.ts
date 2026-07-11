@@ -4,7 +4,7 @@ import { installFakeOpfs } from '../support/fake-opfs';
 
 export const remoteMirrorShareSetup = {
   async install(context: BrowserContext, page: Page, baseURL: string): Promise<void> {
-    await page.addInitScript(installFakeOpfs);
+    await installFakeOpfs(page);
     await context.grantPermissions(['clipboard-write'], { origin: baseURL });
   },
 };

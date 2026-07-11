@@ -6,7 +6,7 @@ import { serviceContractsSupport } from './service-contracts-support';
 import { createMirrorStorageContractProject } from './storage-contract-project';
 
 test('executes mirror file import storage contracts in the browser runtime', async ({ page }) => {
-  await page.addInitScript(installFakeOpfs, { directoryPicker: true });
+  await installFakeOpfs(page, { directoryPicker: true });
   const editor = new EditorAppPage(page, serviceContractsSupport.getServer().baseURL);
   await editor.gotoNewProject();
 

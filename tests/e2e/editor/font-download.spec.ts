@@ -1,3 +1,5 @@
+import { type Page } from '@playwright/test';
+
 import { EditorAppPage } from '../pages/editor-app.page';
 import { expect, test, withIsolatedDevServer } from '../support/journey-test';
 import { googleFontDownloadFixtures } from './google-font-download-fixtures';
@@ -13,9 +15,7 @@ test.describe('editor font download journeys', () => {
 
     const editor = new EditorAppPage(page, getServer().baseURL);
     await editor.gotoNewProject();
-    await editor.openTool('Text');
-    await page.getByRole('button', { name: 'Add a text box' }).click();
-    await editor.openTool('Design');
+    await addTextBoxAndOpenTextDesignControls(editor, page);
     await page.getByRole('button', { name: 'Bold selected text' }).click();
     await page.getByRole('button', { name: 'Download additional font' }).click();
     await page.getByLabel('Search downloadable fonts').fill('Montserrat');
@@ -34,9 +34,7 @@ test.describe('editor font download journeys', () => {
 
     const editor = new EditorAppPage(page, getServer().baseURL);
     await editor.gotoNewProject();
-    await editor.openTool('Text');
-    await page.getByRole('button', { name: 'Add a text box' }).click();
-    await editor.openTool('Design');
+    await addTextBoxAndOpenTextDesignControls(editor, page);
     await page.getByRole('button', { name: 'Bold selected text' }).click();
     await page.getByRole('button', { name: 'Download additional font' }).click();
     await page.getByLabel('Search downloadable fonts').fill('Montserrat');
@@ -46,3 +44,10 @@ test.describe('editor font download journeys', () => {
     await expect(page.getByLabel('Selected text font', { exact: true })).toHaveValue('Montserrat');
   });
 });
+
+async function addTextBoxAndOpenTextDesignControls(editor: EditorAppPage, page: Page) {
+  await editor.openTool('Text');
+  await page.getByRole('button', { name: 'Add a text box' }).click();
+  await editor.openTool('Design');
+  await expect(page.getByRole('region', { name: 'Selected text controls' })).toBeVisible();
+}
