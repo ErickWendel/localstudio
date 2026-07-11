@@ -35,7 +35,8 @@ export async function evaluatePresenterSessionServiceContract({
     countPresenterMessages,
     createFakePresenterPopup,
     createFakeRemotePeerControlHost,
-    dispatchPresenterWindowCommand,
+    dispatchPresenterSessionWindowCommandSequence,
+    emitPresenterSessionRemoteCommandSequence,
     flushAsyncWork,
     getPresenterCommandNames,
     presenterRoutePayload,
@@ -83,36 +84,13 @@ export async function evaluatePresenterSessionServiceContract({
     }),
   ]);
 
-  host.emitCommand({ command: 'request-previews', pageIds: ['slide-1', 'slide-2'], type: 'command' });
-  host.emitCommand({ command: 'update-notes', notes: 'Updated note', pageId: 'slide-1', type: 'command' });
-  host.emitCommand({ command: 'go-to-page', pageId: 'slide-2', type: 'command' });
-  host.emitCommand({ command: 'pause-timer', type: 'command' });
-  host.emitCommand({ command: 'next', type: 'command' });
+  emitPresenterSessionRemoteCommandSequence(host);
   await flushAsyncWork();
 
-  const origin = new URL(window.location.href).origin;
-  dispatchPresenterWindowCommand(window, origin, {
-    command: 'update-timer',
+  dispatchPresenterSessionWindowCommandSequence({
+    origin: new URL(window.location.href).origin,
     sessionId: opened.sessionId,
-    timer: { elapsedMs: 5_000, paused: false, updatedAtEpochMs: 1_786_000_005_000 },
-  });
-  dispatchPresenterWindowCommand(window, origin, {
-    command: 'update-stream-peer',
-    peerId: 'stream-peer-2',
-    sessionId: opened.sessionId,
-  });
-  dispatchPresenterWindowCommand(window, origin, {
-    command: 'go-to-page',
-    pageId: 'slide-3',
-    sessionId: opened.sessionId,
-  });
-  dispatchPresenterWindowCommand(window, origin, {
-    command: 'next',
-    sessionId: opened.sessionId,
-  });
-  dispatchPresenterWindowCommand(window, origin, {
-    command: 'next',
-    sessionId: 'wrong-session',
+    targetWindow: window,
   });
   service.publishState({
     ...presenterRoutePayload.create('slide-2'),
