@@ -262,18 +262,8 @@ class TestPromptService implements PromptService {
 class SlowImageGenerationService implements ImageGenerationService {
   generateImage = vi.fn(
     (_prompt: string, options?: Parameters<ImageGenerationService['generateImage']>[1]) =>
-      new Promise<Awaited<ReturnType<ImageGenerationService['generateImage']>>>((resolve) => {
+      new Promise<Awaited<ReturnType<ImageGenerationService['generateImage']>>>(() => {
         options?.onProgress?.({ label: 'Generating image 1/4', progress: 25 });
-        setTimeout(() => {
-          resolve({
-            id: 'asset-slow-generated',
-            type: 'image',
-            name: 'slow.png',
-            mimeType: 'image/png',
-            objectUrl:
-              'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lMFeWAAAAABJRU5ErkJggg==',
-          });
-        }, 250);
       }),
   );
 }
