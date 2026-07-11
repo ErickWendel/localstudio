@@ -1,24 +1,8 @@
 import type { loadPresenterSessionServiceModules } from './presenter-session-service-modules';
-
-export type PresenterSessionServiceContractResult = {
-  blockedStatus: string;
-  commandNames: string[];
-  duplicateSessionReused: boolean;
-  hostCloseCount: number;
-  hostOpenCount: number;
-  hostPreviewBatchCount: number;
-  hostStateCount: number;
-  openedPopupHrefIncludesPresenter: boolean;
-  openedStatus: string;
-  popupClosed: boolean;
-  popupCommandCount: number;
-  popupStateCount: number;
-  remoteSession: {
-    controlPeerId: string | undefined;
-    qrUrl: string;
-    transport: string | undefined;
-  };
-};
+import {
+  createPresenterSessionServiceContractResult,
+  type PresenterSessionServiceContractResult,
+} from './presenter-session-service-contract-result';
 
 export async function runPresenterSessionServiceContractScenario(
   modules: Awaited<ReturnType<typeof loadPresenterSessionServiceModules>>,
@@ -90,23 +74,15 @@ export async function runPresenterSessionServiceContractScenario(
   unsubscribe();
   service.closePresenterWindow();
 
-  return {
-    blockedStatus: blocked.status,
-    commandNames: getPresenterCommandNames(commands),
-    duplicateSessionReused: duplicateSession.sessionId === remoteSession.sessionId,
-    hostCloseCount: host.closeCount,
-    hostOpenCount: host.openCount,
-    hostPreviewBatchCount: host.previewBatches.length,
-    hostStateCount: host.states.length,
-    openedPopupHrefIncludesPresenter: popup.location.href.includes('presenter=1'),
-    openedStatus: opened.status,
-    popupClosed: popup.closed,
-    popupCommandCount: countPresenterMessages(popup.messages, 'command'),
-    popupStateCount: countPresenterMessages(popup.messages, 'state'),
-    remoteSession: {
-      controlPeerId: remoteSession.controlPeerId,
-      qrUrl: remoteSession.qrUrl,
-      transport: remoteSession.transport,
-    },
-  };
+  return createPresenterSessionServiceContractResult({
+    blocked,
+    commands,
+    countPresenterMessages,
+    duplicateSession,
+    getPresenterCommandNames,
+    host,
+    opened,
+    popup,
+    remoteSession,
+  });
 }

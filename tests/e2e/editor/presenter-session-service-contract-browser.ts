@@ -1,4 +1,4 @@
-import type { PresenterSessionServiceContractResult } from '../support/presenter-session-service-contract-scenario';
+import type { PresenterSessionServiceContractResult } from '../support/presenter-session-service-contract-result';
 
 export type PresenterSessionServiceContractInput = {
   editorSourceRoot: string;
