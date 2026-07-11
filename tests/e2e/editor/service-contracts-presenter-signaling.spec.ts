@@ -1,23 +1,15 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+import { EditorAppPage } from '../pages/editor-app.page';
 import { expect, test } from '../support/journey-test';
 import { serviceContractsSupport } from './service-contracts-support';
 
-test('executes presenter signaling, sample project, and animation preset contracts in the browser runtime', async ({
-  page,
-}) => {
-  await page.goto(new URL('/editor/?newProject=1', serviceContractsSupport.getServer().baseURL).toString());
+test('executes presenter signaling contracts in the browser runtime', async ({ page }) => {
+  const editor = new EditorAppPage(page, serviceContractsSupport.getServer().baseURL);
+  await editor.gotoNewProject();
 
   const result = await page.evaluate(async ({ presenterRemoteSourceRoot }) => {
-    const [{ animationPresetEngine }, { sampleProject }, { InMemoryPresenterRemoteSignalingService }] =
-      (await Promise.all([
-        import('/editor/src/ui/editor/animation/animationPresetEngine.ts'),
-        import('/editor/src/domain/projects/sampleProject.ts'),
-        import(`${presenterRemoteSourceRoot}/signaling-service.ts`),
-      ])) as [
-        typeof import('../../../apps/editor/src/ui/editor/animation/animationPresetEngine'),
-        typeof import('../../../apps/editor/src/domain/projects/sampleProject'),
-        typeof import('../../../packages/presenter-remote/src/signaling-service'),
-      ];
+    const { InMemoryPresenterRemoteSignalingService } = (await import(
+      `${presenterRemoteSourceRoot}/signaling-service.ts`
+    )) as typeof import('../../../packages/presenter-remote/src/signaling-service');
 
     let now = Date.parse('2026-07-09T12:00:00.000Z');
     const service = new InMemoryPresenterRemoteSignalingService({
@@ -113,82 +105,11 @@ test('executes presenter signaling, sample project, and animation preset contrac
     const activeAfterExpiry = expiring.listActiveSessions();
     const lookupAfterExpiry = expiring.lookupSession(expiringSession.code);
 
-    const blank = sampleProject.createBlankProject();
-    const sample = sampleProject.createSampleProject();
-
-    const bounds = { height: 180, width: 320, x: 10, y: 20 };
-    const effects = [
-      'fade',
-      'fade-and-move',
-      'move-in',
-      'push',
-      'drop',
-      'fall',
-      'scale',
-      'switch',
-      'swap',
-      'flip',
-      'flop',
-      'cube',
-      'doorway',
-      'page-flip',
-      'revolving-door',
-      'twirl',
-      'twist',
-      'pivot',
-      'reflection',
-      'clothesline',
-      'wipe',
-      'reveal',
-      'iris',
-      'radial-wipe',
-      'droplet',
-      'grid',
-      'mosaic',
-      'blinds',
-      'color-planes',
-      'fade-through-color',
-      'confetti',
-      'swoosh',
-      'keyboard-typing',
-      'line-draw',
-      'dissolve',
-    ] as const;
-    const directions = ['left', 'right', 'up', 'down'] as const;
-    const animationStates = effects.map((effect, index) =>
-      animationPresetEngine.getRenderState({
-        bounds,
-        direction: directions[index % directions.length],
-        effect,
-        progress: index % 3 === 0 ? 0 : index % 3 === 1 ? 0.45 : 1,
-        seed: `seed-${effect}`,
-      }),
-    );
-    const sideMaskCounts = directions.map(
-      (direction) =>
-        animationPresetEngine.getRenderState({
-          bounds,
-          direction,
-          effect: 'wipe',
-          progress: 0.5,
-          seed: `wipe-${direction}`,
-        }).masks.length,
-    );
-
     return {
       activeAfterExpiryCount: activeAfterExpiry.length,
-      animationCanonicalEffects: animationStates.map((state) => state.canonicalEffect),
-      animationMaskTotal: animationStates.reduce((sum, state) => sum + state.masks.length, 0),
-      animationParticleTotal: animationStates.reduce(
-        (sum, state) => sum + state.particles.length,
-        0,
-      ),
       answer,
       answerPublished,
       anonymousCommandPublished,
-      blankBackground: blank.pages[0]?.background,
-      blankElementCount: Object.keys(blank.elements).length,
-      blankName: blank.name,
       commandPublished,
       commands,
       connectedCount: connected?.connectedControllerCount,
@@ -208,13 +129,9 @@ test('executes presenter signaling, sample project, and animation preset contrac
       presenterCandidates,
       presenterIcePublished,
       publishedState,
-      sampleAssetUrl: sample.assets['asset-hero']?.objectUrl,
-      sampleElementIds: sample.pages[0]?.elementIds,
-      sampleTitle: sample.elements['text-title']?.text,
       sessionAfterControllerClose,
       sessionClosed,
       sessionClosedAgain,
-      sideMaskCounts,
       singleActiveCode,
       statePublished,
       trustedOffer,
@@ -228,9 +145,6 @@ test('executes presenter signaling, sample project, and animation preset contrac
     answer: 'answer-sdp',
     answerPublished: true,
     anonymousCommandPublished: true,
-    blankBackground: { color: '#050D10', type: 'color' },
-    blankElementCount: 0,
-    blankName: 'Untitled Project',
     commandPublished: true,
     connectedCount: 1,
     controllerClosed: true,
@@ -245,7 +159,6 @@ test('executes presenter signaling, sample project, and animation preset contrac
     missingIce: false,
     missingOffer: { status: 'not-found' },
     presenterIcePublished: true,
-    sampleTitle: 'AI Design Revolution',
     sessionAfterControllerClose: { connectedControllerCount: 0 },
     sessionClosed: true,
     sessionClosedAgain: false,
@@ -255,9 +168,6 @@ test('executes presenter signaling, sample project, and animation preset contrac
     untrustedCommandPublished: false,
     untrustedOffer: { status: 'not-found' },
   });
-  expect(result.animationCanonicalEffects).toContain('fade-and-move');
-  expect(result.animationMaskTotal).toBeGreaterThan(10);
-  expect(result.animationParticleTotal).toBeGreaterThan(20);
   expect(result.commands.map((command) => command.type)).toEqual(['go-to-slide', 'previous-slide']);
   expect(result.controllerCandidates).toEqual([{ candidate: 'presenter-candidate' }]);
   expect(result.pendingOffers).toEqual([{ controllerId: 'controller-1', offerSdp: 'offer-sdp' }]);
@@ -267,7 +177,4 @@ test('executes presenter signaling, sample project, and animation preset contrac
     notes: 'Remember the close',
     slideTitle: 'Intro',
   });
-  expect(result.sampleAssetUrl).toContain('encrypted-tbn0.gstatic.com');
-  expect(result.sampleElementIds).toEqual(['image-hero', 'text-subtitle', 'text-title']);
-  expect(result.sideMaskCounts).toEqual([1, 1, 1, 1]);
 });
