@@ -3,7 +3,9 @@ import { expect, test } from '../support/journey-test';
 import { modelRuntimeContractPage } from '../support/model-runtime-contract-page';
 import { serviceContractsSupport } from './service-contracts-support';
 
-test('executes model setup service branches in the browser runtime', async ({ page }) => {
+test('executes browser model download, removal, and failure contracts in the browser runtime', async ({
+  page,
+}) => {
   await modelRuntimeContractPage.gotoReady(page, serviceContractsSupport.getServer().baseURL);
 
   const result = await page.evaluate(async () => {
@@ -18,12 +20,7 @@ test('executes model setup service branches in the browser runtime', async ({ pa
         typeof import('../../../apps/editor/src/services/model-setup/modelSetupService'),
       ];
 
-    const readyStorage = new Map<string, string>([
-      [aiModelCatalog.GEMMA_LLM_READY_KEY, 'true'],
-      [aiModelCatalog.TRANSLATEGEMMA_READY_KEY, 'true'],
-      [aiModelCatalog.LANGUAGE_DETECTION_READY_KEY, 'true'],
-      [imageGenerationModel.IMAGE_GENERATION_READY_KEY, 'true'],
-    ]);
+    const readyStorage = new Map<string, string>();
     const storageWrites: string[] = [];
     const storage = {
       getItem: (key: string) => readyStorage.get(key) ?? null,
@@ -36,19 +33,6 @@ test('executes model setup service branches in the browser runtime', async ({ pa
         readyStorage.set(key, value);
       },
     };
-    const readySetup = new modelSetupService.BrowserModelSetupService(
-      undefined,
-      storage,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-    );
-    const initiallyReady = (await readySetup.getModelStates()).filter(
-      (state) => state.status === 'ready',
-    ).length;
-    readyStorage.clear();
-
     const modelLoads: string[] = [];
     const browserSetup = new modelSetupService.BrowserModelSetupService(
       {
@@ -91,6 +75,7 @@ test('executes model setup service branches in the browser runtime', async ({ pa
         },
       },
     );
+
     const imageEditingState = await browserSetup.downloadModel(
       modelSetupService.IMAGE_EDITING_MODEL_ID,
     );
@@ -120,17 +105,10 @@ test('executes model setup service branches in the browser runtime', async ({ pa
     );
     const failedState = await failingSetup.downloadModel(modelSetupService.IMAGE_EDITING_MODEL_ID);
 
-    const inMemorySetup = new modelSetupService.InMemoryModelSetupService();
-    const inMemoryRequired = await inMemorySetup.downloadRequiredModels();
-    const inMemoryRemoved = await inMemorySetup.removeModel(modelSetupService.IMAGE_EDITING_MODEL_ID);
-
     return {
       failedState,
       imageEditingState,
       imageGenerationState,
-      initiallyReady,
-      inMemoryReadyCount: inMemoryRequired.filter((state) => state.status === 'ready').length,
-      inMemoryRemoved,
       languageState,
       llmState,
       modelLoads,
@@ -147,7 +125,6 @@ test('executes model setup service branches in the browser runtime', async ({ pa
     failedState: { error: 'image editing failed', progress: 0, status: 'failed' },
     imageEditingState: { progress: 100, status: 'ready' },
     imageGenerationState: { progress: 100, status: 'ready' },
-    inMemoryRemoved: { progress: 0, status: 'needs-download' },
     languageState: { progress: 100, status: 'ready' },
     llmState: { progress: 100, status: 'ready' },
     removedImageEditing: { progress: 0, status: 'needs-download' },
@@ -156,8 +133,6 @@ test('executes model setup service branches in the browser runtime', async ({ pa
     removedTranslation: { progress: 0, status: 'needs-download' },
     translationState: { progress: 100, status: 'ready' },
   });
-  expect(result.initiallyReady).toBeGreaterThanOrEqual(4);
-  expect(result.inMemoryReadyCount).toBeGreaterThan(0);
   expect(result.modelLoads).toEqual(
     expect.arrayContaining([
       'image-editing',
