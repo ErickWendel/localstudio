@@ -42,165 +42,80 @@ export async function evaluateJoystickPeerControlContract({
   testSupportSourceRoot,
 }: JoystickPeerControlContractInput): Promise<JoystickPeerControlContractResult> {
   const [
-    { PresenterRemotePeerControlClient },
-    { PresenterRemotePeerControlHost },
-    { presenterRemotePeerOpen },
-    { PresenterRemotePeerStreamPublisher },
-    { PresenterRemotePeerStreamReceiver },
-    { fakePeerTransport },
-    { presenterPeerControlFixture },
+    { runPresenterPeerControlClientLifecycle },
+    { runPresenterPeerControlHostLifecycle },
+    { runPresenterPeerOpenLifecycle },
+    { runPresenterPeerStreamPublisherLifecycle },
+    { runPresenterPeerStreamReceiverLifecycle },
   ] = (await Promise.all([
-    import(`${sourceRoot}/peer-control-client.ts`),
-    import(`${sourceRoot}/peer-control-host.ts`),
-    import(`${sourceRoot}/peer-open.ts`),
-    import(`${sourceRoot}/peer-stream-publisher.ts`),
-    import(`${sourceRoot}/peer-stream-receiver.ts`),
-    import(`${testSupportSourceRoot}/fake-peer-transport.ts`),
-    import(`${testSupportSourceRoot}/presenter-peer-control-fixture.ts`),
+    import(`${testSupportSourceRoot}/presenter-peer-control-client-lifecycle.ts`),
+    import(`${testSupportSourceRoot}/presenter-peer-control-host-lifecycle.ts`),
+    import(`${testSupportSourceRoot}/presenter-peer-open-lifecycle.ts`),
+    import(`${testSupportSourceRoot}/presenter-peer-stream-publisher-lifecycle.ts`),
+    import(`${testSupportSourceRoot}/presenter-peer-stream-receiver-lifecycle.ts`),
   ])) as [
-    typeof import('../../../packages/presenter-remote/src/peer-control-client'),
-    typeof import('../../../packages/presenter-remote/src/peer-control-host'),
-    typeof import('../../../packages/presenter-remote/src/peer-open'),
-    typeof import('../../../packages/presenter-remote/src/peer-stream-publisher'),
-    typeof import('../../../packages/presenter-remote/src/peer-stream-receiver'),
-    typeof import('../support/fake-peer-transport'),
-    typeof import('../support/presenter-peer-control-fixture'),
+    typeof import('../support/presenter-peer-control-client-lifecycle'),
+    typeof import('../support/presenter-peer-control-host-lifecycle'),
+    typeof import('../support/presenter-peer-open-lifecycle'),
+    typeof import('../support/presenter-peer-stream-publisher-lifecycle'),
+    typeof import('../support/presenter-peer-stream-receiver-lifecycle'),
   ];
+  const harnessInput = {
+    presenterRemoteSourceRoot: sourceRoot,
+    testSupportSourceRoot,
+  };
 
-  const commands: unknown[] = [];
-  const controlPeer = fakePeerTransport.createPeer('control-peer-1');
-  const host = new PresenterRemotePeerControlHost({
-    now: () => Date.parse('2026-07-10T12:00:00.000Z'),
-    onCommand: (command) => commands.push(command),
-    peerFactory: () => controlPeer as never,
+  const host = await runPresenterPeerControlHostLifecycle({
+    ...harnessInput,
+    peerId: 'control-peer-1',
     presenterDeviceId: 'presenter-device-1',
     presenterLabel: 'Studio laptop',
-    ttlMs: 60_000,
   });
-
-  const session = await host.open();
-  host.publishState(presenterPeerControlFixture.createHostState());
-
-  const primaryConnection = fakePeerTransport.createDataConnection();
-  controlPeer.emit('connection', primaryConnection);
-  primaryConnection.emit('data', { command: 'request-state', type: 'command' });
-  host.publishPreviewBatch(presenterPeerControlFixture.createHostPreviewBatch());
-
-  const throwingConnection = fakePeerTransport.createDataConnection();
-  throwingConnection.throwOnSend = true;
-  controlPeer.emit('connection', throwingConnection);
-  host.publishState(presenterPeerControlFixture.createReadyState());
-  throwingConnection.emit('error', new Error('connection failed'));
-  const connectionRemovedAfterError = throwingConnection.wasClosed === false;
-  host.close();
-
-  const streamPeer = fakePeerTransport.createPeer('stream-peer-1');
-  const stream = new MediaStream();
-  const publisher = new PresenterRemotePeerStreamPublisher({
-    peerFactory: () => streamPeer as never,
-    stream,
+  const publisher = await runPresenterPeerStreamPublisherLifecycle({
+    ...harnessInput,
+    peerId: 'stream-peer-1',
   });
-  const streamPeerId = await publisher.start();
-  const mediaCall = fakePeerTransport.createMediaConnection();
-  streamPeer.emit('call', mediaCall);
-  const answeredStreamCall = mediaCall.answeredStream === stream;
-  mediaCall.emit('error', new Error('call failed'));
-  const callErrored = mediaCall.wasClosed === false;
-  const closingCall = fakePeerTransport.createMediaConnection();
-  streamPeer.emit('call', closingCall);
-  closingCall.close();
-  publisher.stop();
-
-  const clientPeer = fakePeerTransport.createPeer('client-peer-1');
-  const clientStatuses: string[] = [];
-  const clientStates: unknown[] = [];
-  const clientPreviewBatches: unknown[] = [];
-  const client = new PresenterRemotePeerControlClient({
-    onPreviewBatch: (batch) => clientPreviewBatches.push(batch),
-    onState: (state) => clientStates.push(state),
-    onStatusChange: (status) => clientStatuses.push(status),
-    peerFactory: () => clientPeer as never,
+  const client = await runPresenterPeerControlClientLifecycle({
+    ...harnessInput,
+    clientPeerId: 'client-peer-1',
     presenterPeerId: 'control-peer-1',
+    terminalEvent: 'close',
   });
-  await client.start();
-  const clientConnection = clientPeer.lastDataConnection;
-  const clientRequestStateSent =
-    clientConnection?.sentMessages.some((message) =>
-      presenterPeerControlFixture.hasCommand(message, 'request-state'),
-    ) ?? false;
-  clientConnection?.emit('data', presenterPeerControlFixture.createClientPreviewBatch());
-  clientConnection?.emit('data', presenterPeerControlFixture.createClientState());
-  clientConnection?.emit('data', { type: 'ignored' });
-  const clientCommandSent = client.sendCommand({ command: 'next', type: 'command' });
-  if (clientConnection) clientConnection.throwOnSend = true;
-  const clientCommandFailed = !client.sendCommand({ command: 'previous', type: 'command' });
-  clientConnection?.emit('close');
-  client.close();
-
-  const receiverPeer = fakePeerTransport.createPeer('receiver-peer-1');
-  const receiverStatuses: string[] = [];
-  const receiverStreams: Array<MediaStream | undefined> = [];
-  const receiver = new PresenterRemotePeerStreamReceiver({
-    onStatusChange: (status) => receiverStatuses.push(status),
-    onStream: (receivedStream) => receiverStreams.push(receivedStream),
-    peerFactory: () => receiverPeer as never,
+  const receiver = await runPresenterPeerStreamReceiverLifecycle({
+    ...harnessInput,
+    failureMode: 'error-and-close',
+    peerId: 'receiver-peer-1',
     streamPeerId: 'stream-peer-1',
   });
-  await receiver.start();
-  const receivedStream = new MediaStream();
-  receiverPeer.lastMediaConnection?.emit('stream', receivedStream);
-  receiverPeer.lastMediaConnection?.emit('error', new Error('receiver call failed'));
-  receiverPeer.lastMediaConnection?.emit('close');
-  receiver.stop();
-
-  let timeoutMessage = '';
-  try {
-    await presenterRemotePeerOpen.rejectAfter(0, 'expected timeout');
-  } catch (error) {
-    timeoutMessage = error instanceof Error ? error.message : String(error);
-  }
-  const peerOpenResolved = (await presenterRemotePeerOpen.waitForPeer({
-    id: 'already-open',
-    on: () => undefined,
-    open: true,
-  } as never)) === undefined;
+  const peerOpen = await runPresenterPeerOpenLifecycle({
+    presenterRemoteSourceRoot: sourceRoot,
+    timeoutMessage: 'expected timeout',
+  });
 
   return {
-    answeredStreamCall,
-    callClosed: closingCall.wasClosed,
-    callErrored,
-    clientCommandFailed,
-    clientCommandSent,
-    clientPreviewBatchCount: clientPreviewBatches.length,
-    clientRequestStateSent,
-    clientStateCount: clientStates.length,
-    clientStatuses,
-    closedConnectionCount: Number(primaryConnection.wasClosed) + Number(throwingConnection.wasClosed),
-    commandCount: commands.length,
-    connectionRemovedAfterError,
-    destroyedPeerCount: Number(controlPeer.destroyed) + Number(streamPeer.destroyed),
-    initialStateMessages: presenterPeerControlFixture.countMessages(
-      primaryConnection.sentMessages,
-      (message) => typeof message === 'object' && message !== null && 'type' in message,
-    ),
-    peerOpenResolved,
-    previewMessages: presenterPeerControlFixture.countMessages(
-      primaryConnection.sentMessages,
-      (message) => presenterPeerControlFixture.hasType(message, 'preview-batch'),
-    ),
-    publishedStateMessages: presenterPeerControlFixture.countMessages(
-      primaryConnection.sentMessages,
-      (message) => presenterPeerControlFixture.hasType(message, 'state'),
-    ),
-    receiverClearedStream: receiverStreams.at(-1) === undefined,
-    receiverGotStream: receiverStreams.includes(receivedStream),
-    receiverStatuses,
-    requestedStateMessages: presenterPeerControlFixture.countMessages(
-      primaryConnection.sentMessages,
-      (message) => presenterPeerControlFixture.hasConnectedControllerCount(message, 1),
-    ),
-    session,
-    streamPeerId,
-    timeoutMessage,
+    answeredStreamCall: publisher.answeredStreamCall,
+    callClosed: publisher.callClosed,
+    callErrored: publisher.callErrored,
+    clientCommandFailed: client.commandFailed,
+    clientCommandSent: client.commandSent,
+    clientPreviewBatchCount: client.previewBatchCount,
+    clientRequestStateSent: client.requestStateSent,
+    clientStateCount: client.stateCount,
+    clientStatuses: client.statuses,
+    closedConnectionCount: host.closedConnectionCount,
+    commandCount: host.commandCount,
+    connectionRemovedAfterError: host.connectionRemovedAfterError,
+    destroyedPeerCount: Number(host.destroyedPeer) + Number(publisher.destroyedPeer),
+    initialStateMessages: host.initialStateMessages,
+    peerOpenResolved: peerOpen.peerOpenResolved,
+    previewMessages: host.previewMessages,
+    publishedStateMessages: host.publishedStateMessages,
+    receiverClearedStream: receiver.clearedStream,
+    receiverGotStream: receiver.gotStream,
+    receiverStatuses: receiver.statuses,
+    requestedStateMessages: host.requestedStateMessages,
+    session: host.session,
+    streamPeerId: publisher.streamPeerId,
+    timeoutMessage: peerOpen.timeoutMessage,
   };
 }
