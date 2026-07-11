@@ -12,6 +12,7 @@ const {
   createDeferred,
   createMultiTextProject,
   createReadyPrepareTranslationMock,
+  createThreeColumnCaptionProject,
   openLeftTab,
   selectTitleLayer,
 } = editorShellTestHarness;
@@ -144,8 +145,61 @@ describe('EditorShell translation workflows', () => {
       expect(title).toMatchObject({
         fontSize: 96,
         text: 'Revolucion de diseno impulsada por inteligencia artificial',
+        width: 600,
+        x: 1160,
       });
-      expect(title?.width).toBeGreaterThan(600);
+      expect(title?.height).toBeGreaterThan(240);
+    });
+  });
+
+  it('keeps translated slide captions anchored to their original columns', async () => {
+    const user = userEvent.setup();
+    const project = createThreeColumnCaptionProject();
+    const repository = new SavingProjectRepository();
+    const translations: Record<string, string> = {
+      'Exploring the future of artificial intelligence':
+        'Explorando o futuro da inteligencia artificial',
+      'A look at the latest advancements and applications':
+        'Veja os ultimos avancos e aplicacoes',
+      'The impact of Web AI on society': 'O impacto da Web AI na sociedade',
+    };
+    const translate = vi.fn((text: string) => Promise.resolve(translations[text] ?? text));
+    const services = createAppServices({ initialProject: project });
+    services.projectRepository = repository;
+    services.translatorService = {
+      detectLanguage: vi.fn().mockResolvedValue('en'),
+      prepareTranslation: createReadyPrepareTranslationMock(),
+      translate,
+    };
+    render(<EditorShell services={services} />);
+
+    await openLeftTab(user, 'AI Tools');
+    await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
+    await user.click(screen.getByRole('button', { name: 'Translate Hero split' }));
+    await waitFor(() => {
+      expect(translate).toHaveBeenCalledTimes(3);
+    });
+    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+
+    await waitFor(() => {
+      const savedProject = repository.savedProjects.at(-1);
+      expect(savedProject?.elements['caption-left']).toMatchObject({
+        text: 'Explorando o futuro da inteligencia artificial',
+        x: 120,
+        width: 500,
+      });
+      expect(savedProject?.elements['caption-center']).toMatchObject({
+        text: 'Veja os ultimos avancos e aplicacoes',
+        x: 680,
+        width: 500,
+      });
+      expect(savedProject?.elements['caption-right']).toMatchObject({
+        text: 'O impacto da Web AI na sociedade',
+        x: 1240,
+        width: 500,
+      });
+      expect(savedProject?.elements['caption-left']?.height).toBeGreaterThanOrEqual(96);
     });
   });
 

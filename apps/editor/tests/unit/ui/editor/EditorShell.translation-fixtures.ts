@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import type { ProjectDocument } from '../../../../src/domain/documents/model';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 import type { TranslatorService } from '../../../../src/services/contracts/interfaces';
 
@@ -39,6 +40,68 @@ function createMultiTextProject(textCount: number) {
       name: `Slide ${index + 1}`,
       elementIds: [elementId],
     })),
+  };
+}
+
+function createThreeColumnCaptionProject(): ProjectDocument {
+  const now = new Date('2026-06-24T00:00:00.000Z').toISOString();
+  const captionElements = [
+    {
+      id: 'caption-left',
+      text: 'Exploring the future of artificial intelligence',
+      x: 120,
+    },
+    {
+      id: 'caption-center',
+      text: 'A look at the latest advancements and applications',
+      x: 680,
+    },
+    {
+      id: 'caption-right',
+      text: 'The impact of Web AI on society',
+      x: 1240,
+    },
+  ];
+
+  return {
+    id: 'project-caption-translation',
+    name: 'Caption Translation Deck',
+    assets: {},
+    createdAt: now,
+    updatedAt: now,
+    pages: [
+      {
+        id: 'page-1',
+        name: 'Hero split',
+        width: 1920,
+        height: 1080,
+        background: { type: 'color', color: '#050D10' },
+        elementIds: captionElements.map((element) => element.id),
+      },
+    ],
+    elements: Object.fromEntries(
+      captionElements.map((element) => [
+        element.id,
+        {
+          id: element.id,
+          type: 'text' as const,
+          text: element.text,
+          x: element.x,
+          y: 760,
+          width: 500,
+          height: 96,
+          rotation: 0,
+          locked: false,
+          visible: true,
+          opacity: 1,
+          fontFamily: 'Open Sans',
+          fontSize: 38,
+          fontWeight: 500,
+          fill: '#ffffff',
+          align: 'center' as const,
+        },
+      ]),
+    ),
   };
 }
 
@@ -120,4 +183,5 @@ export const editorShellTranslationFixtures = {
   createDeferred,
   createMultiTextProject,
   createReadyPrepareTranslationMock,
+  createThreeColumnCaptionProject,
 };
