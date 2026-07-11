@@ -54,13 +54,19 @@ test.describe('editor drag reorder journeys', () => {
     await expect(pageCards.nth(2)).toHaveAttribute('aria-label', 'Page 3: Appendix');
 
     await pagesPanel.getByRole('button', { name: 'Select Slide 1' }).click();
+    await expect(page.getByText('2 / 3')).toBeVisible();
+    const activeCanvasFrame = page.getByLabel('Slide canvas', { exact: true });
     await editor.openTool('Layout');
     await page.locator('.layer-list article[role="button"][aria-label="Layer text"]').click();
+    await expect(activeCanvasFrame).toHaveAttribute('data-selected-elements', /text-/);
     await editor.openTool('Animate');
+    await expect(page.getByRole('button', { name: 'Add animation' })).toBeEnabled();
     await page.getByRole('button', { name: 'Add animation' }).click();
     await editor.openTool('Layout');
     await page.locator('.layer-list article[role="button"][aria-label="Background Shape"]').click();
+    await expect(activeCanvasFrame).toHaveAttribute('data-selected-elements', /shape-/);
     await editor.openTool('Animate');
+    await expect(page.getByRole('button', { name: 'Add animation' })).toBeEnabled();
     await page.getByRole('button', { name: 'Add animation' }).click();
 
     const buildRows = page.getByRole('list', { name: 'Object animation build order' }).getByRole('listitem');
