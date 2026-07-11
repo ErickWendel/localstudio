@@ -32,7 +32,10 @@ export const animationMixedSequence = {
     await expect(page.getByRole('listitem', { name: /Build 2: Arrow/ })).toBeVisible();
     await page.getByLabel('Start for Typing headline').selectOption('after-transition');
     await page.getByLabel('Start for Arrow').selectOption('after-previous');
+    const canvasFrame = page.getByTestId('slide-canvas-frame');
     await page.getByRole('button', { name: 'Play animation preview' }).click();
+    await expect(canvasFrame).toHaveAttribute('data-animation-preview', 'playing');
+    await expect(canvasFrame).toHaveAttribute('data-animation-preview-mode', 'editor');
     await expect(page.getByLabel('Slide transition effect')).toHaveValue('push');
   },
 };
