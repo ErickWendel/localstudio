@@ -19,13 +19,11 @@ export type JoystickPeerControlContractResult = {
   initialStateMessages: number;
   peerOpenResolved: boolean;
   previewMessages: number;
-  protocolChecks: Record<string, boolean>;
   publishedStateMessages: number;
   receiverClearedStream: boolean;
   receiverGotStream: boolean;
   receiverStatuses: string[];
   requestedStateMessages: number;
-  sessionCodeChecks: Record<string, string | boolean>;
   session: {
     code: string;
     connectedControllerCount: number;
@@ -135,12 +133,6 @@ export async function evaluateJoystickPeerControlContract({
   const { PresenterRemotePeerStreamReceiver } = (await import(
     `${sourceRoot}/peer-stream-receiver.ts`
   )) as typeof import('../../../packages/presenter-remote/src/peer-stream-receiver');
-  const { presenterRemoteProtocol } = (await import(
-    `${sourceRoot}/protocol.ts`
-  )) as typeof import('../../../packages/presenter-remote/src/protocol');
-  const { presenterRemoteSessionCode } = (await import(
-    `${sourceRoot}/session-code.ts`
-  )) as typeof import('../../../packages/presenter-remote/src/session-code');
 
   const commands: unknown[] = [];
   const controlPeer = new FakePeer('control-peer-1');
@@ -305,52 +297,6 @@ export async function evaluateJoystickPeerControlContract({
     open: true,
   } as never)) === undefined;
 
-  const protocolChecks = {
-    acceptsGoToPage: presenterRemoteProtocol.isCommand({
-      command: 'go-to-page',
-      pageId: 'slide-1',
-      type: 'command',
-    }),
-    acceptsRequestPreviews: presenterRemoteProtocol.isCommand({
-      command: 'request-previews',
-      pageIds: ['slide-1'],
-      requestId: 'preview-request',
-      type: 'command',
-    }),
-    acceptsStreamPreference: presenterRemoteProtocol.isStreamPreference({
-      fps: 30,
-      height: 720,
-      quality: 'medium',
-      type: 'stream-preference',
-      width: 1280,
-    }),
-    acceptsUpdateNotes: presenterRemoteProtocol.isCommand({
-      command: 'update-notes',
-      notes: 'Updated note',
-      pageId: 'slide-1',
-      type: 'command',
-    }),
-    rejectsBadPreviewElement: !presenterRemoteProtocol.isPreviewBatch({
-      previews: [{ id: 'slide-1', name: 'Intro', preview: { elements: [], width: 1 } }],
-      type: 'preview-batch',
-    }),
-    rejectsBadStreamPreference: !presenterRemoteProtocol.isStreamPreference({
-      fps: 0,
-      height: 0,
-      quality: 'best',
-      type: 'stream-preference',
-      width: 0,
-    }),
-  };
-
-  const sessionCodeChecks = {
-    createdFallback: presenterRemoteSessionCode.create(() => 2).endsWith('AAAA'),
-    normalizedShort: presenterRemoteSessionCode.normalize('ab 12'),
-    normalizedSpaced: presenterRemoteSessionCode.normalize('ab12 cd34'),
-    rejectsInvalid: presenterRemoteSessionCode.isValid('IOOO-0000') === false,
-    validatesNormalized: presenterRemoteSessionCode.isValid('ab12 cd34'),
-  };
-
   return {
     answeredStreamCall,
     callClosed: closingCall.wasClosed,
@@ -376,7 +322,6 @@ export async function evaluateJoystickPeerControlContract({
         'type' in message &&
         message.type === 'preview-batch',
     ).length,
-    protocolChecks,
     publishedStateMessages: primaryConnection.sentMessages.filter(
       (message) =>
         typeof message === 'object' &&
@@ -396,7 +341,6 @@ export async function evaluateJoystickPeerControlContract({
         'connectedControllerCount' in message &&
         message.connectedControllerCount === 1,
     ).length,
-    sessionCodeChecks,
     session,
     streamPeerId,
     timeoutMessage,

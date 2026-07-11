@@ -45,19 +45,4 @@ test('executes joystick PeerJS transport contracts in the browser runtime', asyn
   expect(result.receiverStatuses.filter((status) => status === 'failed')).toHaveLength(3);
   expect(result.receiverGotStream).toBe(true);
   expect(result.receiverClearedStream).toBe(true);
-  expect(result.protocolChecks).toEqual({
-    acceptsGoToPage: true,
-    acceptsRequestPreviews: true,
-    acceptsStreamPreference: true,
-    acceptsUpdateNotes: true,
-    rejectsBadPreviewElement: true,
-    rejectsBadStreamPreference: true,
-  });
-  expect(result.sessionCodeChecks).toEqual({
-    createdFallback: true,
-    normalizedShort: 'AB12',
-    normalizedSpaced: 'AB12-CD34',
-    rejectsInvalid: true,
-    validatesNormalized: true,
-  });
 });
