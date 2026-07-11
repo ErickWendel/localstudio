@@ -1,3 +1,8 @@
+import {
+  type LayoutPresetImageElementFixture,
+  type LayoutPresetTextElementFixture,
+} from './layout-preset-contract-fixtures';
+
 export type LayoutPresetGridContractResult = {
   captionFill: string | undefined;
   captionX: number | undefined;
@@ -6,13 +11,17 @@ export type LayoutPresetGridContractResult = {
 };
 
 type LayoutPresetGridContractInput = {
+  imageElement: LayoutPresetImageElementFixture;
   pageSize: { height: number; width: number };
   prompt: string;
+  textElement: LayoutPresetTextElementFixture;
 };
 
 export async function evaluateLayoutPresetGridContract({
+  imageElement,
   pageSize,
   prompt,
+  textElement,
 }: LayoutPresetGridContractInput): Promise<LayoutPresetGridContractResult> {
   const { slideLayoutPresets } = (await import(
     '/editor/src/services/prompting/slideLayoutPresets.ts'
@@ -40,27 +49,11 @@ export async function evaluateLayoutPresetGridContract({
   }
 
   const laidOutImage = slideLayoutPresets.applySlideElementLayoutPreset(
-    { height: 10, id: image.id, opacity: 1, rotation: 0, type: 'image', width: 10, x: 0, y: 0 },
+    { ...imageElement, id: image.id },
     { allTasks: document.tasks, page: document.page, task: image },
   );
   const laidOutCaption = slideLayoutPresets.applySlideElementLayoutPreset(
-    {
-      align: 'left',
-      fill: '#000000',
-      fontFamily: 'Open Sans',
-      fontSize: 18,
-      fontWeight: 400,
-      height: 10,
-      id: caption.id,
-      lineHeight: 1.1,
-      opacity: 1,
-      rotation: 0,
-      text: caption.text,
-      type: 'text',
-      width: 10,
-      x: 0,
-      y: 0,
-    },
+    { ...textElement, id: caption.id, text: caption.text },
     { allTasks: document.tasks, page: document.page, task: caption },
   );
 

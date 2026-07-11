@@ -1,3 +1,5 @@
+import { type LayoutPresetTextElementFixture } from './layout-preset-contract-fixtures';
+
 export type LayoutPresetBulletContractResult = {
   bulletCount: number | undefined;
   bulletFrameWidth: number | undefined;
@@ -6,11 +8,13 @@ export type LayoutPresetBulletContractResult = {
 type LayoutPresetBulletContractInput = {
   pageSize: { height: number; width: number };
   prompt: string;
+  textElement: LayoutPresetTextElementFixture;
 };
 
 export async function evaluateLayoutPresetBulletContract({
   pageSize,
   prompt,
+  textElement,
 }: LayoutPresetBulletContractInput): Promise<LayoutPresetBulletContractResult> {
   const { slideLayoutPresets } = (await import(
     '/editor/src/services/prompting/slideLayoutPresets.ts'
@@ -32,23 +36,7 @@ export async function evaluateLayoutPresetBulletContract({
   }
 
   const bulletText = slideLayoutPresets.applySlideElementLayoutPreset(
-    {
-      align: 'left',
-      fill: '#000000',
-      fontFamily: 'Open Sans',
-      fontSize: 20,
-      fontWeight: 400,
-      height: 10,
-      id: firstBulletTask.id,
-      lineHeight: 1.1,
-      opacity: 1,
-      rotation: 0,
-      text: firstBulletTask.items.join('\n'),
-      type: 'text',
-      width: 10,
-      x: 0,
-      y: 0,
-    },
+    { ...textElement, id: firstBulletTask.id, text: firstBulletTask.items.join('\n') },
     { allTasks: document.tasks, page: document.page, task: firstBulletTask },
   );
 

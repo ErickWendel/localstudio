@@ -15,6 +15,7 @@ test('normalizes bullet prompt tasks and applies bullet layout frames in the bro
     {
       pageSize: layoutPresetContractFixtures.pageSize,
       prompt: layoutPresetContractFixtures.bulletPrompt,
+      textElement: layoutPresetContractFixtures.createTextElement('bullet', ''),
     },
   );
 

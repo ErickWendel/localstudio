@@ -13,6 +13,8 @@ test('normalizes title prompt tasks and applies centered title frames in the bro
     getServer().baseURL,
     evaluateLayoutPresetTitleContract,
     {
+      baseSubtitleElement: layoutPresetContractFixtures.createTextElement('subtitle', ''),
+      baseTitleElement: layoutPresetContractFixtures.createTextElement('title', ''),
       pageSize: layoutPresetContractFixtures.pageSize,
       prompt: layoutPresetContractFixtures.titlePrompt,
     },

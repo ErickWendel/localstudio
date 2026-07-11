@@ -13,8 +13,10 @@ test('normalizes image grid prompt tasks and applies grid layout frames in the b
     getServer().baseURL,
     evaluateLayoutPresetGridContract,
     {
+      imageElement: layoutPresetContractFixtures.createImageElement('image'),
       pageSize: layoutPresetContractFixtures.pageSize,
       prompt: layoutPresetContractFixtures.gridPrompt,
+      textElement: layoutPresetContractFixtures.createTextElement('caption', '', 18),
     },
   );
 

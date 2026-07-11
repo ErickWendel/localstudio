@@ -1,3 +1,5 @@
+import { type LayoutPresetTextElementFixture } from './layout-preset-contract-fixtures';
+
 export type LayoutPresetTitleContractResult = {
   subtitleText: string | undefined;
   titleFill: string | undefined;
@@ -5,11 +7,15 @@ export type LayoutPresetTitleContractResult = {
 };
 
 type LayoutPresetTitleContractInput = {
+  baseSubtitleElement: LayoutPresetTextElementFixture;
+  baseTitleElement: LayoutPresetTextElementFixture;
   pageSize: { height: number; width: number };
   prompt: string;
 };
 
 export async function evaluateLayoutPresetTitleContract({
+  baseSubtitleElement,
+  baseTitleElement,
   pageSize,
   prompt,
 }: LayoutPresetTitleContractInput): Promise<LayoutPresetTitleContractResult> {
@@ -35,43 +41,11 @@ export async function evaluateLayoutPresetTitleContract({
   }
 
   const titleElement = slideLayoutPresets.applySlideElementLayoutPreset(
-    {
-      align: 'left',
-      fill: '#000000',
-      fontFamily: 'Open Sans',
-      fontSize: 20,
-      fontWeight: 400,
-      height: 10,
-      id: titleTask.id,
-      lineHeight: 1.1,
-      opacity: 1,
-      rotation: 0,
-      text: titleTask.text,
-      type: 'text',
-      width: 10,
-      x: 0,
-      y: 0,
-    },
+    { ...baseTitleElement, id: titleTask.id, text: titleTask.text },
     { allTasks: document.tasks, page: document.page, task: titleTask },
   );
   const subtitleElement = slideLayoutPresets.applySlideElementLayoutPreset(
-    {
-      align: 'left',
-      fill: '#000000',
-      fontFamily: 'Open Sans',
-      fontSize: 20,
-      fontWeight: 400,
-      height: 10,
-      id: subtitleTask.id,
-      lineHeight: 1.1,
-      opacity: 1,
-      rotation: 0,
-      text: subtitleTask.text,
-      type: 'text',
-      width: 10,
-      x: 0,
-      y: 0,
-    },
+    { ...baseSubtitleElement, id: subtitleTask.id, text: subtitleTask.text },
     { allTasks: document.tasks, page: document.page, task: subtitleTask },
   );
 
