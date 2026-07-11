@@ -27,20 +27,26 @@ export async function evaluatePresenterSessionServiceContract({
   editorSourceRoot,
   testSupportSourceRoot,
 }: PresenterSessionServiceContractInput): Promise<PresenterSessionServiceContractResult> {
-  const [{ BrowserPresenterSessionService }, { presenterRoutePayload }, { presenterSessionServiceHarness }] =
-    (await Promise.all([
-      import(`${editorSourceRoot}/services/presenter/presenterSessionService.ts`),
-      import(`${testSupportSourceRoot}/presenter-route-payload.ts`),
-      import(`${testSupportSourceRoot}/presenter-session-service-harness.ts`),
-    ])) as [
-      typeof import('../../../apps/editor/src/services/presenter/presenterSessionService'),
-      typeof import('../support/presenter-route-payload'),
-      typeof import('../support/presenter-session-service-harness'),
-    ];
+  const { loadPresenterSessionServiceModules } = (await import(
+    `${testSupportSourceRoot}/presenter-session-service-modules.ts`
+  )) as typeof import('../support/presenter-session-service-modules');
+  const {
+    BrowserPresenterSessionService,
+    countPresenterMessages,
+    createFakePresenterPopup,
+    createFakeRemotePeerControlHost,
+    dispatchPresenterWindowCommand,
+    flushAsyncWork,
+    getPresenterCommandNames,
+    presenterRoutePayload,
+  } = await loadPresenterSessionServiceModules({
+    editorSourceRoot,
+    testSupportSourceRoot,
+  });
 
-  const popup = presenterSessionServiceHarness.createPopup();
+  const popup = createFakePresenterPopup();
   const commands: unknown[] = [];
-  const host = presenterSessionServiceHarness.createPeerControlHost();
+  const host = createFakeRemotePeerControlHost();
 
   const service = new BrowserPresenterSessionService({
     href: window.location.href,
@@ -82,29 +88,29 @@ export async function evaluatePresenterSessionServiceContract({
   host.emitCommand({ command: 'go-to-page', pageId: 'slide-2', type: 'command' });
   host.emitCommand({ command: 'pause-timer', type: 'command' });
   host.emitCommand({ command: 'next', type: 'command' });
-  await presenterSessionServiceHarness.flushAsyncWork();
+  await flushAsyncWork();
 
   const origin = new URL(window.location.href).origin;
-  presenterSessionServiceHarness.dispatchPresenterWindowCommand(window, origin, {
+  dispatchPresenterWindowCommand(window, origin, {
     command: 'update-timer',
     sessionId: opened.sessionId,
     timer: { elapsedMs: 5_000, paused: false, updatedAtEpochMs: 1_786_000_005_000 },
   });
-  presenterSessionServiceHarness.dispatchPresenterWindowCommand(window, origin, {
+  dispatchPresenterWindowCommand(window, origin, {
     command: 'update-stream-peer',
     peerId: 'stream-peer-2',
     sessionId: opened.sessionId,
   });
-  presenterSessionServiceHarness.dispatchPresenterWindowCommand(window, origin, {
+  dispatchPresenterWindowCommand(window, origin, {
     command: 'go-to-page',
     pageId: 'slide-3',
     sessionId: opened.sessionId,
   });
-  presenterSessionServiceHarness.dispatchPresenterWindowCommand(window, origin, {
+  dispatchPresenterWindowCommand(window, origin, {
     command: 'next',
     sessionId: opened.sessionId,
   });
-  presenterSessionServiceHarness.dispatchPresenterWindowCommand(window, origin, {
+  dispatchPresenterWindowCommand(window, origin, {
     command: 'next',
     sessionId: 'wrong-session',
   });
@@ -112,14 +118,14 @@ export async function evaluatePresenterSessionServiceContract({
     ...presenterRoutePayload.create('slide-2'),
     streamPeerId: 'stream-peer-2',
   });
-  await presenterSessionServiceHarness.flushAsyncWork();
+  await flushAsyncWork();
 
   unsubscribe();
   service.closePresenterWindow();
 
   return {
     blockedStatus: blocked.status,
-    commandNames: presenterSessionServiceHarness.commandNames(commands),
+    commandNames: getPresenterCommandNames(commands),
     duplicateSessionReused: duplicateSession.sessionId === remoteSession.sessionId,
     hostCloseCount: host.closeCount,
     hostOpenCount: host.openCount,
@@ -128,11 +134,8 @@ export async function evaluatePresenterSessionServiceContract({
     openedPopupHrefIncludesPresenter: popup.location.href.includes('presenter=1'),
     openedStatus: opened.status,
     popupClosed: popup.closed,
-    popupCommandCount: presenterSessionServiceHarness.countPresenterMessages(
-      popup.messages,
-      'command',
-    ),
-    popupStateCount: presenterSessionServiceHarness.countPresenterMessages(popup.messages, 'state'),
+    popupCommandCount: countPresenterMessages(popup.messages, 'command'),
+    popupStateCount: countPresenterMessages(popup.messages, 'state'),
     remoteSession: {
       controlPeerId: remoteSession.controlPeerId,
       qrUrl: remoteSession.qrUrl,
