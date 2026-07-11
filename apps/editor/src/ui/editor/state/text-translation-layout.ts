@@ -13,6 +13,10 @@ function getMinimumTextHeight(text: string, fontSize: number) {
   return Math.ceil(lineCount * fontSize * 1.08 + Math.max(12, fontSize * 0.18));
 }
 
+function getTextHeightForLineCount(lineCount: number, fontSize: number) {
+  return Math.ceil(Math.max(1, lineCount) * fontSize * 1.08 + Math.max(12, fontSize * 0.18));
+}
+
 function getPageTextSample(project: ProjectDocument, pageId: string) {
   const page = project.pages.find((item) => item.id === pageId);
   if (!page) return '';
@@ -69,47 +73,58 @@ function estimateSingleLineTextWidth(text: string, fontSize: number) {
   }, 0);
 }
 
+function estimateWrappedLineCount(text: string, fontSize: number, availableWidth: number) {
+  return text.split('\n').reduce((lineCount, paragraph) => {
+    const words = paragraph.trim().split(/\s+/).filter(Boolean);
+    if (words.length === 0) return lineCount + 1;
+
+    let currentLineWidth = 0;
+    let paragraphLineCount = 1;
+    const spaceWidth = estimateSingleLineTextWidth(' ', fontSize);
+
+    for (const word of words) {
+      const wordWidth = estimateSingleLineTextWidth(word, fontSize);
+      if (currentLineWidth === 0) {
+        currentLineWidth = wordWidth;
+        paragraphLineCount += Math.max(0, Math.ceil(wordWidth / availableWidth) - 1);
+        continue;
+      }
+
+      const nextLineWidth = currentLineWidth + spaceWidth + wordWidth;
+      if (nextLineWidth <= availableWidth) {
+        currentLineWidth = nextLineWidth;
+        continue;
+      }
+
+      paragraphLineCount += 1;
+      currentLineWidth = wordWidth;
+      paragraphLineCount += Math.max(0, Math.ceil(wordWidth / availableWidth) - 1);
+    }
+
+    return lineCount + paragraphLineCount;
+  }, 0);
+}
+
 function fitTranslatedTextToOriginalFrame(
   element: Extract<ProjectDocument['elements'][string], { type: 'text' }>,
   translatedText: string,
   page?: Page,
 ): TranslationPatch {
+  void page;
   const normalizedText = normalizeTranslatedText(element.text, translatedText);
-  if (normalizedText.includes('\n')) return { text: normalizedText };
-
   const horizontalPadding = 12;
   const availableWidth = Math.max(1, element.width - horizontalPadding);
-  const estimatedWidth = estimateSingleLineTextWidth(normalizedText, element.fontSize);
-  if (estimatedWidth <= availableWidth) return { text: normalizedText };
-
-  const desiredWidth = Math.ceil(estimatedWidth + horizontalPadding);
-  const originalCenter = element.x + element.width / 2;
-  const pageWidth =
-    page?.width ?? Math.max(element.x + desiredWidth, originalCenter + desiredWidth / 2);
-  const maxWidthAroundCenter = Math.max(
-    1,
-    2 * Math.min(originalCenter, pageWidth - originalCenter),
+  const estimatedLineCount = estimateWrappedLineCount(
+    normalizedText,
+    element.fontSize,
+    availableWidth,
   );
-  const nextWidth = Math.max(element.width, Math.min(desiredWidth, maxWidthAroundCenter));
-  const nextX = Math.max(0, Math.min(pageWidth - nextWidth, originalCenter - nextWidth / 2));
+  const nextHeight = getTextHeightForLineCount(estimatedLineCount, element.fontSize);
+  if (nextHeight <= element.height) return { text: normalizedText };
 
-  if (nextWidth >= desiredWidth) {
-    return {
-      text: normalizedText,
-      width: nextWidth,
-      x: nextX,
-    };
-  }
-
-  const estimatedLineCount = Math.max(
-    1,
-    Math.ceil(estimatedWidth / Math.max(1, nextWidth - horizontalPadding)),
-  );
   return {
-    height: Math.max(element.height, Math.ceil(estimatedLineCount * element.fontSize * 1.08)),
+    height: nextHeight,
     text: normalizedText,
-    width: nextWidth,
-    x: nextX,
   };
 }
 
