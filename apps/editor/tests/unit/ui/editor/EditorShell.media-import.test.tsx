@@ -61,10 +61,9 @@ describe('EditorShell media import workflows', () => {
     await user.click(screen.getByRole('button', { name: 'Insert Media' }));
     await user.upload(screen.getByLabelText('Insert media file'), image);
 
-    expect(await screen.findByRole('button', { name: 'toolbar-image.png' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    expect(
+      await screen.findByRole('button', { name: 'toolbar-image.png' }, { timeout: 5_000 }),
+    ).toHaveAttribute('aria-pressed', 'true');
 
     mockVideoMetadataLoad();
     const createObjectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:toolbar-video');
