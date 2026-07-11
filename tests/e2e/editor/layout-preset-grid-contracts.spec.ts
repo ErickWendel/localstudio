@@ -1,12 +1,22 @@
 import { expect, test, withIsolatedDevServer } from '../support/journey-test';
-import { layoutPresetGridContractPage } from './layout-preset-grid-contract-page';
+import { evaluateLayoutPresetGridContract } from './layout-preset-grid-contract-browser';
+import { layoutPresetContractFixtures } from './layout-preset-contract-fixtures';
+import { layoutPresetContractPage } from './layout-preset-contract-page';
 
 const getServer = withIsolatedDevServer(test);
 
 test('normalizes image grid prompt tasks and applies grid layout frames in the browser runtime', async ({
   page,
 }) => {
-  const result = await layoutPresetGridContractPage.run(page, getServer().baseURL);
+  const result = await layoutPresetContractPage.run(
+    page,
+    getServer().baseURL,
+    evaluateLayoutPresetGridContract,
+    {
+      pageSize: layoutPresetContractFixtures.pageSize,
+      prompt: layoutPresetContractFixtures.gridPrompt,
+    },
+  );
 
   expect(result).toEqual({
     captionFill: '#FFFFFF',
