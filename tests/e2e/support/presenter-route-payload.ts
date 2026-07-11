@@ -2,6 +2,8 @@ import type { PresenterStatePayload } from '../../../apps/editor/src/services/pr
 
 import { presenterRouteProject } from './presenter-route-project';
 
+export type PresenterRoutePayload = PresenterStatePayload;
+
 export const presenterRoutePayload = {
   create(activePageId: string): PresenterStatePayload {
     return {

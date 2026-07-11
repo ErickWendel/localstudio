@@ -30,7 +30,11 @@ export const presenterRouteNavigation = {
     await expect
       .poll(() => page.evaluate(() => window.__LOCALSTUDIO_E2E_PRESENTER__?.activePageId()))
       .toBe('slide-2');
+    await page.getByRole('main', { name: 'Presenter view' }).click({ position: { x: 24, y: 24 } });
     await page.keyboard.press('Shift+ArrowDown');
+    await expect
+      .poll(() => page.evaluate(() => window.__LOCALSTUDIO_E2E_PRESENTER__?.activePageId()))
+      .toBe('slide-3');
     await expect(page.getByLabel('Presenter status')).toContainText('Current: Slide 3 of 3');
   },
 };
