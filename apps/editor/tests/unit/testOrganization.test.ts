@@ -32,6 +32,13 @@ async function collectSourceFiles(directory: string): Promise<string[]> {
   return nested.flat();
 }
 
+function isAsyncFunctionLike(node: ts.Node): boolean {
+  if (!ts.isArrowFunction(node) && !ts.isFunctionExpression(node)) return false;
+  return (ts.getModifiers(node) ?? []).some(
+    (modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword,
+  );
+}
+
 function isValueExport(node: ts.Node): boolean {
   if (!ts.canHaveModifiers(node)) return false;
   const modifiers = ts.getModifiers(node) ?? [];
@@ -70,6 +77,45 @@ async function getValueExportCount(filePath: string): Promise<number> {
     }
   });
   return count;
+}
+
+async function getE2eIsolationViolations(
+  filePath: string,
+  repositoryRoot: string,
+): Promise<string[]> {
+  const sourceText = await readFile(filePath, 'utf8');
+  const sourceFile = ts.createSourceFile(filePath, sourceText, ts.ScriptTarget.Latest, true);
+  const relativePath = relative(repositoryRoot, filePath).split(sep).join('/');
+  const violations: string[] = [];
+
+  function visit(node: ts.Node) {
+    if (ts.isCallExpression(node)) {
+      if (
+        ts.isPropertyAccessExpression(node.expression) &&
+        node.expression.name.text === 'evaluate' &&
+        node.arguments[0] &&
+        isAsyncFunctionLike(node.arguments[0])
+      ) {
+        violations.push(`${relativePath}: inline async page.evaluate browser contract`);
+      }
+
+      if (
+        ts.isPropertyAccessExpression(node.expression) &&
+        node.expression.name.text === 'waitForTimeout'
+      ) {
+        violations.push(`${relativePath}: fixed Playwright waitForTimeout delay`);
+      }
+
+      if (ts.isIdentifier(node.expression) && node.expression.text === 'waitDelay') {
+        violations.push(`${relativePath}: fixed waitDelay helper`);
+      }
+    }
+
+    node.forEachChild(visit);
+  }
+
+  visit(sourceFile);
+  return violations;
 }
 
 describe('test organization', () => {
@@ -137,5 +183,17 @@ describe('test organization', () => {
     }
 
     expect(looseFiles).toEqual([]);
+  });
+
+  it('keeps e2e browser runtime work isolated from specs and page objects', async () => {
+    const repositoryRoot = join(process.cwd(), '..', '..');
+    const e2eFiles = await collectSourceFiles(join(repositoryRoot, 'tests/e2e'));
+    const violations = (
+      await Promise.all(
+        e2eFiles.map((filePath) => getE2eIsolationViolations(filePath, repositoryRoot)),
+      )
+    ).flat();
+
+    expect(violations).toEqual([]);
   });
 });
