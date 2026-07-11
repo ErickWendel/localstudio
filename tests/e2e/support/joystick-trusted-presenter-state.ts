@@ -36,7 +36,6 @@ export const joystickTrustedPresenterState = {
       timer: {
         elapsedMs: 4_000,
         paused: false,
-        updatedAtEpochMs: Date.now(),
       },
       type: 'state',
       upcomingSlidePreviews: [

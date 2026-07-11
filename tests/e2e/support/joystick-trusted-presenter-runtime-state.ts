@@ -56,13 +56,13 @@ export const joystickTrustedPresenterRuntimeState = {
         if (command.command === 'resume-timer') {
           state = {
             ...state,
-            timer: { ...state.timer, paused: false, updatedAtEpochMs: Date.now() },
+            timer: { elapsedMs: state.timer.elapsedMs, paused: false },
           };
         }
         if (command.command === 'reset-timer') {
           state = {
             ...state,
-            timer: { elapsedMs: 0, paused: true, updatedAtEpochMs: Date.now() },
+            timer: { elapsedMs: 0, paused: true },
           };
         }
         return true;
