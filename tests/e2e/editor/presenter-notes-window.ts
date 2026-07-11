@@ -18,9 +18,10 @@ export const presenterNotesWindow = {
     const presenterPage = await presenterPopupPromise;
     await expect(presenterPage.getByRole('main', { name: 'Presenter view' })).toBeVisible();
     expect(await presenterPage.evaluate(() => Boolean(window.opener))).toBe(true);
-    await expect(page.getByRole('region', { name: 'Remote control this presentation' })).toBeVisible({
-      timeout: 15_000,
-    });
+    await expect(page.getByRole('dialog', { name: 'Audience Window' })).toBeVisible();
+    await expect(
+      page.getByRole('region', { name: 'Remote control this presentation' }),
+    ).toBeHidden();
     await page.getByRole('button', { name: 'Enter full screen mode' }).click();
     return presenterPage;
   },

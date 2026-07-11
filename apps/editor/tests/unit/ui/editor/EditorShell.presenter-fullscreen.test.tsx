@@ -34,7 +34,7 @@ describe('EditorShell presenter fullscreen workflows', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('opens presenter view with an audience fullscreen prompt and keeps the remote session on fullscreen exit', async () => {
+  it('opens presenter view with an audience fullscreen prompt and keeps the desktop remote panel closed', async () => {
     const user = userEvent.setup();
     let fullscreenElement: Element | null = null;
     const popupClose = vi.fn();
@@ -73,13 +73,8 @@ describe('EditorShell presenter fullscreen workflows', () => {
     expect(popup.location.href).toContain('presenter=1');
     expect(screen.getByRole('dialog', { name: 'Audience Window' })).toBeInTheDocument();
     expect(
-      screen.getByRole('region', { name: 'Remote control this presentation' }),
-    ).toBeInTheDocument();
-    expect(await screen.findByRole('img', { name: 'Remote control QR code' })).toHaveAttribute(
-      'src',
-      expect.stringContaining('data:image/png'),
-    );
-    expect(screen.getByRole('button', { name: 'Copy remote link' })).toBeInTheDocument();
+      screen.queryByRole('region', { name: 'Remote control this presentation' }),
+    ).not.toBeInTheDocument();
     expect(requestFullscreen).not.toHaveBeenCalled();
 
     await user.click(screen.getByLabelText('Canvas workspace'));

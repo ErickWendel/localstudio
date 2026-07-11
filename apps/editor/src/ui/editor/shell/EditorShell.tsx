@@ -259,7 +259,6 @@ export function EditorShell({ services }: EditorShellProps) {
     setPresenterRemoteUnavailable(false);
     setRemotePresenterActive(true);
     setPresenterSessionId(result.sessionId);
-    setPresenterRemotePanelOpen(true);
     void service
       .openRemoteControlSession({
         presenterLabel: navigator.platform || 'Presenter device',

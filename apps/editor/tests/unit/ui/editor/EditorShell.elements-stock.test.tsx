@@ -8,10 +8,17 @@ const {
   InvalidImageStockMediaService,
   ReadyStockMediaService,
   createAppServices,
+  mockControllableVideoMetadataLoad,
   mockVideoMetadataLoad,
   openLeftTab,
   stockImage,
 } = editorShellTestHarness;
+
+class PendingTrackingStockMediaService extends ReadyStockMediaService {
+  override trackImageDownload(): Promise<void> {
+    return new Promise(() => undefined);
+  }
+}
 
 describe('EditorShell elements and stock media workflows', () => {
   afterEach(() => {
@@ -64,6 +71,24 @@ describe('EditorShell elements and stock media workflows', () => {
     expect(stockMediaService.trackedItems).toEqual([stockImage]);
   });
 
+  it('inserts an Unsplash image before download tracking finishes', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    services.stockMediaService = new PendingTrackingStockMediaService();
+
+    render(<EditorShell services={services} />);
+
+    await openLeftTab(user, 'Elements');
+    await user.click(await screen.findByRole('button', { name: 'Insert image by Ada Photo' }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-selected-elements',
+        expect.stringMatching(/^image-/),
+      );
+    });
+  });
+
   it('inserts and selects a GIPHY GIF movie from the Elements panel', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
@@ -82,6 +107,29 @@ describe('EditorShell elements and stock media workflows', () => {
       );
     });
     expect(screen.getByLabelText('Launch GIF').tagName.toLowerCase()).toBe('video');
+    expect(screen.getByLabelText('Launch GIF')).toHaveAttribute(
+      'src',
+      'https://media.giphy.com/media/gif-1/giphy.mp4',
+    );
+  });
+
+  it('inserts a GIPHY GIF movie before video metadata finishes loading', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    mockControllableVideoMetadataLoad();
+    services.stockMediaService = new ReadyStockMediaService();
+
+    render(<EditorShell services={services} />);
+
+    await openLeftTab(user, 'Elements');
+    await user.click(await screen.findByRole('button', { name: 'Insert GIF Launch GIF' }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-selected-elements',
+        expect.stringMatching(/^video-/),
+      );
+    });
     expect(screen.getByLabelText('Launch GIF')).toHaveAttribute(
       'src',
       'https://media.giphy.com/media/gif-1/giphy.mp4',
