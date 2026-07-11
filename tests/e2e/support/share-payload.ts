@@ -1,4 +1,5 @@
 import type { ProjectDocument } from '../../../apps/editor/src/domain/documents/model';
+import { createSharePayloadProject } from './share-payload-project';
 
 interface E2ESharePayload {
   schemaVersion: number;
@@ -15,68 +16,6 @@ export function createSharePayload(): E2ESharePayload {
     shareId: 'e2e-share',
     createdAt: now,
     updatedAt: now,
-    project: {
-      id: 'project-e2e-share',
-      name: 'E2E Shared Deck',
-      createdAt: now,
-      updatedAt: now,
-      assets: {},
-      pages: [
-        {
-          id: 'page-1',
-          name: 'Opening',
-          width: 1920,
-          height: 1080,
-          background: { type: 'color', color: '#050D10' },
-          elementIds: ['title-1'],
-        },
-        {
-          id: 'page-2',
-          name: 'Closing',
-          width: 1920,
-          height: 1080,
-          background: { type: 'color', color: '#102028' },
-          elementIds: ['title-2'],
-        },
-      ],
-      elements: {
-        'title-1': {
-          id: 'title-1',
-          type: 'text',
-          text: 'Shared deck opening',
-          x: 300,
-          y: 300,
-          width: 1200,
-          height: 160,
-          rotation: 0,
-          locked: false,
-          visible: true,
-          opacity: 1,
-          fontFamily: 'Open Sans',
-          fontSize: 72,
-          fontWeight: 800,
-          fill: '#37FD76',
-          align: 'center',
-        },
-        'title-2': {
-          id: 'title-2',
-          type: 'text',
-          text: 'Shared deck closing',
-          x: 300,
-          y: 300,
-          width: 1200,
-          height: 160,
-          rotation: 0,
-          locked: false,
-          visible: true,
-          opacity: 1,
-          fontFamily: 'Open Sans',
-          fontSize: 72,
-          fontWeight: 800,
-          fill: '#FFFFFF',
-          align: 'center',
-        },
-      },
-    },
+    project: createSharePayloadProject(now),
   };
 }
