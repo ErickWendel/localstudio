@@ -13,10 +13,12 @@ export async function installMockAiProviders(page: Page, options: MockAiProvider
     slideElements: mockAiFixtures.slideElements,
     slideTasks: mockAiFixtures.slideTasks,
   });
-  await page.addInitScript(mockAiWorkerInitScript, {
-    mockOptions: options,
-    pngBytes: mockAiFixtures.generatedImagePng,
-    slideElements: mockAiFixtures.slideElements,
-    slideTasks: mockAiFixtures.slideTasks,
+  await page.addInitScript({
+    content: mockAiWorkerInitScript.build({
+      mockOptions: options,
+      pngBytes: mockAiFixtures.generatedImagePng,
+      slideElements: mockAiFixtures.slideElements,
+      slideTasks: mockAiFixtures.slideTasks,
+    }),
   });
 }
