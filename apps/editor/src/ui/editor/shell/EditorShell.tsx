@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type Konva from 'konva';
-import { zipSync } from 'fflate';
 import type { AppServices } from '../../../app/composition';
 import type { ShareMetadata } from '../../../services/contracts/interfaces';
 import { editorAutomationController } from '../../../services/automation/editorAutomationController';
 import type { EditorAutomationDelegate } from '../../../services/automation/editorAutomationController';
-import { modelSetupService } from '../../../services/model-setup/modelSetupService';
 import {
   WebMcpToolAdapter,
   type WebMcpDemoWindow,
@@ -14,8 +12,6 @@ import { EditorFooter } from './EditorFooter';
 import { ImageExportPanel, type ImageExportOptions } from '../panels/ImageExportPanel';
 import { MediaImportProgressOverlay } from './MediaImportProgressOverlay';
 import { PresentationImportProgressOverlay } from './PresentationImportProgressOverlay';
-import { LeftToolPanel } from '../panels/LeftToolPanel';
-import { LocalProjectSetupPanel } from '../panels/LocalProjectSetupPanel';
 import { MediaIntegrationSettingsPanel } from '../panels/MediaIntegrationSettingsPanel';
 import { MirrorSettingsPanel } from '../panels/MirrorSettingsPanel';
 import { PagesPanel } from '../panels/PagesPanel';
@@ -27,116 +23,29 @@ import { RemoteImportPanel } from '../panels/RemoteImportPanel';
 import { CanvasWorkspace } from '../canvas/CanvasWorkspace';
 import { ScrollingCanvasWorkspace } from '../canvas/ScrollingCanvasWorkspace';
 import { SettingsPanel } from '../panels/SettingsPanel';
-import { TopToolbar } from '../toolbars/TopToolbar';
 import { VersionHistoryPanel } from '../panels/VersionHistoryPanel';
 import { presentationMovieControls, type MovieHoldState } from '../media/presentationMovieControls';
 import { useEditorViewModel, type OperationNoticeState } from '../state/useEditorViewModel';
 import { SharePanel } from '../../share/SharePanel';
-import {
-  KeyboardShortcutsDialog,
-  type KeyboardShortcutAction,
-} from '../../components/KeyboardShortcutsDialog';
-import { canvasWorkspaceUtils } from '../canvas/canvasWorkspaceUtils';
-import type { ImageElement } from '../../../domain/documents/model';
+import { KeyboardShortcutsDialog, type KeyboardShortcutAction } from '../../components/KeyboardShortcutsDialog';
 import { editorShellBrowserUtils } from '../browser/editorShellBrowserUtils';
 import { BrowserPresenterSessionService } from '../../../services/presenter/presenterSessionService';
 import type { PresenterRemoteSessionMetadata } from '../../../services/presenter/presenterSessionTypes';
 import { PresenterRemotePanel } from '../../presenter/PresenterRemotePanel';
-import {
-  EditorAiWorkflowTour,
-  type EditorAiWorkflowTourHandle,
-} from '../tour/EditorAiWorkflowTour';
+import { EditorAiWorkflowTour } from '../tour/EditorAiWorkflowTour';
+import type { EditorAiWorkflowTourHandle } from '../tour/editorAiWorkflowTourTypes';
+import { AudienceFullscreenPrompt } from './AudienceFullscreenPrompt';
+import { EditorLeftPanelSurface } from './EditorLeftPanelSurface';
+import { EditorToolbarSurface } from './EditorToolbarSurface';
+import { editorImageExport } from './editor-image-export';
+import type { ImageExportFrame } from './editor-image-export';
+import { editorShortcutActions } from './editor-shortcut-actions';
+import { PresentationSlideNavigator } from './PresentationSlideNavigator';
+import { SpeakerNotesEditor } from './SpeakerNotesEditor';
 
 interface EditorShellProps {
   services: AppServices;
 }
-
-type ImageExportAnimationPreview = ComponentProps<typeof CanvasWorkspace>['animationPreview'];
-
-interface ImageExportFrame {
-  animationPreview?: ImageExportAnimationPreview | undefined;
-  fileName: string;
-  pageId: string;
-}
-
-function waitForNextPaint() {
-  if (typeof window === 'undefined') return Promise.resolve();
-  return new Promise<void>((resolve) => {
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        resolve();
-      });
-    });
-  });
-}
-
-function bytesToBlobPart(bytes: Uint8Array): ArrayBuffer {
-  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-}
-
-function dataUrlToBytes(dataUrl: string) {
-  const commaIndex = dataUrl.indexOf(',');
-  if (commaIndex === -1) throw new Error('Could not read exported slide image.');
-  const metadata = dataUrl.slice(0, commaIndex);
-  const payload = dataUrl.slice(commaIndex + 1);
-  if (!metadata.includes(';base64')) {
-    return new TextEncoder().encode(decodeURIComponent(payload));
-  }
-  const binary = window.atob(payload);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return bytes;
-}
-
-function appendFileNameSuffix(fileName: string, suffix: string) {
-  const extensionIndex = fileName.lastIndexOf('.');
-  if (extensionIndex <= 0) return `${fileName}${suffix}`;
-  return `${fileName.slice(0, extensionIndex)}${suffix}${fileName.slice(extensionIndex)}`;
-}
-
-function createImageExportAnimationPreview(
-  pageId: string,
-  hiddenElementIds: string[],
-): ImageExportAnimationPreview {
-  return {
-    activeBuildElementId: undefined,
-    animationProgress: 1,
-    hiddenElementIds,
-    mode: 'editor',
-    pageId,
-    phase: 'waiting',
-    playing: false,
-    waitingForClick: false,
-  };
-}
-
-const editorShortcutActions = [
-  'next-build',
-  'previous-build',
-  'next-slide',
-  'previous-slide',
-  'first-slide',
-  'last-slide',
-  'quit-presentation',
-  'shortcut-toggle',
-  'pause-presentation',
-  'black-screen',
-  'white-screen',
-  'cursor-toggle',
-  'show-slide-number',
-  'open-slide-navigator',
-  'next-navigator-slide',
-  'previous-navigator-slide',
-  'select-navigator-slide',
-  'close-slide-navigator',
-  'play-pause-movie',
-  'rewind-movie',
-  'fast-forward-movie',
-  'jump-movie-start',
-  'jump-movie-end',
-] satisfies KeyboardShortcutAction[];
 
 export function EditorShell({ services }: EditorShellProps) {
   const vm = useEditorViewModel(services);
@@ -222,88 +131,24 @@ export function EditorShell({ services }: EditorShellProps) {
   }
 
   function getImageExportFrames(options: ImageExportOptions): ImageExportFrame[] {
-    const extension = options.format;
-    const pages =
-      options.slideRange === 'all'
-        ? vm.project.pages
-        : vm.project.pages.slice(options.slideRange.from - 1, options.slideRange.to);
-
-    return pages.flatMap((page) => {
-      const pageFileName = services.exportService.getPageImageFileName(
-        vm.project,
-        page.id,
-        extension,
-      );
-      const builds =
-        page.animationBuilds?.filter((build) => {
-          const element = vm.project.elements[build.elementId];
-          return element && element.visible !== false;
-        }) ?? [];
-      if (!options.includeAnimationFrames || builds.length === 0) {
-        return [
-          {
-            animationPreview: createImageExportAnimationPreview(page.id, []),
-            fileName: pageFileName,
-            pageId: page.id,
-          },
-        ];
-      }
-
-      const buildInElementIds = builds
-        .filter((build) => build.kind === undefined || build.kind === 'build-in')
-        .map((build) => build.elementId);
-      const hiddenElementIds = new Set(buildInElementIds);
-      const frames: ImageExportFrame[] = [];
-
-      builds.forEach((build, index) => {
-        if (build.kind === 'build-out') {
-          hiddenElementIds.add(build.elementId);
-        } else if (build.kind === undefined || build.kind === 'build-in') {
-          hiddenElementIds.delete(build.elementId);
-        }
-        frames.push({
-          animationPreview: createImageExportAnimationPreview(
-            page.id,
-            Array.from(hiddenElementIds),
-          ),
-          fileName: appendFileNameSuffix(
-            pageFileName,
-            `-animation-${String(index + 1).padStart(2, '0')}`,
-          ),
-          pageId: page.id,
-        });
-      });
-
-      return frames;
+    return editorImageExport.getFrames({
+      getPageImageFileName: services.exportService.getPageImageFileName.bind(services.exportService),
+      options,
+      project: vm.project,
     });
   }
 
-  async function renderImageExportFrame(
-    frame: ImageExportFrame,
-    format: ImageExportOptions['format'],
-  ) {
-    const page = vm.project.pages.find((item) => item.id === frame.pageId);
-    const imageUrls =
-      page?.elementIds
-        .map((elementId) => vm.project.elements[elementId])
-        .filter(
-          (element): element is ImageElement =>
-            element?.type === 'image' && element.visible !== false,
-        )
-        .map((element) => vm.project.assets[element.assetId]?.objectUrl)
-        .filter((assetUrl): assetUrl is string => Boolean(assetUrl)) ?? [];
-    await Promise.allSettled(
-      imageUrls.map((assetUrl) => canvasWorkspaceUtils.preloadCanvasImage(assetUrl)),
-    );
+  async function renderImageExportFrame(frame: ImageExportFrame, format: ImageExportOptions['format']) {
+    await editorImageExport.preloadFrameImages(vm.project, frame.pageId);
     setImageExportFrame(frame);
-    await waitForNextPaint();
+    await editorImageExport.waitForNextPaint();
     const dataUrl = imageExportStageRef.current?.toDataURL(
       format === 'jpeg'
         ? { mimeType: 'image/jpeg', pixelRatio: 2, quality: 0.92 }
         : { mimeType: 'image/png', pixelRatio: 2 },
     );
     if (!dataUrl) throw new Error(`Could not render ${frame.fileName}.`);
-    return dataUrlToBytes(dataUrl);
+    return editorImageExport.dataUrlToBytes(dataUrl);
   }
 
   async function exportImages(options: ImageExportOptions) {
@@ -336,9 +181,8 @@ export function EditorShell({ services }: EditorShellProps) {
         archiveFiles[frame.fileName] = await renderImageExportFrame(frame, options.format);
       }
       setImageExportFrame(undefined);
-      const archiveBytes = zipSync(archiveFiles);
       services.exportService.downloadBlob(
-        new Blob([bytesToBlobPart(archiveBytes)], { type: 'application/zip' }),
+        editorImageExport.createZipBlob(archiveFiles),
         services.exportService.getImagesArchiveFileName(vm.project),
       );
       setImageExportPanelOpen(false);
@@ -1182,80 +1026,21 @@ export function EditorShell({ services }: EditorShellProps) {
         onOpenMirrorSettings={vm.openMirrorSettings}
         onOpenSettings={vm.openSettings}
       />
-      <TopToolbar
-        project={vm.project}
-        language={vm.activeSlideLanguage.displayCode}
-        languageFlag={vm.activeSlideLanguage.flag}
-        languageLabel={vm.activeSlideLanguage.label}
-        canRedo={!isHistoryReadOnly && vm.canRedo}
-        canUndo={!isHistoryReadOnly && vm.canUndo}
-        hasSelection={!isHistoryReadOnly && hasSelection}
-        persistenceEnabled={vm.persistenceEnabled}
-        mirrorState={vm.mirrorState}
-        mirrorDisabledBySettings={vm.mirrorDisabledBySettings}
-        persistenceAttention={vm.persistenceAttention}
-        operationNotice={imageExportNotice ?? vm.operationNotice}
-        localProjectSetupPanel={
-          vm.localProjectSetupOpen ? (
-            <LocalProjectSetupPanel
-              initialName={vm.project.name}
-              onCancel={vm.closeLocalProjectSetup}
-              onConfirm={(projectName) => {
-                void vm.confirmLocalProjectSetup(projectName);
-              }}
-            />
-          ) : null
-        }
-        lastEditedAt={vm.lastEditedAt}
-        saveAnimationKey={vm.saveAnimationKey}
-        canTranslateDeck={vm.canTranslateDeck}
+      <EditorToolbarSurface
         deckTranslationStatus={deckTranslationStatus}
-        isTranslatingDeck={Boolean(vm.deckTranslationProgress)}
+        hasDirectoryPersistence={hasDirectoryPersistence}
+        hasSelection={hasSelection}
+        imageExportNotice={imageExportNotice}
         isExportingImages={isExportingImages}
-        isExportingPowerPoint={vm.isExportingPowerPoint}
-        translationLanguageOptions={vm.translationLanguageOptions}
-        translationSourceLanguage={vm.activeSlideLanguage.code}
-        translationTargetLanguage={vm.translationTargetLanguage}
-        persistenceAvailable={services.persistenceAvailable}
-        persistenceMode={services.persistenceMode}
-        onDelete={isHistoryReadOnly ? undefined : vm.deleteSelectedElement}
-        onDuplicate={isHistoryReadOnly ? undefined : vm.duplicateSelectedElement}
-        onImportRemoteMirror={() => {
-          void vm.importRemoteMirror();
-        }}
-        onImportProject={
-          hasDirectoryPersistence
-            ? () => {
-                void vm.importProject();
-              }
-            : undefined
-        }
-        onImportPowerPoint={() => {
-          void vm.importPowerPoint();
-        }}
-        onExportPowerPoint={() => {
-          void vm.exportPowerPoint();
-        }}
+        isHistoryReadOnly={isHistoryReadOnly}
+        services={services}
+        vm={vm}
         onExportImages={() => {
           setImageExportPanelOpen(true);
         }}
-        onMirrorNow={() => {
-          vm.requestMirrorNow();
-        }}
-        onMirrorToggle={vm.setMirrorEnabled}
         onNewProject={openBlankProjectInNewTab}
-        onOpenMirrorSettings={vm.openMirrorSettings}
         onOpenKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
         onStartAiSetupTour={startAiWorkflowTour}
-        onOpenVersionHistory={() => {
-          void vm.openVersionHistory();
-        }}
-        onPersistenceToggle={(enabled) => {
-          void vm.setPersistence(enabled);
-        }}
-        onProjectNameChange={isHistoryReadOnly ? undefined : vm.setProjectName}
-        onRedo={isHistoryReadOnly ? undefined : vm.redo}
-        onResetZoom={vm.resetZoom}
         onSelectLayers={() => {
           vm.setActiveTab('layout');
           openLeftPanel();
@@ -1265,147 +1050,18 @@ export function EditorShell({ services }: EditorShellProps) {
         }}
         onOpenPresenterView={openPresenterView}
         onStartPresenterMode={startPresenterMode}
-        onSaveLocal={() => {
-          void vm.saveLocalNow();
-        }}
-        onSaveLocalAs={
-          hasDirectoryPersistence
-            ? () => {
-                void vm.saveLocalAs();
-              }
-            : undefined
-        }
-        onTranslationSourceLanguageChange={vm.setActiveSlideLanguage}
-        onTranslationTargetLanguageChange={(languageCode) => {
-          void vm.setTranslationTargetLanguageForSource(languageCode, {
-            sourceLanguage: vm.activeSlideLanguage.code,
-          });
-        }}
-        onTranslateDeck={
-          isHistoryReadOnly
-            ? undefined
-            : () => {
-                void vm.translateDeck();
-              }
-        }
-        onUndo={isHistoryReadOnly ? undefined : vm.undo}
-        onZoomIn={vm.zoomIn}
-        onZoomOut={vm.zoomOut}
       />
       <div
         className={vm.pagesPanelOpen ? 'editor-grid' : 'editor-grid editor-grid-pages-collapsed'}
       >
-        <LeftToolPanel
-          activeTab={vm.activeTab}
-          animationPreview={vm.animationPreview}
-          activeSlideLanguage={vm.activeSlideLanguage}
-          focusFontControlKey={designFontFocusKey}
-          onTabChange={vm.setActiveTab}
-          open={leftPanelOpen}
+        <EditorLeftPanelSurface
+          designFontFocusKey={designFontFocusKey}
+          isHistoryReadOnly={isHistoryReadOnly}
+          leftPanelOpen={leftPanelOpen}
+          vm={vm}
+          onImportMedia={importMediaFile}
           onOpenChange={handleLeftPanelOpenChange}
-          project={vm.project}
-          activePageId={vm.activePageId}
-          selection={vm.selection}
-          availableFonts={vm.availableFonts}
-          onDownloadFont={isHistoryReadOnly ? undefined : vm.downloadFontForSelection}
-          onSelectElement={isHistoryReadOnly ? undefined : selectElement}
-          onSetElementVisibility={isHistoryReadOnly ? undefined : vm.setElementVisibility}
-          onSetElementLock={isHistoryReadOnly ? undefined : vm.setElementLock}
-          onDeleteElement={isHistoryReadOnly ? undefined : vm.deleteElement}
-          onReorderElement={isHistoryReadOnly ? undefined : vm.reorderElement}
-          onAlignSelectedElement={isHistoryReadOnly ? undefined : vm.alignSelectedElement}
-          onSetSelectedElementZOrder={isHistoryReadOnly ? undefined : vm.setSelectedElementZOrder}
-          onUpdateElementFrame={isHistoryReadOnly ? undefined : vm.updateElementFrame}
-          onUpdateElementStyle={isHistoryReadOnly ? undefined : vm.updateElementStyle}
-          onUpdateTextContent={isHistoryReadOnly ? undefined : vm.updateTextContent}
-          onUpdateMediaPlayback={isHistoryReadOnly ? undefined : vm.updateMediaPlayback}
-          onUpdatePageBackground={isHistoryReadOnly ? undefined : vm.updatePageBackground}
-          onApplyTheme={isHistoryReadOnly ? undefined : vm.applyTheme}
-          onEditTheme={isHistoryReadOnly ? undefined : vm.editTheme}
-          onChangeTheme={isHistoryReadOnly ? undefined : vm.changeTheme}
-          onApplySlideLayout={isHistoryReadOnly ? undefined : vm.applySlideLayout}
-          onEditSlideLayout={isHistoryReadOnly ? undefined : vm.editSlideLayout}
-          onToggleSlideLayoutPlaceholder={
-            isHistoryReadOnly ? undefined : vm.toggleSlideLayoutPlaceholder
-          }
-          onReplaceVideoAsset={
-            isHistoryReadOnly
-              ? undefined
-              : (elementId, file) => {
-                  void vm.replaceVideoAsset(elementId, file);
-                }
-          }
-          onClearPageTransition={isHistoryReadOnly ? undefined : vm.clearPageTransition}
-          onSetPageTransition={isHistoryReadOnly ? undefined : vm.setPageTransition}
-          onSetElementAnimationBuilds={isHistoryReadOnly ? undefined : vm.setElementAnimationBuilds}
-          onClearElementAnimationBuild={
-            isHistoryReadOnly ? undefined : vm.clearElementAnimationBuild
-          }
-          onReorderElementAnimationBuild={
-            isHistoryReadOnly ? undefined : vm.reorderElementAnimationBuild
-          }
-          onPlayAnimationPreview={vm.playAnimationPreview}
-          onImportImage={
-            isHistoryReadOnly
-              ? undefined
-              : (file) => {
-                  void vm.importImageFile(file);
-                }
-          }
-          stockGifResults={vm.stockGifResults}
-          stockImageResults={vm.stockImageResults}
-          stockMediaError={vm.stockMediaError}
-          stockMediaProviderState={vm.stockMediaProviderState}
-          stockMediaRecentItems={vm.stockMediaRecentItems}
-          stockMediaSearchingGifs={vm.stockMediaSearching.gifs}
-          stockMediaSearchingImages={vm.stockMediaSearching.images}
-          onConfigureStockMedia={vm.openMediaSettings}
-          onRemoveAsset={isHistoryReadOnly ? undefined : vm.removeAsset}
-          onImportMedia={isHistoryReadOnly ? undefined : importMediaFile}
-          onInsertStockMedia={isHistoryReadOnly ? undefined : vm.insertStockMedia}
-          onInsertText={isHistoryReadOnly ? undefined : vm.insertTextElement}
-          onInsertShape={isHistoryReadOnly ? undefined : vm.insertShapeElement}
-          onSearchStockGifs={(query) => {
-            void vm.searchStockGifs(query);
-          }}
-          onSearchStockImages={(query) => {
-            void vm.searchStockImages(query);
-          }}
-          modelStates={vm.modelStates}
-          attentionModelId={
-            vm.aiToolsAttentionModelId ??
-            (vm.backgroundSelectionNotice ? modelSetupService.IMAGE_EDITING_MODEL_ID : undefined)
-          }
-          createImageOptions={vm.createImageOptions}
-          translationLanguageOptions={vm.translationLanguageOptions}
-          promptProviderStates={vm.promptProviderStates}
-          translationProviderStates={vm.translationProviderStates}
-          languageDetectionProviderStates={vm.languageDetectionProviderStates}
-          languageDetectionPreparation={vm.languageDetectionPreparation}
-          translationPreparation={vm.translationPreparation}
-          translationTargetAttention={vm.translationTargetAttention}
-          translationTargetLanguage={vm.translationTargetLanguage}
-          promptApiAttention={vm.promptApiAttention}
-          promptApiNotice={vm.promptApiNotice}
-          promptPreparation={vm.promptPreparation}
-          onDownloadModel={vm.downloadModel}
-          onRemoveModel={vm.removeModel}
-          onCreateImageOptionsChange={vm.setCreateImageOptions}
-          onPreparePromptApi={vm.preparePromptApi}
-          onPrepareLanguageDetectionProvider={vm.prepareSelectedLanguageDetectionProvider}
-          onPrepareTranslationProvider={vm.prepareSelectedTranslationProvider}
-          onPromptProviderChange={(providerId) => {
-            void vm.setPromptProvider(providerId);
-          }}
-          onLanguageDetectionProviderChange={(providerId) => {
-            void vm.setLanguageDetectionProvider(providerId);
-          }}
-          onTranslationTargetLanguageChange={(languageCode) => {
-            void vm.setTranslationTargetLanguage(languageCode);
-          }}
-          onTranslationProviderChange={(providerId) => {
-            void vm.setTranslationProvider(providerId);
-          }}
+          onSelectElement={selectElement}
         />
         <section
           className={[
@@ -1428,49 +1084,16 @@ export function EditorShell({ services }: EditorShellProps) {
             />
           ) : null}
           {slideNavigatorOpen ? (
-            <div
-              className="presentation-slide-navigator"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Slide navigator"
-            >
-              <div className="presentation-slide-navigator-header">
-                <h2>Slide Navigator</h2>
-                <button
-                  className="stitch-icon-button"
-                  type="button"
-                  aria-label="Close slide navigator"
-                  onClick={() => setSlideNavigatorOpen(false)}
-                >
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    close
-                  </span>
-                </button>
-              </div>
-              <div className="presentation-slide-navigator-list" role="listbox" aria-label="Slides">
-                {vm.project.pages.map((page, index) => (
-                  <button
-                    aria-selected={index === slideNavigatorIndex}
-                    className={
-                      index === slideNavigatorIndex
-                        ? 'presentation-slide-navigator-item presentation-slide-navigator-item-active'
-                        : 'presentation-slide-navigator-item'
-                    }
-                    key={page.id}
-                    type="button"
-                    role="option"
-                    onClick={() => setSlideNavigatorIndex(index)}
-                    onDoubleClick={() => {
-                      playPresentationPageAt(index);
-                      setSlideNavigatorOpen(false);
-                    }}
-                  >
-                    <span>Slide {index + 1}</span>
-                    <strong>{page.name}</strong>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <PresentationSlideNavigator
+              project={vm.project}
+              selectedIndex={slideNavigatorIndex}
+              onClose={() => setSlideNavigatorOpen(false)}
+              onPlayPageAt={(index) => {
+                playPresentationPageAt(index);
+                setSlideNavigatorOpen(false);
+              }}
+              onSelectIndex={setSlideNavigatorIndex}
+            />
           ) : null}
           {presentationBlankScreen ? (
             <div
@@ -1607,44 +1230,13 @@ export function EditorShell({ services }: EditorShellProps) {
             onSetPageVisibility={isHistoryReadOnly ? undefined : vm.setPageVisibility}
           />
           {activePage ? (
-            <section className="speaker-notes-editor" aria-label="Speaker notes editor">
-              {speakerNotesOpen ? (
-                <div className="speaker-notes-card">
-                  <header className="speaker-notes-header">
-                    <h2>
-                      Page {activePageIndex + 1} - {activePage.name}
-                    </h2>
-                    <div className="speaker-notes-actions ew-compact-row">
-                      <button type="button" aria-label="Change notes text size">
-                        aA
-                      </button>
-                      <button
-                        type="button"
-                        aria-label="Close notes panel"
-                        onClick={() => setSpeakerNotesOpen(false)}
-                      >
-                        <span className="material-symbols-outlined" aria-hidden="true">
-                          close
-                        </span>
-                      </button>
-                    </div>
-                  </header>
-                  <textarea
-                    id="speaker-notes-textarea"
-                    aria-label="Speaker notes"
-                    maxLength={5000}
-                    placeholder="Add notes to your design"
-                    value={activePage.speakerNotes ?? ''}
-                    onChange={(event) =>
-                      vm.updatePageSpeakerNotes(activePage.id, event.target.value)
-                    }
-                  />
-                  <span className="speaker-notes-count">
-                    {activePage.speakerNotes?.length ?? 0}/5000
-                  </span>
-                </div>
-              ) : null}
-            </section>
+            <SpeakerNotesEditor
+              page={activePage}
+              pageIndex={activePageIndex}
+              open={speakerNotesOpen}
+              onClose={() => setSpeakerNotesOpen(false)}
+              onUpdateNotes={vm.updatePageSpeakerNotes}
+            />
           ) : null}
           {presenterViewError ? (
             <p className="presenter-view-error" role="alert">
@@ -1657,37 +1249,10 @@ export function EditorShell({ services }: EditorShellProps) {
             </div>
           ) : null}
           {audienceFullscreenPromptOpen ? (
-            <div className="audience-fullscreen-backdrop" role="presentation">
-              <section
-                className="audience-fullscreen-dialog"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="audience-fullscreen-title"
-              >
-                <button
-                  className="audience-fullscreen-close"
-                  type="button"
-                  aria-label="Close audience fullscreen prompt"
-                  onClick={closePresenterViewSession}
-                >
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    close
-                  </span>
-                </button>
-                <h2 id="audience-fullscreen-title">Audience Window</h2>
-                <p>
-                  This window is what your audience sees. Drag it to the screen your audience will
-                  be looking at and enter full screen mode.
-                </p>
-                <button
-                  className="audience-fullscreen-primary"
-                  type="button"
-                  onClick={enterAudienceFullscreen}
-                >
-                  Enter full screen mode
-                </button>
-              </section>
-            </div>
+            <AudienceFullscreenPrompt
+              onClose={closePresenterViewSession}
+              onEnterFullscreen={enterAudienceFullscreen}
+            />
           ) : null}
           <input
             ref={toolbarImageInputRef}

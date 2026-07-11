@@ -1,14 +1,16 @@
-import { Download, ImagePlus, Languages, ScanSearch, X } from 'lucide-react';
+import { ImagePlus, Languages, ScanSearch } from 'lucide-react';
 import { aiModelCatalog } from '../../../services/model-setup/aiModelCatalog';
-import { imageGenerationModel } from '../../../services/image-generation/imageGenerationModel';
 import type {
   AiProviderState,
   ModelDownloadProgressDetails,
   ModelState,
 } from '../../../services/contracts/interfaces';
-import { modelSetupService } from '../../../services/model-setup/modelSetupService';
-import { IconButton } from '../../components/IconButton';
 import { StatusPill } from '../../components/StatusPill';
+import { AiToolsDownloadProgress } from './AiToolsDownloadProgress';
+import { AiToolsHelpTip } from './AiToolsHelpTip';
+import { AiToolsModelRow } from './AiToolsModelRow';
+import { aiToolsProviderFallbacks } from './AiToolsProviderFallbacks';
+import { AiToolsProviderCard } from './AiToolsProviderCard';
 import { AiToolsSetupAction } from './AiToolsSetupAction';
 import type { CreateImagePromptOptions } from '../media/imagePromptOptions';
 import { imagePromptOptions } from '../media/imagePromptOptions';
@@ -61,19 +63,6 @@ interface AiToolsPanelProps {
   onTranslationProviderChange?: ((providerId: string) => void) | undefined;
 }
 
-function statusTone(status: ModelState['status']) {
-  if (status === 'ready') return 'success';
-  if (status === 'downloading') return 'warning';
-  return 'neutral';
-}
-
-function formatStatus(status: ModelState['status']) {
-  return status
-    .split('-')
-    .map((word) => word[0]?.toUpperCase() + word.slice(1))
-    .join(' ');
-}
-
 function getPreparationStatus(
   provider: AiProviderState | undefined,
   preparationStatus: 'idle' | 'downloading' | 'ready' | 'failed',
@@ -97,49 +86,6 @@ function getPreparationTone(status: 'idle' | 'downloading' | 'ready' | 'failed')
   return 'neutral';
 }
 
-function hasByteProgress(details: ModelDownloadProgressDetails) {
-  return (
-    typeof details.loadedBytes === 'number' &&
-    typeof details.totalBytes === 'number' &&
-    Number.isFinite(details.loadedBytes) &&
-    Number.isFinite(details.totalBytes) &&
-    details.totalBytes > 0
-  );
-}
-
-function formatGigabytes(bytes: number) {
-  return `${(bytes / 1_000_000_000).toFixed(1)} GB`;
-}
-
-function formatRemainingTime(estimatedRemainingMs: number | undefined) {
-  if (
-    typeof estimatedRemainingMs !== 'number' ||
-    !Number.isFinite(estimatedRemainingMs) ||
-    estimatedRemainingMs <= 0
-  ) {
-    return undefined;
-  }
-
-  const totalSeconds = Math.max(1, Math.ceil(estimatedRemainingMs / 1_000));
-  if (totalSeconds < 60) return 'Less than 1 min remaining';
-
-  const minutes = Math.ceil(totalSeconds / 60);
-  return `About ${minutes} min remaining`;
-}
-
-function getPrimaryProgressText(
-  status: 'idle' | 'downloading' | 'ready' | 'failed',
-  details: ModelDownloadProgressDetails & { progress: number },
-) {
-  if (status !== 'downloading') return undefined;
-  const progress = Math.max(0, Math.min(100, Math.round(details.progress)));
-  if (hasByteProgress(details)) {
-    return `${formatGigabytes(details.loadedBytes!)} / ${formatGigabytes(details.totalBytes!)} (${progress}%)`;
-  }
-  if (status === 'downloading' && progress >= 98) return undefined;
-  return `${progress}%`;
-}
-
 function getModelProgressStatus(
   status: ModelState['status'],
 ): 'idle' | 'downloading' | 'ready' | 'failed' {
@@ -155,55 +101,6 @@ function getModelSetupTaskStatus(
 ): 'idle' | 'downloading' | 'ready' | 'failed' {
   return getModelProgressStatus(
     modelStates.find((model) => model.id === modelId)?.status ?? 'needs-download',
-  );
-}
-
-function getSecondaryProgressText(
-  status: 'idle' | 'downloading' | 'ready' | 'failed',
-  details: ModelDownloadProgressDetails & { progress: number },
-) {
-  if (status !== 'downloading') return undefined;
-  if (details.progress >= 98) return 'Finalizing...';
-  return formatRemainingTime(details.estimatedRemainingMs);
-}
-
-function DownloadProgressCopy({
-  details,
-  status,
-}: {
-  details: ModelDownloadProgressDetails & { progress: number };
-  status: 'idle' | 'downloading' | 'ready' | 'failed';
-}) {
-  const primary = getPrimaryProgressText(status, details);
-  const secondary = getSecondaryProgressText(status, details);
-  if (!primary && !secondary) return null;
-
-  return (
-    <span className="download-progress-copy">
-      {primary ? <span className="download-progress-primary">{primary}</span> : null}
-      {secondary ? <span className="download-progress-secondary">{secondary}</span> : null}
-    </span>
-  );
-}
-
-function getFixedModelDisplayName(modelId: string, fallback: string) {
-  if (modelId === modelSetupService.IMAGE_EDITING_MODEL_ID)
-    return modelSetupService.IMAGE_EDITING_DISPLAY_NAME;
-  if (modelId === imageGenerationModel.IMAGE_GENERATION_MODEL_ID)
-    return imageGenerationModel.IMAGE_GENERATION_DISPLAY_NAME;
-  return fallback;
-}
-
-function ToolHelp({ id, text }: { id: string; text: string }) {
-  return (
-    <span className="translation-target-help">
-      <span aria-describedby={id} className="material-symbols-outlined" tabIndex={0}>
-        info
-      </span>
-      <span id={id} className="translation-target-tooltip" role="tooltip">
-        {text}
-      </span>
-    </span>
   );
 }
 
@@ -234,64 +131,18 @@ export function AiToolsPanel({
   onTranslationTargetLanguageChange,
   onTranslationProviderChange,
 }: AiToolsPanelProps) {
-  function updateCreateImageOptions(patch: Partial<CreateImagePromptOptions>) {
-    onCreateImageOptionsChange?.({
-      ...createImageOptions,
-      ...patch,
-    });
-  }
-
   const promptProviders =
     promptProviderStates.length > 0
       ? promptProviderStates
-      : [
-          {
-            id: 'chrome-prompt-api',
-            label: 'Chrome Built-in Prompt API',
-            description: 'Prompt to slides using Chrome Built-in AI.',
-            capability: 'prompt' as const,
-            runtime: 'chrome-built-in' as const,
-            compatibility: 'compatible' as const,
-            readiness:
-              promptPreparation.status === 'ready'
-                ? ('ready' as const)
-                : ('needs-download' as const),
-            selected: true,
-          },
-        ];
+      : [aiToolsProviderFallbacks.prompt(promptPreparation.status === 'ready')];
   const translationProviders =
     translationProviderStates.length > 0
       ? translationProviderStates
-      : [
-          {
-            id: 'chrome-translator-api',
-            label: 'Chrome Built-in Translator',
-            description: 'Translate visible text using Chrome Built-in AI.',
-            capability: 'translation' as const,
-            runtime: 'chrome-built-in' as const,
-            compatibility: 'compatible' as const,
-            readiness:
-              translationPreparation.status === 'ready'
-                ? ('ready' as const)
-                : ('needs-download' as const),
-            selected: true,
-          },
-        ];
+      : [aiToolsProviderFallbacks.translation(translationPreparation.status === 'ready')];
   const languageDetectionProviders =
     languageDetectionProviderStates.length > 0
       ? languageDetectionProviderStates
-      : [
-          {
-            id: 'chrome-language-detector-api',
-            label: 'Chrome Built-in Language Detector',
-            description: 'Detect slide language using Chrome Built-in AI.',
-            capability: 'language-detection' as const,
-            runtime: 'chrome-built-in' as const,
-            compatibility: 'compatible' as const,
-            readiness: 'ready' as const,
-            selected: true,
-          },
-        ];
+      : [aiToolsProviderFallbacks.languageDetection()];
   const selectedPromptProvider =
     promptProviders.find((provider) => provider.selected) ?? promptProviders[0];
   const selectedTranslationProvider =
@@ -399,289 +250,88 @@ export function AiToolsPanel({
     <div className="panel-stack" data-tour-id="ai-tools-panel">
       <AiToolsSetupAction tasks={setupTasks} />
       <div className="tool-card-list ew-panel-card">
-        <article
-          className={
-            promptApiAttention
-              ? 'tool-card ew-surface ew-surface-hover tool-card-attention'
-              : 'tool-card ew-surface ew-surface-hover'
-          }
-          aria-label="LLM Model"
-          data-tour-id="ai-llm-model"
-        >
-          <div className="tool-card-heading ew-compact-row">
-            <ImagePlus size={18} />
-            <strong>LLM Model</strong>
-            <StatusPill
-              label={selectedPromptProvider?.runtime === 'chrome-built-in' ? 'CHROME' : 'EXTERNAL'}
-              tone={selectedPromptProvider?.compatibility === 'compatible' ? 'success' : 'neutral'}
-            />
-            {promptStatus === 'downloading' ? null : selectedPromptNeedsDownload ? (
-              <IconButton
-                label="Download LLM Model"
-                attention
-                disabled={selectedPromptProvider?.compatibility === 'incompatible'}
-                onClick={() => {
-                  void onPreparePromptApi?.();
-                }}
-              >
-                <Download size={14} />
-              </IconButton>
-            ) : selectedPromptCanRemove ? (
-              <IconButton
-                label="Remove LLM Model"
-                tone="danger"
-                onClick={() => {
-                  void onRemoveModel?.(selectedPromptProvider.modelId!);
-                }}
-              >
-                <X size={14} />
-              </IconButton>
-            ) : null}
-          </div>
-          <p>Choose the local model used for prompt-to-slides.</p>
-          <label className="translation-target-control ew-field-scope">
-            <span className="translation-target-label ew-inline-row">Model</span>
-            <select
-              aria-label="LLM Model"
-              disabled={promptPreparation.status === 'downloading'}
-              value={selectedPromptProvider?.id ?? ''}
-              onChange={(event) => onPromptProviderChange?.(event.target.value)}
-            >
-              {promptProviders.map((provider) => (
-                <option
-                  key={provider.id}
-                  value={provider.id}
-                  disabled={provider.compatibility === 'incompatible'}
-                >
-                  {provider.label}
-                  {provider.compatibility === 'incompatible' ? ' - unavailable' : ''}
-                </option>
-              ))}
-            </select>
-            {selectedPromptProvider?.disabledReason ? (
-              <span className="translation-source-note">
-                {selectedPromptProvider.disabledReason}
-              </span>
-            ) : null}
-          </label>
-          <div className="translation-target-control ew-field-scope">
-            <div className="translation-preparation ew-grid-compact" aria-label="LLM preparation">
-              <div className="translation-preparation-meta">
-                <StatusPill
-                  label={getPreparationLabel(promptStatus)}
-                  tone={getPreparationTone(promptStatus)}
-                />
-                <DownloadProgressCopy
-                  details={{ ...promptPreparation, progress: promptProgress }}
-                  status={promptStatus}
-                />
-              </div>
-              {promptStatus === 'downloading' ? (
-                <>
-                  <div className="model-progress">
-                    <span style={{ width: `${promptProgress}%` }} />
-                  </div>
-                  <span className="translation-source-note">
-                    {promptApiNotice ?? `Availability: ${promptPreparation.availability}`}
-                  </span>
-                </>
-              ) : null}
-            </div>
-          </div>
-        </article>
+        <AiToolsProviderCard
+          actionLabel="LLM Model"
+          ariaLabel="LLM Model"
+          attention={promptApiAttention}
+          canRemove={Boolean(selectedPromptCanRemove)}
+          description="Choose the local model used for prompt-to-slides."
+          disabledReason={selectedPromptProvider?.disabledReason}
+          icon={ImagePlus}
+          isActionDisabled={selectedPromptProvider?.compatibility === 'incompatible'}
+          needsDownload={selectedPromptNeedsDownload}
+          onPrepare={onPreparePromptApi}
+          onProviderChange={onPromptProviderChange}
+          onRemove={onRemoveModel}
+          preparationAriaLabel="LLM preparation"
+          preparationDetails={promptPreparation}
+          preparationNote={promptApiNotice ?? `Availability: ${promptPreparation.availability}`}
+          preparationProgress={promptProgress}
+          preparationStatus={promptStatus}
+          providerModelId={selectedPromptProvider?.modelId}
+          providers={promptProviders}
+          runtime={selectedPromptProvider?.runtime}
+          selectedProviderId={selectedPromptProvider?.id ?? ''}
+          selectLabel="Model"
+          title="LLM Model"
+          tourId="ai-llm-model"
+        />
 
-        <article
-          className="tool-card ew-surface ew-surface-hover"
-          aria-label="Language Detection"
-          data-tour-id="ai-language-detection"
-        >
-          <div className="tool-card-heading ew-compact-row">
-            <ScanSearch size={18} />
-            <strong>Language Detection</strong>
-            <StatusPill
-              label={
-                selectedLanguageDetectionProvider?.runtime === 'chrome-built-in'
-                  ? 'CHROME'
-                  : 'EXTERNAL'
-              }
-              tone={
-                selectedLanguageDetectionProvider?.compatibility === 'compatible'
-                  ? 'success'
-                  : 'neutral'
-              }
-            />
-            {languageDetectionStatus ===
-            'downloading' ? null : selectedLanguageDetectionNeedsDownload ? (
-              <IconButton
-                label="Download Language Detection Model"
-                attention
-                disabled={selectedLanguageDetectionProvider?.compatibility === 'incompatible'}
-                onClick={() => {
-                  void onPrepareLanguageDetectionProvider?.();
-                }}
-              >
-                <Download size={14} />
-              </IconButton>
-            ) : selectedLanguageDetectionCanRemove ? (
-              <IconButton
-                label="Remove Language Detection Model"
-                tone="danger"
-                onClick={() => {
-                  void onRemoveModel?.(selectedLanguageDetectionProvider.modelId!);
-                }}
-              >
-                <X size={14} />
-              </IconButton>
-            ) : null}
-          </div>
-          <p>Choose how LocalStudio.dev detects source text language before translation.</p>
-          <label className="translation-target-control ew-field-scope">
-            <span className="translation-target-label ew-inline-row">Detection Model</span>
-            <select
-              aria-label="Language Detection Model"
-              disabled={languageDetectionPreparation.status === 'downloading'}
-              value={selectedLanguageDetectionProvider?.id ?? ''}
-              onChange={(event) => onLanguageDetectionProviderChange?.(event.target.value)}
-            >
-              {languageDetectionProviders.map((provider) => (
-                <option
-                  key={provider.id}
-                  value={provider.id}
-                  disabled={provider.compatibility === 'incompatible'}
-                >
-                  {provider.label}
-                  {provider.compatibility === 'incompatible' ? ' - unavailable' : ''}
-                </option>
-              ))}
-            </select>
-            {selectedLanguageDetectionProvider?.disabledReason ? (
-              <span className="translation-source-note">
-                {selectedLanguageDetectionProvider.disabledReason}
-              </span>
-            ) : null}
-          </label>
-          <div className="translation-target-control ew-field-scope">
-            <div
-              className="translation-preparation ew-grid-compact"
-              aria-label="Language detection preparation"
-            >
-              <div className="translation-preparation-meta">
-                <StatusPill
-                  label={getPreparationLabel(languageDetectionStatus)}
-                  tone={getPreparationTone(languageDetectionStatus)}
-                />
-                <DownloadProgressCopy
-                  details={{ ...languageDetectionPreparation, progress: languageDetectionProgress }}
-                  status={languageDetectionStatus}
-                />
-              </div>
-              {languageDetectionStatus === 'downloading' ? (
-                <div className="model-progress">
-                  <span style={{ width: `${languageDetectionProgress}%` }} />
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </article>
+        <AiToolsProviderCard
+          actionLabel="Language Detection Model"
+          ariaLabel="Language Detection"
+          canRemove={Boolean(selectedLanguageDetectionCanRemove)}
+          description="Choose how LocalStudio.dev detects source text language before translation."
+          disabledReason={selectedLanguageDetectionProvider?.disabledReason}
+          icon={ScanSearch}
+          isActionDisabled={selectedLanguageDetectionProvider?.compatibility === 'incompatible'}
+          needsDownload={selectedLanguageDetectionNeedsDownload}
+          onPrepare={onPrepareLanguageDetectionProvider}
+          onProviderChange={onLanguageDetectionProviderChange}
+          onRemove={onRemoveModel}
+          preparationAriaLabel="Language detection preparation"
+          preparationDetails={languageDetectionPreparation}
+          preparationProgress={languageDetectionProgress}
+          preparationStatus={languageDetectionStatus}
+          providerModelId={selectedLanguageDetectionProvider?.modelId}
+          providers={languageDetectionProviders}
+          runtime={selectedLanguageDetectionProvider?.runtime}
+          selectedProviderId={selectedLanguageDetectionProvider?.id ?? ''}
+          selectLabel="Detection Model"
+          title="Language Detection"
+          tourId="ai-language-detection"
+        />
 
-        <article
-          className={
-            translationTargetAttention
-              ? 'tool-card ew-surface ew-surface-hover tool-card-attention'
-              : 'tool-card ew-surface ew-surface-hover'
-          }
-          aria-label="Translate Design"
-          data-tour-id="ai-translate-design"
+        <AiToolsProviderCard
+          actionLabel="Translation Model"
+          ariaLabel="Translate Design"
+          attention={translationTargetAttention}
+          canRemove={Boolean(selectedTranslationCanRemove)}
+          description="Translate visible text using the selected local translation model."
+          disabledReason={selectedTranslationProvider?.disabledReason}
+          icon={Languages}
+          isActionDisabled={selectedTranslationProvider?.compatibility === 'incompatible'}
+          needsDownload={selectedTranslationNeedsDownload}
+          onPrepare={onPrepareTranslationProvider}
+          onProviderChange={onTranslationProviderChange}
+          onRemove={onRemoveModel}
+          preparationAriaLabel="Translation model preparation"
+          preparationDetails={translationPreparation}
+          preparationProgress={translationProviderProgress}
+          preparationStatus={translationProviderStatus}
+          providerModelId={selectedTranslationProvider?.modelId}
+          providers={translationProviders}
+          runtime={selectedTranslationProvider?.runtime}
+          selectedProviderId={selectedTranslationProvider?.id ?? ''}
+          selectLabel="Translation Model"
+          shouldShowPreparation={Boolean(selectedTranslationProvider?.modelId)}
+          title="Translate Design"
+          tourId="ai-translate-design"
         >
-          <div className="tool-card-heading ew-compact-row">
-            <Languages size={18} />
-            <strong>Translate Design</strong>
-            <StatusPill
-              label={
-                selectedTranslationProvider?.runtime === 'chrome-built-in' ? 'CHROME' : 'EXTERNAL'
-              }
-              tone={
-                selectedTranslationProvider?.compatibility === 'compatible' ? 'success' : 'neutral'
-              }
-            />
-            {translationProviderStatus ===
-            'downloading' ? null : selectedTranslationNeedsDownload ? (
-              <IconButton
-                label="Download Translation Model"
-                attention
-                disabled={selectedTranslationProvider?.compatibility === 'incompatible'}
-                onClick={() => {
-                  void onPrepareTranslationProvider?.();
-                }}
-              >
-                <Download size={14} />
-              </IconButton>
-            ) : selectedTranslationCanRemove ? (
-              <IconButton
-                label="Remove Translation Model"
-                tone="danger"
-                onClick={() => {
-                  void onRemoveModel?.(selectedTranslationProvider.modelId!);
-                }}
-              >
-                <X size={14} />
-              </IconButton>
-            ) : null}
-          </div>
-          <p>Translate visible text using the selected local translation model.</p>
-          <label className="translation-target-control ew-field-scope">
-            <span className="translation-target-label ew-inline-row">Translation Model</span>
-            <select
-              aria-label="Translation Model"
-              disabled={translationPreparation.status === 'downloading'}
-              value={selectedTranslationProvider?.id ?? ''}
-              onChange={(event) => onTranslationProviderChange?.(event.target.value)}
-            >
-              {translationProviders.map((provider) => (
-                <option
-                  key={provider.id}
-                  value={provider.id}
-                  disabled={provider.compatibility === 'incompatible'}
-                >
-                  {provider.label}
-                  {provider.compatibility === 'incompatible' ? ' - unavailable' : ''}
-                </option>
-              ))}
-            </select>
-            {selectedTranslationProvider?.disabledReason ? (
-              <span className="translation-source-note">
-                {selectedTranslationProvider.disabledReason}
-              </span>
-            ) : null}
-          </label>
-          {selectedTranslationProvider?.modelId ? (
-            <div className="translation-target-control ew-field-scope">
-              <div
-                className="translation-preparation ew-grid-compact"
-                aria-label="Translation model preparation"
-              >
-                <div className="translation-preparation-meta">
-                  <StatusPill
-                    label={getPreparationLabel(translationProviderStatus)}
-                    tone={getPreparationTone(translationProviderStatus)}
-                  />
-                  <DownloadProgressCopy
-                    details={{ ...translationPreparation, progress: translationProviderProgress }}
-                    status={translationProviderStatus}
-                  />
-                </div>
-                {translationProviderStatus === 'downloading' ? (
-                  <div className="model-progress">
-                    <span style={{ width: `${translationProviderProgress}%` }} />
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
           <label className="translation-target-control ew-field-scope">
             <span className="translation-target-label ew-inline-row">
               Translate to:
-              <ToolHelp
+              <AiToolsHelpTip
                 id="translation-target-tooltip"
                 text="Choose the language that will be used for all translations in this deck."
               />
@@ -714,7 +364,7 @@ export function AiToolsPanel({
                         label={getPreparationLabel(translationProviderStatus)}
                         tone={getPreparationTone(translationProviderStatus)}
                       />
-                      <DownloadProgressCopy
+                      <AiToolsDownloadProgress
                         details={{
                           ...translationPreparation,
                           progress: translationProviderProgress,
@@ -737,167 +387,19 @@ export function AiToolsPanel({
               </div>
             ) : null}
           </label>
-        </article>
+        </AiToolsProviderCard>
 
-        {visibleModelStates.map((model) => {
-          const needsAttention = attentionModelId === model.id && model.status !== 'ready';
-          return (
-            <article
-              aria-label={model.label}
-              className={
-                needsAttention
-                  ? 'model-row ew-surface ew-surface-hover model-row-attention'
-                  : 'model-row ew-surface ew-surface-hover'
-              }
-              key={model.id}
-              data-tour-id={
-                model.id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID
-                  ? 'ai-image-generation-model'
-                  : undefined
-              }
-            >
-              <div className="model-row-main ew-compact-row">
-                <ScanSearch size={17} />
-                <div className="model-row-title">
-                  <strong>{model.label}</strong>
-                  {model.description ? <span>{model.description}</span> : null}
-                </div>
-                {model.status === 'ready' ? (
-                  <IconButton
-                    label={`Remove ${model.label}`}
-                    tone="danger"
-                    onClick={() => {
-                      void onRemoveModel?.(model.id);
-                    }}
-                  >
-                    <X size={14} />
-                  </IconButton>
-                ) : (
-                  <IconButton
-                    label={`Download ${model.label}`}
-                    attention={
-                      needsAttention ||
-                      model.status === 'needs-download' ||
-                      model.status === 'failed'
-                    }
-                    disabled={model.status === 'downloading'}
-                    onClick={() => {
-                      void onDownloadModel?.(model.id);
-                    }}
-                  >
-                    <Download size={14} />
-                  </IconButton>
-                )}
-              </div>
-              <label className="translation-target-control ew-field-scope model-row-selector">
-                <span className="translation-target-label ew-inline-row">Model</span>
-                <select
-                  aria-label={`${model.label} model`}
-                  value={model.id}
-                  onChange={() => undefined}
-                >
-                  <option value={model.id}>
-                    {getFixedModelDisplayName(model.id, model.label)}
-                  </option>
-                </select>
-              </label>
-              <div className="model-row-meta ew-compact-row">
-                <StatusPill label={formatStatus(model.status)} tone={statusTone(model.status)} />
-                <DownloadProgressCopy
-                  details={model}
-                  status={getModelProgressStatus(model.status)}
-                />
-              </div>
-              {model.status === 'ready' ? null : (
-                <div className="model-progress" aria-label={`${model.label} progress`}>
-                  <span style={{ width: `${model.progress}%` }} />
-                </div>
-              )}
-              {model.id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID ? (
-                <div className="image-generation-settings" aria-label="Image generation settings">
-                  <div className="image-generation-setting">
-                    <span className="translation-target-label ew-inline-row">Size</span>
-                    <div className="image-size-presets" role="group" aria-label="Image size">
-                      {imagePromptOptions.imageSizePresets.map((preset) => (
-                        <button
-                          key={preset.label}
-                          aria-pressed={
-                            imagePromptOptions.getImageSizeLabel(createImageOptions) ===
-                            preset.label
-                          }
-                          className="image-size-preset"
-                          type="button"
-                          onClick={() => {
-                            updateCreateImageOptions({
-                              width: preset.width,
-                              height: preset.height,
-                            });
-                          }}
-                        >
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <label className="image-generation-setting image-generation-range">
-                    <span className="translation-target-label ew-inline-row">
-                      Steps
-                      <ToolHelp
-                        id="image-steps-tooltip"
-                        text="Steps control how many generation passes the model runs. Lower is faster; higher can add detail but takes longer. Use 4 for quick drafts."
-                      />
-                    </span>
-                    <input
-                      className="ew-range-input"
-                      type="range"
-                      min={1}
-                      max={8}
-                      step={1}
-                      value={createImageOptions.steps}
-                      onChange={(event) => {
-                        updateCreateImageOptions({ steps: Number(event.target.value) });
-                      }}
-                    />
-                    <strong>{createImageOptions.steps}</strong>
-                  </label>
-                  <label className="image-generation-setting">
-                    <span className="translation-target-label ew-inline-row">
-                      Seed
-                      <ToolHelp
-                        id="image-seed-tooltip"
-                        text="Seed controls randomness. Leave it random for new variations, or reuse the same number to recreate a similar image from the same prompt and options."
-                      />
-                    </span>
-                    <input
-                      aria-label="Image seed"
-                      className="image-generation-seed-input ew-field"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      placeholder="random"
-                      type="text"
-                      value={createImageOptions.seed?.toString() ?? ''}
-                      onChange={(event) => {
-                        const nextValue = event.target.value.replace(/\D/g, '').slice(0, 10);
-                        if (!nextValue) {
-                          onCreateImageOptionsChange?.({
-                            width: createImageOptions.width,
-                            height: createImageOptions.height,
-                            steps: createImageOptions.steps,
-                          });
-                          return;
-                        }
-                        updateCreateImageOptions({ seed: Number.parseInt(nextValue, 10) });
-                      }}
-                    />
-                  </label>
-                </div>
-              ) : null}
-              {model.status === 'failed' && model.error ? (
-                <span className="translation-source-note">{model.error}</span>
-              ) : null}
-            </article>
-          );
-        })}
+        {visibleModelStates.map((model) => (
+          <AiToolsModelRow
+            createImageOptions={createImageOptions}
+            key={model.id}
+            model={model}
+            needsAttention={attentionModelId === model.id && model.status !== 'ready'}
+            onCreateImageOptionsChange={onCreateImageOptionsChange}
+            onDownloadModel={onDownloadModel}
+            onRemoveModel={onRemoveModel}
+          />
+        ))}
       </div>
     </div>
   );

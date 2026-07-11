@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
-import type { DesignElement, Page, ProjectDocument, SelectionState } from '../../domain/documents/model';
+import type { Page, ProjectDocument, SelectionState } from '../../domain/documents/model';
 import type {
   PresenterCommandMessage,
   PresenterStateMessage,
@@ -17,6 +17,8 @@ import {
   type MovieHoldState,
 } from '../editor/media/presentationMovieControls';
 import { PresenterRemotePanel } from './PresenterRemotePanel';
+import { PresenterSlideNavigator } from './PresenterSlideNavigator';
+import { PresenterThumbnail } from './PresenterThumbnail';
 import { presenterRemoteMirror } from './presenterRemoteMirror';
 import { presenterRemoteStreamPublisher } from './presenterRemoteStreamPublisher';
 import { presenterRemoteTimerFormat } from '@localstudio/presenter-remote/timer-format';
@@ -139,17 +141,6 @@ function getBuildsRemaining(payload: PresenterStatePayload, page: Page) {
   if (payload.animationPreview.phase === 'complete') return 0;
   const hiddenElementIds = new Set(payload.animationPreview.hiddenElementIds);
   return validBuilds.filter((build) => hiddenElementIds.has(build.elementId)).length;
-}
-
-function getElementStyle(element: DesignElement, page: Page): CSSProperties {
-  return {
-    height: `${(element.height / page.height) * 100}%`,
-    left: `${(element.x / page.width) * 100}%`,
-    opacity: element.opacity,
-    top: `${(element.y / page.height) * 100}%`,
-    transform: `rotate(${element.rotation}deg)`,
-    width: `${(element.width / page.width) * 100}%`,
-  };
 }
 
 export function PresenterView({ sessionId = getRouteSessionId() }: PresenterViewProps) {
@@ -927,107 +918,15 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
         </div>
       ) : null}
       {slideNavigatorOpen && snapshot ? (
-        <div className="presentation-slide-navigator" role="dialog" aria-modal="true" aria-label="Slide navigator">
-          <div className="presentation-slide-navigator-header">
-            <h2>Slide Navigator</h2>
-            <button
-              className="stitch-icon-button"
-              type="button"
-              aria-label="Close slide navigator"
-              onClick={() => setSlideNavigatorOpen(false)}
-            >
-              <span className="material-symbols-outlined" aria-hidden="true">
-                close
-              </span>
-            </button>
-          </div>
-          <div className="presentation-slide-navigator-list" role="listbox" aria-label="Slides">
-            {snapshot.project.pages.map((page, index) => (
-              <button
-                aria-selected={index === slideNavigatorIndex}
-                className={
-                  index === slideNavigatorIndex
-                    ? 'presentation-slide-navigator-item presentation-slide-navigator-item-active'
-                    : 'presentation-slide-navigator-item'
-                }
-	                key={page.id}
-	                type="button"
-	                role="option"
-	                onClick={() => setSlideNavigatorIndex(index)}
-	                onKeyDown={(event) => {
-	                  if (event.key !== 'Enter' && event.key !== ' ') return;
-	                  event.preventDefault();
-	                  goToPage(index);
-	                  setSlideNavigatorOpen(false);
-	                }}
-	                onDoubleClick={() => {
-	                  goToPage(index);
-	                  setSlideNavigatorOpen(false);
-	                }}
-              >
-                <span>Slide {index + 1}</span>
-                <strong>{page.name}</strong>
-              </button>
-            ))}
-          </div>
-        </div>
+        <PresenterSlideNavigator
+          onActivateSlide={goToPage}
+          onClose={() => setSlideNavigatorOpen(false)}
+          onSelectSlide={setSlideNavigatorIndex}
+          pages={snapshot.project.pages}
+          selectedIndex={slideNavigatorIndex}
+        />
       ) : null}
       {introOverlay}
     </main>
-  );
-}
-
-function PresenterThumbnail({ page, project }: { page: Page; project: ProjectDocument }) {
-  const background =
-    page.background.type === 'color'
-      ? page.background.color
-      : (project.assets[page.background.assetId]?.objectUrl ?? page.background.colorFallback);
-
-  return (
-    <span
-      className="presenter-thumb-canvas"
-      style={{
-        aspectRatio: `${page.width} / ${page.height}`,
-        backgroundColor: page.background.type === 'color' ? background : page.background.colorFallback,
-      }}
-    >
-      {page.background.type === 'asset' && project.assets[page.background.assetId]?.objectUrl ? (
-        <img
-          alt=""
-          className="presenter-thumb-bg ew-fill-media"
-          src={project.assets[page.background.assetId]?.objectUrl}
-        />
-      ) : null}
-      {page.elementIds.map((elementId) => {
-        const element = project.elements[elementId];
-        if (!element || element.visible === false) return null;
-        const style = getElementStyle(element, page);
-        if (element.type === 'image') {
-          const asset = project.assets[element.assetId];
-          return asset?.objectUrl ? (
-            <img alt="" className="presenter-thumb-element" key={element.id} src={asset.objectUrl} style={style} />
-          ) : null;
-        }
-        if (element.type === 'text') {
-          return (
-            <span
-              className="presenter-thumb-element presenter-thumb-text"
-              key={element.id}
-              style={{
-                ...style,
-                color: element.fill,
-                fontFamily: element.fontFamily,
-                fontSize: `${Math.max(4, (element.fontSize / page.width) * 100)}cqw`,
-                fontWeight: element.fontWeight,
-                textAlign: element.align,
-              }}
-            >
-              {element.text}
-            </span>
-          );
-        }
-        return <span className="presenter-thumb-element" key={element.id} style={style} />;
-      })}
-    </span>
   );
 }

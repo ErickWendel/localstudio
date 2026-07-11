@@ -13,13 +13,10 @@ import type {
 import type { GeneratedSlideElement } from '../../../domain/generated-slides/generatedSlide';
 import { fitImageWithinPage } from '../../../domain/images/imageSizing';
 import type {
-  DesignElement,
   ImageElement,
-  Page,
   PageBackground,
   ProjectDocument,
   SelectionState,
-  ShapeElement,
   ShapeKind,
   SlideTransition,
 } from '../../../domain/documents/model';
@@ -27,18 +24,11 @@ import { sampleProject } from '../../../domain/projects/sampleProject';
 import type { EditorAutomationDelegate } from '../../../services/automation/editorAutomationController';
 import type {
   AiProviderState,
-  FontImportService,
   MirrorProjectSummary,
   MirrorState,
   ModelDownloadProgressDetails,
   ModelState,
-  PresentationExportProgress,
-  PresentationExportResult,
-  PresentationExportWarning,
   PromptApiAvailability,
-  StockMediaConfig,
-  StockMediaItem,
-  StockMediaProviderState,
   VersionHistoryEntry,
 } from '../../../services/contracts/interfaces';
 import type { PptxImportInput } from '../../../services/importing/pptx/pptxImportService';
@@ -48,16 +38,31 @@ import { minioMirrorService } from '../../../services/mirror/minioMirrorService'
 import type { MinioMirrorConfig } from '../../../services/mirror/minioMirrorService';
 import { aiModelCatalog } from '../../../services/model-setup/aiModelCatalog';
 import { imageGenerationModel } from '../../../services/image-generation/imageGenerationModel';
-import { modelSetupService } from '../../../services/model-setup/modelSetupService';
 import { createPrefixedId } from '../../../services/ids/idUtils';
 import { slideTaskPrompt } from '../../../services/prompting/slideTaskPrompt';
 import { imagePromptOptions } from '../media/imagePromptOptions';
 import type { CreateImagePromptOptions } from '../media/imagePromptOptions';
-import { localMediaImportConfig } from '../media/localMediaImportConfig';
 import { TRANSLATION_LANGUAGE_OPTIONS } from '../translation/translationLanguages';
 import { translationLanguageUtils } from '../translation/translationLanguageUtils';
 import { editorPreferences } from '../persistence/editorPreferences';
 import { useAnimationPreviewController } from '../animation/useAnimationPreviewController';
+import { useLocalMediaImport } from './use-local-media-import';
+import { useBackgroundSubjectSelection } from './use-background-subject-selection';
+import { powerPointIo } from './power-point-io';
+import { textTranslationLayout } from './text-translation-layout';
+import type { TranslationPatch } from './text-translation-layout';
+import { useOperationNotice } from './use-operation-notice';
+import { useStockMediaLibrary } from './use-stock-media-library';
+import { editorViewModelProgress } from './editorViewModelProgress';
+import { editorViewModelProject } from './editorViewModelProject';
+import { editorViewModelRuntime } from './editorViewModelRuntime';
+import { editorViewModelElements } from './editorViewModelElements';
+import type { ElementClipboardState } from './editorViewModelElements';
+import { editorViewModelHistory } from './editorViewModelHistory';
+import type { EditorHistory } from './editorViewModelHistory';
+import { editorViewModelPages } from './editorViewModelPages';
+import { editorViewModelSelection } from './editorViewModelSelection';
+import { editorViewModelText } from './editorViewModelText';
 
 export type RightPanelTab =
   | 'layout'
@@ -68,39 +73,7 @@ export type RightPanelTab =
   | 'assets'
   | 'animations';
 export type TextPreset = 'title' | 'subtitle' | 'body';
-
-interface EditorHistory {
-  past: ProjectDocument[];
-  future: ProjectDocument[];
-}
-
-export type OperationNoticeTone = 'error' | 'info' | 'success' | 'warning';
-
-export interface OperationNoticeState {
-  detail?: string | undefined;
-  message: string;
-  progress?: { current: number; total: number } | undefined;
-  tone: OperationNoticeTone;
-}
-
-interface BackgroundPreviewState {
-  elementId: string;
-  maskUrl?: string;
-  pending: boolean;
-  score?: number;
-}
-
-interface BackgroundPreparationState {
-  elementId: string;
-  progress: number;
-  status: 'preparing' | 'ready' | 'failed';
-}
-
-interface BackgroundSelectionPoint {
-  x: number;
-  y: number;
-  positive: boolean;
-}
+export type { OperationNoticeState } from './use-operation-notice';
 
 interface TranslationPreparationState extends ModelDownloadProgressDetails {
   progress: number;
@@ -128,39 +101,6 @@ export interface PresentationImportProgressState {
   title: string;
 }
 
-export interface MediaImportProgressState {
-  detail: string;
-  title: string;
-  tone: 'loading' | 'error';
-}
-
-interface ElementClipboardState {
-  assets: ProjectDocument['assets'];
-  elements: DesignElement[];
-}
-
-interface StockMediaSearchState {
-  gifs: boolean;
-  images: boolean;
-}
-
-export interface StockMediaErrorState {
-  gifs?: string | undefined;
-  images?: string | undefined;
-}
-
-function getDownloadProgressPatch(
-  progress: number,
-  details: ModelDownloadProgressDetails | undefined,
-): ModelDownloadProgressDetails & { progress: number } {
-  return {
-    estimatedRemainingMs: details?.estimatedRemainingMs,
-    loadedBytes: details?.loadedBytes,
-    progress,
-    totalBytes: details?.totalBytes,
-  };
-}
-
 export type RemoteImportStatus =
   | 'loading'
   | 'ready'
@@ -169,332 +109,13 @@ export type RemoteImportStatus =
   | 'deleting'
   | 'failed';
 
-type WindowWithPowerPointPicker = Window &
-  typeof globalThis & {
-    showOpenFilePicker?: (options?: {
-      excludeAcceptAllOption?: boolean;
-      multiple?: boolean;
-      types?: Array<{
-        description: string;
-        accept: Record<string, string[]>;
-      }>;
-    }) => Promise<FileSystemFileHandle[]>;
-  };
-
-const IMAGE_EDITING_MODEL_REQUIRED_MESSAGE = 'You must download the image editing tools first.';
 const PROMPT_API_REQUIRED_MESSAGE = 'LLM model must be prepared before using prompt-to-slides.';
 const IMAGE_GENERATION_MODEL_REQUIRED_MESSAGE =
   'Download image generation models before creating images.';
 const IMAGE_PROMPT_MODE_REQUIRED_MESSAGE = 'Use Create image from the + menu to generate images.';
-const IMAGE_GENERATION_DIMENSION_MULTIPLE = 16;
-const BACKGROUND_PREVIEW_DEBOUNCE_MS = 120;
-const PASTED_ELEMENT_OFFSET = 32;
-const STOCK_MEDIA_RECENT_LIMIT = 12;
-const LOCAL_PPTX_SAMPLE_IMPORT_PARAM = 'importPptxSample';
-const LOCAL_PPTX_SAMPLE_IMPORT_ROUTE = '/__localstudio/pptx-sample/file';
-const LOCAL_PPTX_SAMPLE_FILE_NAME = 'fullstack-monitoring-jsnation-11062026.pptx';
-
-function normalizeImageGenerationDimension(value: number) {
-  return Math.max(
-    IMAGE_GENERATION_DIMENSION_MULTIPLE,
-    Math.round(value / IMAGE_GENERATION_DIMENSION_MULTIPLE) * IMAGE_GENERATION_DIMENSION_MULTIPLE,
-  );
-}
-
-function writeProjectNameToUrl(projectName: string) {
-  if (typeof window === 'undefined') return;
-  const nextUrl = new URL(window.location.href);
-  nextUrl.searchParams.set('project', projectName);
-  window.history.replaceState(
-    window.history.state,
-    '',
-    `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`,
-  );
-}
-
-function normalizeProjectDocument(project: ProjectDocument): ProjectDocument {
-  const shouldRestoreHeroImage =
-    Boolean(project.assets['asset-hero']) && !project.elements['image-hero'];
-  const pageId = project.pages[0]?.id;
-  const elements: ProjectDocument['elements'] = {};
-
-  for (const [id, element] of Object.entries(project.elements)) {
-    const isLegacyScaledHero =
-      id === 'image-hero' &&
-      element.type === 'image' &&
-      element.assetId === 'asset-hero' &&
-      element.width === 1200 &&
-      element.height === 650;
-    elements[id] = {
-      ...element,
-      ...(isLegacyScaledHero ? sampleProject.SAMPLE_HERO_IMAGE_SIZE : {}),
-      visible: element.visible ?? true,
-    };
-  }
-
-  if (shouldRestoreHeroImage) {
-    elements['image-hero'] = {
-      id: 'image-hero',
-      type: 'image',
-      assetId: 'asset-hero',
-      x: sampleProject.SAMPLE_HERO_IMAGE_SIZE.x,
-      y: sampleProject.SAMPLE_HERO_IMAGE_SIZE.y,
-      width: sampleProject.SAMPLE_HERO_IMAGE_SIZE.width,
-      height: sampleProject.SAMPLE_HERO_IMAGE_SIZE.height,
-      rotation: 0,
-      locked: false,
-      visible: true,
-      opacity: 1,
-    };
-  }
-
-  return {
-    ...project,
-    assets: {
-      ...project.assets,
-      ...(project.assets['asset-hero']
-        ? {
-            'asset-hero': {
-              ...project.assets['asset-hero'],
-              objectUrl:
-                project.assets['asset-hero'].objectUrl ?? sampleProject.SAMPLE_HERO_IMAGE_URL,
-            },
-          }
-        : {}),
-    },
-    elements,
-    pages: (shouldRestoreHeroImage
-      ? project.pages.map((page) =>
-          page.id === pageId
-            ? {
-                ...page,
-                elementIds: (() => {
-                  const nextElementIds = page.elementIds.filter((id) => id !== 'image-hero');
-                  nextElementIds.splice(0, 0, 'image-hero');
-                  return nextElementIds;
-                })(),
-              }
-            : page,
-        )
-      : project.pages
-    ).map((page) => ({
-      ...page,
-      animationBuilds: page.animationBuilds ?? [],
-      visible: page.visible ?? true,
-    })),
-  };
-}
-
-async function loadProjectFonts(project: ProjectDocument, fontImportService: FontImportService) {
-  await fontImportService.loadProjectFonts(project).catch(() => undefined);
-}
-
-function readImageFileAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener('load', () => {
-      if (typeof reader.result === 'string') {
-        resolve(reader.result);
-        return;
-      }
-      reject(new Error('Image file could not be read as a data URL.'));
-    });
-    reader.addEventListener('error', () => {
-      reject(reader.error ?? new Error('Image file could not be read.'));
-    });
-    reader.readAsDataURL(file);
-  });
-}
-
-type MediaSize = { height: number; width: number };
-type VideoSize = MediaSize & { durationSeconds?: number };
-
-function readImageSize(src: string) {
-  return new Promise<MediaSize>((resolve, reject) => {
-    const image = new Image();
-    image.addEventListener('load', () => {
-      resolve({ width: image.naturalWidth, height: image.naturalHeight });
-    });
-    image.addEventListener('error', () => {
-      reject(new Error('Image dimensions could not be read.'));
-    });
-    image.src = src;
-  });
-}
-
-function readVideoSize(src: string) {
-  return new Promise<VideoSize>((resolve, reject) => {
-    const video = document.createElement('video');
-    video.preload = 'metadata';
-    video.addEventListener('loadedmetadata', () => {
-      resolve({
-        ...(Number.isFinite(video.duration) && video.duration > 0
-          ? { durationSeconds: video.duration }
-          : {}),
-        width: video.videoWidth || 16,
-        height: video.videoHeight || 9,
-      });
-    });
-    video.addEventListener('error', () => {
-      reject(new Error('Video dimensions could not be read.'));
-    });
-    video.src = src;
-  });
-}
-
-function getFileExtension(fileName: string) {
-  const extension = fileName.trim().toLowerCase().split('.').pop();
-  return extension && extension !== fileName.toLowerCase() ? extension : '';
-}
-
-function isSupportedLocalVideoFile(file: File) {
-  const extension = getFileExtension(file.name);
-  return (
-    localMediaImportConfig.supportedVideoMimeTypes.has(file.type) ||
-    localMediaImportConfig.supportedVideoExtensions.has(extension)
-  );
-}
-
-function createMediaObjectUrl(file: File) {
-  if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
-    throw new Error('This browser cannot import video files from disk.');
-  }
-  return URL.createObjectURL(file);
-}
-
-function getMediaAssetType(file: File): 'image' | 'gif' | 'video' {
-  const extension = getFileExtension(file.name);
-  if (file.type === 'image/gif') return 'gif';
-  if (file.type.startsWith('video/') || localMediaImportConfig.localVideoExtensions.has(extension)) {
-    return 'video';
-  }
-  return 'image';
-}
-
-function waitForNextPaint() {
-  if (typeof window === 'undefined') return Promise.resolve();
-  return new Promise<void>((resolve) => {
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        resolve();
-      });
-    });
-  });
-}
-
-function isDomError(error: unknown, name: string) {
-  return (
-    (error instanceof DOMException && error.name === name) ||
-    (typeof error === 'object' && error !== null && 'name' in error && error.name === name)
-  );
-}
-
-async function pickPowerPointImportInput(): Promise<PptxImportInput | null> {
-  if (typeof window === 'undefined') return null;
-  const pickerWindow = window as WindowWithPowerPointPicker;
-  if (pickerWindow.showOpenFilePicker) {
-    try {
-      pptxImportLogger.info('Opening PowerPoint file picker.');
-      const handles = await pickerWindow.showOpenFilePicker({
-        excludeAcceptAllOption: false,
-        multiple: false,
-        types: [
-          {
-            description: 'PowerPoint presentation',
-            accept: {
-              'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
-              'application/zip': ['.pptx'],
-            },
-          },
-        ],
-      });
-      const handle = handles[0];
-      if (!handle) return null;
-      pptxImportLogger.info('PowerPoint file handle selected.', { name: handle.name });
-      const file = await handle.getFile();
-      pptxImportLogger.info('PowerPoint file handle read.', {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-      });
-      return { file };
-    } catch (error) {
-      if (isDomError(error, 'AbortError')) {
-        pptxImportLogger.info('PowerPoint file picker was cancelled.');
-        return null;
-      }
-      pptxImportLogger.error('PowerPoint file picker failed.', error);
-      throw error;
-    }
-  }
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation';
-  const file = await new Promise<File | undefined>((resolve) => {
-    input.addEventListener('change', () => resolve(input.files?.[0]));
-    input.click();
-  });
-  if (file) return { file };
-  return null;
-}
-
-async function loadLocalPowerPointSampleInput(): Promise<PptxImportInput> {
-  const response = await fetch(LOCAL_PPTX_SAMPLE_IMPORT_ROUTE);
-  if (!response.ok) {
-    throw new Error(`Sample PowerPoint could not be loaded (${response.status}).`);
-  }
-  const blob = await response.blob();
-  return {
-    file: new File([blob], LOCAL_PPTX_SAMPLE_FILE_NAME, {
-      type:
-        blob.type ||
-        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    }),
-  };
-}
-
-function consumeLocalPowerPointSampleImportRequest() {
-  if (typeof window === 'undefined') return false;
-  const nextUrl = new URL(window.location.href);
-  if (nextUrl.searchParams.get(LOCAL_PPTX_SAMPLE_IMPORT_PARAM) !== '1') return false;
-  nextUrl.searchParams.delete(LOCAL_PPTX_SAMPLE_IMPORT_PARAM);
-  window.history.replaceState(
-    window.history.state,
-    '',
-    `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`,
-  );
-  return true;
-}
-
-function getMinimumTextHeight(text: string, fontSize: number) {
-  const lineCount = Math.max(1, text.split('\n').length);
-  return Math.ceil(lineCount * fontSize * 1.08 + Math.max(12, fontSize * 0.18));
-}
-
-function getPageTextSample(project: ProjectDocument, pageId: string) {
-  const page = project.pages.find((item) => item.id === pageId);
-  if (!page) return '';
-  return page.elementIds
-    .map((elementId) => project.elements[elementId])
-    .filter((element): element is Extract<ProjectDocument['elements'][string], { type: 'text' }> =>
-      Boolean(element && element.type === 'text' && element.visible !== false && !element.locked),
-    )
-    .map((element) => element.text.trim())
-    .filter(Boolean)
-    .join('\n');
-}
-
 type TranslationScope = 'selection' | 'slide' | 'deck';
-type TranslationPatch = {
-  fontSize?: number;
-  height?: number;
-  text: string;
-  width?: number;
-  x?: number;
-};
 
 const DECK_TRANSLATION_CONCURRENCY = 3;
-const OPERATION_NOTICE_CLEAR_MS = 3000;
 
 interface DeckTranslationProgressState {
   activePageIds: string[];
@@ -503,167 +124,9 @@ interface DeckTranslationProgressState {
   totalPages: number;
 }
 
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  concurrency: number,
-  mapper: (item: T, index: number) => Promise<R>,
-) {
-  const results = new Array<R>(items.length);
-  let nextIndex = 0;
-  let firstError: unknown;
-  const workerCount = Math.max(1, Math.min(concurrency, items.length));
-  const workers = Array.from({ length: workerCount }, async () => {
-    while (nextIndex < items.length) {
-      const currentIndex = nextIndex;
-      nextIndex += 1;
-      try {
-        results[currentIndex] = await mapper(items[currentIndex]!, currentIndex);
-      } catch (error) {
-        firstError ??= error;
-        nextIndex = items.length;
-      }
-    }
-  });
-
-  await Promise.all(workers);
-  if (firstError !== undefined) {
-    throw firstError instanceof Error ? firstError : new Error('Concurrent task failed.');
-  }
-  return results;
-}
-
-function normalizeTranslatedText(originalText: string, translatedText: string) {
-  if (originalText.includes('\n')) return translatedText.trim();
-  return translatedText.replace(/\s+/g, ' ').trim();
-}
-
-function estimateSingleLineTextWidth(text: string, fontSize: number) {
-  return Array.from(text).reduce((width, character) => {
-    if (character === ' ') return width + fontSize * 0.32;
-    if (/[A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÄËÏÖÜÇÑ]/.test(character)) return width + fontSize * 0.68;
-    if (/[ilI.,'’|]/.test(character)) return width + fontSize * 0.34;
-    return width + fontSize * 0.58;
-  }, 0);
-}
-
-function pluralizeCount(count: number, singular: string, plural = `${singular}s`) {
-  return `${count.toLocaleString()} ${count === 1 ? singular : plural}`;
-}
-
-function getPowerPointWarningCategory(warning: PresentationExportWarning) {
-  if (warning.category === 'animation') return 'animation';
-  if (warning.category === 'transition') return 'transition';
-  if (
-    warning.category === 'content-type' ||
-    warning.category === 'fidelity' ||
-    warning.category === 'media' ||
-    warning.category === 'relationship'
-  ) {
-    return 'media';
-  }
-  if (warning.code.includes('animation')) return 'animation';
-  if (warning.code.includes('transition')) return 'transition';
-  if (warning.code.includes('media') || warning.code.includes('video') || warning.code.includes('asset')) {
-    return 'media';
-  }
-  return 'other';
-}
-
-function summarizePowerPointExport(result: PresentationExportResult) {
-  const stats = [
-    pluralizeCount(result.stats.slideCount, 'slide'),
-    pluralizeCount(result.stats.mediaElementCount, 'media item'),
-    pluralizeCount(result.stats.animationBuildCount, 'animation build'),
-  ];
-  if (result.warnings.length === 0) return `PowerPoint exported: ${stats.join(', ')}.`;
-
-  const counts = result.warnings.reduce(
-    (summary, warning) => {
-      summary[getPowerPointWarningCategory(warning)] += 1;
-      return summary;
-    },
-    { animation: 0, media: 0, other: 0, transition: 0 },
-  );
-  const fallbackParts = [
-    counts.animation > 0 ? pluralizeCount(counts.animation, 'animation fallback') : undefined,
-    counts.transition > 0 ? pluralizeCount(counts.transition, 'transition fallback') : undefined,
-    counts.media > 0 ? pluralizeCount(counts.media, 'media fallback') : undefined,
-    counts.other > 0 ? pluralizeCount(counts.other, 'fallback') : undefined,
-  ].filter(Boolean);
-
-  return `PowerPoint exported: ${stats.join(', ')}; ${fallbackParts.join(', ')}.`;
-}
-
-function getExportProgressValue(progress: PresentationExportProgress) {
-  if (
-    progress.current === undefined ||
-    progress.total === undefined ||
-    progress.total <= 0
-  ) {
-    return undefined;
-  }
-  return {
-    current: Math.min(progress.total, Math.max(0, progress.current)),
-    total: progress.total,
-  };
-}
-
-function formatPowerPointExportProgress(progress: PresentationExportProgress): OperationNoticeState {
-  return {
-    detail: progress.detail,
-    message: progress.label,
-    progress: getExportProgressValue(progress),
-    tone: 'info',
-  };
-}
-
-function fitTranslatedTextToOriginalFrame(
-  element: Extract<ProjectDocument['elements'][string], { type: 'text' }>,
-  translatedText: string,
-  page?: Page,
-): TranslationPatch {
-  const normalizedText = normalizeTranslatedText(element.text, translatedText);
-  if (normalizedText.includes('\n')) return { text: normalizedText };
-
-  const horizontalPadding = 12;
-  const availableWidth = Math.max(1, element.width - horizontalPadding);
-  const estimatedWidth = estimateSingleLineTextWidth(normalizedText, element.fontSize);
-  if (estimatedWidth <= availableWidth) return { text: normalizedText };
-
-  const desiredWidth = Math.ceil(estimatedWidth + horizontalPadding);
-  const originalCenter = element.x + element.width / 2;
-  const pageWidth =
-    page?.width ?? Math.max(element.x + desiredWidth, originalCenter + desiredWidth / 2);
-  const maxWidthAroundCenter = Math.max(
-    1,
-    2 * Math.min(originalCenter, pageWidth - originalCenter),
-  );
-  const nextWidth = Math.max(element.width, Math.min(desiredWidth, maxWidthAroundCenter));
-  const nextX = Math.max(0, Math.min(pageWidth - nextWidth, originalCenter - nextWidth / 2));
-
-  if (nextWidth >= desiredWidth) {
-    return {
-      text: normalizedText,
-      width: nextWidth,
-      x: nextX,
-    };
-  }
-
-  const estimatedLineCount = Math.max(
-    1,
-    Math.ceil(estimatedWidth / Math.max(1, nextWidth - horizontalPadding)),
-  );
-  return {
-    text: normalizedText,
-    width: nextWidth,
-    x: nextX,
-    height: Math.max(element.height, Math.ceil(estimatedLineCount * element.fontSize * 1.08)),
-  };
-}
-
 export function useEditorViewModel(services: AppServices) {
   const initialProject = useMemo(
-    () => normalizeProjectDocument(services.initialProject),
+    () => editorViewModelProject.normalizeProjectDocument(services.initialProject),
     [services.initialProject],
   );
   const storedMirrorConfig = useMemo(
@@ -688,9 +151,6 @@ export function useEditorViewModel(services: AppServices) {
   const [presentationImportProgress, setPresentationImportProgress] = useState<
     PresentationImportProgressState | undefined
   >();
-  const [mediaImportProgress, setMediaImportProgress] = useState<
-    MediaImportProgressState | undefined
-  >();
   const [hasPersistedLocalProject, setHasPersistedLocalProject] = useState(
     shouldRestoreStoredProject,
   );
@@ -706,13 +166,7 @@ export function useEditorViewModel(services: AppServices) {
   const [zoomPercent, setZoomPercent] = useState(100);
   const [pagesPanelOpen, setPagesPanelOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [backgroundSelectionMode, setBackgroundSelectionMode] = useState(false);
-  const [backgroundSelectionNotice, setBackgroundSelectionNotice] = useState<string | undefined>();
   const [processingElementIds, setProcessingElementIds] = useState<string[]>([]);
-  const [backgroundPreview, setBackgroundPreview] = useState<BackgroundPreviewState | undefined>();
-  const [backgroundPreparation, setBackgroundPreparation] = useState<
-    BackgroundPreparationState | undefined
-  >();
   const [translationTargetLanguage, setTranslationTargetLanguageState] = useState(
     editorPreferences.readTranslationTargetLanguage,
   );
@@ -774,25 +228,11 @@ export function useEditorViewModel(services: AppServices) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mirrorSettingsOpen, setMirrorSettingsOpen] = useState(false);
   const [mediaSettingsOpen, setMediaSettingsOpen] = useState(false);
-  const [stockMediaConfig, setStockMediaConfig] = useState<StockMediaConfig | null>(() =>
-    services.stockMediaService.loadConfig(),
-  );
-  const [stockMediaProviderState, setStockMediaProviderState] = useState<StockMediaProviderState>(
-    () => services.stockMediaService.getProviderState(),
-  );
-  const [stockImageResults, setStockImageResults] = useState<StockMediaItem[]>([]);
-  const [stockGifResults, setStockGifResults] = useState<StockMediaItem[]>([]);
-  const [stockMediaRecentItems, setStockMediaRecentItems] = useState<StockMediaItem[]>([]);
-  const [stockMediaSearching, setStockMediaSearching] = useState<StockMediaSearchState>({
-    gifs: false,
-    images: false,
-  });
-  const [stockMediaError, setStockMediaError] = useState<StockMediaErrorState>({});
   const [mirrorDisabledBySettings, setMirrorDisabledBySettings] = useState(false);
   const [remoteImportOpen, setRemoteImportOpen] = useState(false);
   const [localProjectSetupOpen, setLocalProjectSetupOpen] = useState(false);
   const [persistenceAttention, setPersistenceAttention] = useState(false);
-  const [operationNotice, setOperationNotice] = useState<OperationNoticeState | undefined>();
+  const { operationNotice, showOperationNotice } = useOperationNotice();
   const [isExportingPowerPoint, setIsExportingPowerPoint] = useState(false);
   const [remoteImportStatus, setRemoteImportStatus] = useState<RemoteImportStatus>('loading');
   const [remoteImportProjects, setRemoteImportProjects] = useState<MirrorProjectSummary[]>([]);
@@ -801,6 +241,56 @@ export function useEditorViewModel(services: AppServices) {
     () => storedMirrorConfig ?? minioMirrorService.DEFAULT_MINIO_MIRROR_CONFIG,
   );
   const [hasMirrorConfig, setHasMirrorConfig] = useState(Boolean(storedMirrorConfig));
+  const {
+    clearStockMediaConfig,
+    insertStockMedia,
+    saveStockMediaConfig,
+    searchStockGifs,
+    searchStockImages,
+    stockGifResults,
+    stockImageResults,
+    stockMediaConfig,
+    stockMediaError,
+    stockMediaProviderState,
+    stockMediaRecentItems,
+    stockMediaSearching,
+  } = useStockMediaLibrary({
+    activePageId,
+    commitProject,
+    project,
+    setMediaSettingsOpen,
+    stockMediaService: services.stockMediaService,
+  });
+  const {
+    clearMediaImportProgress,
+    importImageFile,
+    mediaImportProgress,
+    replaceVideoAsset,
+  } = useLocalMediaImport({
+    activePageId,
+    commitProject,
+    project,
+  });
+  const {
+    backgroundPreparation,
+    backgroundPreview,
+    backgroundSelectionMode,
+    backgroundSelectionNotice,
+    cancelBackgroundSelectionMode,
+    pickBackgroundSubject,
+    previewBackgroundSubject,
+    refineBackgroundSubject,
+    toggleBackgroundSelectionMode,
+  } = useBackgroundSubjectSelection({
+    backgroundRemovalService: services.backgroundRemovalService,
+    commitProject,
+    modelStates,
+    processingElementIds,
+    project,
+    selectedElementIds,
+    setActiveTab,
+    setProcessingElementIds,
+  });
   const mirrorConfigRef = useRef<MinioMirrorConfig | null>(storedMirrorConfig);
   const mirrorSyncInFlightRef = useRef(false);
   const mirrorSyncQueuedRef = useRef(false);
@@ -808,7 +298,6 @@ export function useEditorViewModel(services: AppServices) {
   const mirrorDebounceRef = useRef<number | undefined>(undefined);
   const queueMirrorSyncRef = useRef<() => void>(() => undefined);
   const syncMirrorNowRef = useRef<(project?: ProjectDocument) => void>(() => undefined);
-  const [, setBackgroundSelectionPoints] = useState<Record<string, BackgroundSelectionPoint[]>>({});
   projectRef.current = project;
   activePageIdRef.current = activePageId;
   selectedElementIdsRef.current = selectedElementIds;
@@ -817,37 +306,8 @@ export function useEditorViewModel(services: AppServices) {
   syncMirrorNowRef.current = (projectToSync) => {
     void syncMirrorNow(projectToSync);
   };
-  const backgroundSelectionPointsRef = useRef<Record<string, BackgroundSelectionPoint[]>>({});
-  const backgroundPreviewTimeoutRef = useRef<number | undefined>(undefined);
-  const operationNoticeTimeoutRef = useRef<number | undefined>(undefined);
   const wasFullscreenRef = useRef(false);
-
-  function clearOperationNoticeTimer() {
-    if (operationNoticeTimeoutRef.current === undefined) return;
-    window.clearTimeout(operationNoticeTimeoutRef.current);
-    operationNoticeTimeoutRef.current = undefined;
-  }
-
-  function showOperationNotice(notice: OperationNoticeState | undefined, options?: { persistent?: boolean }) {
-    clearOperationNoticeTimer();
-    setOperationNotice(notice);
-    if (!notice || options?.persistent) return;
-    operationNoticeTimeoutRef.current = window.setTimeout(() => {
-      setOperationNotice(undefined);
-      operationNoticeTimeoutRef.current = undefined;
-    }, OPERATION_NOTICE_CLEAR_MS);
-  }
-
-  useEffect(() => {
-    return () => {
-      if (operationNoticeTimeoutRef.current === undefined) return;
-      window.clearTimeout(operationNoticeTimeoutRef.current);
-      operationNoticeTimeoutRef.current = undefined;
-    };
-  }, []);
   const presenterPageIdRef = useRef<string | undefined>(undefined);
-  const backgroundPreviewSequenceRef = useRef(0);
-  const backgroundPreparationSequenceRef = useRef(0);
   const languageDetectionSequenceRef = useRef(0);
   const skipNextProjectSaveRef = useRef(shouldRestoreStoredProject);
   const lastVersionProjectRef = useRef<ProjectDocument>(initialProject);
@@ -865,22 +325,6 @@ export function useEditorViewModel(services: AppServices) {
     () => services.fontImportService.listDownloadableFonts(),
     [services.fontImportService],
   );
-  useEffect(() => {
-    if (stockMediaProviderState.images.configured && stockImageResults.length === 0) {
-      void searchStockImages('');
-    }
-    if (stockMediaProviderState.gifs.configured && stockGifResults.length === 0) {
-      void searchStockGifs('');
-    }
-  // The stock search functions are declared later in this hook and intentionally not dependencies:
-  // adding them would rerun this bootstrap effect on every render.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    stockGifResults.length,
-    stockImageResults.length,
-    stockMediaProviderState.gifs.configured,
-    stockMediaProviderState.images.configured,
-  ]);
   const activeSlideLanguage = useMemo(() => {
     const option = translationLanguageUtils.getLanguageOption(pageLanguageCodes[activePageId]);
     return {
@@ -983,8 +427,8 @@ export function useEditorViewModel(services: AppServices) {
       .then(async (savedProject) => {
         if (!isMounted) return;
         if (savedProject) {
-          const normalizedProject = normalizeProjectDocument(savedProject);
-          await loadProjectFonts(normalizedProject, services.fontImportService);
+          const normalizedProject = editorViewModelProject.normalizeProjectDocument(savedProject);
+          await editorViewModelRuntime.loadProjectFonts(normalizedProject, services.fontImportService);
           if (!isMounted) return;
           setProject(normalizedProject);
           setActivePageId(normalizedProject.pages[0]?.id ?? '');
@@ -999,7 +443,7 @@ export function useEditorViewModel(services: AppServices) {
               .then(setVersionHistoryEntries)
               .catch(() => undefined);
           }
-          writeProjectNameToUrl(normalizedProject.name);
+          editorViewModelProject.writeProjectNameToUrl(normalizedProject.name);
           setHasPersistedLocalProject(true);
           if (storedMirrorConfig && shouldEnableStoredMirror) {
             syncMirrorNowRef.current(normalizedProject);
@@ -1053,7 +497,7 @@ export function useEditorViewModel(services: AppServices) {
       })
       .then(() => {
         queueMirrorSyncRef.current();
-        writeProjectNameToUrl(project.name);
+        editorViewModelProject.writeProjectNameToUrl(project.name);
       })
       .catch(() => {
         setPersistenceEnabled(false);
@@ -1073,7 +517,7 @@ export function useEditorViewModel(services: AppServices) {
 
   useEffect(() => {
     if (pageLanguageCodes[activePageId]) return;
-    const sampleText = getPageTextSample(project, activePageId);
+    const sampleText = textTranslationLayout.getPageTextSample(project, activePageId);
     if (!sampleText) return;
 
     const sequence = languageDetectionSequenceRef.current + 1;
@@ -1091,41 +535,6 @@ export function useEditorViewModel(services: AppServices) {
       .catch(() => undefined);
   }, [activePageId, pageLanguageCodes, project, services.translatorService]);
 
-  useEffect(
-    () => () => {
-      if (backgroundPreviewTimeoutRef.current !== undefined) {
-        window.clearTimeout(backgroundPreviewTimeoutRef.current);
-      }
-    },
-    [],
-  );
-
-  function clearBackgroundPreview() {
-    backgroundPreviewSequenceRef.current += 1;
-    if (backgroundPreviewTimeoutRef.current !== undefined) {
-      window.clearTimeout(backgroundPreviewTimeoutRef.current);
-      backgroundPreviewTimeoutRef.current = undefined;
-    }
-    setBackgroundPreview(undefined);
-  }
-
-  function clearBackgroundPreparation() {
-    backgroundPreparationSequenceRef.current += 1;
-    setBackgroundPreparation(undefined);
-  }
-
-  function clearBackgroundSelectionPoints(elementId?: string) {
-    if (!elementId) {
-      backgroundSelectionPointsRef.current = {};
-      setBackgroundSelectionPoints({});
-      return;
-    }
-    const { [elementId]: removed, ...remainingPoints } = backgroundSelectionPointsRef.current;
-    void removed;
-    backgroundSelectionPointsRef.current = remainingPoints;
-    setBackgroundSelectionPoints(remainingPoints);
-  }
-
   function replaceProjectForAutomation(nextProject: ProjectDocument) {
     const nextActivePageId = nextProject.pages[0]?.id ?? '';
     projectRef.current = nextProject;
@@ -1136,23 +545,13 @@ export function useEditorViewModel(services: AppServices) {
     setSelectedElementIds([]);
     setHistory({ past: [], future: [] });
     setPageLanguageCodes({});
-    setBackgroundSelectionMode(false);
-    setBackgroundSelectionNotice(undefined);
-    clearBackgroundPreview();
-    clearBackgroundPreparation();
-    clearBackgroundSelectionPoints();
+    cancelBackgroundSelectionMode();
     setPreviewProject(undefined);
     setSelectedVersionId(undefined);
     setVersionHistoryOpen(false);
     skipNextProjectSaveRef.current = true;
     lastVersionProjectRef.current = nextProject;
     setLastEditedAt(nextProject.updatedAt);
-  }
-
-  function isBackgroundPreparationReady(elementId: string) {
-    return (
-      backgroundPreparation?.elementId === elementId && backgroundPreparation.status === 'ready'
-    );
   }
 
   async function downloadRequiredModels() {
@@ -1179,14 +578,6 @@ export function useEditorViewModel(services: AppServices) {
     if (
       next.some(
         (state) =>
-          state.id === modelSetupService.IMAGE_EDITING_MODEL_ID && state.status === 'ready',
-      )
-    ) {
-      setBackgroundSelectionNotice(undefined);
-    }
-    if (
-      next.some(
-        (state) =>
           state.id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID && state.status === 'ready',
       )
     ) {
@@ -1208,7 +599,7 @@ export function useEditorViewModel(services: AppServices) {
         setModelStates((currentStates) =>
           currentStates.map((state) =>
             state.id === id
-              ? { ...state, status: 'downloading', ...getDownloadProgressPatch(progress, details) }
+              ? { ...state, status: 'downloading', ...editorViewModelProgress.getDownloadProgressPatch(progress, details) }
               : state,
           ),
         );
@@ -1227,9 +618,6 @@ export function useEditorViewModel(services: AppServices) {
       setLanguageDetectionProviderStates(
         await services.translatorService.getLanguageDetectionProviderStates(),
       );
-    }
-    if (id === modelSetupService.IMAGE_EDITING_MODEL_ID && next.status === 'ready') {
-      setBackgroundSelectionNotice(undefined);
     }
     if (id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID && next.status === 'ready') {
       setCreateImageNotice(undefined);
@@ -1337,7 +725,7 @@ export function useEditorViewModel(services: AppServices) {
           setPromptPreparation((current) => ({
             ...current,
             availability: progress >= 100 ? 'ready' : current.availability,
-            ...getDownloadProgressPatch(
+            ...editorViewModelProgress.getDownloadProgressPatch(
               Math.max(current.progress, 4, Math.min(100, Math.round(progress))),
               details,
             ),
@@ -1432,7 +820,7 @@ export function useEditorViewModel(services: AppServices) {
       await services.translatorService.prepareLanguageDetection?.({
         onProgress: (progress, details) => {
           setLanguageDetectionPreparation((current) => ({
-            ...getDownloadProgressPatch(
+            ...editorViewModelProgress.getDownloadProgressPatch(
               Math.max(current.progress, 4, Math.min(100, Math.round(progress))),
               details,
             ),
@@ -1467,7 +855,7 @@ export function useEditorViewModel(services: AppServices) {
           {
             onProgress: (progress, details) => {
               setTranslationPreparation((current) => ({
-                ...getDownloadProgressPatch(
+                ...editorViewModelProgress.getDownloadProgressPatch(
                   Math.max(current.progress, 4, Math.min(100, Math.round(progress))),
                   details,
                 ),
@@ -1619,14 +1007,14 @@ export function useEditorViewModel(services: AppServices) {
     setIsGeneratingImage(true);
     try {
       const generationOptions = {
-        height: normalizeImageGenerationDimension(
+        height: editorViewModelProgress.normalizeImageGenerationDimension(
           imageToReplace?.height ??
             options?.height ??
             imageGenerationModel.DEFAULT_IMAGE_GENERATION_SIZE,
         ),
         ...(options?.seed !== undefined ? { seed: options.seed } : {}),
         ...(options?.steps !== undefined ? { steps: options.steps } : {}),
-        width: normalizeImageGenerationDimension(
+        width: editorViewModelProgress.normalizeImageGenerationDimension(
           imageToReplace?.width ??
             options?.width ??
             imageGenerationModel.DEFAULT_IMAGE_GENERATION_SIZE,
@@ -1726,83 +1114,52 @@ export function useEditorViewModel(services: AppServices) {
       if (options?.selectedElementIds !== undefined) {
         selectedElementIdsRef.current = options.selectedElementIds;
         setSelectedElementIds(options.selectedElementIds);
-        setSelectionTarget(options.selectedElementIds.length > 0 ? 'elements' : 'slide');
+        setSelectionTarget(
+          editorViewModelSelection.getSelectionTargetForElements(options.selectedElementIds),
+        );
       }
       return nextProject;
     });
   }
 
-  function getSelectionForProject(
-    nextProject: ProjectDocument,
-    pageId: string,
-    currentSelection: string[],
-  ) {
-    const page = nextProject.pages.find((item) => item.id === pageId) ?? nextProject.pages[0];
-    const retainedSelection = currentSelection.filter((id) => page?.elementIds.includes(id));
-    if (retainedSelection.length > 0) return retainedSelection;
-    const nextSelectedId = page?.elementIds.at(-1);
-    return nextSelectedId ? [nextSelectedId] : [];
-  }
-
   function selectElement(elementId: string, options?: { additive?: boolean }) {
     if (processingElementIds.includes(elementId)) return;
-    setBackgroundSelectionMode(false);
-    setBackgroundSelectionNotice(undefined);
-    clearBackgroundPreview();
-    clearBackgroundPreparation();
-    clearBackgroundSelectionPoints();
+    cancelBackgroundSelectionMode();
     setSelectionTarget('elements');
     setSelectedElementIds((currentSelection) => {
-      if (!options?.additive) return [elementId];
-      if (currentSelection.includes(elementId)) {
-        return currentSelection.filter((id) => id !== elementId);
-      }
-      return [...currentSelection, elementId];
+      return editorViewModelSelection.getNextElementSelection({
+        additive: Boolean(options?.additive),
+        currentSelection,
+        elementId,
+      });
     });
   }
 
   function selectAllElementsOnActivePage() {
-    const page = project.pages.find((item) => item.id === activePageId);
-    if (!page) return;
-    const selectableElementIds = page.elementIds.filter((elementId) => {
-      const element = project.elements[elementId];
-      return element && element.visible !== false && !processingElementIds.includes(elementId);
+    const selectableElementIds = editorViewModelSelection.getSelectableElementIdsOnPage({
+      pageId: activePageId,
+      processingElementIds,
+      project,
     });
-    setBackgroundSelectionMode(false);
-    setBackgroundSelectionNotice(undefined);
-    clearBackgroundPreview();
-    clearBackgroundPreparation();
-    clearBackgroundSelectionPoints();
+    cancelBackgroundSelectionMode();
     setSelectionTarget('elements');
     setSelectedElementIds(selectableElementIds);
   }
 
   function clearSelection() {
-    setBackgroundSelectionMode(false);
-    setBackgroundSelectionNotice(undefined);
-    clearBackgroundPreview();
-    clearBackgroundPreparation();
-    clearBackgroundSelectionPoints();
+    cancelBackgroundSelectionMode();
     setSelectionTarget('presentation');
     setSelectedElementIds([]);
   }
 
   function selectSlideBackground() {
-    setBackgroundSelectionMode(false);
-    setBackgroundSelectionNotice(undefined);
-    clearBackgroundPreview();
-    clearBackgroundPreparation();
-    clearBackgroundSelectionPoints();
+    cancelBackgroundSelectionMode();
     setSelectionTarget('slide');
     setSelectedElementIds([]);
   }
 
   function selectPresentation() {
-    setBackgroundSelectionMode(false);
-    setBackgroundSelectionNotice(undefined);
-    clearBackgroundPreview();
-    clearBackgroundPreparation();
-    clearBackgroundSelectionPoints();
+    cancelBackgroundSelectionMode();
     setSelectionTarget('presentation');
     setSelectedElementIds([]);
   }
@@ -1862,7 +1219,7 @@ export function useEditorViewModel(services: AppServices) {
       setPersistenceAttention(false);
       showOperationNotice(undefined);
       setLocalProjectSetupOpen(false);
-      writeProjectNameToUrl(projectToSave.name);
+      editorViewModelProject.writeProjectNameToUrl(projectToSave.name);
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(true);
       }
@@ -1900,7 +1257,7 @@ export function useEditorViewModel(services: AppServices) {
     }
     try {
       await persistCurrentProject();
-      writeProjectNameToUrl(projectRef.current.name);
+      editorViewModelProject.writeProjectNameToUrl(projectRef.current.name);
     } catch {
       setPersistenceEnabled(false);
       if (typeof window !== 'undefined') {
@@ -1931,7 +1288,7 @@ export function useEditorViewModel(services: AppServices) {
       setLastEditedAt(projectToSave.updatedAt);
       setSaveAnimationKey((current) => current + 1);
       skipNextProjectSaveRef.current = true;
-      writeProjectNameToUrl(projectToSave.name);
+      editorViewModelProject.writeProjectNameToUrl(projectToSave.name);
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(true);
       }
@@ -1974,7 +1331,7 @@ export function useEditorViewModel(services: AppServices) {
       setPersistenceAttention(false);
       showOperationNotice(undefined);
       setLocalProjectSetupOpen(false);
-      writeProjectNameToUrl(nextProject.name);
+      editorViewModelProject.writeProjectNameToUrl(nextProject.name);
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(true);
       }
@@ -1991,19 +1348,15 @@ export function useEditorViewModel(services: AppServices) {
     try {
       const importedProject = await services.projectRepository.importProject();
       if (!importedProject) return;
-      const normalizedProject = normalizeProjectDocument(importedProject);
-      await loadProjectFonts(normalizedProject, services.fontImportService);
+      const normalizedProject = editorViewModelProject.normalizeProjectDocument(importedProject);
+      await editorViewModelRuntime.loadProjectFonts(normalizedProject, services.fontImportService);
       setProject(normalizedProject);
       setActivePageId(normalizedProject.pages[0]?.id ?? '');
       setPageLanguageCodes({});
       const nextSelectedId = normalizedProject.pages[0]?.elementIds.at(-1);
       setSelectedElementIds(nextSelectedId ? [nextSelectedId] : []);
       setHistory({ past: [], future: [] });
-      setBackgroundSelectionMode(false);
-      setBackgroundSelectionNotice(undefined);
-      clearBackgroundPreview();
-      clearBackgroundPreparation();
-      clearBackgroundSelectionPoints();
+      cancelBackgroundSelectionMode();
       skipNextProjectSaveRef.current = true;
       setHasPersistedLocalProject(true);
       setPersistenceEnabled(true);
@@ -2016,7 +1369,7 @@ export function useEditorViewModel(services: AppServices) {
           .then(setVersionHistoryEntries)
           .catch(() => undefined);
       }
-      writeProjectNameToUrl(normalizedProject.name);
+      editorViewModelProject.writeProjectNameToUrl(normalizedProject.name);
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(true);
       }
@@ -2031,7 +1384,7 @@ export function useEditorViewModel(services: AppServices) {
   async function importPowerPoint(input?: PptxImportInput) {
     try {
       showOperationNotice(undefined);
-      const pptxInput = input ?? (await pickPowerPointImportInput());
+      const pptxInput = input ?? (await powerPointIo.pickImportInput());
       if (!pptxInput) return;
       setPresentationImportProgress({
         detail: `Reading ${pptxInput.file.name}.`,
@@ -2039,14 +1392,14 @@ export function useEditorViewModel(services: AppServices) {
         stage: 'reading',
         title: 'Reading PowerPoint package',
       });
-      await waitForNextPaint();
+      await editorViewModelRuntime.waitForNextPaint();
       setPresentationImportProgress({
         detail: 'Inspecting slide order, dimensions, and package relationships.',
         progress: 34,
         stage: 'inspecting',
         title: 'Inspecting PPTX structure',
       });
-      await waitForNextPaint();
+      await editorViewModelRuntime.waitForNextPaint();
       const importedProject = await services.presentationImportService.importPowerPoint(pptxInput);
       setPresentationImportProgress({
         detail: `Extracting text and image objects for ${importedProject.pages.length.toLocaleString()} slides.`,
@@ -2054,14 +1407,14 @@ export function useEditorViewModel(services: AppServices) {
         stage: 'extracting-objects',
         title: 'Extracting text and images',
       });
-      await waitForNextPaint();
+      await editorViewModelRuntime.waitForNextPaint();
       setPresentationImportProgress({
         detail: 'Matching imported text styles with downloadable Google Fonts.',
         progress: 68,
         stage: 'downloading-fonts',
         title: 'Downloading fonts',
       });
-      await waitForNextPaint();
+      await editorViewModelRuntime.waitForNextPaint();
       const fontRequests = pptxFontRequests.collect(importedProject);
       const fontImportResult =
         fontRequests.length > 0
@@ -2099,34 +1452,30 @@ export function useEditorViewModel(services: AppServices) {
         stage: 'extracting-media',
         title: 'Extracting videos',
       });
-      await waitForNextPaint();
+      await editorViewModelRuntime.waitForNextPaint();
       setPresentationImportProgress({
         detail: 'Mapping imported transitions and object builds into preview playback.',
         progress: 84,
         stage: 'mapping-animations',
         title: 'Mapping animations',
       });
-      await waitForNextPaint();
-      const normalizedProject = normalizeProjectDocument(importedProjectWithFonts);
-      await loadProjectFonts(normalizedProject, services.fontImportService);
+      await editorViewModelRuntime.waitForNextPaint();
+      const normalizedProject = editorViewModelProject.normalizeProjectDocument(importedProjectWithFonts);
+      await editorViewModelRuntime.loadProjectFonts(normalizedProject, services.fontImportService);
       setPresentationImportProgress({
         detail: 'Opening the imported project in the editor.',
         progress: 94,
         stage: 'opening',
         title: 'Opening deck',
       });
-      await waitForNextPaint();
+      await editorViewModelRuntime.waitForNextPaint();
       setProject(normalizedProject);
       setActivePageId(normalizedProject.pages[0]?.id ?? '');
       setPageLanguageCodes({});
       const nextSelectedId = normalizedProject.pages[0]?.elementIds.at(-1);
       setSelectedElementIds(nextSelectedId ? [nextSelectedId] : []);
       setHistory({ past: [], future: [] });
-      setBackgroundSelectionMode(false);
-      setBackgroundSelectionNotice(undefined);
-      clearBackgroundPreview();
-      clearBackgroundPreparation();
-      clearBackgroundSelectionPoints();
+      cancelBackgroundSelectionMode();
       skipNextProjectSaveRef.current = true;
       setHasPersistedLocalProject(false);
       setPersistenceEnabled(false);
@@ -2134,7 +1483,7 @@ export function useEditorViewModel(services: AppServices) {
       needsFreshPersistenceTargetRef.current = true;
       setLastEditedAt(normalizedProject.updatedAt);
       setVersionHistoryEntries([]);
-      writeProjectNameToUrl(normalizedProject.name);
+      editorViewModelProject.writeProjectNameToUrl(normalizedProject.name);
       setPresentationImportProgress(undefined);
       const missingFontCount = fontImportResult.warnings.filter(
         (warning) => warning.code === 'font-missing',
@@ -2174,10 +1523,10 @@ export function useEditorViewModel(services: AppServices) {
         { message: 'Exporting PowerPoint...', tone: 'info' },
         { persistent: true },
       );
-      await waitForNextPaint();
+      await editorViewModelRuntime.waitForNextPaint();
       const result = await services.presentationExportService.exportPowerPoint(project, {
         onProgress: (progress) => {
-          showOperationNotice(formatPowerPointExportProgress(progress), { persistent: true });
+          showOperationNotice(powerPointIo.formatExportProgress(progress), { persistent: true });
         },
       });
       showOperationNotice(
@@ -2193,7 +1542,7 @@ export function useEditorViewModel(services: AppServices) {
         services.exportService.getPowerPointFileName(project),
       );
       showOperationNotice({
-        message: summarizePowerPointExport(result),
+        message: powerPointIo.summarizeExport(result),
         tone: result.warnings.length > 0 ? 'warning' : 'success',
       });
     } catch (error) {
@@ -2209,8 +1558,8 @@ export function useEditorViewModel(services: AppServices) {
   showOperationNoticeRef.current = showOperationNotice;
 
   useEffect(() => {
-    if (!consumeLocalPowerPointSampleImportRequest()) return;
-    void loadLocalPowerPointSampleInput()
+    if (!powerPointIo.consumeLocalSampleImportRequest()) return;
+    void powerPointIo.loadLocalSampleInput()
       .then((input) => importPowerPointRef.current(input))
       .catch((error: unknown) => {
         pptxImportLogger.error('Local PowerPoint sample import failed.', error);
@@ -2262,27 +1611,6 @@ export function useEditorViewModel(services: AppServices) {
     setMirrorState({ enabled: true, status: 'idle' });
     setMirrorSettingsOpen(false);
     void syncMirrorNow();
-  }
-
-  function refreshStockMediaConfig() {
-    setStockMediaConfig(services.stockMediaService.loadConfig());
-    setStockMediaProviderState(services.stockMediaService.getProviderState());
-  }
-
-  function saveStockMediaConfig(config: StockMediaConfig) {
-    services.stockMediaService.saveConfig(config);
-    refreshStockMediaConfig();
-    setMediaSettingsOpen(false);
-    void searchStockImages('');
-    void searchStockGifs('');
-  }
-
-  function clearStockMediaConfig() {
-    services.stockMediaService.clearConfig();
-    refreshStockMediaConfig();
-    setStockImageResults([]);
-    setStockGifResults([]);
-    setStockMediaError({});
   }
 
   function setMirrorEnabled(enabled: boolean, options?: { fromSettings?: boolean }) {
@@ -2440,18 +1768,14 @@ export function useEditorViewModel(services: AppServices) {
     try {
       const files = await services.mirrorService.downloadProject(projectId, config);
       const importedProject = await services.projectRepository.importMirrorFiles(files);
-      const normalizedProject = normalizeProjectDocument(importedProject);
-      await loadProjectFonts(normalizedProject, services.fontImportService);
+      const normalizedProject = editorViewModelProject.normalizeProjectDocument(importedProject);
+      await editorViewModelRuntime.loadProjectFonts(normalizedProject, services.fontImportService);
       setProject(normalizedProject);
       setActivePageId(normalizedProject.pages[0]?.id ?? '');
       setPageLanguageCodes({});
       setSelectedElementIds([]);
       setHistory({ past: [], future: [] });
-      setBackgroundSelectionMode(false);
-      setBackgroundSelectionNotice(undefined);
-      clearBackgroundPreview();
-      clearBackgroundPreparation();
-      clearBackgroundSelectionPoints();
+      cancelBackgroundSelectionMode();
       skipNextProjectSaveRef.current = true;
       setHasPersistedLocalProject(true);
       setPersistenceEnabled(true);
@@ -2464,7 +1788,7 @@ export function useEditorViewModel(services: AppServices) {
           .then(setVersionHistoryEntries)
           .catch(() => undefined);
       }
-      writeProjectNameToUrl(normalizedProject.name);
+      editorViewModelProject.writeProjectNameToUrl(normalizedProject.name);
       editorPreferences.writePersistencePreference(true);
       setMirrorState({ enabled: true, status: 'synced', lastSyncedAt: new Date().toISOString() });
       setRemoteImportOpen(false);
@@ -2528,8 +1852,8 @@ export function useEditorViewModel(services: AppServices) {
     const entry = entryOverride ?? versionHistoryEntries.find((item) => item.id === versionId);
     const versionProject = await services.projectRepository.loadVersion(versionId);
     if (!versionProject) return;
-    const normalizedVersionProject = normalizeProjectDocument(versionProject);
-    await loadProjectFonts(normalizedVersionProject, services.fontImportService);
+    const normalizedVersionProject = editorViewModelProject.normalizeProjectDocument(versionProject);
+    await editorViewModelRuntime.loadProjectFonts(normalizedVersionProject, services.fontImportService);
     setSelectedVersionId(versionId);
     setPreviewProject(normalizedVersionProject);
     const nextPageId = entry?.firstChangedPageId ?? normalizedVersionProject.pages[0]?.id ?? '';
@@ -2543,11 +1867,11 @@ export function useEditorViewModel(services: AppServices) {
     if (!services.projectRepository.loadVersion) return;
     const restoredProject = await services.projectRepository.loadVersion(versionId);
     if (!restoredProject) return;
-    const normalizedProject = normalizeProjectDocument({
+    const normalizedProject = editorViewModelProject.normalizeProjectDocument({
       ...restoredProject,
       updatedAt: new Date().toISOString(),
     });
-    await loadProjectFonts(normalizedProject, services.fontImportService);
+    await editorViewModelRuntime.loadProjectFonts(normalizedProject, services.fontImportService);
     await services.projectRepository.saveProject(normalizedProject);
     setSaveAnimationKey((current) => current + 1);
     if (services.projectRepository.saveVersion) {
@@ -2574,34 +1898,18 @@ export function useEditorViewModel(services: AppServices) {
   function selectPage(pageId: string) {
     const page = project.pages.find((item) => item.id === pageId);
     if (!page) return;
-    setBackgroundSelectionMode(false);
-    setBackgroundSelectionNotice(undefined);
-    clearBackgroundPreview();
-    clearBackgroundPreparation();
-    clearBackgroundSelectionPoints();
+    cancelBackgroundSelectionMode();
     setActivePageId(page.id);
     setSelectedElementIds([]);
   }
 
   function updateElementFrame(elementId: string, patch: ElementFramePatch) {
-    commitProject((currentProject) => {
-      const element = currentProject.elements[elementId];
-      const nextPatch =
-        element?.type === 'text'
-          ? patch.height === undefined
-            ? patch
-            : {
-                ...patch,
-                height: Math.max(
-                  patch.height,
-                  getMinimumTextHeight(element.text, element.fontSize),
-                ),
-              }
-          : patch;
-      return new basicCommands.UpdateElementFrameCommand(elementId, nextPatch).execute(
-        currentProject,
-      );
-    });
+    commitProject((currentProject) =>
+      new basicCommands.UpdateElementFrameCommand(
+        elementId,
+        editorViewModelText.getFramePatchWithTextMinimum(currentProject, elementId, patch),
+      ).execute(currentProject),
+    );
   }
 
   function updateElementFrames(patches: Record<string, ElementFramePatch>) {
@@ -2611,33 +1919,15 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function updateTextContent(elementId: string, text: string) {
-    commitProject((currentProject) => {
-      const nextProject = new basicCommands.UpdateTextContentCommand(elementId, text).execute(
-        currentProject,
-      );
-      const element = nextProject.elements[elementId];
-      if (!element || element.type !== 'text') return nextProject;
-      const minimumHeight = getMinimumTextHeight(element.text, element.fontSize);
-      if (element.height >= minimumHeight) return nextProject;
-      return new basicCommands.UpdateElementFrameCommand(elementId, {
-        height: minimumHeight,
-      }).execute(nextProject);
-    });
+    commitProject((currentProject) =>
+      editorViewModelText.updateTextContent(currentProject, elementId, text),
+    );
   }
 
   function updateElementStyle(elementId: string, patch: ElementStylePatch) {
-    commitProject((currentProject) => {
-      const nextProject = new basicCommands.UpdateElementStyleCommand(elementId, patch).execute(
-        currentProject,
-      );
-      const element = nextProject.elements[elementId];
-      if (!element || element.type !== 'text') return nextProject;
-      const minimumHeight = getMinimumTextHeight(element.text, element.fontSize);
-      if (element.height >= minimumHeight) return nextProject;
-      return new basicCommands.UpdateElementFrameCommand(elementId, {
-        height: minimumHeight,
-      }).execute(nextProject);
-    });
+    commitProject((currentProject) =>
+      editorViewModelText.updateElementStyle(currentProject, elementId, patch),
+    );
   }
 
   async function downloadFontForSelection(family: string) {
@@ -2661,23 +1951,12 @@ export function useEditorViewModel(services: AppServices) {
     }
 
     commitProject((currentProject) => {
-      const projectWithFont: ProjectDocument = {
-        ...currentProject,
-        fonts: {
-          ...(currentProject.fonts ?? {}),
-          ...result.fonts,
-        },
-      };
-      const nextProject = new basicCommands.UpdateElementStyleCommand(selectedElementId, {
-        fontFamily: font.family,
-      }).execute(projectWithFont);
-      const nextElement = nextProject.elements[selectedElementId];
-      if (!nextElement || nextElement.type !== 'text') return nextProject;
-      const minimumHeight = getMinimumTextHeight(nextElement.text, nextElement.fontSize);
-      if (nextElement.height >= minimumHeight) return nextProject;
-      return new basicCommands.UpdateElementFrameCommand(selectedElementId, {
-        height: minimumHeight,
-      }).execute(nextProject);
+      return editorViewModelText.applyFontFamilyWithFonts({
+        elementId: selectedElementId,
+        font,
+        fonts: result.fonts,
+        project: currentProject,
+      });
     });
   }
 
@@ -2853,7 +2132,7 @@ export function useEditorViewModel(services: AppServices) {
       });
     };
 
-    const translatedEntries = await mapWithConcurrency(
+    const translatedEntries = await textTranslationLayout.mapWithConcurrency(
       elementIds,
       concurrency,
       async (elementId) => {
@@ -2891,7 +2170,7 @@ export function useEditorViewModel(services: AppServices) {
         const page = pageById.get(pageId ?? '');
         return [
           elementId,
-          fitTranslatedTextToOriginalFrame(element, translatedText, page),
+          textTranslationLayout.fitTranslatedTextToOriginalFrame(element, translatedText, page),
         ] as const;
       },
     );
@@ -2967,7 +2246,7 @@ export function useEditorViewModel(services: AppServices) {
             await services.translatorService.detectLanguage(sampleText, {
               onProgress: (progress, details) => {
                 setTranslationPreparation((current) => ({
-                  ...getDownloadProgressPatch(
+                  ...editorViewModelProgress.getDownloadProgressPatch(
                     Math.max(current.progress, 4, Math.min(45, Math.round(progress * 0.45))),
                     details,
                   ),
@@ -2987,7 +2266,7 @@ export function useEditorViewModel(services: AppServices) {
         await services.translatorService.prepareTranslation(sourceLanguage, nextLanguage, {
           onProgress: (progress, details) => {
             setTranslationPreparation((current) => ({
-              ...getDownloadProgressPatch(
+              ...editorViewModelProgress.getDownloadProgressPatch(
                 Math.max(current.progress, 8, Math.min(100, Math.round(progress))),
                 details,
               ),
@@ -3109,7 +2388,7 @@ export function useEditorViewModel(services: AppServices) {
 
   function createProjectForAutomation(input: { name?: string }) {
     const blankProject = sampleProject.createBlankProject();
-    const nextProject = normalizeProjectDocument({
+    const nextProject = editorViewModelProject.normalizeProjectDocument({
       ...blankProject,
       name: input.name?.trim() || blankProject.name,
       updatedAt: new Date().toISOString(),
@@ -3207,38 +2486,28 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function getSelectedElementsForClipboard() {
-    const page = project.pages.find((item) => item.id === activePageId);
-    if (!page) return [];
-    return page.elementIds
-      .filter((elementId) => selectedElementIds.includes(elementId))
-      .map((elementId) => project.elements[elementId])
-      .filter((element): element is DesignElement => Boolean(element));
+    return editorViewModelElements.getSelectedElementsForClipboard({
+      activePageId,
+      project,
+      selectedElementIds,
+    });
   }
 
   function copySelectedElements() {
     const selectedElements = getSelectedElementsForClipboard();
     if (selectedElements.length === 0) return;
-    const copiedAssets: ProjectDocument['assets'] = {};
-    for (const element of selectedElements) {
-      if (element.type !== 'image' && element.type !== 'gif' && element.type !== 'video') continue;
-      const asset = project.assets[element.assetId];
-      if (asset) copiedAssets[element.assetId] = asset;
-    }
     setElementClipboard({
-      assets: copiedAssets,
+      assets: editorViewModelElements.collectClipboardAssets(project, selectedElements),
       elements: selectedElements.map((element) => ({ ...element })),
     });
   }
 
   function pasteCopiedElements() {
     if (elementClipboard.elements.length === 0) return false;
-    const pastedElements = elementClipboard.elements.map((element) => ({
-      ...element,
-      id: createPrefixedId(`${element.id}-copy`),
-      x: element.x + PASTED_ELEMENT_OFFSET,
-      y: element.y + PASTED_ELEMENT_OFFSET,
-      locked: false,
-    }));
+    const pastedElements = editorViewModelElements.createPastedElements({
+      createElementId: (sourceElementId) => createPrefixedId(`${sourceElementId}-copy`),
+      elements: elementClipboard.elements,
+    });
 
     commitProject(
       (currentProject) =>
@@ -3281,13 +2550,7 @@ export function useEditorViewModel(services: AppServices) {
       (elementId) => !processingElementIds.includes(elementId),
     );
     if (deletableElementIds.length === 0) return;
-    setBackgroundSelectionMode(false);
-    setBackgroundSelectionNotice(undefined);
-    clearBackgroundPreview();
-    clearBackgroundPreparation();
-    deletableElementIds.forEach((elementId) => {
-      clearBackgroundSelectionPoints(elementId);
-    });
+    cancelBackgroundSelectionMode();
     commitProject((currentProject) => {
       const nextProject = deletableElementIds.reduce(
         (nextProjectState, elementId) =>
@@ -3326,96 +2589,14 @@ export function useEditorViewModel(services: AppServices) {
     const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
     if (!page) return;
     const selectedElement = project.elements[selectedElementIds[0] ?? ''];
-    const titleTemplate = project.elements['text-title'];
-    const subtitleTemplate = project.elements['text-subtitle'];
-    const presetStyles: Record<
-      TextPreset,
-      Omit<
-        Extract<DesignElement, { type: 'text' }>,
-        'id' | 'locked' | 'opacity' | 'rotation' | 'type' | 'visible' | 'x' | 'y'
-      >
-    > = {
-      title:
-        titleTemplate?.type === 'text'
-          ? {
-              text: 'Add a heading',
-              width: titleTemplate.width,
-              height: titleTemplate.height,
-              fontFamily: titleTemplate.fontFamily,
-              fontSize: titleTemplate.fontSize,
-              fontWeight: titleTemplate.fontWeight,
-              fill: titleTemplate.fill,
-              align: titleTemplate.align,
-            }
-          : {
-              text: 'Add a heading',
-              width: 680,
-              height: 220,
-              fontFamily: 'Orbitron',
-              fontSize: 96,
-              fontWeight: 800,
-              fill: '#37FD76',
-              align: 'center',
-            },
-      subtitle:
-        subtitleTemplate?.type === 'text'
-          ? {
-              text: 'Add a subheading',
-              width: subtitleTemplate.width,
-              height: subtitleTemplate.height,
-              fontFamily: subtitleTemplate.fontFamily,
-              fontSize: subtitleTemplate.fontSize,
-              fontWeight: subtitleTemplate.fontWeight,
-              fill: subtitleTemplate.fill,
-              align: subtitleTemplate.align,
-            }
-          : {
-              text: 'Add a subheading',
-              width: 720,
-              height: 92,
-              fontFamily: 'Open Sans',
-              fontSize: 44,
-              fontWeight: 700,
-              fill: '#FFFFFF',
-              align: 'center',
-            },
-      body: {
-        text: 'Add a little bit of body text',
-        width: 760,
-        height: 120,
-        fontFamily: 'Open Sans',
-        fontSize: 32,
-        fontWeight: 500,
-        fill: '#FFFFFF',
-        align: 'left',
-      },
-    };
-    const style = presetStyles[preset];
-    const width = style.width;
-    const height = style.height;
     const elementId = createPrefixedId('text');
-    const nextElement: DesignElement = {
-      id: elementId,
-      type: 'text',
-      text: style.text,
-      x: selectedElement
-        ? Math.min(page.width - width, selectedElement.x + PASTED_ELEMENT_OFFSET)
-        : (page.width - width) / 2,
-      y: selectedElement
-        ? Math.min(page.height - height, selectedElement.y + PASTED_ELEMENT_OFFSET)
-        : (page.height - height) / 2,
-      width,
-      height,
-      rotation: 0,
-      locked: false,
-      visible: true,
-      opacity: 1,
-      fontFamily: style.fontFamily,
-      fontSize: style.fontSize,
-      fontWeight: style.fontWeight,
-      fill: style.fill,
-      align: style.align,
-    };
+    const nextElement = editorViewModelElements.createTextElement({
+      elementId,
+      page,
+      preset,
+      project,
+      selectedElement,
+    });
 
     commitProject(
       (currentProject) =>
@@ -3428,39 +2609,13 @@ export function useEditorViewModel(services: AppServices) {
     const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
     if (!page) return;
     const selectedElement = project.elements[selectedElementIds[0] ?? ''];
-    const isLinearShape = shape === 'line' || shape === 'arc';
-    const defaultFrame: Record<ShapeKind, { width: number; height: number }> = {
-      arc: { width: 260, height: 180 },
-      arrow: { width: 260, height: 140 },
-      diamond: { width: 180, height: 180 },
-      ellipse: { width: 180, height: 180 },
-      line: { width: 260, height: 120 },
-      parallelogram: { width: 240, height: 150 },
-      pentagon: { width: 190, height: 190 },
-      rect: { width: 180, height: 180 },
-      'rounded-rect': { width: 240, height: 150 },
-      triangle: { width: 190, height: 180 },
-    };
-    const { width, height } = defaultFrame[shape];
     const elementId = createPrefixedId('shape');
-    const nextElement: ShapeElement = {
-      id: elementId,
-      type: 'shape',
+    const nextElement = editorViewModelElements.createShapeElement({
+      elementId,
+      page,
+      selectedElement,
       shape,
-      x: selectedElement
-        ? Math.min(page.width - width, selectedElement.x + PASTED_ELEMENT_OFFSET)
-        : (page.width - width) / 2,
-      y: selectedElement
-        ? Math.min(page.height - height, selectedElement.y + PASTED_ELEMENT_OFFSET)
-        : (page.height - height) / 2,
-      width,
-      height,
-      rotation: 0,
-      locked: false,
-      visible: true,
-      opacity: 1,
-      ...(isLinearShape ? { stroke: '#37FD76', strokeWidth: 4 } : { fill: '#37FD76' }),
-    };
+    });
 
     commitProject(
       (currentProject) =>
@@ -3528,33 +2683,17 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function addPage(afterPageId = activePageId) {
-    const sourcePage =
-      project.pages.find((item) => item.id === afterPageId) ??
-      project.pages.find((item) => item.id === activePageId) ??
-      project.pages[0];
-    if (!sourcePage) return;
     const pageId = createPrefixedId('page');
-    const nextPage: Page = {
-      id: pageId,
-      name: `Slide ${project.pages.length + 1}`,
-      width: sourcePage.width,
-      height: sourcePage.height,
-      background: sourcePage.background,
-      elementIds: [],
-    };
+    const nextPage = editorViewModelPages.createInsertedPage({
+      activePageId,
+      afterPageId,
+      pageId,
+      project,
+    });
+    if (!nextPage) return;
 
     commitProject(
-      (currentProject) => {
-        const afterIndex = currentProject.pages.findIndex((page) => page.id === afterPageId);
-        const insertIndex = afterIndex >= 0 ? afterIndex + 1 : currentProject.pages.length;
-        const pages = [...currentProject.pages];
-        pages.splice(insertIndex, 0, nextPage);
-        return {
-          ...currentProject,
-          pages,
-          updatedAt: new Date().toISOString(),
-        };
-      },
+      (currentProject) => editorViewModelPages.insertPageAfter(currentProject, afterPageId, nextPage),
       { activePageId: pageId, selectedElementIds: [] },
     );
   }
@@ -3573,14 +2712,8 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function deletePage(pageId: string) {
-    if (project.pages.length <= 1) return;
-    const pageIndex = project.pages.findIndex((page) => page.id === pageId);
-    if (pageIndex < 0) return;
-    const nextPageId =
-      project.pages[pageIndex + 1]?.id ??
-      project.pages[pageIndex - 1]?.id ??
-      project.pages[0]?.id ??
-      '';
+    const nextPageId = editorViewModelPages.getNextPageIdAfterDelete(project, pageId);
+    if (nextPageId === undefined) return;
     commitProject(
       (currentProject) => new basicCommands.DeletePageCommand(pageId).execute(currentProject),
       {
@@ -3656,12 +2789,17 @@ export function useEditorViewModel(services: AppServices) {
       future: [project, ...currentHistory.future],
     }));
     setProject(previousProject);
-    const nextActivePageId = previousProject.pages.some((page) => page.id === activePageId)
-      ? activePageId
-      : (previousProject.pages[0]?.id ?? '');
+    const nextActivePageId = editorViewModelHistory.getActivePageIdForProject(
+      previousProject,
+      activePageId,
+    );
     setActivePageId(nextActivePageId);
     setSelectedElementIds(
-      getSelectionForProject(previousProject, nextActivePageId, selectedElementIds),
+      editorViewModelHistory.getSelectionForProject({
+        currentSelection: selectedElementIds,
+        pageId: nextActivePageId,
+        project: previousProject,
+      }),
     );
   }
 
@@ -3674,12 +2812,17 @@ export function useEditorViewModel(services: AppServices) {
       future: currentHistory.future.slice(1),
     }));
     setProject(nextProject);
-    const nextActivePageId = nextProject.pages.some((page) => page.id === activePageId)
-      ? activePageId
-      : (nextProject.pages[0]?.id ?? '');
+    const nextActivePageId = editorViewModelHistory.getActivePageIdForProject(
+      nextProject,
+      activePageId,
+    );
     setActivePageId(nextActivePageId);
     setSelectedElementIds(
-      getSelectionForProject(nextProject, nextActivePageId, selectedElementIds),
+      editorViewModelHistory.getSelectionForProject({
+        currentSelection: selectedElementIds,
+        pageId: nextActivePageId,
+        project: nextProject,
+      }),
     );
   }
 
@@ -3695,660 +2838,10 @@ export function useEditorViewModel(services: AppServices) {
     setZoomPercent(100);
   }
 
-  function toggleBackgroundSelectionMode() {
-    const element = project.elements[selectedElementIds[0] ?? ''];
-    if (element?.type !== 'image') return;
-    if (processingElementIds.includes(element.id)) return;
-    if (backgroundSelectionMode) {
-      setBackgroundSelectionMode(false);
-      setBackgroundSelectionNotice(undefined);
-      clearBackgroundPreview();
-      clearBackgroundPreparation();
-      clearBackgroundSelectionPoints(element.id);
-      return;
-    }
-
-    const imageEditingModel = modelStates.find(
-      (state) => state.id === modelSetupService.IMAGE_EDITING_MODEL_ID,
-    );
-    if (imageEditingModel?.status !== 'ready') {
-      setActiveTab('ai-tools');
-      setBackgroundSelectionNotice(IMAGE_EDITING_MODEL_REQUIRED_MESSAGE);
-      return;
-    }
-
-    setBackgroundSelectionNotice(undefined);
-    setBackgroundSelectionMode(true);
-    clearBackgroundSelectionPoints(element.id);
-    prepareBackgroundSelection(element.id);
-  }
-
-  function cancelBackgroundSelectionMode() {
-    setBackgroundSelectionMode(false);
-    setBackgroundSelectionNotice(undefined);
-    clearBackgroundPreview();
-    clearBackgroundPreparation();
-    clearBackgroundSelectionPoints();
-  }
-
-  function prepareBackgroundSelection(elementId: string) {
-    const element = project.elements[elementId];
-    if (!element || element.type !== 'image') return;
-    const asset = project.assets[element.assetId];
-    if (!asset) return;
-
-    const sequence = backgroundPreparationSequenceRef.current + 1;
-    backgroundPreparationSequenceRef.current = sequence;
-    setBackgroundPreparation({ elementId, progress: 4, status: 'preparing' });
-
-    void (async () => {
-      try {
-        await services.backgroundRemovalService.prepareBackgroundRemoval(asset, {
-          onProgress: (progress) => {
-            if (backgroundPreparationSequenceRef.current !== sequence) return;
-            setBackgroundPreparation({
-              elementId,
-              progress: Math.max(4, Math.min(100, Math.round(progress))),
-              status: progress >= 100 ? 'ready' : 'preparing',
-            });
-          },
-        });
-        if (backgroundPreparationSequenceRef.current !== sequence) return;
-        setBackgroundPreparation({ elementId, progress: 100, status: 'ready' });
-      } catch {
-        if (backgroundPreparationSequenceRef.current !== sequence) return;
-        setBackgroundPreparation({ elementId, progress: 0, status: 'failed' });
-      }
-    })();
-  }
-
-  function getBackgroundSelectionPointSet(
-    elementId: string,
-    point: { x: number; y: number },
-    positive: boolean,
-  ) {
-    return [...(backgroundSelectionPointsRef.current[elementId] ?? []), { ...point, positive }];
-  }
-
-  function setBackgroundSelectionPointSet(elementId: string, points: BackgroundSelectionPoint[]) {
-    backgroundSelectionPointsRef.current = {
-      ...backgroundSelectionPointsRef.current,
-      [elementId]: points,
-    };
-    setBackgroundSelectionPoints(backgroundSelectionPointsRef.current);
-  }
-
-  function previewBackgroundSubject(elementId: string, subjectPoint: { x: number; y: number }) {
-    if (!backgroundSelectionMode || processingElementIds.includes(elementId)) return;
-    if (!isBackgroundPreparationReady(elementId)) return;
-    const element = project.elements[elementId];
-    if (!element || element.type !== 'image') return;
-    const asset = project.assets[element.assetId];
-    if (!asset) return;
-
-    const sequence = backgroundPreviewSequenceRef.current + 1;
-    backgroundPreviewSequenceRef.current = sequence;
-    if (backgroundPreviewTimeoutRef.current !== undefined) {
-      window.clearTimeout(backgroundPreviewTimeoutRef.current);
-    }
-    const points = getBackgroundSelectionPointSet(elementId, subjectPoint, true);
-    setBackgroundPreview((currentPreview) => {
-      const shouldKeepCurrentPreview = currentPreview?.elementId === elementId;
-      return {
-        elementId,
-        pending: true,
-        ...(shouldKeepCurrentPreview && currentPreview.maskUrl
-          ? { maskUrl: currentPreview.maskUrl }
-          : {}),
-        ...(shouldKeepCurrentPreview && currentPreview.score !== undefined
-          ? { score: currentPreview.score }
-          : {}),
-      };
-    });
-
-    backgroundPreviewTimeoutRef.current = window.setTimeout(() => {
-      void (async () => {
-        try {
-          const result = await services.backgroundRemovalService.previewBackgroundMask(asset, {
-            points,
-          });
-          if (backgroundPreviewSequenceRef.current !== sequence) return;
-          setBackgroundPreview({
-            elementId,
-            maskUrl: result.maskUrl,
-            pending: false,
-            score: result.score,
-          });
-        } catch {
-          if (backgroundPreviewSequenceRef.current !== sequence) return;
-          setBackgroundPreview((currentPreview) =>
-            currentPreview?.elementId === elementId
-              ? { ...currentPreview, pending: false }
-              : currentPreview,
-          );
-        }
-      })();
-    }, BACKGROUND_PREVIEW_DEBOUNCE_MS);
-  }
-
-  function refineBackgroundSubject(elementId: string, subjectPoint: { x: number; y: number }) {
-    if (!backgroundSelectionMode || processingElementIds.includes(elementId)) return;
-    if (!isBackgroundPreparationReady(elementId)) return;
-    const element = project.elements[elementId];
-    if (!element || element.type !== 'image') return;
-    const asset = project.assets[element.assetId];
-    if (!asset) return;
-    const points = getBackgroundSelectionPointSet(elementId, subjectPoint, true);
-    setBackgroundSelectionPointSet(elementId, points);
-    const sequence = backgroundPreviewSequenceRef.current + 1;
-    backgroundPreviewSequenceRef.current = sequence;
-    if (backgroundPreviewTimeoutRef.current !== undefined) {
-      window.clearTimeout(backgroundPreviewTimeoutRef.current);
-      backgroundPreviewTimeoutRef.current = undefined;
-    }
-    setBackgroundPreview((currentPreview) => {
-      const shouldKeepCurrentPreview = currentPreview?.elementId === elementId;
-      return {
-        elementId,
-        pending: true,
-        ...(shouldKeepCurrentPreview && currentPreview.maskUrl
-          ? { maskUrl: currentPreview.maskUrl }
-          : {}),
-        ...(shouldKeepCurrentPreview && currentPreview.score !== undefined
-          ? { score: currentPreview.score }
-          : {}),
-      };
-    });
-
-    void (async () => {
-      try {
-        const result = await services.backgroundRemovalService.previewBackgroundMask(asset, {
-          points,
-        });
-        if (backgroundPreviewSequenceRef.current !== sequence) return;
-        setBackgroundPreview({
-          elementId,
-          maskUrl: result.maskUrl,
-          pending: false,
-          score: result.score,
-        });
-      } catch {
-        if (backgroundPreviewSequenceRef.current !== sequence) return;
-        setBackgroundPreview({ elementId, pending: false });
-      }
-    })();
-  }
-
-  async function pickBackgroundSubject(elementId: string, subjectPoint: { x: number; y: number }) {
-    if (processingElementIds.includes(elementId)) return;
-    if (!isBackgroundPreparationReady(elementId)) return;
-    const element = project.elements[elementId];
-    if (!element || element.type !== 'image') return;
-    const asset = project.assets[element.assetId];
-    if (!asset) return;
-
-    setBackgroundSelectionMode(false);
-    setBackgroundSelectionNotice(undefined);
-    clearBackgroundPreview();
-    clearBackgroundPreparation();
-    const points = getBackgroundSelectionPointSet(elementId, subjectPoint, true);
-    clearBackgroundSelectionPoints(elementId);
-    setProcessingElementIds((currentIds) =>
-      currentIds.includes(elementId) ? currentIds : [...currentIds, elementId],
-    );
-    await waitForNextPaint();
-
-    try {
-      const result = await services.backgroundRemovalService.removeBackground(asset, { points });
-      commitProject(
-        (currentProject) => ({
-          ...currentProject,
-          assets: {
-            ...currentProject.assets,
-            [result.asset.id]: result.asset,
-          },
-          elements: {
-            ...currentProject.elements,
-            [elementId]: {
-              ...element,
-              assetId: result.asset.id,
-              ...(result.bounds
-                ? {
-                    x: element.x + element.width * result.bounds.x,
-                    y: element.y + element.height * result.bounds.y,
-                    width: Math.max(1, element.width * result.bounds.width),
-                    height: Math.max(1, element.height * result.bounds.height),
-                  }
-                : {}),
-            },
-          },
-          updatedAt: new Date().toISOString(),
-        }),
-        { selectedElementIds: [elementId] },
-      );
-    } finally {
-      setProcessingElementIds((currentIds) => currentIds.filter((id) => id !== elementId));
-    }
-  }
-
-  async function importImageFile(file: File) {
-    const assetType = getMediaAssetType(file);
-    if (assetType === 'video' && !isSupportedLocalVideoFile(file)) {
-      setMediaImportProgress({
-        detail:
-          'Video import supports MP4 and WebM files. Convert this clip to MP4 or WebM and import it again.',
-        title: 'Unsupported video format',
-        tone: 'error',
-      });
-      return;
-    }
-
-    setMediaImportProgress({
-      detail:
-        assetType === 'video'
-          ? 'Loading video metadata without copying the full file into memory.'
-          : assetType === 'gif'
-            ? 'Loading animated media from disk.'
-            : 'Loading image from disk.',
-      title: 'Loading media',
-      tone: 'loading',
-    });
-    await waitForNextPaint();
-
-    let imported = false;
-    let objectUrl: string | undefined;
-    try {
-      objectUrl =
-        assetType === 'video' || assetType === 'gif' ? createMediaObjectUrl(file) : undefined;
-      const mediaUrl = objectUrl ?? (await readImageFileAsDataUrl(file));
-      const mediaSize =
-        assetType === 'video' ? await readVideoSize(mediaUrl) : await readImageSize(mediaUrl);
-      const videoDurationSeconds =
-        assetType === 'video' ? (mediaSize as VideoSize).durationSeconds : undefined;
-      const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
-      if (!page) {
-        setMediaImportProgress(undefined);
-        return;
-      }
-
-      const assetId = createPrefixedId('asset');
-      const elementId = createPrefixedId(assetType);
-      const mediaName =
-        file.name.trim() ||
-        (assetType === 'video'
-          ? 'Pasted video'
-          : assetType === 'gif'
-            ? 'Pasted GIF'
-            : 'Pasted image');
-      const fittedMedia = fitImageWithinPage({
-        imageWidth: mediaSize.width,
-        imageHeight: mediaSize.height,
-        pageWidth: page.width,
-        pageHeight: page.height,
-      });
-
-      if (assetType === 'gif') {
-        commitProject(
-          (currentProject) =>
-            new basicCommands.AddMediaElementCommand(activePageId, {
-              asset: {
-                id: assetId,
-                type: 'gif',
-                name: mediaName,
-                mimeType: file.type || 'image/gif',
-                objectUrl: mediaUrl,
-              },
-              element: {
-                id: elementId,
-                type: 'gif',
-                assetId,
-                x: fittedMedia.x,
-                y: fittedMedia.y,
-                width: fittedMedia.width,
-                height: fittedMedia.height,
-                rotation: 0,
-                locked: false,
-                visible: true,
-                opacity: 1,
-                playing: true,
-              },
-            }).execute(currentProject),
-          { selectedElementIds: [elementId] },
-        );
-        imported = true;
-        return;
-      }
-
-      if (assetType === 'video') {
-        commitProject(
-          (currentProject) =>
-            new basicCommands.AddMediaElementCommand(activePageId, {
-              asset: {
-                id: assetId,
-                type: 'video',
-                name: mediaName,
-                mimeType: file.type || 'video/mp4',
-                objectUrl: mediaUrl,
-              },
-              element: {
-                id: elementId,
-                type: 'video',
-                assetId,
-                x: fittedMedia.x,
-                y: fittedMedia.y,
-                width: fittedMedia.width,
-                height: fittedMedia.height,
-                rotation: 0,
-                locked: false,
-                visible: true,
-                opacity: 1,
-                loop: false,
-                controls: true,
-                muted: true,
-                autoplayInPreview: true,
-                playing: true,
-                trimStartSeconds: 0,
-                ...(videoDurationSeconds !== undefined
-                  ? {
-                      durationSeconds: videoDurationSeconds,
-                      trimEndSeconds: videoDurationSeconds,
-                    }
-                  : {}),
-              },
-            }).execute(currentProject),
-          { selectedElementIds: [elementId] },
-        );
-        imported = true;
-        return;
-      }
-
-      commitProject(
-        (currentProject) =>
-          new basicCommands.AddImageElementCommand(activePageId, {
-            asset: {
-              id: assetId,
-              type: 'image',
-              name: mediaName,
-              mimeType: file.type || 'image/*',
-              objectUrl: mediaUrl,
-            },
-            element: {
-              id: elementId,
-              type: 'image',
-              assetId,
-              x: fittedMedia.x,
-              y: fittedMedia.y,
-              width: fittedMedia.width,
-              height: fittedMedia.height,
-              rotation: 0,
-              locked: false,
-              visible: true,
-              opacity: 1,
-            },
-        }).execute(currentProject),
-        { selectedElementIds: [elementId] },
-      );
-      imported = true;
-    } catch (error) {
-      setMediaImportProgress({
-        detail:
-          error instanceof Error
-            ? error.message
-            : 'The selected media file could not be loaded.',
-        title: 'Media import failed',
-        tone: 'error',
-      });
-      return;
-    } finally {
-      if (!imported && objectUrl && typeof URL.revokeObjectURL === 'function') {
-        URL.revokeObjectURL(objectUrl);
-      }
-      if (imported) setMediaImportProgress(undefined);
-    }
-  }
-
-  async function replaceVideoAsset(elementId: string, file: File) {
-    if (getMediaAssetType(file) !== 'video') return;
-    const dataUrl = await readImageFileAsDataUrl(file);
-    const mediaSize = await readVideoSize(dataUrl);
-    const videoDurationSeconds = mediaSize.durationSeconds;
-    const assetId = createPrefixedId('asset');
-    const mediaName = file.name.trim() || 'Replacement video';
-
-    commitProject(
-      (currentProject) =>
-        new basicCommands.ReplaceVideoAssetCommand(
-          elementId,
-          {
-            id: assetId,
-            type: 'video',
-            name: mediaName,
-            mimeType: file.type || 'video/mp4',
-            objectUrl: dataUrl,
-          },
-          videoDurationSeconds !== undefined ? { durationSeconds: videoDurationSeconds } : {},
-        ).execute(currentProject),
-      { selectedElementIds: [elementId] },
-    );
-  }
-
-  function addRecentStockMedia(item: StockMediaItem) {
-    setStockMediaRecentItems((currentItems) => [
-      item,
-      ...currentItems.filter(
-        (currentItem) => currentItem.provider !== item.provider || currentItem.id !== item.id,
-      ),
-    ].slice(0, STOCK_MEDIA_RECENT_LIMIT));
-  }
-
-  async function searchStockImages(query: string) {
-    setStockMediaSearching((current) => ({ ...current, images: true }));
-    setStockMediaError((current) => ({ ...current, images: undefined }));
-    try {
-      const results = await services.stockMediaService.searchImages(query);
-      setStockImageResults(results);
-      setStockMediaError((current) => ({ ...current, images: undefined }));
-    } catch {
-      setStockImageResults([]);
-      setStockMediaError((current) => ({
-        ...current,
-        images: 'API Key is invalid',
-      }));
-    } finally {
-      setStockMediaSearching((current) => ({ ...current, images: false }));
-    }
-  }
-
-  async function searchStockGifs(query: string) {
-    setStockMediaSearching((current) => ({ ...current, gifs: true }));
-    setStockMediaError((current) => ({ ...current, gifs: undefined }));
-    try {
-      const results = await services.stockMediaService.searchGifs(query);
-      setStockGifResults(results);
-      setStockMediaError((current) => ({ ...current, gifs: undefined }));
-    } catch {
-      setStockGifResults([]);
-      setStockMediaError((current) => ({
-        ...current,
-        gifs: 'API Key is invalid',
-      }));
-    } finally {
-      setStockMediaSearching((current) => ({ ...current, gifs: false }));
-    }
-  }
-
-  async function insertRemoteImage(item: StockMediaItem) {
-    if (item.kind !== 'image') return;
-    const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
-    if (!page) return;
-    await services.stockMediaService.trackImageDownload(item).catch(() => undefined);
-
-    const assetId = createPrefixedId('asset');
-    const elementId = createPrefixedId('image');
-    const fittedMedia = fitImageWithinPage({
-      imageWidth: item.width,
-      imageHeight: item.height,
-      pageWidth: page.width,
-      pageHeight: page.height,
-    });
-
-    commitProject(
-      (currentProject) =>
-        new basicCommands.AddImageElementCommand(activePageId, {
-          asset: {
-            id: assetId,
-            type: 'image',
-            name: item.title,
-            mimeType: 'image/jpeg',
-            objectUrl: item.mediaUrl,
-            storage: 'remote',
-          },
-          element: {
-            id: elementId,
-            type: 'image',
-            assetId,
-            x: fittedMedia.x,
-            y: fittedMedia.y,
-            width: fittedMedia.width,
-            height: fittedMedia.height,
-            rotation: 0,
-            locked: false,
-            visible: true,
-            opacity: 1,
-          },
-        }).execute(currentProject),
-      { selectedElementIds: [elementId] },
-    );
-    addRecentStockMedia(item);
-  }
-
-  function commitRemoteGifElement(item: StockMediaItem) {
-    if (item.kind !== 'gif') return;
-    const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
-    if (!page) return;
-
-    const assetId = createPrefixedId('asset');
-    const elementId = createPrefixedId('gif');
-    const fittedMedia = fitImageWithinPage({
-      imageWidth: item.width,
-      imageHeight: item.height,
-      pageWidth: page.width,
-      pageHeight: page.height,
-    });
-
-    commitProject(
-      (currentProject) =>
-        new basicCommands.AddMediaElementCommand(activePageId, {
-          asset: {
-            id: assetId,
-            type: 'gif',
-            name: item.title,
-            mimeType: 'image/gif',
-            objectUrl: item.mediaUrl,
-            storage: 'remote',
-          },
-          element: {
-            id: elementId,
-            type: 'gif',
-            assetId,
-            x: fittedMedia.x,
-            y: fittedMedia.y,
-            width: fittedMedia.width,
-            height: fittedMedia.height,
-            rotation: 0,
-            locked: false,
-            visible: true,
-            opacity: 1,
-            playing: true,
-          },
-        }).execute(currentProject),
-      { selectedElementIds: [elementId] },
-    );
-    addRecentStockMedia(item);
-  }
-
-  async function insertRemoteGif(item: StockMediaItem) {
-    if (item.kind !== 'gif') return;
-    if (!item.videoUrl) {
-      commitRemoteGifElement(item);
-      return;
-    }
-    const videoUrl = item.videoUrl;
-    const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
-    if (!page) return;
-
-    try {
-      const mediaSize = await readVideoSize(videoUrl);
-      const assetId = createPrefixedId('asset');
-      const elementId = createPrefixedId('video');
-      const fittedMedia = fitImageWithinPage({
-        imageWidth: item.width || mediaSize.width,
-        imageHeight: item.height || mediaSize.height,
-        pageWidth: page.width,
-        pageHeight: page.height,
-      });
-
-      commitProject(
-        (currentProject) =>
-          new basicCommands.AddMediaElementCommand(activePageId, {
-            asset: {
-              id: assetId,
-              type: 'video',
-              name: item.title,
-              mimeType: 'video/mp4',
-              objectUrl: videoUrl,
-              storage: 'remote',
-            },
-            element: {
-              id: elementId,
-              type: 'video',
-              assetId,
-              x: fittedMedia.x,
-              y: fittedMedia.y,
-              width: fittedMedia.width,
-              height: fittedMedia.height,
-              rotation: 0,
-              locked: false,
-              visible: true,
-              opacity: 1,
-              loop: true,
-              controls: true,
-              muted: true,
-              autoplayInPreview: true,
-              trimStartSeconds: 0,
-              repeatMode: 'loop',
-              ...(mediaSize.durationSeconds !== undefined
-                ? {
-                    durationSeconds: mediaSize.durationSeconds,
-                    trimEndSeconds: mediaSize.durationSeconds,
-                  }
-                : {}),
-            },
-          }).execute(currentProject),
-        { selectedElementIds: [elementId] },
-      );
-      addRecentStockMedia(item);
-    } catch {
-      commitRemoteGifElement(item);
-    }
-  }
-
-  function insertStockMedia(item: StockMediaItem) {
-    if (item.kind === 'gif') {
-      void insertRemoteGif(item);
-      return;
-    }
-    void insertRemoteImage(item);
-  }
-
   function updateMediaPlayback(elementId: string, patch: MediaPlaybackPatch) {
     commitProject((currentProject) =>
       new basicCommands.UpdateMediaPlaybackCommand(elementId, patch).execute(currentProject),
     );
-  }
-
-  function clearMediaImportProgress() {
-    setMediaImportProgress(undefined);
   }
 
   return {

@@ -1,18 +1,11 @@
 import { Peer, type MediaConnection, type PeerOptions } from 'peerjs';
 import { presenterRemoteDebugLog } from './debug-log';
+import { presenterRemotePeerOpen } from './peer-open.ts';
 
 export interface PresenterRemotePeerStreamPublisherOptions {
   peerFactory?: (() => Peer) | undefined;
   peerOptions?: PeerOptions | undefined;
   stream: MediaStream;
-}
-
-function oncePeerOpen(peer: Peer) {
-  if (peer.open && peer.id) return Promise.resolve(peer.id);
-  return new Promise<string>((resolve, reject) => {
-    peer.on('open', resolve);
-    peer.on('error', reject);
-  });
 }
 
 export class PresenterRemotePeerStreamPublisher {
@@ -49,7 +42,7 @@ export class PresenterRemotePeerStreamPublisher {
       call.answer(this.options.stream);
       presenterRemoteDebugLog.info('Stream publisher answered media call.');
     });
-    const peerId = await oncePeerOpen(peer);
+    const peerId = await presenterRemotePeerOpen.waitForPeerId(peer);
     presenterRemoteDebugLog.info('Stream publisher peer opened.', { peerId });
     return peerId;
   }

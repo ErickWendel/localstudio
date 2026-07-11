@@ -32,7 +32,8 @@ import type { CreateImagePromptOptions } from '../media/imagePromptOptions';
 import { localMediaImportConfig } from '../media/localMediaImportConfig';
 import { LayersPanel } from './LayersPanel';
 import { TextPanel } from './TextPanel';
-import type { RightPanelTab, StockMediaErrorState, TextPreset } from '../state/useEditorViewModel';
+import type { RightPanelTab, TextPreset } from '../state/useEditorViewModel';
+import type { StockMediaErrorState } from '../state/use-stock-media-library';
 
 interface LeftToolPanelProps {
   activeTab: RightPanelTab;

@@ -68,6 +68,9 @@ test.describe('editor text theme and layout journey', () => {
     expect(canvasBox).not.toBeNull();
     await page.mouse.click(canvasBox!.x + canvasBox!.width / 2, canvasBox!.y + canvasBox!.height / 2);
     await expect(page.getByRole('button', { name: 'Open layout picker, current layout Blank' })).toBeVisible();
+    await page.getByRole('button', { name: 'Open layout picker, current layout Blank' }).click();
+    await expect(page.getByRole('region', { name: 'Choose a layout' })).toBeVisible();
+    await expect(page.getByText('No imported layouts yet.')).toBeVisible();
     await page.getByLabel('Slide background color').fill('#ffffff');
     await expect(page.getByLabel('Slide background color')).toHaveValue('#ffffff');
     await expect(page.getByLabel('Slide fill type')).toHaveValue('color');

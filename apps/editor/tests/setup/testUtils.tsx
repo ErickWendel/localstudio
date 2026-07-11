@@ -105,6 +105,27 @@ class ResizeObserverMock implements ResizeObserver {
 
 globalThis.ResizeObserver = ResizeObserverMock;
 
+Object.defineProperties(HTMLMediaElement.prototype, {
+  load: {
+    configurable: true,
+    value() {
+      return undefined;
+    },
+  },
+  pause: {
+    configurable: true,
+    value() {
+      return undefined;
+    },
+  },
+  play: {
+    configurable: true,
+    value() {
+      return Promise.resolve();
+    },
+  },
+});
+
 class ImageMock extends EventTarget {
   naturalWidth = 100;
   naturalHeight = 50;

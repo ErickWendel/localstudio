@@ -3,6 +3,12 @@ import type { ProjectDocument } from '../../../domain/documents/model';
 import type { MirrorState, PersistenceStorageMode } from '../../../services/contracts/interfaces';
 import type { OperationNoticeState } from '../state/useEditorViewModel';
 import type { TranslationLanguageOption } from '../translation/translationLanguages';
+import { DeckTranslationControl } from './DeckTranslationControl';
+import { GitHubToolbarLink } from './GitHubToolbarLink';
+import { ProjectPlayControl } from './ProjectPlayControl';
+import { ToolbarMirrorButton } from './ToolbarMirrorButton';
+import { ToolbarOperationNotice } from './ToolbarOperationNotice';
+import { ToolbarPersistenceButton } from './ToolbarPersistenceButton';
 
 interface TopToolbarProps {
   project: ProjectDocument;
@@ -85,47 +91,6 @@ interface HeaderMenuSubmenu {
 type HeaderMenuAction = HeaderMenuActionItem | HeaderMenuSeparator | HeaderMenuSubmenu;
 
 const menuLabels: HeaderMenu[] = ['File', 'Edit', 'View', 'Help'];
-const githubUrl = 'https://github.com/ErickWendel/localstudio';
-const githubStarCount = 9999;
-
-function useAnimatedStarCount(target: number) {
-  const [count, setCount] = useState(target);
-
-  useEffect(() => {
-    const startCount = Math.max(0, target - 999);
-    const durationMs = 2800;
-    const holdMs = 1400;
-    const cycleMs = durationMs + holdMs;
-    let animationFrame = 0;
-    const start = performance.now();
-
-    const tick = (now: number) => {
-      const elapsed = (now - start) % cycleMs;
-      const progress = Math.min(elapsed / durationMs, 1);
-      const easedProgress = 1 - Math.pow(1 - progress, 3);
-      setCount(Math.round(startCount + (target - startCount) * easedProgress));
-
-      animationFrame = requestAnimationFrame(tick);
-    };
-
-    animationFrame = requestAnimationFrame(tick);
-
-    return () => cancelAnimationFrame(animationFrame);
-  }, [target]);
-
-  return count;
-}
-
-function GitHubLogo() {
-  return (
-    <svg className="github-toolbar-logo" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-      <path
-        fill="currentColor"
-        d="M8 0C3.58 0 0 3.67 0 8.2c0 3.62 2.29 6.7 5.47 7.78.4.07.55-.18.55-.39 0-.2-.01-.84-.01-1.53-2.01.38-2.53-.5-2.69-.96-.09-.24-.48-.96-.82-1.15-.28-.16-.68-.55-.01-.56.63-.01 1.08.59 1.23.84.72 1.24 1.87.89 2.33.68.07-.53.28-.89.51-1.1-1.78-.21-3.64-.91-3.64-4.04 0-.89.31-1.62.82-2.19-.08-.21-.36-1.04.08-2.16 0 0 .67-.22 2.2.84A7.4 7.4 0 0 1 8 3.99c.68 0 1.36.09 2 .27 1.53-1.06 2.2-.84 2.2-.84.44 1.12.16 1.95.08 2.16.51.57.82 1.3.82 2.19 0 3.14-1.87 3.83-3.65 4.04.29.26.54.75.54 1.52 0 1.1-.01 1.98-.01 2.25 0 .21.15.47.55.39A8.13 8.13 0 0 0 16 8.2C16 3.67 12.42 0 8 0Z"
-      />
-    </svg>
-  );
-}
 
 export function TopToolbar({
   project,
@@ -186,14 +151,13 @@ export function TopToolbar({
 }: TopToolbarProps) {
   const [openMenu, setOpenMenu] = useState<HeaderMenu | null>(null);
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
-  const [playMenuOpen, setPlayMenuOpen] = useState(false);
   const [translationMenuOpen, setTranslationMenuOpen] = useState(false);
+  const [playMenuOpen, setPlayMenuOpen] = useState(false);
   const [isEditingProjectName, setIsEditingProjectName] = useState(false);
   const [projectNameDraft, setProjectNameDraft] = useState(project.name);
   const projectNameInputRef = useRef<HTMLInputElement>(null);
   const toolbarMenuRef = useRef<HTMLElement>(null);
   const translationMenuRef = useRef<HTMLDivElement>(null);
-  const stars = useAnimatedStarCount(githubStarCount);
 
   useEffect(() => {
     if (!isEditingProjectName) return;
@@ -245,26 +209,6 @@ export function TopToolbar({
   function closeMenu() {
     setOpenMenu(null);
     setOpenSubmenu(null);
-  }
-
-  function startPresenterMode(options?: { fromBeginning?: boolean }) {
-    if (options) {
-      onStartPresenterMode?.(options);
-    } else {
-      onStartPresenterMode?.();
-    }
-    setPlayMenuOpen(false);
-    setTranslationMenuOpen(false);
-  }
-
-  function startDefaultPresentation() {
-    if (onOpenPresenterView) {
-      onOpenPresenterView();
-    } else {
-      onStartPresenterMode?.();
-    }
-    setPlayMenuOpen(false);
-    setTranslationMenuOpen(false);
   }
 
   function commitProjectName() {
@@ -360,24 +304,6 @@ export function TopToolbar({
         timeStyle: 'short',
       }).format(new Date(lastEditedAt))}`
     : 'No saved versions yet';
-  const persistenceLabel = !persistenceAvailable
-    ? 'Persistence unavailable'
-    : persistenceMode === 'opfs'
-      ? persistenceEnabled
-        ? 'Browser storage enabled'
-        : 'Browser storage disabled'
-      : persistenceEnabled
-        ? 'Persistence enabled'
-        : 'Persistence disabled';
-  const persistenceTitle = !persistenceAvailable
-    ? 'Local project persistence is not available in this browser.'
-    : persistenceMode === 'opfs'
-      ? persistenceEnabled
-        ? 'Browser-private project storage is enabled. Files are stored by this browser profile and are not visible in Finder.'
-        : 'Save this deck in browser-private storage. Files are scoped to this browser profile and are not visible in Finder.'
-      : persistenceEnabled
-        ? 'Local folder persistence is enabled'
-        : 'Save this deck to a local folder';
   const mirrorLabel = !persistenceEnabled
     ? 'Unsaved deck'
     : !mirrorState.enabled
@@ -389,37 +315,7 @@ export function TopToolbar({
           : mirrorState.status === 'synced'
             ? 'Mirrored'
             : 'Local only';
-  const mirrorStatusDisabled = !persistenceEnabled;
-  const mirrorStatusLabel = mirrorStatusDisabled
-    ? 'Mirror disabled'
-    : !mirrorState.enabled
-      ? 'Mirror disabled'
-      : mirrorState.status === 'syncing'
-        ? 'Mirror syncing'
-        : mirrorState.status === 'synced'
-          ? 'Mirror up to date'
-          : mirrorState.status === 'failed'
-            ? 'Mirror failed'
-            : 'Mirror ready';
-  const mirrorStatusClassName = [
-    'stitch-icon-button',
-    'mirror-status-button',
-    mirrorStatusDisabled || !mirrorState.enabled ? 'mirror-disabled' : '',
-    !mirrorStatusDisabled && mirrorState.status === 'syncing' ? 'mirror-syncing' : '',
-    !mirrorStatusDisabled && mirrorState.status === 'synced' ? 'mirror-synced' : '',
-    !mirrorStatusDisabled && mirrorState.status === 'failed' ? 'mirror-failed' : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
   const shareTitle = 'Share';
-  const deckTranslateButtonClassName = [
-    'stitch-icon-button',
-    'deck-translate-button',
-    isTranslatingDeck ? 'deck-translate-button-active' : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
-
   return (
     <header className="top-toolbar" data-tour-id="top-toolbar">
       <div className="toolbar-left">
@@ -437,8 +333,8 @@ export function TopToolbar({
                 type="button"
                 data-tour-id={`${item.toLowerCase()}-menu-button`}
                 onClick={() => {
-                  setPlayMenuOpen(false);
                   setTranslationMenuOpen(false);
+                  setPlayMenuOpen(false);
                   setOpenSubmenu(null);
                   setOpenMenu((current) => (current === item ? null : item));
                 }}
@@ -558,81 +454,16 @@ export function TopToolbar({
               {project.name}
             </button>
           )}
-          <div className="project-play-shell">
-            <button
-              className="project-play-button project-play-main"
-              type="button"
-              aria-label="Play presentation"
-              data-tour-id="play-presentation"
-              title="Open presenter view"
-              onClick={startDefaultPresentation}
-            >
-              <span className="material-symbols-outlined" aria-hidden="true">
-                play_arrow
-              </span>
-              <span>Play</span>
-            </button>
-            <button
-              className="project-play-button project-play-menu-button"
-              type="button"
-              aria-expanded={playMenuOpen}
-              aria-label="Presentation play options"
-              title="Presentation play options"
-              onClick={() => {
-                setOpenMenu(null);
-                setTranslationMenuOpen(false);
-                setPlayMenuOpen((current) => !current);
-              }}
-            >
-              <span className="material-symbols-outlined" aria-hidden="true">
-                keyboard_arrow_down
-              </span>
-            </button>
-            {playMenuOpen ? (
-              <div
-                className="toolbar-dropdown project-play-dropdown"
-                role="menu"
-                aria-label="Presentation play menu"
-              >
-                <button
-                  className="toolbar-dropdown-item project-play-dropdown-item"
-                  role="menuitem"
-                  type="button"
-                  onClick={() => startPresenterMode()}
-                >
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    fullscreen
-                  </span>
-                  <span>Present in fullscreen</span>
-                </button>
-                <button
-                  className="toolbar-dropdown-item project-play-dropdown-item"
-                  role="menuitem"
-                  type="button"
-                  onClick={() => {
-                    setPlayMenuOpen(false);
-                    onOpenPresenterView?.();
-                  }}
-                >
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    co_present
-                  </span>
-                  <span>Presenter view</span>
-                </button>
-                <button
-                  className="toolbar-dropdown-item project-play-dropdown-item"
-                  role="menuitem"
-                  type="button"
-                  onClick={() => startPresenterMode({ fromBeginning: true })}
-                >
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    skip_previous
-                  </span>
-                  <span>Play from beginning</span>
-                </button>
-              </div>
-            ) : null}
-          </div>
+          <ProjectPlayControl
+            isMenuOpen={playMenuOpen}
+            onMenuOpenChange={(isOpen) => {
+              setOpenMenu(null);
+              setTranslationMenuOpen(false);
+              setPlayMenuOpen(isOpen);
+            }}
+            onOpenPresenterView={onOpenPresenterView}
+            onStartPresenterMode={onStartPresenterMode}
+          />
           <span className="local-only-badge" title={mirrorState.error}>
             {mirrorLabel}
           </span>
@@ -640,85 +471,23 @@ export function TopToolbar({
       </div>
       <div className="toolbar-right">
         <div className="toolbar-icon-group" aria-label="Editing actions">
-          <button
-            className={
-              !persistenceAvailable
-                ? 'stitch-icon-button persistence-off persistence-unavailable'
-                : persistenceEnabled
-                  ? 'stitch-icon-button persistence-on'
-                  : persistenceAttention
-                    ? 'stitch-icon-button persistence-off persistence-attention'
-                    : 'stitch-icon-button persistence-off'
-            }
-            disabled={!persistenceAvailable}
-            title={persistenceTitle}
-            type="button"
-            aria-label={persistenceLabel}
-            data-tour-id="storage-toggle"
-            onClick={() => {
-              if (!persistenceAvailable) return;
-              onPersistenceToggle?.(!persistenceEnabled);
-            }}
-          >
-            <span className="material-symbols-outlined" aria-hidden="true">
-              {persistenceEnabled ? 'cloud_done' : 'cloud_off'}
-            </span>
-            {!persistenceAvailable ? (
-              <span className="persistence-unavailable-x" aria-hidden="true">
-                ×
-              </span>
-            ) : null}
-          </button>
-          {operationNotice ? (
-            <div
-              className={`operation-notice operation-notice-${operationNotice.tone}`}
-              role="status"
-            >
-              <span className="operation-notice-message">{operationNotice.message}</span>
-              {operationNotice.detail ? (
-                <span className="operation-notice-detail">{operationNotice.detail}</span>
-              ) : null}
-              {operationNotice.progress ? (
-                <span
-                  className="operation-notice-progress"
-                  aria-label={`${operationNotice.progress.current} of ${operationNotice.progress.total}`}
-                >
-                  <span
-                    className="operation-notice-progress-fill"
-                    style={{
-                      width: `${Math.round(
-                        (operationNotice.progress.current / operationNotice.progress.total) * 100,
-                      )}%`,
-                    }}
-                  />
-                </span>
-              ) : null}
-            </div>
-          ) : null}
+          <ToolbarPersistenceButton
+            persistenceAttention={persistenceAttention}
+            persistenceAvailable={persistenceAvailable}
+            persistenceEnabled={persistenceEnabled}
+            persistenceMode={persistenceMode}
+            onPersistenceToggle={onPersistenceToggle}
+          />
+          {operationNotice ? <ToolbarOperationNotice operationNotice={operationNotice} /> : null}
           {localProjectSetupPanel}
-          <button
-            className={mirrorStatusClassName}
-            disabled={mirrorStatusDisabled}
-            title={mirrorState.error ?? mirrorStatusLabel}
-            type="button"
-            aria-label={mirrorStatusLabel}
-            data-tour-id="mirror-status"
-            onClick={() => {
-              if (mirrorDisabledBySettings) {
-                onOpenMirrorSettings?.();
-                return;
-              }
-              if (mirrorState.enabled) {
-                onMirrorToggle?.(false);
-                return;
-              }
-              onMirrorNow?.();
-            }}
-          >
-            <span className="material-symbols-outlined" aria-hidden="true">
-              {mirrorState.status === 'syncing' ? 'sync' : 'cloud_sync'}
-            </span>
-          </button>
+          <ToolbarMirrorButton
+            mirrorDisabledBySettings={mirrorDisabledBySettings}
+            mirrorState={mirrorState}
+            persistenceEnabled={persistenceEnabled}
+            onMirrorNow={onMirrorNow}
+            onMirrorToggle={onMirrorToggle}
+            onOpenMirrorSettings={onOpenMirrorSettings}
+          />
           <button
             className="stitch-icon-button history-save-applied"
             disabled={!persistenceEnabled || !onOpenVersionHistory}
@@ -756,76 +525,24 @@ export function TopToolbar({
               redo
             </span>
           </button>
-          <div className="deck-translation-shell" ref={translationMenuRef}>
-            <button
-              className={`${deckTranslateButtonClassName} deck-translation-main`}
-              disabled={!canTranslateDeck || !onTranslateDeck}
-              title={deckTranslationStatus ?? 'Translate deck using the selected target language'}
-              type="button"
-              aria-label="Translate deck"
-              data-tour-id="translate-deck"
-              onClick={onTranslateDeck}
-            >
-              <span className="material-symbols-outlined" aria-hidden="true">
-                translate
-              </span>
-            </button>
-            <button
-              className="stitch-icon-button deck-translation-menu-button"
-              type="button"
-              aria-expanded={translationMenuOpen}
-              aria-label="Translation path options"
-              title="Translation path options"
-              onClick={() => {
-                setOpenMenu(null);
-                setPlayMenuOpen(false);
-                setTranslationMenuOpen((current) => !current);
-              }}
-            >
-              <span className="material-symbols-outlined" aria-hidden="true">
-                keyboard_arrow_down
-              </span>
-            </button>
-            {translationMenuOpen ? (
-              <div className="translation-path-dropdown" role="group" aria-label="Translation path">
-                <label className="translation-path-field ew-field-scope">
-                  <span>From</span>
-                  <select
-                    value={translationSourceLanguage}
-                    aria-label="Translate from"
-                    onChange={(event) => onTranslationSourceLanguageChange?.(event.target.value)}
-                  >
-                    {translationLanguageOptions.map((option) => (
-                      <option value={option.code} key={option.code}>
-                        {option.label} ({option.code}) {option.flag}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="translation-path-field ew-field-scope">
-                  <span>To</span>
-                  <select
-                    value={translationTargetLanguage}
-                    aria-label="Translate to"
-                    onChange={(event) => onTranslationTargetLanguageChange?.(event.target.value)}
-                  >
-                    <option value="">Choose language</option>
-                    {translationLanguageOptions.map((option) => (
-                      <option value={option.code} key={option.code}>
-                        {option.label} ({option.code}) {option.flag}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            ) : null}
-          </div>
-          {deckTranslationStatus ? (
-            <div className="deck-translation-status" role="status" aria-live="polite">
-              <span className="deck-translation-status-orbit" aria-hidden="true" />
-              <span className="ew-truncate">{deckTranslationStatus}</span>
-            </div>
-          ) : null}
+          <DeckTranslationControl
+            canTranslateDeck={canTranslateDeck}
+            deckTranslationStatus={deckTranslationStatus}
+            isMenuOpen={translationMenuOpen}
+            isTranslatingDeck={isTranslatingDeck}
+            menuRef={translationMenuRef}
+            translationLanguageOptions={translationLanguageOptions}
+            translationSourceLanguage={translationSourceLanguage}
+            translationTargetLanguage={translationTargetLanguage}
+            onMenuOpenChange={(isOpen) => {
+              setOpenMenu(null);
+              setPlayMenuOpen(false);
+              setTranslationMenuOpen(isOpen);
+            }}
+            onTranslationSourceLanguageChange={onTranslationSourceLanguageChange}
+            onTranslationTargetLanguageChange={onTranslationTargetLanguageChange}
+            onTranslateDeck={onTranslateDeck}
+          />
         </div>
         <button
           className="language-chip"
@@ -837,19 +554,7 @@ export function TopToolbar({
           </span>
           <span>{language}</span>
         </button>
-        <a
-          className="github-toolbar-link"
-          href={githubUrl}
-          target="_blank"
-          rel="noreferrer"
-          aria-label="Star LocalStudio.dev on GitHub"
-          title="Star LocalStudio.dev on GitHub"
-        >
-          <GitHubLogo />
-          <span className="github-toolbar-count" aria-label={`${githubStarCount} GitHub stars`}>
-            {stars}
-          </span>
-        </a>
+        <GitHubToolbarLink />
         <button
           className="export-button font-orbitron"
           disabled={!onShare}

@@ -232,7 +232,9 @@ describe('JoystickApp', () => {
     );
 
     expect(await screen.findByLabelText('Connected (1)')).toBeInTheDocument();
-    expect(getTestLocalStorage().getItem('localstudio.joystick.lastCode')).toBe('ABCD-1234');
+    await waitFor(() => {
+      expect(getTestLocalStorage().getItem('localstudio.joystick.lastCode')).toBe('ABCD-1234');
+    });
     expect(
       JSON.parse(getTestLocalStorage().getItem('localstudio.joystick.approvedCodes') ?? '[]'),
     ).toEqual(['ABCD-1234']);

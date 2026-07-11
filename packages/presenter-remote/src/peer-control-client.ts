@@ -6,6 +6,7 @@ import {
   type PresenterRemoteState,
 } from './protocol';
 import { presenterRemoteDebugLog } from './debug-log';
+import { presenterRemotePeerOpen } from './peer-open.ts';
 
 export interface PresenterRemotePeerControlClientOptions {
   connectionTimeoutMs?: number | undefined;
@@ -15,20 +16,6 @@ export interface PresenterRemotePeerControlClientOptions {
   peerFactory?: (() => Peer) | undefined;
   peerOptions?: PeerOptions | undefined;
   presenterPeerId: string;
-}
-
-function oncePeerOpen(peer: Peer) {
-  if (peer.open) return Promise.resolve();
-  return new Promise<void>((resolve, reject) => {
-    peer.on('open', () => resolve());
-    peer.on('error', reject);
-  });
-}
-
-function rejectAfter(timeoutMs: number) {
-  return new Promise<never>((_, reject) => {
-    window.setTimeout(() => reject(new Error('PeerJS connection timed out.')), timeoutMs);
-  });
 }
 
 export class PresenterRemotePeerControlClient {
@@ -54,12 +41,15 @@ export class PresenterRemotePeerControlClient {
       presenterPeerId: this.options.presenterPeerId,
     });
     peer.on('error', (error) => presenterRemoteDebugLog.error('Control client peer error.', error));
-    await Promise.race([oncePeerOpen(peer), rejectAfter(timeoutMs)]).catch((error: unknown) => {
-      if (this.closed) return;
-      presenterRemoteDebugLog.error('Control client peer failed to open.', error);
-      this.options.onStatusChange?.('failed');
-      throw error;
-    });
+    await Promise.race([
+      presenterRemotePeerOpen.waitForPeer(peer),
+      presenterRemotePeerOpen.rejectAfter(timeoutMs, 'PeerJS connection timed out.'),
+    ]).catch((error: unknown) => {
+        if (this.closed) return;
+        presenterRemoteDebugLog.error('Control client peer failed to open.', error);
+        this.options.onStatusChange?.('failed');
+        throw error;
+      });
     if (this.closed) {
       peer.destroy();
       return;

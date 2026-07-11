@@ -6,7 +6,7 @@ const getServer = withIsolatedDevServer(test);
 
 test.describe('editor version restore journey', () => {
   test('saves multiple browser-private versions and restores an older one', async ({ page }) => {
-    await page.addInitScript(installFakeOpfs);
+    await installFakeOpfs(page);
 
     const editor = new EditorAppPage(page, getServer().baseURL);
     await editor.gotoNewProject();

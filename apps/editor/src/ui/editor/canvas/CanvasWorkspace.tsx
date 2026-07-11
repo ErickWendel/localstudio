@@ -12,9 +12,7 @@ import type Konva from 'konva';
 import {
   Circle,
   Group,
-  Image as KonvaImage,
   Layer,
-  Line,
   Rect,
   Stage,
   Text,
@@ -33,8 +31,6 @@ import type {
   ImageElement,
   ProjectDocument,
   SelectionState,
-  ShapeElement,
-  ShapeLineEndpoint,
   VideoElement,
 } from '../../../domain/documents/model';
 import { getNormalizedElementPoint } from '../background-selection/backgroundSelection';
@@ -43,10 +39,17 @@ import { imageCrop } from './imageCrop';
 import type { ImageCropHandle } from './imageCrop';
 import { canvasWorkspaceUtils } from './canvasWorkspaceUtils';
 import { movieStartPlayback } from '../media/movieStartPlayback';
-import {
-  animationPresetEngine,
-  type AnimationPresetRenderState,
-} from '../animation/animationPresetEngine';
+import { animationPresetEngine } from '../animation/animationPresetEngine';
+import { BackgroundSelectionPreview } from './BackgroundSelectionPreview';
+import { CanvasImageElement } from './CanvasImageElement';
+import { CanvasMediaElement } from './CanvasMediaElement';
+import { CanvasReadOnlyMediaElement } from './CanvasReadOnlyMediaElement';
+import { CanvasShapeElement } from './CanvasShapeElement';
+import { CanvasStatusHint } from './CanvasStatusHint';
+import { CanvasDragGuide } from './CanvasDragGuide';
+import { CropFrameOverlay } from './CropFrameOverlay';
+import type { CommonElementProps, ElementAnimationRenderState } from './canvas-element-props';
+import { shapeLineDraw } from './shape-line-draw';
 
 const TEXT_FRAME_PADDING = 6;
 
@@ -117,41 +120,6 @@ interface CanvasWorkspaceProps {
   onUpdateTextContent?: ((elementId: string, text: string) => void) | undefined;
 }
 
-interface CommonElementProps {
-  draggable: boolean;
-  height: number;
-  name?: string;
-  offsetX: number;
-  offsetY: number;
-  opacity: number;
-  rotation: number;
-  scaleX: number;
-  scaleY: number;
-  skewX: number;
-  skewY: number;
-  width: number;
-  x: number;
-  y: number;
-  onClick: (event: Konva.KonvaEventObject<MouseEvent>) => void;
-  onContextMenu: (event: Konva.KonvaEventObject<PointerEvent>) => void;
-  onDblClick: () => void;
-  onDblTap: () => void;
-  onDragEnd: (event: Konva.KonvaEventObject<DragEvent>) => void;
-  onDragMove: (event: Konva.KonvaEventObject<DragEvent>) => void;
-  onMouseEnter: (event: Konva.KonvaEventObject<MouseEvent>) => void;
-  onMouseLeave: (event: Konva.KonvaEventObject<MouseEvent>) => void;
-  onMouseMove: (event: Konva.KonvaEventObject<MouseEvent>) => void;
-  onTap: () => void;
-  onTransformEnd: (event: Konva.KonvaEventObject<Event>) => void;
-}
-
-interface ElementAnimationRenderState {
-  activeBuild: ElementAnimationPreviewBuild | undefined;
-  hidden: boolean;
-  preset: AnimationPresetRenderState | undefined;
-  progress: number;
-}
-
 interface MarqueeSelection {
   anchor: { x: number; y: number };
   current: { x: number; y: number };
@@ -168,10 +136,6 @@ function clampAnimationProgress(value: number | undefined) {
   return Math.max(0, Math.min(1, value ?? 0));
 }
 
-function easeOutCubic(value: number) {
-  return 1 - Math.pow(1 - value, 3);
-}
-
 function getAnimationOpacity(baseOpacity: number, state: ElementAnimationRenderState) {
   if (state.activeBuild?.mediaAction === 'play') return baseOpacity;
   if (state.activeBuild) return baseOpacity * (state.preset?.opacity ?? 1);
@@ -181,75 +145,6 @@ function getAnimationOpacity(baseOpacity: number, state: ElementAnimationRenderS
 function getTypedText(text: string, state: ElementAnimationRenderState) {
   if (state.activeBuild?.effect !== 'keyboard-typing') return text;
   return text.slice(0, Math.ceil(text.length * state.progress));
-}
-
-function getLineDrawPoints(
-  points: number[],
-  progress: number,
-  direction: ElementAnimationPreviewBuild['lineDrawDirection'],
-) {
-  if (points.length < 4) return points;
-  const startX = points[0] ?? 0;
-  const startY = points[1] ?? 0;
-  const endX = points[points.length - 2] ?? startX;
-  const endY = points[points.length - 1] ?? startY;
-  const lerp = (start: number, end: number, ratio = progress) => start + (end - start) * ratio;
-
-  if (direction === 'end-to-start') {
-    return [endX, endY, lerp(endX, startX), lerp(endY, startY)];
-  }
-  if (direction === 'middle-to-ends') {
-    const middleX = (startX + endX) / 2;
-    const middleY = (startY + endY) / 2;
-    return [
-      lerp(middleX, startX, progress),
-      lerp(middleY, startY, progress),
-      lerp(middleX, endX, progress),
-      lerp(middleY, endY, progress),
-    ];
-  }
-  return [startX, startY, lerp(startX, endX, progress), lerp(startY, endY, progress)];
-}
-
-function getLineDrawDash(
-  length: number,
-  progress: number,
-  direction: ElementAnimationPreviewBuild['lineDrawDirection'],
-) {
-  const safeLength = Math.max(1, length);
-  if (direction === 'middle-to-ends') {
-    return {
-      dash: [safeLength * progress, safeLength],
-      dashOffset: (safeLength * progress) / 2,
-    };
-  }
-  return {
-    dash: [safeLength, safeLength],
-    dashOffset:
-      direction === 'end-to-start' ? -safeLength * (1 - progress) : safeLength * (1 - progress),
-  };
-}
-
-function getLineDrawPerimeter(width: number, height: number) {
-  return Math.max(1, width * 2 + height * 2);
-}
-
-function getShapeLineDrawState(element: ShapeElement, state: ElementAnimationRenderState) {
-  if (state.activeBuild?.effect !== 'line-draw') {
-    return {
-      direction: undefined,
-      progress: 1,
-    };
-  }
-  return {
-    direction: state.activeBuild.lineDrawDirection ?? 'start-to-end',
-    progress: easeOutCubic(state.progress),
-  };
-}
-
-function getShapeEndpoint(element: ShapeElement, position: 'end' | 'start') {
-  if (position === 'end' && element.shape === 'arrow') return element.endEndpoint ?? 'arrow';
-  return (position === 'start' ? element.startEndpoint : element.endEndpoint) ?? 'none';
 }
 
 function getNormalizedStageRect(start: { x: number; y: number }, end: { x: number; y: number }) {
@@ -267,218 +162,6 @@ function stageRectsIntersect(first: StageRect, second: StageRect) {
     first.x + first.width >= second.x &&
     first.y <= second.y + second.height &&
     first.y + first.height >= second.y
-  );
-}
-
-function getEndpointStrokeWidth(element: ShapeElement) {
-  return Math.max(1, element.strokeWidth ?? 4);
-}
-
-function getEndpointColor(element: ShapeElement) {
-  return element.stroke ?? element.fill ?? '#37FD76';
-}
-
-function getEndpointAngle(start: { x: number; y: number }, end: { x: number; y: number }) {
-  return Math.atan2(end.y - start.y, end.x - start.x);
-}
-
-function EndpointMarker({
-  color,
-  endpoint,
-  point,
-  angle,
-  strokeWidth,
-}: {
-  color: string;
-  endpoint: ShapeLineEndpoint;
-  point: { x: number; y: number };
-  angle: number;
-  strokeWidth: number;
-}) {
-  if (endpoint === 'none') return null;
-
-  const size = Math.max(12, strokeWidth * 3.2);
-  const unitX = Math.cos(angle);
-  const unitY = Math.sin(angle);
-  const perpendicularX = -unitY;
-  const perpendicularY = unitX;
-  const back = {
-    x: point.x - unitX * size,
-    y: point.y - unitY * size,
-  };
-  const sideA = {
-    x: back.x + perpendicularX * size * 0.42,
-    y: back.y + perpendicularY * size * 0.42,
-  };
-  const sideB = {
-    x: back.x - perpendicularX * size * 0.42,
-    y: back.y - perpendicularY * size * 0.42,
-  };
-
-  if (endpoint === 'arrow') {
-    return (
-      <Line
-        closed
-        fill={color}
-        listening={false}
-        points={[point.x, point.y, sideA.x, sideA.y, sideB.x, sideB.y]}
-      />
-    );
-  }
-
-  if (endpoint === 'open-arrow') {
-    return (
-      <Line
-        listening={false}
-        points={[sideA.x, sideA.y, point.x, point.y, sideB.x, sideB.y]}
-        stroke={color}
-        strokeWidth={strokeWidth}
-      />
-    );
-  }
-
-  if (endpoint === 'circle' || endpoint === 'open-circle') {
-    return (
-      <Circle
-        {...(endpoint === 'circle' ? { fill: color } : {})}
-        listening={false}
-        radius={size * 0.42}
-        stroke={color}
-        strokeWidth={endpoint === 'open-circle' ? Math.max(1, strokeWidth * 0.72) : 0}
-        x={point.x}
-        y={point.y}
-      />
-    );
-  }
-
-  if (endpoint === 'square' || endpoint === 'open-square') {
-    return (
-      <Rect
-        {...(endpoint === 'square' ? { fill: color } : {})}
-        height={size * 0.74}
-        listening={false}
-        offsetX={(size * 0.74) / 2}
-        offsetY={(size * 0.74) / 2}
-        rotation={(angle * 180) / Math.PI}
-        stroke={color}
-        strokeWidth={endpoint === 'open-square' ? Math.max(1, strokeWidth * 0.72) : 0}
-        width={size * 0.74}
-        x={point.x}
-        y={point.y}
-      />
-    );
-  }
-
-  if (endpoint === 'diamond') {
-    return (
-      <Line
-        closed
-        fill={color}
-        listening={false}
-        points={[
-          point.x + unitX * size * 0.54,
-          point.y + unitY * size * 0.54,
-          point.x + perpendicularX * size * 0.42,
-          point.y + perpendicularY * size * 0.42,
-          point.x - unitX * size * 0.54,
-          point.y - unitY * size * 0.54,
-          point.x - perpendicularX * size * 0.42,
-          point.y - perpendicularY * size * 0.42,
-        ]}
-      />
-    );
-  }
-
-  return (
-    <Line
-      listening={false}
-      points={[
-        point.x + perpendicularX * size * 0.48,
-        point.y + perpendicularY * size * 0.48,
-        point.x - perpendicularX * size * 0.48,
-        point.y - perpendicularY * size * 0.48,
-      ]}
-      stroke={color}
-      strokeWidth={strokeWidth}
-    />
-  );
-}
-
-function LinearShapeElement({
-  commonProps,
-  element,
-  lineDrawState,
-  nodeRef,
-}: {
-  commonProps: CommonElementProps;
-  element: ShapeElement;
-  lineDrawState: { direction: ElementAnimationPreviewBuild['lineDrawDirection']; progress: number };
-  nodeRef: (node: Konva.Node | null) => void;
-}) {
-  const stroke = getEndpointColor(element);
-  const strokeWidth = getEndpointStrokeWidth(element);
-  const fullPoints =
-    element.shape === 'arc'
-      ? [
-          0,
-          commonProps.height,
-          commonProps.width * 0.12,
-          0,
-          commonProps.width * 0.88,
-          0,
-          commonProps.width,
-          commonProps.height,
-        ]
-      : element.shape === 'line'
-        ? [0, commonProps.height, commonProps.width, 0]
-        : [0, commonProps.height / 2, commonProps.width, commonProps.height / 2];
-  const points =
-    lineDrawState.direction && element.shape !== 'arc'
-      ? getLineDrawPoints(fullPoints, lineDrawState.progress, lineDrawState.direction)
-      : fullPoints;
-  const startPoint = { x: points[0] ?? 0, y: points[1] ?? 0 };
-  const endPoint = {
-    x: points[points.length - 2] ?? startPoint.x,
-    y: points[points.length - 1] ?? startPoint.y,
-  };
-  const fullStartPoint = { x: fullPoints[0] ?? 0, y: fullPoints[1] ?? 0 };
-  const fullEndPoint = {
-    x: fullPoints[fullPoints.length - 2] ?? fullStartPoint.x,
-    y: fullPoints[fullPoints.length - 1] ?? fullStartPoint.y,
-  };
-  const startAngle = getEndpointAngle(fullEndPoint, fullStartPoint);
-  const endAngle = getEndpointAngle(fullStartPoint, fullEndPoint);
-
-  return (
-    <Group {...commonProps} key={element.id} ref={nodeRef}>
-      <Line
-        bezier={element.shape === 'arc'}
-        points={points}
-        {...(lineDrawState.direction && element.shape === 'arc'
-          ? getLineDrawDash(
-              commonProps.width * 2 + commonProps.height,
-              lineDrawState.progress,
-              lineDrawState.direction,
-            )
-          : {})}
-        stroke={stroke}
-        strokeWidth={strokeWidth}
-      />
-      <EndpointMarker
-        angle={startAngle}
-        color={stroke}
-        endpoint={getShapeEndpoint(element, 'start')}
-        point={startPoint}
-        strokeWidth={strokeWidth}
-      />
-      <EndpointMarker
-        angle={endAngle}
-        color={stroke}
-        endpoint={getShapeEndpoint(element, 'end')}
-        point={endPoint}
-        strokeWidth={strokeWidth}
-      />
-    </Group>
   );
 }
 
@@ -1212,51 +895,16 @@ export function CanvasWorkspace({
             processingSelectedImageId ||
             isTranslating ||
             translationNotice) ? (
-            <div
-              className={`background-selection-hint ${
-                isTranslating || translationNotice ? 'background-selection-hint-translation' : ''
-              }`}
-              role="status"
-            >
-              <span className="material-symbols-outlined" aria-hidden="true">
-                {isTranslating || translationNotice
-                  ? 'translate'
-                  : processingSelectedImageId
-                    ? 'auto_fix_high'
-                    : backgroundSelectionNotice
-                      ? 'download'
-                      : 'ads_click'}
-              </span>
-              <span>
-                {isTranslating
-                  ? 'Translating text...'
-                  : (translationNotice ??
-                    getBackgroundSelectionMessage({
-                      backgroundPreparation: activeBackgroundPreparation,
-                      backgroundPreview,
-                      backgroundSelectionTargetId,
-                      backgroundSelectionNotice,
-                      processingSelectedImageId,
-                    }))}
-              </span>
-              {activeBackgroundPreparation?.status === 'preparing' && !isTranslating ? (
-                <span
-                  aria-label="Image extraction progress"
-                  aria-valuemax={100}
-                  aria-valuemin={0}
-                  aria-valuenow={activeBackgroundPreparation.progress}
-                  className="background-selection-progress"
-                  role="progressbar"
-                >
-                  <span style={{ width: `${activeBackgroundPreparation.progress}%` }} />
-                </span>
-              ) : null}
-              {processingSelectedImageId || isTranslating ? null : (
-                <button type="button" onClick={onCancelBackgroundSelection}>
-                  Esc
-                </button>
-              )}
-            </div>
+            <CanvasStatusHint
+              backgroundPreparation={activeBackgroundPreparation}
+              backgroundPreview={backgroundPreview}
+              backgroundSelectionNotice={backgroundSelectionNotice}
+              backgroundSelectionTargetId={backgroundSelectionTargetId}
+              isTranslating={isTranslating}
+              processingSelectedImageId={processingSelectedImageId}
+              translationNotice={translationNotice}
+              onCancelBackgroundSelection={onCancelBackgroundSelection}
+            />
           ) : null}
           <Stage
             ref={stageRef}
@@ -1282,118 +930,14 @@ export function CanvasWorkspace({
                 };
 
                 if (element.type === 'shape') {
-                  const paint = canvasWorkspaceUtils.getShapePaint(element);
-                  const lineDrawState = getShapeLineDrawState(element, animationState);
-                  if (element.shape === 'ellipse') {
-                    return (
-                      <Rect
-                        {...commonProps}
-                        {...paint}
-                        key={element.id}
-                        cornerRadius={Math.min(commonProps.width, commonProps.height) / 2}
-                        {...(lineDrawState.direction
-                          ? getLineDrawDash(
-                              getLineDrawPerimeter(commonProps.width, commonProps.height),
-                              lineDrawState.progress,
-                              lineDrawState.direction,
-                            )
-                          : {})}
-                        ref={nodeRef}
-                      />
-                    );
-                  }
-                  if (element.shape === 'rounded-rect') {
-                    return (
-                      <Rect
-                        {...commonProps}
-                        {...paint}
-                        key={element.id}
-                        cornerRadius={Math.min(commonProps.width, commonProps.height) * 0.18}
-                        {...(lineDrawState.direction
-                          ? getLineDrawDash(
-                              getLineDrawPerimeter(commonProps.width, commonProps.height),
-                              lineDrawState.progress,
-                              lineDrawState.direction,
-                            )
-                          : {})}
-                        ref={nodeRef}
-                      />
-                    );
-                  }
-                  if (element.shape === 'line') {
-                    return (
-                      <LinearShapeElement
-                        commonProps={commonProps}
-                        element={element}
-                        key={element.id}
-                        lineDrawState={lineDrawState}
-                        nodeRef={nodeRef}
-                      />
-                    );
-                  }
-                  if (element.shape === 'arrow') {
-                    return (
-                      <LinearShapeElement
-                        commonProps={commonProps}
-                        element={element}
-                        key={element.id}
-                        lineDrawState={lineDrawState}
-                        nodeRef={nodeRef}
-                      />
-                    );
-                  }
-                  if (element.shape === 'arc') {
-                    return (
-                      <LinearShapeElement
-                        commonProps={commonProps}
-                        element={element}
-                        key={element.id}
-                        lineDrawState={lineDrawState}
-                        nodeRef={nodeRef}
-                      />
-                    );
-                  }
-                  if (
-                    element.shape === 'triangle' ||
-                    element.shape === 'pentagon' ||
-                    element.shape === 'diamond' ||
-                    element.shape === 'parallelogram'
-                  ) {
-                    return (
-                      <Line
-                        {...commonProps}
-                        {...paint}
-                        closed
-                        key={element.id}
-                        points={canvasWorkspaceUtils.getPolygonPoints(
-                          element.shape,
-                          commonProps.width,
-                          commonProps.height,
-                        )}
-                        {...(lineDrawState.direction
-                          ? getLineDrawDash(
-                              getLineDrawPerimeter(commonProps.width, commonProps.height),
-                              lineDrawState.progress,
-                              lineDrawState.direction,
-                            )
-                          : {})}
-                        ref={nodeRef}
-                      />
-                    );
-                  }
+                  const lineDrawState = shapeLineDraw.getState(element, animationState);
                   return (
-                    <Rect
-                      {...commonProps}
-                      {...paint}
+                    <CanvasShapeElement
+                      commonProps={commonProps}
+                      element={element}
                       key={element.id}
-                      {...(lineDrawState.direction
-                        ? getLineDrawDash(
-                            getLineDrawPerimeter(commonProps.width, commonProps.height),
-                            lineDrawState.progress,
-                            lineDrawState.direction,
-                          )
-                        : {})}
-                      ref={nodeRef}
+                      lineDrawState={lineDrawState}
+                      nodeRef={nodeRef}
                     />
                   );
                 }
@@ -1415,33 +959,14 @@ export function CanvasWorkspace({
                   const selected = selection.elementIds.includes(element.id);
                   const asset = project.assets[element.assetId];
                   if (readOnly) {
-                    const label = asset?.name ?? (element.type === 'video' ? 'Imported video' : 'Imported GIF');
                     return (
-                      <Group {...commonProps} key={element.id} ref={nodeRef}>
-                        <Rect
-                          fill="#153A2D"
-                          height={commonProps.height}
-                          stroke="#37FD76"
-                          strokeWidth={Math.max(2, Math.min(commonProps.width, commonProps.height) * 0.006)}
-                          width={commonProps.width}
-                          x={0}
-                          y={0}
-                        />
-                        <Text
-                          align="center"
-                          fill="#FFFFFF"
-                          fontFamily="Open Sans"
-                          fontSize={Math.max(18, Math.min(48, commonProps.height * 0.12))}
-                          fontStyle="bold"
-                          height={commonProps.height}
-                          padding={Math.max(12, commonProps.height * 0.04)}
-                          text={label}
-                          verticalAlign="middle"
-                          width={commonProps.width}
-                          x={0}
-                          y={0}
-                        />
-                      </Group>
+                      <CanvasReadOnlyMediaElement
+                        commonProps={commonProps}
+                        element={element}
+                        key={element.id}
+                        label={asset?.name ?? (element.type === 'video' ? 'Imported video' : 'Imported GIF')}
+                        nodeRef={nodeRef}
+                      />
                     );
                   }
                   return (
@@ -1511,32 +1036,13 @@ export function CanvasWorkspace({
                 </>
               ) : null}
               {showEditorOverlays && !backgroundSelectionMode && !processingSelectedImageId ? (
-                <>
-                  {dragGuide ? (
-                    <>
-                      <Line
-                        listening={false}
-                        points={[dragGuide.x, 0, dragGuide.x, stageHeight]}
-                        stroke="#37FD76"
-                        strokeWidth={1}
-                        opacity={0.78}
-                        dash={[2, 7]}
-                        shadowBlur={10}
-                        shadowColor="#37FD76"
-                      />
-                      <Line
-                        listening={false}
-                        points={[0, dragGuide.y, stageWidth, dragGuide.y]}
-                        stroke="#37FD76"
-                        strokeWidth={1}
-                        opacity={0.78}
-                        dash={[2, 7]}
-                        shadowBlur={10}
-                        shadowColor="#37FD76"
-                      />
-                    </>
-                  ) : null}
-                </>
+                dragGuide ? (
+                  <CanvasDragGuide
+                    guide={dragGuide}
+                    stageHeight={stageHeight}
+                    stageWidth={stageWidth}
+                  />
+                ) : null
               ) : null}
               {showEditorOverlays &&
               !backgroundSelectionMode &&
@@ -1737,457 +1243,6 @@ export function CanvasWorkspace({
           />
         ) : null}
       </div>
-    </div>
-  );
-}
-
-interface BackgroundSelectionPreviewProps {
-  element: DesignElement;
-  maskUrl: string | undefined;
-  pending?: boolean;
-  point: { x: number; y: number } | null;
-  scale: { x: number; y: number };
-}
-
-function BackgroundSelectionPreview({
-  element,
-  maskUrl,
-  pending = false,
-  point,
-  scale,
-}: BackgroundSelectionPreviewProps) {
-  const maskImage = canvasWorkspaceUtils.useCanvasImage(maskUrl);
-  const x = element.x * scale.x;
-  const y = element.y * scale.y;
-  const width = element.width * scale.x;
-  const height = element.height * scale.y;
-
-  return (
-    <>
-      {maskImage ? (
-        <KonvaImage
-          listening={false}
-          image={maskImage}
-          opacity={pending ? 0.62 : 1}
-          rotation={element.rotation}
-          width={width}
-          height={height}
-          x={x}
-          y={y}
-        />
-      ) : null}
-      {point ? (
-        <Circle
-          listening={false}
-          radius={7}
-          shadowBlur={14}
-          shadowColor="#37FD76"
-          fill="#37FD76"
-          stroke="#001B0A"
-          strokeWidth={2}
-          x={point.x}
-          y={point.y}
-        />
-      ) : null}
-    </>
-  );
-}
-
-interface BackgroundSelectionMessageOptions {
-  backgroundPreparation:
-    | { elementId: string; progress: number; status: 'preparing' | 'ready' | 'failed' }
-    | undefined;
-  backgroundPreview:
-    | { elementId: string; maskUrl?: string; pending: boolean; score?: number }
-    | undefined;
-  backgroundSelectionNotice: string | undefined;
-  backgroundSelectionTargetId: string | undefined;
-  processingSelectedImageId: string | undefined;
-}
-
-function getBackgroundSelectionMessage({
-  backgroundPreparation,
-  backgroundPreview,
-  backgroundSelectionNotice,
-  backgroundSelectionTargetId,
-  processingSelectedImageId,
-}: BackgroundSelectionMessageOptions) {
-  if (processingSelectedImageId) return 'Removing background...';
-  if (backgroundSelectionNotice) return backgroundSelectionNotice;
-  if (backgroundPreparation?.status === 'failed')
-    return 'Image extraction failed. Try background removal again.';
-  if (backgroundPreparation?.status === 'preparing') return 'Extracting image embedding...';
-  const previewScore =
-    backgroundPreview && backgroundPreview.elementId === backgroundSelectionTargetId
-      ? backgroundPreview.score
-      : undefined;
-  if (previewScore !== undefined) {
-    return `Segment score: ${previewScore.toFixed(2)}`;
-  }
-  return 'Right click adds areas to keep. Left click applies the background removal.';
-}
-
-interface CanvasImageElementProps {
-  assetUrl: string | undefined;
-  commonProps: CommonElementProps;
-  element: Extract<DesignElement, { type: 'image' }>;
-  nodeRef: (node: Konva.Node | null) => void;
-}
-
-interface CanvasMediaElementProps {
-  animationState: ElementAnimationRenderState;
-  assetName: string;
-  assetUrl: string | undefined;
-  element: GifElement | VideoElement;
-  interactive: boolean;
-  opacity: number;
-  previewMode: boolean;
-  scale: { x: number; y: number };
-}
-
-function getMediaStyle(
-  element: GifElement | VideoElement,
-  scale: { x: number; y: number },
-  interactive: boolean,
-  opacity: number,
-) {
-  return {
-    height: `${element.height * scale.y}px`,
-    left: `${element.x * scale.x}px`,
-    opacity,
-    pointerEvents: interactive ? 'auto' : 'none',
-    top: `${element.y * scale.y}px`,
-    transform: `rotate(${element.rotation}deg)`,
-    width: `${element.width * scale.x}px`,
-  } as const;
-}
-
-function CanvasMediaElement({
-  animationState,
-  assetName,
-  assetUrl,
-  element,
-  interactive,
-  opacity,
-  previewMode,
-  scale,
-}: CanvasMediaElementProps) {
-  if (element.type === 'gif') {
-    return (
-      <img
-        aria-label={assetName}
-        className="canvas-media-element"
-        src={element.playing ? assetUrl : undefined}
-        style={getMediaStyle(element, scale, interactive, opacity)}
-      />
-    );
-  }
-
-  return (
-    <CanvasVideoElement
-      assetName={assetName}
-      assetUrl={assetUrl}
-      element={element}
-      animationState={animationState}
-      interactive={interactive}
-      opacity={opacity}
-      previewMode={previewMode}
-      scale={scale}
-    />
-  );
-}
-
-interface CanvasVideoElementProps {
-  animationState: ElementAnimationRenderState;
-  assetName: string;
-  assetUrl: string | undefined;
-  element: VideoElement;
-  interactive: boolean;
-  opacity: number;
-  previewMode: boolean;
-  scale: { x: number; y: number };
-}
-
-function CanvasVideoElement({
-  animationState,
-  assetName,
-  assetUrl,
-  element,
-  interactive,
-  opacity,
-  previewMode,
-  scale,
-}: CanvasVideoElementProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const reverseIntervalRef = useRef<number | undefined>(undefined);
-  const previousTrimRef = useRef<
-    | {
-        assetUrl: string | undefined;
-        end: number | undefined;
-        poster: number | undefined;
-        start: number;
-      }
-    | undefined
-  >(undefined);
-  const repeatMode = element.repeatMode ?? (element.loop ? 'loop' : 'none');
-  const autoplay =
-    previewMode && element.autoplayInPreview && !element.startOnClick && !animationState.hidden;
-
-  function stopReversePlayback() {
-    if (reverseIntervalRef.current === undefined) return;
-    window.clearInterval(reverseIntervalRef.current);
-    reverseIntervalRef.current = undefined;
-  }
-
-  function getTrimStart() {
-    return Math.max(0, element.trimStartSeconds);
-  }
-
-  function getTrimEnd(video: HTMLVideoElement) {
-    if (element.trimEndSeconds !== undefined && element.trimEndSeconds > 0) {
-      return Math.max(0, element.trimEndSeconds);
-    }
-    return Number.isFinite(video.duration) ? video.duration : undefined;
-  }
-
-  function playVideo(video: HTMLVideoElement) {
-    const playResult = video.play() as Promise<void> | undefined;
-    if (playResult !== undefined) {
-      void playResult.catch(() => {
-        video.pause();
-      });
-    }
-  }
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    const start = Math.max(0, element.trimStartSeconds);
-    const end =
-      element.trimEndSeconds !== undefined && element.trimEndSeconds > 0
-        ? Math.max(0, element.trimEndSeconds)
-        : Number.isFinite(video.duration)
-          ? video.duration
-          : undefined;
-    const previousTrim = previousTrimRef.current;
-    const assetChanged = previousTrim?.assetUrl !== assetUrl;
-    const poster =
-      element.posterFrameSeconds !== undefined
-        ? Math.max(0, element.posterFrameSeconds)
-        : undefined;
-    const posterChanged = previousTrim?.poster !== poster;
-    video.volume = Math.min(1, Math.max(0, element.volume ?? 1));
-    if (posterChanged && poster !== undefined) {
-      video.currentTime = poster;
-    } else if (assetChanged || previousTrim?.start !== start) {
-      video.currentTime = start;
-    } else if (previousTrim?.end !== end && end !== undefined) {
-      video.currentTime = end;
-    }
-    previousTrimRef.current = { assetUrl, end, poster, start };
-  }, [
-    assetUrl,
-    element.posterFrameSeconds,
-    element.trimEndSeconds,
-    element.trimStartSeconds,
-    element.volume,
-  ]);
-
-  useEffect(() => {
-    return () => {
-      if (reverseIntervalRef.current === undefined) return;
-      window.clearInterval(reverseIntervalRef.current);
-      reverseIntervalRef.current = undefined;
-    };
-  }, []);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || element.playbackPositionSeconds === undefined) return;
-    stopReversePlayback();
-    video.currentTime = Math.max(0, element.playbackPositionSeconds);
-  }, [element.playbackPositionSeconds]);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || element.playing === undefined) return;
-    stopReversePlayback();
-    if (!element.playing) {
-      video.pause();
-      return;
-    }
-    playVideo(video);
-  }, [element.playing]);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !previewMode || !element.autoplayInPreview) return;
-    if (animationState.activeBuild?.mediaAction === 'play') {
-      stopReversePlayback();
-      video.currentTime = Math.max(0, element.trimStartSeconds);
-      if (movieStartPlayback.consumeStartedBuild(video, animationState.activeBuild.id)) return;
-      playVideo(video);
-      return;
-    }
-    if (animationState.hidden || element.startOnClick) {
-      stopReversePlayback();
-      video.pause();
-      video.currentTime = Math.max(0, element.trimStartSeconds);
-    }
-  }, [
-    animationState.activeBuild,
-    animationState.hidden,
-    element.autoplayInPreview,
-    element.startOnClick,
-    element.trimStartSeconds,
-    previewMode,
-  ]);
-
-  function playReverse(video: HTMLVideoElement) {
-    stopReversePlayback();
-    video.pause();
-    reverseIntervalRef.current = window.setInterval(() => {
-      const trimStart = getTrimStart();
-      const nextTime = Math.max(trimStart, video.currentTime - 1 / 30);
-      video.currentTime = nextTime;
-      if (nextTime > trimStart) return;
-      stopReversePlayback();
-      playVideo(video);
-    }, 1000 / 30);
-  }
-
-  function enforceTrimWindow(video: HTMLVideoElement) {
-    const trimEnd = getTrimEnd(video);
-    if (trimEnd === undefined || trimEnd <= 0) return;
-    if (video.currentTime < trimEnd) return;
-    if (repeatMode === 'loop') {
-      video.currentTime = getTrimStart();
-      playVideo(video);
-      return;
-    }
-    if (repeatMode === 'loop-back-and-forth') {
-      playReverse(video);
-      return;
-    }
-    video.pause();
-  }
-
-  return (
-    <video
-      aria-label={assetName}
-      autoPlay={autoplay}
-      className="canvas-media-element"
-      controls={false}
-      data-element-id={element.id}
-      data-trim-end={element.trimEndSeconds ?? ''}
-      data-trim-start={element.trimStartSeconds}
-      data-media-element-id={element.id}
-      loop={repeatMode === 'loop' && element.trimEndSeconds === undefined}
-      muted={element.muted}
-      playsInline
-      preload="auto"
-      ref={videoRef}
-      src={assetUrl}
-      style={getMediaStyle(element, scale, interactive, opacity)}
-      onLoadedMetadata={(event) => {
-        event.currentTarget.volume = Math.min(1, Math.max(0, element.volume ?? 1));
-        event.currentTarget.currentTime = element.posterFrameSeconds ?? getTrimStart();
-      }}
-      onTimeUpdate={(event) => {
-        enforceTrimWindow(event.currentTarget);
-      }}
-    />
-  );
-}
-
-function CanvasImageElement({ assetUrl, commonProps, element, nodeRef }: CanvasImageElementProps) {
-  const image = canvasWorkspaceUtils.useCanvasImage(assetUrl);
-  const crop =
-    element.crop && image
-      ? {
-          x: element.crop.x * image.naturalWidth,
-          y: element.crop.y * image.naturalHeight,
-          width: element.crop.width * image.naturalWidth,
-          height: element.crop.height * image.naturalHeight,
-        }
-      : undefined;
-  const imageProps = element.flipX
-    ? {
-        ...commonProps,
-        scaleX: -1,
-        x: commonProps.x + commonProps.width,
-      }
-    : commonProps;
-
-  if (!image) {
-    return (
-      <Rect
-        {...imageProps}
-        fill="#101B1D"
-        stroke="#37FD76"
-        strokeWidth={1}
-        cornerRadius={6}
-        ref={nodeRef}
-      />
-    );
-  }
-
-  return (
-    <KonvaImage
-      {...imageProps}
-      image={image}
-      {...(crop ? { crop } : {})}
-      cornerRadius={6}
-      ref={nodeRef}
-    />
-  );
-}
-
-interface CropFrameOverlayProps {
-  element: ImageElement;
-  scale: { x: number; y: number };
-  onHandlePointerDown: (
-    element: ImageElement,
-    handle: ImageCropHandle,
-    event: ReactPointerEvent<HTMLButtonElement>,
-  ) => void;
-}
-
-const cropHandles: Array<{ handle: ImageCropHandle; label: string }> = [
-  { handle: 'top-left', label: 'Crop top left' },
-  { handle: 'top', label: 'Crop top' },
-  { handle: 'top-right', label: 'Crop top right' },
-  { handle: 'right', label: 'Crop right' },
-  { handle: 'bottom-right', label: 'Crop bottom right' },
-  { handle: 'bottom', label: 'Crop bottom' },
-  { handle: 'bottom-left', label: 'Crop bottom left' },
-  { handle: 'left', label: 'Crop left' },
-];
-
-function CropFrameOverlay({ element, scale, onHandlePointerDown }: CropFrameOverlayProps) {
-  return (
-    <div
-      className="image-crop-frame"
-      style={{
-        height: `${element.height * scale.y}px`,
-        left: `${element.x * scale.x}px`,
-        top: `${element.y * scale.y}px`,
-        transform: `rotate(${element.rotation}deg)`,
-        width: `${element.width * scale.x}px`,
-      }}
-    >
-      <div className="image-crop-grid" aria-hidden="true" />
-      {cropHandles.map(({ handle, label }) => (
-        <button
-          key={handle}
-          aria-label={label}
-          className={`image-crop-handle image-crop-handle-${handle}`}
-          type="button"
-          onPointerDown={(event) => {
-            onHandlePointerDown(element, handle, event);
-          }}
-        />
-      ))}
     </div>
   );
 }

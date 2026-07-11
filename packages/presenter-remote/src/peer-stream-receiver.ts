@@ -1,5 +1,6 @@
 import { Peer, type MediaConnection, type PeerOptions } from 'peerjs';
 import { presenterRemoteDebugLog } from './debug-log';
+import { presenterRemotePeerOpen } from './peer-open.ts';
 
 export interface PresenterRemotePeerStreamReceiverOptions {
   onStatusChange: (status: 'connected' | 'connecting' | 'failed') => void;
@@ -7,14 +8,6 @@ export interface PresenterRemotePeerStreamReceiverOptions {
   peerFactory?: (() => Peer) | undefined;
   peerOptions?: PeerOptions | undefined;
   streamPeerId: string;
-}
-
-function oncePeerOpen(peer: Peer) {
-  if (peer.open) return Promise.resolve();
-  return new Promise<void>((resolve, reject) => {
-    peer.on('open', () => resolve());
-    peer.on('error', reject);
-  });
 }
 
 export class PresenterRemotePeerStreamReceiver {
@@ -39,7 +32,7 @@ export class PresenterRemotePeerStreamReceiver {
     peer.on('error', (error) =>
       presenterRemoteDebugLog.error('Stream receiver peer error.', error),
     );
-    await oncePeerOpen(peer);
+    await presenterRemotePeerOpen.waitForPeer(peer);
     presenterRemoteDebugLog.info('Stream receiver peer opened.');
     this.outgoingStream = createReceiverOfferStream();
     const call = peer.call(this.options.streamPeerId, this.outgoingStream);

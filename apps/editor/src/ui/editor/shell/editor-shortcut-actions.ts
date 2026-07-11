@@ -1,0 +1,27 @@
+import type { KeyboardShortcutAction } from '../../components/KeyboardShortcutsDialog';
+
+export const editorShortcutActions = [
+  'next-build',
+  'previous-build',
+  'next-slide',
+  'previous-slide',
+  'first-slide',
+  'last-slide',
+  'quit-presentation',
+  'shortcut-toggle',
+  'pause-presentation',
+  'black-screen',
+  'white-screen',
+  'cursor-toggle',
+  'show-slide-number',
+  'open-slide-navigator',
+  'next-navigator-slide',
+  'previous-navigator-slide',
+  'select-navigator-slide',
+  'close-slide-navigator',
+  'play-pause-movie',
+  'rewind-movie',
+  'fast-forward-movie',
+  'jump-movie-start',
+  'jump-movie-end',
+] satisfies KeyboardShortcutAction[];

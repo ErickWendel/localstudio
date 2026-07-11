@@ -1,5 +1,6 @@
 import type { PresenterRemoteCommand, PresenterRemoteState, PresenterRemoteSession } from './protocol';
 import { presenterRemoteSessionCode } from './session-code.ts';
+import { PresenterRemoteSignalingSessionRecord } from './signaling-session-record.ts';
 import type {
   PresenterRemoteControllerOffer,
   PresenterRemoteIceCandidateMessage,
@@ -25,22 +26,6 @@ export interface ControllerOfferInput {
 
 export type ControllerOfferResult = { status: 'not-found' } | { status: 'pending' };
 
-interface StoredControllerConnection {
-  answerSdp?: string | undefined;
-  controllerIceCandidates: RTCIceCandidateInit[];
-  offerSdp: string;
-  presenterIceCandidates: RTCIceCandidateInit[];
-}
-
-interface StoredSession {
-  commands: PresenterRemoteCommand[];
-  connectedControllers: Set<string>;
-  publishedState?: PresenterRemoteState | undefined;
-  session: PresenterRemoteSession;
-  trustedControllers: Set<string>;
-  webRtcControllers: Map<string, StoredControllerConnection>;
-}
-
 function createSessionId() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
   return `remote-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -50,7 +35,7 @@ export class InMemoryPresenterRemoteSignalingService {
   private readonly now: () => number;
   private readonly randomCode: () => string;
   private readonly randomId: () => string;
-  private readonly sessions = new Map<string, StoredSession>();
+  private readonly sessions = new Map<string, PresenterRemoteSignalingSessionRecord>();
 
   constructor(options: PresenterRemoteSignalingServiceOptions = {}) {
     this.now = options.now ?? Date.now;
@@ -72,19 +57,13 @@ export class InMemoryPresenterRemoteSignalingService {
       presenterLabel: input.presenterLabel,
       sessionId: this.randomId(),
     };
-    this.sessions.set(code, {
-      commands: [],
-      connectedControllers: new Set(),
-      session,
-      trustedControllers: new Set(),
-      webRtcControllers: new Map(),
-    });
+    this.sessions.set(code, new PresenterRemoteSignalingSessionRecord(session));
     return session;
   }
 
   listActiveSessions(): PresenterRemoteSession[] {
     this.pruneExpiredSessions();
-    return Array.from(this.sessions.values(), ({ session }) => ({ ...session }));
+    return Array.from(this.sessions.values(), (storedSession) => storedSession.getSession());
   }
 
   listSessions(): PresenterRemoteSession[] {
@@ -99,17 +78,13 @@ export class InMemoryPresenterRemoteSignalingService {
   lookupSession(sessionCode: string) {
     this.pruneExpiredSessions();
     const code = presenterRemoteSessionCode.normalize(sessionCode);
-    return this.sessions.get(code)?.session;
+    return this.sessions.get(code)?.getSession();
   }
 
   connectController(sessionCode: string, controllerId: string) {
     this.pruneExpiredSessions();
     const storedSession = this.sessions.get(presenterRemoteSessionCode.normalize(sessionCode));
-    if (!storedSession || !controllerId) return undefined;
-    storedSession.connectedControllers.add(controllerId);
-    storedSession.trustedControllers.add(controllerId);
-    storedSession.session.connectedControllerCount = storedSession.connectedControllers.size;
-    return { ...storedSession.session };
+    return storedSession?.connectController(controllerId);
   }
 
   createControllerOffer(input: ControllerOfferInput): ControllerOfferResult {
@@ -117,107 +92,69 @@ export class InMemoryPresenterRemoteSignalingService {
     const code = presenterRemoteSessionCode.normalize(input.sessionCode);
     const storedSession = this.sessions.get(code);
     if (!storedSession) return { status: 'not-found' };
-    if (!storedSession.trustedControllers.has(input.controllerId)) return { status: 'not-found' };
-    storedSession.webRtcControllers.set(input.controllerId, {
-      controllerIceCandidates: [],
-      offerSdp: input.offerSdp,
-      presenterIceCandidates: [],
-    });
-    return { status: 'pending' };
+    return storedSession.createControllerOffer(input.controllerId, input.offerSdp);
   }
 
   takePendingOffers(sessionCode: string): PresenterRemoteControllerOffer[] {
     this.pruneExpiredSessions();
     const storedSession = this.sessions.get(presenterRemoteSessionCode.normalize(sessionCode));
-    if (!storedSession) return [];
-    return Array.from(storedSession.webRtcControllers.entries())
-      .filter(([, connection]) => connection.answerSdp === undefined)
-      .map(([controllerId, connection]) => ({ controllerId, offerSdp: connection.offerSdp }));
+    return storedSession?.takePendingOffers() ?? [];
   }
 
   publishAnswer(sessionCode: string, controllerId: string, answerSdp: string) {
     this.pruneExpiredSessions();
     const storedSession = this.sessions.get(presenterRemoteSessionCode.normalize(sessionCode));
-    if (!storedSession) return false;
-    const connection = storedSession.webRtcControllers.get(controllerId);
-    if (!connection) return false;
-    connection.answerSdp = answerSdp;
-    return true;
+    return storedSession?.publishAnswer(controllerId, answerSdp) ?? false;
   }
 
   getAnswer(sessionCode: string, controllerId: string) {
     this.pruneExpiredSessions();
-    return this.sessions.get(presenterRemoteSessionCode.normalize(sessionCode))?.webRtcControllers.get(controllerId)
-      ?.answerSdp;
+    return this.sessions.get(presenterRemoteSessionCode.normalize(sessionCode))?.getAnswer(controllerId);
   }
 
   publishIceCandidate(sessionCode: string, controllerId: string, message: PresenterRemoteIceCandidateMessage) {
     this.pruneExpiredSessions();
-    const connection = this.sessions
-      .get(presenterRemoteSessionCode.normalize(sessionCode))
-      ?.webRtcControllers.get(controllerId);
-    if (!connection) return false;
-    if (message.target === 'presenter') connection.controllerIceCandidates.push(message.candidate);
-    else connection.presenterIceCandidates.push(message.candidate);
-    return true;
+    const storedSession = this.sessions.get(presenterRemoteSessionCode.normalize(sessionCode));
+    return storedSession?.publishIceCandidate(controllerId, message) ?? false;
   }
 
   takeIceCandidates(sessionCode: string, controllerId: string, target: 'controller' | 'presenter') {
     this.pruneExpiredSessions();
-    const connection = this.sessions
-      .get(presenterRemoteSessionCode.normalize(sessionCode))
-      ?.webRtcControllers.get(controllerId);
-    if (!connection) return [];
-    const candidates = target === 'presenter'
-      ? connection.controllerIceCandidates
-      : connection.presenterIceCandidates;
-    if (target === 'presenter') connection.controllerIceCandidates = [];
-    else connection.presenterIceCandidates = [];
-    return candidates;
+    const storedSession = this.sessions.get(presenterRemoteSessionCode.normalize(sessionCode));
+    return storedSession?.takeIceCandidates(controllerId, target) ?? [];
   }
 
   closeController(sessionCode: string, controllerId: string) {
     this.pruneExpiredSessions();
     const storedSession = this.sessions.get(presenterRemoteSessionCode.normalize(sessionCode));
     if (!storedSession) return false;
-    storedSession.webRtcControllers.delete(controllerId);
-    storedSession.connectedControllers.delete(controllerId);
-    storedSession.session.connectedControllerCount = storedSession.connectedControllers.size;
-    return true;
+    return storedSession.closeController(controllerId);
   }
 
   publishState(sessionCode: string, state: PresenterRemoteState) {
     this.pruneExpiredSessions();
     const storedSession = this.sessions.get(presenterRemoteSessionCode.normalize(sessionCode));
     if (!storedSession) return false;
-    storedSession.publishedState = {
-      ...state,
-      connectedControllerCount: storedSession.session.connectedControllerCount,
-    };
+    storedSession.publishState(state);
     return true;
   }
 
   getPublishedState(sessionCode: string) {
     this.pruneExpiredSessions();
-    return this.sessions.get(presenterRemoteSessionCode.normalize(sessionCode))?.publishedState;
+    return this.sessions.get(presenterRemoteSessionCode.normalize(sessionCode))?.getPublishedState();
   }
 
   publishCommand(sessionCode: string, command: PresenterRemoteCommand, controllerId?: string) {
     this.pruneExpiredSessions();
     const storedSession = this.sessions.get(presenterRemoteSessionCode.normalize(sessionCode));
     if (!storedSession) return false;
-    if (controllerId !== undefined && !storedSession.trustedControllers.has(controllerId)) return false;
-    storedSession.commands.push(command);
-    return true;
+    return storedSession.publishCommand(command, controllerId);
   }
 
   takeCommands(sessionCode: string) {
     this.pruneExpiredSessions();
     const storedSession = this.sessions.get(presenterRemoteSessionCode.normalize(sessionCode));
-    if (!storedSession) return [];
-    const commands = storedSession.commands;
-    storedSession.commands = [];
-    return commands;
+    return storedSession?.takeCommands() ?? [];
   }
 
   closeSession(sessionCode: string) {
@@ -227,7 +164,7 @@ export class InMemoryPresenterRemoteSignalingService {
   private pruneExpiredSessions() {
     const now = this.now();
     for (const [code, storedSession] of this.sessions) {
-      if (Date.parse(storedSession.session.expiresAt) <= now) this.sessions.delete(code);
+      if (storedSession.isExpired(now)) this.sessions.delete(code);
     }
   }
 }
