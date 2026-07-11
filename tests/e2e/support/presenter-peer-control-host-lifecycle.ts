@@ -4,33 +4,16 @@ import {
 } from './presenter-peer-control-modules';
 import { createPresenterPeerControlHostPreviewBatch } from './presenter-peer-control-host-preview-batch-fixture';
 import { createPresenterPeerControlHostState } from './presenter-peer-control-host-state-fixture';
-import { presenterPeerControlMessagePredicates } from './presenter-peer-control-message-predicates';
+import {
+  createPresenterPeerControlHostLifecycleResult,
+  type PresenterPeerControlHostLifecycleResult,
+} from './presenter-peer-control-host-lifecycle-result';
 import { createPresenterPeerControlReadyState } from './presenter-peer-control-ready-state-fixture';
 
 export type PresenterPeerControlHostLifecycleInput = PresenterPeerControlContractHarnessInput & {
   peerId: string;
   presenterDeviceId: string;
   presenterLabel: string;
-};
-
-export type PresenterPeerControlHostLifecycleResult = {
-  closedConnectionCount: number;
-  commandCount: number;
-  connectionRemovedAfterError: boolean;
-  destroyedPeer: boolean;
-  hostClosed: boolean;
-  initialStateMessages: number;
-  previewMessages: number;
-  publishedStateMessages: number;
-  requestedStateMessages: number;
-  session: {
-    code: string;
-    connectedControllerCount: number;
-    controlPeerId: string;
-    presenterDeviceId: string;
-    presenterLabel: string;
-    transport: string;
-  };
 };
 
 export async function runPresenterPeerControlHostLifecycle({
@@ -65,28 +48,12 @@ export async function runPresenterPeerControlHostLifecycle({
   const connectionRemovedAfterError = throwingHostConnection.wasClosed === false;
   host.close();
 
-  return {
-    closedConnectionCount: Number(hostConnection.wasClosed) + Number(throwingHostConnection.wasClosed),
-    commandCount: commands.length,
+  return createPresenterPeerControlHostLifecycleResult({
+    commands,
     connectionRemovedAfterError,
-    destroyedPeer: hostPeer.destroyed,
-    hostClosed: hostConnection.wasClosed,
-    initialStateMessages: presenterPeerControlMessagePredicates.countMessages(
-      hostConnection.sentMessages,
-      (message) => typeof message === 'object' && message !== null && 'type' in message,
-    ),
-    previewMessages: presenterPeerControlMessagePredicates.countMessages(
-      hostConnection.sentMessages,
-      (message) => presenterPeerControlMessagePredicates.hasType(message, 'preview-batch'),
-    ),
-    publishedStateMessages: presenterPeerControlMessagePredicates.countMessages(
-      hostConnection.sentMessages,
-      (message) => presenterPeerControlMessagePredicates.hasType(message, 'state'),
-    ),
-    requestedStateMessages: presenterPeerControlMessagePredicates.countMessages(
-      hostConnection.sentMessages,
-      (message) => presenterPeerControlMessagePredicates.hasConnectedControllerCount(message, 1),
-    ),
+    hostConnection,
+    hostPeer,
     session,
-  };
+    throwingHostConnection,
+  });
 }

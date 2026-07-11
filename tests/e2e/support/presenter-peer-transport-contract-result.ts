@@ -1,5 +1,5 @@
 import type { PresenterPeerControlClientLifecycleResult } from './presenter-peer-control-client-lifecycle';
-import type { PresenterPeerControlHostLifecycleResult } from './presenter-peer-control-host-lifecycle';
+import type { PresenterPeerControlHostLifecycleResult } from './presenter-peer-control-host-lifecycle-result';
 import type { PresenterPeerOpenLifecycleResult } from './presenter-peer-open-lifecycle';
 import type { PresenterPeerStreamPublisherLifecycleResult } from './presenter-peer-stream-publisher-lifecycle';
 import type { PresenterPeerStreamReceiverLifecycleResult } from './presenter-peer-stream-receiver-lifecycle';
