@@ -31,6 +31,7 @@ export async function evaluatePresenterPeerTransportContract({
     { PresenterRemotePeerStreamPublisher },
     { PresenterRemotePeerStreamReceiver },
     { fakePeerTransport },
+    { presenterPeerControlFixture },
   ] = (await Promise.all([
     import(`${presenterRemoteSourceRoot}/peer-control-client.ts`),
     import(`${presenterRemoteSourceRoot}/peer-control-host.ts`),
@@ -38,6 +39,7 @@ export async function evaluatePresenterPeerTransportContract({
     import(`${presenterRemoteSourceRoot}/peer-stream-publisher.ts`),
     import(`${presenterRemoteSourceRoot}/peer-stream-receiver.ts`),
     import(`${testSupportSourceRoot}/fake-peer-transport.ts`),
+    import(`${testSupportSourceRoot}/presenter-peer-control-fixture.ts`),
   ])) as [
     typeof import('../../../packages/presenter-remote/src/peer-control-client'),
     typeof import('../../../packages/presenter-remote/src/peer-control-host'),
@@ -45,6 +47,7 @@ export async function evaluatePresenterPeerTransportContract({
     typeof import('../../../packages/presenter-remote/src/peer-stream-publisher'),
     typeof import('../../../packages/presenter-remote/src/peer-stream-receiver'),
     typeof import('../support/fake-peer-transport'),
+    typeof import('../support/presenter-peer-control-fixture'),
   ];
 
   const commands: unknown[] = [];
@@ -59,43 +62,15 @@ export async function evaluatePresenterPeerTransportContract({
   });
   await host.open();
   const hostOpenCount = await host.open().then(() => 1);
-  host.publishState({
-    activePageId: 'slide-1',
-    activePageIndex: 0,
-    buildsRemaining: 0,
-    connectedControllerCount: 0,
-    deckName: 'Transport contract',
-    notes: '',
-    pageCount: 1,
-    presenterMode: 'presenting',
-    shortcuts: [],
-    timer: { elapsedMs: 0, paused: true },
-    type: 'state',
-  });
+  host.publishState(presenterPeerControlFixture.createHostState());
   const hostConnection = fakePeerTransport.createDataConnection();
   hostPeer.emit('connection', hostConnection);
   hostConnection.emit('data', { command: 'request-state', type: 'command' });
-  host.publishPreviewBatch({
-    previews: [{ id: 'slide-1', name: 'Intro' }],
-    requestId: 'preview-request',
-    type: 'preview-batch',
-  });
+  host.publishPreviewBatch(presenterPeerControlFixture.createHostPreviewBatch());
   const throwingHostConnection = fakePeerTransport.createDataConnection();
   throwingHostConnection.throwOnSend = true;
   hostPeer.emit('connection', throwingHostConnection);
-  host.publishState({
-    activePageId: 'slide-2',
-    activePageIndex: 1,
-    buildsRemaining: 0,
-    connectedControllerCount: 0,
-    deckName: 'Transport contract',
-    notes: '',
-    pageCount: 2,
-    presenterMode: 'ready',
-    shortcuts: [],
-    timer: { elapsedMs: 100, paused: false },
-    type: 'state',
-  });
+  host.publishState(presenterPeerControlFixture.createReadyState());
   throwingHostConnection.emit('error', new Error('host connection failed'));
   host.close();
 
@@ -112,24 +87,8 @@ export async function evaluatePresenterPeerTransportContract({
   });
   await client.start();
   const clientConnection = clientPeer.lastDataConnection;
-  clientConnection?.emit('data', {
-    previews: [{ id: 'slide-1', name: 'Intro' }],
-    requestId: 'preview-request',
-    type: 'preview-batch',
-  });
-  clientConnection?.emit('data', {
-    activePageId: 'slide-1',
-    activePageIndex: 0,
-    buildsRemaining: 0,
-    connectedControllerCount: 1,
-    deckName: 'Transport contract',
-    notes: '',
-    pageCount: 1,
-    presenterMode: 'ready',
-    shortcuts: [],
-    timer: { elapsedMs: 0, paused: true },
-    type: 'state',
-  });
+  clientConnection?.emit('data', presenterPeerControlFixture.createClientPreviewBatch());
+  clientConnection?.emit('data', presenterPeerControlFixture.createClientState());
   clientConnection?.emit('data', { type: 'ignored' });
   const sentCommandSucceeded = client.sendCommand({ command: 'next', type: 'command' });
   if (clientConnection) clientConnection.throwOnSend = true;
@@ -183,12 +142,8 @@ export async function evaluatePresenterPeerTransportContract({
     publisherAnsweredCall: publisherCall.answeredStream === stream,
     receiverStatuses,
     requestStateSent:
-      clientConnection?.sentMessages.some(
-        (message) =>
-          typeof message === 'object' &&
-          message !== null &&
-          'command' in message &&
-          message.command === 'request-state',
+      clientConnection?.sentMessages.some((message) =>
+        presenterPeerControlFixture.hasCommand(message, 'request-state'),
       ) ?? false,
     sentCommandFailed,
     sentCommandSucceeded,

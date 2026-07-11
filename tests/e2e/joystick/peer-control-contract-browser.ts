@@ -48,6 +48,7 @@ export async function evaluateJoystickPeerControlContract({
     { PresenterRemotePeerStreamPublisher },
     { PresenterRemotePeerStreamReceiver },
     { fakePeerTransport },
+    { presenterPeerControlFixture },
   ] = (await Promise.all([
     import(`${sourceRoot}/peer-control-client.ts`),
     import(`${sourceRoot}/peer-control-host.ts`),
@@ -55,6 +56,7 @@ export async function evaluateJoystickPeerControlContract({
     import(`${sourceRoot}/peer-stream-publisher.ts`),
     import(`${sourceRoot}/peer-stream-receiver.ts`),
     import(`${testSupportSourceRoot}/fake-peer-transport.ts`),
+    import(`${testSupportSourceRoot}/presenter-peer-control-fixture.ts`),
   ])) as [
     typeof import('../../../packages/presenter-remote/src/peer-control-client'),
     typeof import('../../../packages/presenter-remote/src/peer-control-host'),
@@ -62,6 +64,7 @@ export async function evaluateJoystickPeerControlContract({
     typeof import('../../../packages/presenter-remote/src/peer-stream-publisher'),
     typeof import('../../../packages/presenter-remote/src/peer-stream-receiver'),
     typeof import('../support/fake-peer-transport'),
+    typeof import('../support/presenter-peer-control-fixture'),
   ];
 
   const commands: unknown[] = [];
@@ -76,62 +79,17 @@ export async function evaluateJoystickPeerControlContract({
   });
 
   const session = await host.open();
-  host.publishState({
-    activePageId: 'slide-1',
-    activePageIndex: 0,
-    buildsRemaining: 1,
-    canGoNext: true,
-    canGoPrevious: false,
-    connectedControllerCount: 0,
-    currentSlideIndex: 0,
-    deckName: 'Peer contract',
-    notes: 'Speaker note',
-    pageCount: 2,
-    pages: [{ id: 'slide-1', index: 0, title: 'Intro' }],
-    presenterMode: 'presenting',
-    shortcuts: ['Swipe to navigate'],
-    slideCount: 2,
-    slidePreview: { pageId: 'slide-1', preview: 'data:image/png;base64,AA==' },
-    slideTitle: 'Intro',
-    stream: { peerId: 'stream-peer-1', status: 'available' },
-    timer: { elapsedMs: 1_000, paused: false },
-    timerElapsedMs: 1_000,
-    timerRunning: true,
-    type: 'state',
-  });
+  host.publishState(presenterPeerControlFixture.createHostState());
 
   const primaryConnection = fakePeerTransport.createDataConnection();
   controlPeer.emit('connection', primaryConnection);
   primaryConnection.emit('data', { command: 'request-state', type: 'command' });
-  host.publishPreviewBatch({
-    previews: [{ pageId: 'slide-1', preview: 'data:image/png;base64,AA==' }],
-    requestId: 'preview-request-1',
-    type: 'preview-batch',
-  });
+  host.publishPreviewBatch(presenterPeerControlFixture.createHostPreviewBatch());
 
   const throwingConnection = fakePeerTransport.createDataConnection();
   throwingConnection.throwOnSend = true;
   controlPeer.emit('connection', throwingConnection);
-  host.publishState({
-    activePageId: 'slide-2',
-    activePageIndex: 1,
-    buildsRemaining: 0,
-    canGoNext: false,
-    canGoPrevious: true,
-    connectedControllerCount: 0,
-    currentSlideIndex: 1,
-    deckName: 'Peer contract',
-    notes: '',
-    pageCount: 2,
-    presenterMode: 'presenting',
-    shortcuts: [],
-    slideCount: 2,
-    slideTitle: 'Close',
-    timer: { elapsedMs: 2_000, paused: true },
-    timerElapsedMs: 2_000,
-    timerRunning: false,
-    type: 'state',
-  });
+  host.publishState(presenterPeerControlFixture.createReadyState());
   throwingConnection.emit('error', new Error('connection failed'));
   const connectionRemovedAfterError = throwingConnection.wasClosed === false;
   host.close();
@@ -167,31 +125,11 @@ export async function evaluateJoystickPeerControlContract({
   await client.start();
   const clientConnection = clientPeer.lastDataConnection;
   const clientRequestStateSent =
-    clientConnection?.sentMessages.some(
-      (message) =>
-        typeof message === 'object' &&
-        message !== null &&
-        'command' in message &&
-        message.command === 'request-state',
+    clientConnection?.sentMessages.some((message) =>
+      presenterPeerControlFixture.hasCommand(message, 'request-state'),
     ) ?? false;
-  clientConnection?.emit('data', {
-    previews: [{ id: 'slide-1', name: 'Intro' }],
-    requestId: 'client-preview-request',
-    type: 'preview-batch',
-  });
-  clientConnection?.emit('data', {
-    activePageId: 'slide-1',
-    activePageIndex: 0,
-    buildsRemaining: 0,
-    connectedControllerCount: 1,
-    deckName: 'Client state',
-    notes: '',
-    pageCount: 1,
-    presenterMode: 'ready',
-    shortcuts: [],
-    timer: { elapsedMs: 0, paused: true },
-    type: 'state',
-  });
+  clientConnection?.emit('data', presenterPeerControlFixture.createClientPreviewBatch());
+  clientConnection?.emit('data', presenterPeerControlFixture.createClientState());
   clientConnection?.emit('data', { type: 'ignored' });
   const clientCommandSent = client.sendCommand({ command: 'next', type: 'command' });
   if (clientConnection) clientConnection.throwOnSend = true;
@@ -241,36 +179,26 @@ export async function evaluateJoystickPeerControlContract({
     commandCount: commands.length,
     connectionRemovedAfterError,
     destroyedPeerCount: Number(controlPeer.destroyed) + Number(streamPeer.destroyed),
-    initialStateMessages: primaryConnection.sentMessages.filter(
+    initialStateMessages: presenterPeerControlFixture.countMessages(
+      primaryConnection.sentMessages,
       (message) => typeof message === 'object' && message !== null && 'type' in message,
-    ).length,
+    ),
     peerOpenResolved,
-    previewMessages: primaryConnection.sentMessages.filter(
-      (message) =>
-        typeof message === 'object' &&
-        message !== null &&
-        'type' in message &&
-        message.type === 'preview-batch',
-    ).length,
-    publishedStateMessages: primaryConnection.sentMessages.filter(
-      (message) =>
-        typeof message === 'object' &&
-        message !== null &&
-        'type' in message &&
-        message.type === 'state',
-    ).length,
+    previewMessages: presenterPeerControlFixture.countMessages(
+      primaryConnection.sentMessages,
+      (message) => presenterPeerControlFixture.hasType(message, 'preview-batch'),
+    ),
+    publishedStateMessages: presenterPeerControlFixture.countMessages(
+      primaryConnection.sentMessages,
+      (message) => presenterPeerControlFixture.hasType(message, 'state'),
+    ),
     receiverClearedStream: receiverStreams.at(-1) === undefined,
     receiverGotStream: receiverStreams.includes(receivedStream),
     receiverStatuses,
-    requestedStateMessages: primaryConnection.sentMessages.filter(
-      (message) =>
-        typeof message === 'object' &&
-        message !== null &&
-        'type' in message &&
-        message.type === 'state' &&
-        'connectedControllerCount' in message &&
-        message.connectedControllerCount === 1,
-    ).length,
+    requestedStateMessages: presenterPeerControlFixture.countMessages(
+      primaryConnection.sentMessages,
+      (message) => presenterPeerControlFixture.hasConnectedControllerCount(message, 1),
+    ),
     session,
     streamPeerId,
     timeoutMessage,
