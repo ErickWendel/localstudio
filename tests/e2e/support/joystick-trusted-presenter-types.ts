@@ -9,6 +9,11 @@ export type E2EJoystickRemote = {
   setPresenterMode: (presenterMode: PresenterRemoteState['presenterMode']) => void;
 };
 
+export type E2EJoystickRemoteRuntime = E2EJoystickRemote & {
+  getState: () => PresenterRemoteState;
+  publishCommand: (command: PresenterRemoteCommand) => boolean;
+};
+
 export interface JoystickTrustedPresenterInstallConfig {
   initialState: PresenterRemoteState;
   sessions: PresenterRemoteSession[];
@@ -17,6 +22,7 @@ export interface JoystickTrustedPresenterInstallConfig {
 declare global {
   interface Window {
     __LOCALSTUDIO_E2E_JOYSTICK__?: E2EJoystickRemote | undefined;
+    __LOCALSTUDIO_E2E_JOYSTICK_RUNTIME__?: E2EJoystickRemoteRuntime | undefined;
     __LOCALSTUDIO_JOYSTICK_SIGNALING_SERVICE__?:
       | {
           connectController?: (code: string) => PresenterRemoteSession | undefined;
