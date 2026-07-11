@@ -2,6 +2,10 @@ import {
   loadPresenterPeerControlModules,
   type PresenterPeerControlContractHarnessInput,
 } from './presenter-peer-control-modules';
+import { createPresenterPeerControlHostPreviewBatch } from './presenter-peer-control-host-preview-batch-fixture';
+import { createPresenterPeerControlHostState } from './presenter-peer-control-host-state-fixture';
+import { presenterPeerControlMessagePredicates } from './presenter-peer-control-message-predicates';
+import { createPresenterPeerControlReadyState } from './presenter-peer-control-ready-state-fixture';
 
 export type PresenterPeerControlHostLifecycleInput = PresenterPeerControlContractHarnessInput & {
   peerId: string;
@@ -35,8 +39,7 @@ export async function runPresenterPeerControlHostLifecycle({
   presenterLabel,
   ...input
 }: PresenterPeerControlHostLifecycleInput): Promise<PresenterPeerControlHostLifecycleResult> {
-  const { PresenterRemotePeerControlHost, fakePeerTransport, presenterPeerControlFixture } =
-    await loadPresenterPeerControlModules(input);
+  const { PresenterRemotePeerControlHost, fakePeerTransport } = await loadPresenterPeerControlModules(input);
   const commands: unknown[] = [];
   const hostPeer = fakePeerTransport.createPeer(peerId);
   const host = new PresenterRemotePeerControlHost({
@@ -49,15 +52,15 @@ export async function runPresenterPeerControlHostLifecycle({
   });
 
   const session = await host.open();
-  host.publishState(presenterPeerControlFixture.createHostState());
+  host.publishState(createPresenterPeerControlHostState());
   const hostConnection = fakePeerTransport.createDataConnection();
   hostPeer.emit('connection', hostConnection);
   hostConnection.emit('data', { command: 'request-state', type: 'command' });
-  host.publishPreviewBatch(presenterPeerControlFixture.createHostPreviewBatch());
+  host.publishPreviewBatch(createPresenterPeerControlHostPreviewBatch());
   const throwingHostConnection = fakePeerTransport.createDataConnection();
   throwingHostConnection.throwOnSend = true;
   hostPeer.emit('connection', throwingHostConnection);
-  host.publishState(presenterPeerControlFixture.createReadyState());
+  host.publishState(createPresenterPeerControlReadyState());
   throwingHostConnection.emit('error', new Error('host connection failed'));
   const connectionRemovedAfterError = throwingHostConnection.wasClosed === false;
   host.close();
@@ -68,21 +71,21 @@ export async function runPresenterPeerControlHostLifecycle({
     connectionRemovedAfterError,
     destroyedPeer: hostPeer.destroyed,
     hostClosed: hostConnection.wasClosed,
-    initialStateMessages: presenterPeerControlFixture.countMessages(
+    initialStateMessages: presenterPeerControlMessagePredicates.countMessages(
       hostConnection.sentMessages,
       (message) => typeof message === 'object' && message !== null && 'type' in message,
     ),
-    previewMessages: presenterPeerControlFixture.countMessages(
+    previewMessages: presenterPeerControlMessagePredicates.countMessages(
       hostConnection.sentMessages,
-      (message) => presenterPeerControlFixture.hasType(message, 'preview-batch'),
+      (message) => presenterPeerControlMessagePredicates.hasType(message, 'preview-batch'),
     ),
-    publishedStateMessages: presenterPeerControlFixture.countMessages(
+    publishedStateMessages: presenterPeerControlMessagePredicates.countMessages(
       hostConnection.sentMessages,
-      (message) => presenterPeerControlFixture.hasType(message, 'state'),
+      (message) => presenterPeerControlMessagePredicates.hasType(message, 'state'),
     ),
-    requestedStateMessages: presenterPeerControlFixture.countMessages(
+    requestedStateMessages: presenterPeerControlMessagePredicates.countMessages(
       hostConnection.sentMessages,
-      (message) => presenterPeerControlFixture.hasConnectedControllerCount(message, 1),
+      (message) => presenterPeerControlMessagePredicates.hasConnectedControllerCount(message, 1),
     ),
     session,
   };

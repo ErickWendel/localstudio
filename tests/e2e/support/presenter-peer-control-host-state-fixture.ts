@@ -1,0 +1,25 @@
+export function createPresenterPeerControlHostState() {
+  return {
+    activePageId: 'slide-1',
+    activePageIndex: 0,
+    buildsRemaining: 1,
+    canGoNext: true,
+    canGoPrevious: false,
+    connectedControllerCount: 0,
+    currentSlideIndex: 0,
+    deckName: 'Peer contract',
+    notes: 'Speaker note',
+    pageCount: 2,
+    pages: [{ id: 'slide-1', index: 0, title: 'Intro' }],
+    presenterMode: 'presenting',
+    shortcuts: ['Swipe to navigate'],
+    slideCount: 2,
+    slidePreview: { pageId: 'slide-1', preview: 'data:image/png;base64,AA==' },
+    slideTitle: 'Intro',
+    stream: { peerId: 'stream-peer-1', status: 'available' },
+    timer: { elapsedMs: 1_000, paused: false },
+    timerElapsedMs: 1_000,
+    timerRunning: true,
+    type: 'state',
+  };
+}

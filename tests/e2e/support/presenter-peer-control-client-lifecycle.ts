@@ -2,6 +2,9 @@ import {
   loadPresenterPeerControlModules,
   type PresenterPeerControlContractHarnessInput,
 } from './presenter-peer-control-modules';
+import { createPresenterPeerControlClientPreviewBatch } from './presenter-peer-control-client-preview-batch-fixture';
+import { createPresenterPeerControlClientState } from './presenter-peer-control-client-state-fixture';
+import { presenterPeerControlMessagePredicates } from './presenter-peer-control-message-predicates';
 
 export type PresenterPeerControlClientLifecycleInput = PresenterPeerControlContractHarnessInput & {
   clientPeerId: string;
@@ -25,8 +28,7 @@ export async function runPresenterPeerControlClientLifecycle({
   terminalEvent,
   ...input
 }: PresenterPeerControlClientLifecycleInput): Promise<PresenterPeerControlClientLifecycleResult> {
-  const { PresenterRemotePeerControlClient, fakePeerTransport, presenterPeerControlFixture } =
-    await loadPresenterPeerControlModules(input);
+  const { PresenterRemotePeerControlClient, fakePeerTransport } = await loadPresenterPeerControlModules(input);
   const clientPeer = fakePeerTransport.createPeer(clientPeerId);
   const statuses: string[] = [];
   const states: unknown[] = [];
@@ -41,8 +43,8 @@ export async function runPresenterPeerControlClientLifecycle({
 
   await client.start();
   const clientConnection = clientPeer.lastDataConnection;
-  clientConnection?.emit('data', presenterPeerControlFixture.createClientPreviewBatch());
-  clientConnection?.emit('data', presenterPeerControlFixture.createClientState());
+  clientConnection?.emit('data', createPresenterPeerControlClientPreviewBatch());
+  clientConnection?.emit('data', createPresenterPeerControlClientState());
   clientConnection?.emit('data', { type: 'ignored' });
   const commandSent = client.sendCommand({ command: 'next', type: 'command' });
   if (clientConnection) clientConnection.throwOnSend = true;
@@ -61,7 +63,7 @@ export async function runPresenterPeerControlClientLifecycle({
     previewBatchCount: previewBatches.length,
     requestStateSent:
       clientConnection?.sentMessages.some((message) =>
-        presenterPeerControlFixture.hasCommand(message, 'request-state'),
+        presenterPeerControlMessagePredicates.hasCommand(message, 'request-state'),
       ) ?? false,
     stateCount: states.length,
     statuses,
