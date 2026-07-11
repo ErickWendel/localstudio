@@ -1,6 +1,8 @@
 import { EditorAppPage } from '../pages/editor-app.page';
 import { expect, test } from '../support/journey-test';
-import { presenterProtocolFixture } from '../support/presenter-protocol-fixture';
+import { createPresenterProtocolCommands } from '../support/presenter-protocol-commands-fixture';
+import { createPresenterProtocolPreview } from '../support/presenter-protocol-preview-fixture';
+import { createPresenterProtocolState } from '../support/presenter-protocol-state-fixture';
 import { evaluatePresenterProtocolValidatorContract } from './presenter-protocol-validator-contract-browser';
 import { serviceContractsSupport } from './service-contracts-support';
 
@@ -9,10 +11,10 @@ test('executes presenter protocol validator contracts in the browser runtime', a
   await editor.gotoNewProject();
 
   const result = await page.evaluate(evaluatePresenterProtocolValidatorContract, {
-    commands: presenterProtocolFixture.createCommands(),
+    commands: createPresenterProtocolCommands(),
     presenterRemoteSourceRoot: serviceContractsSupport.presenterRemoteSourceRoot,
-    preview: presenterProtocolFixture.createPreview(),
-    state: presenterProtocolFixture.createState(),
+    preview: createPresenterProtocolPreview(),
+    state: createPresenterProtocolState(),
   });
 
   expect(result).toMatchObject({

@@ -7,14 +7,14 @@ export async function evaluatePresenterProtocolPreviewBatchChecks({
   presenterRemoteSourceRoot,
   testSupportSourceRoot,
 }: PresenterProtocolPreviewBatchChecksInput): Promise<Record<string, boolean>> {
-  const [{ presenterRemoteProtocol }, { presenterProtocolFixture }] = (await Promise.all([
+  const [{ presenterRemoteProtocol }, { createPresenterProtocolPreview }] = (await Promise.all([
     import(`${presenterRemoteSourceRoot}/protocol.ts`),
-    import(`${testSupportSourceRoot}/presenter-protocol-fixture.ts`),
+    import(`${testSupportSourceRoot}/presenter-protocol-preview-fixture.ts`),
   ])) as [
     typeof import('../../../packages/presenter-remote/src/protocol'),
-    typeof import('./presenter-protocol-fixture'),
+    typeof import('./presenter-protocol-preview-fixture'),
   ];
-  const slidePreview = presenterProtocolFixture.createPreview();
+  const slidePreview = createPresenterProtocolPreview();
 
   return {
     acceptsFullPreview: presenterRemoteProtocol.isPreviewBatch({

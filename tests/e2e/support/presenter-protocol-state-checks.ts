@@ -7,14 +7,14 @@ export async function evaluatePresenterProtocolStateChecks({
   presenterRemoteSourceRoot,
   testSupportSourceRoot,
 }: PresenterProtocolStateChecksInput): Promise<Record<string, boolean>> {
-  const [{ presenterRemoteProtocol }, { presenterProtocolFixture }] = (await Promise.all([
+  const [{ presenterRemoteProtocol }, { createPresenterProtocolState }] = (await Promise.all([
     import(`${presenterRemoteSourceRoot}/protocol.ts`),
-    import(`${testSupportSourceRoot}/presenter-protocol-fixture.ts`),
+    import(`${testSupportSourceRoot}/presenter-protocol-state-fixture.ts`),
   ])) as [
     typeof import('../../../packages/presenter-remote/src/protocol'),
-    typeof import('./presenter-protocol-fixture'),
+    typeof import('./presenter-protocol-state-fixture'),
   ];
-  const state = presenterProtocolFixture.createState();
+  const state = createPresenterProtocolState();
 
   return {
     acceptsFullState: presenterRemoteProtocol.isState(state),
