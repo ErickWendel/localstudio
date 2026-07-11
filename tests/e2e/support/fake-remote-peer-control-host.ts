@@ -1,3 +1,8 @@
+import {
+  createFakeRemotePeerControlSession,
+  type FakeRemotePeerControlSession,
+} from './fake-remote-peer-control-session';
+
 export type FakeRemoteCommand =
   | { command: 'go-to-page'; pageId: string; type: 'command' }
   | { command: 'next'; type: 'command' }
@@ -17,16 +22,7 @@ export type FakeRemotePeerControlHost = {
   attach(options: FakeRemotePeerControlHostOptions): FakeRemotePeerControlHost;
   close(): void;
   emitCommand(command: FakeRemoteCommand): void;
-  open(): Promise<{
-    code: string;
-    connectedControllerCount: number;
-    controlPeerId: string;
-    expiresAt: string;
-    presenterDeviceId: string;
-    presenterLabel: string;
-    sessionId: string;
-    transport: 'peerjs';
-  }>;
+  open(): Promise<FakeRemotePeerControlSession>;
   publishPreviewBatch(batch: unknown): void;
   publishState(state: unknown): void;
 };
@@ -53,27 +49,9 @@ export function createFakeRemotePeerControlHost(): FakeRemotePeerControlHost {
       options?.onCommand?.(command);
     },
 
-    open(): Promise<{
-      code: string;
-      connectedControllerCount: number;
-      controlPeerId: string;
-      expiresAt: string;
-      presenterDeviceId: string;
-      presenterLabel: string;
-      sessionId: string;
-      transport: 'peerjs';
-    }> {
+    open(): Promise<FakeRemotePeerControlSession> {
       this.openCount += 1;
-      return Promise.resolve({
-        code: 'peer-control-1',
-        connectedControllerCount: 0,
-        controlPeerId: 'peer-control-1',
-        expiresAt: '2026-07-10T12:01:00.000Z',
-        presenterDeviceId: 'presenter-device-1',
-        presenterLabel: 'Studio laptop',
-        sessionId: 'peer-session-1',
-        transport: 'peerjs',
-      });
+      return Promise.resolve(createFakeRemotePeerControlSession());
     },
 
     publishPreviewBatch(batch: unknown): void {
