@@ -11,6 +11,7 @@ test('executes joystick PeerJS transport contracts in the browser runtime', asyn
 
   const result = await page.evaluate(evaluateJoystickPeerControlContract, {
     sourceRoot: joystickSignalingContractRuntime.presenterRemoteSourceRoot,
+    testSupportSourceRoot: joystickSignalingContractRuntime.testSupportSourceRoot,
   });
 
   expect(result.session).toMatchObject({

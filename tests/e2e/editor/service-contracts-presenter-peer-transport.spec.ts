@@ -8,7 +8,10 @@ test('executes presenter PeerJS transport contracts in the browser runtime', asy
     page,
     serviceContractsSupport.getServer().baseURL,
     evaluatePresenterPeerTransportContract,
-    { presenterRemoteSourceRoot: serviceContractsSupport.presenterRemoteSourceRoot },
+    {
+      presenterRemoteSourceRoot: serviceContractsSupport.presenterRemoteSourceRoot,
+      testSupportSourceRoot: serviceContractsSupport.testSupportSourceRoot,
+    },
   );
 
   expect(result.clientStatuses).toEqual(['connecting', 'connected', 'failed']);

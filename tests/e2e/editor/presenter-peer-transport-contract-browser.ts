@@ -1,5 +1,6 @@
 export type PresenterPeerTransportContractInput = {
   presenterRemoteSourceRoot: string;
+  testSupportSourceRoot: string;
 };
 
 export type PresenterPeerTransportContractResult = {
@@ -19,105 +20,35 @@ export type PresenterPeerTransportContractResult = {
   timeoutMessage: string;
 };
 
-type Listener = (...args: unknown[]) => void;
-
 export async function evaluatePresenterPeerTransportContract({
   presenterRemoteSourceRoot,
+  testSupportSourceRoot,
 }: PresenterPeerTransportContractInput): Promise<PresenterPeerTransportContractResult> {
-  class FakeEventTarget {
-    private readonly listeners = new Map<string, Listener[]>();
-
-    emit(eventName: string, ...args: unknown[]): void {
-      for (const listener of this.listeners.get(eventName) ?? []) listener(...args);
-    }
-
-    on(eventName: string, listener: Listener): void {
-      const listeners = this.listeners.get(eventName) ?? [];
-      listeners.push(listener);
-      this.listeners.set(eventName, listeners);
-    }
-  }
-
-  class FakeDataConnection extends FakeEventTarget {
-    open = true;
-    sentMessages: unknown[] = [];
-    throwOnSend = false;
-    wasClosed = false;
-
-    close(): void {
-      this.wasClosed = true;
-      this.emit('close');
-    }
-
-    send(message: unknown): void {
-      if (this.throwOnSend) throw new Error('send failed');
-      this.sentMessages.push(message);
-    }
-  }
-
-  class FakeMediaConnection extends FakeEventTarget {
-    answeredStream: MediaStream | undefined;
-    wasClosed = false;
-
-    answer(stream: MediaStream): void {
-      this.answeredStream = stream;
-    }
-
-    close(): void {
-      this.wasClosed = true;
-      this.emit('close');
-    }
-  }
-
-  class FakePeer extends FakeEventTarget {
-    destroyed = false;
-    lastDataConnection: FakeDataConnection | undefined;
-    lastMediaConnection: FakeMediaConnection | undefined;
-    open = true;
-
-    constructor(readonly id: string) {
-      super();
-    }
-
-    call(): FakeMediaConnection {
-      const call = new FakeMediaConnection();
-      this.lastMediaConnection = call;
-      return call;
-    }
-
-    connect(): FakeDataConnection {
-      const connection = new FakeDataConnection();
-      this.lastDataConnection = connection;
-      return connection;
-    }
-
-    destroy(): void {
-      this.destroyed = true;
-    }
-  }
-
   const [
     { PresenterRemotePeerControlClient },
     { PresenterRemotePeerControlHost },
     { presenterRemotePeerOpen },
     { PresenterRemotePeerStreamPublisher },
     { PresenterRemotePeerStreamReceiver },
+    { fakePeerTransport },
   ] = (await Promise.all([
     import(`${presenterRemoteSourceRoot}/peer-control-client.ts`),
     import(`${presenterRemoteSourceRoot}/peer-control-host.ts`),
     import(`${presenterRemoteSourceRoot}/peer-open.ts`),
     import(`${presenterRemoteSourceRoot}/peer-stream-publisher.ts`),
     import(`${presenterRemoteSourceRoot}/peer-stream-receiver.ts`),
+    import(`${testSupportSourceRoot}/fake-peer-transport.ts`),
   ])) as [
     typeof import('../../../packages/presenter-remote/src/peer-control-client'),
     typeof import('../../../packages/presenter-remote/src/peer-control-host'),
     typeof import('../../../packages/presenter-remote/src/peer-open'),
     typeof import('../../../packages/presenter-remote/src/peer-stream-publisher'),
     typeof import('../../../packages/presenter-remote/src/peer-stream-receiver'),
+    typeof import('../support/fake-peer-transport'),
   ];
 
   const commands: unknown[] = [];
-  const hostPeer = new FakePeer('host-peer');
+  const hostPeer = fakePeerTransport.createPeer('host-peer');
   const host = new PresenterRemotePeerControlHost({
     now: () => Date.parse('2026-07-10T12:00:00.000Z'),
     onCommand: (command) => commands.push(command),
@@ -141,7 +72,7 @@ export async function evaluatePresenterPeerTransportContract({
     timer: { elapsedMs: 0, paused: true },
     type: 'state',
   });
-  const hostConnection = new FakeDataConnection();
+  const hostConnection = fakePeerTransport.createDataConnection();
   hostPeer.emit('connection', hostConnection);
   hostConnection.emit('data', { command: 'request-state', type: 'command' });
   host.publishPreviewBatch({
@@ -149,7 +80,7 @@ export async function evaluatePresenterPeerTransportContract({
     requestId: 'preview-request',
     type: 'preview-batch',
   });
-  const throwingHostConnection = new FakeDataConnection();
+  const throwingHostConnection = fakePeerTransport.createDataConnection();
   throwingHostConnection.throwOnSend = true;
   hostPeer.emit('connection', throwingHostConnection);
   host.publishState({
@@ -168,7 +99,7 @@ export async function evaluatePresenterPeerTransportContract({
   throwingHostConnection.emit('error', new Error('host connection failed'));
   host.close();
 
-  const clientPeer = new FakePeer('client-peer');
+  const clientPeer = fakePeerTransport.createPeer('client-peer');
   const clientStatuses: string[] = [];
   const states: unknown[] = [];
   const previewBatches: unknown[] = [];
@@ -207,18 +138,18 @@ export async function evaluatePresenterPeerTransportContract({
   client.close();
 
   const stream = new MediaStream();
-  const publisherPeer = new FakePeer('publisher-peer');
+  const publisherPeer = fakePeerTransport.createPeer('publisher-peer');
   const publisher = new PresenterRemotePeerStreamPublisher({
     peerFactory: () => publisherPeer as never,
     stream,
   });
   const streamPeerId = await publisher.start();
-  const publisherCall = new FakeMediaConnection();
+  const publisherCall = fakePeerTransport.createMediaConnection();
   publisherPeer.emit('call', publisherCall);
   publisherCall.emit('close');
   publisher.stop();
 
-  const receiverPeer = new FakePeer('receiver-peer');
+  const receiverPeer = fakePeerTransport.createPeer('receiver-peer');
   const receiverStatuses: string[] = [];
   const receiver = new PresenterRemotePeerStreamReceiver({
     onStatusChange: (status) => receiverStatuses.push(status),
