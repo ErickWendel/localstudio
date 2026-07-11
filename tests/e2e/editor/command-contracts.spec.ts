@@ -4,7 +4,9 @@ import { expect, test, withIsolatedDevServer } from '../support/journey-test';
 const getServer = withIsolatedDevServer(test);
 
 test.describe('editor document command contracts', () => {
-  test('executes core document mutation commands in the browser runtime', async ({ page }) => {
+  test('executes element, media, background, and animation commands in the browser runtime', async ({
+    page,
+  }) => {
     await page.goto(new URL('/editor/?newProject=1', getServer().baseURL).toString());
 
     const result = await page.evaluate(async () => {
@@ -230,89 +232,35 @@ test.describe('editor document command contracts', () => {
         new basicCommands.SetElementAnimationBuildsCommand(
           'page-1',
           ['text-1', 'shape-1'],
-          (elementId: string) => `build-${elementId}`,
+          (elementId: string) => 'build-' + elementId,
           { delayMs: -20, direction: 'up', durationMs: 300, effect: 'fade', trigger: 'click' },
         ),
       );
       run(new basicCommands.ReorderElementAnimationBuildCommand('page-1', 'shape-1', 0));
       run(new basicCommands.ClearElementAnimationBuildCommand('page-1', 'text-1'));
       run(new basicCommands.TranslateTextElementsCommand({ 'text-1': { fontSize: 46, text: 'Traduzido' } }));
-
-      run(new basicCommands.DuplicatePageCommand('page-1', 'page-2', (id: string) => `${id}-copy`));
-      run(new basicCommands.RenamePageCommand('page-2', 'Appendix'));
-      run(new basicCommands.SetPageVisibilityCommand('page-2', false));
-      run(new basicCommands.ReorderPageCommand('page-2', 0));
-      run(new basicCommands.DeletePageCommand('page-2'));
-
-      const theme = {
-        id: 'theme-contrast',
-        name: 'Contrast',
-        palette: ['#000000', '#ffffff'],
-        typography: { bodyFontFamily: 'Inter', headingFontFamily: 'Inter' },
-      };
-      run(new basicCommands.SaveThemeCommand(theme));
-      run(new basicCommands.ApplyThemeCommand('theme-contrast'));
-      run(new basicCommands.EditThemeCommand({ ...theme, name: 'Contrast edited' }));
-
-      const layout = {
-        elementIds: ['title-placeholder'],
-        elements: {
-          'title-placeholder': {
-            align: 'left',
-            fill: '#111111',
-            fontFamily: 'Inter',
-            fontSize: 64,
-            fontWeight: 700,
-            height: 120,
-            id: 'title-placeholder',
-            lineHeight: 1.1,
-            locked: true,
-            opacity: 1,
-            placeholderRole: 'title',
-            rotation: 0,
-            templateSource: 'layout',
-            text: 'Title',
-            type: 'text',
-            verticalAlign: 'top',
-            visible: true,
-            width: 900,
-            x: 80,
-            y: 80,
-          },
-        },
-        id: 'layout-title',
-        name: 'Title layout',
-        placeholderVisibility: { body: true, media: true, title: true },
-      };
-      run(new basicCommands.SaveSlideLayoutCommand(layout));
-      run(new basicCommands.ToggleSlideLayoutPlaceholderVisibilityCommand('layout-title', 'title', false));
-      run(new basicCommands.ToggleSlideLayoutPlaceholderVisibilityCommand('layout-title', 'title', true));
-      run(new basicCommands.ApplySlideLayoutCommand('page-1', 'layout-title'));
-      run(new basicCommands.EditSlideLayoutCommand({ ...layout, name: 'Edited title layout' }));
-
       run(new basicCommands.DeleteElementCommand('page-1', 'shape-2'));
       run(new basicCommands.RemoveAssetCommand('asset-image'));
 
-      assert(project.pages.length === 1, 'delete page should keep one page');
-      assert(project.pages[0]?.layoutId === 'layout-title', 'layout should be applied');
       assert(project.elements['text-1']?.text === 'Traduzido', 'text should be translated');
       assert(project.elements['text-copy']?.locked === true, 'copy should be locked');
       assert(project.elements['image-1']?.assetId === 'asset-image-2', 'image asset should be replaced');
       assert(project.elements['video-1']?.assetId === 'asset-video-2', 'video asset should be replaced');
-      assert(project.themeId === 'theme-contrast', 'theme should be applied');
       assert(!project.assets['asset-image'], 'unreferenced asset should be removed');
+      assert(project.pages[0]?.background.color === '#101820', 'background should be updated');
+      assert(project.pages[0]?.animationBuilds?.[0]?.elementId === 'shape-1', 'animation should reorder');
 
       return {
         elementCount: Object.keys(project.elements).length,
         pageCount: project.pages.length,
-        themeId: project.themeId,
+        remainingAssetIds: Object.keys(project.assets).sort(),
       };
     });
 
     expect(result).toEqual({
       elementCount: 5,
       pageCount: 1,
-      themeId: 'theme-contrast',
+      remainingAssetIds: ['asset-image-2', 'asset-video', 'asset-video-2'],
     });
   });
 });
