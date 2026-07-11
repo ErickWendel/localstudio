@@ -14,14 +14,11 @@ import type {
   ShareMetadata,
   ShareRecord,
   ShareService,
-  StockMediaConfig,
-  StockMediaItem,
-  StockMediaProviderState,
-  StockMediaService,
   TranslatorService,
   VersionHistoryEntry,
 } from '../../../../src/services/contracts/interfaces';
 import type { MinioMirrorConfig } from '../../../../src/services/mirror/minioMirrorService';
+import { editorShellMediaFixtures } from './EditorShell.media-fixtures';
 
 function createAppServices(options: Parameters<typeof createRealAppServices>[0] = {}) {
   vi.stubGlobal('showDirectoryPicker', vi.fn());
@@ -106,74 +103,6 @@ class InstantBackgroundRemovalService implements BackgroundRemovalService {
 
   removeBackground(asset: Asset): Promise<{ asset: Asset }> {
     return Promise.resolve({ asset });
-  }
-}
-
-const stockImage: StockMediaItem = {
-  id: 'photo-1',
-  provider: 'unsplash',
-  kind: 'image',
-  title: 'Mountain sunset',
-  authorName: 'Ada Photo',
-  thumbnailUrl: 'https://images.unsplash.com/photo-1?w=400',
-  mediaUrl: 'https://images.unsplash.com/photo-1?w=1080',
-  width: 1200,
-  height: 800,
-  downloadLocation: 'https://api.unsplash.com/photos/photo-1/download',
-};
-
-const stockGif: StockMediaItem = {
-  id: 'gif-1',
-  provider: 'giphy',
-  kind: 'gif',
-  title: 'Launch GIF',
-  authorName: 'Motion Studio',
-  thumbnailUrl: 'https://media.giphy.com/media/gif-1/200w.gif',
-  mediaUrl: 'https://media.giphy.com/media/gif-1/giphy.gif',
-  videoUrl: 'https://media.giphy.com/media/gif-1/giphy.mp4',
-  width: 480,
-  height: 270,
-};
-
-class ReadyStockMediaService implements StockMediaService {
-  trackedItems: StockMediaItem[] = [];
-
-  loadConfig(): StockMediaConfig {
-    return { giphyApiKey: 'giphy-key', unsplashAccessKey: 'unsplash-key' };
-  }
-
-  saveConfig(): void {
-    return undefined;
-  }
-
-  clearConfig(): void {
-    return undefined;
-  }
-
-  getProviderState(): StockMediaProviderState {
-    return {
-      gifs: { configured: true, provider: 'giphy' },
-      images: { configured: true, provider: 'unsplash' },
-    };
-  }
-
-  searchImages(): Promise<StockMediaItem[]> {
-    return Promise.resolve([stockImage]);
-  }
-
-  searchGifs(): Promise<StockMediaItem[]> {
-    return Promise.resolve([stockGif]);
-  }
-
-  trackImageDownload(item: StockMediaItem): Promise<void> {
-    this.trackedItems.push(item);
-    return Promise.resolve();
-  }
-}
-
-class InvalidImageStockMediaService extends ReadyStockMediaService {
-  override searchImages(): Promise<StockMediaItem[]> {
-    return Promise.reject(new Error('Unsplash image search failed with 401 Unauthorized.'));
   }
 }
 
@@ -479,37 +408,6 @@ function createClipboardData(options: { editorObject?: boolean; files?: File[] }
   };
 }
 
-function createProjectWithVideo(): ProjectDocument {
-  const project = sampleProject.createSampleProject();
-  project.assets['asset-video'] = {
-    id: 'asset-video',
-    type: 'video',
-    name: 'Demo clip',
-    mimeType: 'video/mp4',
-    objectUrl: 'blob:video',
-  };
-  project.elements['video-demo'] = {
-    id: 'video-demo',
-    type: 'video',
-    assetId: 'asset-video',
-    x: 120,
-    y: 80,
-    width: 640,
-    height: 360,
-    rotation: 0,
-    locked: false,
-    visible: true,
-    opacity: 1,
-    loop: false,
-    controls: true,
-    muted: true,
-    autoplayInPreview: true,
-    trimStartSeconds: 0,
-  };
-  project.pages[0]?.elementIds.push('video-demo');
-  return project;
-}
-
 function createReadyPrepareTranslationMock() {
   return vi.fn(
     (
@@ -545,57 +443,12 @@ async function selectImageLayer(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Selected Image' }));
 }
 
-function mockVideoMetadataLoad() {
-  const createElement = document.createElement.bind(document);
-  return vi
-    .spyOn(document, 'createElement')
-    .mockImplementation((tagName: string, options?: ElementCreationOptions) => {
-      const element = createElement(tagName, options);
-      if (tagName.toLowerCase() === 'video') {
-        Object.defineProperty(element, 'videoWidth', { configurable: true, value: 1280 });
-        Object.defineProperty(element, 'videoHeight', { configurable: true, value: 720 });
-        Object.defineProperty(element, 'duration', { configurable: true, value: 8.5 });
-        queueMicrotask(() => {
-          element.dispatchEvent(new Event('loadedmetadata'));
-        });
-      }
-      return element;
-    });
-}
-
-function mockControllableVideoMetadataLoad() {
-  const createElement = document.createElement.bind(document);
-  let videoElement: HTMLElement | undefined;
-  const createElementSpy = vi
-    .spyOn(document, 'createElement')
-    .mockImplementation((tagName: string, options?: ElementCreationOptions) => {
-      const element = createElement(tagName, options);
-      if (tagName.toLowerCase() === 'video') {
-        Object.defineProperty(element, 'videoWidth', { configurable: true, value: 1280 });
-        Object.defineProperty(element, 'videoHeight', { configurable: true, value: 720 });
-        videoElement = element;
-      }
-      return element;
-    });
-
-  return {
-    createElementSpy,
-    hasMetadataTarget() {
-      return Boolean(videoElement);
-    },
-    loadMetadata() {
-      videoElement?.dispatchEvent(new Event('loadedmetadata'));
-    },
-  };
-}
 export const editorShellTestHarness = {
   ConcurrentRecordingTranslatorService,
   DeferredLoadingProjectRepository,
   ImportingProjectRepository,
   InstantBackgroundRemovalService,
-  InvalidImageStockMediaService,
   LoadingProjectRepository,
-  ReadyStockMediaService,
   RecordingMirrorService,
   RecordingShareService,
   RecordingTranslatorService,
@@ -608,16 +461,13 @@ export const editorShellTestHarness = {
   createClipboardData,
   createDeferred,
   createMultiTextProject,
-  createProjectWithVideo,
   createReadyPrepareTranslationMock,
   enableSyncedSharing,
+  ...editorShellMediaFixtures,
   mirrorConfig,
-  mockControllableVideoMetadataLoad,
-  mockVideoMetadataLoad,
   openLeftTab,
   selectImageLayer,
   selectTitleLayer,
   startFullscreenPresentation,
-  stockImage,
   waitForShareButtonReady,
 };
