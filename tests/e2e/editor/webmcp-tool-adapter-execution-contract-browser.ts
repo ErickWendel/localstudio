@@ -1,19 +1,15 @@
-export type WebMcpToolAdapterContractResult = {
+export type WebMcpToolAdapterExecutionContractResult = {
   controllerCalls: Array<{ input: unknown; name: string }>;
   createProjectBlank: unknown;
   createProjectNamed: unknown;
   generatedImage: unknown;
   generatedSlides: unknown;
-  individuallyRegisteredNames: string[];
-  registeredNames: string[];
   snapshot: unknown;
   translated: unknown;
   translatedWithoutPage: unknown;
-  toolDescriptions: string[];
-  toolNames: string[];
 };
 
-export async function evaluateWebMcpToolAdapterContract(): Promise<WebMcpToolAdapterContractResult> {
+export async function evaluateWebMcpToolAdapterExecutionContract(): Promise<WebMcpToolAdapterExecutionContractResult> {
   const { WebMcpToolAdapter } = (await import(
     '/editor/src/services/webmcp/webMcpToolAdapter.ts'
   )) as typeof import('../../../apps/editor/src/services/webmcp/webMcpToolAdapter');
@@ -63,31 +59,15 @@ export async function evaluateWebMcpToolAdapterContract(): Promise<WebMcpToolAda
     targetLanguage: 'es',
   });
   const snapshot = await tools[4].execute({});
-  const registeredNames: string[] = [];
-  const unregisterBatch = adapter.register({
-    registerTools: (registeredTools) => {
-      registeredNames.push(...registeredTools.map((tool) => tool.name));
-    },
-  });
-  unregisterBatch();
-  const individuallyRegisteredNames: string[] = [];
-  adapter.register({
-    registerTool: (tool) => {
-      individuallyRegisteredNames.push(tool.name);
-    },
-  });
+
   return {
     controllerCalls,
     createProjectBlank,
     createProjectNamed,
     generatedImage,
     generatedSlides,
-    individuallyRegisteredNames,
-    registeredNames,
     snapshot,
     translated,
     translatedWithoutPage,
-    toolDescriptions: tools.map((tool) => tool.description),
-    toolNames: tools.map((tool) => tool.name),
   };
 }
