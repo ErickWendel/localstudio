@@ -11,6 +11,7 @@ test('executes joystick protocol and session code contracts in the browser runti
 
   const result = await page.evaluate(evaluateJoystickProtocolContract, {
     sourceRoot: joystickSignalingContractRuntime.presenterRemoteSourceRoot,
+    testSupportSourceRoot: joystickSignalingContractRuntime.testSupportSourceRoot,
   });
 
   expect(result.commandChecks).toEqual({
