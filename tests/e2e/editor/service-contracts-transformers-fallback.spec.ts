@@ -2,33 +2,76 @@ import { transformersFallbackContractPage } from './transformers-fallback-contra
 import { expect, test } from '../support/journey-test';
 import { serviceContractsSupport } from './service-contracts-support';
 
-test('executes Transformers fallback and runtime wrapper contracts in the browser runtime', async ({
+test('executes Transformers text generation fallback operations in the browser runtime', async ({
   page,
 }) => {
-  const result = await transformersFallbackContractPage.runFallbackAndWrapperContract(
+  const result = await transformersFallbackContractPage.runFallbackTextContract(
     page,
     serviceContractsSupport.getServer().baseURL,
   );
 
   expect(result).toMatchObject({
-    fallbackLanguage: { language: 'pt', score: 0.77 },
-    fallbackSegmentationScore: 1,
-    fallbackText: 'fallback text',
-    runtimeLanguage: { language: 'pt', score: 0.77 },
-    runtimeText: 'fallback text',
+    text: 'fallback text',
   });
-  expect(result.fallbackCalls).toEqual(
-    expect.arrayContaining([
-      'preload-text:fallback-llm',
-      'generate:fallback prompt',
-      'release:fallback-llm',
-      'remove:fallback-llm',
-      'preload-language:fallback-lang',
-      'detect:olá',
-      'preload-image-editing',
-      'prepare:asset://fallback',
-      'segment:asset://fallback:1',
-      'remove-image-editing',
-    ]),
+  expect(result.calls).toEqual([
+    'preload-text:fallback-llm',
+    'generate:fallback prompt',
+    'release:fallback-llm',
+    'remove:fallback-llm',
+  ]);
+});
+
+test('executes Transformers language detection fallback operations in the browser runtime', async ({
+  page,
+}) => {
+  const result = await transformersFallbackContractPage.runFallbackLanguageContract(
+    page,
+    serviceContractsSupport.getServer().baseURL,
   );
+
+  expect(result).toMatchObject({
+    language: { language: 'pt', score: 0.77 },
+  });
+  expect(result.calls).toEqual(['preload-language:fallback-lang', 'detect:ola']);
+});
+
+test('executes Transformers image editing fallback operations in the browser runtime', async ({
+  page,
+}) => {
+  const result = await transformersFallbackContractPage.runFallbackImageContract(
+    page,
+    serviceContractsSupport.getServer().baseURL,
+  );
+
+  expect(result).toMatchObject({
+    segmentationScore: 1,
+  });
+  expect(result.calls).toEqual([
+    'preload-image-editing',
+    'prepare:asset://fallback',
+    'segment:asset://fallback:1',
+    'remove-image-editing',
+  ]);
+});
+
+test('executes Transformers runtime wrappers over fallback operations in the browser runtime', async ({
+  page,
+}) => {
+  const result = await transformersFallbackContractPage.runFallbackWrapperContract(
+    page,
+    serviceContractsSupport.getServer().baseURL,
+  );
+
+  expect(result).toMatchObject({
+    language: { language: 'pt', score: 0.77 },
+    text: 'fallback text',
+  });
+  expect(result.calls).toEqual([
+    'preload-text:runtime-llm',
+    'release:runtime-llm',
+    'generate:runtime prompt',
+    'remove:runtime-llm',
+    'preload-language:runtime-lang',
+    'detect:runtime text',
+  ]);
 });

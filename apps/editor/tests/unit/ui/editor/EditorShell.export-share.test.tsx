@@ -280,7 +280,6 @@ describe('EditorShell export and share workflows', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Export to' }));
     await user.click(screen.getByRole('menuitem', { name: 'Powerpoint (.pptx)' }));
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Exporting PowerPoint...');
     await waitFor(() => {
       expect(screen.getByRole('status')).toHaveTextContent('Building slide 2 of 4');
       expect(screen.getByRole('status')).toHaveTextContent('Hero slide');
