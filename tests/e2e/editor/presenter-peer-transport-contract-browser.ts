@@ -1,4 +1,4 @@
-import type { PresenterPeerTransportContractResult } from '../support/presenter-peer-transport-contract-scenario';
+import type { PresenterPeerTransportContractResult } from '../support/presenter-peer-transport-contract-result';
 
 export type PresenterPeerTransportContractInput = {
   presenterRemoteSourceRoot: string;
