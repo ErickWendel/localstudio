@@ -51,6 +51,7 @@ import { useBackgroundSubjectSelection } from './use-background-subject-selectio
 import { powerPointIo } from './power-point-io';
 import { textTranslationLayout } from './text-translation-layout';
 import type { TranslationPatch } from './text-translation-layout';
+import { useOperationNotice } from './use-operation-notice';
 import { useStockMediaLibrary } from './use-stock-media-library';
 import { editorViewModelProgress } from './editorViewModelProgress';
 import { editorViewModelProject } from './editorViewModelProject';
@@ -72,15 +73,7 @@ export type RightPanelTab =
   | 'assets'
   | 'animations';
 export type TextPreset = 'title' | 'subtitle' | 'body';
-
-export type OperationNoticeTone = 'error' | 'info' | 'success' | 'warning';
-
-export interface OperationNoticeState {
-  detail?: string | undefined;
-  message: string;
-  progress?: { current: number; total: number } | undefined;
-  tone: OperationNoticeTone;
-}
+export type { OperationNoticeState } from './use-operation-notice';
 
 interface TranslationPreparationState extends ModelDownloadProgressDetails {
   progress: number;
@@ -123,7 +116,6 @@ const IMAGE_PROMPT_MODE_REQUIRED_MESSAGE = 'Use Create image from the + menu to 
 type TranslationScope = 'selection' | 'slide' | 'deck';
 
 const DECK_TRANSLATION_CONCURRENCY = 3;
-const OPERATION_NOTICE_CLEAR_MS = 3000;
 
 interface DeckTranslationProgressState {
   activePageIds: string[];
@@ -240,7 +232,7 @@ export function useEditorViewModel(services: AppServices) {
   const [remoteImportOpen, setRemoteImportOpen] = useState(false);
   const [localProjectSetupOpen, setLocalProjectSetupOpen] = useState(false);
   const [persistenceAttention, setPersistenceAttention] = useState(false);
-  const [operationNotice, setOperationNotice] = useState<OperationNoticeState | undefined>();
+  const { operationNotice, showOperationNotice } = useOperationNotice();
   const [isExportingPowerPoint, setIsExportingPowerPoint] = useState(false);
   const [remoteImportStatus, setRemoteImportStatus] = useState<RemoteImportStatus>('loading');
   const [remoteImportProjects, setRemoteImportProjects] = useState<MirrorProjectSummary[]>([]);
@@ -314,32 +306,7 @@ export function useEditorViewModel(services: AppServices) {
   syncMirrorNowRef.current = (projectToSync) => {
     void syncMirrorNow(projectToSync);
   };
-  const operationNoticeTimeoutRef = useRef<number | undefined>(undefined);
   const wasFullscreenRef = useRef(false);
-
-  function clearOperationNoticeTimer() {
-    if (operationNoticeTimeoutRef.current === undefined) return;
-    window.clearTimeout(operationNoticeTimeoutRef.current);
-    operationNoticeTimeoutRef.current = undefined;
-  }
-
-  function showOperationNotice(notice: OperationNoticeState | undefined, options?: { persistent?: boolean }) {
-    clearOperationNoticeTimer();
-    setOperationNotice(notice);
-    if (!notice || options?.persistent) return;
-    operationNoticeTimeoutRef.current = window.setTimeout(() => {
-      setOperationNotice(undefined);
-      operationNoticeTimeoutRef.current = undefined;
-    }, OPERATION_NOTICE_CLEAR_MS);
-  }
-
-  useEffect(() => {
-    return () => {
-      if (operationNoticeTimeoutRef.current === undefined) return;
-      window.clearTimeout(operationNoticeTimeoutRef.current);
-      operationNoticeTimeoutRef.current = undefined;
-    };
-  }, []);
   const presenterPageIdRef = useRef<string | undefined>(undefined);
   const languageDetectionSequenceRef = useRef(0);
   const skipNextProjectSaveRef = useRef(shouldRestoreStoredProject);
