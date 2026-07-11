@@ -8,6 +8,16 @@ export const stockMediaGiphyFlow = {
     await editor.openTool('Elements');
     await page.getByRole('textbox', { name: 'Search GIPHY GIFs' }).fill('celebration');
     await page.getByRole('button', { name: 'Search GIPHY GIFs submit' }).click();
-    await expect(page.getByRole('button', { name: 'Insert GIF E2E celebration' })).toBeVisible();
+    const gifResult = page.getByRole('button', { name: 'Insert GIF E2E celebration' });
+    await expect(gifResult).toBeVisible();
+    await gifResult.click();
+    await editor.openTool('Layout');
+    await expect(page.getByRole('button', { name: 'E2E celebration', exact: true })).toBeVisible();
+    await editor.openTool('Elements');
+    await expect(
+      page.getByRole('region', { name: 'Recently used results' }).getByRole('button', {
+        name: 'Insert GIF E2E celebration',
+      }),
+    ).toBeVisible();
   },
 };

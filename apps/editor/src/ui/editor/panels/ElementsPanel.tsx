@@ -315,7 +315,7 @@ function MediaSection({
 
   if (items.length === 0) return <p className="panel-muted">{emptyLabel}</p>;
   return (
-    <>
+    <section aria-label={`${title} results`}>
       <div className="media-grid" aria-label={`${title} results`}>
         {visibleItems.map((item) => (
           <button
@@ -365,7 +365,7 @@ function MediaSection({
           </button>
         </div>
       ) : null}
-    </>
+    </section>
   );
 }
 
