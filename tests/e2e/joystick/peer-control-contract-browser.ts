@@ -1,4 +1,4 @@
-import type { JoystickPeerControlContractResult } from '../support/joystick-peer-control-contract-scenario';
+import type { JoystickPeerControlContractResult } from '../support/joystick-peer-control-contract-result';
 
 export type JoystickPeerControlContractInput = {
   sourceRoot: string;
