@@ -1,7 +1,9 @@
 import { EditorAppPage } from '../pages/editor-app.page';
 import { expect, test } from '../support/journey-test';
+import { presenterProtocolCommandFixture } from './presenter-protocol-command-fixture';
+import { presenterProtocolPreviewFixture } from './presenter-protocol-preview-fixture';
+import { presenterProtocolStateFixture } from './presenter-protocol-state-fixture';
 import { serviceContractsSupport } from './service-contracts-support';
-import { presenterProtocolFixtures } from './presenter-protocol-fixtures';
 
 test('executes presenter protocol validator contracts in the browser runtime', async ({ page }) => {
   const editor = new EditorAppPage(page, serviceContractsSupport.getServer().baseURL);
@@ -56,10 +58,10 @@ test('executes presenter protocol validator contracts in the browser runtime', a
       };
     },
     {
-      commands: presenterProtocolFixtures.createCommands(),
+      commands: presenterProtocolCommandFixture.createCommands(),
       presenterRemoteSourceRoot: serviceContractsSupport.presenterRemoteSourceRoot,
-      preview: presenterProtocolFixtures.createPreview(),
-      state: presenterProtocolFixtures.createState(),
+      preview: presenterProtocolPreviewFixture.createPreview(),
+      state: presenterProtocolStateFixture.createState(),
     },
   );
 
