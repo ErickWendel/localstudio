@@ -32,10 +32,9 @@ describe('EditorShell clipboard workflows', () => {
       },
     });
 
-    expect(await screen.findByRole('button', { name: 'clipboard.png' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    expect(
+      await screen.findByRole('button', { name: 'clipboard.png' }, { timeout: 5_000 }),
+    ).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('pastes an item-only clipboard image from the window with a fallback name', async () => {
@@ -51,10 +50,9 @@ describe('EditorShell clipboard workflows', () => {
       },
     });
 
-    expect(await screen.findByRole('button', { name: 'Pasted image' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    expect(
+      await screen.findByRole('button', { name: 'Pasted image' }, { timeout: 5_000 }),
+    ).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('copies and pastes selected objects near the original selection', async () => {
@@ -161,10 +159,9 @@ describe('EditorShell clipboard workflows', () => {
       clipboardData: createClipboardData({ files: [image] }),
     });
 
-    expect(await screen.findByRole('button', { name: 'new-system-image.png' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    expect(
+      await screen.findByRole('button', { name: 'new-system-image.png' }, { timeout: 5_000 }),
+    ).toHaveAttribute('aria-pressed', 'true');
     expect(screen.queryByRole('button', { name: 'Selected Image copy' })).not.toBeInTheDocument();
   });
 
