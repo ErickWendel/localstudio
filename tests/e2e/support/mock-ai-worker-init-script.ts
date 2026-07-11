@@ -1,6 +1,9 @@
 import { mockAiWorkerBonsaiRuntime } from './mock-ai-worker-bonsai-runtime';
 import { mockAiWorkerImageEditingRuntime } from './mock-ai-worker-image-editing-runtime';
+import { mockAiWorkerTransformersControlRuntime } from './mock-ai-worker-transformers-control-runtime';
+import { mockAiWorkerTransformersLanguageRuntime } from './mock-ai-worker-transformers-language-runtime';
 import { mockAiWorkerTransformersRuntime } from './mock-ai-worker-transformers-runtime';
+import { mockAiWorkerTransformersTextRuntime } from './mock-ai-worker-transformers-text-runtime';
 import type { MockAiWorkerPayload } from './mock-ai-worker-types';
 
 export const mockAiWorkerInitScript = {
@@ -9,8 +12,17 @@ export const mockAiWorkerInitScript = {
       (() => {
         const payload = ${JSON.stringify(payload)};
         const originalWorker = window.Worker;
+        const controlRuntime = (${mockAiWorkerTransformersControlRuntime.source()})();
+        const textRuntime = (${mockAiWorkerTransformersTextRuntime.source()})(payload);
+        const languageRuntime = (${mockAiWorkerTransformersLanguageRuntime.source()})();
         const imageEditingRuntime = (${mockAiWorkerImageEditingRuntime.source()})();
-        const transformersRuntime = (${mockAiWorkerTransformersRuntime.source()})(payload, imageEditingRuntime);
+        const transformersRuntime = (${mockAiWorkerTransformersRuntime.source()})(
+          payload,
+          controlRuntime,
+          textRuntime,
+          languageRuntime,
+          imageEditingRuntime
+        );
         const bonsaiRuntime = (${mockAiWorkerBonsaiRuntime.source()})(payload);
 
         class MockLocalStudioWorker {
