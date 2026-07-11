@@ -1,4 +1,5 @@
 const storageKey = 'localstudio.ai-workflow-tour.seen';
+const enabledOverrideKey = 'localstudio.ai-workflow-tour.enabled';
 
 function readSeen() {
   if (typeof window === 'undefined') return true;
@@ -18,7 +19,17 @@ function writeSeen() {
   }
 }
 
+function readEnabledOverride() {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(enabledOverrideKey) === '1';
+  } catch {
+    return false;
+  }
+}
+
 export const editorAiWorkflowTourStorage = {
+  readEnabledOverride,
   readSeen,
   writeSeen,
 };

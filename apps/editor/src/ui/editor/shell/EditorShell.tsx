@@ -32,10 +32,8 @@ import { editorShellBrowserUtils } from '../browser/editorShellBrowserUtils';
 import { BrowserPresenterSessionService } from '../../../services/presenter/presenterSessionService';
 import type { PresenterRemoteSessionMetadata } from '../../../services/presenter/presenterSessionTypes';
 import { PresenterRemotePanel } from '../../presenter/PresenterRemotePanel';
-import {
-  EditorAiWorkflowTour,
-  type EditorAiWorkflowTourHandle,
-} from '../tour/EditorAiWorkflowTour';
+import { EditorAiWorkflowTour } from '../tour/EditorAiWorkflowTour';
+import type { EditorAiWorkflowTourHandle } from '../tour/editorAiWorkflowTourTypes';
 import { AudienceFullscreenPrompt } from './AudienceFullscreenPrompt';
 import { EditorLeftPanelSurface } from './EditorLeftPanelSurface';
 import { EditorToolbarSurface } from './EditorToolbarSurface';
