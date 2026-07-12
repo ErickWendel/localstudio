@@ -255,6 +255,7 @@ function getTextBox(shape: Element, scaleX: number, scaleY: number): PptxTextBox
   const bodyProperties = pptxXml.firstDescendant(shape, 'bodyPr');
   const anchor = bodyProperties?.getAttribute('anchor');
   return {
+    autoFit: bodyProperties && pptxXml.firstDescendant(bodyProperties, 'normAutofit') ? 'shrink-text' : 'none',
     insets: {
       bottom: getTextInset(bodyProperties, 'bIns', pptxParserDefaults.textInsetsEmu.bottom, scaleY),
       left: getTextInset(bodyProperties, 'lIns', pptxParserDefaults.textInsetsEmu.left, scaleX),

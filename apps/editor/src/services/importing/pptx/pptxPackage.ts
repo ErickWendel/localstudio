@@ -1,6 +1,7 @@
 import type { ImportWarning } from '../../../domain/documents/model';
 import type { PptxPackageFile } from './pptxPackageTypes';
 import { pptxFileUtils } from './pptxFileUtils';
+import { pptxImageDimensions } from './pptxImageDimensions';
 import { pptxXml } from './pptxXml';
 
 export interface PptxRelationship {
@@ -38,6 +39,18 @@ function extensionFor(path: string) {
   const fileName = path.split('/').at(-1) ?? path;
   const dotIndex = fileName.lastIndexOf('.');
   return dotIndex >= 0 ? fileName.slice(dotIndex + 1).toLowerCase() : '';
+}
+
+function getContentTypeForPath(
+  path: string,
+  defaults: Map<string, string>,
+  overrides: Map<string, string>,
+) {
+  return (
+    overrides.get(pptxFileUtils.normalizePath(path)) ??
+    defaults.get(extensionFor(path)) ??
+    pptxFileUtils.getMimeType(path)
+  );
 }
 
 function parseContentTypes(xml: string | undefined) {
@@ -83,13 +96,18 @@ function parseRelationships(xml: string | undefined, sourcePath: string) {
 async function create(files: PptxPackageFile[]): Promise<PptxPackage> {
   const filesByPath = new Map(files.map((file) => [file.path, file]));
   const { defaults, overrides } = parseContentTypes(await readText(filesByPath.get(CONTENT_TYPES_PATH)));
+  const enrichedFiles = await Promise.all(
+    files.map(async (file) => {
+      const imageSize = await pptxImageDimensions.getSize(file, getContentTypeForPath(file.path, defaults, overrides));
+      return imageSize ? { ...file, imageSize } : file;
+    }),
+  );
+  const enrichedFilesByPath = new Map(enrichedFiles.map((file) => [file.path, file]));
   const relationshipCache = new Map<string, Map<string, PptxRelationship>>();
   const warnings: ImportWarning[] = [];
 
   const getContentType = (path: string) =>
-    overrides.get(pptxFileUtils.normalizePath(path)) ??
-    defaults.get(extensionFor(path)) ??
-    pptxFileUtils.getMimeType(path);
+    getContentTypeForPath(path, defaults, overrides);
 
   const getRelationships = (sourcePath: string) => {
     const normalizedSource = pptxFileUtils.normalizePath(sourcePath);
@@ -101,9 +119,9 @@ async function create(files: PptxPackageFile[]): Promise<PptxPackage> {
   };
 
   const pkg: PptxPackage = {
-    files,
+    files: enrichedFiles,
     getContentType,
-    getFile: (path) => filesByPath.get(pptxFileUtils.normalizePath(path)),
+    getFile: (path) => enrichedFilesByPath.get(pptxFileUtils.normalizePath(path)),
     getRelationships,
     readText: (path) => readText(path ? filesByPath.get(pptxFileUtils.normalizePath(path)) : undefined),
     warnings,

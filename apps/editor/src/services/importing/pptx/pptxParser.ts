@@ -169,8 +169,10 @@ function parsePictureObject(
   if (!assetType) return undefined;
   const shapeId = localShapeId(picture, String(zIndex));
   const opacity = pptxVisualStyle.getOpacity(picture);
+  const crop = parsePictureCrop(picture);
   return {
     assetPath,
+    ...(crop ? { crop } : {}),
     frame,
     id: `${slideId}-${idScope}-${assetType}-${shapeId}`,
     kind: assetType,
@@ -180,6 +182,23 @@ function parsePictureObject(
     sourceShapeId: shapeId,
     zIndex,
   };
+}
+
+function parseCropCoordinate(value: string | null | undefined) {
+  const coordinate = Number(value);
+  return Number.isFinite(coordinate) ? Math.max(0, coordinate / 100000) : 0;
+}
+
+function parsePictureCrop(picture: Element) {
+  const srcRect = pptxXml.firstDescendant(picture, 'srcRect');
+  if (!srcRect) return undefined;
+  const left = parseCropCoordinate(srcRect.getAttribute('l'));
+  const top = parseCropCoordinate(srcRect.getAttribute('t'));
+  const right = parseCropCoordinate(srcRect.getAttribute('r'));
+  const bottom = parseCropCoordinate(srcRect.getAttribute('b'));
+  const width = Math.max(0.01, 1 - left - right);
+  const height = Math.max(0.01, 1 - top - bottom);
+  return { x: left, y: top, width, height };
 }
 
 function getBackgroundColor(document: Document, theme: ParseScope['theme'], fallback = '#000000') {
@@ -597,6 +616,7 @@ async function parseSlide(
   context: ParseContext,
   slidePath: string,
   slideIndex: number,
+  visible: boolean,
   scaleX: number,
   scaleY: number,
   textDefaults: PptxTextDefaults,
@@ -653,6 +673,7 @@ async function parseSlide(
     placeholderRoles: parsedLayout?.placeholderRoles ?? getPlaceholderRoles(inheritedObjects),
     ...(speakerNotes ? { speakerNotes } : {}),
     transitionEffect: pptxAnimationBuilds.getTransitionEffect(document),
+    visible,
   };
 }
 
@@ -684,10 +705,16 @@ async function parse(context: ParseContext, name: string): Promise<PptxDeck> {
   const presentationRelationships = context.package.getRelationships(presentationPath);
   const size = getPresentationSize(presentation);
   const textDefaults = pptxTextParser.getPresentationTextDefaults(presentation);
-  const slidePaths = pptxXml
+  const slideEntries = pptxXml
     .descendants(presentation, 'sldId')
-    .map((slide) => presentationRelationships.get(pptxXml.getRelationshipAttr(slide, 'id') ?? '')?.target)
-    .filter((path): path is string => Boolean(path));
+    .map((slide) => {
+      const target = presentationRelationships.get(pptxXml.getRelationshipAttr(slide, 'id') ?? '')?.target;
+      if (!target) return undefined;
+      const show = slide.getAttribute('show');
+      return { target, visible: show !== '0' && show !== 'false' };
+    })
+    .filter((entry): entry is { target: string; visible: boolean } => Boolean(entry));
+  const slidePaths = slideEntries.map((entry) => entry.target);
   if (slidePaths.length === 0) throw new Error('PowerPoint package does not contain slides.');
   const masterPaths = getRelationshipTargetsInListOrder(
     presentationRelationships,
@@ -730,8 +757,17 @@ async function parse(context: ParseContext, name: string): Promise<PptxDeck> {
     layouts,
     name: normalizeName(name),
     slides: await Promise.all(
-      slidePaths.map((slidePath, index) =>
-        parseSlide(context, slidePath, index, size.scaleX, size.scaleY, textDefaults, layoutsByPath),
+      slideEntries.map((entry, index) =>
+        parseSlide(
+          context,
+          entry.target,
+          index,
+          entry.visible,
+          size.scaleX,
+          size.scaleY,
+          textDefaults,
+          layoutsByPath,
+        ),
       ),
     ),
     warnings: context.package.warnings,

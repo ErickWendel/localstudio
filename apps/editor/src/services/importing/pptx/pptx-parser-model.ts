@@ -1,6 +1,7 @@
 import type {
   AnimationEffect,
   AnimationTrigger,
+  CropRect,
   ElementAnimationBuild,
   ImportWarning,
   PlaceholderRole,
@@ -39,6 +40,7 @@ export interface PptxTextInsets {
 }
 
 export interface PptxTextBox {
+  autoFit: 'none' | 'shrink-text';
   insets: PptxTextInsets;
   verticalAlign: 'bottom' | 'middle' | 'top';
 }
@@ -60,6 +62,7 @@ export type PptxSlideObject =
     }
   | {
       assetPath: string;
+      crop?: CropRect;
       frame: PptxRect;
       id: string;
       kind: 'image' | 'gif' | 'video';
@@ -101,6 +104,7 @@ export interface PptxSlide {
   placeholderRoles: PlaceholderRole[];
   speakerNotes?: string;
   transitionEffect: AnimationEffect;
+  visible: boolean;
 }
 
 export interface PptxLayout {

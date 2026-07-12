@@ -58,6 +58,20 @@ function isMediaControlTiming(timingNode: Element | undefined) {
   return timingNode?.getAttribute('presetClass') === 'mediacall';
 }
 
+function toBuildEffect(timingNode: Element | undefined): AnimationEffect {
+  if (!timingNode || isMediaControlTiming(timingNode)) return 'reveal';
+  const presetSubtype = timingNode.getAttribute('presetSubtype');
+  const presetId = timingNode.getAttribute('presetID');
+  const effectFilter = pptxXml.firstDescendant(timingNode, 'animEffect')?.getAttribute('filter');
+  const effectName = effectFilter ?? presetSubtype;
+  if (effectName === 'fade' || effectName === 'dissolve' || presetId === '9' || presetId === '10') {
+    return 'dissolve';
+  }
+  if (effectName === 'push') return 'push';
+  if (effectName === 'wipe') return 'wipe';
+  return 'reveal';
+}
+
 function getVideoStartTriggers(document: Document, objects: PptxSlideObject[]) {
   const videoObjectsByShapeId = new Map(
     objects
@@ -100,7 +114,7 @@ function parse(document: Document, slideId: string, objects: PptxSlideObject[]):
     builds.push({
       id: `${slideId}-build-${buildIndex + 1}-${object.id}`,
       elementId: object.id,
-      effect: 'reveal',
+      effect: toBuildEffect(timingNode),
       trigger: toBuildTrigger(timingNode?.getAttribute('nodeType') ?? null, buildIndex),
       delayMs: 0,
       durationMs: isMediaControlTiming(timingNode) ? 0 : getBuildDurationMs(timingNode),
