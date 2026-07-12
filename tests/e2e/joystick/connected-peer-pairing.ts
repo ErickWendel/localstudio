@@ -3,11 +3,13 @@ import { expect } from '../support/journey-test';
 
 export const connectedPeerPairing = {
   async connectRemote(context: BrowserContext, editorPage: Page, presenterPage: Page, baseURL: string) {
-    const remotePanel = editorPage.getByRole('region', { name: 'Remote control this presentation' });
+    await presenterPage.getByRole('button', { name: 'Show remote control QR code' }).click();
+    const remotePanel = presenterPage.getByRole('region', { name: 'Remote control this presentation' });
     await expect(remotePanel).toBeVisible({ timeout: 45_000 });
     await expect(remotePanel.getByRole('img', { name: 'Remote control QR code' })).toBeVisible();
     const remoteUrl = await remotePanel.evaluate((element) => element.getAttribute('data-remote-url'));
     expect(remoteUrl).toContain('/joystick/?peer=');
+    await this.installClipboardCapture(presenterPage);
     await remotePanel.getByRole('button', { name: 'Copy remote link' }).click();
     await expect(remotePanel.getByRole('button', { name: 'Copied' })).toBeVisible();
     await expect
@@ -22,9 +24,6 @@ export const connectedPeerPairing = {
     localRemoteUrl.host = localBaseUrl.host;
     await editorPage.getByRole('button', { name: 'Enter full screen mode' }).click();
 
-    const introDismissButton = presenterPage.getByRole('button', { name: 'Got it' });
-    if (await introDismissButton.isVisible().catch(() => false)) await introDismissButton.click();
-
     const joystickPage = await context.newPage();
     await joystickPage.goto(localRemoteUrl.toString());
     await expect(joystickPage.getByRole('main', { name: 'Presentation remote control' })).toBeVisible();
@@ -33,7 +32,7 @@ export const connectedPeerPairing = {
   },
 
   async installClipboardCapture(page: Page) {
-    await page.addInitScript(() => {
+    const install = () => {
       Object.defineProperty(navigator, 'clipboard', {
         configurable: true,
         value: {
@@ -43,7 +42,9 @@ export const connectedPeerPairing = {
           },
         },
       });
-    });
+    };
+    await page.addInitScript(install);
+    await page.evaluate(install);
   },
 
   async openPresenterView(page: Page) {
@@ -51,6 +52,11 @@ export const connectedPeerPairing = {
     await page.getByRole('button', { name: 'Presentation play options' }).click();
     await page.getByRole('menuitem', { name: /Presenter view/i }).click();
     const presenterPage = await presenterPopupPromise;
+    await presenterPage.locator('.presenter-view').waitFor({ state: 'visible', timeout: 30_000 });
+    const introDismissButton = presenterPage.getByRole('button', { name: 'Got it' });
+    if (await introDismissButton.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await introDismissButton.click();
+    }
     await expect(presenterPage.getByRole('main', { name: 'Presenter view' })).toBeVisible();
     return presenterPage;
   },

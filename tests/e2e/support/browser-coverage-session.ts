@@ -1,7 +1,6 @@
 import type { BrowserContext, CDPSession, Page } from '@playwright/test';
 
 import { browserCoverageConfig } from './browser-coverage-config';
-import { browserCoverageSource } from './browser-coverage-source';
 import { withCoverageTimeout } from './browser-coverage-timeout';
 import type { BrowserCoverageSession, ScriptCoverageEntry } from './browser-coverage-types';
 
@@ -34,14 +33,6 @@ async function stopCoverage(client: CDPSession): Promise<ScriptCoverageEntry[]> 
     browserCoverageConfig.cdpCoverageTimeoutMs,
     'Profiler.takePreciseCoverage',
   );
-  const entriesWithSource = await Promise.all(
-    coverage.result.map(async (entry) => ({
-      ...entry,
-      source: browserCoverageSource.shouldFetch(entry)
-        ? await browserCoverageSource.get(client, entry)
-        : entry.source,
-    })),
-  );
   await withCoverageTimeout(
     client.send('Profiler.stopPreciseCoverage'),
     browserCoverageConfig.cdpCoverageTimeoutMs,
@@ -62,5 +53,5 @@ async function stopCoverage(client: CDPSession): Promise<ScriptCoverageEntry[]> 
     browserCoverageConfig.cdpCoverageTimeoutMs,
     'CDP detach',
   );
-  return entriesWithSource;
+  return coverage.result;
 }

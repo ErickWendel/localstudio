@@ -6,6 +6,7 @@ import { coverageFiles } from './coverage-files';
 import { isCoverageLocalScript } from './coverage-local-script-filter';
 import { isCoverageReportableSourceFile } from './coverage-reportable-source-file';
 import { coverageReportConfig } from './coverage-report-config';
+import { coverageReportSource } from './coverage-report-source';
 import { normalizeCoverageSourcePath } from './coverage-source-path-normalizer';
 
 interface TestCoverageFile {
@@ -68,7 +69,7 @@ export default async function reportPlaywrightCoverage() {
 
   for (const file of browserCoverageFiles) {
     const payload = JSON.parse(await readFile(file, 'utf8')) as TestCoverageFile;
-    await coverageReport.add(payload.entries);
+    await coverageReport.add(await coverageReportSource.hydrate(payload.entries));
   }
 
   await coverageReport.generate();

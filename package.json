@@ -20,7 +20,7 @@
     "test:e2e": "playwright test --project=chromium",
     "test:e2e:coverage": "npm run test:e2e:coverage:editor && npm run test:e2e:coverage:joystick",
     "test:e2e:coverage:editor": "node scripts/run-editor-e2e-coverage.mjs",
-    "test:e2e:coverage:joystick": "E2E_COVERAGE_SCOPE=joystick playwright test --project=chromium tests/e2e/joystick",
+    "test:e2e:coverage:joystick": "node scripts/run-joystick-e2e-coverage.mjs",
     "test:e2e:all": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:watch": "npm run test:watch --workspace @localstudio/editor",

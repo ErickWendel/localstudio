@@ -16,6 +16,19 @@ export const test = base.extend<JourneyFixtures, JourneyWorkerFixtures>({
   workerDevServer: [
     async ({ browser }, use) => {
       void browser;
+      const sharedBaseURL = process.env.LOCALSTUDIO_E2E_BASE_URL;
+      const sharedPort = Number.parseInt(process.env.LOCALSTUDIO_E2E_PORT ?? '', 10);
+      if (sharedBaseURL && Number.isInteger(sharedPort)) {
+        await use({
+          baseURL: sharedBaseURL,
+          port: sharedPort,
+          stop: async () => {
+            await Promise.resolve();
+          },
+        });
+        return;
+      }
+
       const server = await startIsolatedDevServer();
       await use(server);
       await server.stop();

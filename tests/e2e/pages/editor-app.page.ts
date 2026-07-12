@@ -17,7 +17,7 @@ export class EditorAppPage extends BasePage {
   }
 
   async openMenu(name: 'Edit' | 'File' | 'Help' | 'View') {
-    await this.page.getByRole('button', { name, exact: true }).click();
+    await this.page.getByRole('button', { name, exact: true }).click({ timeout: 30_000 });
     await expect(this.page.getByRole('menu', { name: `${name} menu` })).toBeVisible();
   }
 

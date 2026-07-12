@@ -7,18 +7,14 @@ import process from 'node:process';
 import { chromium } from 'playwright';
 
 const workspaceRoot = process.cwd();
-const coverageInputDir = join(workspaceRoot, 'test-results', 'editor-coverage');
+const coverageInputDir = join(workspaceRoot, 'test-results', 'joystick-coverage');
 const playwrightCli = join(workspaceRoot, 'node_modules', 'playwright', 'cli.js');
 const peerPath = '/peerjs';
 
 rmSync(coverageInputDir, { force: true, recursive: true });
-rmSync(join(workspaceRoot, 'coverage-report', 'editor'), { force: true, recursive: true });
+rmSync(join(workspaceRoot, 'coverage-report', 'joystick'), { force: true, recursive: true });
 
-const specFiles = [
-  ...listSpecFiles('tests/e2e/editor'),
-  ...listSpecFiles('tests/e2e/public-deck'),
-  ...listSpecFiles('tests/e2e/webmcp'),
-];
+const specFiles = listSpecFiles('tests/e2e/joystick');
 
 const peerPort = await getFreePort();
 let peerServer;
@@ -58,7 +54,7 @@ try {
 
   const baseURL = `http://localhost:${localStudioPort}`;
   await waitForOk(`${baseURL}/`);
-  await warmEditor(baseURL);
+  await warmJoystick(baseURL);
 
   const result = runPlaywright(baseURL, localStudioPort);
   exitCode = result.status ?? 1;
@@ -85,7 +81,7 @@ function runPlaywright(baseURL, port) {
       env: {
         ...process.env,
         E2E_COVERAGE_INPUT_DIR: coverageInputDir,
-        E2E_COVERAGE_SCOPE: 'editor',
+        E2E_COVERAGE_SCOPE: 'joystick',
         LOCALSTUDIO_E2E_BASE_URL: baseURL,
         LOCALSTUDIO_E2E_PORT: String(port),
       },
@@ -158,14 +154,16 @@ async function waitForOk(url) {
   throw new Error(`Timed out waiting for ${url}`);
 }
 
-async function warmEditor(baseURL) {
+async function warmJoystick(baseURL) {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage();
+    await page.goto(new URL('/joystick/', baseURL).toString());
+    await page.getByRole('main', { name: 'Presentation remote control' }).waitFor({
+      timeout: 30_000,
+    });
     await page.goto(new URL('/editor/?newProject=1', baseURL).toString());
     await page.getByRole('heading', { name: 'LocalStudio.dev' }).waitFor({ timeout: 30_000 });
-    await page.goto(new URL('/editor/?presenter=1&presenterSession=warmup', baseURL).toString());
-    await page.getByRole('main', { name: 'Presenter view' }).waitFor({ timeout: 30_000 });
   } finally {
     await browser.close();
   }
