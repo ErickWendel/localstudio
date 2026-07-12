@@ -9,13 +9,14 @@ export const presenterRouteStartup = {
     await presenterRouteHarness.install(page);
 
     await page.goto(`${baseURL}/editor/?presenter=1&presenterSession=e2e-presenter`);
-    await expect(page.getByRole('main', { name: 'Presenter view' })).toBeVisible();
+    await page.locator('.presenter-view').waitFor({ state: 'visible', timeout: 30_000 });
     await this.dismissIntro(page);
+    await expect(page.getByRole('main', { name: 'Presenter view' })).toBeVisible();
   },
 
   async dismissIntro(page: Page): Promise<void> {
     const introDismissButton = page.getByRole('button', { name: 'Got it' });
-    if (await introDismissButton.isVisible().catch(() => false)) {
+    if (await introDismissButton.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await introDismissButton.click();
     }
   },
