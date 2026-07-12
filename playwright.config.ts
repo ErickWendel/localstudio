@@ -1,10 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
-import os from 'node:os';
 import process from 'node:process';
-
-function getWorkerCount() {
-  return Math.max(1, os.availableParallelism?.() ?? os.cpus().length);
-}
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -13,7 +8,7 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
-  workers: getWorkerCount(),
+  workers: '100%',
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     actionTimeout: 10_000,
