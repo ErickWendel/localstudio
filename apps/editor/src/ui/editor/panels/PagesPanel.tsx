@@ -343,10 +343,18 @@ function MiniElement({
 
   if (element.type === 'image') {
     const asset = project.assets[element.assetId];
+    const imageStyle = element.crop
+      ? {
+          ...style,
+          objectPosition: `${(element.crop.x + element.crop.width / 2) * 100}% ${
+            (element.crop.y + element.crop.height / 2) * 100
+          }%`,
+        }
+      : style;
     return asset?.objectUrl ? (
-      <img alt="" className="page-card-mini-element" src={asset.objectUrl} style={style} />
+      <img alt="" className="page-card-mini-element" src={asset.objectUrl} style={imageStyle} />
     ) : (
-      <span className="page-card-mini-element page-card-mini-placeholder" style={style} />
+      <span className="page-card-mini-element page-card-mini-placeholder" style={imageStyle} />
     );
   }
 

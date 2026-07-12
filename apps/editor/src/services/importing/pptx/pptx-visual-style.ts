@@ -66,10 +66,26 @@ function getHexColor(element: ParentNode | undefined, fallback: string, theme?: 
   return rawColor && sourceElement ? applyColorModifier(normalizeColor(rawColor), sourceElement) : fallback;
 }
 
+function toUnitInterval(value: string | null | undefined) {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue)
+    ? Math.max(0, Math.min(1, numericValue / 100000))
+    : undefined;
+}
+
 function getOpacity(element: ParentNode | undefined) {
   if (!element) return undefined;
-  const alpha = Number(pptxXml.firstDescendant(element, 'alpha')?.getAttribute('val'));
-  return Number.isFinite(alpha) ? Math.max(0, Math.min(1, alpha / 100000)) : undefined;
+  const blip = pptxXml.firstDescendant(element, 'blip');
+  const blipAlpha = blip
+    ? toUnitInterval(pptxXml.firstDescendant(blip, 'alpha')?.getAttribute('val')) ??
+      toUnitInterval(pptxXml.firstDescendant(blip, 'alphaModFix')?.getAttribute('amt')) ??
+      toUnitInterval(pptxXml.firstDescendant(blip, 'alphaMod')?.getAttribute('amt'))
+    : undefined;
+  if (blipAlpha !== undefined) return blipAlpha;
+  const solidFill = pptxXml.firstDescendant(element, 'solidFill');
+  return solidFill
+    ? toUnitInterval(pptxXml.firstDescendant(solidFill, 'alpha')?.getAttribute('val'))
+    : undefined;
 }
 
 export const pptxVisualStyle = {

@@ -1,5 +1,6 @@
 import type {
   Asset,
+  CropRect,
   DesignElement,
   ImportWarning,
   Page,
@@ -17,7 +18,12 @@ const TEXT_FRAME_FIT = {
   heightPaddingRatio: 0.4,
   horizontalPaddingRatio: 1.2,
   lineHeightRatio: 1.35,
+  minimumAutoFitFontSize: 8,
   shrinkOversizedHeightRatio: 1.8,
+};
+
+const IMAGE_FIT = {
+  aspectRatioTolerance: 0.03,
 };
 
 function createAssetId(path: string, index: number) {
@@ -128,32 +134,33 @@ function getFittedTextFrame(
   object: Extract<PptxSlideObject, { kind: 'text' }>,
   pageWidth: number,
   pageHeight: number,
+  fontSize = object.style.fontSize,
 ) {
   const frame = getInsetTextFrame(object);
   const lines = getTextLines(object.text);
   const longestLineUnits = Math.max(...lines.map(getTextLineUnits), 1);
   const preferredWidth = Math.ceil(
-    longestLineUnits * object.style.fontSize * TEXT_FRAME_FIT.averageCharacterWidth +
-      object.style.fontSize * TEXT_FRAME_FIT.horizontalPaddingRatio,
+    longestLineUnits * fontSize * TEXT_FRAME_FIT.averageCharacterWidth +
+      fontSize * TEXT_FRAME_FIT.horizontalPaddingRatio,
   );
   const width = Math.min(pageWidth, Math.max(frame.width, preferredWidth));
   const x = getHorizontallyAnchoredX(object, frame, width, pageWidth);
 
   const contentWidth = Math.max(
-    object.style.fontSize,
-    width - object.style.fontSize * TEXT_FRAME_FIT.horizontalPaddingRatio,
+    fontSize,
+    width - fontSize * TEXT_FRAME_FIT.horizontalPaddingRatio,
   );
   const lineCapacity = Math.max(
     1,
-    contentWidth / (object.style.fontSize * TEXT_FRAME_FIT.averageCharacterWidth),
+    contentWidth / (fontSize * TEXT_FRAME_FIT.averageCharacterWidth),
   );
   const visualLineCount = lines.reduce(
     (count, line) => count + Math.max(1, Math.ceil(getTextLineUnits(line) / lineCapacity)),
     0,
   );
   const fittedHeight = Math.ceil(
-    visualLineCount * object.style.fontSize * object.style.lineHeight +
-      object.style.fontSize * TEXT_FRAME_FIT.heightPaddingRatio,
+    visualLineCount * fontSize * object.style.lineHeight +
+      fontSize * TEXT_FRAME_FIT.heightPaddingRatio,
   );
   let height =
     frame.height > fittedHeight * TEXT_FRAME_FIT.shrinkOversizedHeightRatio
@@ -170,6 +177,108 @@ function getFittedTextFrame(
   };
 }
 
+function getAutoFitTextFrame(
+  object: Extract<PptxSlideObject, { kind: 'text' }>,
+  pageWidth: number,
+  pageHeight: number,
+) {
+  const frame = getInsetTextFrame(object);
+  return {
+    height: Math.min(pageHeight, frame.height),
+    width: Math.min(pageWidth, frame.width),
+    x: clampFrameStart(frame.x, frame.width, pageWidth),
+    y: getVerticallyAnchoredY(object, frame, Math.min(pageHeight, frame.height), pageHeight),
+  };
+}
+
+function getVisualLineCount(text: string, width: number, fontSize: number) {
+  const contentWidth = Math.max(
+    fontSize,
+    width - fontSize * TEXT_FRAME_FIT.horizontalPaddingRatio,
+  );
+  const lineCapacity = Math.max(
+    1,
+    contentWidth / (fontSize * TEXT_FRAME_FIT.averageCharacterWidth),
+  );
+  return getTextLines(text).reduce(
+    (count, line) => count + Math.max(1, Math.ceil(getTextLineUnits(line) / lineCapacity)),
+    0,
+  );
+}
+
+function textFitsFrame(
+  object: Extract<PptxSlideObject, { kind: 'text' }>,
+  frame: ReturnType<typeof getAutoFitTextFrame>,
+  fontSize: number,
+) {
+  const visualLineCount = getVisualLineCount(object.text, frame.width, fontSize);
+  const fittedHeight = Math.ceil(
+    visualLineCount * fontSize * object.style.lineHeight +
+      fontSize * TEXT_FRAME_FIT.heightPaddingRatio,
+  );
+  return fittedHeight <= frame.height;
+}
+
+function getAutoFitFontSize(
+  object: Extract<PptxSlideObject, { kind: 'text' }>,
+  pageWidth: number,
+  pageHeight: number,
+) {
+  if (object.textBox.autoFit !== 'shrink-text') return object.style.fontSize;
+  const frame = getAutoFitTextFrame(object, pageWidth, pageHeight);
+  if (textFitsFrame(object, frame, object.style.fontSize)) return object.style.fontSize;
+  let lower = TEXT_FRAME_FIT.minimumAutoFitFontSize;
+  let upper = object.style.fontSize;
+  while (lower < upper) {
+    const candidate = Math.ceil((lower + upper) / 2);
+    if (textFitsFrame(object, frame, candidate)) {
+      lower = candidate;
+    } else {
+      upper = candidate - 1;
+    }
+  }
+  return lower;
+}
+
+function roundCrop(value: number) {
+  return Math.round(value * 10_000) / 10_000;
+}
+
+function getCoverCrop(
+  object: Extract<PptxSlideObject, { kind: 'image' | 'gif' | 'video' }>,
+  pptxPackage: PptxPackage,
+): CropRect | undefined {
+  if (object.kind !== 'image') return undefined;
+  if (object.crop) return object.crop;
+  const imageSize = pptxPackage.getFile(object.assetPath)?.imageSize;
+  if (!imageSize) return undefined;
+  const sourceRatio = imageSize.width / imageSize.height;
+  const frameRatio = object.frame.width / object.frame.height;
+  if (
+    !Number.isFinite(sourceRatio) ||
+    !Number.isFinite(frameRatio) ||
+    Math.abs(sourceRatio - frameRatio) <= IMAGE_FIT.aspectRatioTolerance
+  ) {
+    return undefined;
+  }
+  if (sourceRatio > frameRatio) {
+    const width = frameRatio / sourceRatio;
+    return {
+      x: roundCrop((1 - width) / 2),
+      y: 0,
+      width: roundCrop(width),
+      height: 1,
+    };
+  }
+  const height = sourceRatio / frameRatio;
+  return {
+    x: 0,
+    y: roundCrop((1 - height) / 2),
+    width: 1,
+    height: roundCrop(height),
+  };
+}
+
 function mapObject(
   object: PptxSlideObject,
   pptxPackage: PptxPackage,
@@ -181,7 +290,11 @@ function mapObject(
   layoutId?: string,
 ): DesignElement | undefined {
   if (object.kind === 'text') {
-    const frame = getFittedTextFrame(object, pageWidth, pageHeight);
+    const fontSize = getAutoFitFontSize(object, pageWidth, pageHeight);
+    const frame =
+      object.textBox.autoFit === 'shrink-text'
+        ? getAutoFitTextFrame(object, pageWidth, pageHeight)
+        : getFittedTextFrame(object, pageWidth, pageHeight, fontSize);
     return {
       id: object.id,
       type: 'text',
@@ -194,6 +307,7 @@ function mapObject(
       ...(layoutId ? { templateSource: { layoutId, type: 'layout' as const } } : {}),
       ...(object.placeholderRole ? { placeholderRole: object.placeholderRole } : {}),
       ...object.style,
+      fontSize,
     };
   }
   if (object.kind === 'shape') {
@@ -249,7 +363,12 @@ function mapObject(
     };
   }
   if (object.kind === 'gif') return { ...base, type: 'gif', playing: true };
-  return { ...base, type: 'image' };
+  const crop = getCoverCrop(object, pptxPackage);
+  return {
+    ...base,
+    type: 'image',
+    ...(crop ? { crop } : {}),
+  };
 }
 
 const defaultPlaceholderVisibility: Record<PlaceholderRole, boolean> = {
@@ -360,7 +479,7 @@ function map(deck: PptxDeck, pptxPackage: PptxPackage): ProjectDocument {
           }
         : {}),
       ...(slide.speakerNotes ? { speakerNotes: slide.speakerNotes } : {}),
-      visible: true,
+      visible: slide.visible,
     };
   });
   return {

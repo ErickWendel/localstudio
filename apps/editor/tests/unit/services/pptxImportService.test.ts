@@ -38,6 +38,7 @@ const slideRels = `<?xml version="1.0" encoding="UTF-8"?>
   <Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/>
   <Relationship Id="rIdPoster" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/poster1.png"/>
   <Relationship Id="rIdVideo" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/video" Target="../media/media1.mp4"/>
+  <Relationship Id="rIdWideImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/wide.png"/>
 </Relationships>`;
 
 const layoutRels = `<?xml version="1.0" encoding="UTF-8"?>
@@ -132,10 +133,20 @@ const slideXml = `<?xml version="1.0" encoding="UTF-8"?>
         <p:spPr><a:xfrm><a:off x="2743200" y="4572000"/><a:ext cx="1828800" cy="457200"/></a:xfrm></p:spPr>
         <p:txBody><a:bodyPr anchor="ctr"/><a:lstStyle/><a:p><a:pPr/><a:r><a:rPr sz="2400"><a:solidFill><a:srgbClr val="ffffff"/></a:solidFill><a:latin typeface="Arial"/></a:rPr><a:t>Inherited centered</a:t></a:r></a:p></p:txBody>
       </p:sp>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="8" name="Auto-fit title"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr><a:xfrm><a:off x="914400" y="3657600"/><a:ext cx="1828800" cy="457200"/></a:xfrm></p:spPr>
+        <p:txBody><a:bodyPr lIns="0" rIns="0" tIns="0" bIns="0" anchor="ctr"><a:normAutofit/></a:bodyPr><a:lstStyle/><a:p><a:pPr algn="ctr"/><a:r><a:rPr sz="9600" b="1"><a:solidFill><a:srgbClr val="ffffff"/></a:solidFill><a:latin typeface="Arial"/></a:rPr><a:t>Shrink me please</a:t></a:r></a:p></p:txBody>
+      </p:sp>
       <p:pic>
         <p:nvPicPr><p:cNvPr id="3" name="Hero image"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>
         <p:blipFill><a:blip r:embed="rIdImage"/></p:blipFill>
-        <p:spPr><a:xfrm><a:off x="4572000" y="914400"/><a:ext cx="1828800" cy="914400"/></a:xfrm></p:spPr>
+        <p:spPr><a:xfrm><a:off x="4572000" y="914400"/><a:ext cx="1828800" cy="914400"/></a:xfrm><a:effectLst><a:outerShdw><a:srgbClr val="000000"><a:alpha val="70000"/></a:srgbClr></a:outerShdw></a:effectLst></p:spPr>
+      </p:pic>
+      <p:pic>
+        <p:nvPicPr><p:cNvPr id="9" name="Wide screenshot"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>
+        <p:blipFill><a:blip r:embed="rIdWideImage"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>
+        <p:spPr><a:xfrm><a:off x="914400" y="3200400"/><a:ext cx="914400" cy="914400"/></a:xfrm></p:spPr>
       </p:pic>
       <p:pic>
         <p:nvPicPr><p:cNvPr id="4" name="Movie"/><p:cNvPicPr/><p:nvPr><a:videoFile r:link="rIdVideo"/><p14:media r:embed="rIdVideo"/></p:nvPr></p:nvPicPr>
@@ -151,8 +162,8 @@ const slideXml = `<?xml version="1.0" encoding="UTF-8"?>
         <p:cTn id="1">
           <p:childTnLst>
             <p:par>
-              <p:cTn id="2" nodeType="afterEffect" presetClass="entr" dur="700">
-                <p:childTnLst><p:anim><p:cBhvr><p:tgtEl><p:spTgt spid="2"/></p:tgtEl></p:cBhvr></p:anim></p:childTnLst>
+              <p:cTn id="2" nodeType="afterEffect" presetClass="entr" presetID="10" dur="700">
+                <p:childTnLst><p:animEffect filter="fade" transition="in"><p:cBhvr><p:tgtEl><p:spTgt spid="2"/></p:tgtEl></p:cBhvr></p:animEffect></p:childTnLst>
               </p:cTn>
             </p:par>
             <p:par>
@@ -198,9 +209,13 @@ const notesSlideXml = `<?xml version="1.0" encoding="UTF-8"?>
   </p:cSld>
 </p:notes>`;
 
-function createPptxFixture(slideContents = slideXml) {
+const widePngHeader = new Uint8Array([
+  137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 200, 0, 0, 0, 100,
+]);
+
+function createPptxFixture(slideContents = slideXml, presentationContents = presentationXml) {
   return createStoredPptxFile([
-    { path: 'ppt/presentation.xml', contents: presentationXml },
+    { path: 'ppt/presentation.xml', contents: presentationContents },
     { path: 'ppt/_rels/presentation.xml.rels', contents: presentationRels },
     { path: 'ppt/slides/slide1.xml', contents: slideContents },
     { path: 'ppt/slides/_rels/slide1.xml.rels', contents: slideRels },
@@ -212,6 +227,7 @@ function createPptxFixture(slideContents = slideXml) {
     { path: 'ppt/slideMasters/_rels/slideMaster1.xml.rels', contents: masterRels },
     { path: 'ppt/media/image1.png', contents: new Uint8Array([137, 80, 78, 71]) },
     { path: 'ppt/media/layout-icon.png', contents: new Uint8Array([137, 80, 78, 71]) },
+    { path: 'ppt/media/wide.png', contents: widePngHeader },
     { path: 'ppt/media/poster1.png', contents: new Uint8Array([137, 80, 78, 71]) },
     { path: 'ppt/media/media1.mp4', contents: new Uint8Array([0, 0, 0, 24]) },
   ]);
@@ -376,7 +392,7 @@ describe('BrowserPptxImportService', () => {
     expect(project.pages[0]?.animationBuilds).toMatchObject([
       {
         elementId: 'pptx-page-1-slide-text-2',
-        effect: 'reveal',
+        effect: 'dissolve',
         trigger: 'after-transition',
         durationMs: 700,
         kind: 'build-in',
@@ -414,11 +430,16 @@ describe('BrowserPptxImportService', () => {
     const inheritedCenteredElement = elements.find(
       (element) => element.type === 'text' && element.text === 'Inherited centered',
     );
+    const autoFitElement = elements.find(
+      (element) => element.type === 'text' && element.text === 'Shrink me please',
+    );
     const imageElements = elements.filter((element) => element.type === 'image');
     const videoElement = elements.find((element) => element.type === 'video');
     const imageAsset = Object.values(project.assets).find((asset) => asset.fileName === 'image1.png');
+    const wideImageAsset = Object.values(project.assets).find((asset) => asset.fileName === 'wide.png');
     const layoutImageAsset = Object.values(project.assets).find((asset) => asset.fileName === 'layout-icon.png');
     const imageElement = imageElements.find((element) => element.assetId === imageAsset?.id);
+    const wideImageElement = imageElements.find((element) => element.assetId === wideImageAsset?.id);
 
     expect(textElement).toMatchObject({
       locked: false,
@@ -490,9 +511,21 @@ describe('BrowserPptxImportService', () => {
       throw new Error('Expected inherited centered text.');
     }
     expect(inheritedCenteredElement.align).toBe('center');
+    if (!autoFitElement || autoFitElement.type !== 'text') {
+      throw new Error('Expected auto-fit text.');
+    }
+    expect(autoFitElement.fontSize).toBeLessThan(256);
+    expect(autoFitElement.height).toBe(108);
+    expect(autoFitElement.width).toBe(396);
+    expect(autoFitElement.align).toBe('center');
     expect(project.pages[0]?.elementIds.some((elementId) => elementId.includes('placeholder'))).toBe(false);
-    expect(imageElements).toHaveLength(1);
-    expect(imageElement).toMatchObject({ locked: false, type: 'image' });
+    expect(imageElements).toHaveLength(2);
+    expect(imageElement).toMatchObject({ locked: false, opacity: 1, type: 'image' });
+    expect(wideImageElement).toMatchObject({
+      crop: { x: 0.25, y: 0, width: 0.5, height: 1 },
+      locked: false,
+      type: 'image',
+    });
     expect(videoElement).toMatchObject({
       autoplayInPreview: true,
       controls: true,
@@ -536,6 +569,21 @@ describe('BrowserPptxImportService', () => {
       startOnClick: false,
       type: 'video',
     });
+  });
+
+  it('imports skipped PowerPoint slides as disabled pages', async () => {
+    const hiddenPresentationXml = presentationXml.replace(
+      '<p:sldId id="256" r:id="rId1"/>',
+      '<p:sldId id="256" r:id="rId1" show="0"/>',
+    );
+    const service = new BrowserPptxImportService();
+    const project = await service.importPowerPoint({
+      file: createPptxFixture(slideXml, hiddenPresentationXml),
+    });
+
+    expect(project.pages).toHaveLength(1);
+    expect(project.pages[0]?.visible).toBe(false);
+    expect(project.pages[0]?.elementIds.length).toBeGreaterThan(0);
   });
 
   it('rejects files that are not valid PPTX packages', async () => {

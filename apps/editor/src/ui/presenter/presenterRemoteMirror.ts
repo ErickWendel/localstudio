@@ -81,6 +81,30 @@ function getVideoElement(videoElements: HTMLVideoElement[], elementId: string) {
   return videoElements.find((video) => video.dataset.mediaElementId === elementId);
 }
 
+function drawImageElement(
+  context: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  element: Extract<DesignElement, { type: 'image' }>,
+  width: number,
+  height: number,
+) {
+  if (!element.crop) {
+    context.drawImage(image, 0, 0, width, height);
+    return;
+  }
+  context.drawImage(
+    image,
+    element.crop.x * image.naturalWidth,
+    element.crop.y * image.naturalHeight,
+    element.crop.width * image.naturalWidth,
+    element.crop.height * image.naturalHeight,
+    0,
+    0,
+    width,
+    height,
+  );
+}
+
 function drawElement(
   context: CanvasRenderingContext2D,
   frame: PresenterRemoteMirrorFrame,
@@ -105,7 +129,10 @@ function drawElement(
     context.textBaseline = 'top';
     const textX = element.align === 'center' ? width / 2 : element.align === 'right' ? width : 0;
     drawWrappedText(context, element.text, textX, 0, width, (element.lineHeight ?? 1.05) * element.fontSize * scale, 8);
-  } else if (element.type === 'image' || element.type === 'gif') {
+  } else if (element.type === 'image') {
+    const image = getCachedImage(frame.project.assets[element.assetId]?.objectUrl);
+    if (image) drawImageElement(context, image, element, width, height);
+  } else if (element.type === 'gif') {
     const image = getCachedImage(frame.project.assets[element.assetId]?.objectUrl);
     if (image) context.drawImage(image, 0, 0, width, height);
   } else if (element.type === 'video') {
