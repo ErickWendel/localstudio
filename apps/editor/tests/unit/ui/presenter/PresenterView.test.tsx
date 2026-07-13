@@ -574,6 +574,72 @@ describe('PresenterView', () => {
     expect(screen.queryByRole('dialog', { name: 'Slide navigator' })).not.toBeInTheDocument();
   });
 
+  it('omits hidden slides from presenter counts, previews, and navigation', () => {
+    const opener = { postMessage: vi.fn() };
+    Object.defineProperty(window, 'opener', {
+      configurable: true,
+      value: opener,
+    });
+    window.localStorage.setItem('localstudio.presenterWindowIntroDismissed', '1');
+    render(<PresenterView sessionId="session-1" />);
+    const project = sampleProject.createSampleProject();
+    project.pages.push(
+      {
+        background: { type: 'color', color: '#111111' },
+        elementIds: [],
+        height: 1080,
+        id: 'page-2',
+        name: 'Hidden slide',
+        visible: false,
+        width: 1920,
+      },
+      {
+        background: { type: 'color', color: '#222222' },
+        elementIds: [],
+        height: 1080,
+        id: 'page-3',
+        name: 'Enabled slide',
+        visible: true,
+        width: 1920,
+      },
+    );
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          origin: window.location.origin,
+          data: {
+            payload: {
+              activePageId: 'page-1',
+              animationPreview: undefined,
+              project,
+            },
+            sessionId: 'session-1',
+            source: 'localstudio-presenter-main',
+            type: 'state',
+          },
+        }),
+      );
+    });
+
+    expect(screen.getByText('Current: Slide 1 of 2')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Hidden slide' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Enabled slide' })).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'End' });
+
+    expect(opener.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: 'go-to-page',
+        pageId: 'page-3',
+      }),
+      window.location.origin,
+    );
+
+    fireEvent.keyDown(window, { key: '#' });
+    expect(screen.queryByRole('option', { name: /Hidden slide/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Enabled slide/ })).toBeInTheDocument();
+  });
+
   it('opens the remote control QR panel from the presenter toolbar', async () => {
     window.localStorage.setItem('localstudio.presenterWindowIntroDismissed', '1');
     render(<PresenterView sessionId="session-1" />);

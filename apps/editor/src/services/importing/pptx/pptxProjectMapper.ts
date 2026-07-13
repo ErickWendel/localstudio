@@ -191,6 +191,22 @@ function getAutoFitTextFrame(
   };
 }
 
+function getFixedTextFrame(
+  object: Extract<PptxSlideObject, { kind: 'text' }>,
+  pageWidth: number,
+  pageHeight: number,
+) {
+  const frame = getInsetTextFrame(object);
+  const width = Math.min(pageWidth, frame.width);
+  const height = Math.min(pageHeight, frame.height);
+  return {
+    height,
+    width,
+    x: clampFrameStart(frame.x, width, pageWidth),
+    y: clampFrameStart(frame.y, height, pageHeight),
+  };
+}
+
 function getVisualLineCount(text: string, width: number, fontSize: number) {
   const contentWidth = Math.max(
     fontSize,
@@ -290,10 +306,14 @@ function mapObject(
   layoutId?: string,
 ): DesignElement | undefined {
   if (object.kind === 'text') {
+    const { capitalization, ...style } = object.style;
+    void capitalization;
     const fontSize = getAutoFitFontSize(object, pageWidth, pageHeight);
     const frame =
       object.textBox.autoFit === 'shrink-text'
         ? getAutoFitTextFrame(object, pageWidth, pageHeight)
+        : object.placeholderRole
+          ? getFixedTextFrame(object, pageWidth, pageHeight)
         : getFittedTextFrame(object, pageWidth, pageHeight, fontSize);
     return {
       id: object.id,
@@ -306,7 +326,7 @@ function mapObject(
       opacity: object.opacity ?? 1,
       ...(layoutId ? { templateSource: { layoutId, type: 'layout' as const } } : {}),
       ...(object.placeholderRole ? { placeholderRole: object.placeholderRole } : {}),
-      ...object.style,
+      ...style,
       fontSize,
     };
   }
@@ -329,6 +349,7 @@ function mapObject(
       ...(object.endEndpoint ? { endEndpoint: object.endEndpoint } : {}),
     };
   }
+  if (object.placeholderOnly) return undefined;
   const asset = getOrCreateAsset(object.assetPath, pptxPackage, assets);
   if (!asset) {
     warnings.push({

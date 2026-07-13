@@ -1,4 +1,5 @@
 import { ArrowRight } from 'lucide-react';
+import { BrandLockup } from './BrandLockup';
 import { GitHubStarButton } from './GitHubStarButton';
 
 const navItems = [
@@ -18,8 +19,7 @@ export function LandingHeader({
   return (
     <header className="landing-header">
       <a className="brand-mark" href="#top" aria-label="LocalStudio.dev beta home">
-        LocalStudio.dev
-        <span className="beta-flag">Beta</span>
+        <BrandLockup />
       </a>
       <nav className="landing-nav" aria-label="Landing sections">
         {navItems.map((item) => {

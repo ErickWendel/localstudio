@@ -230,6 +230,52 @@ describe('useAnimationPreviewController', () => {
     expect(activePageIdRef.current).toBe('page-2');
   });
 
+  it('skips hidden slides during presenter navigation', () => {
+    const project = createProject();
+    project.pages[1] = { ...project.pages[1]!, visible: false };
+    project.pages.push({
+      id: 'page-3',
+      name: 'Slide 3',
+      width: 1280,
+      height: 720,
+      background: { type: 'color', color: '#ffffff' },
+      elementIds: [],
+      animationBuilds: [],
+      visible: true,
+    });
+    const projectRef = { current: project };
+    const activePageIdRef = { current: 'page-1' };
+    const setActivePageId = vi.fn();
+    const setSelectedElementIds = vi.fn();
+    const { result } = renderHook(() =>
+      useAnimationPreviewController({
+        activePageIdRef,
+        projectRef,
+        setActivePageId,
+        setSelectedElementIds,
+      }),
+    );
+
+    act(() => {
+      result.current.playPresentationPreview('page-1');
+    });
+    act(() => {
+      vi.runOnlyPendingTimers();
+    });
+    act(() => {
+      result.current.advanceAnimationPreview();
+    });
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+    act(() => {
+      result.current.advancePresentationPreview();
+    });
+
+    expect(activePageIdRef.current).toBe('page-3');
+    expect(setActivePageId).toHaveBeenLastCalledWith('page-3');
+  });
+
   it('rewinds through the current slide build pipeline before moving to the previous slide', () => {
     const projectRef = { current: createProject() };
     const activePageIdRef = { current: 'page-1' };

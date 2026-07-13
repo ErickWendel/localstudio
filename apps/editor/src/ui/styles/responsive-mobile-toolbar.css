@@ -34,10 +34,15 @@
   }
 
   .toolbar-product-title::after {
-    content: 'LS';
-    color: var(--ew-green-fixed);
-    font-size: 13px;
-    letter-spacing: 0.08em;
+    content: none;
+  }
+
+  .toolbar-product-title .ls-logo-word {
+    display: none;
+  }
+
+  .toolbar-product-logo {
+    width: 32px;
   }
 
   .toolbar-menu {

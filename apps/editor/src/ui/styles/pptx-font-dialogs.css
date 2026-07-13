@@ -1,0 +1,232 @@
+.pptx-font-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 180;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(4, 9, 10, 0.58);
+  backdrop-filter: blur(6px);
+}
+
+.pptx-font-warning-dialog,
+.pptx-font-replacement-dialog {
+  position: relative;
+  width: min(620px, calc(100vw - 48px));
+  display: grid;
+  gap: 16px;
+  border: 1px solid rgba(122, 255, 199, 0.18);
+  border-radius: 8px;
+  background: rgba(18, 25, 26, 0.98);
+  color: var(--ew-text);
+  box-shadow:
+    0 28px 80px rgba(0, 0, 0, 0.55),
+    0 0 24px rgba(55, 253, 118, 0.08);
+}
+
+.pptx-font-warning-dialog {
+  padding: 28px 28px 20px;
+}
+
+.pptx-font-replacement-dialog {
+  padding: 18px;
+}
+
+.pptx-font-dialog-close {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ew-text);
+  cursor: pointer;
+}
+
+.pptx-font-warning-dialog > .pptx-font-dialog-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+.pptx-font-dialog-close:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.pptx-font-warning-heading {
+  display: grid;
+  gap: 6px;
+  text-align: center;
+}
+
+.pptx-font-warning-heading h2,
+.pptx-font-replacement-header h2 {
+  margin: 0;
+  color: var(--ew-text);
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.pptx-font-warning-heading p,
+.pptx-font-replacement-header p {
+  margin: 0;
+  color: var(--ew-muted);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.pptx-font-warning-list {
+  display: grid;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.pptx-font-warning-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  color: #ffe15a;
+}
+
+.pptx-font-warning-row + .pptx-font-warning-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.pptx-font-warning-row p {
+  margin: 0;
+  color: var(--ew-text);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.pptx-font-warning-note {
+  margin: -4px 0 0;
+  color: var(--ew-muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.pptx-font-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.pptx-font-replacement-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pptx-font-replacement-table {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+}
+
+.pptx-font-replacement-row {
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+  gap: 12px;
+  align-items: center;
+  padding: 0 12px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ew-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+}
+
+.pptx-font-replacement-row:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.pptx-font-replacement-row-heading {
+  min-height: 30px;
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--ew-muted);
+  cursor: default;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.pptx-font-replacement-row-active {
+  color: var(--ew-green);
+  outline: 1px solid rgba(55, 253, 118, 0.34);
+  outline-offset: -1px;
+}
+
+.pptx-font-search-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.pptx-font-search-box {
+  min-height: 38px;
+  gap: 8px;
+  padding: 0 10px;
+}
+
+.pptx-font-search-box input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ew-text);
+  font: inherit;
+  outline: 0;
+}
+
+.pptx-font-search-results {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pptx-font-search-result {
+  min-width: 0;
+  min-height: 42px;
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.26);
+  color: var(--ew-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 9px;
+}
+
+.pptx-font-search-result:hover,
+.pptx-font-search-result:focus-visible {
+  border-color: rgba(55, 253, 118, 0.32);
+  color: var(--ew-green);
+}
+
+.pptx-font-search-result small {
+  max-width: 100%;
+  color: var(--ew-muted);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pptx-font-replacement-status {
+  color: var(--ew-muted);
+  font-size: 12px;
+  font-weight: 700;
+}

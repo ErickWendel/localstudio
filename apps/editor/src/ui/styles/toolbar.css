@@ -5,14 +5,21 @@
 }
 
 .toolbar-product-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   margin: 0;
-  color: var(--ew-green-fixed);
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
   line-height: 24px;
-  text-transform: uppercase;
   white-space: nowrap;
+}
+
+.toolbar-product-title .ls-logo-word {
+  font-size: 18px;
+}
+
+.toolbar-product-logo {
+  width: 34px;
+  height: auto;
 }
 
 .toolbar-menu {

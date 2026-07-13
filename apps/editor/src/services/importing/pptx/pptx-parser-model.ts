@@ -18,12 +18,17 @@ export interface PptxRect {
 }
 
 export interface PptxTransform extends PptxRect {
+  childOffsetX?: number;
+  childOffsetY?: number;
   flipX?: boolean;
   rotation: number;
+  scaleX?: number;
+  scaleY?: number;
 }
 
 export interface PptxTextStyle {
   align: 'left' | 'center' | 'right';
+  capitalization?: 'all';
   fill: string;
   fontFamily: string;
   fontSize: number;
@@ -48,9 +53,11 @@ export interface PptxTextBox {
 export type PptxSlideObject =
   | {
       frame: PptxRect;
+      frameSource?: 'inherited' | 'self';
       id: string;
       kind: 'text';
       opacity?: number;
+      placeholderIndex?: string;
       placeholderRole?: PlaceholderRole;
       rotation?: number;
       source: 'layout' | 'master' | 'slide';
@@ -64,9 +71,12 @@ export type PptxSlideObject =
       assetPath: string;
       crop?: CropRect;
       frame: PptxRect;
+      frameSource?: 'inherited' | 'self';
       id: string;
       kind: 'image' | 'gif' | 'video';
       opacity?: number;
+      placeholderIndex?: string;
+      placeholderOnly?: boolean;
       placeholderRole?: PlaceholderRole;
       rotation?: number;
       source: 'layout' | 'master' | 'slide';
@@ -81,6 +91,7 @@ export type PptxSlideObject =
       id: string;
       kind: 'shape';
       opacity?: number;
+      placeholderIndex?: string;
       placeholderRole?: PlaceholderRole;
       rotation?: number;
       shape: ShapeKind;
@@ -126,14 +137,20 @@ export interface PptxDeck {
 }
 
 export interface PptxTextDefaults {
+  bodyParagraphProperties: Element | undefined;
+  bodyRunProperties: Element | undefined;
   defaultParagraphProperties: Element | undefined;
   defaultRunProperties: Element | undefined;
   listParagraphProperties: Element | undefined;
   listRunProperties: Element | undefined;
+  titleParagraphProperties: Element | undefined;
+  titleRunProperties: Element | undefined;
 }
 
 export interface PptxTheme {
   colors: Map<string, string>;
+  majorFontFamily?: string;
+  minorFontFamily?: string;
 }
 
 export interface ParseContext {

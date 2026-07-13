@@ -68,6 +68,10 @@ const layoutXml = `<?xml version="1.0" encoding="UTF-8"?>
         <p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="914400" cy="457200"/></a:xfrm></p:spPr>
         <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Title Text</a:t></a:r></a:p></p:txBody>
       </p:sp>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="23" name="Photo placeholder"/><p:cNvSpPr/><p:nvPr><p:ph type="pic" idx="13"/></p:nvPr></p:nvSpPr>
+        <p:spPr><a:xfrm><a:off x="914400" y="3200400"/><a:ext cx="1828800" cy="914400"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>
+      </p:sp>
     </p:spTree>
   </p:cSld>
 </p:sldLayout>`;
@@ -237,6 +241,7 @@ const contentTypesXml = `<?xml version="1.0" encoding="UTF-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="xml" ContentType="application/xml"/>
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="svg" ContentType="image/svg+xml"/>
   <Override PartName="/deck/main.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>
   <Override PartName="/deck/media/photo.dat" ContentType="image/png"/>
 </Types>`;
@@ -252,6 +257,14 @@ const standardPresentationXml = `<?xml version="1.0" encoding="UTF-8"?>
   <p:sldIdLst>
     <p:sldId id="256" r:id="rIdSlide"/>
   </p:sldIdLst>
+  <p:defaultTextStyle>
+    <a:defPPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" algn="l">
+      <a:defRPr sz="1800"/>
+    </a:defPPr>
+    <a:lvl1pPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" algn="l">
+      <a:defRPr sz="2600"><a:latin typeface="+mn-lt"/></a:defRPr>
+    </a:lvl1pPr>
+  </p:defaultTextStyle>
 </p:presentation>`;
 
 const standardPresentationRels = `<?xml version="1.0" encoding="UTF-8"?>
@@ -263,6 +276,7 @@ const standardSlideRels = `<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rIdLayout" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../layouts/layoutA.xml"/>
   <Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/photo.dat"/>
+  <Relationship Id="rIdSvg" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/decor.svg"/>
   <Relationship Id="rIdExternal" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="https://example.com/external.png" TargetMode="External"/>
   <Relationship Id="rIdChart" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart1.xml"/>
 </Relationships>`;
@@ -285,6 +299,9 @@ const standardLayoutXml = `<?xml version="1.0" encoding="UTF-8"?>
 const standardMasterXml = `<?xml version="1.0" encoding="UTF-8"?>
 <p:sldMaster xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
   <p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld>
+  <p:txStyles>
+    <p:titleStyle><a:lvl1pPr><a:defRPr sz="4000" cap="all"><a:solidFill><a:srgbClr val="ffffff"/></a:solidFill></a:defRPr></a:lvl1pPr></p:titleStyle>
+  </p:txStyles>
 </p:sldMaster>`;
 
 const standardThemeXml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -295,6 +312,10 @@ const standardThemeXml = `<?xml version="1.0" encoding="UTF-8"?>
       <a:lt1><a:srgbClr val="ffffff"/></a:lt1>
       <a:accent1><a:srgbClr val="ff9900"/></a:accent1>
     </a:clrScheme>
+    <a:fontScheme name="LocalStudio Fonts">
+      <a:majorFont><a:latin typeface="Aptos Display"/></a:majorFont>
+      <a:minorFont><a:latin typeface="Tenorite"/></a:minorFont>
+    </a:fontScheme>
   </a:themeElements>
 </a:theme>`;
 
@@ -314,6 +335,16 @@ const standardSlideXml = `<?xml version="1.0" encoding="UTF-8"?>
           <a:ln w="25400"><a:solidFill><a:schemeClr val="dk1"/></a:solidFill></a:ln>
         </p:spPr>
       </p:sp>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="11" name="All caps text"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr><a:xfrm><a:off x="914400" y="1600200"/><a:ext cx="1828800" cy="457200"/></a:xfrm></p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr sz="2400" cap="all"><a:solidFill><a:srgbClr val="ffffff"/></a:solidFill></a:rPr><a:t>Mixed case</a:t></a:r></a:p></p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="12" name="Inherited title"/><p:cNvSpPr/><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr>
+        <p:spPr><a:xfrm><a:off x="914400" y="5029200"/><a:ext cx="3657600" cy="457200"/></a:xfrm></p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr/><a:t>Inherited style</a:t></a:r></a:p></p:txBody>
+      </p:sp>
       <p:grpSp>
         <p:nvGrpSpPr><p:cNvPr id="20" name="Group"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
         <p:grpSpPr><a:xfrm><a:off x="1828800" y="914400"/><a:ext cx="1828800" cy="914400"/><a:chOff x="0" y="0"/><a:chExt cx="1828800" cy="914400"/></a:xfrm></p:grpSpPr>
@@ -323,6 +354,18 @@ const standardSlideXml = `<?xml version="1.0" encoding="UTF-8"?>
             <a:xfrm><a:off x="0" y="0"/><a:ext cx="457200" cy="457200"/></a:xfrm>
             <a:prstGeom prst="diamond"><a:avLst/></a:prstGeom>
             <a:solidFill><a:srgbClr val="00aa66"/></a:solidFill>
+          </p:spPr>
+        </p:sp>
+      </p:grpSp>
+      <p:grpSp>
+        <p:nvGrpSpPr><p:cNvPr id="22" name="Scaled group"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+        <p:grpSpPr><a:xfrm><a:off x="2743200" y="914400"/><a:ext cx="1828800" cy="914400"/><a:chOff x="914400" y="457200"/><a:chExt cx="914400" cy="457200"/></a:xfrm></p:grpSpPr>
+        <p:sp>
+          <p:nvSpPr><p:cNvPr id="23" name="Scaled grouped rectangle"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+          <p:spPr>
+            <a:xfrm><a:off x="1371600" y="685800"/><a:ext cx="228600" cy="228600"/></a:xfrm>
+            <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+            <a:solidFill><a:srgbClr val="0066aa"/></a:solidFill>
           </p:spPr>
         </p:sp>
       </p:grpSp>
@@ -349,6 +392,21 @@ const standardSlideXml = `<?xml version="1.0" encoding="UTF-8"?>
         <p:blipFill><a:blip r:embed="rIdImage"/></p:blipFill>
         <p:spPr><a:xfrm><a:off x="4572000" y="2286000"/><a:ext cx="914400" cy="457200"/></a:xfrm></p:spPr>
       </p:pic>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="52" name="Theme font text"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr><a:xfrm><a:off x="5486400" y="2286000"/><a:ext cx="1371600" cy="457200"/></a:xfrm></p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr sz="2400"><a:latin typeface="+mn-lt"/></a:rPr><a:t>Theme font</a:t></a:r></a:p></p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="53" name="Inherited theme font text"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr><a:xfrm><a:off x="5486400" y="2743200"/><a:ext cx="1371600" cy="457200"/></a:xfrm></p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Inherited theme font</a:t></a:r></a:p></p:txBody>
+      </p:sp>
+      <p:pic>
+        <p:nvPicPr><p:cNvPr id="52" name="SVG image"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>
+        <p:blipFill><a:blip><a:extLst><a:ext uri="{96DAC541-7B7A-43D3-8B79-37D633B846F1}"><asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" r:embed="rIdSvg"/></a:ext></a:extLst></a:blip></p:blipFill>
+        <p:spPr><a:xfrm><a:off x="5486400" y="2286000"/><a:ext cx="914400" cy="457200"/></a:xfrm></p:spPr>
+      </p:pic>
       <p:pic>
         <p:nvPicPr><p:cNvPr id="51" name="External image"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>
         <p:blipFill><a:blip r:embed="rIdExternal"/></p:blipFill>
@@ -372,6 +430,7 @@ function createStandardsFixture() {
     { path: 'deck/masters/_rels/masterA.xml.rels', contents: standardMasterRels },
     { path: 'deck/theme/themeA.xml', contents: standardThemeXml },
     { path: 'deck/media/photo.dat', contents: new Uint8Array([137, 80, 78, 71]) },
+    { path: 'deck/media/decor.svg', contents: '<svg xmlns="http://www.w3.org/2000/svg"/>' },
     { path: 'deck/charts/chart1.xml', contents: '<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>' },
   ], 'standards.pptx');
 }
@@ -586,6 +645,84 @@ describe('BrowserPptxImportService', () => {
     expect(project.pages[0]?.elementIds.length).toBeGreaterThan(0);
   });
 
+  it('keeps long placeholder text inside its authored PowerPoint frame', async () => {
+    const placeholderSlideXml = `<?xml version="1.0" encoding="UTF-8"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+      <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm></p:grpSpPr>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="30" name="Body placeholder"/><p:cNvSpPr/><p:nvPr><p:ph type="body" idx="15"/></p:nvPr></p:nvSpPr>
+        <p:spPr><a:xfrm><a:off x="4572000" y="914400"/><a:ext cx="1828800" cy="914400"/></a:xfrm></p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr sz="1800"/><a:t>This placeholder has a long sentence that should wrap inside the body column instead of expanding across the whole slide.</a:t></a:r></a:p></p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+</p:sld>`;
+    const service = new BrowserPptxImportService();
+    const project = await service.importPowerPoint({ file: createPptxFixture(placeholderSlideXml) });
+    const placeholderElement = Object.values(project.elements).find(
+      (element) => element.type === 'text' && element.placeholderRole === 'body',
+    );
+
+    expect(placeholderElement).toMatchObject({
+      type: 'text',
+      placeholderRole: 'body',
+      x: 973,
+      y: 196,
+      width: 358,
+      height: 184,
+    });
+  });
+
+  it('inherits placeholder frames when slide text and pictures omit direct transforms', async () => {
+    const inheritedFrameSlideXml = `<?xml version="1.0" encoding="UTF-8"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+      <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm></p:grpSpPr>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="30" name="Title"/><p:cNvSpPr/><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr>
+        <p:spPr/>
+        <p:txBody><a:bodyPr><a:normAutofit/></a:bodyPr><a:lstStyle/><a:p><a:r><a:rPr sz="2400"/><a:t>Inherited frame title</a:t></a:r></a:p></p:txBody>
+      </p:sp>
+      <p:pic>
+        <p:nvPicPr><p:cNvPr id="31" name="Photo"/><p:cNvPicPr/><p:nvPr><p:ph type="pic" idx="13"/></p:nvPr></p:nvPicPr>
+        <p:blipFill><a:blip r:embed="rIdImage"/></p:blipFill>
+        <p:spPr/>
+      </p:pic>
+    </p:spTree>
+  </p:cSld>
+</p:sld>`;
+    const service = new BrowserPptxImportService();
+    const project = await service.importPowerPoint({ file: createPptxFixture(inheritedFrameSlideXml) });
+    const titleElement = Object.values(project.elements).find(
+      (element) => element.type === 'text' && element.text === 'Inherited frame title',
+    );
+    const imageAsset = Object.values(project.assets).find((asset) => asset.fileName === 'image1.png');
+    const imageElement = Object.values(project.elements).find(
+      (element) => element.type === 'image' && element.assetId === imageAsset?.id,
+    );
+
+    expect(titleElement).toMatchObject({
+      type: 'text',
+      placeholderRole: 'title',
+      x: 13,
+      y: 4,
+      width: 166,
+      height: 88,
+    });
+    expect(imageElement).toMatchObject({
+      type: 'image',
+      x: 192,
+      y: 672,
+      width: 384,
+      height: 192,
+    });
+  });
+
   it('rejects files that are not valid PPTX packages', async () => {
     const service = new BrowserPptxImportService();
 
@@ -607,13 +744,23 @@ describe('BrowserPptxImportService', () => {
 
     const elements = Object.values(project.elements);
     const themeShape = elements.find((element) => element.type === 'shape' && element.id.includes('shape-10'));
+    const allCapsText = elements.find((element) => element.type === 'text' && element.id.includes('text-11'));
+    const inheritedTitle = elements.find((element) => element.type === 'text' && element.id.includes('text-12'));
     const groupedShape = elements.find((element) => element.type === 'shape' && element.id.includes('shape-21'));
+    const scaledGroupedShape = elements.find((element) => element.type === 'shape' && element.id.includes('shape-23'));
     const imageAsset = Object.values(project.assets).find((asset) => asset.fileName === 'photo.dat');
+    const svgAsset = Object.values(project.assets).find((asset) => asset.fileName === 'decor.svg');
     const tableTexts = elements
       .filter((element) => element.type === 'text')
       .filter((element) => ['Cell A', 'Cell B'].includes(element.text))
       .map((element) => element.text)
       .sort();
+    const themeFontText = elements.find(
+      (element) => element.type === 'text' && element.text === 'Theme font',
+    );
+    const inheritedThemeFontText = elements.find(
+      (element) => element.type === 'text' && element.text === 'Inherited theme font',
+    );
 
     expect(themeShape).toMatchObject({
       type: 'shape',
@@ -623,6 +770,16 @@ describe('BrowserPptxImportService', () => {
       strokeWidth: 5,
       rotation: 90,
     });
+    expect(allCapsText).toMatchObject({
+      type: 'text',
+      text: 'MIXED CASE',
+    });
+    expect(inheritedTitle).toMatchObject({
+      type: 'text',
+      fill: '#FFFFFF',
+      fontSize: 107,
+      text: 'INHERITED STYLE',
+    });
     expect(groupedShape).toMatchObject({
       type: 'shape',
       shape: 'diamond',
@@ -630,8 +787,25 @@ describe('BrowserPptxImportService', () => {
       x: 384,
       y: 192,
     });
+    expect(scaledGroupedShape).toMatchObject({
+      type: 'shape',
+      shape: 'rect',
+      width: 96,
+      height: 96,
+      x: 768,
+      y: 288,
+    });
+    expect(themeFontText).toMatchObject({
+      type: 'text',
+      fontFamily: 'Tenorite',
+    });
+    expect(inheritedThemeFontText).toMatchObject({
+      type: 'text',
+      fontFamily: 'Tenorite',
+    });
     expect(tableTexts).toEqual(['Cell A', 'Cell B']);
     expect(imageAsset).toMatchObject({ fileName: 'photo.dat', mimeType: 'image/png', type: 'image' });
+    expect(svgAsset).toMatchObject({ fileName: 'decor.svg', mimeType: 'image/svg+xml', type: 'image' });
     expect(project.importWarnings).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ code: 'pptx-external-relationship', severity: 'warning' }),

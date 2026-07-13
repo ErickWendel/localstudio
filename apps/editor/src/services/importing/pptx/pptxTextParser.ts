@@ -21,10 +21,28 @@ function getPresentationTextDefaults(document: Document): PptxTextDefaults {
     ? pptxXml.firstDescendant(defaultTextStyle, 'lvl1pPr')
     : undefined;
   return {
+    bodyParagraphProperties: undefined,
+    bodyRunProperties: undefined,
     defaultParagraphProperties,
     defaultRunProperties: getParagraphDefaultRunProperties(defaultParagraphProperties),
     listParagraphProperties,
     listRunProperties: getParagraphDefaultRunProperties(listParagraphProperties),
+    titleParagraphProperties: undefined,
+    titleRunProperties: undefined,
+  };
+}
+
+function getMasterTextDefaults(document: Document, baseDefaults: PptxTextDefaults): PptxTextDefaults {
+  const titleStyle = pptxXml.firstDescendant(document, 'titleStyle');
+  const bodyStyle = pptxXml.firstDescendant(document, 'bodyStyle');
+  const titleParagraphProperties = titleStyle ? pptxXml.firstDescendant(titleStyle, 'lvl1pPr') : undefined;
+  const bodyParagraphProperties = bodyStyle ? pptxXml.firstDescendant(bodyStyle, 'lvl1pPr') : undefined;
+  return {
+    ...baseDefaults,
+    bodyParagraphProperties: bodyParagraphProperties ?? baseDefaults.bodyParagraphProperties,
+    bodyRunProperties: getParagraphDefaultRunProperties(bodyParagraphProperties) ?? baseDefaults.bodyRunProperties,
+    titleParagraphProperties: titleParagraphProperties ?? baseDefaults.titleParagraphProperties,
+    titleRunProperties: getParagraphDefaultRunProperties(titleParagraphProperties) ?? baseDefaults.titleRunProperties,
   };
 }
 
@@ -32,12 +50,19 @@ function getPlaceholderType(shape: Element) {
   return pptxXml.firstDescendant(shape, 'ph')?.getAttribute('type');
 }
 
+function getPlaceholderIndex(shape: Element) {
+  return pptxXml.firstDescendant(shape, 'ph')?.getAttribute('idx') ?? undefined;
+}
+
 function getPlaceholderRole(shape: Element): PlaceholderRole | undefined {
+  const placeholder = pptxXml.firstDescendant(shape, 'ph');
+  if (!placeholder) return undefined;
   const type = getPlaceholderType(shape);
   if (type === 'title' || type === 'ctrTitle') return 'title';
   if (type === 'body' || type === 'obj' || type === 'subTitle') return 'body';
   if (type === 'ftr') return 'footer';
   if (type === 'sldNum') return 'slideNumber';
+  if (!type) return 'body';
   return undefined;
 }
 
@@ -100,6 +125,21 @@ function hasEnabledBold(...elements: Array<Element | undefined>) {
   return false;
 }
 
+function getRoleParagraphProperties(
+  role: PlaceholderRole | undefined,
+  textDefaults: PptxTextDefaults,
+) {
+  if (role === 'title') return textDefaults.titleParagraphProperties;
+  if (role === 'body') return textDefaults.bodyParagraphProperties;
+  return undefined;
+}
+
+function getRoleRunProperties(role: PlaceholderRole | undefined, textDefaults: PptxTextDefaults) {
+  if (role === 'title') return textDefaults.titleRunProperties;
+  if (role === 'body') return textDefaults.bodyRunProperties;
+  return undefined;
+}
+
 function getFontSize(rawSize: number, scaleY: number) {
   return Number.isFinite(rawSize) && rawSize > 0
     ? Math.max(8, Math.round((rawSize / 100) * EMUS_PER_POINT * scaleY))
@@ -125,6 +165,18 @@ function getLineHeight(...paragraphProperties: Array<Element | undefined>) {
     }
   }
   return pptxParserDefaults.textStyle.lineHeight;
+}
+
+function resolveThemeFontFamily(font: string | undefined, theme: PptxTheme | undefined) {
+  if (!font) return undefined;
+  if (font === '+mj-lt' || font === '+mj-ea' || font === '+mj-cs') {
+    return theme?.majorFontFamily;
+  }
+  if (font === '+mn-lt' || font === '+mn-ea' || font === '+mn-cs') {
+    return theme?.minorFontFamily;
+  }
+  if (font.startsWith('+')) return undefined;
+  return font;
 }
 
 function getTextAlign(
@@ -157,6 +209,7 @@ function getTextStyle(
   scaleY: number,
   textDefaults: PptxTextDefaults,
   theme: PptxTheme | undefined,
+  placeholderRole?: PlaceholderRole,
 ): PptxTextStyle {
   const paragraph = getFirstParagraph(shape);
   const paragraphProperties = paragraph ? pptxXml.firstDescendant(paragraph, 'pPr') : undefined;
@@ -165,8 +218,12 @@ function getTextStyle(
   const listParagraphProperties = getListParagraphProperties(shape);
   const listDefaultRunProperties = getListDefaultRunProperties(shape);
   const verticalAlign = getVerticalAlign(shape);
+  const roleParagraphProperties = getRoleParagraphProperties(placeholderRole, textDefaults);
+  const roleRunProperties = getRoleRunProperties(placeholderRole, textDefaults);
   const inheritedRunProperties =
     verticalAlign === 'middle' ? textDefaults.listRunProperties : textDefaults.defaultRunProperties;
+  const fallbackInheritedRunProperties =
+    verticalAlign === 'middle' ? textDefaults.defaultRunProperties : textDefaults.listRunProperties;
   const inheritedParagraphProperties =
     verticalAlign === 'middle'
       ? textDefaults.listParagraphProperties
@@ -177,7 +234,9 @@ function getTextStyle(
       runProperties,
       paragraphDefaultRunProperties,
       listDefaultRunProperties,
+      roleRunProperties,
       inheritedRunProperties,
+      fallbackInheritedRunProperties,
       textDefaults.defaultRunProperties,
     ),
   );
@@ -185,43 +244,95 @@ function getTextStyle(
     runProperties,
     paragraphDefaultRunProperties,
     listDefaultRunProperties,
+    roleRunProperties,
     inheritedRunProperties,
+    fallbackInheritedRunProperties,
     textDefaults.defaultRunProperties,
   );
+  const resolvedFont = resolveThemeFontFamily(font, theme);
   const bold = hasEnabledBold(
     runProperties,
     paragraphDefaultRunProperties,
     listDefaultRunProperties,
+    roleRunProperties,
     inheritedRunProperties,
+    fallbackInheritedRunProperties,
+    textDefaults.defaultRunProperties,
+  );
+  const capitalization = getFirstAttribute(
+    'cap',
+    runProperties,
+    paragraphDefaultRunProperties,
+    listDefaultRunProperties,
+    roleRunProperties,
+    inheritedRunProperties,
+    fallbackInheritedRunProperties,
     textDefaults.defaultRunProperties,
   );
   const fontSize = getFontSize(size, scaleY);
   return {
     align: getTextAlign(paragraphProperties, listParagraphProperties, textDefaults, fontSize, verticalAlign),
-    fill: pptxVisualStyle.getHexColor(
-      runProperties ??
-        paragraphDefaultRunProperties ??
-        listDefaultRunProperties ??
-        inheritedRunProperties ??
-        shape,
-      pptxParserDefaults.textStyle.fill,
+    ...(capitalization === 'all' ? { capitalization: 'all' as const } : {}),
+    fill: getTextFill(
       theme,
+      runProperties,
+      paragraphDefaultRunProperties,
+      listDefaultRunProperties,
+      roleRunProperties,
+      inheritedRunProperties,
+      fallbackInheritedRunProperties,
+      shape,
     ),
-    fontFamily: font && !font.startsWith('+') ? font : pptxParserDefaults.textStyle.fontFamily,
+    fontFamily: resolvedFont ?? pptxParserDefaults.textStyle.fontFamily,
     fontSize,
     fontWeight: bold ? 700 : pptxParserDefaults.textStyle.fontWeight,
-    lineHeight: getLineHeight(paragraphProperties, listParagraphProperties, inheritedParagraphProperties),
+    lineHeight: getLineHeight(
+      paragraphProperties,
+      listParagraphProperties,
+      roleParagraphProperties,
+      inheritedParagraphProperties,
+    ),
     verticalAlign,
   };
+}
+
+function getTextFill(theme: PptxTheme | undefined, ...elements: Array<Element | undefined>) {
+  for (const element of elements) {
+    const color = pptxVisualStyle.getHexColor(element, '', theme);
+    if (color) return color;
+  }
+  return pptxParserDefaults.textStyle.fill;
+}
+
+function applyRunCapitalization(text: string, runProperties: Element | undefined) {
+  const capitalization = runProperties?.getAttribute('cap');
+  if (capitalization === 'all') return text.toLocaleUpperCase();
+  return text;
+}
+
+function getParagraphText(paragraph: Element) {
+  const runs = pptxXml.descendants(paragraph, 'r');
+  if (runs.length === 0) return pptxXml.textContent(paragraph, 't');
+  return runs
+    .map((run) => {
+      const runProperties = pptxXml.firstDescendant(run, 'rPr');
+      return applyRunCapitalization(pptxXml.textContent(run, 't'), runProperties);
+    })
+    .join('');
 }
 
 function getTextParagraphs(shape: Element) {
   const body = pptxXml.firstDescendant(shape, 'txBody');
   const paragraphs = body ? pptxXml.descendants(body, 'p') : [];
   return paragraphs
-    .map((paragraph) => pptxXml.textContent(paragraph, 't').replace(/[ \t\r\f\v]+/g, ' ').trim())
+    .map((paragraph) => getParagraphText(paragraph).replace(/[ \t\r\f\v]+/g, ' ').trim())
     .filter(Boolean)
     .join('\n');
+}
+
+function applyTextStyle(text: string, style: PptxTextStyle) {
+  if (style.capitalization === 'all') return text.toLocaleUpperCase();
+  return text;
 }
 
 async function parseSpeakerNotes(context: ParseContext, notesPath: string | undefined) {
@@ -267,7 +378,10 @@ function getTextBox(shape: Element, scaleX: number, scaleY: number): PptxTextBox
 }
 
 export const pptxTextParser = {
+  applyTextStyle,
+  getMasterTextDefaults,
   getPlaceholderFallbackText,
+  getPlaceholderIndex,
   getPlaceholderRole,
   getPlaceholderType,
   getPresentationTextDefaults,

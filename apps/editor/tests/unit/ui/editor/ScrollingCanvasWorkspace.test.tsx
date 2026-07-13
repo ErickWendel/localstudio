@@ -39,6 +39,37 @@ describe('ScrollingCanvasWorkspace', () => {
     expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start', behavior: 'auto' });
   });
 
+  it('does not scroll when the active slide visibility changes', () => {
+    const project = sampleProject.createSampleProject();
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+
+    const { rerender } = render(
+      <ScrollingCanvasWorkspace
+        activePageId="page-1"
+        project={project}
+        selection={{ pageId: 'page-1', elementIds: [] }}
+      />,
+    );
+
+    scrollIntoView.mockClear();
+    rerender(
+      <ScrollingCanvasWorkspace
+        activePageId="page-1"
+        project={{
+          ...project,
+          pages: [{ ...project.pages[0]!, visible: false }],
+        }}
+        selection={{ pageId: 'page-1', elementIds: [] }}
+      />,
+    );
+
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+
   it('activates placeholder pages and exposes page header actions', async () => {
     const user = userEvent.setup();
     const project = sampleProject.createSampleProject();
