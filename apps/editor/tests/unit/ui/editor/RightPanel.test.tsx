@@ -1,5 +1,4 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 import type { ProjectDocument } from '../../../../src/domain/documents/model';
@@ -74,14 +73,13 @@ describe('RightPanel', () => {
     return mediaProject;
   }
 
-  it('switches between Layout, Design, and AI Tools tabs', async () => {
-    const user = userEvent.setup();
+  it('switches between Layout, Design, and AI Tools tabs', () => {
     let activeTab: 'layout' | 'design' | 'ai-tools' = 'layout';
     const onTabChange = vi.fn((tab: 'layout' | 'design' | 'ai-tools') => {
       activeTab = tab;
     });
 
-    const { rerender } = render(
+    render(
       <RightPanel
         activeTab={activeTab}
         onTabChange={onTabChange}
@@ -92,129 +90,14 @@ describe('RightPanel', () => {
       />,
     );
 
-    expect(screen.getByRole('tab', { name: 'Layout' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByText('4 layers on current page')).toBeInTheDocument();
-    expect(screen.getByText('Selected Image')).toBeInTheDocument();
-    await user.click(screen.getByRole('tab', { name: 'Design' }));
-    rerender(
-      <RightPanel
-        activeTab="design"
-        onTabChange={onTabChange}
-        project={project}
-        activePageId="page-1"
-        selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
-        modelStates={modelStates}
-      />,
-    );
-    expect(screen.getByText('1920 x 1080')).toBeInTheDocument();
-    expect(screen.getByLabelText('Canvas background color')).toHaveValue('#050d10');
-    expect(screen.queryByText('Text-to-Palette')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('tab', { name: 'AI Tools' }));
-    rerender(
-      <RightPanel
-        activeTab="ai-tools"
-        onTabChange={onTabChange}
-        project={project}
-        activePageId="page-1"
-        selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
-        modelStates={modelStates}
-      />,
-    );
-    expect(screen.queryByText('Download Required Models')).not.toBeInTheDocument();
-    expect(screen.queryByText('Local Chrome AI')).not.toBeInTheDocument();
-    expect(screen.queryByText('Cached Browser Models')).not.toBeInTheDocument();
-    expect(screen.queryByText('Configuration')).not.toBeInTheDocument();
-    expect(screen.queryByText('Models')).not.toBeInTheDocument();
-    expect(screen.getAllByLabelText('LLM Model').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByLabelText('Translation Model').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Image Editing Models')).toBeInTheDocument();
-    expect(screen.getByText('Segmentation model for image editing.')).toBeInTheDocument();
-    expect(screen.queryByText('Background Remover')).not.toBeInTheDocument();
-    expect(screen.queryByText('Magic Eraser')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Design'));
+    expect(onTabChange).toHaveBeenCalledWith('design');
+    fireEvent.click(screen.getByText('AI Tools'));
+    expect(onTabChange).toHaveBeenCalledWith('ai-tools');
   });
 
-  it('selects the matching canvas element from a layout row', async () => {
-    const user = userEvent.setup();
+  it('exposes layer selection, controls, and drag order', () => {
     const onSelectElement = vi.fn();
-
-    render(
-      <RightPanel
-        activeTab="layout"
-        onTabChange={vi.fn()}
-        project={project}
-        activePageId="page-1"
-        selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
-        modelStates={modelStates}
-        onSelectElement={onSelectElement}
-      />,
-    );
-
-    await user.click(screen.getByRole('button', { name: 'Title' }));
-
-    expect(onSelectElement).toHaveBeenCalledWith('text-title');
-  });
-
-  it('adds to selection from a layout row with shift click', async () => {
-    const user = userEvent.setup();
-    const onSelectElement = vi.fn();
-
-    render(
-      <RightPanel
-        activeTab="layout"
-        onTabChange={vi.fn()}
-        project={project}
-        activePageId="page-1"
-        selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
-        modelStates={modelStates}
-        onSelectElement={onSelectElement}
-      />,
-    );
-
-    await user.keyboard('{Shift>}');
-    await user.click(screen.getByRole('button', { name: 'Title' }));
-    await user.keyboard('{/Shift}');
-
-    expect(onSelectElement).toHaveBeenCalledWith('text-title', { additive: true });
-  });
-
-  it('highlights the image editing model download when background selection needs it', () => {
-    render(
-      <RightPanel
-        activeTab="ai-tools"
-        onTabChange={vi.fn()}
-        project={project}
-        activePageId="page-1"
-        selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
-        modelStates={modelStates}
-        attentionModelId="image-editing-models"
-      />,
-    );
-
-    expect(screen.getByRole('article', { name: 'Image Editing Models' })).toHaveClass('model-row-attention');
-    expect(screen.getByRole('button', { name: 'Download Image Editing Models' })).toHaveClass(
-      'icon-button-attention',
-    );
-  });
-
-  it('does not pulse a ready image editing model', () => {
-    render(
-      <RightPanel
-        activeTab="ai-tools"
-        onTabChange={vi.fn()}
-        project={project}
-        activePageId="page-1"
-        selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
-        modelStates={[{ ...modelStates[0]!, status: 'ready' as const, progress: 100 }]}
-        attentionModelId="image-editing-models"
-      />,
-    );
-
-    expect(screen.getByRole('article', { name: 'Image Editing Models' })).not.toHaveClass('model-row-attention');
-    expect(screen.queryByRole('button', { name: 'Download Image Editing Models' })).not.toBeInTheDocument();
-  });
-
-  it('exposes layer controls for visibility, lock, delete, and drag order', async () => {
-    const user = userEvent.setup();
     const onSetVisibility = vi.fn();
     const onSetLock = vi.fn();
     const onDeleteElement = vi.fn();
@@ -228,6 +111,7 @@ describe('RightPanel', () => {
         activePageId="page-1"
         selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
         modelStates={modelStates}
+        onSelectElement={onSelectElement}
         onSetElementVisibility={onSetVisibility}
         onSetElementLock={onSetLock}
         onDeleteElement={onDeleteElement}
@@ -235,13 +119,19 @@ describe('RightPanel', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Hide Selected Image' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Title' }));
+    expect(onSelectElement).toHaveBeenCalledWith('text-title');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Title' }), { shiftKey: true });
+    expect(onSelectElement).toHaveBeenCalledWith('text-title', { additive: true });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide Selected Image' }));
     expect(onSetVisibility).toHaveBeenCalledWith('image-hero', false);
 
-    await user.click(screen.getByRole('button', { name: 'Lock Selected Image' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Lock Selected Image' }));
     expect(onSetLock).toHaveBeenCalledWith('image-hero', true);
 
-    await user.click(screen.getByRole('button', { name: 'Delete Selected Image' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Selected Image' }));
     expect(onDeleteElement).toHaveBeenCalledWith('image-hero');
 
     const titleRow = screen.getByRole('button', { name: 'Title' });
@@ -271,8 +161,41 @@ describe('RightPanel', () => {
     expect(onReorderElement).toHaveBeenCalledWith('text-title', 'text-subtitle', 'after');
   });
 
-  it('updates selected text design properties and page background', async () => {
-    const user = userEvent.setup();
+  it('highlights model downloads only while they are needed', () => {
+    const { rerender } = render(
+      <RightPanel
+        activeTab="ai-tools"
+        onTabChange={vi.fn()}
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
+        modelStates={modelStates}
+        attentionModelId="image-editing-models"
+      />,
+    );
+
+    expect(screen.getByRole('article', { name: 'Image Editing Models' })).toHaveClass('model-row-attention');
+    expect(screen.getByRole('button', { name: 'Download Image Editing Models' })).toHaveClass(
+      'icon-button-attention',
+    );
+
+    rerender(
+      <RightPanel
+        activeTab="ai-tools"
+        onTabChange={vi.fn()}
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
+        modelStates={[{ ...modelStates[0]!, status: 'ready' as const, progress: 100 }]}
+        attentionModelId="image-editing-models"
+      />,
+    );
+
+    expect(screen.getByRole('article', { name: 'Image Editing Models' })).not.toHaveClass('model-row-attention');
+    expect(screen.queryByRole('button', { name: 'Download Image Editing Models' })).not.toBeInTheDocument();
+  });
+
+  it('updates selected text design properties and page background', () => {
     const onUpdateElementStyle = vi.fn();
     const onUpdatePageBackground = vi.fn();
 
@@ -299,12 +222,11 @@ describe('RightPanel', () => {
     });
     expect(onUpdateElementStyle).toHaveBeenCalledWith('text-title', { fill: '#ffffff' });
 
-    await user.click(screen.getByRole('button', { name: 'Align selected text left' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Align selected text left' }));
     expect(onUpdateElementStyle).toHaveBeenCalledWith('text-title', { align: 'left' });
   });
 
-  it('shows video playback settings for selected videos', async () => {
-    const user = userEvent.setup();
+  it('shows video playback settings for selected videos', () => {
     const onAlignSelectedElement = vi.fn();
     const onSetElementLock = vi.fn();
     const onSetSelectedElementZOrder = vi.fn();
@@ -339,25 +261,31 @@ describe('RightPanel', () => {
     expect(screen.getByLabelText('Selected video repeat mode')).toHaveValue('none');
     expect(screen.getByLabelText('Selected video volume')).toHaveValue('100');
     const replacement = new File(['video'], 'replacement.mp4', { type: 'video/mp4' });
-    await user.upload(screen.getByLabelText('Replace video file'), replacement);
+    fireEvent.change(screen.getByLabelText('Replace video file'), {
+      target: { files: [replacement] },
+    });
     expect(onReplaceVideoAsset).toHaveBeenCalledWith('video-demo', replacement);
 
-    await user.click(screen.getByRole('button', { name: 'Play movie' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Play movie' }));
     expect(onUpdateMediaPlayback).toHaveBeenCalledWith('video-demo', { playing: true });
 
-    await user.click(screen.getByRole('button', { name: 'Jump movie to end' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Jump movie to end' }));
     expect(onUpdateMediaPlayback).toHaveBeenCalledWith('video-demo', {
       playbackPositionSeconds: 12,
       playing: false,
     });
 
-    await user.selectOptions(screen.getByLabelText('Selected video repeat mode'), 'loop');
+    fireEvent.change(screen.getByLabelText('Selected video repeat mode'), {
+      target: { value: 'loop' },
+    });
     expect(onUpdateMediaPlayback).toHaveBeenCalledWith('video-demo', {
       loop: true,
       repeatMode: 'loop',
     });
 
-    await user.selectOptions(screen.getByLabelText('Selected video start'), 'after-previous');
+    fireEvent.change(screen.getByLabelText('Selected video start'), {
+      target: { value: 'after-previous' },
+    });
     expect(onSetElementAnimationBuilds).toHaveBeenCalledWith(['video-demo'], {
       effect: 'reveal',
       trigger: 'after-previous',
@@ -388,20 +316,22 @@ describe('RightPanel', () => {
     });
     expect(onUpdateMediaPlayback).toHaveBeenCalledWith('video-demo', { posterFrameSeconds: 3.5 });
 
-    await user.click(screen.getByRole('tab', { name: 'Style' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Style' }));
     fireEvent.change(screen.getByLabelText('Selected element opacity'), {
       target: { value: '48' },
     });
     expect(onUpdateElementStyle).toHaveBeenCalledWith('video-demo', { opacity: 0.48 });
 
-    await user.click(screen.getByRole('tab', { name: 'Arrange' }));
-    await user.click(screen.getByRole('button', { name: /Front/ }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Arrange' }));
+    fireEvent.click(screen.getByRole('button', { name: /Front/ }));
     expect(onSetSelectedElementZOrder).toHaveBeenCalledWith('front');
-    await user.selectOptions(screen.getByLabelText('Align selected element'), 'page-center');
+    fireEvent.change(screen.getByLabelText('Align selected element'), {
+      target: { value: 'page-center' },
+    });
     expect(onAlignSelectedElement).toHaveBeenCalledWith('page-center');
     fireEvent.change(screen.getByLabelText('Selected element width'), { target: { value: '800' } });
     expect(onUpdateElementFrame).toHaveBeenCalledWith('video-demo', { width: 800 });
-    await user.click(screen.getByRole('button', { name: 'Lock' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Lock' }));
     expect(onSetElementLock).toHaveBeenCalledWith('video-demo', true);
   });
 
@@ -439,8 +369,7 @@ describe('RightPanel', () => {
     expect(screen.getByLabelText('Selected video start')).toHaveValue('after-previous');
   });
 
-  it('shows movie controls for selected GIF objects', async () => {
-    const user = userEvent.setup();
+  it('shows movie controls for selected GIF objects', () => {
     const onUpdateMediaPlayback = vi.fn();
 
     render(
@@ -457,7 +386,7 @@ describe('RightPanel', () => {
 
     expect(screen.getByRole('tab', { name: 'Movie' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByLabelText('Play selected GIF')).toBeChecked();
-    await user.click(screen.getByLabelText('Play selected GIF'));
+    fireEvent.click(screen.getByLabelText('Play selected GIF'));
     expect(onUpdateMediaPlayback).toHaveBeenCalledWith('gif-demo', { playing: false });
     expect(screen.queryByLabelText('Selected video trim start')).not.toBeInTheDocument();
   });

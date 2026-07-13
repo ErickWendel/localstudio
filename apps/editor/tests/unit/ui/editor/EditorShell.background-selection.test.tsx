@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { modelSetupService } from '../../../../src/services/model-setup/modelSetupService';
@@ -22,7 +22,7 @@ describe('EditorShell background selection workflows', () => {
     render(<EditorShell services={createAppServices()} />);
     await selectImageLayer(user);
 
-    await user.click(screen.getByRole('button', { name: 'BG Remover' }));
+    fireEvent.click(screen.getByRole('button', { name: 'BG Remover' }));
 
     expect(
       screen.getByText('You must download the image editing tools first.'),
@@ -55,7 +55,7 @@ describe('EditorShell background selection workflows', () => {
     render(<EditorShell services={services} />);
     await selectImageLayer(user);
 
-    await user.click(screen.getByRole('button', { name: 'BG Remover' }));
+    fireEvent.click(screen.getByRole('button', { name: 'BG Remover' }));
 
     expect(
       await screen.findByText(

@@ -35,7 +35,6 @@ describe('EditorShell presenter fullscreen workflows', () => {
   });
 
   it('opens presenter view with an audience fullscreen prompt and keeps the desktop remote panel closed', async () => {
-    const user = userEvent.setup();
     let fullscreenElement: Element | null = null;
     const popupClose = vi.fn();
     const popupPostMessage = vi.fn();
@@ -66,8 +65,8 @@ describe('EditorShell presenter fullscreen workflows', () => {
 
     render(<EditorShell services={createAppServices()} />);
 
-    await user.click(screen.getByRole('button', { name: 'Presentation play options' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Presenter view' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Presentation play options' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Presenter view' }));
 
     expect(openWindow).toHaveBeenCalledTimes(1);
     expect(popup.location.href).toContain('presenter=1');
@@ -77,13 +76,13 @@ describe('EditorShell presenter fullscreen workflows', () => {
     ).not.toBeInTheDocument();
     expect(requestFullscreen).not.toHaveBeenCalled();
 
-    await user.click(screen.getByLabelText('Canvas workspace'));
+    fireEvent.click(screen.getByLabelText('Canvas workspace'));
 
     expect(
       screen.queryByRole('region', { name: 'Remote control this presentation' }),
     ).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Enter full screen mode' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Enter full screen mode' }));
 
     await waitFor(() => {
       expect(requestFullscreen).toHaveBeenCalledTimes(1);

@@ -97,8 +97,173 @@ jobs:
         run: npm run typecheck
 
   test:
-    name: Unit tests
+    name: Unit tests (${{ matrix.label }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: landing
+            command: npm run test --workspace @localstudio/landing
+          - label: editor 1/4
+            command: npm run test --workspace @localstudio/editor -- --shard=1/4
+          - label: editor 2/4
+            command: npm run test --workspace @localstudio/editor -- --shard=2/4
+          - label: editor 3/4
+            command: npm run test --workspace @localstudio/editor -- --shard=3/4
+          - label: editor 4/4
+            command: npm run test --workspace @localstudio/editor -- --shard=4/4
+          - label: joystick
+            command: npm run test --workspace @localstudio/joystick
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test
+        run: ${{ matrix.command }}
+
+  e2e:
+    name: Playwright E2E (${{ matrix.label }})
     needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: editor 1/3
+            script: test:e2e:coverage:editor
+            report: editor-shard-1
+            raw_path: test-results/editor-shard-1-coverage/**/browser-coverage.json
+            shard: 1/3
+            output_name: editor-shard-1
+            coverage_threshold: '0'
+          - label: editor 2/3
+            script: test:e2e:coverage:editor
+            report: editor-shard-2
+            raw_path: test-results/editor-shard-2-coverage/**/browser-coverage.json
+            shard: 2/3
+            output_name: editor-shard-2
+            coverage_threshold: '0'
+          - label: editor 3/3
+            script: test:e2e:coverage:editor
+            report: editor-shard-3
+            raw_path: test-results/editor-shard-3-coverage/**/browser-coverage.json
+            shard: 3/3
+            output_name: editor-shard-3
+            coverage_threshold: '0'
+          - label: landing
+            script: test:e2e:coverage:landing
+            report: landing
+            raw_path: test-results/landing-coverage/**/browser-coverage.json
+            shard: ''
+            output_name: ''
+            coverage_threshold: ''
+          - label: public-deck
+            script: test:e2e:coverage:public-deck
+            report: public-deck
+            raw_path: test-results/public-deck-coverage/**/browser-coverage.json
+            shard: ''
+            output_name: ''
+            coverage_threshold: ''
+          - label: webmcp
+            script: test:e2e:coverage:webmcp
+            report: webmcp
+            raw_path: test-results/webmcp-coverage/**/browser-coverage.json
+            shard: ''
+            output_name: ''
+            coverage_threshold: ''
+          - label: joystick
+            script: test:e2e:coverage:joystick
+            report: joystick
+            raw_path: test-results/joystick-coverage/**/browser-coverage.json
+            shard: ''
+            output_name: ''
+            coverage_threshold: ''
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: localstudio-dist
+          path: dist
+
+      - name: Restore Playwright browser cache
+        id: playwright-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Install Playwright Chromium system dependencies
+        run: npx playwright install-deps chromium
+
+      - name: Install Playwright Chromium browser
+        run: npx playwright install chromium
+
+      - name: Playwright E2E coverage test
+        run: npm run ${{ matrix.script }}
+        env:
+          E2E_SERVER: dist
+          E2E_COVERAGE_THRESHOLD: ${{ matrix.coverage_threshold }}
+          LOCALSTUDIO_E2E_OUTPUT_NAME: ${{ matrix.output_name }}
+          LOCALSTUDIO_E2E_SHARD: ${{ matrix.shard }}
+
+      - name: Upload raw Playwright coverage
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-browser-coverage-${{ matrix.report }}
+          path: ${{ matrix.raw_path }}
+          if-no-files-found: ignore
+
+      - name: Add E2E coverage report to job summary
+        if: always()
+        run: |
+          if [ -f coverage-report/${{ matrix.report }}/coverage-summary.md ]; then
+            cat coverage-report/${{ matrix.report }}/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            cat coverage-report/${{ matrix.report }}/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload E2E coverage report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: e2e-coverage-report-${{ matrix.report }}
+          path: coverage-report
+          if-no-files-found: error
+
+  editor-e2e-coverage:
+    name: Editor E2E coverage aggregate
+    needs: e2e
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -122,56 +287,23 @@ jobs:
           name: localstudio-dist
           path: dist
 
-      - name: Test
-        run: npm run test
-
-  e2e:
-    name: Playwright E2E
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Setup Node
-        uses: actions/setup-node@v5
+      - name: Download raw editor Playwright coverage
+        uses: actions/download-artifact@v5
         with:
-          node-version: 26
-          cache: npm
+          pattern: playwright-browser-coverage-editor-shard-*
+          path: coverage-input/editor
+          merge-multiple: true
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Generate aggregate editor E2E coverage report
+        run: npx playwright test --project=chromium --output=test-results/coverage-report-only tests/e2e/support/coverage-report-only.spec.ts
+        env:
+          E2E_COVERAGE_INPUT_DIR: coverage-input/editor
+          E2E_COVERAGE_OUTPUT_DIR: coverage-report/editor
+          E2E_COVERAGE_REPORT_ONLY: '1'
+          E2E_COVERAGE_SCOPE: editor
+          E2E_COVERAGE_THRESHOLD: '80'
 
-      - name: Restore Playwright browser cache
-        id: playwright-cache
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            playwright-${{ runner.os }}-
-
-      - name: Install Playwright Chromium system dependencies
-        run: npx playwright install-deps chromium
-
-      - name: Install Playwright Chromium browser
-        run: npx playwright install chromium
-
-      - name: Editor E2E coverage test
-        run: npm run test:e2e:coverage:editor
-
-      - name: Upload editor raw Playwright coverage
-        if: always()
-        uses: actions/upload-artifact@v5
-        with:
-          name: playwright-browser-coverage-editor
-          path: test-results/**/browser-coverage.json
-          if-no-files-found: ignore
-
-      - name: Add editor E2E coverage report to job summary
+      - name: Add aggregate editor E2E coverage report to job summary
         if: always()
         run: |
           if [ -f coverage-report/editor/coverage-summary.md ]; then
@@ -180,32 +312,11 @@ jobs:
             cat coverage-report/editor/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Joystick E2E coverage test
-        if: always()
-        run: npm run test:e2e:coverage:joystick
-
-      - name: Upload joystick raw Playwright coverage
+      - name: Upload aggregate editor E2E coverage report
         if: always()
         uses: actions/upload-artifact@v5
         with:
-          name: playwright-browser-coverage-joystick
-          path: test-results/**/browser-coverage.json
-          if-no-files-found: ignore
-
-      - name: Add joystick E2E coverage report to job summary
-        if: always()
-        run: |
-          if [ -f coverage-report/joystick/coverage-summary.md ]; then
-            cat coverage-report/joystick/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
-            printf '\n' >> "$GITHUB_STEP_SUMMARY"
-            cat coverage-report/joystick/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - name: Upload E2E coverage report
-        if: always()
-        uses: actions/upload-artifact@v5
-        with:
-          name: e2e-coverage-report
+          name: e2e-coverage-report-editor
           path: coverage-report
           if-no-files-found: error
 
@@ -245,7 +356,7 @@ jobs:
   pages-artifact:
     name: Prepare Pages artifact
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: [build, test, e2e]
+    needs: [build, test, e2e, editor-e2e-coverage]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -267,11 +378,12 @@ jobs:
           name: localstudio-dist
           path: dist
 
-      - name: Download E2E coverage report
+      - name: Download E2E coverage reports
         uses: actions/download-artifact@v5
         with:
-          name: e2e-coverage-report
+          pattern: e2e-coverage-report-*
           path: coverage-report
+          merge-multiple: true
 
       - name: Add coverage report to job summary
         run: |
@@ -285,6 +397,24 @@ jobs:
             cat coverage-report/joystick/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
             printf '\n' >> "$GITHUB_STEP_SUMMARY"
             cat coverage-report/joystick/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f coverage-report/landing/coverage-summary.md ]; then
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            cat coverage-report/landing/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            cat coverage-report/landing/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f coverage-report/public-deck/coverage-summary.md ]; then
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            cat coverage-report/public-deck/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            cat coverage-report/public-deck/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f coverage-report/webmcp/coverage-summary.md ]; then
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            cat coverage-report/webmcp/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            cat coverage-report/webmcp/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Publish coverage report with site

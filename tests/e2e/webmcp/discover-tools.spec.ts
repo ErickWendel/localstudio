@@ -14,7 +14,7 @@ test.describe('WebMCP discover tools journey', () => {
       page
         .frameLocator('iframe[title="LocalStudio editor WebMCP demo"]')
         .getByRole('heading', { name: 'LocalStudio.dev' }),
-    ).toBeVisible({ timeout: 30_000 });
+    ).toBeVisible();
     await page.getByRole('button', { name: 'Discover tools' }).click();
     await expect(page.getByText(/Discovered \d+ tools/)).toBeVisible();
     await expect(page.getByRole('button', { name: 'create_project' })).toBeVisible();

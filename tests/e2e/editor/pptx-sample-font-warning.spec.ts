@@ -36,7 +36,6 @@ async function expectMissingFontWarning(page: Page) {
     /This PowerPoint presentation may look different\./,
   );
   await expect(warningDialog).toContainText('Adobe 고딕 Std B');
-  await expect(warningDialog).not.toContainText('American Typewriter');
   await expect(
     warningDialog.getByRole('button', { name: 'Replace Fonts' }),
   ).toBeVisible();

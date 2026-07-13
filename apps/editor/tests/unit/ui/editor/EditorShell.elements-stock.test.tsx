@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { EditorShell } from '../../../../src/ui/editor/shell/EditorShell';
@@ -31,7 +31,7 @@ describe('EditorShell elements and stock media workflows', () => {
     render(<EditorShell services={createAppServices()} />);
 
     await openLeftTab(user, 'Elements');
-    await user.click(screen.getByRole('button', { name: 'Add triangle' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add triangle' }));
 
     await waitFor(() => {
       expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
@@ -60,7 +60,7 @@ describe('EditorShell elements and stock media workflows', () => {
     render(<EditorShell services={services} />);
 
     await openLeftTab(user, 'Elements');
-    await user.click(await screen.findByRole('button', { name: 'Insert image by Ada Photo' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Insert image by Ada Photo' }));
 
     await waitFor(() => {
       expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
@@ -79,7 +79,7 @@ describe('EditorShell elements and stock media workflows', () => {
     render(<EditorShell services={services} />);
 
     await openLeftTab(user, 'Elements');
-    await user.click(await screen.findByRole('button', { name: 'Insert image by Ada Photo' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Insert image by Ada Photo' }));
 
     await waitFor(() => {
       expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
@@ -98,7 +98,7 @@ describe('EditorShell elements and stock media workflows', () => {
     render(<EditorShell services={services} />);
 
     await openLeftTab(user, 'Elements');
-    await user.click(await screen.findByRole('button', { name: 'Insert GIF Launch GIF' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Insert GIF Launch GIF' }));
 
     await waitFor(() => {
       expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
@@ -122,7 +122,7 @@ describe('EditorShell elements and stock media workflows', () => {
     render(<EditorShell services={services} />);
 
     await openLeftTab(user, 'Elements');
-    await user.click(await screen.findByRole('button', { name: 'Insert GIF Launch GIF' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Insert GIF Launch GIF' }));
 
     await waitFor(() => {
       expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
@@ -150,7 +150,7 @@ describe('EditorShell elements and stock media workflows', () => {
       screen.queryByText('Unsplash image search failed with 401 Unauthorized.'),
     ).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Configure media integrations' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Configure media integrations' }));
 
     expect(screen.getByRole('dialog', { name: 'Media integrations' })).toBeInTheDocument();
   });
@@ -165,13 +165,13 @@ describe('EditorShell elements and stock media workflows', () => {
     await openLeftTab(user, 'Animate');
     expect(screen.getByRole('tab', { name: 'Animate' })).toHaveAttribute('aria-selected', 'true');
 
-    await user.click(screen.getByRole('button', { name: 'Mirror settings' }));
-    await user.click(
+    fireEvent.click(screen.getByRole('button', { name: 'Mirror settings' }));
+    fireEvent.click(
       within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('button', {
         name: 'Media integrations',
       }),
     );
-    await user.click(screen.getByRole('button', { name: 'Save media integrations' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save media integrations' }));
 
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: 'Media integrations' })).not.toBeInTheDocument();

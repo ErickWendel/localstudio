@@ -75,8 +75,8 @@ describe('EditorShell clipboard workflows', () => {
       'true',
     );
 
-    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
-    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Choose folder' }));
 
     await waitFor(() => {
       const savedProject = repository.savedProjects.at(-1);

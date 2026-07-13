@@ -1,12 +1,11 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 import { TopToolbar } from '../../../../src/ui/editor/toolbars/TopToolbar';
 
 describe('TopToolbar', () => {
-  it('opens Stitch header menus and wires available actions', async () => {
-    const user = userEvent.setup();
+  it('opens Stitch header menus and wires available actions', () => {
     const onShare = vi.fn();
     const onImportPowerPoint = vi.fn();
     const onImportProject = vi.fn();
@@ -37,62 +36,61 @@ describe('TopToolbar', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'New Project' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'New Project' }));
     expect(onNewProject).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Import' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Project' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Import' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Project' }));
     expect(onImportProject).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Import' }));
-    await user.click(screen.getByRole('menuitem', { name: 'PowerPoint (.pptx)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Import' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'PowerPoint (.pptx)' }));
     expect(onImportPowerPoint).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Import' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Remote' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Import' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remote' }));
     expect(onImportRemoteMirror).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Share' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Share' }));
     expect(onShare).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
     expect(screen.getByRole('separator', { name: 'File storage actions' })).toBeInTheDocument();
-    await user.click(screen.getByRole('menuitem', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Save' }));
     expect(onSaveLocal).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Save As...' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Save As...' }));
     expect(onSaveLocalAs).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Mirror Now' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Mirror Now' }));
     expect(onMirrorNow).toHaveBeenCalledTimes(1);
 
-    await user.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
     expect(screen.queryByRole('menuitem', { name: 'Save Local' })).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Export' })).not.toBeInTheDocument();
     expect(
       screen.queryByRole('menuitem', { name: 'MinIO Mirror Settings' }),
     ).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'View' }));
+    fireEvent.click(screen.getByRole('button', { name: 'View' }));
     expect(screen.queryByRole('menuitem', { name: 'Toggle Layers Panel' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('menuitem', { name: 'Zoom' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Zoom Out' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Zoom' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Zoom Out' }));
     expect(onZoomOut).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole('button', { name: 'View' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Zoom' }));
-    await user.click(screen.getByRole('menuitem', { name: '100%' }));
+    fireEvent.click(screen.getByRole('button', { name: 'View' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Zoom' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '100%' }));
     expect(onResetZoom).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole('button', { name: 'View' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Zoom' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Zoom In' }));
+    fireEvent.click(screen.getByRole('button', { name: 'View' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Zoom' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Zoom In' }));
     expect(onZoomIn).toHaveBeenCalledTimes(1);
 
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     expect(screen.queryByRole('menuitem', { name: 'Translate Deck' })).not.toBeInTheDocument();
   });
 
-  it('opens the PowerPoint export action from the File menu', async () => {
-    const user = userEvent.setup();
+  it('opens the PowerPoint export action from the File menu', () => {
     const onExportPowerPoint = vi.fn();
 
     render(
@@ -103,15 +101,14 @@ describe('TopToolbar', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Export to' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Powerpoint (.pptx)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Export to' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Powerpoint (.pptx)' }));
 
     expect(onExportPowerPoint).toHaveBeenCalledTimes(1);
   });
 
-  it('opens the image archive export action from the File menu', async () => {
-    const user = userEvent.setup();
+  it('opens the image archive export action from the File menu', () => {
     const onExportImages = vi.fn();
 
     render(
@@ -122,15 +119,14 @@ describe('TopToolbar', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Export to' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Images (.zip)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Export to' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Images (.zip)' }));
 
     expect(onExportImages).toHaveBeenCalledTimes(1);
   });
 
-  it('shows operation notices and disables PowerPoint export while exporting', async () => {
-    const user = userEvent.setup();
+  it('shows operation notices and disables PowerPoint export while exporting', () => {
     const onExportPowerPoint = vi.fn();
 
     render(
@@ -153,13 +149,12 @@ describe('TopToolbar', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Slide 1');
     expect(screen.getByLabelText('1 of 4')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Export to' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Export to' }));
     expect(screen.getByRole('menuitem', { name: 'Exporting PowerPoint...' })).toBeDisabled();
   });
 
-  it('disables image export while exporting images', async () => {
-    const user = userEvent.setup();
+  it('disables image export while exporting images', () => {
     const onExportImages = vi.fn();
 
     render(
@@ -171,14 +166,13 @@ describe('TopToolbar', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Export to' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Export to' }));
 
     expect(screen.getByRole('menuitem', { name: 'Exporting images...' })).toBeDisabled();
   });
 
-  it('toggles persistence from the toolbar status icon', async () => {
-    const user = userEvent.setup();
+  it('toggles persistence from the toolbar status icon', () => {
     const onPersistenceToggle = vi.fn();
 
     render(
@@ -189,13 +183,12 @@ describe('TopToolbar', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Persistence disabled' }));
 
     expect(onPersistenceToggle).toHaveBeenCalledWith(true);
   });
 
-  it('opens keyboard shortcuts from the Help menu', async () => {
-    const user = userEvent.setup();
+  it('opens keyboard shortcuts from the Help menu', () => {
     const onOpenKeyboardShortcuts = vi.fn();
 
     render(
@@ -206,14 +199,13 @@ describe('TopToolbar', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Help' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Keyboard Shortcuts' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Help' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Keyboard Shortcuts' }));
 
     expect(onOpenKeyboardShortcuts).toHaveBeenCalledTimes(1);
   });
 
-  it('starts the AI setup tour from the Help menu', async () => {
-    const user = userEvent.setup();
+  it('starts the AI setup tour from the Help menu', () => {
     const onStartAiSetupTour = vi.fn();
 
     render(
@@ -224,21 +216,20 @@ describe('TopToolbar', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Help' }));
-    await user.click(screen.getByRole('menuitem', { name: 'AI Setup Tour' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Help' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'AI Setup Tour' }));
 
     expect(onStartAiSetupTour).toHaveBeenCalledTimes(1);
   });
 
-  it('opens GitHub issues from the Help menu bug report action', async () => {
-    const user = userEvent.setup();
+  it('opens GitHub issues from the Help menu bug report action', () => {
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
 
     render(<TopToolbar project={sampleProject.createSampleProject()} language="PT-BR" />);
 
-    await user.click(screen.getByRole('button', { name: 'Help' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Help' }));
     expect(screen.queryByRole('menuitem', { name: 'Local AI Setup' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('menuitem', { name: 'Found a bug?' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Found a bug?' }));
 
     expect(openSpy).toHaveBeenCalledWith(
       'https://github.com/ErickWendel/localstudio/issues/new/choose',
@@ -258,7 +249,7 @@ describe('TopToolbar', () => {
       </div>,
     );
 
-    await user.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
     expect(screen.getByRole('menu', { name: 'File menu' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Outside target' }));
@@ -266,8 +257,7 @@ describe('TopToolbar', () => {
     expect(screen.queryByRole('menu', { name: 'File menu' })).not.toBeInTheDocument();
   });
 
-  it('translates the deck from the toolbar icon beside persistence', async () => {
-    const user = userEvent.setup();
+  it('translates the deck from the toolbar icon beside persistence', () => {
     const onTranslateDeck = vi.fn();
 
     render(
@@ -279,7 +269,7 @@ describe('TopToolbar', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Translate deck' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Translate deck' }));
 
     expect(onTranslateDeck).toHaveBeenCalledTimes(1);
     const editingActionLabels = within(screen.getByLabelText('Editing actions'))
@@ -319,7 +309,7 @@ describe('TopToolbar', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Translation path options' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Translation path options' }));
     expect(screen.getAllByRole('option', { name: 'Spanish (es) 🇪🇸' }).length).toBeGreaterThan(0);
     await user.selectOptions(screen.getByLabelText('Translate from'), 'es');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'en');
@@ -346,7 +336,7 @@ describe('TopToolbar', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Translation path options' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Translation path options' }));
     expect(screen.getByRole('group', { name: 'Translation path' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /Current slide language/ }));
@@ -407,20 +397,19 @@ describe('TopToolbar', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Edit project name Untitled AI Deck' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit project name Untitled AI Deck' }));
     await user.clear(screen.getByRole('textbox', { name: 'Project name' }));
     await user.type(screen.getByRole('textbox', { name: 'Project name' }), 'Demo Deck{Enter}');
 
     expect(onProjectNameChange).toHaveBeenCalledWith('Demo Deck');
   });
 
-  it('selects the full project name when entering rename mode', async () => {
-    const user = userEvent.setup();
+  it('selects the full project name when entering rename mode', () => {
     const project = sampleProject.createSampleProject();
 
     render(<TopToolbar project={project} language="PT-BR" />);
 
-    await user.click(screen.getByRole('button', { name: 'Edit project name Untitled AI Deck' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit project name Untitled AI Deck' }));
 
     const input = screen.getByRole<HTMLInputElement>('textbox', { name: 'Project name' });
     expect(input).toHaveFocus();

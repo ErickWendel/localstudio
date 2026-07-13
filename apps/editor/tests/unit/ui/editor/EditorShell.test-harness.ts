@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { createAppServices as createRealAppServices } from '../../../../src/app/composition';
@@ -32,20 +32,22 @@ async function openLeftTab(
   user: ReturnType<typeof userEvent.setup>,
   name: 'AI Tools' | 'Animate' | 'Elements' | 'Layout',
 ) {
+  void user;
   const tab = screen.getByRole('tab', { name });
   if (tab.getAttribute('aria-selected') !== 'true') {
-    await user.click(tab);
+    fireEvent.click(tab);
   }
+  await Promise.resolve();
 }
 
 async function selectTitleLayer(user: ReturnType<typeof userEvent.setup>) {
   await openLeftTab(user, 'Layout');
-  await user.click(screen.getByRole('button', { name: 'Title' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Title' }));
 }
 
 async function selectImageLayer(user: ReturnType<typeof userEvent.setup>) {
   await openLeftTab(user, 'Layout');
-  await user.click(screen.getByRole('button', { name: 'Selected Image' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Selected Image' }));
 }
 
 export const editorShellTestHarness = {

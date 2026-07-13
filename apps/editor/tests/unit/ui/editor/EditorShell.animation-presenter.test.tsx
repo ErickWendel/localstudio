@@ -44,13 +44,13 @@ describe('EditorShell animation and presenter workflows', () => {
 
     render(<EditorShell services={createAppServices({ initialProject: project })} />);
 
-    await user.click(screen.getByRole('button', { name: 'Duplicate Slide 1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Duplicate Slide 1' }));
 
     expect(screen.getByRole('button', { name: 'Rename Slide 1 copy' })).toBeInTheDocument();
     expect(screen.getByLabelText('Animation build 1 for Image')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Insert Text' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Insert Media' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Insert Text' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Insert Text' }));
     await openLeftTab(user, 'Layout');
     expect(screen.getByRole('button', { name: 'Add a heading' })).toHaveAttribute(
       'aria-pressed',
@@ -132,7 +132,7 @@ describe('EditorShell animation and presenter workflows', () => {
     render(<EditorShell services={createAppServices({ initialProject: project })} />);
 
     await openLeftTab(user, 'Animate');
-    await user.click(screen.getByRole('button', { name: 'Play animation preview' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Play animation preview' }));
 
     await waitFor(() => {
       expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
@@ -225,7 +225,9 @@ describe('EditorShell animation and presenter workflows', () => {
 
       fireEvent.keyDown(window, { key });
 
-      expect(playSpy).toHaveBeenCalledTimes(1);
+      await waitFor(() => {
+        expect(playSpy).toHaveBeenCalledTimes(1);
+      });
       playSpy.mockRestore();
       pauseSpy.mockRestore();
     },
@@ -404,7 +406,7 @@ describe('EditorShell animation and presenter workflows', () => {
 
     render(<EditorShell services={createAppServices({ initialProject: project })} />);
 
-    await user.click(screen.getByRole('button', { name: 'Activate Slide 3' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Activate Slide 3' }));
     expect(screen.getByText('3 / 3')).toBeInTheDocument();
 
     await startFullscreenPresentation(user);
@@ -417,8 +419,8 @@ describe('EditorShell animation and presenter workflows', () => {
       );
     });
 
-    await user.click(screen.getByRole('button', { name: 'Presentation play options' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Play from beginning' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Presentation play options' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Play from beginning' }));
 
     await waitFor(() => {
       expect(screen.getByText('1 / 3')).toBeInTheDocument();

@@ -40,14 +40,15 @@ export const imageExportJourneyPage = {
       page.getByRole('button', {
         name: 'Edit project name fullstack-monitoring-jsnation-11062026',
       }),
-    ).toBeVisible({ timeout: 90_000 });
+    ).toBeVisible({ timeout: 15_000 });
 
     await this.openImagesExportDialog(page, editor);
+    await dismissPowerPointFontDialogIfPresent(page);
     await expect(
       page.getByRole('checkbox', { name: 'Create an image for each animation' }),
     ).not.toBeChecked();
 
-    const downloadPromise = page.waitForEvent('download', { timeout: 60_000 });
+    const downloadPromise = page.waitForEvent('download', { timeout: 30_000 });
     await page.getByRole('button', { name: 'Export images' }).click();
     return downloadPromise;
   },
@@ -59,3 +60,21 @@ export const imageExportJourneyPage = {
     await expect(page.getByRole('dialog', { name: 'Export images' })).toBeVisible();
   },
 };
+
+async function dismissPowerPointFontDialogIfPresent(page: Page) {
+  const backdrop = page.locator('.pptx-font-dialog-backdrop');
+  if (!(await backdrop.isVisible({ timeout: 1_000 }).catch(() => false))) return;
+
+  const dismissButton = backdrop
+    .getByRole('button', {
+      name: /continue|dismiss|close|done|skip|ok|use/i,
+    })
+    .first();
+  if (await dismissButton.isVisible({ timeout: 1_000 }).catch(() => false)) {
+    await dismissButton.click();
+  } else {
+    await page.keyboard.press('Escape');
+  }
+
+  await expect(backdrop).toBeHidden({ timeout: 5_000 });
+}

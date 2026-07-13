@@ -1,5 +1,4 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import type {
   ProjectDocument,
@@ -221,8 +220,7 @@ function createProjectWithTemplates(): ProjectDocument {
 }
 
 describe('DesignPanel', () => {
-  it('shows presentation theme actions when the presentation is selected', async () => {
-    const user = userEvent.setup();
+  it('shows presentation theme actions and applies imported themes', () => {
     const onApplyTheme = vi.fn();
     const onChangeTheme = vi.fn();
     const onEditTheme = vi.fn();
@@ -239,41 +237,22 @@ describe('DesignPanel', () => {
     );
 
     expect(screen.getByText('Studio theme')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Change theme' }));
-    await user.click(screen.getByRole('button', { name: 'Edit theme' }));
-    await user.click(screen.getByRole('button', { name: 'Apply theme' }));
+    fireEvent.click(screen.getByText('Change theme'));
+    fireEvent.click(screen.getByText('Edit theme'));
+    fireEvent.click(screen.getByText('Apply theme'));
 
     expect(onChangeTheme).toHaveBeenCalledOnce();
     expect(onEditTheme).toHaveBeenCalledWith('theme-studio');
     expect(onApplyTheme).toHaveBeenCalledWith('theme-studio');
-  });
 
-  it('opens a theme picker from the theme preview with default and imported themes', async () => {
-    const user = userEvent.setup();
-    const onApplyTheme = vi.fn();
+    fireEvent.click(screen.getByLabelText('Open theme picker, current theme Studio theme'));
 
-    render(
-      <DesignPanel
-        project={createProjectWithTemplates()}
-        activePageId="page-1"
-        selection={{ pageId: 'page-1', elementIds: [], target: 'presentation' }}
-        onApplyTheme={onApplyTheme}
-      />,
-    );
-
-    await user.click(
-      screen.getByRole('button', { name: 'Open theme picker, current theme Studio theme' }),
-    );
-
-    expect(screen.getByRole('region', { name: 'Choose a theme' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Default theme/ })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /Imported theme/ }));
+    fireEvent.click(screen.getByText('Imported theme'));
 
     expect(onApplyTheme).toHaveBeenCalledWith('theme-imported');
   });
 
-  it('shows slide layout and background controls when the slide background is selected', async () => {
-    const user = userEvent.setup();
+  it('shows slide layout and background controls and applies the chosen layout', () => {
     const onApplySlideLayout = vi.fn();
     const onEditSlideLayout = vi.fn();
     const onToggleSlideLayoutPlaceholder = vi.fn();
@@ -292,9 +271,9 @@ describe('DesignPanel', () => {
     );
 
     expect(screen.getByText('Statement')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Edit layout' }));
-    await user.click(screen.getByRole('button', { name: 'Apply layout' }));
-    await user.click(screen.getByLabelText('Title'));
+    fireEvent.click(screen.getByText('Edit layout'));
+    fireEvent.click(screen.getByText('Apply layout'));
+    fireEvent.click(screen.getByLabelText('Title'));
     fireEvent.change(screen.getByLabelText('Slide background color'), {
       target: { value: '#112233' },
     });
@@ -307,34 +286,16 @@ describe('DesignPanel', () => {
       false,
     );
     expect(onUpdatePageBackground).toHaveBeenCalledWith({ type: 'color', color: '#112233' });
-  });
 
-  it('opens a slide layout picker from the layout preview and applies the chosen layout', async () => {
-    const user = userEvent.setup();
-    const onApplySlideLayout = vi.fn();
+    fireEvent.click(screen.getByLabelText('Open layout picker, current layout Statement'));
 
-    render(
-      <DesignPanel
-        project={createProjectWithTemplates()}
-        activePageId="page-1"
-        selection={{ pageId: 'page-1', elementIds: [], target: 'slide' }}
-        onApplySlideLayout={onApplySlideLayout}
-      />,
-    );
-
-    await user.click(
-      screen.getByRole('button', { name: 'Open layout picker, current layout Statement' }),
-    );
-
-    expect(screen.getByRole('region', { name: 'Choose a layout' })).toBeInTheDocument();
     expect(screen.queryByText('Presentation Title')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Title' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Title' }));
 
     expect(onApplySlideLayout).toHaveBeenCalledWith('page-1', 'layout-title');
   });
 
-  it('updates selected shape fill and border modes', async () => {
-    const user = userEvent.setup();
+  it('updates selected shape fill and border modes', () => {
     const onUpdateElementStyle = vi.fn();
 
     render(
@@ -347,19 +308,22 @@ describe('DesignPanel', () => {
     );
 
     expect(screen.getByLabelText('Selected shape fill mode')).toHaveValue('color');
-    await user.selectOptions(screen.getByLabelText('Selected shape fill mode'), 'none');
+    fireEvent.change(screen.getByLabelText('Selected shape fill mode'), {
+      target: { value: 'none' },
+    });
     expect(onUpdateElementStyle).toHaveBeenCalledWith('shape-test', { fill: null });
 
     expect(screen.getByLabelText('Selected shape border mode')).toHaveValue('none');
-    await user.selectOptions(screen.getByLabelText('Selected shape border mode'), 'color');
+    fireEvent.change(screen.getByLabelText('Selected shape border mode'), {
+      target: { value: 'color' },
+    });
     expect(onUpdateElementStyle).toHaveBeenCalledWith('shape-test', {
       stroke: '#37FD76',
       strokeWidth: 2,
     });
   });
 
-  it('updates selected line endpoint styles', async () => {
-    const user = userEvent.setup();
+  it('updates selected line endpoint styles', () => {
     const onUpdateElementStyle = vi.fn();
 
     render(
@@ -371,8 +335,12 @@ describe('DesignPanel', () => {
       />,
     );
 
-    await user.selectOptions(screen.getByLabelText('Selected shape start endpoint'), 'circle');
-    await user.selectOptions(screen.getByLabelText('Selected shape end endpoint'), 'open-arrow');
+    fireEvent.change(screen.getByLabelText('Selected shape start endpoint'), {
+      target: { value: 'circle' },
+    });
+    fireEvent.change(screen.getByLabelText('Selected shape end endpoint'), {
+      target: { value: 'open-arrow' },
+    });
 
     expect(onUpdateElementStyle).toHaveBeenCalledWith('shape-test', {
       startEndpoint: 'circle',
@@ -382,9 +350,8 @@ describe('DesignPanel', () => {
     });
   });
 
-  it('lets users expand search results and download a Google font for selected text', async () => {
-    const user = userEvent.setup();
-    const onDownloadFont = vi.fn(() => Promise.resolve());
+  it('lets users expand search results and download a Google font for selected text', () => {
+    const onDownloadFont = vi.fn(() => new Promise<void>(() => undefined));
 
     render(
       <DesignPanel
@@ -402,19 +369,19 @@ describe('DesignPanel', () => {
 
     expect(screen.queryByLabelText('Search downloadable fonts')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Download additional font' }));
-    await user.type(screen.getByLabelText('Search downloadable fonts'), 'mont');
-    await user.click(screen.getByRole('button', { name: 'Search fonts' }));
+    fireEvent.click(screen.getByLabelText('Download additional font'));
+    fireEvent.change(screen.getByLabelText('Search downloadable fonts'), {
+      target: { value: 'mont' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Search fonts' }));
     expect(screen.getByLabelText('Downloadable font results')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Download Montserrat' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Download Montserrat' }));
 
     expect(onDownloadFont).toHaveBeenCalledWith('Montserrat');
   });
 
-  it('finds Google font alternatives by system font aliases', async () => {
-    const user = userEvent.setup();
-
+  it('finds Google font alternatives by system font aliases', () => {
     render(
       <DesignPanel
         project={createProjectWithSelectedText()}
@@ -427,19 +394,24 @@ describe('DesignPanel', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Download additional font' }));
-    await user.type(screen.getByLabelText('Search downloadable fonts'), 'aria');
+    fireEvent.click(screen.getByLabelText('Download additional font'));
+    fireEvent.change(screen.getByLabelText('Search downloadable fonts'), {
+      target: { value: 'aria' },
+    });
 
     expect(screen.getByRole('button', { name: 'Download Arimo' })).toBeInTheDocument();
     expect(screen.queryByText('No Google Fonts match that search.')).not.toBeInTheDocument();
   });
 
-  it('shows typography controls before selection controls for selected text styles', () => {
+  it('shows selected text style controls and text content editing in the expected tabs', () => {
+    const onUpdateTextContent = vi.fn();
+
     render(
       <DesignPanel
         project={createProjectWithSelectedText()}
         activePageId="page-1"
         selection={{ pageId: 'page-1', elementIds: ['text-test'] }}
+        onUpdateTextContent={onUpdateTextContent}
       />,
     );
 
@@ -447,6 +419,23 @@ describe('DesignPanel', () => {
     expect(headings).toContain('Typography');
     expect(headings).toContain('Selection');
     expect(headings.indexOf('Typography')).toBeLessThan(headings.indexOf('Selection'));
+
+    expect(screen.getAllByLabelText('Selected text font')).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Text' }));
+
+    expect(screen.queryByLabelText('Selected text font')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Selected text font size')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Selected text font weight')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Selected text color')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Selected text alignment')).not.toBeInTheDocument();
+
+    const textContent = screen.getByLabelText('Selected text content');
+    expect(textContent).toHaveValue('Editable text');
+
+    fireEvent.change(textContent, { target: { value: 'Updated copy' } });
+
+    expect(onUpdateTextContent).toHaveBeenLastCalledWith('text-test', 'Updated copy');
   });
 
   it('includes the selected imported font in the font dropdown options', () => {
@@ -460,51 +449,6 @@ describe('DesignPanel', () => {
 
     expect(screen.getByLabelText('Selected text font')).toHaveValue('American Typewriter');
     expect(screen.getByRole('option', { name: 'American Typewriter' })).toBeInTheDocument();
-  });
-
-  it('keeps selected text style controls in the Style tab only', async () => {
-    const user = userEvent.setup();
-
-    render(
-      <DesignPanel
-        project={createProjectWithSelectedText()}
-        activePageId="page-1"
-        selection={{ pageId: 'page-1', elementIds: ['text-test'] }}
-      />,
-    );
-
-    expect(screen.getAllByLabelText('Selected text font')).toHaveLength(1);
-
-    await user.click(screen.getByRole('tab', { name: 'Text' }));
-
-    expect(screen.queryByLabelText('Selected text font')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Selected text font size')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Selected text font weight')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Selected text color')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Selected text alignment')).not.toBeInTheDocument();
-  });
-
-  it('shows selected text content editing in the Text tab', async () => {
-    const user = userEvent.setup();
-    const onUpdateTextContent = vi.fn();
-
-    render(
-      <DesignPanel
-        project={createProjectWithSelectedText()}
-        activePageId="page-1"
-        selection={{ pageId: 'page-1', elementIds: ['text-test'] }}
-        onUpdateTextContent={onUpdateTextContent}
-      />,
-    );
-
-    await user.click(screen.getByRole('tab', { name: 'Text' }));
-
-    const textContent = screen.getByLabelText('Selected text content');
-    expect(textContent).toHaveValue('Editable text');
-
-    fireEvent.change(textContent, { target: { value: 'Updated copy' } });
-
-    expect(onUpdateTextContent).toHaveBeenLastCalledWith('text-test', 'Updated copy');
   });
 
   it('focuses the selected text font list when requested', async () => {

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
@@ -15,9 +15,15 @@ const {
   selectImageLayer,
 } = editorShellTestHarness;
 
+const originalMatchMedia = window.matchMedia;
+
 describe('EditorShell', () => {
   afterEach(() => {
     window.history.pushState({}, '', '/editor/');
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: originalMatchMedia,
+    });
     Object.defineProperty(document, 'modelContext', {
       configurable: true,
       value: undefined,
@@ -74,10 +80,31 @@ describe('EditorShell', () => {
     ]);
   });
 
+  it('keeps WebMCP embeds available inside narrow host frames', async () => {
+    const matchMedia = vi.fn().mockReturnValue({
+      addEventListener: vi.fn(),
+      matches: true,
+      removeEventListener: vi.fn(),
+    });
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: matchMedia,
+    });
+    window.history.pushState({}, '', '/editor/?webmcp=1');
+
+    render(<EditorShell services={createAppServices()} />);
+
+    expect(await screen.findByRole('heading', { name: 'LocalStudio.dev' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Open this workspace on a desktop screen.' }),
+    ).not.toBeInTheDocument();
+    expect((window as WebMcpDemoWindow).localStudioWebMcpTools).toHaveLength(5);
+  });
+
   it('renders the approved editor shell landmarks', async () => {
     render(<EditorShell services={createAppServices()} />);
 
-    expect(screen.getByText('LocalStudio.dev')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'LocalStudio.dev' })).toBeInTheDocument();
     expect(screen.getByText('Untitled AI Deck')).toBeInTheDocument();
     expect(screen.getByText('PT')).toBeInTheDocument();
     expect(await screen.findByText('EN')).toBeInTheDocument();
@@ -119,8 +146,8 @@ describe('EditorShell', () => {
       'image-hero',
     );
 
-    await user.click(screen.getByRole('button', { name: 'Toggle pages panel' }));
-    await user.click(screen.getByRole('button', { name: 'Select Slide 2' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle pages panel' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Select Slide 2' }));
 
     await waitFor(() => {
       expect(screen.getByText('2 / 2')).toBeInTheDocument();

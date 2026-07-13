@@ -42,6 +42,8 @@ export default async function reportPlaywrightCoverage() {
     clean: true,
     cleanCache: true,
     entryFilter: (entry) => isCoverageLocalScript(entry, coverageScope),
+    sourceMapResolver: (url, defaultResolver: (url: string) => Promise<unknown>) =>
+      coverageReportSource.resolveSourceMap(url, defaultResolver),
     sourcePath: (sourcePath, info) => normalizeCoverageSourcePath(sourcePath, info),
     sourceFilter: (sourcePath) => isCoverageReportableSourceFile(sourcePath, coverageScope),
     watermarks: {

@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { EditorShell } from '../../../../src/ui/editor/shell/EditorShell';
@@ -19,12 +19,11 @@ describe('EditorShell mirror workflows', () => {
     vi.restoreAllMocks();
   });
 
-  it('prompts the user to save before mirroring an unsaved project from the File menu', async () => {
-    const user = userEvent.setup();
+  it('prompts the user to save before mirroring an unsaved project from the File menu', () => {
     render(<EditorShell services={createAppServices()} />);
 
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Mirror Now' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Mirror Now' }));
 
     expect(screen.getByText('Save the project before mirroring.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Persistence disabled' })).toHaveClass(
@@ -39,10 +38,10 @@ describe('EditorShell mirror workflows', () => {
     services.mirrorService = new RecordingMirrorService(null);
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Persistence disabled' }));
     await user.click(screen.getByRole('button', { name: 'Choose folder' }));
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Mirror Now' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Mirror Now' }));
 
     expect(screen.getByRole('dialog', { name: 'Mirror settings' })).toBeInTheDocument();
   });
@@ -56,15 +55,15 @@ describe('EditorShell mirror workflows', () => {
     services.mirrorService = mirrorService;
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Persistence disabled' }));
     await user.click(screen.getByRole('button', { name: 'Choose folder' }));
-    await user.click(screen.getByRole('button', { name: 'Mirror settings' }));
-    await user.click(
+    fireEvent.click(screen.getByRole('button', { name: 'Mirror settings' }));
+    fireEvent.click(
       within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('button', {
         name: 'Mirror settings',
       }),
     );
-    await user.click(screen.getByRole('button', { name: 'Save settings' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
 
     await waitFor(() => {
       expect(mirrorService.syncProject).toHaveBeenCalledWith(
@@ -84,21 +83,21 @@ describe('EditorShell mirror workflows', () => {
     services.mirrorService = mirrorService;
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Persistence disabled' }));
     await user.click(screen.getByRole('button', { name: 'Choose folder' }));
-    await user.click(screen.getByRole('button', { name: 'Mirror settings' }));
-    await user.click(
+    fireEvent.click(screen.getByRole('button', { name: 'Mirror settings' }));
+    fireEvent.click(
       within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('button', {
         name: 'Mirror settings',
       }),
     );
-    await user.click(screen.getByRole('button', { name: 'Save settings' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
     await waitFor(() => {
       expect(mirrorService.syncProject).toHaveBeenCalledTimes(1);
     });
     mirrorService.syncProject.mockClear();
 
-    await user.click(screen.getByRole('button', { name: 'Edit project name Untitled AI Deck' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit project name Untitled AI Deck' }));
     await user.clear(screen.getByRole('textbox', { name: 'Project name' }));
     await user.type(
       screen.getByRole('textbox', { name: 'Project name' }),
@@ -121,7 +120,6 @@ describe('EditorShell mirror workflows', () => {
   });
 
   it('toggles mirroring from the mirror status icon when a saved config is available', async () => {
-    const user = userEvent.setup();
     const services = createAppServices();
     const mirrorService = new RecordingMirrorService();
     const repository = new DeferredLoadingProjectRepository();
@@ -137,14 +135,14 @@ describe('EditorShell mirror workflows', () => {
     });
 
     const mirrorButton = await screen.findByRole('button', { name: 'Mirror up to date' });
-    await user.click(mirrorButton);
+    fireEvent.click(mirrorButton);
 
     expect(mirrorService.clearConfig).not.toHaveBeenCalled();
     expect(screen.getByText('Local only')).toBeInTheDocument();
 
     const disabledMirrorButton = screen.getByRole('button', { name: 'Mirror disabled' });
     expect(disabledMirrorButton).not.toBeDisabled();
-    await user.click(disabledMirrorButton);
+    fireEvent.click(disabledMirrorButton);
 
     await waitFor(() => {
       expect(mirrorService.syncProject).toHaveBeenCalledTimes(2);
@@ -153,7 +151,6 @@ describe('EditorShell mirror workflows', () => {
   });
 
   it('keeps saved mirror config disabled after refreshing the page', async () => {
-    const user = userEvent.setup();
     const firstServices = createAppServices();
     const firstRepository = new DeferredLoadingProjectRepository();
     firstServices.projectRepository = firstRepository;
@@ -168,13 +165,13 @@ describe('EditorShell mirror workflows', () => {
     });
 
     expect(await screen.findByRole('button', { name: 'Mirror up to date' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Mirror settings' }));
-    await user.click(
+    fireEvent.click(screen.getByRole('button', { name: 'Mirror settings' }));
+    fireEvent.click(
       within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('button', {
         name: 'Mirror settings',
       }),
     );
-    await user.click(screen.getByRole('button', { name: 'Disable mirroring' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Disable mirroring' }));
 
     expect(window.localStorage.getItem('ew-canvas-ai.mirror-enabled')).toBe('false');
     firstRender.unmount();
@@ -198,7 +195,6 @@ describe('EditorShell mirror workflows', () => {
   });
 
   it('opens mirror settings from the disabled mirror icon after mirroring is disabled in settings', async () => {
-    const user = userEvent.setup();
     const services = createAppServices();
     const repository = new DeferredLoadingProjectRepository();
     services.projectRepository = repository;
@@ -212,21 +208,21 @@ describe('EditorShell mirror workflows', () => {
       });
     });
 
-    await user.click(await screen.findByRole('button', { name: 'Mirror settings' }));
-    await user.click(
+    fireEvent.click(await screen.findByRole('button', { name: 'Mirror settings' }));
+    fireEvent.click(
       within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('button', {
         name: 'Mirror settings',
       }),
     );
-    await user.click(screen.getByRole('button', { name: 'Disable mirroring' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Disable mirroring' }));
 
     expect(screen.getByRole('button', { name: 'Mirror disabled' })).toHaveClass('mirror-disabled');
 
-    await user.click(screen.getByRole('button', { name: 'Mirror disabled' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mirror disabled' }));
     expect(screen.getByRole('dialog', { name: 'Mirror settings' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Enable mirroring' }));
-    await user.click(screen.getByRole('button', { name: 'Save settings' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Enable mirroring' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
 
     expect(await screen.findByRole('button', { name: 'Mirror up to date' })).toHaveClass(
       'mirror-synced',
@@ -234,7 +230,6 @@ describe('EditorShell mirror workflows', () => {
   });
 
   it('displays the remote project name after importing a mirrored project', async () => {
-    const user = userEvent.setup();
     const services = createAppServices();
     const repository = new RemoteMirrorImportingProjectRepository();
     const mirrorService = new RecordingMirrorService(mirrorConfig);
@@ -264,10 +259,10 @@ describe('EditorShell mirror workflows', () => {
     ]);
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Import' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Remote' }));
-    await user.click(await screen.findByRole('button', { name: 'Import Remote Mirror Deck' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Import' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remote' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Import Remote Mirror Deck' }));
 
     expect(
       await screen.findByRole('button', { name: 'Edit project name Remote Mirror Deck' }),

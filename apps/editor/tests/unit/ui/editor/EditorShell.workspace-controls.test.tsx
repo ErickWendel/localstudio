@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { EditorShell } from '../../../../src/ui/editor/shell/EditorShell';
@@ -16,12 +16,11 @@ describe('EditorShell workspace controls', () => {
     vi.restoreAllMocks();
   });
 
-  it('switches to the layout panel from the header view menu', async () => {
+  it('switches to the layout panel from the left tool rail', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
 
-    await user.click(screen.getByRole('button', { name: 'View' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Toggle Layers Panel' }));
+    await openLeftTab(user, 'Layout');
 
     expect(screen.getByRole('tab', { name: 'Layout' })).toHaveAttribute('aria-selected', 'true');
   });
@@ -30,7 +29,7 @@ describe('EditorShell workspace controls', () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
 
-    await user.click(screen.getByRole('button', { name: 'Toggle pages panel' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle pages panel' }));
     expect(screen.getByLabelText('Pages')).toBeInTheDocument();
 
     await openLeftTab(user, 'Layout');
@@ -38,17 +37,16 @@ describe('EditorShell workspace controls', () => {
     expect(screen.getByText('4 layers on current page')).toBeInTheDocument();
     expect(screen.queryByLabelText('Pages')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Toggle pages panel' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle pages panel' }));
 
     expect(screen.getByLabelText('Pages')).toBeInTheDocument();
     expect(screen.queryByText('4 layers on current page')).not.toBeInTheDocument();
   });
 
-  it('marks the workspace as zoomed out when the user scales below 100%', async () => {
-    const user = userEvent.setup();
+  it('marks the workspace as zoomed out when the user scales below 100%', () => {
     render(<EditorShell services={createAppServices()} />);
 
-    await user.click(screen.getByRole('button', { name: 'Zoom Out' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom Out' }));
 
     expect(screen.getByLabelText('Canvas workspace')).toHaveClass('workspace-column-zoomed-out');
   });
@@ -58,13 +56,13 @@ describe('EditorShell workspace controls', () => {
     render(<EditorShell services={createAppServices()} />);
     await selectImageLayer(user);
 
-    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
     expect(screen.queryByRole('button', { name: 'Selected Image' })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
     expect(screen.getByRole('button', { name: 'Selected Image' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Redo' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Redo' }));
     expect(screen.queryByRole('button', { name: 'Selected Image' })).not.toBeInTheDocument();
   });
 
@@ -73,7 +71,7 @@ describe('EditorShell workspace controls', () => {
     render(<EditorShell services={createAppServices()} />);
     await selectImageLayer(user);
 
-    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
     expect(screen.queryByRole('button', { name: 'Selected Image' })).not.toBeInTheDocument();
 
     await user.keyboard('{Meta>}z{/Meta}');
@@ -109,7 +107,7 @@ describe('EditorShell workspace controls', () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
 
-    await user.click(screen.getByRole('button', { name: 'Edit project name Untitled AI Deck' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit project name Untitled AI Deck' }));
     await user.clear(screen.getByRole('textbox', { name: 'Project name' }));
     await user.type(screen.getByRole('textbox', { name: 'Project name' }), 'Browser Deck{Enter}');
 
@@ -118,14 +116,13 @@ describe('EditorShell workspace controls', () => {
     ).toBeInTheDocument();
   });
 
-  it('zooms the canvas from the toolbar', async () => {
-    const user = userEvent.setup();
+  it('zooms the canvas from the toolbar', () => {
     render(<EditorShell services={createAppServices()} />);
 
-    await user.click(screen.getByRole('button', { name: 'Zoom In' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom In' }));
     expect(screen.getByText('110%')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Zoom Out' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom Out' }));
     expect(screen.getByText('100%')).toBeInTheDocument();
   });
 
@@ -133,12 +130,12 @@ describe('EditorShell workspace controls', () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
 
-    await user.click(screen.getAllByRole('button', { name: 'Add page' })[0]!);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Add page' })[0]!);
 
     expect(screen.getByRole('button', { name: 'Rename Slide 2' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Insert Text' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Insert Media' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Insert Text' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Insert Text' }));
     await openLeftTab(user, 'Layout');
     expect(screen.getByRole('button', { name: 'Add a heading' })).toHaveAttribute(
       'aria-pressed',
@@ -154,8 +151,8 @@ describe('EditorShell workspace controls', () => {
     await user.keyboard('{Delete}');
     expect(screen.queryByRole('button', { name: 'Selected Image' })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Undo' }));
-    await user.click(screen.getByRole('button', { name: 'Selected Image' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Selected Image' }));
 
     await user.keyboard('{Backspace}');
     expect(screen.queryByRole('button', { name: 'Selected Image' })).not.toBeInTheDocument();
@@ -166,15 +163,15 @@ describe('EditorShell workspace controls', () => {
     render(<EditorShell services={createAppServices()} />);
     await selectImageLayer(user);
 
-    await user.click(screen.getByRole('button', { name: 'Duplicate' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Duplicate' }));
     expect(screen.getByRole('button', { name: 'Selected Image copy' })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
 
-    await user.click(screen.getByRole('button', { name: 'Align Center' }));
-    await user.click(screen.getByRole('button', { name: 'Send Backward' }));
-    await user.click(screen.getByRole('button', { name: 'Bring Forward' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Align Center' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send Backward' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Bring Forward' }));
 
     expect(screen.getByRole('button', { name: 'Selected Image copy' })).toHaveAttribute(
       'aria-pressed',
@@ -190,7 +187,7 @@ describe('EditorShell workspace controls', () => {
     expect(notesToggle).toHaveAttribute('aria-pressed', 'false');
     expect(screen.queryByRole('heading', { name: 'Page 1 - Slide 1' })).not.toBeInTheDocument();
 
-    await user.click(notesToggle);
+    fireEvent.click(notesToggle);
 
     expect(notesToggle).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('heading', { name: 'Page 1 - Slide 1' })).toBeInTheDocument();
@@ -203,7 +200,7 @@ describe('EditorShell workspace controls', () => {
 
     expect(screen.getByText('12/5000')).toBeInTheDocument();
 
-    await user.click(notesToggle);
+    fireEvent.click(notesToggle);
     expect(screen.queryByRole('heading', { name: 'Page 1 - Slide 1' })).not.toBeInTheDocument();
   });
 });

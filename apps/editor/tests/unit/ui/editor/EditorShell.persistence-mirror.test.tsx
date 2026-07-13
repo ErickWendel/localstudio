@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import type { ProjectDocument } from '../../../../src/domain/documents/model';
@@ -29,7 +29,7 @@ describe('EditorShell persistence and mirror workflows', () => {
     services.projectRepository = new SavingProjectRepository();
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Persistence disabled' }));
     expect(screen.getByRole('dialog', { name: 'Save local project' })).toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: 'Save local project' })).toHaveAttribute(
       'data-anchor',
@@ -55,14 +55,14 @@ describe('EditorShell persistence and mirror workflows', () => {
     services.projectRepository = repository;
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Persistence disabled' }));
     await user.click(screen.getByRole('button', { name: 'Choose folder' }));
     expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Persistence enabled' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Persistence enabled' }));
     expect(screen.getByRole('button', { name: 'Persistence disabled' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Persistence disabled' }));
 
     expect(screen.queryByRole('dialog', { name: 'Save local project' })).not.toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
@@ -76,7 +76,7 @@ describe('EditorShell persistence and mirror workflows', () => {
     window.history.replaceState({}, '', '/');
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Persistence disabled' }));
     await user.click(screen.getByRole('button', { name: 'Choose folder' }));
 
     expect(window.location.search).toBe('?project=Untitled+AI+Deck');
@@ -89,44 +89,41 @@ describe('EditorShell persistence and mirror workflows', () => {
     services.projectRepository = repository;
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Persistence disabled' }));
     await user.click(screen.getByRole('button', { name: 'Choose folder' }));
     expect(repository.savedProjects.at(-1)?.name).toBe('Untitled AI Deck');
 
-    await user.click(screen.getByRole('button', { name: 'Edit project name Untitled AI Deck' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit project name Untitled AI Deck' }));
     await user.clear(screen.getByRole('textbox', { name: 'Project name' }));
     await user.type(screen.getByRole('textbox', { name: 'Project name' }), 'Autosaved Deck{Enter}');
 
     expect(repository.savedProjects.at(-1)?.name).toBe('Autosaved Deck');
   });
 
-  it('saves the current project as a new local folder from the File menu', async () => {
-    const user = userEvent.setup();
+  it('saves the current project as a new local folder from the File menu', () => {
     const services = createAppServices();
     const repository = new SavingProjectRepository();
     services.projectRepository = repository;
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Save As...' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Save As...' }));
 
     expect(repository.savedProjectsAs).toHaveLength(1);
     expect(repository.savedProjectsAs[0]).toMatchObject({ name: 'Untitled AI Deck' });
   });
 
   it('keeps persistence disabled when the project folder cannot be saved', async () => {
-    const user = userEvent.setup();
     const services = createAppServices();
     services.projectRepository = new RejectingProjectRepository();
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Persistence disabled' }));
 
     expect(await screen.findByRole('button', { name: 'Persistence disabled' })).toBeInTheDocument();
   });
 
   it('imports an existing project from the File menu', async () => {
-    const user = userEvent.setup();
     const services = createAppServices();
     services.projectRepository = new ImportingProjectRepository({
       ...services.initialProject,
@@ -135,9 +132,9 @@ describe('EditorShell persistence and mirror workflows', () => {
     });
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Import' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Project' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Import' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Project' }));
 
     expect(
       await screen.findByRole('button', { name: 'Edit project name Imported LocalStudio Project' }),
@@ -147,7 +144,6 @@ describe('EditorShell persistence and mirror workflows', () => {
   });
 
   it('preserves hydrated sample hero object URLs during import normalization', async () => {
-    const user = userEvent.setup();
     const services = createAppServices();
     const repository = new ImportingProjectRepository({
       ...services.initialProject,
@@ -166,21 +162,20 @@ describe('EditorShell persistence and mirror workflows', () => {
     services.projectRepository = repository;
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Import' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Project' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Import' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Project' }));
 
     await screen.findByRole('button', { name: 'Edit project name Imported Hydrated Project' });
     expect(repository.savedProjects).toHaveLength(0);
   });
 
-  it('opens a blank project in a new tab from the File menu', async () => {
-    const user = userEvent.setup();
+  it('opens a blank project in a new tab from the File menu', () => {
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
     render(<EditorShell services={createAppServices()} />);
 
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'New Project' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'New Project' }));
 
     expect(openSpy).toHaveBeenCalledTimes(1);
     expect(openSpy.mock.calls[0]?.[0]).toContain('newProject=1');
@@ -195,7 +190,7 @@ describe('EditorShell persistence and mirror workflows', () => {
     firstServices.projectRepository = new SavingProjectRepository();
     const { unmount } = render(<EditorShell services={firstServices} />);
 
-    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Persistence disabled' }));
     await user.click(screen.getByRole('button', { name: 'Choose folder' }));
     unmount();
     const secondServices = createAppServices();
@@ -206,7 +201,6 @@ describe('EditorShell persistence and mirror workflows', () => {
   });
 
   it('refocuses the changed slide when selecting a history version on the active page', async () => {
-    const user = userEvent.setup();
     const scrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(
       HTMLElement.prototype,
       'scrollIntoView',
@@ -253,11 +247,11 @@ describe('EditorShell persistence and mirror workflows', () => {
       render(<EditorShell services={services} />);
 
       expect(await screen.findByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
-      await user.click(screen.getByRole('button', { name: 'Version history' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Version history' }));
       await screen.findByText('Version with title edit');
       scrollIntoView.mockClear();
 
-      await user.click(screen.getByText('Version with title edit').closest('button')!);
+      fireEvent.click(screen.getByText('Version with title edit').closest('button')!);
 
       await waitFor(() => {
         expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(

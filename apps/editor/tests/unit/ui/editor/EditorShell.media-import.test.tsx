@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { EditorShell } from '../../../../src/ui/editor/shell/EditorShell';
@@ -29,15 +29,15 @@ describe('EditorShell media import workflows', () => {
     await openLeftTab(user, 'Layout');
     await selectImageLayer(user);
 
-    await user.click(screen.getByRole('button', { name: 'Insert Text' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Insert Text' }));
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Add a heading' })).toHaveAttribute(
         'aria-pressed',
         'true',
       );
     });
-    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
-    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Choose folder' }));
     await waitFor(() => {
       const insertedText = Object.values(repository.savedProjects.at(-1)?.elements ?? {}).find(
         (element) =>
@@ -58,7 +58,7 @@ describe('EditorShell media import workflows', () => {
 
     const image = new File(['image-bytes'], 'toolbar-image.png', { type: 'image/png' });
     await selectImageLayer(user);
-    await user.click(screen.getByRole('button', { name: 'Insert Media' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Insert Media' }));
     await user.upload(screen.getByLabelText('Insert media file'), image);
 
     expect(
@@ -68,7 +68,7 @@ describe('EditorShell media import workflows', () => {
     mockVideoMetadataLoad();
     const createObjectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:toolbar-video');
     const video = new File(['video-bytes'], 'toolbar-video.mp4', { type: 'video/mp4' });
-    await user.click(screen.getByRole('button', { name: 'Insert Media' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Insert Media' }));
     await user.upload(screen.getByLabelText('Insert media file'), video);
 
     await waitFor(() => {
@@ -101,7 +101,7 @@ describe('EditorShell media import workflows', () => {
     render(<EditorShell services={services} />);
 
     const video = new File(['video-bytes'], 'pending-video.mp4', { type: 'video/mp4' });
-    await user.click(screen.getByRole('button', { name: 'Insert Media' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Insert Media' }));
     await user.upload(screen.getByLabelText('Insert media file'), video);
 
     expect(await screen.findByText('Loading media')).toBeInTheDocument();
@@ -132,7 +132,7 @@ describe('EditorShell media import workflows', () => {
     render(<EditorShell services={services} />);
 
     const video = new File(['video-bytes'], 'phone-video.mov', { type: 'video/quicktime' });
-    await user.click(screen.getByRole('button', { name: 'Insert Media' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Insert Media' }));
     const input = screen.getByLabelText('Insert media file');
     expect(input).toHaveAttribute('accept', 'image/*,video/*');
     await user.upload(input, video);
@@ -151,7 +151,7 @@ describe('EditorShell media import workflows', () => {
       ),
     ).toBe(false);
 
-    await user.click(screen.getByRole('button', { name: 'OK' }));
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }));
     expect(screen.queryByText('Unsupported video format')).not.toBeInTheDocument();
   });
 
@@ -162,7 +162,7 @@ describe('EditorShell media import workflows', () => {
     );
 
     await openLeftTab(user, 'Layout');
-    await user.click(screen.getByRole('button', { name: 'Demo clip' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Demo clip' }));
 
     expect(screen.getByRole('tab', { name: 'Design' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tab', { name: 'Movie' })).toHaveAttribute('aria-selected', 'true');
