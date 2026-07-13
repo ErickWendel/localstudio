@@ -272,6 +272,55 @@ describe('OpfsProjectRepository', () => {
     expect(loadedVersion?.name).toBe('Versioned Deck');
   });
 
+  it('keeps image asset files that are still referenced by OPFS version history', async () => {
+    const root = new MockDirectoryHandle();
+    const repository = new OpfsProjectRepository({
+      getRootDirectory: () => Promise.resolve(root as unknown as FileSystemDirectoryHandle),
+      storage: new MemoryStorage(),
+    });
+    const createObjectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:history-image');
+    const projectWithImage = sampleProject.createBlankProject();
+    projectWithImage.assets['asset-history-image'] = {
+      id: 'asset-history-image',
+      type: 'image',
+      name: 'History image',
+      mimeType: 'image/png',
+      objectUrl: 'data:image/png;base64,aGlzdG9yeQ==',
+    };
+    projectWithImage.elements['image-history'] = {
+      id: 'image-history',
+      type: 'image',
+      assetId: 'asset-history-image',
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      rotation: 0,
+      locked: false,
+      visible: true,
+      opacity: 1,
+    };
+    projectWithImage.pages[0]?.elementIds.push('image-history');
+
+    await repository.saveProject(projectWithImage);
+    const version = await repository.saveVersion(projectWithImage, {
+      previousProject: sampleProject.createBlankProject(),
+    });
+    await repository.saveProject({
+      ...projectWithImage,
+      assets: {},
+      elements: {},
+      pages: projectWithImage.pages.map((page) => ({ ...page, elementIds: [] })),
+    });
+
+    const projectDirectory = await getProjectDirectory(root, projectWithImage.name);
+    const assetsDirectory = projectDirectory.directories.get('assets')!;
+    expect(assetsDirectory.files.has('asset-history-image.png')).toBe(true);
+    const loadedVersion = await repository.loadVersion(version.id);
+    expect(loadedVersion?.assets['asset-history-image']?.objectUrl).toBe('blob:history-image');
+    expect(createObjectUrl).toHaveBeenCalled();
+  });
+
   it('surfaces unavailable OPFS errors without creating fallback state', async () => {
     const repository = new OpfsProjectRepository({
       getRootDirectory: () => Promise.reject(new DOMException('Private browsing', 'SecurityError')),
