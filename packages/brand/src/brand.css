@@ -35,3 +35,56 @@
   --ew-dim: var(--ls-dim);
   --ew-on-primary: var(--ls-on-primary);
 }
+
+.ls-logo-lockup {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.ls-logo-mark {
+  flex: 0 0 auto;
+  filter: drop-shadow(0 0 14px rgba(55, 253, 118, 0.2));
+}
+
+.ls-logo-mark__layer {
+  fill: rgba(16, 27, 18, 0.52);
+  stroke-linejoin: round;
+  stroke-width: 2.4;
+}
+
+.ls-logo-mark__layer-back {
+  opacity: 0.48;
+  stroke: rgba(105, 255, 137, 0.58);
+}
+
+.ls-logo-mark__layer-middle {
+  opacity: 0.72;
+  stroke: rgba(55, 253, 118, 0.78);
+}
+
+.ls-logo-mark__layer-front {
+  fill: rgba(16, 27, 18, 0.84);
+  stroke: var(--ls-green-fixed);
+}
+
+.ls-logo-mark__dot {
+  fill: var(--ls-green-fixed);
+}
+
+.ls-logo-mark__bar {
+  fill: none;
+  stroke: rgba(193, 201, 189, 0.72);
+  stroke-linecap: round;
+  stroke-width: 2.4;
+}
+
+.ls-logo-word {
+  color: var(--ls-green-fixed);
+  font-family: var(--ls-font-display);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}

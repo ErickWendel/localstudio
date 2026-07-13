@@ -9,6 +9,9 @@ test.describe('landing public funnel journey', () => {
     await landing.gotoHome();
 
     await expect(page.getByRole('navigation', { name: 'Landing sections' })).toBeVisible();
+    await expect(
+      page.locator('.landing-header').getByRole('link', { name: 'LocalStudio.dev beta home' }),
+    ).toBeVisible();
     await page.getByRole('tab', { name: 'Import existing presentations' }).click();
     await page.getByRole('tab', { name: 'Prompt-to-slide' }).click();
     await expect(page.getByText('A prompt becomes editable slide layers')).toBeVisible();
@@ -23,6 +26,7 @@ test.describe('landing public funnel journey', () => {
 
     await page.getByRole('link', { name: 'Open editor' }).first().click();
     await expect(page).toHaveURL(/\/editor\/$/);
+    await expect(page.getByRole('heading', { name: 'LocalStudio.dev' })).toBeVisible();
 
     await page.goto(new URL('/', getServer().baseURL).toString());
     await page.getByRole('link', { name: 'Open WebMCP demo' }).click();

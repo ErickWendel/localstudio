@@ -1,3 +1,4 @@
+import { localStudioLogoMark } from '@localstudio/brand/logo';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ProjectDocument } from '../../../domain/documents/model';
 import type { MirrorState, PersistenceStorageMode } from '../../../services/contracts/interfaces';
@@ -321,7 +322,32 @@ export function TopToolbar({
   return (
     <header className="top-toolbar" data-tour-id="top-toolbar">
       <div className="toolbar-left">
-        <h1 className="toolbar-product-title font-orbitron">LocalStudio.dev</h1>
+        <h1 className="toolbar-product-title" aria-label="LocalStudio.dev">
+          <svg
+            aria-hidden="true"
+            className="ls-logo-mark toolbar-product-logo"
+            focusable="false"
+            viewBox={localStudioLogoMark.viewBox}
+          >
+            <path
+              className="ls-logo-mark__layer ls-logo-mark__layer-back"
+              d={localStudioLogoMark.backLayerPath}
+            />
+            <path
+              className="ls-logo-mark__layer ls-logo-mark__layer-middle"
+              d={localStudioLogoMark.middleLayerPath}
+            />
+            <path
+              className="ls-logo-mark__layer ls-logo-mark__layer-front"
+              d={localStudioLogoMark.frontLayerPath}
+            />
+            <circle className="ls-logo-mark__dot" cx="31" cy="26" r="1.5" />
+            <circle className="ls-logo-mark__dot" cx="36" cy="26" r="1.5" />
+            <circle className="ls-logo-mark__dot" cx="41" cy="26" r="1.5" />
+            <path className="ls-logo-mark__bar" d={localStudioLogoMark.browserBarPath} />
+          </svg>
+          <span className="ls-logo-word">LocalStudio</span>
+        </h1>
         <nav className="toolbar-menu" aria-label="Application menu" ref={toolbarMenuRef}>
           {menuLabels.map((item) => (
             <div className="toolbar-menu-shell" key={item}>

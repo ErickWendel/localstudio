@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 260" fill="none">
+  <g transform="translate(62 70)">
+    <path d="M24 0H112L128 16V100L112 116H24L8 100V16L24 0Z" fill="#000000" fill-opacity="0.08" stroke="#000000" stroke-opacity="0.38" stroke-linejoin="round" stroke-width="7" />
+    <path d="M50 18H138L154 34V118L138 134H50L34 118V34L50 18Z" fill="#000000" fill-opacity="0.14" stroke="#000000" stroke-opacity="0.62" stroke-linejoin="round" stroke-width="7" />
+    <path d="M80 44H168L184 60V120L168 136H80L64 120V60L80 44Z" fill="#000000" fill-opacity="0.2" stroke="#000000" stroke-linejoin="round" stroke-width="7" />
+    <circle cx="94" cy="74" r="5" fill="#000000" />
+    <circle cx="110" cy="74" r="5" fill="#000000" />
+    <circle cx="126" cy="74" r="5" fill="#000000" />
+    <path d="M132 68H168" stroke="#000000" stroke-linecap="round" stroke-opacity="0.72" stroke-width="7" />
+  </g>
+  <text x="300" y="106" fill="#000000" font-family="Orbitron, Helvetica, Arial, sans-serif" font-size="76" font-weight="900" letter-spacing="4">LOCAL</text>
+  <text x="300" y="178" fill="#000000" font-family="Orbitron, Helvetica, Arial, sans-serif" font-size="76" font-weight="900" letter-spacing="4">STUDIO</text>
+</svg>
