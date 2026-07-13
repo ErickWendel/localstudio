@@ -5,7 +5,9 @@ import { expect, test, withIsolatedDevServer } from '../support/journey-test';
 const getServer = withIsolatedDevServer(test);
 
 test.describe('editor local persistence journey', () => {
-  test('saves a browser-private project, reloads it, and opens version history', async ({ page }) => {
+  test('keeps the plain editor route fresh and restores a named browser-private project', async ({
+    page,
+  }) => {
     await installFakeOpfs(page);
 
     const editor = new EditorAppPage(page, getServer().baseURL);
@@ -18,7 +20,17 @@ test.describe('editor local persistence journey', () => {
     await expect(page.getByRole('button', { name: 'Version history' })).toBeEnabled();
 
     await page.goto(new URL('/editor/', getServer().baseURL).toString());
-    await expect(page.getByRole('button', { name: 'Edit project name E2E Persisted Deck' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Edit project name Untitled Project' }),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Browser storage disabled' })).toBeVisible();
+
+    const restoredProjectUrl = new URL('/editor/', getServer().baseURL);
+    restoredProjectUrl.searchParams.set('project', 'E2E Persisted Deck');
+    await page.goto(restoredProjectUrl.toString());
+    await expect(
+      page.getByRole('button', { name: 'Edit project name E2E Persisted Deck' }),
+    ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Browser storage enabled' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Version history' }).focus();
