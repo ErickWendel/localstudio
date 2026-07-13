@@ -28,7 +28,6 @@ test.describe('editor current page image export journey', () => {
   test('exports readable final slide states from the local PPTX sample when animation images are disabled', async ({
     page,
   }) => {
-    test.setTimeout(180_000);
     const download = await imageExportJourneyPage.downloadSampleFinalSlideStatesZip(
       page,
       getServer().baseURL,

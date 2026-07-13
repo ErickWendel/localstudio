@@ -40,14 +40,14 @@ export const imageExportJourneyPage = {
       page.getByRole('button', {
         name: 'Edit project name fullstack-monitoring-jsnation-11062026',
       }),
-    ).toBeVisible({ timeout: 150_000 });
+    ).toBeVisible({ timeout: 15_000 });
 
     await this.openImagesExportDialog(page, editor);
     await expect(
       page.getByRole('checkbox', { name: 'Create an image for each animation' }),
     ).not.toBeChecked();
 
-    const downloadPromise = page.waitForEvent('download', { timeout: 60_000 });
+    const downloadPromise = page.waitForEvent('download', { timeout: 30_000 });
     await page.getByRole('button', { name: 'Export images' }).click();
     return downloadPromise;
   },

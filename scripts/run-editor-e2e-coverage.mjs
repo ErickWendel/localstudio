@@ -19,6 +19,9 @@ const specFiles = [
   ...listSpecFiles('tests/e2e/public-deck'),
   ...listSpecFiles('tests/e2e/webmcp'),
 ];
+const localPptxSampleExportSpec = 'tests/e2e/editor/export-current-page-image.spec.ts';
+const localPptxSampleExportTitle =
+  'exports readable final slide states from the local PPTX sample when animation images are disabled';
 
 const peerPort = await getFreePort();
 let peerServer;
@@ -60,8 +63,23 @@ try {
   await waitForOk(`${baseURL}/`);
   await warmEditor(baseURL);
 
-  const result = runPlaywright(baseURL, localStudioPort);
-  exitCode = result.status ?? 1;
+  const sampleResult = runPlaywright(baseURL, localStudioPort, {
+    env: { E2E_COVERAGE_REPORT: '0' },
+    grep: localPptxSampleExportTitle,
+    outputDir: join(coverageInputDir, 'sample-pptx-export'),
+    specs: [localPptxSampleExportSpec],
+    workers: 1,
+  });
+  exitCode = sampleResult.status ?? 1;
+
+  if (exitCode === 0) {
+    const parallelResult = runPlaywright(baseURL, localStudioPort, {
+      grepInvert: localPptxSampleExportTitle,
+      outputDir: join(coverageInputDir, 'parallel'),
+      specs: specFiles,
+    });
+    exitCode = parallelResult.status ?? 1;
+  }
 } finally {
   if (localStudioServer) await stopProcess(localStudioServer.child);
   if (peerServer) await stopProcess(peerServer.child);
@@ -76,14 +94,25 @@ function listSpecFiles(directory) {
     .sort((left, right) => left.localeCompare(right));
 }
 
-function runPlaywright(baseURL, port) {
+function runPlaywright(
+  baseURL,
+  port,
+  { env = {}, grep, grepInvert, outputDir = coverageInputDir, specs = specFiles, workers } = {},
+) {
+  const args = [playwrightCli, 'test', '--project=chromium', `--output=${outputDir}`];
+  if (workers) args.push('--workers', String(workers));
+  if (grep) args.push('--grep', grep);
+  if (grepInvert) args.push('--grep-invert', grepInvert);
+  args.push(...specs);
+
   return spawnSync(
     process.execPath,
-    [playwrightCli, 'test', '--project=chromium', `--output=${coverageInputDir}`, ...specFiles],
+    args,
     {
       cwd: workspaceRoot,
       env: {
         ...process.env,
+        ...env,
         E2E_COVERAGE_INPUT_DIR: coverageInputDir,
         E2E_COVERAGE_SCOPE: 'editor',
         LOCALSTUDIO_E2E_BASE_URL: baseURL,
