@@ -22,6 +22,7 @@ function getMimeType(path: string, fallback = 'application/octet-stream') {
   const lowerPath = path.toLowerCase();
   if (lowerPath.endsWith('.jpg') || lowerPath.endsWith('.jpeg')) return 'image/jpeg';
   if (lowerPath.endsWith('.png')) return 'image/png';
+  if (lowerPath.endsWith('.svg')) return 'image/svg+xml';
   if (lowerPath.endsWith('.gif')) return 'image/gif';
   if (lowerPath.endsWith('.mp4')) return 'video/mp4';
   if (lowerPath.endsWith('.mov')) return 'video/quicktime';

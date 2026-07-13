@@ -64,12 +64,16 @@ function parseFrame(element: Element, scaleX: number, scaleY: number, groupTrans
       height: Math.round(localFrame.height),
     };
   }
+  const childOffsetX = groupTransform.childOffsetX ?? 0;
+  const childOffsetY = groupTransform.childOffsetY ?? 0;
+  const childScaleX = groupTransform.scaleX ?? 1;
+  const childScaleY = groupTransform.scaleY ?? 1;
   return {
     ...localFrame,
-    x: Math.round(groupTransform.x + localFrame.x),
-    y: Math.round(groupTransform.y + localFrame.y),
-    width: Math.round(localFrame.width),
-    height: Math.round(localFrame.height),
+    x: Math.round(groupTransform.x + (localFrame.x - childOffsetX) * childScaleX),
+    y: Math.round(groupTransform.y + (localFrame.y - childOffsetY) * childScaleY),
+    width: Math.round(localFrame.width * childScaleX),
+    height: Math.round(localFrame.height * childScaleY),
     rotation: groupTransform.rotation + localFrame.rotation,
   };
 }
@@ -90,24 +94,30 @@ function parseTextObject(
   idScope: 'layout' | 'master' | 'slide' = 'slide',
 ): PptxSlideObject | undefined {
   const placeholderRole = pptxTextParser.getPlaceholderRole(shape);
-  const text =
+  const rawText =
     pptxTextParser.getTextParagraphs(shape) ||
     (idScope === 'slide' ? '' : pptxTextParser.getPlaceholderFallbackText(placeholderRole));
+  if (!rawText) return undefined;
+  const style = pptxTextParser.getTextStyle(shape, scaleY, textDefaults, scope.theme, placeholderRole);
+  const text = pptxTextParser.applyTextStyle(rawText, style);
   if (!text) return undefined;
   const frame = parseFrame(shape, scaleX, scaleY, scope.groupTransform);
-  if (!frame) return undefined;
+  if (!frame && !placeholderRole) return undefined;
+  const resolvedFrame = frame ?? { height: 1, width: 1, x: 0, y: 0, rotation: 0 };
   const shapeId = localShapeId(shape, String(zIndex));
   const opacity = pptxVisualStyle.getOpacity(shape);
   return {
-    frame,
+    frame: resolvedFrame,
+    frameSource: frame ? 'self' : 'inherited',
     id: `${slideId}-${idScope}-text-${shapeId}`,
     kind: 'text',
     ...(opacity !== undefined ? { opacity } : {}),
+    ...(pptxTextParser.getPlaceholderIndex(shape) ? { placeholderIndex: pptxTextParser.getPlaceholderIndex(shape)! } : {}),
     ...(placeholderRole ? { placeholderRole } : {}),
-    rotation: frame.rotation,
+    rotation: resolvedFrame.rotation,
     source: idScope,
     sourceShapeId: shapeId,
-    style: pptxTextParser.getTextStyle(shape, scaleY, textDefaults, scope.theme),
+    style,
     text,
     textBox: pptxTextParser.getTextBox(shape, scaleX, scaleY),
     zIndex,
@@ -147,14 +157,33 @@ function parsePictureObject(
   idScope: 'layout' | 'master' | 'slide' = 'slide',
 ): PptxSlideObject | undefined {
   const frame = parseFrame(picture, scaleX, scaleY, scope.groupTransform);
-  if (!frame) return undefined;
+  const placeholderIndex = pptxTextParser.getPlaceholderIndex(picture);
+  if (!frame && !placeholderIndex) return undefined;
   const videoRelId =
     pptxXml.getRelationshipAttr(pptxXml.firstDescendant(picture, 'videoFile'), 'link') ??
     pptxXml.getRelationshipAttr(pptxXml.firstDescendant(picture, 'media'), 'embed');
-  const imageRelId = pptxXml.getRelationshipAttr(pptxXml.firstDescendant(picture, 'blip'), 'embed');
+  const imageRelId =
+    pptxXml.getRelationshipAttr(pptxXml.firstDescendant(picture, 'blip'), 'embed') ??
+    pptxXml.getRelationshipAttr(pptxXml.firstDescendant(picture, 'svgBlip'), 'embed');
   const assetPath =
     getRelationshipTarget(context, relationships, videoRelId, slideId) ??
     getRelationshipTarget(context, relationships, imageRelId, slideId);
+  if (!assetPath && idScope !== 'slide' && placeholderIndex) {
+    const shapeId = localShapeId(picture, String(zIndex));
+    return {
+      assetPath: '',
+      frame: frame ?? { height: 1, width: 1, x: 0, y: 0, rotation: 0 },
+      frameSource: frame ? 'self' : 'inherited',
+      id: `${slideId}-${idScope}-image-placeholder-${shapeId}`,
+      kind: 'image',
+      placeholderIndex,
+      placeholderOnly: true,
+      rotation: frame?.rotation ?? 0,
+      source: idScope,
+      sourceShapeId: shapeId,
+      zIndex,
+    };
+  }
   if (!assetPath) return undefined;
   const mimeType = context.package.getContentType(assetPath) ?? pptxFileUtils.getMimeType(assetPath);
   const assetType = pptxFileUtils.getAssetType(assetPath, mimeType);
@@ -170,14 +199,17 @@ function parsePictureObject(
   const shapeId = localShapeId(picture, String(zIndex));
   const opacity = pptxVisualStyle.getOpacity(picture);
   const crop = parsePictureCrop(picture);
+  const resolvedFrame = frame ?? { height: 1, width: 1, x: 0, y: 0, rotation: 0 };
   return {
     assetPath,
     ...(crop ? { crop } : {}),
-    frame,
+    frame: resolvedFrame,
+    frameSource: frame ? 'self' : 'inherited',
     id: `${slideId}-${idScope}-${assetType}-${shapeId}`,
     kind: assetType,
     ...(opacity !== undefined ? { opacity } : {}),
-    rotation: frame.rotation,
+    ...(placeholderIndex ? { placeholderIndex } : {}),
+    rotation: resolvedFrame.rotation,
     source: idScope,
     sourceShapeId: shapeId,
     zIndex,
@@ -275,6 +307,7 @@ function parseShapeObject(
     ...(startEndpoint ? { startEndpoint } : {}),
     ...(endEndpoint ? { endEndpoint } : {}),
     ...(opacity !== undefined ? { opacity } : {}),
+    ...(pptxTextParser.getPlaceholderIndex(shape) ? { placeholderIndex: pptxTextParser.getPlaceholderIndex(shape)! } : {}),
     ...(placeholderRole ? { placeholderRole } : {}),
     rotation: frame.rotation,
     shape: shapeKind,
@@ -284,9 +317,56 @@ function parseShapeObject(
   };
 }
 
+function parsePicturePlaceholderObject(
+  shape: Element,
+  slideId: string,
+  zIndex: number,
+  scaleX: number,
+  scaleY: number,
+  scope: ParseScope,
+  idScope: 'layout' | 'master' | 'slide' = 'slide',
+): PptxSlideObject | undefined {
+  if (pptxTextParser.getPlaceholderType(shape) !== 'pic') return undefined;
+  const placeholderIndex = pptxTextParser.getPlaceholderIndex(shape);
+  if (!placeholderIndex) return undefined;
+  const frame = parseFrame(shape, scaleX, scaleY, scope.groupTransform);
+  if (!frame) return undefined;
+  const shapeId = localShapeId(shape, String(zIndex));
+  return {
+    assetPath: '',
+    frame,
+    frameSource: 'self',
+    id: `${slideId}-${idScope}-image-placeholder-${shapeId}`,
+    kind: 'image',
+    placeholderIndex,
+    placeholderOnly: true,
+    rotation: frame.rotation,
+    source: idScope,
+    sourceShapeId: shapeId,
+    zIndex,
+  };
+}
+
+function getPositiveNumber(value: string | null | undefined) {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : undefined;
+}
+
 function parseGroupTransform(group: Element, scaleX: number, scaleY: number, parent?: PptxTransform) {
   const frame = parseFrame(group, scaleX, scaleY, parent);
-  return frame;
+  if (!frame) return undefined;
+  const transform = pptxXml.firstDescendant(group, 'xfrm');
+  const childOffset = transform ? pptxXml.firstDescendant(transform, 'chOff') : undefined;
+  const childExtent = transform ? pptxXml.firstDescendant(transform, 'chExt') : undefined;
+  const childWidth = getPositiveNumber(childExtent?.getAttribute('cx'));
+  const childHeight = getPositiveNumber(childExtent?.getAttribute('cy'));
+  return {
+    ...frame,
+    childOffsetX: Number(childOffset?.getAttribute('x') ?? 0) * scaleX,
+    childOffsetY: Number(childOffset?.getAttribute('y') ?? 0) * scaleY,
+    scaleX: childWidth ? frame.width / (childWidth * scaleX) : 1,
+    scaleY: childHeight ? frame.height / (childHeight * scaleY) : 1,
+  };
 }
 
 function getTableColumnWidths(table: Element) {
@@ -399,6 +479,19 @@ function parseSlideTreeObjects(
   for (const child of pptxXml.childElements(tree)) {
     const zIndex = zIndexStart + objects.length;
     if (child.localName === 'sp') {
+      const picturePlaceholderObject = parsePicturePlaceholderObject(
+        child,
+        slideId,
+        zIndex,
+        scaleX,
+        scaleY,
+        scope,
+        idScope,
+      );
+      if (picturePlaceholderObject) {
+        objects.push(picturePlaceholderObject);
+        continue;
+      }
       const textObject = parseTextObject(child, slideId, zIndex, scaleX, scaleY, textDefaults, scope, idScope);
       if (textObject) objects.push(textObject);
       if (!textObject || !pptxTextParser.getTextParagraphs(child)) {
@@ -411,6 +504,7 @@ function parseSlideTreeObjects(
       if (object) objects.push(object);
     }
     if (child.localName === 'grpSp') {
+      const groupTransform = parseGroupTransform(child, scaleX, scaleY, scope.groupTransform);
       objects.push(
         ...parseSlideTreeObjects(
           context,
@@ -423,9 +517,7 @@ function parseSlideTreeObjects(
           relationships,
           {
             ...scope,
-            ...(parseGroupTransform(child, scaleX, scaleY, scope.groupTransform)
-              ? { groupTransform: parseGroupTransform(child, scaleX, scaleY, scope.groupTransform)! }
-              : {}),
+            ...(groupTransform ? { groupTransform } : {}),
           },
           idScope,
         ),
@@ -463,6 +555,17 @@ async function loadTheme(context: ParseContext, masterPath: string | undefined) 
   const theme = { colors };
   context.themeCache.set(masterPath, theme);
   return theme;
+}
+
+async function loadMasterTextDefaults(
+  context: ParseContext,
+  masterPath: string | undefined,
+  textDefaults: PptxTextDefaults,
+) {
+  if (!masterPath) return textDefaults;
+  const xml = await context.package.readText(masterPath);
+  if (!xml) return textDefaults;
+  return pptxTextParser.getMasterTextDefaults(pptxXml.parseXml(xml), textDefaults);
 }
 
 async function parseInheritedObjects(
@@ -525,6 +628,82 @@ function getPlaceholderRoles(objects: PptxSlideObject[]) {
   );
 }
 
+function findInheritedPlaceholder(
+  object: PptxSlideObject,
+  inheritedObjects: PptxSlideObject[],
+) {
+  if (!object.placeholderRole && !object.placeholderIndex) return undefined;
+  const candidates = inheritedObjects.filter(
+    (inheritedObject) =>
+      inheritedObject.kind === object.kind &&
+      (object.placeholderRole
+        ? inheritedObject.placeholderRole === object.placeholderRole
+        : inheritedObject.placeholderIndex === object.placeholderIndex),
+  );
+  const exactMatch = object.placeholderIndex
+    ? candidates.find((candidate) => candidate.placeholderIndex === object.placeholderIndex)
+    : undefined;
+  return exactMatch ?? candidates.at(-1);
+}
+
+function textBoxMatchesDefaults(object: Extract<PptxSlideObject, { kind: 'text' }>) {
+  return object.textBox.autoFit === 'none' && object.textBox.verticalAlign === 'top';
+}
+
+function inheritPlaceholderTextObject(
+  object: Extract<PptxSlideObject, { kind: 'text' }>,
+  inheritedObject: Extract<PptxSlideObject, { kind: 'text' }>,
+) : Extract<PptxSlideObject, { kind: 'text' }> {
+  const inheritedStyle = inheritedObject.style;
+  const inheritsFrame = object.frameSource === 'inherited';
+  const textBox = textBoxMatchesDefaults(object) ? inheritedObject.textBox : object.textBox;
+  const style = {
+    ...inheritedStyle,
+    align: object.style.align,
+    fontWeight:
+      object.style.fontWeight === pptxParserDefaults.textStyle.fontWeight
+        ? inheritedStyle.fontWeight
+        : object.style.fontWeight,
+    ...(object.style.capitalization ? { capitalization: object.style.capitalization } : {}),
+  };
+  return {
+    ...object,
+    frame: inheritsFrame ? inheritedObject.frame : object.frame,
+    ...(inheritsFrame ? { frameSource: 'self' as const } : {}),
+    style,
+    text: pptxTextParser.applyTextStyle(object.text, style),
+    textBox,
+  };
+}
+
+function inheritPlaceholderFrame(
+  object: Extract<PptxSlideObject, { kind: 'image' | 'gif' | 'video' }>,
+  inheritedObject: PptxSlideObject,
+) : Extract<PptxSlideObject, { kind: 'image' | 'gif' | 'video' }> {
+  if (object.frameSource !== 'inherited') return object;
+  return {
+    ...object,
+    frame: inheritedObject.frame,
+    frameSource: 'self' as const,
+    rotation: inheritedObject.rotation ?? 0,
+  };
+}
+
+function inheritSlidePlaceholderObjects(
+  objects: PptxSlideObject[],
+  inheritedObjects: PptxSlideObject[],
+) {
+  return objects.map((object) => {
+    const inheritedObject = findInheritedPlaceholder(object, inheritedObjects);
+    if (!inheritedObject) return object;
+    if (object.kind === 'text' && inheritedObject.kind === 'text') {
+      return inheritPlaceholderTextObject(object, inheritedObject);
+    }
+    if (object.kind !== 'image' && object.kind !== 'gif' && object.kind !== 'video') return object;
+    return inheritPlaceholderFrame(object, inheritedObject);
+  });
+}
+
 function getRelationshipTargetsInListOrder(
   relationships: Map<string, PptxRelationship>,
   listItems: Element[],
@@ -574,6 +753,7 @@ async function parseLayout(
   const resolvedMasterPath =
     masterPath ?? findRelationshipByType(relationships, '/slideMaster')?.target;
   const theme = await loadTheme(context, resolvedMasterPath);
+  const scopedTextDefaults = await loadMasterTextDefaults(context, resolvedMasterPath, textDefaults);
   const scope = { theme };
   const masterObjects = await parseInheritedObjects(
     context,
@@ -581,7 +761,7 @@ async function parseLayout(
     layoutId,
     scaleX,
     scaleY,
-    textDefaults,
+    scopedTextDefaults,
     scope,
     'master',
   );
@@ -593,7 +773,7 @@ async function parseLayout(
     masterObjects.length,
     scaleX,
     scaleY,
-    textDefaults,
+    scopedTextDefaults,
     relationships,
     scope,
     'layout',
@@ -633,6 +813,7 @@ async function parseSlide(
   const layoutRels = layoutPath ? context.package.getRelationships(layoutPath) : new Map<string, PptxRelationship>();
   const masterPath = findRelationshipByType(layoutRels, '/slideMaster')?.target;
   const theme = await loadTheme(context, masterPath);
+  const scopedTextDefaults = await loadMasterTextDefaults(context, masterPath, textDefaults);
   const scope = { theme };
   const speakerNotes = await pptxTextParser.parseSpeakerNotes(context, notesPath);
   const parsedLayout = layoutPath ? layoutsByPath.get(layoutPath) : undefined;
@@ -641,20 +822,18 @@ async function parseSlide(
     ...object,
     zIndex: index,
   }));
-  const objects: PptxSlideObject[] = [];
-  objects.push(
-    ...parseSlideTreeObjects(
-      context,
-      tree,
-      slideId,
-      objects.length,
-      scaleX,
-      scaleY,
-      textDefaults,
-      rels,
-      scope,
-    ),
+  const parsedObjects = parseSlideTreeObjects(
+    context,
+    tree,
+    slideId,
+    0,
+    scaleX,
+    scaleY,
+    scopedTextDefaults,
+    rels,
+    scope,
   );
+  const objects = inheritSlidePlaceholderObjects(parsedObjects, inheritedObjects);
   const videoStartTriggers = pptxAnimationBuilds.getVideoStartTriggers(document, objects);
   for (const object of objects) {
     const startTrigger = videoStartTriggers.get(object.sourceShapeId);
@@ -662,7 +841,7 @@ async function parseSlide(
   }
   const resolvedLayoutId = parsedLayout?.id ?? layoutId;
   return {
-    backgroundColor: getBackgroundColor(document, theme),
+    backgroundColor: getBackgroundColor(document, theme, parsedLayout?.backgroundColor ?? '#000000'),
     id: slideId,
     ...(resolvedLayoutId ? { layoutId: resolvedLayoutId } : {}),
     ...(parsedLayout?.name ? { layoutName: parsedLayout.name } : {}),
