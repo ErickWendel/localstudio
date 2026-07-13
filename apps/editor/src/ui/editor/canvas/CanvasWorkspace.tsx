@@ -52,6 +52,7 @@ import type { CommonElementProps, ElementAnimationRenderState } from './canvas-e
 import { shapeLineDraw } from './shape-line-draw';
 
 const TEXT_FRAME_PADDING = 6;
+const TEXT_EDITOR_HEIGHT_BUFFER = 4;
 
 interface CanvasWorkspaceProps {
   project: ProjectDocument;
@@ -215,6 +216,7 @@ export function CanvasWorkspace({
   const [stageSize, setStageSize] = useState({ width: 768, height: 432 });
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [editingTextValue, setEditingTextValue] = useState('');
+  const [editingTextHeight, setEditingTextHeight] = useState<number | undefined>(undefined);
   const [fontRenderVersion, setFontRenderVersion] = useState(0);
   const [processingBlinkOn, setProcessingBlinkOn] = useState(false);
   const [backgroundPreviewPoint, setBackgroundPreviewPoint] = useState<{
@@ -573,17 +575,34 @@ export function CanvasWorkspace({
     onSelectElement?.(element.id);
     setEditingTextId(element.id);
     setEditingTextValue(element.text);
+    setEditingTextHeight(element.height);
   }
 
   function commitTextEditing() {
     if (!editingTextId) return;
     onUpdateTextContent?.(editingTextId, editingTextValue);
     setEditingTextId(null);
+    setEditingTextHeight(undefined);
   }
 
   function cancelTextEditing() {
     setEditingTextId(null);
     setEditingTextValue('');
+    setEditingTextHeight(undefined);
+  }
+
+  function updateTextEditing(element: Extract<DesignElement, { type: 'text' }>, input: HTMLTextAreaElement) {
+    const nextValue = input.value;
+    setEditingTextValue(nextValue);
+    onUpdateTextContent?.(element.id, nextValue);
+
+    const nextHeight = Math.ceil(
+      Math.max(8, toDocumentY(input.scrollHeight + TEXT_EDITOR_HEIGHT_BUFFER)),
+    );
+    setEditingTextHeight(nextHeight);
+    if (nextHeight !== element.height) {
+      onUpdateElementFrame?.(element.id, { height: nextHeight });
+    }
   }
 
   function pickBackgroundSubject(
@@ -1136,7 +1155,7 @@ export function CanvasWorkspace({
                       fontFamily: element.fontFamily,
                       fontSize: `${element.fontSize * scaleY}px`,
                       fontWeight: element.fontWeight,
-                      height: `${element.height * scaleY}px`,
+                      height: `${Math.max(element.height, editingTextHeight ?? element.height) * scaleY}px`,
                       left: `${element.x * scaleX}px`,
                       lineHeight: element.lineHeight ?? 1.05,
                       padding: `${TEXT_FRAME_PADDING * scaleY}px`,
@@ -1147,7 +1166,7 @@ export function CanvasWorkspace({
                     }}
                     onBlur={commitTextEditing}
                     onChange={(event) => {
-                      setEditingTextValue(event.target.value);
+                      updateTextEditing(element, event.currentTarget);
                     }}
                     onKeyDown={(event) => {
                       if (event.key === 'Escape') {

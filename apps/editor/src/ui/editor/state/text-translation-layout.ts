@@ -1,4 +1,4 @@
-import type { Page, ProjectDocument } from '../../../domain/documents/model';
+import type { Page, ProjectDocument, TextElement } from '../../../domain/documents/model';
 
 export type TranslationPatch = {
   fontSize?: number;
@@ -8,13 +8,20 @@ export type TranslationPatch = {
   x?: number;
 };
 
+const TEXT_FRAME_HORIZONTAL_PADDING = 12;
+const TEXT_FRAME_VERTICAL_PADDING_RATIO = 0.18;
+const TEXT_FRAME_LINE_HEIGHT = 1.08;
+
 function getMinimumTextHeight(text: string, fontSize: number) {
   const lineCount = Math.max(1, text.split('\n').length);
-  return Math.ceil(lineCount * fontSize * 1.08 + Math.max(12, fontSize * 0.18));
+  return getTextHeightForLineCount(lineCount, fontSize);
 }
 
 function getTextHeightForLineCount(lineCount: number, fontSize: number) {
-  return Math.ceil(Math.max(1, lineCount) * fontSize * 1.08 + Math.max(12, fontSize * 0.18));
+  return Math.ceil(
+    Math.max(1, lineCount) * fontSize * TEXT_FRAME_LINE_HEIGHT +
+      Math.max(12, fontSize * TEXT_FRAME_VERTICAL_PADDING_RATIO),
+  );
 }
 
 function getPageTextSample(project: ProjectDocument, pageId: string) {
@@ -74,6 +81,7 @@ function estimateSingleLineTextWidth(text: string, fontSize: number) {
 }
 
 function estimateWrappedLineCount(text: string, fontSize: number, availableWidth: number) {
+  const safeAvailableWidth = Math.max(1, availableWidth);
   return text.split('\n').reduce((lineCount, paragraph) => {
     const words = paragraph.trim().split(/\s+/).filter(Boolean);
     if (words.length === 0) return lineCount + 1;
@@ -86,23 +94,29 @@ function estimateWrappedLineCount(text: string, fontSize: number, availableWidth
       const wordWidth = estimateSingleLineTextWidth(word, fontSize);
       if (currentLineWidth === 0) {
         currentLineWidth = wordWidth;
-        paragraphLineCount += Math.max(0, Math.ceil(wordWidth / availableWidth) - 1);
+        paragraphLineCount += Math.max(0, Math.ceil(wordWidth / safeAvailableWidth) - 1);
         continue;
       }
 
       const nextLineWidth = currentLineWidth + spaceWidth + wordWidth;
-      if (nextLineWidth <= availableWidth) {
+      if (nextLineWidth <= safeAvailableWidth) {
         currentLineWidth = nextLineWidth;
         continue;
       }
 
       paragraphLineCount += 1;
       currentLineWidth = wordWidth;
-      paragraphLineCount += Math.max(0, Math.ceil(wordWidth / availableWidth) - 1);
+      paragraphLineCount += Math.max(0, Math.ceil(wordWidth / safeAvailableWidth) - 1);
     }
 
     return lineCount + paragraphLineCount;
   }, 0);
+}
+
+function getMinimumTextFrameHeight(element: TextElement) {
+  const availableWidth = element.width - TEXT_FRAME_HORIZONTAL_PADDING;
+  const lineCount = estimateWrappedLineCount(element.text, element.fontSize, availableWidth);
+  return getTextHeightForLineCount(lineCount, element.fontSize);
 }
 
 function fitTranslatedTextToOriginalFrame(
@@ -112,8 +126,7 @@ function fitTranslatedTextToOriginalFrame(
 ): TranslationPatch {
   void page;
   const normalizedText = normalizeTranslatedText(element.text, translatedText);
-  const horizontalPadding = 12;
-  const availableWidth = Math.max(1, element.width - horizontalPadding);
+  const availableWidth = Math.max(1, element.width - TEXT_FRAME_HORIZONTAL_PADDING);
   const estimatedLineCount = estimateWrappedLineCount(
     normalizedText,
     element.fontSize,
@@ -130,6 +143,7 @@ function fitTranslatedTextToOriginalFrame(
 
 export const textTranslationLayout = {
   fitTranslatedTextToOriginalFrame,
+  getMinimumTextFrameHeight,
   getMinimumTextHeight,
   getPageTextSample,
   mapWithConcurrency,

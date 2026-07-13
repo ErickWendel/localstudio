@@ -11,11 +11,12 @@ function getFramePatchWithTextMinimum(
   if (patch.height === undefined) return patch;
   const element = project.elements[elementId];
   if (!element || element.type !== 'text') return patch;
+  const nextElement = { ...element, ...patch };
   return {
     ...patch,
     height: Math.max(
       patch.height,
-      textTranslationLayout.getMinimumTextHeight(element.text, element.fontSize),
+      textTranslationLayout.getMinimumTextFrameHeight(nextElement),
     ),
   };
 }
@@ -23,7 +24,7 @@ function getFramePatchWithTextMinimum(
 function ensureTextElementMinimumHeight(project: ProjectDocument, elementId: string) {
   const element = project.elements[elementId];
   if (!element || element.type !== 'text') return project;
-  const minimumHeight = textTranslationLayout.getMinimumTextHeight(element.text, element.fontSize);
+  const minimumHeight = textTranslationLayout.getMinimumTextFrameHeight(element);
   if (element.height >= minimumHeight) return project;
   return new basicCommands.UpdateElementFrameCommand(elementId, {
     height: minimumHeight,

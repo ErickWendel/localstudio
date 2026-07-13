@@ -36,13 +36,28 @@ export async function resizeTextAndUseArrangeControls(page: Page, baseURL: strin
   await expect.poll(async () => Number(await widthInput.inputValue())).toBeGreaterThan(360);
   await expect.poll(async () => Number(await heightInput.inputValue())).toBeGreaterThan(200);
 
-  await editor.openTool('Layout');
-  await page.getByRole('button', { name: 'Add a little bit of body text', exact: true }).click();
+  await editor.openTool('Text');
+  await page.getByRole('button', { name: 'Add a text box' }).click();
   await editor.openTool('Design');
   await page
     .getByRole('tablist', { name: 'Movie inspector sections' })
     .getByRole('tab', { name: 'Arrange' })
     .click();
+  await xInput.fill('560');
+  await yInput.fill('280');
+  await widthInput.fill('320');
+  await heightInput.fill('120');
+
+  const editPoint = await getCanvasPoint(page, { x: 720, y: 340 });
+  await page.mouse.dblclick(editPoint.x, editPoint.y);
+  const canvasTextEditor = page.getByRole('textbox', { name: 'Edit text' });
+  await expect(canvasTextEditor).toBeVisible();
+  await canvasTextEditor.fill(
+    '55 Horas, 770M Tokens e Uma Alternativa ao Canva Rodando no Browser',
+  );
+  await expect.poll(async () => Number(await heightInput.inputValue())).toBeGreaterThan(120);
+  await expect(canvasTextEditor).toBeFocused();
+  await page.keyboard.press('Enter');
 
   await rotationInput.fill('18');
   await expect(rotationInput).toHaveValue('18');
