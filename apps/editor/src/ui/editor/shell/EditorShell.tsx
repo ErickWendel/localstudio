@@ -52,6 +52,7 @@ const editorMobileViewportQuery = '(max-width: 760px)';
 
 function isMobileEditorViewport() {
   if (typeof window === 'undefined' || !window.matchMedia) return false;
+  if (editorShellBrowserUtils.isWebMcpEnabled()) return false;
   return window.matchMedia(editorMobileViewportQuery).matches;
 }
 
@@ -59,6 +60,7 @@ export function EditorShell({ services }: EditorShellProps) {
   const [mobileEditorUnavailable, setMobileEditorUnavailable] = useState(isMobileEditorViewport);
 
   useEffect(() => {
+    if (editorShellBrowserUtils.isWebMcpEnabled()) return undefined;
     if (!window.matchMedia) return undefined;
     const mediaQuery = window.matchMedia(editorMobileViewportQuery);
     function syncMobileEditorAvailability(event: MediaQueryList | MediaQueryListEvent) {

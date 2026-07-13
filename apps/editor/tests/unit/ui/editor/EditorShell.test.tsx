@@ -15,9 +15,15 @@ const {
   selectImageLayer,
 } = editorShellTestHarness;
 
+const originalMatchMedia = window.matchMedia;
+
 describe('EditorShell', () => {
   afterEach(() => {
     window.history.pushState({}, '', '/editor/');
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: originalMatchMedia,
+    });
     Object.defineProperty(document, 'modelContext', {
       configurable: true,
       value: undefined,
@@ -72,6 +78,27 @@ describe('EditorShell', () => {
       'translate_text',
       'get_project_snapshot',
     ]);
+  });
+
+  it('keeps WebMCP embeds available inside narrow host frames', async () => {
+    const matchMedia = vi.fn().mockReturnValue({
+      addEventListener: vi.fn(),
+      matches: true,
+      removeEventListener: vi.fn(),
+    });
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: matchMedia,
+    });
+    window.history.pushState({}, '', '/editor/?webmcp=1');
+
+    render(<EditorShell services={createAppServices()} />);
+
+    expect(await screen.findByRole('heading', { name: 'LocalStudio.dev' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Open this workspace on a desktop screen.' }),
+    ).not.toBeInTheDocument();
+    expect((window as WebMcpDemoWindow).localStudioWebMcpTools).toHaveLength(5);
   });
 
   it('renders the approved editor shell landmarks', async () => {
