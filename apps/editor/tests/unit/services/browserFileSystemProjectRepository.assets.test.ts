@@ -386,4 +386,52 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
 
     expect(assetsDirectory.files.has('asset-removed.png')).toBe(false);
   });
+
+  it('keeps image asset files that are still referenced by version history', async () => {
+    const directory = new MockDirectoryHandle();
+    const repository = new BrowserFileSystemProjectRepository({
+      pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
+    });
+    const createObjectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:history-image');
+    const projectWithImage = sampleProject.createBlankProject();
+    projectWithImage.assets['asset-history-image'] = {
+      id: 'asset-history-image',
+      type: 'image',
+      name: 'History image',
+      mimeType: 'image/png',
+      objectUrl: 'data:image/png;base64,aGlzdG9yeQ==',
+    };
+    projectWithImage.elements['image-history'] = {
+      id: 'image-history',
+      type: 'image',
+      assetId: 'asset-history-image',
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      rotation: 0,
+      locked: false,
+      visible: true,
+      opacity: 1,
+    };
+    projectWithImage.pages[0]?.elementIds.push('image-history');
+
+    await repository.saveProject(projectWithImage);
+    const version = await repository.saveVersion(projectWithImage, {
+      previousProject: sampleProject.createBlankProject(),
+    });
+    await repository.saveProject({
+      ...projectWithImage,
+      assets: {},
+      elements: {},
+      pages: projectWithImage.pages.map((page) => ({ ...page, elementIds: [] })),
+    });
+
+    const assetsDirectory = directory.directories.get('assets')!;
+    expect(assetsDirectory.files.has('asset-history-image.png')).toBe(true);
+    const loadedVersion = await repository.loadVersion(version.id);
+    expect(loadedVersion?.assets['asset-history-image']?.objectUrl).toBe('blob:history-image');
+    expect(createObjectUrl).toHaveBeenCalled();
+  });
 });

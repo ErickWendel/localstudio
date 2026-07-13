@@ -32,6 +32,10 @@ const VERSION_HISTORY_FILE_NAME = 'manifest.json';
 const VERSION_HISTORY_LIMIT = 100;
 const LAST_PROJECT_NAME_KEY = 'localstudio.ai.opfs.last-project-name';
 
+function addRetainedFileName(fileNames: Set<string>, fileName: string | undefined) {
+  if (fileName) fileNames.add(fileName);
+}
+
 async function createFileBackedProjectSnapshot(
   project: ProjectDocument,
   assetsDirectory: FileSystemDirectoryHandle,
@@ -188,16 +192,14 @@ export class OpfsProjectRepository implements ProjectRepository {
         .map((asset) => asset.fileName)
         .filter((fileName): fileName is string => Boolean(fileName)),
     );
-
+    await this.addVersionAssetFileNames(directoryHandle, retainedAssetFileNames);
     await this.removeUnretainedAssetFiles(assetsDirectory, retainedAssetFileNames);
-    await this.removeUnretainedAssetFiles(
-      fontsDirectory,
-      new Set(
-        Object.values(projectForDisk.fonts ?? {})
-          .map((font) => font.fileName)
-          .filter((fileName): fileName is string => Boolean(fileName)),
-      ),
-    );
+    const retainedFontFileNames = new Set<string>();
+    for (const font of Object.values(projectForDisk.fonts ?? {})) {
+      addRetainedFileName(retainedFontFileNames, font.fileName);
+    }
+    await this.addVersionFontFileNames(directoryHandle, retainedFontFileNames);
+    await this.removeUnretainedAssetFiles(fontsDirectory, retainedFontFileNames);
     await this.writeJsonFile(directoryHandle, PROJECT_FILE_NAME, projectForDisk);
     const configDirectory = await directoryHandle.getDirectoryHandle('config', { create: true });
     await this.writeJsonFile(configDirectory, PROJECT_CONFIG_FILE_NAME, {
@@ -373,6 +375,58 @@ export class OpfsProjectRepository implements ProjectRepository {
       removals.push(directoryHandle.removeEntry(name).catch(() => undefined));
     }
     await Promise.all(removals);
+  }
+
+  private async addVersionAssetFileNames(
+    directoryHandle: FileSystemDirectoryHandle,
+    retainedAssetFileNames: Set<string>,
+  ) {
+    await this.addVersionFileNames(directoryHandle, (versionProject) => {
+      for (const asset of Object.values(versionProject.assets)) {
+        addRetainedFileName(retainedAssetFileNames, asset.fileName);
+      }
+    });
+  }
+
+  private async addVersionFontFileNames(
+    directoryHandle: FileSystemDirectoryHandle,
+    retainedFontFileNames: Set<string>,
+  ) {
+    await this.addVersionFileNames(directoryHandle, (versionProject) => {
+      for (const font of Object.values(versionProject.fonts ?? {})) {
+        addRetainedFileName(retainedFontFileNames, font.fileName);
+      }
+    });
+  }
+
+  private async addVersionFileNames(
+    directoryHandle: FileSystemDirectoryHandle,
+    addProjectFileNames: (versionProject: ProjectDocument) => void,
+  ) {
+    let manifest: VersionHistoryManifest;
+    let versionsDirectory: FileSystemDirectoryHandle;
+    try {
+      const historyDirectory = await directoryHandle.getDirectoryHandle('history');
+      const manifestHandle = await historyDirectory.getFileHandle(VERSION_HISTORY_FILE_NAME);
+      const manifestFile = await manifestHandle.getFile();
+      manifest = JSON.parse(await manifestFile.text()) as VersionHistoryManifest;
+      versionsDirectory = await historyDirectory.getDirectoryHandle('versions');
+    } catch (error) {
+      if (isNotFoundError(error)) return;
+      throw error;
+    }
+    if (manifest.versions.length === 0) return;
+    await Promise.all(
+      manifest.versions.map(async (entry) => {
+        try {
+          const fileHandle = await versionsDirectory.getFileHandle(entry.fileName);
+          const file = await fileHandle.getFile();
+          addProjectFileNames(JSON.parse(await file.text()) as ProjectDocument);
+        } catch (error) {
+          if (!isNotFoundError(error)) throw error;
+        }
+      }),
+    );
   }
 
   private async writeMirrorFile(directoryHandle: FileSystemDirectoryHandle, file: MirrorFile) {
