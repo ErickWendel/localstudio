@@ -42,6 +42,18 @@ describe('App', () => {
     expect(screen.getByText('1 layers on current page')).toBeInTheDocument();
   });
 
+  it('starts with persistence disabled on the plain editor route', async () => {
+    window.history.replaceState({}, '', '/editor/');
+    window.localStorage.setItem('ew-canvas-ai.persistence-enabled', 'true');
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole('button', { name: 'Edit project name Untitled Project' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Persistence disabled' })).toBeInTheDocument();
+  });
+
   it('removes the new project query string after consuming it', async () => {
     window.history.replaceState({}, '', '/?newProject=1&theme=dark');
 

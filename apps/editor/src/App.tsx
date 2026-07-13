@@ -110,7 +110,9 @@ function stripBasePath(pathname: string) {
 function EditorApp() {
   const services = useMemo(() => {
     const url = new URL(window.location.href);
-    const shouldStartBlankProject = url.searchParams.get('newProject') === '1';
+    const storedProjectName = url.searchParams.get('project');
+    const shouldStartBlankProject =
+      url.searchParams.get('newProject') === '1' || !storedProjectName;
     if (shouldStartBlankProject) {
       url.searchParams.delete('newProject');
       url.searchParams.delete('project');
@@ -123,10 +125,7 @@ function EditorApp() {
             initialProject: sampleProject.createBlankProject(),
             skipStoredProjectLoad: true,
           }
-        : (() => {
-            const storedProjectName = url.searchParams.get('project');
-            return storedProjectName ? { storedProjectName } : {};
-          })(),
+        : { storedProjectName },
     );
   }, []);
 
