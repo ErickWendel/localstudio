@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import type { Page, ProjectDocument, SelectionState } from '../../domain/documents/model';
+import { pageVisibility } from '../../domain/documents/pageVisibility';
 import type {
   PresenterCommandMessage,
   PresenterStateMessage,
@@ -122,14 +123,7 @@ function isEditablePresenterTarget(target: EventTarget | null) {
 }
 
 function getActivePage(project: ProjectDocument, activePageId: string) {
-  return project.pages.find((page) => page.id === activePageId) ?? project.pages[0];
-}
-
-function getPageIndex(project: ProjectDocument, activePageId: string) {
-  return Math.max(
-    0,
-    project.pages.findIndex((page) => page.id === activePageId),
-  );
+  return pageVisibility.getNearestVisiblePage(project, activePageId) ?? project.pages[0];
 }
 
 function getBuildsRemaining(payload: PresenterStatePayload, page: Page) {
@@ -337,9 +331,15 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     };
   }, [remotePanelOpen]);
 
+  const visiblePages = useMemo(
+    () => (snapshot ? pageVisibility.getVisiblePages(snapshot.project) : []),
+    [snapshot],
+  );
   const activePage = snapshot ? getActivePage(snapshot.project, snapshot.activePageId) : undefined;
-  const activePageIndex = snapshot ? getPageIndex(snapshot.project, snapshot.activePageId) : 0;
-  const upcomingPages = snapshot ? snapshot.project.pages.slice(activePageIndex + 1, activePageIndex + 3) : [];
+  const activePageIndex = activePage
+    ? Math.max(0, visiblePages.findIndex((page) => page.id === activePage.id))
+    : 0;
+  const upcomingPages = visiblePages.slice(activePageIndex + 1, activePageIndex + 3);
   const buildsRemaining = snapshot && activePage ? getBuildsRemaining(snapshot, activePage) : 0;
   const speakerNotes = activePage?.speakerNotes ?? '';
   const currentTimeLabel = currentTime.toLocaleTimeString([], {
@@ -403,12 +403,12 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
   }, []);
 
   const goToPage = useCallback((index: number) => {
-    const page = snapshot?.project.pages[index];
+    const page = visiblePages[index];
     if (!page) return false;
     setSlideNavigatorIndex(index);
     postCommand({ command: 'go-to-page', pageId: page.id });
     return true;
-  }, [postCommand, snapshot]);
+  }, [postCommand, visiblePages]);
 
   const executePresenterShortcut = useCallback((action: KeyboardShortcutAction) => {
     if (action === 'shortcut-toggle') {
@@ -426,7 +426,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     }
     if (action === 'next-navigator-slide') {
       setSlideNavigatorIndex((current) =>
-        Math.min((snapshot?.project.pages.length ?? 1) - 1, current + 1),
+        Math.min(Math.max(0, visiblePages.length - 1), current + 1),
       );
       return;
     }
@@ -444,7 +444,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
       return;
     }
     if (action === 'last-slide') {
-      goToPage((snapshot?.project.pages.length ?? 1) - 1);
+      goToPage(visiblePages.length - 1);
       return;
     }
     if (action === 'next-slide') {
@@ -493,7 +493,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     postCommand,
     resetTimer,
     slideNavigatorIndex,
-    snapshot,
+    visiblePages,
   ]);
 
   function dismissIntro() {
@@ -519,7 +519,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
         if (event.key === '+' || event.key === '=') {
           event.preventDefault();
           setSlideNavigatorIndex((current) =>
-            Math.min((snapshot?.project.pages.length ?? 1) - 1, current + 1),
+            Math.min(Math.max(0, visiblePages.length - 1), current + 1),
           );
           return;
         }
@@ -648,6 +648,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     snapshot,
     startPresenterMovieHold,
     stopPresenterMovieHold,
+    visiblePages.length,
   ]);
 
   useEffect(() => {
@@ -817,7 +818,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
         </header>
         <div className="presenter-status-row" aria-label="Presenter status">
           <span className="presenter-status-item ew-ellipsis">
-            Current: Slide {activePageIndex + 1} of {snapshot.project.pages.length}
+            Current: Slide {activePageIndex + 1} of {visiblePages.length}
           </span>
           <span className="presenter-status-item ew-ellipsis">
             Builds remaining: {buildsRemaining}
@@ -922,7 +923,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
           onActivateSlide={goToPage}
           onClose={() => setSlideNavigatorOpen(false)}
           onSelectSlide={setSlideNavigatorIndex}
-          pages={snapshot.project.pages}
+          pages={visiblePages}
           selectedIndex={slideNavigatorIndex}
         />
       ) : null}

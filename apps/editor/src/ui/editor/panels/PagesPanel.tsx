@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import type { DesignElement, Page, ProjectDocument } from '../../../domain/documents/model';
+import { pageVisibility } from '../../../domain/documents/pageVisibility';
 
 type DropPosition = 'before' | 'after';
 
@@ -16,6 +17,14 @@ interface PagesPanelProps {
   onSelectPage?: ((pageId: string) => void) | undefined;
   onSetPageVisibility?: ((pageId: string, visible: boolean) => void) | undefined;
   onTranslatePage?: ((pageId: string) => void) | undefined;
+}
+
+function getPageDisplayName(page: Page) {
+  return page.visible === false ? `${page.name} (skipped)` : page.name;
+}
+
+function formatActivePageCount(count: number) {
+  return `${count} active ${count === 1 ? 'page' : 'pages'}`;
 }
 
 export function PagesPanel({
@@ -94,12 +103,14 @@ export function PagesPanel({
     onReorderPage?.(pageId, position === 'after' ? targetIndex + 1 : targetIndex);
   }
 
+  const activePageCount = pageVisibility.getVisiblePages(project).length;
+
   return (
     <aside className="pages-panel" aria-label="Pages">
       <div className="pages-panel-header">
         <div>
           <h2 className="panel-heading">Pages</h2>
-          <p className="panel-muted">{project.pages.length} pages</p>
+          <p className="panel-muted">{formatActivePageCount(activePageCount)}</p>
         </div>
         <div className="pages-panel-header-actions ew-inline-row">
           <button className="icon-button" type="button" aria-label="Add page" title="Add page" onClick={onAddPage}>
@@ -117,6 +128,7 @@ export function PagesPanel({
       <div className="pages-list">
         {project.pages.map((page, index) => {
           const visible = page.visible ?? true;
+          const pageDisplayName = getPageDisplayName(page);
           const isActive = page.id === activePageId;
           const dropPosition = dropIndicator?.pageId === page.id ? dropIndicator.position : undefined;
           const className = [
@@ -129,7 +141,7 @@ export function PagesPanel({
             .join(' ');
           return (
             <article
-              aria-label={`Page ${index + 1}: ${page.name}`}
+              aria-label={`Page ${index + 1}: ${pageDisplayName}`}
               className={className}
               data-drop-position={dropPosition}
               draggable
@@ -163,12 +175,19 @@ export function PagesPanel({
                 className="page-card-preview"
                 style={{ aspectRatio: `${page.width} / ${page.height}` }}
                 type="button"
-                aria-label={`Select ${page.name}`}
+                aria-label={`Select ${pageDisplayName}`}
                 onClick={() => {
                   onSelectPage?.(page.id);
                 }}
               >
                 <MiniPagePreview page={page} project={project} visible={visible} />
+                {visible ? null : (
+                  <span className="page-card-skip-badge" aria-label="Skipped slide">
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      visibility_off
+                    </span>
+                  </span>
+                )}
               </button>
               <div className="page-card-body">
                 {editingPageId === page.id ? (
@@ -190,12 +209,12 @@ export function PagesPanel({
                   <button
                     className="page-title-button"
                     type="button"
-                    aria-label={`Rename ${page.name}`}
+                    aria-label={`Rename ${pageDisplayName}`}
                     onClick={() => {
                       startRename(page.id, page.name);
                     }}
                   >
-                    {page.name}
+                    {pageDisplayName}
                   </button>
                 )}
                 <div

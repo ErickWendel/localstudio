@@ -30,6 +30,10 @@ interface ScrollingCanvasWorkspaceProps extends CanvasWorkspaceProps {
   translatingPageIds?: string[] | undefined;
 }
 
+function getPageDisplayName(name: string, visible: boolean) {
+  return visible ? name : `${name} (skipped)`;
+}
+
 export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanvasWorkspaceProps>(
   function ScrollingCanvasWorkspace(
     {
@@ -153,6 +157,7 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
           const isTranslatingPage = translatingPageIds.includes(page.id);
           const shouldRenderCanvas = isActive || index === preloadedPageIndex;
           const visible = page.visible ?? true;
+          const pageDisplayName = getPageDisplayName(page.name, visible);
           const pageClassName = [
             'scroll-page',
             isActive ? 'scroll-page-active' : '',
@@ -179,8 +184,9 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
                 canMoveUp={index > 0}
                 canTranslate={Boolean(canTranslateCurrentSlide)}
                 index={index}
-                name={page.name}
+                name={pageDisplayName}
                 pageId={page.id}
+                rawName={page.name}
                 visible={visible}
                 {...(onAddPage ? { onAddPage } : {})}
                 {...(onDeletePage ? { onDeletePage } : {})}
@@ -219,7 +225,7 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
                     onActivePageFromScroll?.(page.id);
                   }}
                 >
-                  <span>{visible ? page.name : `${page.name} hidden`}</span>
+                  <span>{pageDisplayName}</span>
                 </button>
               )}
               {showPageControls && onAddPage ? (
@@ -251,6 +257,7 @@ interface PageHeaderProps {
   index: number;
   name: string;
   pageId: string;
+  rawName: string;
   visible: boolean;
   onAddPage?: (afterPageId?: string) => void;
   onDeletePage?: (pageId: string) => void;
@@ -269,6 +276,7 @@ function PageHeader({
   index,
   name,
   pageId,
+  rawName,
   visible,
   onAddPage,
   onDeletePage,
@@ -285,7 +293,7 @@ function PageHeader({
         type="button"
         aria-label={`Rename ${name}`}
         onClick={() => {
-          const nextName = window.prompt('Page title', name);
+          const nextName = window.prompt('Page title', rawName);
           if (nextName) onRenamePage?.(pageId, nextName);
         }}
       >

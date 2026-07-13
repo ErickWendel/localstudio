@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { ElementAnimationBuild, ProjectDocument } from '../../../domain/documents/model';
+import { pageVisibility } from '../../../domain/documents/pageVisibility';
 
 export interface AnimationPreviewState {
   activeBuild: ElementAnimationBuild | undefined;
@@ -219,10 +220,11 @@ export function useAnimationPreviewController({
   }
 
   function goToPresentationPage(offset: -1 | 1) {
-    const pages = projectRef.current.pages;
-    const currentIndex = pages.findIndex((page) => page.id === activePageIdRef.current);
-    if (currentIndex < 0) return false;
-    const nextPage = pages[currentIndex + offset];
+    const nextPage = pageVisibility.getRelativeVisiblePage(
+      projectRef.current,
+      activePageIdRef.current,
+      offset,
+    );
     if (!nextPage) return false;
     activePageIdRef.current = nextPage.id;
     setActivePageId(nextPage.id);
@@ -232,10 +234,12 @@ export function useAnimationPreviewController({
   }
 
   function playPresentationPreview(pageId = activePageIdRef.current) {
-    activePageIdRef.current = pageId;
-    setActivePageId(pageId);
+    const page = pageVisibility.getNearestVisiblePage(projectRef.current, pageId);
+    if (!page) return;
+    activePageIdRef.current = page.id;
+    setActivePageId(page.id);
     setSelectedElementIds([]);
-    playAnimationPreview(pageId, 'presenter');
+    playAnimationPreview(page.id, 'presenter');
   }
 
   function advancePresentationPreview() {

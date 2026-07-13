@@ -146,4 +146,25 @@ describe('PagesPanel', () => {
 
     expect(screen.getByRole('button', { name: 'Move Slide 1 up' })).toBeDisabled();
   });
+
+  it('marks skipped pages and counts only active pages', () => {
+    const project = sampleProject.createSampleProject();
+    project.pages.push({
+      ...project.pages[0]!,
+      id: 'page-2',
+      name: 'Skipped Slide',
+      elementIds: [],
+      visible: false,
+    });
+
+    render(<PagesPanel activePageId="page-1" project={project} />);
+
+    expect(screen.getByText('1 active page')).toBeInTheDocument();
+    expect(screen.getByRole('article', { name: 'Page 2: Skipped Slide (skipped)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Select Skipped Slide (skipped)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Rename Skipped Slide (skipped)' })).toHaveTextContent(
+      'Skipped Slide (skipped)',
+    );
+    expect(screen.getByLabelText('Skipped slide')).toBeInTheDocument();
+  });
 });
