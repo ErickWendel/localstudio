@@ -145,6 +145,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Download build artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: localstudio-dist
+          path: dist
+
       - name: Restore Playwright browser cache
         id: playwright-cache
         uses: actions/cache@v5
@@ -162,13 +168,15 @@ jobs:
 
       - name: Editor E2E coverage test
         run: npm run test:e2e:coverage:editor
+        env:
+          E2E_SERVER: dist
 
       - name: Upload editor raw Playwright coverage
         if: always()
         uses: actions/upload-artifact@v5
         with:
           name: playwright-browser-coverage-editor
-          path: test-results/**/browser-coverage.json
+          path: test-results/editor-coverage/**/browser-coverage.json
           if-no-files-found: ignore
 
       - name: Add editor E2E coverage report to job summary
@@ -180,16 +188,87 @@ jobs:
             cat coverage-report/editor/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: Landing E2E coverage test
+        if: always()
+        run: npm run test:e2e:coverage:landing
+        env:
+          E2E_SERVER: dist
+
+      - name: Upload landing raw Playwright coverage
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-browser-coverage-landing
+          path: test-results/landing-coverage/**/browser-coverage.json
+          if-no-files-found: ignore
+
+      - name: Add landing E2E coverage report to job summary
+        if: always()
+        run: |
+          if [ -f coverage-report/landing/coverage-summary.md ]; then
+            cat coverage-report/landing/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            cat coverage-report/landing/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Public deck E2E coverage test
+        if: always()
+        run: npm run test:e2e:coverage:public-deck
+        env:
+          E2E_SERVER: dist
+
+      - name: Upload public deck raw Playwright coverage
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-browser-coverage-public-deck
+          path: test-results/public-deck-coverage/**/browser-coverage.json
+          if-no-files-found: ignore
+
+      - name: Add public deck E2E coverage report to job summary
+        if: always()
+        run: |
+          if [ -f coverage-report/public-deck/coverage-summary.md ]; then
+            cat coverage-report/public-deck/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            cat coverage-report/public-deck/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: WebMCP E2E coverage test
+        if: always()
+        run: npm run test:e2e:coverage:webmcp
+        env:
+          E2E_SERVER: dist
+
+      - name: Upload WebMCP raw Playwright coverage
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-browser-coverage-webmcp
+          path: test-results/webmcp-coverage/**/browser-coverage.json
+          if-no-files-found: ignore
+
+      - name: Add WebMCP E2E coverage report to job summary
+        if: always()
+        run: |
+          if [ -f coverage-report/webmcp/coverage-summary.md ]; then
+            cat coverage-report/webmcp/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            cat coverage-report/webmcp/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Joystick E2E coverage test
         if: always()
         run: npm run test:e2e:coverage:joystick
+        env:
+          E2E_SERVER: dist
 
       - name: Upload joystick raw Playwright coverage
         if: always()
         uses: actions/upload-artifact@v5
         with:
           name: playwright-browser-coverage-joystick
-          path: test-results/**/browser-coverage.json
+          path: test-results/joystick-coverage/**/browser-coverage.json
           if-no-files-found: ignore
 
       - name: Add joystick E2E coverage report to job summary
@@ -285,6 +364,24 @@ jobs:
             cat coverage-report/joystick/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
             printf '\n' >> "$GITHUB_STEP_SUMMARY"
             cat coverage-report/joystick/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f coverage-report/landing/coverage-summary.md ]; then
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            cat coverage-report/landing/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            cat coverage-report/landing/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f coverage-report/public-deck/coverage-summary.md ]; then
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            cat coverage-report/public-deck/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            cat coverage-report/public-deck/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f coverage-report/webmcp/coverage-summary.md ]; then
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            cat coverage-report/webmcp/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            cat coverage-report/webmcp/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Publish coverage report with site

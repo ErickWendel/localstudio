@@ -7,5 +7,8 @@ export function isCoverageSourceInScope(normalized: string, scope: CoverageScope
   if (scope === 'joystick') {
     return normalized.startsWith('apps/joystick/') || normalized.startsWith('packages/presenter-remote/');
   }
+  if (scope === 'landing') {
+    return normalized.startsWith('apps/landing/') || normalized.startsWith('packages/brand/');
+  }
   return true;
 }

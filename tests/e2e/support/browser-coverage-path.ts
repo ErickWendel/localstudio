@@ -30,6 +30,16 @@ export const browserCoveragePath = {
 
   shouldFetchSource(url: string): boolean {
     const path = this.fromUrl(url);
-    return path ? isCoverageReportableSourceFile(path, 'all') : false;
+    return path ? isCoverageReportableSourceFile(path, 'all') || isBuiltAssetScriptPath(path) : false;
   },
 };
+
+function isBuiltAssetScriptPath(path: string): boolean {
+  return (
+    path.endsWith('.js') &&
+    (path.startsWith('assets/') ||
+      path.startsWith('editor/assets/') ||
+      path.startsWith('joystick/assets/') ||
+      path.startsWith('webmcp/assets/'))
+  );
+}

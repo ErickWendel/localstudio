@@ -63,6 +63,7 @@ export default defineConfig({
     chunkSizeWarningLimit: 1200,
     emptyOutDir: false,
     outDir: '../../dist/editor',
+    sourcemap: true,
     rollupOptions: {
       output: {
         manualChunks: editorManualChunks,

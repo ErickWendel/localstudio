@@ -9,6 +9,7 @@ export default defineConfig({
   build: {
     emptyOutDir: false,
     outDir: '../../dist/joystick',
+    sourcemap: true,
   },
   test: {
     environment: 'jsdom',

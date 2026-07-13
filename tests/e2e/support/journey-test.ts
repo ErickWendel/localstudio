@@ -4,6 +4,7 @@ import { startIsolatedDevServer, type IsolatedDevServer } from './isolated-dev-s
 
 type JourneyFixtures = {
   browserCoverage: void;
+  e2eBrowserDefaults: void;
   isolatedDevServer: IsolatedDevServer;
 };
 type JourneyWorkerFixtures = {
@@ -39,6 +40,15 @@ export const test = base.extend<JourneyFixtures, JourneyWorkerFixtures>({
     async ({ workerDevServer }, use) => {
       currentServer = workerDevServer;
       await use(workerDevServer);
+    },
+    { auto: true },
+  ],
+  e2eBrowserDefaults: [
+    async ({ context }, use) => {
+      await context.addInitScript(() => {
+        window.localStorage.setItem('localstudio.ai-workflow-tour.seen', '1');
+      });
+      await use();
     },
     { auto: true },
   ],
