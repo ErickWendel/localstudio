@@ -144,26 +144,55 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: editor
+          - label: editor 1/3
             script: test:e2e:coverage:editor
-            report: editor
-            raw_path: test-results/editor-coverage/**/browser-coverage.json
+            report: editor-shard-1
+            raw_path: test-results/editor-shard-1-coverage/**/browser-coverage.json
+            shard: 1/3
+            output_name: editor-shard-1
+            coverage_threshold: '0'
+          - label: editor 2/3
+            script: test:e2e:coverage:editor
+            report: editor-shard-2
+            raw_path: test-results/editor-shard-2-coverage/**/browser-coverage.json
+            shard: 2/3
+            output_name: editor-shard-2
+            coverage_threshold: '0'
+          - label: editor 3/3
+            script: test:e2e:coverage:editor
+            report: editor-shard-3
+            raw_path: test-results/editor-shard-3-coverage/**/browser-coverage.json
+            shard: 3/3
+            output_name: editor-shard-3
+            coverage_threshold: '0'
           - label: landing
             script: test:e2e:coverage:landing
             report: landing
             raw_path: test-results/landing-coverage/**/browser-coverage.json
+            shard: ''
+            output_name: ''
+            coverage_threshold: ''
           - label: public-deck
             script: test:e2e:coverage:public-deck
             report: public-deck
             raw_path: test-results/public-deck-coverage/**/browser-coverage.json
+            shard: ''
+            output_name: ''
+            coverage_threshold: ''
           - label: webmcp
             script: test:e2e:coverage:webmcp
             report: webmcp
             raw_path: test-results/webmcp-coverage/**/browser-coverage.json
+            shard: ''
+            output_name: ''
+            coverage_threshold: ''
           - label: joystick
             script: test:e2e:coverage:joystick
             report: joystick
             raw_path: test-results/joystick-coverage/**/browser-coverage.json
+            shard: ''
+            output_name: ''
+            coverage_threshold: ''
 
     steps:
       - name: Checkout
@@ -203,6 +232,9 @@ jobs:
         run: npm run ${{ matrix.script }}
         env:
           E2E_SERVER: dist
+          E2E_COVERAGE_THRESHOLD: ${{ matrix.coverage_threshold }}
+          LOCALSTUDIO_E2E_OUTPUT_NAME: ${{ matrix.output_name }}
+          LOCALSTUDIO_E2E_SHARD: ${{ matrix.shard }}
 
       - name: Upload raw Playwright coverage
         if: always()
@@ -226,6 +258,65 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: e2e-coverage-report-${{ matrix.report }}
+          path: coverage-report
+          if-no-files-found: error
+
+  editor-e2e-coverage:
+    name: Editor E2E coverage aggregate
+    needs: e2e
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: localstudio-dist
+          path: dist
+
+      - name: Download raw editor Playwright coverage
+        uses: actions/download-artifact@v5
+        with:
+          pattern: playwright-browser-coverage-editor-shard-*
+          path: coverage-input/editor
+          merge-multiple: true
+
+      - name: Generate aggregate editor E2E coverage report
+        run: npx playwright test --project=chromium --output=test-results/coverage-report-only tests/e2e/support/coverage-report-only.spec.ts
+        env:
+          E2E_COVERAGE_INPUT_DIR: coverage-input/editor
+          E2E_COVERAGE_OUTPUT_DIR: coverage-report/editor
+          E2E_COVERAGE_REPORT_ONLY: '1'
+          E2E_COVERAGE_SCOPE: editor
+          E2E_COVERAGE_THRESHOLD: '80'
+
+      - name: Add aggregate editor E2E coverage report to job summary
+        if: always()
+        run: |
+          if [ -f coverage-report/editor/coverage-summary.md ]; then
+            cat coverage-report/editor/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            cat coverage-report/editor/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload aggregate editor E2E coverage report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: e2e-coverage-report-editor
           path: coverage-report
           if-no-files-found: error
 
@@ -265,7 +356,7 @@ jobs:
   pages-artifact:
     name: Prepare Pages artifact
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: [build, test, e2e]
+    needs: [build, test, e2e, editor-e2e-coverage]
     runs-on: ubuntu-latest
     permissions:
       contents: read

@@ -10,6 +10,7 @@ const workspaceRoot = process.cwd();
 const playwrightCli = join(workspaceRoot, 'node_modules', 'playwright', 'cli.js');
 const peerPath = '/peerjs';
 const coverageWorkers = parsePositiveInteger(process.env.LOCALSTUDIO_E2E_WORKERS);
+const e2eShard = parseShard(process.env.LOCALSTUDIO_E2E_SHARD);
 
 const coverageRuns = {
   editor: {
@@ -86,14 +87,18 @@ if (!coverageRun) {
   process.exit(1);
 }
 
-const coverageInputDir = join(workspaceRoot, 'test-results', `${coverageRun.outputName}-coverage`);
-const coverageOutputDir = join(workspaceRoot, 'coverage-report', coverageRun.outputName);
+const outputName = process.env.LOCALSTUDIO_E2E_OUTPUT_NAME || coverageRun.outputName;
+const coverageInputDir = join(workspaceRoot, 'test-results', `${outputName}-coverage`);
+const coverageOutputDir = join(workspaceRoot, 'coverage-report', outputName);
 
 rmSync(coverageInputDir, { force: true, recursive: true });
 rmSync(coverageOutputDir, { force: true, recursive: true });
 
-const specFiles = coverageRun.dirs.flatMap((directory) =>
-  listSpecFiles(directory).filter((file) => !coverageRun.exclude?.(file)),
+const specFiles = applyShard(
+  coverageRun.dirs.flatMap((directory) =>
+    listSpecFiles(directory).filter((file) => !coverageRun.exclude?.(file)),
+  ),
+  e2eShard,
 );
 const serverScript = process.env.E2E_SERVER === 'dev' ? 'scripts/dev.mjs' : 'scripts/serve-dist.mjs';
 
@@ -135,7 +140,7 @@ try {
   await waitForOk(`${baseURL}/`);
   await coverageRun.warm(baseURL);
 
-  if (coverageRun.split) {
+  if (shouldRunSplit(coverageRun.split, specFiles)) {
     const splitResult = runPlaywright(baseURL, localStudioPort, {
       env: { E2E_COVERAGE_REPORT: '0' },
       grep: coverageRun.split.grep,
@@ -222,7 +227,7 @@ function runPlaywright(
       E2E_COVERAGE_INPUT_DIR: coverageInputDir,
       E2E_COVERAGE_OUTPUT_DIR: coverageOutputDir,
       E2E_COVERAGE_SCOPE: coverageRun.coverageScope,
-      E2E_COVERAGE_THRESHOLD: String(coverageRun.threshold),
+      E2E_COVERAGE_THRESHOLD: String(getCoverageThreshold(coverageRun)),
       LOCALSTUDIO_E2E_BASE_URL: baseURL,
       LOCALSTUDIO_E2E_PORT: String(port),
     },
@@ -380,6 +385,39 @@ function parsePositiveInteger(value) {
   if (!value) return undefined;
   const parsed = Number.parseInt(value, 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function parseShard(value) {
+  if (!value) return undefined;
+  const match = /^(\d+)\/(\d+)$/.exec(value);
+  if (!match) {
+    throw new Error(`LOCALSTUDIO_E2E_SHARD must use the form index/total, got ${value}.`);
+  }
+  const index = Number.parseInt(match[1], 10);
+  const total = Number.parseInt(match[2], 10);
+  if (!Number.isInteger(index) || !Number.isInteger(total) || index < 1 || total < 1 || index > total) {
+    throw new Error(`LOCALSTUDIO_E2E_SHARD must use 1-based bounds, got ${value}.`);
+  }
+  return { index, total };
+}
+
+function applyShard(files, shard) {
+  if (!shard) return files;
+  return files.filter((_file, fileIndex) => fileIndex % shard.total === shard.index - 1);
+}
+
+function shouldRunSplit(split, files) {
+  if (!split) return false;
+  return files.includes(split.spec);
+}
+
+function getCoverageThreshold(run) {
+  const override = process.env.E2E_COVERAGE_THRESHOLD;
+  if (override !== undefined) {
+    const parsed = Number.parseFloat(override);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return run.threshold;
 }
 
 async function stopProcess(child) {
