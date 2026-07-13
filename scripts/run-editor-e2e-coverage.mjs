@@ -15,13 +15,16 @@ rmSync(coverageInputDir, { force: true, recursive: true });
 rmSync(join(workspaceRoot, 'coverage-report', 'editor'), { force: true, recursive: true });
 
 const specFiles = [
-  ...listSpecFiles('tests/e2e/editor'),
+  ...listSpecFiles('tests/e2e/editor').filter(
+    (file) => !/^tests\/e2e\/editor\/service-contracts-.+\.spec\.ts$/.test(file),
+  ),
   ...listSpecFiles('tests/e2e/public-deck'),
   ...listSpecFiles('tests/e2e/webmcp'),
 ];
 const localPptxSampleExportSpec = 'tests/e2e/editor/export-current-page-image.spec.ts';
 const localPptxSampleExportTitle =
   'exports readable final slide states from the local PPTX sample when animation images are disabled';
+const coverageWorkers = parsePositiveInteger(process.env.LOCALSTUDIO_E2E_WORKERS);
 
 const peerPort = await getFreePort();
 let peerServer;
@@ -77,6 +80,7 @@ try {
       grepInvert: localPptxSampleExportTitle,
       outputDir: join(coverageInputDir, 'parallel'),
       specs: specFiles,
+      workers: coverageWorkers,
     });
     exitCode = parallelResult.status ?? 1;
   }
@@ -215,6 +219,12 @@ async function getFreePort() {
     });
     server.on('error', reject);
   });
+}
+
+function parsePositiveInteger(value) {
+  if (!value) return undefined;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 async function stopProcess(child) {

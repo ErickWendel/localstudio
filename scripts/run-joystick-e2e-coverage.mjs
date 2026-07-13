@@ -10,6 +10,7 @@ const workspaceRoot = process.cwd();
 const coverageInputDir = join(workspaceRoot, 'test-results', 'joystick-coverage');
 const playwrightCli = join(workspaceRoot, 'node_modules', 'playwright', 'cli.js');
 const peerPath = '/peerjs';
+const coverageWorkers = parsePositiveInteger(process.env.LOCALSTUDIO_E2E_WORKERS);
 
 rmSync(coverageInputDir, { force: true, recursive: true });
 rmSync(join(workspaceRoot, 'coverage-report', 'joystick'), { force: true, recursive: true });
@@ -73,9 +74,13 @@ function listSpecFiles(directory) {
 }
 
 function runPlaywright(baseURL, port) {
+  const args = [playwrightCli, 'test', '--project=chromium', `--output=${coverageInputDir}`];
+  if (coverageWorkers) args.push('--workers', String(coverageWorkers));
+  args.push(...specFiles);
+
   return spawnSync(
     process.execPath,
-    [playwrightCli, 'test', '--project=chromium', `--output=${coverageInputDir}`, ...specFiles],
+    args,
     {
       cwd: workspaceRoot,
       env: {
@@ -184,6 +189,12 @@ async function getFreePort() {
     });
     server.on('error', reject);
   });
+}
+
+function parsePositiveInteger(value) {
+  if (!value) return undefined;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 async function stopProcess(child) {
