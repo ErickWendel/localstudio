@@ -16,12 +16,11 @@ describe('EditorShell workspace controls', () => {
     vi.restoreAllMocks();
   });
 
-  it('switches to the layout panel from the header view menu', async () => {
+  it('switches to the layout panel from the left tool rail', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
 
-    await user.click(screen.getByRole('button', { name: 'View' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Toggle Layers Panel' }));
+    await openLeftTab(user, 'Layout');
 
     expect(screen.getByRole('tab', { name: 'Layout' })).toHaveAttribute('aria-selected', 'true');
   });

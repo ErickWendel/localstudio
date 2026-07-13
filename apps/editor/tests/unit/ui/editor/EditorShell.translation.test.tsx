@@ -292,7 +292,7 @@ describe('EditorShell translation workflows', () => {
     });
   });
 
-  it('translates the full deck from the Edit menu', async () => {
+  it('translates the full deck from the toolbar deck translation control', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
     const translator = new RecordingTranslatorService();
@@ -306,8 +306,7 @@ describe('EditorShell translation workflows', () => {
     });
     await openLeftTab(user, 'AI Tools');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Translate Deck' }));
+    await user.click(screen.getByRole('button', { name: 'Translate deck' }));
 
     await waitFor(() => {
       expect(translator.translate).toHaveBeenCalledWith('AI Design Revolution', 'pt', {
