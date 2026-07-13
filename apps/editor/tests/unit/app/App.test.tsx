@@ -26,7 +26,7 @@ describe('App', () => {
   it('renders the application root', async () => {
     render(<App />);
 
-    expect(await screen.findByText('LocalStudio.dev', undefined, { timeout: 5_000 })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'LocalStudio.dev' })).toBeInTheDocument();
   });
 
   it('starts with a blank project when requested from a new project tab', async () => {

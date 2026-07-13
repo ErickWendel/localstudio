@@ -104,7 +104,7 @@ describe('EditorShell', () => {
   it('renders the approved editor shell landmarks', async () => {
     render(<EditorShell services={createAppServices()} />);
 
-    expect(screen.getByText('LocalStudio.dev')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'LocalStudio.dev' })).toBeInTheDocument();
     expect(screen.getByText('Untitled AI Deck')).toBeInTheDocument();
     expect(screen.getByText('PT')).toBeInTheDocument();
     expect(await screen.findByText('EN')).toBeInTheDocument();
