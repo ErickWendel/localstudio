@@ -13,10 +13,13 @@ test('executes presenter debug logging contracts in the browser runtime', async 
 
   expect(result.logs).toEqual(
     expect.arrayContaining([
-      expect.stringContaining('info:[LocalStudio presenter remote]|ready'),
+      expect.stringContaining('info:[LocalStudio presenter remote]|enabled'),
       expect.stringContaining('warn:[LocalStudio presenter remote]|object|{"ok":true}'),
       expect.stringContaining('error:[LocalStudio presenter remote]|failure|TypeError: bad stream'),
       expect.stringContaining('warn:[LocalStudio presenter remote]|circular|[object Object]'),
     ]),
+  );
+  expect(result.logs).not.toEqual(
+    expect.arrayContaining([expect.stringContaining('info:[LocalStudio presenter remote]|ready')]),
   );
 });
