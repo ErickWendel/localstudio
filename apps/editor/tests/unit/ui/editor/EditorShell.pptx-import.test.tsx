@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { createAppServices as createRealAppServices } from '../../../../src/app/composition';
@@ -176,7 +176,6 @@ describe('EditorShell PowerPoint import', () => {
   });
 
   it('shows PowerPoint import progress only after a source is selected', async () => {
-    const user = userEvent.setup();
     const services = createAppServices();
     const importService = new PendingPresentationImportService();
     services.presentationImportService = importService;
@@ -192,9 +191,9 @@ describe('EditorShell PowerPoint import', () => {
     );
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Import' }));
-    await user.click(screen.getByRole('menuitem', { name: 'PowerPoint (.pptx)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Import' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'PowerPoint (.pptx)' }));
 
     expect(screen.queryByRole('progressbar', { name: 'PowerPoint import progress' })).toBeNull();
 
@@ -230,7 +229,6 @@ describe('EditorShell PowerPoint import', () => {
   });
 
   it('chooses a fresh persistence target after importing PowerPoint over a saved project', async () => {
-    const user = userEvent.setup();
     const services = createAppServices();
     const repository = new SavingProjectRepository();
     const importService = new PendingPresentationImportService();
@@ -250,13 +248,13 @@ describe('EditorShell PowerPoint import', () => {
     );
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
-    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Choose folder' }));
     expect(repository.savedProjects).toHaveLength(1);
 
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Import' }));
-    await user.click(screen.getByRole('menuitem', { name: 'PowerPoint (.pptx)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Import' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'PowerPoint (.pptx)' }));
     await waitFor(() => {
       expect(importService.importCalls).toHaveLength(1);
     });
@@ -272,8 +270,8 @@ describe('EditorShell PowerPoint import', () => {
     expect(await findProjectNameButton('Imported PowerPoint Deck')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Persistence disabled' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
-    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Choose folder' }));
 
     expect(repository.savedProjectsAs).toHaveLength(1);
     expect(repository.savedProjectsAs[0]).toMatchObject({
@@ -283,7 +281,6 @@ describe('EditorShell PowerPoint import', () => {
   });
 
   it('downloads PPTX fonts during import without blocking the deck when fonts fail', async () => {
-    const user = userEvent.setup();
     const services = createAppServices();
     const fontImportService = new FailingFontImportService();
     services.fontImportService = fontImportService;
@@ -334,9 +331,9 @@ describe('EditorShell PowerPoint import', () => {
     );
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Import' }));
-    await user.click(screen.getByRole('menuitem', { name: 'PowerPoint (.pptx)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Import' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'PowerPoint (.pptx)' }));
 
     expect(await screen.findAllByText('Downloading fonts')).toHaveLength(2);
     await waitFor(() => {
@@ -412,9 +409,9 @@ describe('EditorShell PowerPoint import', () => {
     );
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Import' }));
-    await user.click(screen.getByRole('menuitem', { name: 'PowerPoint (.pptx)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Import' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'PowerPoint (.pptx)' }));
 
     const warningDialog = await screen.findByRole('dialog', {
       name: 'PowerPoint font warnings',
@@ -422,7 +419,7 @@ describe('EditorShell PowerPoint import', () => {
     expect(warningDialog).toHaveTextContent('This PowerPoint presentation may look different.');
     expect(warningDialog).toHaveTextContent('The font Tenorite is missing.');
 
-    await user.click(within(warningDialog).getByRole('button', { name: 'Replace Fonts' }));
+    fireEvent.click(within(warningDialog).getByRole('button', { name: 'Replace Fonts' }));
     const replacementDialog = screen.getByRole('dialog', { name: 'Replace PowerPoint fonts' });
     expect(within(replacementDialog).getByRole('table', { name: 'Missing PowerPoint fonts' })).toHaveTextContent(
       'Tenorite',
@@ -434,10 +431,10 @@ describe('EditorShell PowerPoint import', () => {
       }),
       'carl',
     );
-    await user.click(within(replacementDialog).getByRole('button', { name: /Carlito/ }));
+    fireEvent.click(within(replacementDialog).getByRole('button', { name: /Carlito/ }));
     expect(replacementDialog).toHaveTextContent('Carlito');
 
-    await user.click(within(replacementDialog).getByRole('button', { name: 'Replace Fonts' }));
+    fireEvent.click(within(replacementDialog).getByRole('button', { name: 'Replace Fonts' }));
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: 'Replace PowerPoint fonts' })).toBeNull();
     });
@@ -447,7 +444,6 @@ describe('EditorShell PowerPoint import', () => {
   });
 
   it('reports PowerPoint picker failures without starting import progress', async () => {
-    const user = userEvent.setup();
     const services = createAppServices();
     const importService = new PendingPresentationImportService();
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -467,9 +463,9 @@ describe('EditorShell PowerPoint import', () => {
     );
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Import' }));
-    await user.click(screen.getByRole('menuitem', { name: 'PowerPoint (.pptx)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Import' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'PowerPoint (.pptx)' }));
 
     await waitFor(() => {
       expect(consoleError).toHaveBeenCalled();

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { unzipSync } from 'fflate';
 import { vi } from 'vitest';
@@ -20,6 +20,7 @@ const {
 
 describe('EditorShell export and share workflows', () => {
   afterEach(() => {
+    vi.useRealTimers();
     window.history.pushState({}, '', '/editor/');
     Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
       configurable: true,
@@ -28,11 +29,10 @@ describe('EditorShell export and share workflows', () => {
     vi.restoreAllMocks();
   });
 
-  it('opens Share before MinIO is synced and disables only public link creation', async () => {
-    const user = userEvent.setup();
+  it('opens Share before MinIO is synced and disables only public link creation', () => {
     render(<EditorShell services={createAppServices()} />);
 
-    await user.click(screen.getByRole('button', { name: 'Share' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Share' }));
 
     expect(screen.getByRole('heading', { name: 'Share design' })).toBeInTheDocument();
     expect(
@@ -44,7 +44,6 @@ describe('EditorShell export and share workflows', () => {
   });
 
   it('exports the current slide as a PNG file', async () => {
-    const user = userEvent.setup();
     const services = createAppServices();
     enableSyncedSharing(services);
     const downloadDataUrl = vi.fn();
@@ -60,8 +59,8 @@ describe('EditorShell export and share workflows', () => {
     render(<EditorShell services={services} />);
 
     await waitForShareButtonReady();
-    await user.click(screen.getByRole('button', { name: 'Share' }));
-    await user.click(screen.getByRole('button', { name: 'Download' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Download' }));
 
     expect(downloadDataUrl).toHaveBeenCalledWith(
       expect.stringMatching(/^data:image\/png/),
@@ -70,7 +69,6 @@ describe('EditorShell export and share workflows', () => {
   });
 
   it('exports all slides as PNG files in one ZIP archive from the File menu', async () => {
-    const user = userEvent.setup();
     const project = sampleProject.createSampleProject();
     const firstPage = project.pages[0];
     if (!firstPage) throw new Error('Sample project must contain a page.');
@@ -100,9 +98,9 @@ describe('EditorShell export and share workflows', () => {
 
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Export to' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Images (.zip)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Export to' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Images (.zip)' }));
 
     expect(screen.getByRole('dialog', { name: 'Export images' })).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'All' })).toBeChecked();
@@ -110,7 +108,7 @@ describe('EditorShell export and share workflows', () => {
       screen.getByRole('checkbox', { name: 'Create an image for each animation' }),
     ).not.toBeChecked();
     expect(screen.getByRole('combobox', { name: 'Image format' })).toHaveValue('png');
-    await user.click(screen.getByRole('button', { name: 'Export images' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Export images' }));
 
     expect(await screen.findByRole('status')).toHaveTextContent('Exporting slide images...');
     await waitFor(() => {
@@ -126,7 +124,6 @@ describe('EditorShell export and share workflows', () => {
   });
 
   it('exports a single readable final-state image when animation images are disabled', async () => {
-    const user = userEvent.setup();
     const project = sampleProject.createSampleProject();
     const firstPage = project.pages[0];
     if (!firstPage) throw new Error('Sample project must contain a page.');
@@ -168,10 +165,10 @@ describe('EditorShell export and share workflows', () => {
 
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Export to' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Images (.zip)' }));
-    await user.click(screen.getByRole('button', { name: 'Export images' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Export to' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Images (.zip)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Export images' }));
 
     await waitFor(() => {
       expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), 'deck-images.zip');
@@ -223,17 +220,17 @@ describe('EditorShell export and share workflows', () => {
 
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Export to' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Images (.zip)' }));
-    await user.click(screen.getByRole('radio', { name: /From:/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Export to' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Images (.zip)' }));
+    fireEvent.click(screen.getByRole('radio', { name: /From:/ }));
     await user.clear(screen.getByRole('spinbutton', { name: 'From slide' }));
     await user.type(screen.getByRole('spinbutton', { name: 'From slide' }), '1');
     await user.clear(screen.getByRole('spinbutton', { name: 'To slide' }));
     await user.type(screen.getByRole('spinbutton', { name: 'To slide' }), '1');
-    await user.click(screen.getByRole('checkbox', { name: 'Create an image for each animation' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Create an image for each animation' }));
     await user.selectOptions(screen.getByRole('combobox', { name: 'Image format' }), 'jpeg');
-    await user.click(screen.getByRole('button', { name: 'Export images' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Export images' }));
 
     await waitFor(() => {
       expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), 'deck-images.zip');
@@ -245,7 +242,6 @@ describe('EditorShell export and share workflows', () => {
   });
 
   it('exports PowerPoint with stats and clears the operation notice', async () => {
-    const user = userEvent.setup();
     const services = createAppServices();
     const downloadBlob = vi.fn();
     services.exportService = {
@@ -276,9 +272,9 @@ describe('EditorShell export and share workflows', () => {
 
     render(<EditorShell services={services} />);
 
-    await user.click(screen.getByRole('button', { name: 'File' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Export to' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Powerpoint (.pptx)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Export to' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Powerpoint (.pptx)' }));
 
     await waitFor(() => {
       expect(screen.getByRole('status')).toHaveTextContent('Building slide 2 of 4');
@@ -296,41 +292,40 @@ describe('EditorShell export and share workflows', () => {
         'Checking media targets, content types, and timing targets.',
       );
     });
-    resolvePowerPointExport?.({
-      blob: new Blob(['pptx']),
-      stats: {
-        animationBuildCount: 2,
-        mediaElementCount: 3,
-        slideCount: 4,
-      },
-      warnings: [
-        {
-          code: 'pptx-animation-effect-downgraded',
-          message: 'Animation was downgraded.',
+    vi.useFakeTimers();
+    await act(async () => {
+      resolvePowerPointExport?.({
+        blob: new Blob(['pptx']),
+        stats: {
+          animationBuildCount: 2,
+          mediaElementCount: 3,
+          slideCount: 4,
         },
-        {
-          code: 'pptx-video-playback-downgraded',
-          message: 'Video playback was downgraded.',
-        },
-      ],
+        warnings: [
+          {
+            code: 'pptx-animation-effect-downgraded',
+            message: 'Animation was downgraded.',
+          },
+          {
+            code: 'pptx-video-playback-downgraded',
+            message: 'Video playback was downgraded.',
+          },
+        ],
+      });
+      await Promise.resolve();
     });
-    await waitFor(() => {
-      expect(screen.getByRole('status')).toHaveTextContent(
-        'PowerPoint exported: 4 slides, 3 media items, 2 animation builds; 1 animation fallback, 1 media fallback.',
-      );
-    });
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'PowerPoint exported: 4 slides, 3 media items, 2 animation builds; 1 animation fallback, 1 media fallback.',
+    );
     expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), 'deck.pptx');
 
-    await waitFor(
-      () => {
-        expect(screen.queryByRole('status')).not.toBeInTheDocument();
-      },
-      { timeout: 4000 },
-    );
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('creates and shows a public link from the share panel', async () => {
-    const user = userEvent.setup();
     vi.spyOn(crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000301');
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', {
@@ -345,8 +340,8 @@ describe('EditorShell export and share workflows', () => {
     render(<EditorShell services={services} />);
 
     await waitForShareButtonReady();
-    await user.click(screen.getByRole('button', { name: 'Share' }));
-    await user.click(screen.getByRole('button', { name: 'Copy link' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link' }));
 
     const expectedPublicUrl = `${
       window.location.origin
@@ -358,7 +353,6 @@ describe('EditorShell export and share workflows', () => {
   });
 
   it('enters fullscreen presentation mode from the share panel', async () => {
-    const user = userEvent.setup();
     const requestFullscreen = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
       configurable: true,
@@ -370,8 +364,8 @@ describe('EditorShell export and share workflows', () => {
     render(<EditorShell services={services} />);
 
     await waitForShareButtonReady();
-    await user.click(screen.getByRole('button', { name: 'Share' }));
-    await user.click(screen.getByRole('button', { name: 'Present' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Present' }));
 
     expect(requestFullscreen).toHaveBeenCalled();
     expect(requestFullscreen.mock.instances[0]).toBe(screen.getByLabelText('Canvas workspace'));

@@ -1,5 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '../../../src/App';
 import { sampleProject } from '../../../src/domain/projects/sampleProject';
@@ -30,7 +29,6 @@ describe('App', () => {
   });
 
   it('starts with a blank project when requested from a new project tab', async () => {
-    const user = userEvent.setup();
     window.history.replaceState({}, '', '/?newProject=1');
 
     render(<App />);
@@ -38,7 +36,7 @@ describe('App', () => {
     expect(
       await screen.findByRole('button', { name: 'Edit project name Untitled Project' }),
     ).toBeInTheDocument();
-    await user.click(screen.getByRole('tab', { name: 'Layout' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Layout' }));
     expect(screen.getByText('1 layers on current page')).toBeInTheDocument();
   });
 
@@ -242,25 +240,23 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'WebMCP showcase' })).toBeInTheDocument();
   });
 
-  it('opens editable command input for a WebMCP workflow step', async () => {
-    const user = userEvent.setup();
+  it('opens editable command input for a WebMCP workflow step', () => {
     window.history.replaceState({}, '', '/webmcp');
 
     render(<App />);
 
-    await user.click(screen.getByRole('button', { name: 'Create project' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create project' }));
 
     expect(screen.getByLabelText('Create project command input')).toHaveValue('WebMCP Demo Deck');
     expect(screen.getByRole('button', { name: 'Send Create project' })).toBeInTheDocument();
   });
 
-  it('shows the AI tools translation options for the WebMCP translate step', async () => {
-    const user = userEvent.setup();
+  it('shows the AI tools translation options for the WebMCP translate step', () => {
     window.history.replaceState({}, '', '/webmcp');
 
     render(<App />);
 
-    await user.click(screen.getByRole('button', { name: 'Translate deck' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Translate deck' }));
 
     const languageSelect = screen.getByLabelText('Translate deck command input');
     const options = within(languageSelect).getAllByRole<HTMLOptionElement>('option');
@@ -273,7 +269,6 @@ describe('App', () => {
   });
 
   it('runs the WebMCP snapshot step without showing a command input', async () => {
-    const user = userEvent.setup();
     const executeSnapshot = vi.fn().mockResolvedValue({ project: { name: 'Demo' } });
     window.history.replaceState({}, '', '/webmcp');
     Object.defineProperty(document, 'modelContext', {
@@ -287,8 +282,9 @@ describe('App', () => {
 
     render(<App />);
 
-    await user.click(screen.getByRole('button', { name: 'Discover tools' }));
-    await user.click(screen.getByRole('button', { name: 'Read snapshot' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'get_project_snapshot' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Read snapshot' }));
 
     await waitFor(() => {
       expect(executeSnapshot).toHaveBeenCalledWith({});
@@ -298,7 +294,6 @@ describe('App', () => {
   });
 
   it('focuses the matching workflow step when a discovered tool is selected', async () => {
-    const user = userEvent.setup();
     window.history.replaceState({}, '', '/webmcp');
     Object.defineProperty(document, 'modelContext', {
       configurable: true,
@@ -312,8 +307,8 @@ describe('App', () => {
 
     render(<App />);
 
-    await user.click(screen.getByRole('button', { name: 'Discover tools' }));
-    await user.click(await screen.findByRole('button', { name: 'generate_slides' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'generate_slides' }));
 
     const stepButton = screen.getByRole('button', { name: 'Generate slide' });
     expect(stepButton).toHaveFocus();

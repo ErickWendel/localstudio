@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { EditorShell } from '../../../../src/ui/editor/shell/EditorShell';
@@ -33,7 +33,7 @@ describe('EditorShell translation workflows', () => {
     await openLeftTab(user, 'AI Tools');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
     await selectTitleLayer(user);
-    await user.click(screen.getByRole('button', { name: 'Translate Selected Text' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Translate Selected Text' }));
 
     await waitFor(() => {
       expect(translator.translate).toHaveBeenCalledWith('AI Design Revolution', 'pt', {
@@ -59,7 +59,7 @@ describe('EditorShell translation workflows', () => {
     await openLeftTab(user, 'AI Tools');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
     expect(await screen.findByText('Pair: en → pt')).toBeInTheDocument();
-    await user.click(screen.getAllByRole('button', { name: 'Translate Slide 1' })[0]!);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Translate Slide 1' })[0]!);
 
     expect(
       await screen.findByRole('button', { name: 'Current slide language Portuguese' }),
@@ -76,12 +76,12 @@ describe('EditorShell translation workflows', () => {
 
     await openLeftTab(user, 'AI Tools');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
-    await user.click(screen.getAllByRole('button', { name: 'Translate Slide 1' })[0]!);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Translate Slide 1' })[0]!);
 
     expect(
       await screen.findByRole('button', { name: 'Current slide language Portuguese' }),
     ).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Translation path options' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Translation path options' }));
     expect(screen.getByLabelText<HTMLSelectElement>('Translate from').value).toBe('pt');
 
     screen.getByRole('button', { name: 'Translate deck' }).focus();
@@ -131,7 +131,7 @@ describe('EditorShell translation workflows', () => {
     await openLeftTab(user, 'AI Tools');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'es');
     await selectTitleLayer(user);
-    await user.click(screen.getByRole('button', { name: 'Translate Selected Text' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Translate Selected Text' }));
 
     expect(
       await screen.findByText('Chrome Built-in AI translation is not ready.'),
@@ -156,15 +156,15 @@ describe('EditorShell translation workflows', () => {
     await openLeftTab(user, 'AI Tools');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'es');
     await selectTitleLayer(user);
-    await user.click(screen.getByRole('button', { name: 'Translate Selected Text' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Translate Selected Text' }));
 
     await waitFor(() => {
       expect(translate).toHaveBeenCalledWith('AI Design Revolution', 'es', {
         sourceLanguage: 'en',
       });
     });
-    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
-    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Choose folder' }));
 
     await waitFor(() => {
       const title = repository.savedProjects.at(-1)?.elements['text-title'];
@@ -201,12 +201,12 @@ describe('EditorShell translation workflows', () => {
 
     await openLeftTab(user, 'AI Tools');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
-    await user.click(screen.getByRole('button', { name: 'Translate Hero split' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Translate Hero split' }));
     await waitFor(() => {
       expect(translate).toHaveBeenCalledTimes(3);
     });
-    await user.click(screen.getByRole('button', { name: 'Persistence disabled' }));
-    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Choose folder' }));
 
     await waitFor(() => {
       const savedProject = repository.savedProjects.at(-1);
@@ -237,7 +237,7 @@ describe('EditorShell translation workflows', () => {
     render(<EditorShell services={services} />);
 
     await selectTitleLayer(user);
-    await user.click(screen.getByRole('button', { name: 'Translate Selected Text' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Translate Selected Text' }));
 
     expect(screen.getByRole('tab', { name: 'AI Tools' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByLabelText('Translate to')).toHaveValue('');
@@ -253,7 +253,7 @@ describe('EditorShell translation workflows', () => {
 
     await openLeftTab(user, 'AI Tools');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
-    await user.click(screen.getAllByRole('button', { name: 'Translate Slide 1' })[0]!);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Translate Slide 1' })[0]!);
 
     await waitFor(() => {
       expect(translator.translate).toHaveBeenCalledWith('AI Design Revolution', 'pt', {
@@ -283,7 +283,7 @@ describe('EditorShell translation workflows', () => {
     await openLeftTab(user, 'AI Tools');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'en');
     await selectTitleLayer(user);
-    await user.click(screen.getByRole('button', { name: 'Translate Selected Text' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Translate Selected Text' }));
 
     await waitFor(() => {
       expect(translate).toHaveBeenCalledWith('AI Design Revolution', 'en', {
@@ -306,7 +306,7 @@ describe('EditorShell translation workflows', () => {
     });
     await openLeftTab(user, 'AI Tools');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
-    await user.click(screen.getByRole('button', { name: 'Translate deck' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Translate deck' }));
 
     await waitFor(() => {
       expect(translator.translate).toHaveBeenCalledWith('AI Design Revolution', 'pt', {
@@ -344,7 +344,7 @@ describe('EditorShell translation workflows', () => {
       expect(translator.prepareTranslation).toHaveBeenCalled();
     });
 
-    await user.click(screen.getByRole('button', { name: 'Translate deck' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Translate deck' }));
 
     await waitFor(() => {
       expect(translator.prepareTranslation).toHaveBeenCalledWith('en', 'pt');
@@ -366,10 +366,10 @@ describe('EditorShell translation workflows', () => {
         screen.getByRole('button', { name: 'Current slide language English' }),
       ).toBeInTheDocument();
     });
-    await user.click(screen.getByRole('button', { name: 'Translation path options' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Translation path options' }));
     await user.selectOptions(screen.getByLabelText('Translate from'), 'es');
     await user.selectOptions(screen.getByLabelText('Translate to'), 'en');
-    await user.click(screen.getByRole('button', { name: 'Translate deck' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Translate deck' }));
 
     await waitFor(() => {
       expect(translator.prepareTranslation).toHaveBeenCalledWith('es', 'en');
@@ -395,7 +395,7 @@ describe('EditorShell translation workflows', () => {
     await waitFor(() => {
       expect(translateDeckButton).not.toBeDisabled();
     });
-    await user.click(translateDeckButton);
+    fireEvent.click(translateDeckButton);
 
     await waitFor(() => {
       expect(translator.translate).toHaveBeenCalled();

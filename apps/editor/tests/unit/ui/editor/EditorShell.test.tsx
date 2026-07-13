@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
@@ -146,8 +146,8 @@ describe('EditorShell', () => {
       'image-hero',
     );
 
-    await user.click(screen.getByRole('button', { name: 'Toggle pages panel' }));
-    await user.click(screen.getByRole('button', { name: 'Select Slide 2' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle pages panel' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Select Slide 2' }));
 
     await waitFor(() => {
       expect(screen.getByText('2 / 2')).toBeInTheDocument();
