@@ -1,4 +1,5 @@
 import { ArrowRight, ExternalLink, Star } from 'lucide-react';
+import { BrandLockup } from './BrandLockup';
 import { externalLinks } from '../content/externalLinks';
 import { socialLinks } from '../content/socialLinks';
 
@@ -17,8 +18,7 @@ export function LandingFooter() {
     <footer className="landing-footer" aria-label="LocalStudio footer">
       <div>
         <a className="brand-mark footer-brand" href="#top" aria-label="LocalStudio.dev beta home">
-          LocalStudio.dev
-          <span className="beta-flag">Beta</span>
+          <BrandLockup />
         </a>
         <p>Built by Erick Wendel for browser-native AI workflows.</p>
       </div>

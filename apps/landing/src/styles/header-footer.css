@@ -16,13 +16,17 @@
 .brand-mark {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  color: var(--ls-green-fixed);
-  font-family: var(--ls-font-display);
+  gap: 10px;
   font-size: clamp(17px, 2vw, 24px);
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+}
+
+.brand-mark-logo {
+  width: clamp(42px, 4.2vw, 58px);
+  height: auto;
+}
+
+.brand-mark .ls-logo-word {
+  font-size: inherit;
 }
 
 .beta-flag {
