@@ -18,7 +18,6 @@ interface EditorToolbarSurfaceProps {
   onNewProject: () => void;
   onOpenKeyboardShortcuts: () => void;
   onOpenPresenterView: () => void;
-  onSelectLayers: () => void;
   onShare: () => void;
   onStartAiSetupTour: () => void;
   onStartPresenterMode: (options?: { fromBeginning?: boolean }) => void;
@@ -37,7 +36,6 @@ export function EditorToolbarSurface({
   onNewProject,
   onOpenKeyboardShortcuts,
   onOpenPresenterView,
-  onSelectLayers,
   onShare,
   onStartAiSetupTour,
   onStartPresenterMode,
@@ -115,7 +113,6 @@ export function EditorToolbarSurface({
       onProjectNameChange={isHistoryReadOnly ? undefined : vm.setProjectName}
       onRedo={isHistoryReadOnly ? undefined : vm.redo}
       onResetZoom={vm.resetZoom}
-      onSelectLayers={onSelectLayers}
       onShare={onShare}
       onOpenPresenterView={onOpenPresenterView}
       onStartPresenterMode={onStartPresenterMode}
