@@ -67,6 +67,32 @@ describe('EditorShell translation workflows', () => {
     expect(screen.getByText('Pair: pt → pt')).toBeInTheDocument();
   });
 
+  it('restores the toolbar source language after undoing a slide translation with Ctrl+Z', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const translator = new RecordingTranslatorService();
+    services.translatorService = translator;
+    render(<EditorShell services={services} />);
+
+    await openLeftTab(user, 'AI Tools');
+    await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
+    await user.click(screen.getAllByRole('button', { name: 'Translate Slide 1' })[0]!);
+
+    expect(
+      await screen.findByRole('button', { name: 'Current slide language Portuguese' }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Translation path options' }));
+    expect(screen.getByLabelText<HTMLSelectElement>('Translate from').value).toBe('pt');
+
+    screen.getByRole('button', { name: 'Translate deck' }).focus();
+    await user.keyboard('{Control>}z{/Control}');
+
+    expect(
+      await screen.findByRole('button', { name: 'Current slide language English' }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText<HTMLSelectElement>('Translate from').value).toBe('en');
+  });
+
   it('ignores repeated translate clicks while a translation is running', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
