@@ -36,6 +36,7 @@ import { EditorAiWorkflowTour } from '../tour/EditorAiWorkflowTour';
 import type { EditorAiWorkflowTourHandle } from '../tour/editorAiWorkflowTourTypes';
 import { AudienceFullscreenPrompt } from './AudienceFullscreenPrompt';
 import { EditorLeftPanelSurface } from './EditorLeftPanelSurface';
+import { EditorMobileUnavailable } from './EditorMobileUnavailable';
 import { EditorToolbarSurface } from './EditorToolbarSurface';
 import { editorImageExport } from './editor-image-export';
 import type { ImageExportFrame } from './editor-image-export';
@@ -47,7 +48,38 @@ interface EditorShellProps {
   services: AppServices;
 }
 
+const editorMobileViewportQuery = '(max-width: 760px)';
+
+function isMobileEditorViewport() {
+  if (typeof window === 'undefined' || !window.matchMedia) return false;
+  return window.matchMedia(editorMobileViewportQuery).matches;
+}
+
 export function EditorShell({ services }: EditorShellProps) {
+  const [mobileEditorUnavailable, setMobileEditorUnavailable] = useState(isMobileEditorViewport);
+
+  useEffect(() => {
+    if (!window.matchMedia) return undefined;
+    const mediaQuery = window.matchMedia(editorMobileViewportQuery);
+    function syncMobileEditorAvailability(event: MediaQueryList | MediaQueryListEvent) {
+      setMobileEditorUnavailable(event.matches);
+    }
+
+    syncMobileEditorAvailability(mediaQuery);
+    mediaQuery.addEventListener('change', syncMobileEditorAvailability);
+    return () => {
+      mediaQuery.removeEventListener('change', syncMobileEditorAvailability);
+    };
+  }, []);
+
+  if (mobileEditorUnavailable) {
+    return <EditorMobileUnavailable />;
+  }
+
+  return <EditorDesktopShell services={services} />;
+}
+
+function EditorDesktopShell({ services }: EditorShellProps) {
   const vm = useEditorViewModel(services);
   const automationDelegateRef = useRef(vm.automation);
   const movieHoldStateRef = useRef<MovieHoldState | undefined>(undefined);
