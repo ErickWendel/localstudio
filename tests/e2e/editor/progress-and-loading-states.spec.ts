@@ -47,6 +47,11 @@ test.describe('editor progress and loading states journey', () => {
     await expect(page.getByRole('button', { name: 'Edit project name localstudio-e2e-import' })).toBeVisible({
       timeout: 60_000,
     });
+    const fontWarningDialog = page.getByRole('dialog', { name: 'PowerPoint font warnings' });
+    if (await fontWarningDialog.isVisible().catch(() => false)) {
+      await fontWarningDialog.getByRole('button', { name: 'Keep Defaults' }).click();
+      await expect(fontWarningDialog).toBeHidden();
+    }
 
     await page
       .getByRole('contentinfo', { name: 'Editor footer controls' })
