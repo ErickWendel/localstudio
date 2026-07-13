@@ -1,6 +1,17 @@
 type DebugLogLevel = 'error' | 'info' | 'warn';
 
+const presenterRemoteDebugStorageKey = 'localstudio.presenterRemoteDebug';
+
+function isPresenterRemoteInfoLoggingEnabled() {
+  try {
+    return globalThis.localStorage?.getItem(presenterRemoteDebugStorageKey) === 'true';
+  } catch {
+    return false;
+  }
+}
+
 function write(level: DebugLogLevel, message: string, detail?: unknown) {
+  if (level === 'info' && !isPresenterRemoteInfoLoggingEnabled()) return;
   const prefix = '[LocalStudio presenter remote]';
   if (detail === undefined) {
     globalThis.console[level](prefix, message);

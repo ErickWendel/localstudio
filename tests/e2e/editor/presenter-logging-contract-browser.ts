@@ -18,10 +18,13 @@ export async function evaluatePresenterLoggingContract({
   const originalWarn = console.warn;
   const originalError = console.error;
   try {
+    localStorage.removeItem('localstudio.presenterRemoteDebug');
     console.info = (...values: unknown[]) => logs.push(`info:${values.join('|')}`);
     console.warn = (...values: unknown[]) => logs.push(`warn:${values.join('|')}`);
     console.error = (...values: unknown[]) => logs.push(`error:${values.join('|')}`);
     presenterRemoteDebugLog.info('ready');
+    localStorage.setItem('localstudio.presenterRemoteDebug', 'true');
+    presenterRemoteDebugLog.info('enabled');
     presenterRemoteDebugLog.warn('object', { ok: true });
     presenterRemoteDebugLog.error('failure', new TypeError('bad stream'));
     const circular: { self?: unknown } = {};
@@ -31,6 +34,7 @@ export async function evaluatePresenterLoggingContract({
     console.info = originalInfo;
     console.warn = originalWarn;
     console.error = originalError;
+    localStorage.removeItem('localstudio.presenterRemoteDebug');
   }
 
   return { logs };
