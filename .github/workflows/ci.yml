@@ -126,11 +126,35 @@ jobs:
         run: npm run test
 
   e2e:
-    name: Playwright E2E
+    name: Playwright E2E (${{ matrix.label }})
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: editor
+            script: test:e2e:coverage:editor
+            report: editor
+            raw_path: test-results/editor-coverage/**/browser-coverage.json
+          - label: landing
+            script: test:e2e:coverage:landing
+            report: landing
+            raw_path: test-results/landing-coverage/**/browser-coverage.json
+          - label: public-deck
+            script: test:e2e:coverage:public-deck
+            report: public-deck
+            raw_path: test-results/public-deck-coverage/**/browser-coverage.json
+          - label: webmcp
+            script: test:e2e:coverage:webmcp
+            report: webmcp
+            raw_path: test-results/webmcp-coverage/**/browser-coverage.json
+          - label: joystick
+            script: test:e2e:coverage:joystick
+            report: joystick
+            raw_path: test-results/joystick-coverage/**/browser-coverage.json
 
     steps:
       - name: Checkout
@@ -166,125 +190,33 @@ jobs:
       - name: Install Playwright Chromium browser
         run: npx playwright install chromium
 
-      - name: Editor E2E coverage test
-        run: npm run test:e2e:coverage:editor
+      - name: Playwright E2E coverage test
+        run: npm run ${{ matrix.script }}
         env:
           E2E_SERVER: dist
 
-      - name: Upload editor raw Playwright coverage
+      - name: Upload raw Playwright coverage
         if: always()
         uses: actions/upload-artifact@v5
         with:
-          name: playwright-browser-coverage-editor
-          path: test-results/editor-coverage/**/browser-coverage.json
+          name: playwright-browser-coverage-${{ matrix.report }}
+          path: ${{ matrix.raw_path }}
           if-no-files-found: ignore
 
-      - name: Add editor E2E coverage report to job summary
+      - name: Add E2E coverage report to job summary
         if: always()
         run: |
-          if [ -f coverage-report/editor/coverage-summary.md ]; then
-            cat coverage-report/editor/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+          if [ -f coverage-report/${{ matrix.report }}/coverage-summary.md ]; then
+            cat coverage-report/${{ matrix.report }}/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
             printf '\n' >> "$GITHUB_STEP_SUMMARY"
-            cat coverage-report/editor/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - name: Landing E2E coverage test
-        if: always()
-        run: npm run test:e2e:coverage:landing
-        env:
-          E2E_SERVER: dist
-
-      - name: Upload landing raw Playwright coverage
-        if: always()
-        uses: actions/upload-artifact@v5
-        with:
-          name: playwright-browser-coverage-landing
-          path: test-results/landing-coverage/**/browser-coverage.json
-          if-no-files-found: ignore
-
-      - name: Add landing E2E coverage report to job summary
-        if: always()
-        run: |
-          if [ -f coverage-report/landing/coverage-summary.md ]; then
-            cat coverage-report/landing/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
-            printf '\n' >> "$GITHUB_STEP_SUMMARY"
-            cat coverage-report/landing/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - name: Public deck E2E coverage test
-        if: always()
-        run: npm run test:e2e:coverage:public-deck
-        env:
-          E2E_SERVER: dist
-
-      - name: Upload public deck raw Playwright coverage
-        if: always()
-        uses: actions/upload-artifact@v5
-        with:
-          name: playwright-browser-coverage-public-deck
-          path: test-results/public-deck-coverage/**/browser-coverage.json
-          if-no-files-found: ignore
-
-      - name: Add public deck E2E coverage report to job summary
-        if: always()
-        run: |
-          if [ -f coverage-report/public-deck/coverage-summary.md ]; then
-            cat coverage-report/public-deck/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
-            printf '\n' >> "$GITHUB_STEP_SUMMARY"
-            cat coverage-report/public-deck/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - name: WebMCP E2E coverage test
-        if: always()
-        run: npm run test:e2e:coverage:webmcp
-        env:
-          E2E_SERVER: dist
-
-      - name: Upload WebMCP raw Playwright coverage
-        if: always()
-        uses: actions/upload-artifact@v5
-        with:
-          name: playwright-browser-coverage-webmcp
-          path: test-results/webmcp-coverage/**/browser-coverage.json
-          if-no-files-found: ignore
-
-      - name: Add WebMCP E2E coverage report to job summary
-        if: always()
-        run: |
-          if [ -f coverage-report/webmcp/coverage-summary.md ]; then
-            cat coverage-report/webmcp/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
-            printf '\n' >> "$GITHUB_STEP_SUMMARY"
-            cat coverage-report/webmcp/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - name: Joystick E2E coverage test
-        if: always()
-        run: npm run test:e2e:coverage:joystick
-        env:
-          E2E_SERVER: dist
-
-      - name: Upload joystick raw Playwright coverage
-        if: always()
-        uses: actions/upload-artifact@v5
-        with:
-          name: playwright-browser-coverage-joystick
-          path: test-results/joystick-coverage/**/browser-coverage.json
-          if-no-files-found: ignore
-
-      - name: Add joystick E2E coverage report to job summary
-        if: always()
-        run: |
-          if [ -f coverage-report/joystick/coverage-summary.md ]; then
-            cat coverage-report/joystick/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
-            printf '\n' >> "$GITHUB_STEP_SUMMARY"
-            cat coverage-report/joystick/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
+            cat coverage-report/${{ matrix.report }}/coverage-ci-summary.md >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload E2E coverage report
         if: always()
         uses: actions/upload-artifact@v5
         with:
-          name: e2e-coverage-report
+          name: e2e-coverage-report-${{ matrix.report }}
           path: coverage-report
           if-no-files-found: error
 
@@ -346,11 +278,12 @@ jobs:
           name: localstudio-dist
           path: dist
 
-      - name: Download E2E coverage report
+      - name: Download E2E coverage reports
         uses: actions/download-artifact@v5
         with:
-          name: e2e-coverage-report
+          pattern: e2e-coverage-report-*
           path: coverage-report
+          merge-multiple: true
 
       - name: Add coverage report to job summary
         run: |
