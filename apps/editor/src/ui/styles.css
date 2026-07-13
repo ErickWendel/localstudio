@@ -11,6 +11,7 @@
 @import './styles/shell.css';
 @import './styles/editor-mobile-unavailable.css';
 @import './styles/presentation-import.css';
+@import './styles/pptx-font-dialogs.css';
 @import './styles/footer.css';
 @import './styles/toolbar.css';
 @import './styles/project-controls.css';

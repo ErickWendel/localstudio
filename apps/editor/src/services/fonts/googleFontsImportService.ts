@@ -9,12 +9,19 @@ import { googleFontsCatalog } from './googleFontsCatalog';
 
 interface BrowserGoogleFontsImportServiceOptions {
   fetch?: typeof fetch;
+  fontAvailability?: FontAvailabilityDetector;
   fontFaceConstructor?: typeof FontFace;
   fontSet?: FontFaceSet;
 }
 
+interface FontAvailabilityDetector {
+  isAvailable(family: string): boolean;
+}
+
 const GOOGLE_FONTS_CSS_ORIGIN = 'https://fonts.googleapis.com';
 const GOOGLE_FONTS_FILE_ORIGIN = 'https://fonts.gstatic.com';
+const FONT_AVAILABILITY_SAMPLE = 'mmmmmmmmmmlliWWWWW@@@###1234567890';
+const FONT_AVAILABILITY_BASE_FAMILIES = ['serif', 'sans-serif', 'monospace'] as const;
 
 function getDefaultFetch() {
   if (typeof window !== 'undefined') return window.fetch.bind(window);
@@ -117,15 +124,48 @@ function getFontSet(options: BrowserGoogleFontsImportServiceOptions) {
 }
 
 function escapeFontFamily(family: string) {
-  return family.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
+  return family.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function createBrowserFontAvailabilityDetector(): FontAvailabilityDetector | undefined {
+  if (typeof document === 'undefined') return undefined;
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  if (!context) return undefined;
+
+  const baselineWidths = new Map<string, number>();
+  for (const baseFamily of FONT_AVAILABILITY_BASE_FAMILIES) {
+    context.font = `72px ${baseFamily}`;
+    baselineWidths.set(baseFamily, context.measureText(FONT_AVAILABILITY_SAMPLE).width);
+  }
+
+  const cache = new Map<string, boolean>();
+  return {
+    isAvailable(family: string) {
+      const cached = cache.get(family);
+      if (cached !== undefined) return cached;
+
+      const escapedFamily = escapeFontFamily(family);
+      const isAvailable = FONT_AVAILABILITY_BASE_FAMILIES.some((baseFamily) => {
+        const baselineWidth = baselineWidths.get(baseFamily);
+        if (baselineWidth === undefined) return false;
+        context.font = `72px "${escapedFamily}", ${baseFamily}`;
+        return Math.abs(context.measureText(FONT_AVAILABILITY_SAMPLE).width - baselineWidth) > 0.5;
+      });
+      cache.set(family, isAvailable);
+      return isAvailable;
+    },
+  };
 }
 
 export class BrowserGoogleFontsImportService implements FontImportService {
   private readonly requestFetch: typeof fetch;
   private readonly downloadableFamilies = new Map<string, { family: string; exact: boolean }>();
+  private readonly fontAvailability: FontAvailabilityDetector | undefined;
 
   constructor(private readonly options: BrowserGoogleFontsImportServiceOptions = {}) {
     this.requestFetch = options.fetch ?? getDefaultFetch();
+    this.fontAvailability = options.fontAvailability ?? createBrowserFontAvailabilityDetector();
     for (const font of googleFontsCatalog) {
       this.downloadableFamilies.set(font.family.toLowerCase(), { exact: true, family: font.family });
       for (const alias of font.aliases ?? []) {
@@ -139,7 +179,19 @@ export class BrowserGoogleFontsImportService implements FontImportService {
     const resolutions: FontResolution[] = [];
     const warnings: ImportWarning[] = [];
     for (const request of requests) {
-      const result = await this.downloadFont(request);
+      const result = await this.downloadFont(request).catch((error: unknown) => {
+        const reason = error instanceof Error ? error.message : 'font request failed';
+        return {
+          resolution: {
+            fontStyle: request.fontStyle,
+            fontWeight: request.fontWeight,
+            message: reason,
+            requestedFamily: request.family,
+            status: 'failed' as const,
+          },
+          warning: createWarning(request, reason),
+        };
+      });
       if ('font' in result) {
         fonts[result.font.id] = result.font;
       }
@@ -181,7 +233,9 @@ export class BrowserGoogleFontsImportService implements FontImportService {
     | { resolution: FontResolution; warning: ImportWarning }
   > {
     const localResolution = this.resolveLocalFont(request);
-    if (localResolution) return { resolution: localResolution };
+    if (localResolution) {
+      return { resolution: localResolution };
+    }
 
     const catalogMatch = this.downloadableFamilies.get(request.family.toLowerCase());
     if (!catalogMatch) {
@@ -274,20 +328,13 @@ export class BrowserGoogleFontsImportService implements FontImportService {
   }
 
   private resolveLocalFont(request: FontImportRequest): FontResolution | undefined {
-    const fontSet = getFontSet(this.options);
-    if (!fontSet || typeof fontSet.check !== 'function') return undefined;
-    try {
-      const descriptor = `${request.fontStyle} ${request.fontWeight} 16px "${escapeFontFamily(request.family)}"`;
-      if (!fontSet.check(descriptor)) return undefined;
-      return {
-        family: request.family,
-        fontStyle: request.fontStyle,
-        fontWeight: request.fontWeight,
-        requestedFamily: request.family,
-        status: 'available-system',
-      };
-    } catch {
-      return undefined;
-    }
+    if (!this.fontAvailability?.isAvailable(request.family)) return undefined;
+    return {
+      family: request.family,
+      fontStyle: request.fontStyle,
+      fontWeight: request.fontWeight,
+      requestedFamily: request.family,
+      status: 'available-system',
+    };
   }
 }

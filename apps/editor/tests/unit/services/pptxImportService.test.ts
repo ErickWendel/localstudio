@@ -257,6 +257,14 @@ const standardPresentationXml = `<?xml version="1.0" encoding="UTF-8"?>
   <p:sldIdLst>
     <p:sldId id="256" r:id="rIdSlide"/>
   </p:sldIdLst>
+  <p:defaultTextStyle>
+    <a:defPPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" algn="l">
+      <a:defRPr sz="1800"/>
+    </a:defPPr>
+    <a:lvl1pPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" algn="l">
+      <a:defRPr sz="2600"><a:latin typeface="+mn-lt"/></a:defRPr>
+    </a:lvl1pPr>
+  </p:defaultTextStyle>
 </p:presentation>`;
 
 const standardPresentationRels = `<?xml version="1.0" encoding="UTF-8"?>
@@ -304,6 +312,10 @@ const standardThemeXml = `<?xml version="1.0" encoding="UTF-8"?>
       <a:lt1><a:srgbClr val="ffffff"/></a:lt1>
       <a:accent1><a:srgbClr val="ff9900"/></a:accent1>
     </a:clrScheme>
+    <a:fontScheme name="LocalStudio Fonts">
+      <a:majorFont><a:latin typeface="Aptos Display"/></a:majorFont>
+      <a:minorFont><a:latin typeface="Tenorite"/></a:minorFont>
+    </a:fontScheme>
   </a:themeElements>
 </a:theme>`;
 
@@ -380,6 +392,16 @@ const standardSlideXml = `<?xml version="1.0" encoding="UTF-8"?>
         <p:blipFill><a:blip r:embed="rIdImage"/></p:blipFill>
         <p:spPr><a:xfrm><a:off x="4572000" y="2286000"/><a:ext cx="914400" cy="457200"/></a:xfrm></p:spPr>
       </p:pic>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="52" name="Theme font text"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr><a:xfrm><a:off x="5486400" y="2286000"/><a:ext cx="1371600" cy="457200"/></a:xfrm></p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr sz="2400"><a:latin typeface="+mn-lt"/></a:rPr><a:t>Theme font</a:t></a:r></a:p></p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="53" name="Inherited theme font text"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr><a:xfrm><a:off x="5486400" y="2743200"/><a:ext cx="1371600" cy="457200"/></a:xfrm></p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Inherited theme font</a:t></a:r></a:p></p:txBody>
+      </p:sp>
       <p:pic>
         <p:nvPicPr><p:cNvPr id="52" name="SVG image"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>
         <p:blipFill><a:blip><a:extLst><a:ext uri="{96DAC541-7B7A-43D3-8B79-37D633B846F1}"><asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" r:embed="rIdSvg"/></a:ext></a:extLst></a:blip></p:blipFill>
@@ -733,6 +755,12 @@ describe('BrowserPptxImportService', () => {
       .filter((element) => ['Cell A', 'Cell B'].includes(element.text))
       .map((element) => element.text)
       .sort();
+    const themeFontText = elements.find(
+      (element) => element.type === 'text' && element.text === 'Theme font',
+    );
+    const inheritedThemeFontText = elements.find(
+      (element) => element.type === 'text' && element.text === 'Inherited theme font',
+    );
 
     expect(themeShape).toMatchObject({
       type: 'shape',
@@ -766,6 +794,14 @@ describe('BrowserPptxImportService', () => {
       height: 96,
       x: 768,
       y: 288,
+    });
+    expect(themeFontText).toMatchObject({
+      type: 'text',
+      fontFamily: 'Tenorite',
+    });
+    expect(inheritedThemeFontText).toMatchObject({
+      type: 'text',
+      fontFamily: 'Tenorite',
     });
     expect(tableTexts).toEqual(['Cell A', 'Cell B']);
     expect(imageAsset).toMatchObject({ fileName: 'photo.dat', mimeType: 'image/png', type: 'image' });

@@ -167,6 +167,18 @@ function getLineHeight(...paragraphProperties: Array<Element | undefined>) {
   return pptxParserDefaults.textStyle.lineHeight;
 }
 
+function resolveThemeFontFamily(font: string | undefined, theme: PptxTheme | undefined) {
+  if (!font) return undefined;
+  if (font === '+mj-lt' || font === '+mj-ea' || font === '+mj-cs') {
+    return theme?.majorFontFamily;
+  }
+  if (font === '+mn-lt' || font === '+mn-ea' || font === '+mn-cs') {
+    return theme?.minorFontFamily;
+  }
+  if (font.startsWith('+')) return undefined;
+  return font;
+}
+
 function getTextAlign(
   paragraphProperties: Element | undefined,
   listParagraphProperties: Element | undefined,
@@ -210,6 +222,8 @@ function getTextStyle(
   const roleRunProperties = getRoleRunProperties(placeholderRole, textDefaults);
   const inheritedRunProperties =
     verticalAlign === 'middle' ? textDefaults.listRunProperties : textDefaults.defaultRunProperties;
+  const fallbackInheritedRunProperties =
+    verticalAlign === 'middle' ? textDefaults.defaultRunProperties : textDefaults.listRunProperties;
   const inheritedParagraphProperties =
     verticalAlign === 'middle'
       ? textDefaults.listParagraphProperties
@@ -222,6 +236,7 @@ function getTextStyle(
       listDefaultRunProperties,
       roleRunProperties,
       inheritedRunProperties,
+      fallbackInheritedRunProperties,
       textDefaults.defaultRunProperties,
     ),
   );
@@ -231,14 +246,17 @@ function getTextStyle(
     listDefaultRunProperties,
     roleRunProperties,
     inheritedRunProperties,
+    fallbackInheritedRunProperties,
     textDefaults.defaultRunProperties,
   );
+  const resolvedFont = resolveThemeFontFamily(font, theme);
   const bold = hasEnabledBold(
     runProperties,
     paragraphDefaultRunProperties,
     listDefaultRunProperties,
     roleRunProperties,
     inheritedRunProperties,
+    fallbackInheritedRunProperties,
     textDefaults.defaultRunProperties,
   );
   const capitalization = getFirstAttribute(
@@ -248,6 +266,7 @@ function getTextStyle(
     listDefaultRunProperties,
     roleRunProperties,
     inheritedRunProperties,
+    fallbackInheritedRunProperties,
     textDefaults.defaultRunProperties,
   );
   const fontSize = getFontSize(size, scaleY);
@@ -261,9 +280,10 @@ function getTextStyle(
       listDefaultRunProperties,
       roleRunProperties,
       inheritedRunProperties,
+      fallbackInheritedRunProperties,
       shape,
     ),
-    fontFamily: font && !font.startsWith('+') ? font : pptxParserDefaults.textStyle.fontFamily,
+    fontFamily: resolvedFont ?? pptxParserDefaults.textStyle.fontFamily,
     fontSize,
     fontWeight: bold ? 700 : pptxParserDefaults.textStyle.fontWeight,
     lineHeight: getLineHeight(

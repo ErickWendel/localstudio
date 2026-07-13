@@ -149,6 +149,8 @@ export interface PptxTextDefaults {
 
 export interface PptxTheme {
   colors: Map<string, string>;
+  majorFontFamily?: string;
+  minorFontFamily?: string;
 }
 
 export interface ParseContext {

@@ -75,6 +75,11 @@ export type RightPanelTab =
 export type TextPreset = 'title' | 'subtitle' | 'body';
 export type { OperationNoticeState } from './use-operation-notice';
 
+export interface MissingPowerPointFont {
+  family: string;
+  fontWeights: number[];
+}
+
 interface TranslationPreparationState extends ModelDownloadProgressDetails {
   progress: number;
   sourceLanguage?: string;
@@ -117,6 +122,32 @@ type TranslationScope = 'selection' | 'slide' | 'deck';
 
 const DECK_TRANSLATION_CONCURRENCY = 3;
 
+function getFirstFontFamily(fontFamily: string) {
+  return fontFamily
+    .split(',')
+    .at(0)
+    ?.replace(/^["']|["']$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getMissingPowerPointFonts(project: ProjectDocument, missingFamilies: string[]) {
+  const missingFamilySet = new Set(missingFamilies.map((family) => family.toLowerCase()));
+  const fonts = new Map<string, MissingPowerPointFont>();
+  for (const element of Object.values(project.elements)) {
+    if (element.type !== 'text') continue;
+    const family = getFirstFontFamily(element.fontFamily);
+    if (!family || !missingFamilySet.has(family.toLowerCase())) continue;
+    const current = fonts.get(family.toLowerCase()) ?? { family, fontWeights: [] };
+    const fontWeight = element.fontWeight >= 700 ? 700 : 400;
+    if (!current.fontWeights.includes(fontWeight)) {
+      current.fontWeights = [...current.fontWeights, fontWeight].sort((a, b) => a - b);
+    }
+    fonts.set(family.toLowerCase(), current);
+  }
+  return Array.from(fonts.values()).sort((a, b) => a.family.localeCompare(b.family));
+}
+
 interface DeckTranslationProgressState {
   activePageIds: string[];
   completedPages: number;
@@ -151,6 +182,9 @@ export function useEditorViewModel(services: AppServices) {
   const [presentationImportProgress, setPresentationImportProgress] = useState<
     PresentationImportProgressState | undefined
   >();
+  const [missingPowerPointFonts, setMissingPowerPointFonts] = useState<MissingPowerPointFont[]>(
+    [],
+  );
   const [hasPersistedLocalProject, setHasPersistedLocalProject] = useState(
     shouldRestoreStoredProject,
   );
@@ -1432,7 +1466,7 @@ export function useEditorViewModel(services: AppServices) {
                 },
               ],
             }))
-          : { fonts: {}, warnings: [] };
+          : { fonts: {}, resolutions: [], warnings: [] };
       const importedProjectWithFonts: ProjectDocument = {
         ...importedProject,
         fonts: {
@@ -1449,6 +1483,13 @@ export function useEditorViewModel(services: AppServices) {
             }
           : {}),
       };
+      const unresolvedFontFamilies = fontImportResult.resolutions
+        .filter((resolution) => resolution.status === 'missing-needs-user')
+        .map((resolution) => resolution.requestedFamily);
+      const nextMissingPowerPointFonts = getMissingPowerPointFonts(
+        importedProjectWithFonts,
+        unresolvedFontFamilies,
+      );
       setPresentationImportProgress({
         detail: 'Linking original videos and GIFs from the PowerPoint package.',
         progress: 72,
@@ -1473,6 +1514,7 @@ export function useEditorViewModel(services: AppServices) {
       });
       await editorViewModelRuntime.waitForNextPaint();
       setProject(normalizedProject);
+      setMissingPowerPointFonts(nextMissingPowerPointFonts);
       setActivePageId(normalizedProject.pages[0]?.id ?? '');
       setPageLanguageCodes({});
       const nextSelectedId = normalizedProject.pages[0]?.elementIds.at(-1);
@@ -1516,6 +1558,63 @@ export function useEditorViewModel(services: AppServices) {
       const message = pptxImportLogger.describeError(error).message;
       showOperationNotice({ message: `PowerPoint import failed: ${message}`, tone: 'error' });
     }
+  }
+
+  function dismissMissingPowerPointFonts() {
+    setMissingPowerPointFonts([]);
+  }
+
+  async function replacePowerPointFont(missingFamily: string, replacementFamily: string) {
+    const trimmedReplacement = replacementFamily.trim();
+    if (!trimmedReplacement) return;
+    const matchingElements = Object.values(projectRef.current.elements).filter((element) => {
+      if (element.type !== 'text') return false;
+      return getFirstFontFamily(element.fontFamily)?.toLowerCase() === missingFamily.toLowerCase();
+    }) as Array<Extract<ProjectDocument['elements'][string], { type: 'text' }>>;
+    if (matchingElements.length === 0) {
+      setMissingPowerPointFonts((current) =>
+        current.filter((font) => font.family.toLowerCase() !== missingFamily.toLowerCase()),
+      );
+      return;
+    }
+
+    const fontWeights = Array.from(
+      new Set(matchingElements.map((element) => (element.fontWeight >= 700 ? 700 : 400))),
+    );
+    const result = await services.fontImportService.resolveAndDownloadFonts(
+      fontWeights.map((fontWeight) => ({
+        family: trimmedReplacement,
+        fontStyle: 'normal',
+        fontWeight,
+      })),
+    );
+    if (result.warnings.some((warning) => warning.code === 'font-missing')) {
+      throw new Error(result.warnings[0]?.message ?? `${trimmedReplacement} could not be downloaded.`);
+    }
+
+    commitProject((currentProject) => ({
+      ...currentProject,
+      fonts: {
+        ...(currentProject.fonts ?? {}),
+        ...result.fonts,
+      },
+      elements: Object.fromEntries(
+        Object.entries(currentProject.elements).map(([elementId, element]) => {
+          if (
+            element.type !== 'text' ||
+            getFirstFontFamily(element.fontFamily)?.toLowerCase() !== missingFamily.toLowerCase()
+          ) {
+            return [elementId, element];
+          }
+          return [elementId, { ...element, fontFamily: trimmedReplacement }];
+        }),
+      ),
+      updatedAt: new Date().toISOString(),
+    }));
+    await editorViewModelRuntime.loadProjectFonts(projectRef.current, services.fontImportService);
+    setMissingPowerPointFonts((current) =>
+      current.filter((font) => font.family.toLowerCase() !== missingFamily.toLowerCase()),
+    );
   }
 
   async function exportPowerPoint() {
@@ -2861,6 +2960,7 @@ export function useEditorViewModel(services: AppServices) {
     isFullscreen,
     persistenceEnabled,
     presentationImportProgress,
+    missingPowerPointFonts,
     mediaImportProgress,
     persistenceAttention,
     operationNotice,
@@ -2901,6 +3001,7 @@ export function useEditorViewModel(services: AppServices) {
     selection,
     activeTab,
     availableFonts,
+    downloadableFonts: services.fontImportService.listDownloadableFonts(),
     activeSlideLanguage,
     setActiveTab,
     modelStates,
@@ -2933,6 +3034,8 @@ export function useEditorViewModel(services: AppServices) {
     closeRemoteImport,
     importProject,
     importPowerPoint,
+    dismissMissingPowerPointFonts,
+    replacePowerPointFont,
     exportPowerPoint,
     openVersionHistory,
     closeVersionHistory,
