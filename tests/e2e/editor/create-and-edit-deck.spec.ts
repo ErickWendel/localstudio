@@ -37,13 +37,25 @@ test.describe('editor create and edit deck journey', () => {
     await expect(page.getByRole('button', { name: 'Background Shape', exact: true })).toBeHidden();
 
     await editor.openMenu('Edit');
+    await expect(page.getByRole('menuitem', { name: 'Translate Deck' })).toBeHidden();
     await page.getByRole('menuitem', { name: 'Undo' }).click();
     await expect(page.getByRole('button', { name: 'Background Shape', exact: true })).toBeVisible();
     await editor.openMenu('Edit');
     await page.getByRole('menuitem', { name: 'Redo' }).click();
     await expect(page.getByRole('button', { name: 'Background Shape', exact: true })).toBeHidden();
 
+    await editor.openMenu('View');
+    await expect(page.getByRole('menuitem', { name: 'Toggle Layers Panel' })).toBeHidden();
+    await page.getByRole('menuitem', { name: 'Zoom' }).click();
+    const zoomMenu = page.getByRole('menu', { name: 'Zoom' });
+    await expect(zoomMenu).toBeVisible();
+    await expect(zoomMenu.getByRole('menuitem', { name: 'Zoom Out' })).toBeVisible();
+    await expect(zoomMenu.getByRole('menuitem', { name: '100%' })).toBeVisible();
+    await expect(zoomMenu.getByRole('menuitem', { name: 'Zoom In' })).toBeVisible();
+
     await editor.openMenu('Help');
+    await expect(page.getByRole('menuitem', { name: 'Local AI Setup' })).toBeHidden();
+    await expect(page.getByRole('menuitem', { name: 'Found a bug?' })).toBeVisible();
     await page.getByRole('menuitem', { name: 'Keyboard Shortcuts' }).click();
     await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeVisible();
     await page.getByRole('button', { name: 'Close keyboard shortcuts' }).click();

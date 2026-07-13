@@ -29,6 +29,12 @@ LocalStudio.dev uses browser-local AI features. Some paths need Chrome experimen
 
 When changing AI flows, document which browser and device you tested. When changing UI, include a screenshot or short recording in the pull request.
 
+## Issues
+
+Bug reports should include a reproducible video demo whenever possible. We recommend recording with
+[Loom](https://chromewebstore.google.com/detail/loom-%E2%80%93-screen-recorder-sc/liecbddmkiiihnedobmlmillhodjkdmb?utm_source=localstudio.dev)
+so maintainers can see the browser, steps, and failure state clearly.
+
 ## Pull Requests
 
 Keep PRs focused. Describe the user-visible change, list the checks you ran, and call out browser-specific behavior.

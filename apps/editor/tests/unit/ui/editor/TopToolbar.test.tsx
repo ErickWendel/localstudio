@@ -15,8 +15,9 @@ describe('TopToolbar', () => {
     const onNewProject = vi.fn();
     const onSaveLocalAs = vi.fn();
     const onSaveLocal = vi.fn();
-    const onSelectLayers = vi.fn();
-    const onTranslateDeck = vi.fn();
+    const onResetZoom = vi.fn();
+    const onZoomIn = vi.fn();
+    const onZoomOut = vi.fn();
 
     render(
       <TopToolbar
@@ -30,9 +31,9 @@ describe('TopToolbar', () => {
         onNewProject={onNewProject}
         onSaveLocal={onSaveLocal}
         onSaveLocalAs={onSaveLocalAs}
-        onSelectLayers={onSelectLayers}
-        onTranslateDeck={onTranslateDeck}
-        canTranslateDeck
+        onResetZoom={onResetZoom}
+        onZoomIn={onZoomIn}
+        onZoomOut={onZoomOut}
       />,
     );
 
@@ -73,12 +74,21 @@ describe('TopToolbar', () => {
     ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'View' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Toggle Layers Panel' }));
-    expect(onSelectLayers).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('menuitem', { name: 'Toggle Layers Panel' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('menuitem', { name: 'Zoom' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Zoom Out' }));
+    expect(onZoomOut).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'View' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Zoom' }));
+    await user.click(screen.getByRole('menuitem', { name: '100%' }));
+    expect(onResetZoom).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'View' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Zoom' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Zoom In' }));
+    expect(onZoomIn).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole('button', { name: 'Edit' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Translate Deck' }));
-    expect(onTranslateDeck).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('menuitem', { name: 'Translate Deck' })).not.toBeInTheDocument();
   });
 
   it('opens the PowerPoint export action from the File menu', async () => {
@@ -218,6 +228,24 @@ describe('TopToolbar', () => {
     await user.click(screen.getByRole('menuitem', { name: 'AI Setup Tour' }));
 
     expect(onStartAiSetupTour).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens GitHub issues from the Help menu bug report action', async () => {
+    const user = userEvent.setup();
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+
+    render(<TopToolbar project={sampleProject.createSampleProject()} language="PT-BR" />);
+
+    await user.click(screen.getByRole('button', { name: 'Help' }));
+    expect(screen.queryByRole('menuitem', { name: 'Local AI Setup' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('menuitem', { name: 'Found a bug?' }));
+
+    expect(openSpy).toHaveBeenCalledWith(
+      'https://github.com/ErickWendel/localstudio/issues/new/choose',
+      '_blank',
+      'noopener,noreferrer',
+    );
+    openSpy.mockRestore();
   });
 
   it('closes header menus when clicking outside them', async () => {

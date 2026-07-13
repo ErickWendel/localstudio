@@ -57,7 +57,6 @@ interface TopToolbarProps {
   onOpenPresenterView?: (() => void) | undefined;
   onRedo?: (() => void) | undefined;
   onResetZoom?: (() => void) | undefined;
-  onSelectLayers?: (() => void) | undefined;
   onShare?: (() => void) | undefined;
   onStartPresenterMode?: ((options?: { fromBeginning?: boolean }) => void) | undefined;
   onTranslationSourceLanguageChange?: ((languageCode: string) => void) | undefined;
@@ -91,6 +90,7 @@ interface HeaderMenuSubmenu {
 type HeaderMenuAction = HeaderMenuActionItem | HeaderMenuSeparator | HeaderMenuSubmenu;
 
 const menuLabels: HeaderMenu[] = ['File', 'Edit', 'View', 'Help'];
+const githubIssuesUrl = 'https://github.com/ErickWendel/localstudio/issues/new/choose';
 
 export function TopToolbar({
   project,
@@ -137,7 +137,6 @@ export function TopToolbar({
   onOpenPresenterView,
   onRedo,
   onResetZoom,
-  onSelectLayers,
   onShare,
   onStartPresenterMode,
   onSaveLocal,
@@ -262,19 +261,17 @@ export function TopToolbar({
       { label: 'Redo', disabled: !canRedo, onSelect: onRedo },
       { label: 'Duplicate', disabled: !hasSelection, onSelect: onDuplicate },
       { label: 'Delete', disabled: !hasSelection, onSelect: onDelete },
-      {
-        label: 'Translate Deck',
-        disabled: !canTranslateDeck || !onTranslateDeck,
-        onSelect: onTranslateDeck,
-      },
     ],
     View: [
-      { label: 'Zoom Out', disabled: !onZoomOut, onSelect: onZoomOut },
-      { label: '100%', disabled: !onResetZoom, onSelect: onResetZoom },
-      { label: 'Zoom In', disabled: !onZoomIn, onSelect: onZoomIn },
-      onSelectLayers
-        ? { label: 'Toggle Layers Panel', onSelect: onSelectLayers }
-        : { label: 'Toggle Layers Panel', disabled: true },
+      {
+        kind: 'submenu',
+        label: 'Zoom',
+        items: [
+          { label: 'Zoom Out', disabled: !onZoomOut, onSelect: onZoomOut },
+          { label: '100%', disabled: !onResetZoom, onSelect: onResetZoom },
+          { label: 'Zoom In', disabled: !onZoomIn, onSelect: onZoomIn },
+        ],
+      },
     ],
     Help: [
       { label: 'AI Setup Tour', disabled: !onStartAiSetupTour, onSelect: onStartAiSetupTour },
@@ -283,7 +280,12 @@ export function TopToolbar({
         disabled: !onOpenKeyboardShortcuts,
         onSelect: onOpenKeyboardShortcuts,
       },
-      { label: 'Local AI Setup', disabled: true },
+      {
+        label: 'Found a bug?',
+        onSelect: () => {
+          window.open(githubIssuesUrl, '_blank', 'noopener,noreferrer');
+        },
+      },
     ],
   };
 

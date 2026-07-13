@@ -1072,10 +1072,6 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         onNewProject={openBlankProjectInNewTab}
         onOpenKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
         onStartAiSetupTour={startAiWorkflowTour}
-        onSelectLayers={() => {
-          vm.setActiveTab('layout');
-          openLeftPanel();
-        }}
         onShare={() => {
           setSharePanelOpen(true);
         }}
