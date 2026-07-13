@@ -1,8 +1,13 @@
 import type { ProjectDocument } from '../../../domain/documents/model';
 
+export interface EditorHistorySnapshot {
+  pageLanguageCodes: Record<string, string>;
+  project: ProjectDocument;
+}
+
 export interface EditorHistory {
-  past: ProjectDocument[];
-  future: ProjectDocument[];
+  past: EditorHistorySnapshot[];
+  future: EditorHistorySnapshot[];
 }
 
 function getActivePageIdForProject(project: ProjectDocument, currentPageId: string) {

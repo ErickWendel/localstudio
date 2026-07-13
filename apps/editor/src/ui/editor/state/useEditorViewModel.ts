@@ -1103,7 +1103,10 @@ export function useEditorViewModel(services: AppServices) {
       projectRef.current = nextProject;
 
       setHistory((currentHistory) => ({
-        past: [...currentHistory.past, currentProject].slice(-50),
+        past: [
+          ...currentHistory.past,
+          { pageLanguageCodes: { ...pageLanguageCodes }, project: currentProject },
+        ].slice(-50),
         future: [],
       }));
 
@@ -2781,14 +2784,16 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function undo() {
-    const previousProject = history.past.at(-1);
-    if (!previousProject) return;
+    const previousSnapshot = history.past.at(-1);
+    if (!previousSnapshot) return;
+    const previousProject = previousSnapshot.project;
 
     setHistory((currentHistory) => ({
       past: currentHistory.past.slice(0, -1),
-      future: [project, ...currentHistory.future],
+      future: [{ pageLanguageCodes: { ...pageLanguageCodes }, project }, ...currentHistory.future],
     }));
     setProject(previousProject);
+    setPageLanguageCodes(previousSnapshot.pageLanguageCodes);
     const nextActivePageId = editorViewModelHistory.getActivePageIdForProject(
       previousProject,
       activePageId,
@@ -2804,14 +2809,16 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function redo() {
-    const nextProject = history.future[0];
-    if (!nextProject) return;
+    const nextSnapshot = history.future[0];
+    if (!nextSnapshot) return;
+    const nextProject = nextSnapshot.project;
 
     setHistory((currentHistory) => ({
-      past: [...currentHistory.past, project],
+      past: [...currentHistory.past, { pageLanguageCodes: { ...pageLanguageCodes }, project }],
       future: currentHistory.future.slice(1),
     }));
     setProject(nextProject);
+    setPageLanguageCodes(nextSnapshot.pageLanguageCodes);
     const nextActivePageId = editorViewModelHistory.getActivePageIdForProject(
       nextProject,
       activePageId,
