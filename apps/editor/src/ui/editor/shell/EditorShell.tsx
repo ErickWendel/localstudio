@@ -13,6 +13,8 @@ import { EditorFooter } from './EditorFooter';
 import { ImageExportPanel, type ImageExportOptions } from '../panels/ImageExportPanel';
 import { MediaImportProgressOverlay } from './MediaImportProgressOverlay';
 import { PresentationImportProgressOverlay } from './PresentationImportProgressOverlay';
+import { PowerPointFontReplacementDialog } from './PowerPointFontReplacementDialog';
+import { PowerPointFontWarningDialog } from './PowerPointFontWarningDialog';
 import { MediaIntegrationSettingsPanel } from '../panels/MediaIntegrationSettingsPanel';
 import { MirrorSettingsPanel } from '../panels/MirrorSettingsPanel';
 import { PagesPanel } from '../panels/PagesPanel';
@@ -89,6 +91,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const [speakerNotesOpen, setSpeakerNotesOpen] = useState(false);
   const [audienceFullscreenPromptOpen, setAudienceFullscreenPromptOpen] = useState(false);
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
+  const [fontReplacementOpen, setFontReplacementOpen] = useState(false);
   const [slideNavigatorOpen, setSlideNavigatorOpen] = useState(false);
   const [slideNavigatorIndex, setSlideNavigatorIndex] = useState(0);
   const [presentationPaused, setPresentationPaused] = useState(false);
@@ -1432,6 +1435,21 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           onImportProject={(projectId) => {
             void vm.importRemoteMirrorProject(projectId);
           }}
+        />
+      ) : null}
+      {vm.missingPowerPointFonts.length > 0 && !fontReplacementOpen ? (
+        <PowerPointFontWarningDialog
+          missingFonts={vm.missingPowerPointFonts}
+          onDismiss={vm.dismissMissingPowerPointFonts}
+          onReplaceFonts={() => setFontReplacementOpen(true)}
+        />
+      ) : null}
+      {vm.missingPowerPointFonts.length > 0 && fontReplacementOpen ? (
+        <PowerPointFontReplacementDialog
+          downloadableFonts={vm.downloadableFonts}
+          missingFonts={vm.missingPowerPointFonts}
+          onClose={() => setFontReplacementOpen(false)}
+          onReplaceFont={vm.replacePowerPointFont}
         />
       ) : null}
       {vm.presentationImportProgress ? (

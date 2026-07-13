@@ -172,28 +172,6 @@ describe('BrowserGoogleFontsImportService', () => {
     );
   });
 
-  it('marks locally available fonts without downloading a duplicate', async () => {
-    const fetchMock = vi.fn(() => Promise.resolve(new Response('', { status: 404 })));
-    const service = new BrowserGoogleFontsImportService({
-      fetch: fetchMock,
-      fontSet: { check: vi.fn(() => true) } as unknown as FontFaceSet,
-    });
-
-    const result = await service.resolveAndDownloadFonts([
-      { family: 'Montserrat', fontStyle: 'normal', fontWeight: 400 },
-    ]);
-
-    expect(result.fonts).toEqual({});
-    expect(result.warnings).toEqual([]);
-    expect(result.resolutions).toEqual([
-      expect.objectContaining({
-        requestedFamily: 'Montserrat',
-        status: 'available-system',
-      }),
-    ]);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
   it('returns a warning instead of failing when Google Fonts has no exact match', async () => {
     const fetchMock = vi.fn(() => Promise.resolve(new Response('', { status: 400 })));
     const service = new BrowserGoogleFontsImportService({
@@ -215,9 +193,62 @@ describe('BrowserGoogleFontsImportService', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('does not request Google CSS for unsupported PowerPoint font names', async () => {
-    const fetchMock = vi.fn(() => Promise.resolve(new Response('', { status: 200 })));
+  it('marks installed system fonts as available without downloading or warning', async () => {
+    const fetchMock = vi.fn(() => Promise.resolve(new Response('', { status: 400 })));
+    const isAvailable = vi.fn((family: string) => family === 'American Typewriter');
+    const service = new BrowserGoogleFontsImportService({
+      fetch: fetchMock,
+      fontAvailability: { isAvailable },
+    });
+
+    const result = await service.resolveAndDownloadFonts([
+      { family: 'American Typewriter', fontStyle: 'normal', fontWeight: 400 },
+    ]);
+
+    expect(result.fonts).toEqual({});
+    expect(result.warnings).toEqual([]);
+    expect(result.resolutions).toEqual([
+      {
+        family: 'American Typewriter',
+        fontStyle: 'normal',
+        fontWeight: 400,
+        requestedFamily: 'American Typewriter',
+        status: 'available-system',
+      },
+    ]);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(isAvailable).toHaveBeenCalledWith('American Typewriter');
+  });
+
+  it('keeps resolving later missing fonts when one Google Fonts request fails', async () => {
+    const fetchMock = vi.fn(() => Promise.reject(new Error('network unavailable')));
     const service = new BrowserGoogleFontsImportService({ fetch: fetchMock });
+
+    const result = await service.resolveAndDownloadFonts([
+      { family: 'Montserrat', fontStyle: 'normal', fontWeight: 400 },
+      { family: 'Tw Cen MT', fontStyle: 'normal', fontWeight: 400 },
+    ]);
+
+    expect(result.fonts).toEqual({});
+    expect(result.resolutions).toMatchObject([
+      { requestedFamily: 'Montserrat', status: 'failed' },
+      { requestedFamily: 'Tw Cen MT', status: 'missing-needs-user' },
+    ]);
+    expect(result.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'font-download-failed' }),
+        expect.objectContaining({ code: 'font-missing' }),
+      ]),
+    );
+  });
+
+  it('does not trust browser fallback checks for unsupported PowerPoint font names', async () => {
+    const fetchMock = vi.fn(() => Promise.resolve(new Response('', { status: 200 })));
+    const service = new BrowserGoogleFontsImportService({
+      fetch: fetchMock,
+      fontAvailability: { isAvailable: vi.fn(() => false) },
+      fontSet: { check: vi.fn(() => true) } as unknown as FontFaceSet,
+    });
 
     const result = await service.resolveAndDownloadFonts([
       { family: 'Adobe 고딕 Std B', fontStyle: 'normal', fontWeight: 400 },
@@ -225,6 +256,7 @@ describe('BrowserGoogleFontsImportService', () => {
 
     expect(result.fonts).toEqual({});
     expect(result.warnings[0]?.message).toContain('Adobe 고딕 Std B');
+    expect(result.resolutions[0]?.status).toBe('missing-needs-user');
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

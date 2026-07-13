@@ -552,7 +552,22 @@ async function loadTheme(context: ParseContext, masterPath: string | undefined) 
       if (color) colors.set(child.localName, color);
     }
   }
-  const theme = { colors };
+  const fontScheme = pptxXml.firstDescendant(document, 'fontScheme');
+  const majorFontFamily = fontScheme
+    ? pptxXml.firstDescendant(pptxXml.firstDescendant(fontScheme, 'majorFont') ?? fontScheme, 'latin')
+        ?.getAttribute('typeface')
+        ?.trim()
+    : undefined;
+  const minorFontFamily = fontScheme
+    ? pptxXml.firstDescendant(pptxXml.firstDescendant(fontScheme, 'minorFont') ?? fontScheme, 'latin')
+        ?.getAttribute('typeface')
+        ?.trim()
+    : undefined;
+  const theme = {
+    colors,
+    ...(majorFontFamily ? { majorFontFamily } : {}),
+    ...(minorFontFamily ? { minorFontFamily } : {}),
+  };
   context.themeCache.set(masterPath, theme);
   return theme;
 }
