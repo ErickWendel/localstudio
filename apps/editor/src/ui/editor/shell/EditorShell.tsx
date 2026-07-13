@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type Konva from 'konva';
 import type { AppServices } from '../../../app/composition';
+import { pageVisibility } from '../../../domain/documents/pageVisibility';
 import type { ShareMetadata } from '../../../services/contracts/interfaces';
 import { editorAutomationController } from '../../../services/automation/editorAutomationController';
 import type { EditorAutomationDelegate } from '../../../services/automation/editorAutomationController';
@@ -130,6 +131,12 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     vm.project.pages.findIndex((page) => page.id === vm.activePageId),
   );
   const activePage = vm.project.pages[activePageIndex];
+  const visiblePages = pageVisibility.getVisiblePages(vm.project);
+  const visiblePageCount = visiblePages.length;
+  const activeVisiblePageIndex = Math.max(
+    0,
+    visiblePages.findIndex((page) => page.id === vm.activePageId),
+  );
   const deckTranslationStatus = vm.deckTranslationProgress
     ? `Translating ${vm.deckTranslationProgress.currentPageName} · ${vm.deckTranslationProgress.completedPages}/${vm.deckTranslationProgress.totalPages}`
     : undefined;
@@ -818,7 +825,10 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     if (!presenterRemoteSession && !presenterSessionId) return undefined;
     return getPresenterSessionService().subscribeToCommands((message) => {
       if (message.command === 'start-presenting') {
-        const firstPageId = vm.project.pages[0]?.id ?? vm.activePageId;
+        const firstPageId =
+          pageVisibility.getFirstVisiblePage(vm.project)?.id ??
+          vm.project.pages[0]?.id ??
+          vm.activePageId;
         setRemotePresenterActive(true);
         if (firstPageId) {
           vm.playPresentationPreview(firstPageId);
@@ -1134,7 +1144,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           ) : null}
           {slideNumberVisible ? (
             <div className="presentation-slide-number" aria-live="polite">
-              Slide {activePageIndex + 1} of {vm.project.pages.length}
+              Slide {activeVisiblePageIndex + 1} of {visiblePageCount}
             </div>
           ) : null}
           <ScrollingCanvasWorkspace
@@ -1435,9 +1445,9 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       ) : null}
       <ProjectVideoPreloader project={vm.project} />
       <EditorFooter
-        activePageIndex={activePageIndex}
+        activePageIndex={activeVisiblePageIndex}
         notesOpen={speakerNotesOpen}
-        pageCount={vm.project.pages.length}
+        pageCount={visiblePageCount}
         pagesPanelOpen={vm.pagesPanelOpen}
         zoomPercent={vm.zoomPercent}
         onResetZoom={vm.resetZoom}

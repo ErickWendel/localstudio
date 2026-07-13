@@ -122,6 +122,61 @@ describe('BrowserPresenterSessionService remote previews', () => {
     });
   });
 
+  it('omits hidden slides from published remote state and previews', async () => {
+    const popup = {
+      location: { href: '' },
+      postMessage: vi.fn(),
+      closed: false,
+    } as unknown as Window;
+    const signalingService = new InMemoryPresenterRemoteSignalingService({
+      randomCode: () => 'ABCD-1234',
+      randomId: () => 'remote-session-1',
+    });
+    const service = new BrowserPresenterSessionService({
+      href: 'https://localstudio.test/editor/?project=Demo',
+      openWindow: vi.fn(() => popup),
+      randomId: () => 'session-1',
+      remoteSignalingService: signalingService,
+    });
+    service.openPresenterWindow();
+    await service.openRemoteControlSession({ presenterLabel: 'MacBook Pro', ttlMs: 60_000 });
+    const project = sampleProject.createSampleProject();
+    project.pages.push(
+      {
+        ...project.pages[0]!,
+        id: 'page-hidden',
+        name: 'Hidden slide',
+        visible: false,
+      },
+      {
+        ...project.pages[0]!,
+        id: 'page-enabled',
+        name: 'Enabled slide',
+        visible: true,
+      },
+    );
+
+    service.publishState({
+      activePageId: project.pages[0]!.id,
+      animationPreview: undefined,
+      project,
+    });
+
+    await vi.waitFor(() => {
+      expect(signalingService.getPublishedState('ABCD-1234')?.slidePreview).toBeDefined();
+    });
+    const publishedState = signalingService.getPublishedState('ABCD-1234');
+
+    expect(publishedState?.pageCount).toBe(2);
+    expect(publishedState?.pages).toEqual([
+      { id: project.pages[0]!.id, name: project.pages[0]!.name },
+      { id: 'page-enabled', name: 'Enabled slide' },
+    ]);
+    expect(publishedState?.nextPageName).toBe('Enabled slide');
+    expect(publishedState?.upcomingSlidePreviews).toHaveLength(1);
+    expect(publishedState?.upcomingSlidePreviews?.[0]?.pageId).toBe('page-enabled');
+  });
+
   it('publishes requested PeerJS slide previews in bounded batches', async () => {
     const popup = {
       location: { href: '' },

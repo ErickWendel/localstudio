@@ -1,4 +1,5 @@
 import type { DesignElement, Page, ProjectDocument } from '../../domain/documents/model';
+import { pageVisibility } from '../../domain/documents/pageVisibility';
 import { presenterRemoteDebugLog } from '@localstudio/presenter-remote/debug-log';
 import type {
   PresenterRemotePreviewBatch,
@@ -30,12 +31,14 @@ function createRemoteStateSkeleton(
   connectedControllerCount: number,
   timer: PresenterRemoteTimerState,
 ): PresenterRemoteState {
-  const activePageIndex = Math.max(
-    0,
-    payload.project.pages.findIndex((page) => page.id === payload.activePageId),
-  );
-  const activePage = payload.project.pages[activePageIndex] ?? payload.project.pages[0];
-  const nextPage = payload.project.pages[activePageIndex + 1];
+  const visiblePages = pageVisibility.getVisiblePages(payload.project);
+  const activePage =
+    pageVisibility.getNearestVisiblePage(payload.project, payload.activePageId) ??
+    payload.project.pages[0];
+  const activePageIndex = activePage
+    ? Math.max(0, visiblePages.findIndex((page) => page.id === activePage.id))
+    : 0;
+  const nextPage = visiblePages[activePageIndex + 1];
   const activePageBuilds = activePage ? getRemoteBuildInfo(payload, activePage) : undefined;
   return {
     activePageId: activePage?.id ?? payload.activePageId,
@@ -47,8 +50,8 @@ function createRemoteStateSkeleton(
     deckName: payload.project.name,
     nextPageName: nextPage?.name,
     notes: activePage?.speakerNotes ?? '',
-    pageCount: payload.project.pages.length,
-    pages: payload.project.pages.map((page) => ({
+    pageCount: visiblePages.length,
+    pages: visiblePages.map((page) => ({
       id: page.id,
       name: page.name,
     })),
@@ -83,18 +86,20 @@ function createRemoteState(
   connectedControllerCount: number,
   timer: PresenterRemoteTimerState,
 ): Promise<PresenterRemoteState> {
-  const activePageIndex = Math.max(
-    0,
-    payload.project.pages.findIndex((page) => page.id === payload.activePageId),
-  );
-  const activePage = payload.project.pages[activePageIndex] ?? payload.project.pages[0];
-  const nextPage = payload.project.pages[activePageIndex + 1];
+  const visiblePages = pageVisibility.getVisiblePages(payload.project);
+  const activePage =
+    pageVisibility.getNearestVisiblePage(payload.project, payload.activePageId) ??
+    payload.project.pages[0];
+  const activePageIndex = activePage
+    ? Math.max(0, visiblePages.findIndex((page) => page.id === activePage.id))
+    : 0;
+  const nextPage = visiblePages[activePageIndex + 1];
   const hiddenElementIds =
     activePage && payload.animationPreview?.pageId === activePage.id
       ? new Set(payload.animationPreview.hiddenElementIds)
       : undefined;
   const activePageBuilds = activePage ? getRemoteBuildInfo(payload, activePage) : undefined;
-  const pages = payload.project.pages.map((page) => ({
+  const pages = visiblePages.map((page) => ({
     id: page.id,
     name: page.name,
   }));
@@ -104,7 +109,7 @@ function createRemoteState(
       : Promise.resolve(undefined),
     createUpcomingSlidePreviews(
       payload.project,
-      payload.project.pages.slice(activePageIndex + 1, activePageIndex + 4),
+      visiblePages.slice(activePageIndex + 1, activePageIndex + 4),
     ),
   ]).then(([slidePreview, upcomingSlidePreviews]) => ({
     activePageId: activePage?.id ?? payload.activePageId,
@@ -117,7 +122,7 @@ function createRemoteState(
     nextPageName: nextPage?.name,
     nextSlidePreview: upcomingSlidePreviews[0]?.preview,
     notes: activePage?.speakerNotes ?? '',
-    pageCount: payload.project.pages.length,
+    pageCount: visiblePages.length,
     pages,
     presenterMode: payload.presenterMode ?? 'presenting',
     commandAvailability: [
@@ -198,7 +203,7 @@ async function createRemotePreviewBatches(
       : undefined;
   const previews = await Promise.all(
     payload.project.pages
-      .filter((page) => pageIds.has(page.id))
+      .filter((page) => pageVisibility.isVisible(page) && pageIds.has(page.id))
       .map(async (page) => ({
         id: page.id,
         name: page.name,

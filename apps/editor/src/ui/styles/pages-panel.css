@@ -66,6 +66,7 @@
 }
 
 .page-card-preview {
+  position: relative;
   grid-area: preview;
   width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -74,6 +75,25 @@
   cursor: pointer;
   padding: 0;
   overflow: hidden;
+}
+
+.page-card-skip-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 999px;
+  background: rgba(5, 13, 16, 0.72);
+  color: #ffffff;
+  pointer-events: none;
+}
+
+.page-card-skip-badge .material-symbols-outlined {
+  font-size: 15px;
 }
 
 .page-card-canvas {

@@ -25,6 +25,8 @@ export function EditorFooter({
   onZoomIn,
   onZoomOut,
 }: EditorFooterProps) {
+  const activePageNumber = pageCount === 0 ? 0 : activePageIndex + 1;
+
   return (
     <footer className="editor-footer" aria-label="Editor footer controls">
       <div className="editor-footer-left">
@@ -100,7 +102,7 @@ export function EditorFooter({
           Pages
         </button>
         <span className="footer-page-count">
-          {activePageIndex + 1} / {pageCount}
+          {activePageNumber} / {pageCount}
         </span>
       </div>
     </footer>
