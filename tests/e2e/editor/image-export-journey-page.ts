@@ -43,6 +43,7 @@ export const imageExportJourneyPage = {
     ).toBeVisible({ timeout: 15_000 });
 
     await this.openImagesExportDialog(page, editor);
+    await dismissPowerPointFontDialogIfPresent(page);
     await expect(
       page.getByRole('checkbox', { name: 'Create an image for each animation' }),
     ).not.toBeChecked();
@@ -59,3 +60,21 @@ export const imageExportJourneyPage = {
     await expect(page.getByRole('dialog', { name: 'Export images' })).toBeVisible();
   },
 };
+
+async function dismissPowerPointFontDialogIfPresent(page: Page) {
+  const backdrop = page.locator('.pptx-font-dialog-backdrop');
+  if (!(await backdrop.isVisible({ timeout: 1_000 }).catch(() => false))) return;
+
+  const dismissButton = backdrop
+    .getByRole('button', {
+      name: /continue|dismiss|close|done|skip|ok|use/i,
+    })
+    .first();
+  if (await dismissButton.isVisible({ timeout: 1_000 }).catch(() => false)) {
+    await dismissButton.click();
+  } else {
+    await page.keyboard.press('Escape');
+  }
+
+  await expect(backdrop).toBeHidden({ timeout: 5_000 });
+}
