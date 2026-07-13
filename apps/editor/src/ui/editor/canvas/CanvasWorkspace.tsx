@@ -312,6 +312,26 @@ export function CanvasWorkspace({
     page?.background.type === 'color'
       ? page.background.color
       : (page?.background.colorFallback ?? '#050D10');
+  const transformAnchors =
+    selectedElement?.type === 'text'
+      ? ([
+          'top-left',
+          'top-right',
+          'middle-left',
+          'middle-right',
+          'bottom-left',
+          'bottom-right',
+        ] as const)
+      : ([
+          'top-left',
+          'top-center',
+          'top-right',
+          'middle-left',
+          'middle-right',
+          'bottom-left',
+          'bottom-center',
+          'bottom-right',
+        ] as const);
   const setElementNodeRef = useCallback((elementId: string, node: Konva.Node | null) => {
     nodeRefs.current[elementId] = node;
   }, []);
@@ -495,26 +515,61 @@ export function CanvasWorkspace({
     });
   }
 
-  function handleTransformEnd(elementId: string, event: Konva.KonvaEventObject<Event>) {
-    const node = event.target;
+  function getTransformFramePatch(elementId: string, node: Konva.Node): ElementFramePatch | undefined {
     const element = project.elements[elementId];
-    const scaleX = Math.abs(node.scaleX());
-    const scaleY = node.scaleY();
-    const nextWidth = toDocumentX(Math.max(8, node.width() * scaleX));
-
-    node.scaleX(1);
-    node.scaleY(1);
-
-    onUpdateElementFrame?.(elementId, {
+    if (!element) return undefined;
+    const scaleXValue = Math.abs(node.scaleX());
+    const scaleYValue = Math.abs(node.scaleY());
+    const nextWidth = toDocumentX(Math.max(8, node.width() * scaleXValue));
+    const nextHeight = toDocumentY(Math.max(8, node.height() * scaleYValue));
+    return {
       x:
-        element?.type === 'image' && element.flipX
+        element.type === 'image' && element.flipX
           ? toDocumentX(node.x()) - nextWidth
           : toDocumentX(node.x()),
       y: toDocumentY(node.y()),
       width: nextWidth,
-      height: toDocumentY(Math.max(8, node.height() * scaleY)),
+      height: nextHeight,
       rotation: node.rotation(),
-    });
+    };
+  }
+
+  function applyTransformPatchToNode(
+    elementId: string,
+    node: Konva.Node,
+    patch: ElementFramePatch,
+  ) {
+    const element = project.elements[elementId];
+    if (!element) return;
+    const width = patch.width ?? element.width;
+    const height = patch.height ?? element.height;
+    const x = patch.x ?? element.x;
+    const y = patch.y ?? element.y;
+
+    node.width(width * scaleX);
+    node.height(height * scaleY);
+    node.x(element.type === 'image' && element.flipX ? (x + width) * scaleX : x * scaleX);
+    node.y(y * scaleY);
+    node.rotation(patch.rotation ?? element.rotation);
+    node.scaleX(element.type === 'image' && element.flipX ? -1 : 1);
+    node.scaleY(1);
+  }
+
+  function handleTransform(elementId: string, event: Konva.KonvaEventObject<Event>) {
+    const node = event.target;
+    const frame = getTransformFramePatch(elementId, node);
+    if (!frame) return;
+
+    applyTransformPatchToNode(elementId, node, frame);
+  }
+
+  function handleTransformEnd(elementId: string, event: Konva.KonvaEventObject<Event>) {
+    const node = event.target;
+    const draft = getTransformFramePatch(elementId, node);
+    if (!draft) return;
+
+    applyTransformPatchToNode(elementId, node, draft);
+    onUpdateElementFrame?.(elementId, draft);
   }
 
   function toggleCropMode() {
@@ -736,6 +791,9 @@ export function CanvasWorkspace({
       onTap: () => {
         if (isProcessing) return;
         onSelectElement?.(element.id);
+      },
+      onTransform: (event: Konva.KonvaEventObject<Event>) => {
+        handleTransform(element.id, event);
       },
       onTransformEnd: (event: Konva.KonvaEventObject<Event>) => {
         handleTransformEnd(element.id, event);
@@ -1077,16 +1135,7 @@ export function CanvasWorkspace({
                   ignoreStroke
                   resizeEnabled={!selectedElement?.locked}
                   rotateEnabled={!selectedElement?.locked}
-                  enabledAnchors={[
-                    'top-left',
-                    'top-center',
-                    'top-right',
-                    'middle-left',
-                    'middle-right',
-                    'bottom-left',
-                    'bottom-center',
-                    'bottom-right',
-                  ]}
+                  enabledAnchors={[...transformAnchors]}
                   boundBoxFunc={(oldBox, newBox) =>
                     newBox.width < 8 || newBox.height < 8 ? oldBox : newBox
                   }
@@ -1204,7 +1253,6 @@ export function CanvasWorkspace({
               ))}
             </div>
           ) : null}
-          <span className="canvas-fallback-label">Selected Image</span>
         </div>
         {showEditorOverlays &&
         animationPreview?.pageId === activePageId &&

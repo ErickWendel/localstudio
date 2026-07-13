@@ -27,6 +27,7 @@ export interface CommonElementProps {
   onMouseLeave: (event: Konva.KonvaEventObject<MouseEvent>) => void;
   onMouseMove: (event: Konva.KonvaEventObject<MouseEvent>) => void;
   onTap: () => void;
+  onTransform: (event: Konva.KonvaEventObject<Event>) => void;
   onTransformEnd: (event: Konva.KonvaEventObject<Event>) => void;
 }
 
