@@ -97,11 +97,26 @@ jobs:
         run: npm run typecheck
 
   test:
-    name: Unit tests
-    needs: build
+    name: Unit tests (${{ matrix.label }})
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: landing
+            command: npm run test --workspace @localstudio/landing
+          - label: editor 1/4
+            command: npm run test --workspace @localstudio/editor -- --shard=1/4
+          - label: editor 2/4
+            command: npm run test --workspace @localstudio/editor -- --shard=2/4
+          - label: editor 3/4
+            command: npm run test --workspace @localstudio/editor -- --shard=3/4
+          - label: editor 4/4
+            command: npm run test --workspace @localstudio/editor -- --shard=4/4
+          - label: joystick
+            command: npm run test --workspace @localstudio/joystick
 
     steps:
       - name: Checkout
@@ -116,14 +131,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Download build artifact
-        uses: actions/download-artifact@v5
-        with:
-          name: localstudio-dist
-          path: dist
-
       - name: Test
-        run: npm run test
+        run: ${{ matrix.command }}
 
   e2e:
     name: Playwright E2E (${{ matrix.label }})
