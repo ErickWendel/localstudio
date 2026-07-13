@@ -45,6 +45,45 @@ describe('editor view model text helpers', () => {
     expect(nextProject.elements['text-title']?.height).toBeGreaterThan(1);
   });
 
+  it('expands a text element after long pasted content wraps inside the frame', () => {
+    const project = sampleProject.createSampleProject();
+    const element = project.elements['text-title']!;
+
+    const nextProject = editorViewModelText.updateTextContent(
+      project,
+      'text-title',
+      '55 Horas, 770M Tokens e Uma Alternativa ao Canva Rodando no Browser',
+    );
+
+    expect(nextProject.elements['text-title']).toMatchObject({
+      text: '55 Horas, 770M Tokens e Uma Alternativa ao Canva Rodando no Browser',
+      width: element.width,
+    });
+    expect(nextProject.elements['text-title']?.height).toBeGreaterThan(element.height);
+  });
+
+  it('keeps wrapped text readable when a frame is resized narrower', () => {
+    const baseProject = sampleProject.createSampleProject();
+    const project = {
+      ...baseProject,
+      elements: {
+        ...baseProject.elements,
+        'text-title': {
+          ...baseProject.elements['text-title']!,
+          text: '55 Horas, 770M Tokens e Uma Alternativa ao Canva Rodando no Browser',
+        },
+      },
+    };
+
+    const patch = editorViewModelText.getFramePatchWithTextMinimum(project, 'text-title', {
+      height: 1,
+      width: 240,
+    });
+
+    expect(patch.width).toBe(240);
+    expect(patch.height).toBeGreaterThan(1);
+  });
+
   it('expands a text element after style updates increase font size', () => {
     const project = createProjectWithShortTitleFrame();
 
