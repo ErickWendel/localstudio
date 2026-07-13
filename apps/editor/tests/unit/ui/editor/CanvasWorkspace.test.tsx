@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createRef } from 'react';
 import type Konva from 'konva';
 import { vi } from 'vitest';
+import type { ElementFramePatch } from '../../../../src/domain/commands/elements/basicCommands';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 import type { ProjectDocument } from '../../../../src/domain/documents/model';
 import { CanvasWorkspace } from '../../../../src/ui/editor/canvas/CanvasWorkspace';
@@ -28,6 +29,18 @@ describe('CanvasWorkspace', () => {
     expect(screen.getByRole('button', { name: 'Flip' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Crop' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Animate' })).toBeInTheDocument();
+  });
+
+  it('does not leak the selected image label into the canvas DOM', () => {
+    render(
+      <CanvasWorkspace
+        project={sampleProject.createSampleProject()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
+      />,
+    );
+
+    expect(screen.queryByText('Selected Image')).not.toBeInTheDocument();
   });
 
   it('uses layout sizing instead of transform scaling for zoom', () => {
@@ -148,6 +161,124 @@ describe('CanvasWorkspace', () => {
     );
 
     expect(container.querySelector('.canvas-accessible-text')).not.toBeInTheDocument();
+  });
+
+  it('resizes selected text live instead of stretching it until transform end', () => {
+    const onUpdateElementFrame = vi.fn<(elementId: string, patch: ElementFramePatch) => void>();
+    const stageRef = createRef<Konva.Stage>();
+    const project = sampleProject.createSampleProject();
+
+    render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['text-title'] }}
+        stageRef={stageRef}
+        onUpdateElementFrame={onUpdateElementFrame}
+      />,
+    );
+
+    const textNode = stageRef.current
+      ?.find('Text')
+      .find((node) => (node as Konva.Text).text() === 'AI Design Revolution') as
+      | Konva.Text
+      | undefined;
+    expect(textNode).toBeDefined();
+
+    const originalWidth = textNode!.width();
+    const originalHeight = textNode!.height();
+
+    act(() => {
+      textNode!.scaleX(1.5);
+      textNode!.scaleY(1.25);
+      textNode!.fire('transform', { target: textNode });
+    });
+
+    expect(textNode!.scaleX()).toBe(1);
+    expect(textNode!.scaleY()).toBe(1);
+    expect(textNode!.width()).toBeCloseTo(originalWidth * 1.5);
+    expect(textNode!.height()).toBeCloseTo(originalHeight * 1.25);
+    expect(onUpdateElementFrame).not.toHaveBeenCalled();
+
+    act(() => {
+      textNode!.fire('transformend', { target: textNode });
+    });
+
+    expect(onUpdateElementFrame).toHaveBeenCalledWith(
+      'text-title',
+      expect.objectContaining({
+        height: 300,
+        width: 900,
+      }),
+    );
+  });
+
+  it('hides vertical transform handles for selected text', () => {
+    const stageRef = createRef<Konva.Stage>();
+    const project = sampleProject.createSampleProject();
+
+    render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['text-title'] }}
+        stageRef={stageRef}
+      />,
+    );
+
+    expect(stageRef.current?.findOne('.top-center')?.visible()).toBe(false);
+    expect(stageRef.current?.findOne('.bottom-center')?.visible()).toBe(false);
+    expect(stageRef.current?.findOne('.top-left')?.visible()).toBe(true);
+    expect(stageRef.current?.findOne('.bottom-right')?.visible()).toBe(true);
+  });
+
+  it('resizes selected images live instead of stretching the bitmap until transform end', async () => {
+    const onUpdateElementFrame = vi.fn<(elementId: string, patch: ElementFramePatch) => void>();
+    const stageRef = createRef<Konva.Stage>();
+
+    render(
+      <CanvasWorkspace
+        project={sampleProject.createSampleProject()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
+        stageRef={stageRef}
+        onUpdateElementFrame={onUpdateElementFrame}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(stageRef.current?.findOne('Image')).toBeDefined();
+    });
+
+    const imageNode = stageRef.current?.findOne('Image');
+    expect(imageNode).toBeDefined();
+
+    const originalWidth = imageNode!.width();
+    const originalHeight = imageNode!.height();
+
+    act(() => {
+      imageNode!.scaleX(0.8);
+      imageNode!.scaleY(1.2);
+      imageNode!.fire('transform', { target: imageNode });
+    });
+
+    expect(imageNode!.scaleX()).toBe(1);
+    expect(imageNode!.scaleY()).toBe(1);
+    expect(imageNode!.width()).toBeCloseTo(originalWidth * 0.8);
+    expect(imageNode!.height()).toBeCloseTo(originalHeight * 1.2);
+    expect(onUpdateElementFrame).not.toHaveBeenCalled();
+
+    act(() => {
+      imageNode!.fire('transformend', { target: imageNode });
+    });
+
+    expect(onUpdateElementFrame).toHaveBeenCalledWith(
+      'image-hero',
+      expect.objectContaining({
+        height: 882,
+        width: 784,
+      }),
+    );
   });
 
   it('selects slide and presentation surfaces from canvas clicks', () => {
