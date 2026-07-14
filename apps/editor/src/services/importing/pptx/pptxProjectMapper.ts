@@ -302,6 +302,18 @@ function getCoverCrop(
   };
 }
 
+function getImportSource(object: PptxSlideObject, pageId: string, layoutId?: string) {
+  return {
+    format: 'pptx' as const,
+    pageId,
+    shapeId: object.sourceShapeId,
+    source: object.source,
+    ...(layoutId ? { layoutId } : {}),
+    ...(object.placeholderIndex ? { placeholderIndex: object.placeholderIndex } : {}),
+    ...(object.placeholderRole ? { placeholderRole: object.placeholderRole } : {}),
+  };
+}
+
 function mapObject(
   object: PptxSlideObject,
   pptxPackage: PptxPackage,
@@ -334,6 +346,7 @@ function mapObject(
       opacity: object.opacity ?? 1,
       ...(layoutId ? { templateSource: { layoutId, type: 'layout' as const } } : {}),
       ...(object.placeholderRole ? { placeholderRole: object.placeholderRole } : {}),
+      importSource: getImportSource(object, pageId, layoutId),
       ...style,
       fill: getReadableTextFill(style.fill, backgroundColor),
       fontSize,
@@ -350,6 +363,7 @@ function mapObject(
       opacity: object.opacity ?? 1,
       ...(layoutId ? { templateSource: { layoutId, type: 'layout' as const } } : {}),
       ...(object.placeholderRole ? { placeholderRole: object.placeholderRole } : {}),
+      importSource: getImportSource(object, pageId, layoutId),
       shape: object.shape,
       ...(object.fill ? { fill: object.fill } : {}),
       ...(object.stroke ? { stroke: object.stroke } : {}),
@@ -379,6 +393,7 @@ function mapObject(
     opacity: object.opacity ?? 1,
     ...(layoutId ? { templateSource: { layoutId, type: 'layout' as const } } : {}),
     ...(object.placeholderRole ? { placeholderRole: object.placeholderRole } : {}),
+    importSource: getImportSource(object, pageId, layoutId),
   };
   if (object.kind === 'video') {
     return {

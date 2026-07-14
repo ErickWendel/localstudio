@@ -37,6 +37,8 @@ export interface PptxTextStyle {
   verticalAlign: 'bottom' | 'middle' | 'top';
 }
 
+export type PptxTextStyleOverrides = Partial<Record<keyof PptxTextStyle, true>>;
+
 export interface PptxTextInsets {
   bottom: number;
   left: number;
@@ -49,6 +51,8 @@ export interface PptxTextBox {
   insets: PptxTextInsets;
   verticalAlign: 'bottom' | 'middle' | 'top';
 }
+
+export type PptxTextBoxOverrides = Partial<Record<'autoFit' | 'insets' | 'verticalAlign', true>>;
 
 export type PptxSlideObject =
   | {
@@ -63,8 +67,10 @@ export type PptxSlideObject =
       source: 'layout' | 'master' | 'slide';
       sourceShapeId: string;
       style: PptxTextStyle;
+      styleOverrides?: PptxTextStyleOverrides;
       text: string;
       textBox: PptxTextBox;
+      textBoxOverrides?: PptxTextBoxOverrides;
       zIndex: number;
     }
   | {

@@ -48,6 +48,13 @@ describe('PowerPoint sample regression', () => {
     const authorLabel = Object.values(project.slideLayouts ?? {})
       .flatMap((layout) => layout.elementIds.map((elementId) => layout.elements[elementId]))
       .find((element) => element?.type === 'text' && element.text === 'Erick Wendel');
+    const authorLayout = Object.values(project.slideLayouts ?? {}).find((layout) =>
+      layout.elementIds.some((elementId) => layout.elements[elementId] === authorLabel),
+    );
+    const headerLogoElements =
+      authorLayout?.elementIds
+        .map((elementId) => authorLayout.elements[elementId])
+        .flatMap((element) => (element?.type === 'image' && element.y <= 10 ? [element] : [])) ?? [];
     const slide15BuildLabels =
       slide15?.animationBuilds?.map((build) => {
         const element = project.elements[build.elementId];
@@ -102,7 +109,13 @@ describe('PowerPoint sample regression', () => {
     ).toBe(true);
     expect(slide15ImageElements).toHaveLength(0);
     expect(slide15LayoutImageElements.length).toBeGreaterThan(0);
-    expect(slide5Text).toMatchObject({ fill: '#FFFFFF' });
+    expect(slide5Text).toMatchObject({
+      fill: '#FFFFFF',
+      fontFamily: 'American Typewriter',
+      fontWeight: 700,
+    });
+    if (!slide5Text || slide5Text.type !== 'text') throw new Error('Expected slide 5 title text.');
+    expect(slide5Text.fontSize).toBeGreaterThanOrEqual(160);
     if (!authorLabel || authorLabel.type !== 'text') throw new Error('Expected author text label.');
     if (!slide18BulletText || slide18BulletText.type !== 'text') {
       throw new Error('Expected slide 18 bullet text.');
@@ -117,6 +130,9 @@ describe('PowerPoint sample regression', () => {
     expect(authorLabel.width).toEqual(expect.any(Number));
     expect(authorLabel.width).toBeGreaterThanOrEqual(190);
     expect(authorLabel.height).toBeGreaterThanOrEqual(authorLabel.fontSize * 1.35);
+    expect(headerLogoElements.length).toBeGreaterThanOrEqual(4);
+    expect(headerLogoElements.every((element) => element.width >= 30 && element.height >= 30)).toBe(true);
+    expect(authorLabel.fontSize).toBeGreaterThanOrEqual(30);
     expect(slide18BulletText.fontSize).toBeGreaterThanOrEqual(69);
     expect(slide18BulletText.fontSize).toBeLessThanOrEqual(90);
     expect(slide21TitleText.align).toBe('center');

@@ -217,14 +217,18 @@ const widePngHeader = new Uint8Array([
   137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 200, 0, 0, 0, 100,
 ]);
 
-function createPptxFixture(slideContents = slideXml, presentationContents = presentationXml) {
+function createPptxFixture(
+  slideContents = slideXml,
+  presentationContents = presentationXml,
+  layoutContents = layoutXml,
+) {
   return createStoredPptxFile([
     { path: 'ppt/presentation.xml', contents: presentationContents },
     { path: 'ppt/_rels/presentation.xml.rels', contents: presentationRels },
     { path: 'ppt/slides/slide1.xml', contents: slideContents },
     { path: 'ppt/slides/_rels/slide1.xml.rels', contents: slideRels },
     { path: 'ppt/notesSlides/notesSlide1.xml', contents: notesSlideXml },
-    { path: 'ppt/slideLayouts/slideLayout1.xml', contents: layoutXml },
+    { path: 'ppt/slideLayouts/slideLayout1.xml', contents: layoutContents },
     { path: 'ppt/slideLayouts/slideLayout2.xml', contents: unusedLayoutXml },
     { path: 'ppt/slideLayouts/_rels/slideLayout1.xml.rels', contents: layoutRels },
     { path: 'ppt/slideMasters/slideMaster1.xml', contents: masterXml },
@@ -513,6 +517,12 @@ describe('BrowserPptxImportService', () => {
       fontSize: 64,
       fontWeight: 700,
       lineHeight: 1.05,
+      importSource: {
+        format: 'pptx',
+        pageId: 'pptx-page-1',
+        shapeId: '2',
+        source: 'slide',
+      },
     });
     expect(authorElement).toBeUndefined();
     expect(project.pages[0]?.layoutId).toBe('pptx-layout-slideLayout1');
@@ -677,6 +687,24 @@ describe('BrowserPptxImportService', () => {
   });
 
   it('prefers slide text-body list styles over inherited placeholder defaults', async () => {
+    const inheritedBodyLayoutXml = `<?xml version="1.0" encoding="UTF-8"?>
+<p:sldLayout xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:cSld name="Body">
+    <p:spTree>
+      <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+      <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm></p:grpSpPr>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="41" name="Inherited body"/><p:cNvSpPr/><p:nvPr><p:ph type="body" idx="15"/></p:nvPr></p:nvSpPr>
+        <p:spPr><a:xfrm><a:off x="914400" y="1828800"/><a:ext cx="5486400" cy="914400"/></a:xfrm></p:spPr>
+        <p:txBody>
+          <a:bodyPr/>
+          <a:lstStyle><a:lvl1pPr><a:defRPr sz="2000"><a:solidFill><a:srgbClr val="000000"/></a:solidFill><a:latin typeface="Helvetica Neue"/></a:defRPr></a:lvl1pPr></a:lstStyle>
+          <a:p><a:r><a:t>Inherited body</a:t></a:r></a:p>
+        </p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+</p:sldLayout>`;
     const styledPlaceholderSlideXml = `<?xml version="1.0" encoding="UTF-8"?>
 <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
   <p:cSld>
@@ -697,7 +725,9 @@ describe('BrowserPptxImportService', () => {
   </p:cSld>
 </p:sld>`;
     const service = new BrowserPptxImportService();
-    const project = await service.importPowerPoint({ file: createPptxFixture(styledPlaceholderSlideXml) });
+    const project = await service.importPowerPoint({
+      file: createPptxFixture(styledPlaceholderSlideXml, presentationXml, inheritedBodyLayoutXml),
+    });
     const placeholderElement = Object.values(project.elements).find(
       (element) => element.type === 'text' && element.text === 'Styled placeholder',
     );
@@ -709,6 +739,60 @@ describe('BrowserPptxImportService', () => {
       fontFamily: 'American Typewriter',
       fontWeight: 700,
     });
+    if (!placeholderElement || placeholderElement.type !== 'text') throw new Error('Expected styled placeholder.');
+    expect(placeholderElement.fontSize).toBeGreaterThan(100);
+  });
+
+  it('matches same-role placeholders by nearby geometry when indexes are missing', async () => {
+    const multiBodyLayoutXml = `<?xml version="1.0" encoding="UTF-8"?>
+<p:sldLayout xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:cSld name="Two Bodies">
+    <p:spTree>
+      <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+      <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm></p:grpSpPr>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="41" name="Left body"/><p:cNvSpPr/><p:nvPr><p:ph type="body"/></p:nvPr></p:nvSpPr>
+        <p:spPr><a:xfrm><a:off x="914400" y="914400"/><a:ext cx="1828800" cy="914400"/></a:xfrm></p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle><a:lvl1pPr><a:defRPr sz="2200"><a:solidFill><a:srgbClr val="111111"/></a:solidFill><a:latin typeface="Arial"/></a:defRPr></a:lvl1pPr></a:lstStyle><a:p><a:r><a:t>Left body</a:t></a:r></a:p></p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="42" name="Right body"/><p:cNvSpPr/><p:nvPr><p:ph type="body"/></p:nvPr></p:nvSpPr>
+        <p:spPr><a:xfrm><a:off x="5486400" y="914400"/><a:ext cx="1828800" cy="914400"/></a:xfrm></p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle><a:lvl1pPr><a:defRPr sz="6200"><a:solidFill><a:srgbClr val="ff0000"/></a:solidFill><a:latin typeface="American Typewriter"/></a:defRPr></a:lvl1pPr></a:lstStyle><a:p><a:r><a:t>Right body</a:t></a:r></a:p></p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+</p:sldLayout>`;
+    const nearLeftSlideXml = `<?xml version="1.0" encoding="UTF-8"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+      <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm></p:grpSpPr>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="30" name="Nearest body"/><p:cNvSpPr/><p:nvPr><p:ph type="body"/></p:nvPr></p:nvSpPr>
+        <p:spPr><a:xfrm><a:off x="914400" y="914400"/><a:ext cx="1828800" cy="914400"/></a:xfrm></p:spPr>
+        <p:txBody><a:bodyPr lIns="0" rIns="0" tIns="0" bIns="0"/><a:lstStyle/><a:p><a:r><a:t>Nearest body</a:t></a:r></a:p></p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+</p:sld>`;
+    const service = new BrowserPptxImportService();
+    const project = await service.importPowerPoint({
+      file: createPptxFixture(nearLeftSlideXml, presentationXml, multiBodyLayoutXml),
+    });
+    const textElement = Object.values(project.elements).find(
+      (element) => element.type === 'text' && element.text === 'Nearest body',
+    );
+
+    expect(textElement).toMatchObject({
+      type: 'text',
+      fontFamily: 'Arial',
+      fill: '#111111',
+      x: 186,
+    });
+    if (!textElement || textElement.type !== 'text') throw new Error('Expected nearest body text.');
+    expect(textElement.fontSize).toBeLessThan(100);
   });
 
   it('shrinks oversized placeholder text to fit its authored PowerPoint frame', async () => {
