@@ -46,7 +46,7 @@ test.describe('editor create and edit deck journey', () => {
 
     await editor.openMenu('View');
     await expect(page.getByRole('menuitem', { name: 'Toggle Layers Panel' })).toBeHidden();
-    await page.getByRole('menuitem', { name: 'Zoom' }).click();
+    await page.getByRole('menuitem', { name: 'Zoom' }).hover();
     const zoomMenu = page.getByRole('menu', { name: 'Zoom' });
     await expect(zoomMenu).toBeVisible();
     await expect(zoomMenu.getByRole('menuitem', { name: 'Zoom Out' })).toBeVisible();

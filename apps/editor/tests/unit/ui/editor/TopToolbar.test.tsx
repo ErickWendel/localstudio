@@ -108,6 +108,44 @@ describe('TopToolbar', () => {
     expect(onExportPowerPoint).toHaveBeenCalledTimes(1);
   });
 
+  it('opens file submenus when users hover their triggers', () => {
+    render(<TopToolbar project={sampleProject.createSampleProject()} language="PT-BR" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.pointerEnter(screen.getByRole('menuitem', { name: 'Import' }));
+
+    expect(screen.getByRole('menu', { name: 'Import' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'PowerPoint (.pptx)' })).toBeInTheDocument();
+
+    fireEvent.pointerEnter(screen.getByRole('menuitem', { name: 'Export to' }));
+
+    expect(screen.queryByRole('menu', { name: 'Import' })).not.toBeInTheDocument();
+    expect(screen.getByRole('menu', { name: 'Export to' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Images (.zip)' })).toBeInTheDocument();
+  });
+
+  it('switches open header menus when users hover another header item', () => {
+    render(<TopToolbar project={sampleProject.createSampleProject()} language="PT-BR" />);
+
+    fireEvent.pointerEnter(screen.getByRole('button', { name: 'View' }));
+    expect(screen.queryByRole('menu', { name: 'View menu' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.pointerEnter(screen.getByRole('menuitem', { name: 'Import' }));
+    expect(screen.getByRole('menu', { name: 'File menu' })).toBeInTheDocument();
+    expect(screen.getByRole('menu', { name: 'Import' })).toBeInTheDocument();
+
+    fireEvent.pointerEnter(screen.getByRole('button', { name: 'View' }));
+
+    expect(screen.queryByRole('menu', { name: 'File menu' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menu', { name: 'Import' })).not.toBeInTheDocument();
+    expect(screen.getByRole('menu', { name: 'View menu' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Zoom' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'View' }));
+    expect(screen.getByRole('menu', { name: 'View menu' })).toBeInTheDocument();
+  });
+
   it('opens the image archive export action from the File menu', () => {
     const onExportImages = vi.fn();
 

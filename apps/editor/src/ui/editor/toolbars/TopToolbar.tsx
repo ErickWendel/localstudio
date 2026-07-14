@@ -211,6 +211,14 @@ export function TopToolbar({
     setOpenSubmenu(null);
   }
 
+  function switchOpenHeaderMenu(menu: HeaderMenu) {
+    if (!openMenu || openMenu === menu) return;
+    setTranslationMenuOpen(false);
+    setPlayMenuOpen(false);
+    setOpenSubmenu(null);
+    setOpenMenu(menu);
+  }
+
   function commitProjectName() {
     const nextName = projectNameDraft.trim();
     if (nextName && nextName !== project.name) {
@@ -293,7 +301,7 @@ export function TopToolbar({
   function handleMenuAction(action: HeaderMenuAction) {
     if (action.kind === 'separator') return;
     if (action.kind === 'submenu') {
-      setOpenSubmenu((current) => (current === action.label ? null : action.label));
+      setOpenSubmenu(action.label);
       return;
     }
     if (action.disabled) return;
@@ -364,7 +372,10 @@ export function TopToolbar({
                   setTranslationMenuOpen(false);
                   setPlayMenuOpen(false);
                   setOpenSubmenu(null);
-                  setOpenMenu((current) => (current === item ? null : item));
+                  setOpenMenu(item);
+                }}
+                onPointerEnter={() => {
+                  switchOpenHeaderMenu(item);
                 }}
               >
                 {item}
@@ -377,6 +388,9 @@ export function TopToolbar({
                         aria-label={action.label}
                         className="toolbar-dropdown-separator"
                         key={action.label}
+                        onPointerEnter={() => {
+                          setOpenSubmenu(null);
+                        }}
                         role="separator"
                       />
                     ) : action.kind === 'submenu' ? (
@@ -391,6 +405,9 @@ export function TopToolbar({
                           type="button"
                           onClick={() => {
                             handleMenuAction(action);
+                          }}
+                          onPointerEnter={() => {
+                            setOpenSubmenu(action.label);
                           }}
                         >
                           <span>{action.label}</span>
@@ -433,6 +450,9 @@ export function TopToolbar({
                         type="button"
                         onClick={() => {
                           handleMenuAction(action);
+                        }}
+                        onPointerEnter={() => {
+                          setOpenSubmenu(null);
                         }}
                       >
                         {action.label}
