@@ -174,6 +174,21 @@ export class BrowserShareService implements ShareService {
       }),
     );
 
+    await Promise.all(
+      Object.entries(projectForShare.fonts ?? {}).map(async ([fontId, font]) => {
+        const blob = await assetFileUtils.objectUrlToBlobIfReadable(font.objectUrl, this.fetchImpl);
+        if (!blob) return;
+
+        const key = storageObjectUtils.joinObjectKey(getShareRootKey(config, shareId), 'fonts', font.fileName);
+        await this.mirrorService.uploadPublicObject(key, blob, config);
+        projectForShare.fonts![fontId] = {
+          ...font,
+          objectUrl: this.mirrorService.getPublicObjectUrl(key, config),
+          storage: 'remote',
+        };
+      }),
+    );
+
     return projectForShare;
   }
 

@@ -369,16 +369,48 @@ describe('DesignPanel', () => {
 
     expect(screen.queryByLabelText('Search downloadable fonts')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByLabelText('Download additional font'));
+    fireEvent.click(screen.getByLabelText('Selected text font'));
     fireEvent.change(screen.getByLabelText('Search downloadable fonts'), {
       target: { value: 'mont' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Search fonts' }));
     expect(screen.getByLabelText('Downloadable font results')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Download Montserrat' }));
 
     expect(onDownloadFont).toHaveBeenCalledWith('Montserrat');
+  });
+
+  it('adds a selected local font from the configured font folder before applying it', async () => {
+    const onImportLocalFont = vi.fn(() => Promise.resolve());
+    const onUpdateElementStyle = vi.fn();
+
+    render(
+      <DesignPanel
+        project={createProjectWithSelectedText()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['text-test'] }}
+        localFonts={[{ family: 'Acme Sans', source: 'local-font-folder' }]}
+        onImportLocalFont={onImportLocalFont}
+        onUpdateElementStyle={onUpdateElementStyle}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText('Selected text font'));
+    fireEvent.change(screen.getByLabelText('Search downloadable fonts'), {
+      target: { value: 'Acme' },
+    });
+    const localFontResult = screen.getByRole('button', { name: 'Add Acme Sans from local fonts' });
+    expect(localFontResult.querySelector('.ew-ellipsis')).toHaveStyle({ fontFamily: 'Acme Sans' });
+    fireEvent.click(localFontResult);
+
+    await waitFor(() => {
+      expect(onImportLocalFont).toHaveBeenCalledWith('Acme Sans');
+    });
+    expect(onUpdateElementStyle).not.toHaveBeenCalledWith('text-test', {
+      fontFamily: 'Acme Sans',
+    });
+    expect(screen.queryByRole('button', { name: 'Add Acme Sans from local fonts' })).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Acme Sans added to mirrored fonts');
   });
 
   it('finds Google font alternatives by system font aliases', () => {
@@ -394,7 +426,7 @@ describe('DesignPanel', () => {
       />,
     );
 
-    fireEvent.click(screen.getByLabelText('Download additional font'));
+    fireEvent.click(screen.getByLabelText('Selected text font'));
     fireEvent.change(screen.getByLabelText('Search downloadable fonts'), {
       target: { value: 'aria' },
     });
@@ -447,8 +479,9 @@ describe('DesignPanel', () => {
       />,
     );
 
-    expect(screen.getByLabelText('Selected text font')).toHaveValue('American Typewriter');
-    expect(screen.getByRole('option', { name: 'American Typewriter' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Selected text font')).toHaveTextContent('American Typewriter');
+    fireEvent.click(screen.getByLabelText('Selected text font'));
+    expect(screen.getByRole('button', { name: 'Apply American Typewriter' })).toBeInTheDocument();
   });
 
   it('focuses the selected text font list when requested', async () => {

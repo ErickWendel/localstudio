@@ -17,7 +17,7 @@ test.describe('editor font download journeys', () => {
     await editor.gotoNewProject();
     await addTextBoxAndOpenTextDesignControls(editor, page);
     await page.getByRole('button', { name: 'Bold selected text' }).click();
-    await page.getByRole('button', { name: 'Download additional font' }).click();
+    await page.getByLabel('Selected text font', { exact: true }).click();
     await page.getByLabel('Search downloadable fonts').fill('Montserrat');
     await page.getByRole('button', { name: 'Download Montserrat' }).click();
 
@@ -36,12 +36,12 @@ test.describe('editor font download journeys', () => {
     await editor.gotoNewProject();
     await addTextBoxAndOpenTextDesignControls(editor, page);
     await page.getByRole('button', { name: 'Bold selected text' }).click();
-    await page.getByRole('button', { name: 'Download additional font' }).click();
+    await page.getByLabel('Selected text font', { exact: true }).click();
     await page.getByLabel('Search downloadable fonts').fill('Montserrat');
     await page.getByRole('button', { name: 'Download Montserrat' }).click();
 
     await expect(page.getByRole('status')).toContainText('Montserrat downloaded and applied');
-    await expect(page.getByLabel('Selected text font', { exact: true })).toHaveValue('Montserrat');
+    await expect(page.getByLabel('Selected text font', { exact: true })).toContainText('Montserrat');
   });
 });
 

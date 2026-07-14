@@ -32,8 +32,10 @@ interface DesignPanelProps {
   activePageId: string;
   selection: SelectionState;
   availableFonts?: FontCatalogItem[];
+  localFonts?: FontCatalogItem[];
   focusFontControlKey?: number | undefined;
   onDownloadFont?: (family: string) => Promise<void>;
+  onImportLocalFont?: (family: string) => Promise<void>;
   onUpdateElementStyle?: (elementId: string, patch: ElementStylePatch) => void;
   onUpdateElementFrame?: (elementId: string, patch: ElementFramePatch) => void;
   onUpdateTextContent?: (elementId: string, text: string) => void;
@@ -101,12 +103,14 @@ export function DesignPanel({
   onSetElementLock,
   onSetSelectedElementZOrder,
   availableFonts = [],
+  localFonts = [],
   focusFontControlKey,
   onDownloadFont,
+  onImportLocalFont,
   onReplaceVideoAsset,
   onSetElementAnimationBuilds,
 }: DesignPanelProps) {
-  const fontSelectRef = useRef<HTMLSelectElement>(null);
+  const fontSelectRef = useRef<HTMLButtonElement>(null);
   const [fontDownloadOpen, setFontDownloadOpen] = useState(false);
   const [fontSearchInput, setFontSearchInput] = useState('');
   const [fontSearchQuery, setFontSearchQuery] = useState('');
@@ -133,6 +137,13 @@ export function DesignPanel({
       ).sort((left, right) => left.localeCompare(right)),
     [projectFontFamilies],
   );
+  const localFontFamilyOptions = useMemo(() => {
+    const existingFamilies = new Set(fontFamilyOptions.map((font) => font.toLowerCase()));
+    return localFonts
+      .map((font) => font.family)
+      .filter((family) => !existingFamilies.has(family.toLowerCase()))
+      .sort((left, right) => left.localeCompare(right));
+  }, [fontFamilyOptions, localFonts]);
   const filteredDownloadableFonts = useMemo(() => {
     const query = fontSearchQuery.trim();
     return availableFonts
@@ -171,11 +182,33 @@ export function DesignPanel({
     try {
       await onDownloadFont(family);
       setFontDownloadStatus(`${family} downloaded and applied`);
+      setFontDownloadOpen(false);
     } catch (error) {
       setFontDownloadStatus(error instanceof Error ? error.message : 'Font download failed.');
     } finally {
       setDownloadingFontFamily(undefined);
     }
+  }
+
+  async function applyFontFamily(family: string) {
+    if (!family) return;
+    const isLocalFont = localFontFamilyOptions.some((localFamily) => localFamily === family);
+    if (isLocalFont && onImportLocalFont) {
+      setDownloadingFontFamily(family);
+      setFontDownloadStatus(`Adding ${family} from local fonts...`);
+      try {
+        await onImportLocalFont(family);
+        setFontDownloadStatus(`${family} added to mirrored fonts`);
+        setFontDownloadOpen(false);
+      } catch (error) {
+        setFontDownloadStatus(error instanceof Error ? error.message : 'Local font import failed.');
+      } finally {
+        setDownloadingFontFamily(undefined);
+      }
+      return;
+    }
+    updateSelectedStyle({ fontFamily: family });
+    setFontDownloadOpen(false);
   }
 
   function submitFontSearch(event: FormEvent<HTMLFormElement>) {
@@ -271,10 +304,12 @@ export function DesignPanel({
                   fontDownloadOpen,
                   fontDownloadStatus,
                   fontFamilyOptions,
+                  localFontFamilyOptions,
                   fontSearchInput,
                   fontSearchQuery,
                   fontSelectRef,
                   hasFontDownload: Boolean(onDownloadFont),
+                  onApplyFontFamily: applyFontFamily,
                   onDownloadFontFamily: downloadFont,
                   onFontSearchInputChange: (value) => {
                     setFontSearchInput(value);

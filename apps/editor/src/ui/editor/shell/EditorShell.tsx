@@ -87,6 +87,7 @@ export function EditorShell({ services }: EditorShellProps) {
 function EditorDesktopShell({ services }: EditorShellProps) {
   const vm = useEditorViewModel(services);
   const automationDelegateRef = useRef(vm.automation);
+  const prepareProjectFontsForPublicShareRef = useRef(vm.prepareProjectFontsForPublicShare);
   const movieHoldStateRef = useRef<MovieHoldState | undefined>(undefined);
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
   const [designFontFocusKey, setDesignFontFocusKey] = useState(0);
@@ -119,6 +120,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const [isExportingImages, setIsExportingImages] = useState(false);
   const [sharePanelOpen, setSharePanelOpen] = useState(false);
   const [shareMetadata, setShareMetadata] = useState<ShareMetadata | undefined>();
+  const [shareProgressLabel, setShareProgressLabel] = useState<string | undefined>();
   const stageRef = useRef<Konva.Stage>(null);
   const imageExportStageRef = useRef<Konva.Stage>(null);
   const workspaceRef = useRef<HTMLElement>(null);
@@ -128,6 +130,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const aiWorkflowTourRef = useRef<EditorAiWorkflowTourHandle>(null);
   const imageExportNoticeTimeoutRef = useRef<number | undefined>(undefined);
   const presenterFullscreenEnteredRef = useRef(false);
+  const pendingShareAfterLocalSaveRef = useRef(false);
   const toolbarImageInputRef = useRef<HTMLInputElement>(null);
   const hasSelection = vm.selection.elementIds.length > 0;
   const isHistoryReadOnly = vm.versionHistoryOpen;
@@ -251,13 +254,55 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   }
 
   async function copyPublicShareLink() {
-    const nextShare = shareMetadata
-      ? await services.shareService.updateShare(shareMetadata.shareId, vm.project)
-      : await services.shareService.createShare(vm.project);
-    const copiedShare: ShareMetadata = { ...nextShare, status: 'copied' };
-    setShareMetadata(copiedShare);
-    await navigator.clipboard?.writeText(copiedShare.publicUrl);
-    return copiedShare;
+    setShareProgressLabel('Checking local fonts');
+    try {
+      const fontResult = await vm.prepareProjectFontsForPublicShare({
+        onProgress: (progress) => setShareProgressLabel(progress.label),
+      });
+      if (fontResult.unresolvedFamilies.length > 0) {
+        setShareProgressLabel(
+          `Publishing with fallback risk for ${fontResult.unresolvedFamilies.join(', ')}`,
+        );
+      } else {
+        setShareProgressLabel('Publishing public link');
+      }
+      const projectToShare = fontResult.project;
+      const nextShare = shareMetadata
+        ? await services.shareService.updateShare(shareMetadata.shareId, projectToShare)
+        : await services.shareService.createShare(projectToShare);
+      const copiedShare: ShareMetadata = { ...nextShare, status: 'copied' };
+      setShareMetadata(copiedShare);
+      await navigator.clipboard?.writeText(copiedShare.publicUrl);
+      return copiedShare;
+    } finally {
+      setShareProgressLabel(undefined);
+    }
+  }
+
+  function continueShareAfterLocalSave() {
+    if (!pendingShareAfterLocalSaveRef.current) return;
+    pendingShareAfterLocalSaveRef.current = false;
+    if (!vm.hasMirrorConfig) {
+      setSharePanelOpen(false);
+      vm.openMirrorSettings();
+      return;
+    }
+    setSharePanelOpen(true);
+  }
+
+  async function openShareWorkflow() {
+    setSharePanelOpen(false);
+    if (!vm.persistenceEnabled) {
+      pendingShareAfterLocalSaveRef.current = true;
+      const saved = await vm.setPersistence(true);
+      if (saved) continueShareAfterLocalSave();
+      return;
+    }
+    if (!vm.hasMirrorConfig) {
+      vm.openMirrorSettings();
+      return;
+    }
+    setSharePanelOpen(true);
   }
 
   function presentFromSharePanel() {
@@ -787,6 +832,10 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   }, [vm.automation]);
 
   useEffect(() => {
+    prepareProjectFontsForPublicShareRef.current = vm.prepareProjectFontsForPublicShare;
+  });
+
+  useEffect(() => {
     const pageId = vm.activePageId;
     if (!pageId) return undefined;
     if (presenterRemoteUnavailable) return undefined;
@@ -1046,8 +1095,10 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     }
     const timeoutId = window.setTimeout(() => {
       setShareMetadata((current) => (current ? { ...current, status: 'syncing' } : current));
-      void services.shareService
-        .updateShare(shareId, vm.project)
+      void (async () => {
+        const fontResult = await prepareProjectFontsForPublicShareRef.current();
+        return services.shareService.updateShare(shareId, fontResult.project);
+      })()
         .then((nextShare) => {
           setShareMetadata(nextShare);
         })
@@ -1087,8 +1138,12 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         onNewProject={openBlankProjectInNewTab}
         onOpenKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
         onStartAiSetupTour={startAiWorkflowTour}
+        onLocalProjectSetupCancel={() => {
+          pendingShareAfterLocalSaveRef.current = false;
+        }}
+        onLocalProjectSetupConfirm={continueShareAfterLocalSave}
         onShare={() => {
-          setSharePanelOpen(true);
+          void openShareWorkflow();
         }}
         onOpenPresenterView={openPresenterView}
         onStartPresenterMode={startPresenterMode}
@@ -1368,8 +1423,13 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         <SharePanel
           projectName={vm.project.name}
           share={shareMetadata}
+          shareProgressLabel={shareProgressLabel}
           onClose={() => {
             setSharePanelOpen(false);
+          }}
+          onConfigurePublicLink={() => {
+            setSharePanelOpen(false);
+            vm.openMirrorSettings();
           }}
           onCopyLink={copyPublicShareLink}
           publicLinkUnavailableReason={
@@ -1413,14 +1473,17 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       {vm.mirrorSettingsOpen ? (
         <MirrorSettingsPanel
           config={vm.mirrorConfig}
+          localFontMirrorSettings={vm.localFontMirrorSettings}
           mirrorState={vm.mirrorState}
           mirrorDisabledBySettings={vm.mirrorDisabledBySettings}
           onBack={() => {
             vm.closeMirrorSettings();
             vm.openSettings();
           }}
+          onChooseLocalFontFolder={vm.chooseLocalFontMirrorFolder}
           onClose={vm.closeMirrorSettings}
           onEnabledChange={vm.setMirrorEnabledFromSettings}
+          onLocalFontMirrorEnabledChange={vm.setLocalFontMirrorEnabled}
           onSave={vm.saveMirrorConfig}
           onTestConnection={vm.testMirrorConnection}
         />

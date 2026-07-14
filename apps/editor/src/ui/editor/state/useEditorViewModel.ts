@@ -24,6 +24,8 @@ import { sampleProject } from '../../../domain/projects/sampleProject';
 import type { EditorAutomationDelegate } from '../../../services/automation/editorAutomationController';
 import type {
   AiProviderState,
+  FontCatalogItem,
+  LocalFontMirrorProgress,
   MirrorProjectSummary,
   MirrorState,
   ModelDownloadProgressDetails,
@@ -36,6 +38,7 @@ import { pptxFontRequests } from '../../../services/importing/pptx/pptxFontReque
 import { pptxImportLogger } from '../../../services/importing/pptx/pptxImportLogger';
 import { minioMirrorService } from '../../../services/mirror/minioMirrorService';
 import type { MinioMirrorConfig } from '../../../services/mirror/minioMirrorService';
+import { storageObjectUtils } from '../../../services/storage/storageObjectUtils';
 import { aiModelCatalog } from '../../../services/model-setup/aiModelCatalog';
 import { imageGenerationModel } from '../../../services/image-generation/imageGenerationModel';
 import { createPrefixedId } from '../../../services/ids/idUtils';
@@ -261,6 +264,10 @@ export function useEditorViewModel(services: AppServices) {
   }));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mirrorSettingsOpen, setMirrorSettingsOpen] = useState(false);
+  const [localFontMirrorSettings, setLocalFontMirrorSettings] = useState(() =>
+    services.localFontMirrorService.getSettings(),
+  );
+  const [localFontOptions, setLocalFontOptions] = useState<FontCatalogItem[]>([]);
   const [mediaSettingsOpen, setMediaSettingsOpen] = useState(false);
   const [mirrorDisabledBySettings, setMirrorDisabledBySettings] = useState(false);
   const [remoteImportOpen, setRemoteImportOpen] = useState(false);
@@ -359,6 +366,24 @@ export function useEditorViewModel(services: AppServices) {
     () => services.fontImportService.listDownloadableFonts(),
     [services.fontImportService],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadLocalFontOptions = async () => {
+      const fonts = localFontMirrorSettings.enabled
+        ? await services.localFontMirrorService.listAvailableFonts().catch(() => [])
+        : [];
+      if (!cancelled) setLocalFontOptions(fonts);
+    };
+    void loadLocalFontOptions();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    localFontMirrorSettings.enabled,
+    localFontMirrorSettings.folderLabel,
+    services.localFontMirrorService,
+  ]);
   const activeSlideLanguage = useMemo(() => {
     const option = translationLanguageUtils.getLanguageOption(pageLanguageCodes[activePageId]);
     return {
@@ -1220,20 +1245,19 @@ export function useEditorViewModel(services: AppServices) {
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(false);
       }
-      return;
+      return true;
     }
 
     if (hasPersistedLocalProject) {
-      void reenablePersistence();
-      return;
+      return reenablePersistence();
     }
 
     if (services.persistenceMode === 'opfs') {
-      void reenablePersistence();
-      return;
+      return reenablePersistence();
     }
 
     setLocalProjectSetupOpen(true);
+    return false;
   }
 
   async function reenablePersistence() {
@@ -1260,11 +1284,13 @@ export function useEditorViewModel(services: AppServices) {
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(true);
       }
+      return true;
     } catch {
       setPersistenceEnabled(false);
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(false);
       }
+      return false;
     }
   }
 
@@ -1289,7 +1315,7 @@ export function useEditorViewModel(services: AppServices) {
 
   async function saveLocalNow() {
     if (!persistenceEnabled) {
-      setPersistence(true);
+      void setPersistence(true);
       return;
     }
     try {
@@ -1343,7 +1369,7 @@ export function useEditorViewModel(services: AppServices) {
 
   async function confirmLocalProjectSetup(projectName: string) {
     const nextName = projectName.trim();
-    if (!nextName) return;
+    if (!nextName) return false;
     const nextProject = {
       ...projectRef.current,
       name: nextName,
@@ -1372,11 +1398,13 @@ export function useEditorViewModel(services: AppServices) {
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(true);
       }
+      return true;
     } catch {
       setPersistenceEnabled(false);
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(false);
       }
+      return false;
     }
   }
 
@@ -1699,6 +1727,14 @@ export function useEditorViewModel(services: AppServices) {
     setMirrorSettingsOpen(false);
   }
 
+  function setLocalFontMirrorEnabled(enabled: boolean) {
+    setLocalFontMirrorSettings(services.localFontMirrorService.setEnabled(enabled));
+  }
+
+  async function chooseLocalFontMirrorFolder() {
+    setLocalFontMirrorSettings(await services.localFontMirrorService.chooseFontFolder());
+  }
+
   function closeRemoteImport() {
     setRemoteImportOpen(false);
   }
@@ -1736,11 +1772,42 @@ export function useEditorViewModel(services: AppServices) {
     setMirrorEnabled(enabled, { fromSettings: true });
   }
 
-  async function testMirrorConnection(config: MinioMirrorConfig) {
+  async function testMirrorConnection(
+    config: MinioMirrorConfig,
+    options?: { onProgress?: (progress: LocalFontMirrorProgress) => void },
+  ) {
     setMirrorState({ enabled: true, status: 'syncing' });
     try {
+      options?.onProgress?.({ label: 'Checking storage', stage: 'checking-local-fonts' });
       await services.mirrorService.listProjects(config);
+      const testFontFiles = localFontMirrorSettings.enabled
+        ? await services.localFontMirrorService.getTestFontFiles({
+            ...(options?.onProgress ? { onProgress: options.onProgress } : {}),
+          })
+        : [];
+      if (localFontMirrorSettings.enabled && testFontFiles.length > 0) {
+        if (!services.mirrorService.uploadPublicObject) {
+          throw new Error('Mirror storage does not support public font uploads.');
+        }
+        options?.onProgress?.({ label: 'Uploading test fonts', stage: 'uploading-test-fonts' });
+        await Promise.all(
+          testFontFiles.map((file, index) => {
+            const key = storageObjectUtils.joinObjectKey(
+              storageObjectUtils.normalizeObjectKeyPart(config.prefix),
+              'font-mirror-test',
+              `${Date.now().toString(36)}-${index + 1}-${file.name}`,
+            );
+            return services.mirrorService.uploadPublicObject?.(key, file, config) ?? Promise.resolve();
+          }),
+        );
+      }
+      const fontMirrorTestResult = localFontMirrorSettings.enabled
+        ? await services.localFontMirrorService.validateTestFontFiles(testFontFiles, {
+            ...(options?.onProgress ? { onProgress: options.onProgress } : {}),
+          })
+        : {};
       setMirrorState({ enabled: true, status: 'idle' });
+      return fontMirrorTestResult.warning;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'S3-compatible connection failed.';
       setMirrorState({
@@ -1750,6 +1817,20 @@ export function useEditorViewModel(services: AppServices) {
       });
       throw new Error(message, { cause: error });
     }
+  }
+
+  async function prepareProjectFontsForPublicShare(
+    options?: { onProgress?: (progress: LocalFontMirrorProgress) => void },
+  ) {
+    const result = await services.localFontMirrorService.importProjectFonts(projectRef.current, {
+      ...(options?.onProgress ? { onProgress: options.onProgress } : {}),
+    });
+    if (result.project !== projectRef.current) {
+      setProject(result.project);
+      projectRef.current = result.project;
+      await editorViewModelRuntime.loadProjectFonts(result.project, services.fontImportService).catch(() => undefined);
+    }
+    return result;
   }
 
   function queueMirrorSync() {
@@ -2057,6 +2138,35 @@ export function useEditorViewModel(services: AppServices) {
         elementId: selectedElementId,
         font,
         fonts: result.fonts,
+        project: currentProject,
+      });
+    });
+  }
+
+  async function importLocalFontForSelection(family: string) {
+    const selectedElementId = selectedElementIdsRef.current[0];
+    if (!selectedElementId) throw new Error('Select a text element before adding a local font.');
+    const selectedElement = projectRef.current.elements[selectedElementId];
+    if (!selectedElement || selectedElement.type !== 'text') {
+      throw new Error('Select a text element before adding a local font.');
+    }
+
+    const result = await services.localFontMirrorService.importFontFamily(projectRef.current, {
+      family,
+      fontStyle: 'normal',
+      fontWeight: selectedElement.fontWeight >= 700 ? 700 : 400,
+    });
+    const font = result.addedFonts[0];
+    if (!font) {
+      throw new Error(result.warnings[0]?.message ?? 'Local font was not found.');
+    }
+
+    await editorViewModelRuntime.loadProjectFonts(result.project, services.fontImportService);
+    commitProject((currentProject) => {
+      return editorViewModelText.applyFontFamilyWithFonts({
+        elementId: selectedElementId,
+        font,
+        fonts: result.project.fonts ?? {},
         project: currentProject,
       });
     });
@@ -2968,6 +3078,8 @@ export function useEditorViewModel(services: AppServices) {
     mirrorState,
     mirrorDisabledBySettings,
     mirrorConfig,
+    hasMirrorConfig,
+    localFontMirrorSettings,
     settingsOpen,
     mirrorSettingsOpen,
     mediaSettingsOpen,
@@ -3001,6 +3113,7 @@ export function useEditorViewModel(services: AppServices) {
     selection,
     activeTab,
     availableFonts,
+    localFontOptions,
     downloadableFonts: services.fontImportService.listDownloadableFonts(),
     activeSlideLanguage,
     setActiveTab,
@@ -3024,6 +3137,9 @@ export function useEditorViewModel(services: AppServices) {
     insertStockMedia,
     saveMirrorConfig,
     testMirrorConnection,
+    setLocalFontMirrorEnabled,
+    chooseLocalFontMirrorFolder,
+    prepareProjectFontsForPublicShare,
     syncMirrorNow,
     requestMirrorNow,
     setMirrorEnabled,
@@ -3132,6 +3248,7 @@ export function useEditorViewModel(services: AppServices) {
     updateElementFrames,
     updateElementStyle,
     downloadFontForSelection,
+    importLocalFontForSelection,
     updateMediaPlayback,
     updatePageBackground,
     applyTheme,

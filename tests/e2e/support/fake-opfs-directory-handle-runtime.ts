@@ -79,7 +79,12 @@ function createFakeOpfsDirectoryHandleClass(
         const [entryName, ...rest] = relativePath.split('/');
         if (!entryName || seen.has(entryName)) continue;
         seen.add(entryName);
-        yield [entryName, { kind: rest.length > 0 ? 'directory' : 'file' }];
+        yield [
+          entryName,
+          rest.length > 0
+            ? new FakeDirectoryHandle(entryName, pathRuntime.normalizePath(`${prefix}/${entryName}`))
+            : new FakeFileHandle(entryName, pathRuntime.normalizePath(`${prefix}/${entryName}`)),
+        ];
       }
     }
   };

@@ -98,6 +98,8 @@ export interface MirrorService<TConfig = unknown> {
   listProjects(config: TConfig): Promise<MirrorProjectSummary[]>;
   downloadProject(projectId: string, config: TConfig): Promise<MirrorFile[]>;
   deleteProject?(projectId: string, config: TConfig): Promise<void>;
+  getPublicObjectUrl?(key: string, config: TConfig): string;
+  uploadPublicObject?(key: string, blob: Blob, config: TConfig): Promise<void>;
 }
 
 export interface VersionHistoryEntry {
@@ -216,13 +218,65 @@ export interface FontImportResult {
 export interface FontCatalogItem {
   aliases?: string[];
   family: string;
-  source: 'google-fonts';
+  source: 'google-fonts' | 'local-font-folder';
 }
 
 export interface FontImportService {
   listDownloadableFonts(): FontCatalogItem[];
   resolveAndDownloadFonts(requests: FontImportRequest[]): Promise<FontImportResult>;
   loadProjectFonts(project: ProjectDocument): Promise<void>;
+}
+
+export interface LocalFontMirrorSettings {
+  enabled: boolean;
+  folderLabel?: string | undefined;
+  supported: boolean;
+  systemHint: string;
+}
+
+export interface LocalFontMirrorProgress {
+  label: string;
+  stage:
+    | 'adding-project-fonts'
+    | 'checking-local-fonts'
+    | 'requesting-font-folder'
+    | 'scanning-font-folder'
+    | 'uploading-test-fonts'
+    | 'verifying-mirrored-fonts';
+}
+
+export interface LocalFontMirrorResult {
+  project: ProjectDocument;
+  addedFonts: ProjectFont[];
+  unresolvedFamilies: string[];
+  warnings: ImportWarning[];
+}
+
+export interface LocalFontMirrorTestResult {
+  warning?: string | undefined;
+}
+
+export interface LocalFontMirrorService {
+  getSettings(): LocalFontMirrorSettings;
+  setEnabled(enabled: boolean): LocalFontMirrorSettings;
+  chooseFontFolder(): Promise<LocalFontMirrorSettings>;
+  listAvailableFonts(): Promise<FontCatalogItem[]>;
+  importFontFamily(
+    project: ProjectDocument,
+    request: FontImportRequest,
+    options?: { onProgress?: (progress: LocalFontMirrorProgress) => void },
+  ): Promise<LocalFontMirrorResult>;
+  importProjectFonts(
+    project: ProjectDocument,
+    options?: { onProgress?: (progress: LocalFontMirrorProgress) => void },
+  ): Promise<LocalFontMirrorResult>;
+  getTestFontFiles(
+    options?: { onProgress?: (progress: LocalFontMirrorProgress) => void },
+  ): Promise<File[]>;
+  validateTestFontFiles(
+    files: File[],
+    options?: { onProgress?: (progress: LocalFontMirrorProgress) => void },
+  ): Promise<LocalFontMirrorTestResult>;
 }
 
 export type ShareStatus = 'published' | 'copied' | 'syncing' | 'sync-failed';
