@@ -479,7 +479,7 @@ export function TopToolbar({
                 setIsEditingProjectName(true);
               }}
             >
-              {project.name}
+              <span className="project-title-text">{project.name}</span>
             </button>
           )}
           <ProjectPlayControl
