@@ -50,9 +50,9 @@ import { CanvasDragGuide } from './CanvasDragGuide';
 import { CropFrameOverlay } from './CropFrameOverlay';
 import type { CommonElementProps, ElementAnimationRenderState } from './canvas-element-props';
 import { shapeLineDraw } from './shape-line-draw';
+import { textTranslationLayout } from '../state/text-translation-layout';
 
 const TEXT_FRAME_PADDING = 6;
-const TEXT_EDITOR_HEIGHT_BUFFER = 4;
 
 interface CanvasWorkspaceProps {
   project: ProjectDocument;
@@ -648,12 +648,13 @@ export function CanvasWorkspace({
 
   function updateTextEditing(element: Extract<DesignElement, { type: 'text' }>, input: HTMLTextAreaElement) {
     const nextValue = input.value;
+    const nextHeight = textTranslationLayout.getMinimumTextFrameHeight({
+      ...element,
+      text: nextValue,
+    });
+
     setEditingTextValue(nextValue);
     onUpdateTextContent?.(element.id, nextValue);
-
-    const nextHeight = Math.ceil(
-      Math.max(8, toDocumentY(input.scrollHeight + TEXT_EDITOR_HEIGHT_BUFFER)),
-    );
     setEditingTextHeight(nextHeight);
     if (nextHeight !== element.height) {
       onUpdateElementFrame?.(element.id, { height: nextHeight });

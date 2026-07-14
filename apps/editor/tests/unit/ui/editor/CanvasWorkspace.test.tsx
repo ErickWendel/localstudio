@@ -213,6 +213,46 @@ describe('CanvasWorkspace', () => {
     );
   });
 
+  it('shrinks the live text editor frame to the typed text height', () => {
+    const onSelectElement = vi.fn();
+    const onUpdateElementFrame = vi.fn<(elementId: string, patch: ElementFramePatch) => void>();
+    const onUpdateTextContent = vi.fn();
+    const stageRef = createRef<Konva.Stage>();
+    const project = sampleProject.createSampleProject();
+
+    render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['text-title'] }}
+        stageRef={stageRef}
+        onSelectElement={onSelectElement}
+        onUpdateElementFrame={onUpdateElementFrame}
+        onUpdateTextContent={onUpdateTextContent}
+      />,
+    );
+
+    const textNode = stageRef.current
+      ?.find('Text')
+      .find((node) => (node as Konva.Text).text() === 'AI Design Revolution') as
+      | Konva.Text
+      | undefined;
+    expect(textNode).toBeDefined();
+
+    act(() => {
+      textNode!.fire('dblclick', { target: textNode });
+    });
+
+    const editor = screen.getByLabelText('Edit text');
+    fireEvent.change(editor, { target: { value: 'Hello dear' } });
+
+    expect(onUpdateTextContent).toHaveBeenCalledWith('text-title', 'Hello dear');
+    const lastFrameUpdate = onUpdateElementFrame.mock.calls.at(-1);
+    expect(lastFrameUpdate?.[0]).toBe('text-title');
+    expect(typeof lastFrameUpdate?.[1].height).toBe('number');
+    expect(lastFrameUpdate?.[1].height).toBeLessThan(project.elements['text-title']!.height);
+  });
+
   it('hides vertical transform handles for selected text', () => {
     const stageRef = createRef<Konva.Stage>();
     const project = sampleProject.createSampleProject();

@@ -71,6 +71,8 @@ export async function resizeTextAndUseArrangeControls(page: Page, baseURL: strin
   await page.mouse.dblclick(editPoint.x, editPoint.y);
   const canvasTextEditor = page.getByRole('textbox', { name: 'Edit text' });
   await expect(canvasTextEditor).toBeVisible();
+  await canvasTextEditor.fill('Hello dear');
+  await expect.poll(async () => Number(await heightInput.inputValue())).toBeLessThan(120);
   await canvasTextEditor.fill(
     '55 Horas, 770M Tokens e Uma Alternativa ao Canva Rodando no Browser',
   );
