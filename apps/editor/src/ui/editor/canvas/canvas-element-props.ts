@@ -5,6 +5,7 @@ import type { AnimationPresetRenderState } from '../animation/animationPresetEng
 export interface CommonElementProps {
   draggable: boolean;
   height: number;
+  listening?: boolean;
   name?: string;
   offsetX: number;
   offsetY: number;

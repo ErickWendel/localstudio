@@ -235,6 +235,13 @@ export function CanvasWorkspace({
     | undefined
   >();
   const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
+  const activeLayout = page?.layoutId ? project.slideLayouts?.[page.layoutId] : undefined;
+  const layoutVisibleElements =
+    activeLayout?.elementIds
+      .map((id) => activeLayout.elements[id])
+      .filter(canvasWorkspaceUtils.isDesignElement)
+      .filter((element) => element.visible !== false && !element.placeholderRole) ?? [];
+  const layoutVisibleElementIds = new Set(layoutVisibleElements.map((element) => element.id));
   const sourceVisibleElements =
     page?.elementIds
       .map((id) => project.elements[id])
@@ -244,9 +251,10 @@ export function CanvasWorkspace({
     if (!element || element.type !== 'image' || cropDraft?.elementId !== element.id) return element;
     return { ...element, ...cropDraft.frame, crop: cropDraft.crop };
   };
-  const visibleElements = sourceVisibleElements
+  const pageVisibleElements = sourceVisibleElements
     .map((element) => getDraftedElement(element))
     .filter(canvasWorkspaceUtils.isDesignElement);
+  const visibleElements = [...layoutVisibleElements, ...pageVisibleElements];
   const visibleMediaElements = visibleElements.filter(
     (element): element is GifElement | VideoElement =>
       element.type === 'gif' || element.type === 'video',
@@ -457,7 +465,7 @@ export function CanvasWorkspace({
   }
 
   function selectElementsInMarquee(rect: StageRect) {
-    const selectedElementIds = visibleElements
+    const selectedElementIds = pageVisibleElements
       .filter((element) => stageRectsIntersect(rect, getElementStageRect(element)))
       .map((element) => element.id);
     selectedElementIds.forEach((elementId, index) => {
@@ -703,15 +711,17 @@ export function CanvasWorkspace({
     };
   }
 
-  function getCommonElementProps(element: DesignElement): CommonElementProps {
+  function getCommonElementProps(element: DesignElement, options: { interactive?: boolean } = {}): CommonElementProps {
+    const isInteractive = options.interactive ?? true;
     const isBackgroundSelectionTarget = element.id === backgroundSelectionTargetId;
     const isProcessing = processingElementIds.includes(element.id);
     const animationState = getElementAnimationState(element);
     const animationTransform = animationState.preset?.transform;
 
     return {
-      draggable: !readOnly && !element.locked && !backgroundSelectionMode && !isProcessing,
+      draggable: isInteractive && !readOnly && !element.locked && !backgroundSelectionMode && !isProcessing,
       height: element.height * scaleY,
+      ...(!isInteractive ? { listening: false } : {}),
       ...(animationState.activeBuild ? { name: `animated-element-${element.id}` } : {}),
       offsetX: animationTransform?.offsetX ?? 0,
       offsetY: animationTransform?.offsetY ?? 0,
@@ -730,6 +740,7 @@ export function CanvasWorkspace({
       x: element.x * scaleX + (animationTransform?.x ?? 0),
       y: element.y * scaleY + (animationTransform?.y ?? 0),
       onClick: (event: Konva.KonvaEventObject<MouseEvent>) => {
+        if (!isInteractive) return;
         if (canAdvanceAnimationPreviewByClick) {
           event.cancelBubble = true;
           onAnimationPreviewAdvance?.();
@@ -748,14 +759,17 @@ export function CanvasWorkspace({
       },
       onContextMenu: (event: Konva.KonvaEventObject<PointerEvent>) => {
         event.evt.preventDefault();
+        if (!isInteractive) return;
         if (isProcessing || !backgroundSelectionMode) return;
         pickBackgroundSubject(element, event);
       },
       onDblClick: () => {
+        if (!isInteractive) return;
         if (readOnly) return;
         startTextEditing(element);
       },
       onDblTap: () => {
+        if (!isInteractive) return;
         if (readOnly) return;
         startTextEditing(element);
       },
@@ -790,6 +804,7 @@ export function CanvasWorkspace({
         }
       },
       onTap: () => {
+        if (!isInteractive) return;
         if (isProcessing) return;
         onSelectElement?.(element.id);
       },
@@ -1002,7 +1017,10 @@ export function CanvasWorkspace({
               />
               {visibleElements.map((element) => {
                 const animationState = getElementAnimationState(element);
-                const commonProps = getCommonElementProps(element);
+                const isLayoutElement = layoutVisibleElementIds.has(element.id);
+                const commonProps = getCommonElementProps(element, {
+                  interactive: !isLayoutElement,
+                });
                 const nodeRef = (node: Konva.Node | null) => {
                   setElementNodeRef(element.id, node);
                 };

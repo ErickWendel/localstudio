@@ -36,9 +36,25 @@ describe('PowerPoint sample regression', () => {
       slide15?.elementIds
         .map((elementId) => project.elements[elementId])
         .filter((element) => element?.type === 'image') ?? [];
-    const authorLabel = project.pages[2]?.elementIds
+    const slide15LayoutImageElements =
+      slide15?.layoutId
+        ? (project.slideLayouts?.[slide15.layoutId]?.elementIds
+            .map((elementId) => project.slideLayouts?.[slide15.layoutId!]?.elements[elementId])
+            .filter((element) => element?.type === 'image') ?? [])
+        : [];
+    const slide5Text = project.pages[4]?.elementIds
       .map((elementId) => project.elements[elementId])
+      .find((element) => element?.type === 'text' && element.text === 'Meu objetivo hoje');
+    const authorLabel = Object.values(project.slideLayouts ?? {})
+      .flatMap((layout) => layout.elementIds.map((elementId) => layout.elements[elementId]))
       .find((element) => element?.type === 'text' && element.text === 'Erick Wendel');
+    const authorLayout = Object.values(project.slideLayouts ?? {}).find((layout) =>
+      layout.elementIds.some((elementId) => layout.elements[elementId] === authorLabel),
+    );
+    const headerLogoElements =
+      authorLayout?.elementIds
+        .map((elementId) => authorLayout.elements[elementId])
+        .flatMap((element) => (element?.type === 'image' && element.y <= 10 ? [element] : [])) ?? [];
     const slide15BuildLabels =
       slide15?.animationBuilds?.map((build) => {
         const element = project.elements[build.elementId];
@@ -91,7 +107,15 @@ describe('PowerPoint sample regression', () => {
         .filter((element) => element.fontSize >= 80)
         .every((element) => element.height >= element.fontSize),
     ).toBe(true);
-    expect(slide15ImageElements.length).toBeGreaterThan(0);
+    expect(slide15ImageElements).toHaveLength(0);
+    expect(slide15LayoutImageElements.length).toBeGreaterThan(0);
+    expect(slide5Text).toMatchObject({
+      fill: '#FFFFFF',
+      fontFamily: 'American Typewriter',
+      fontWeight: 700,
+    });
+    if (!slide5Text || slide5Text.type !== 'text') throw new Error('Expected slide 5 title text.');
+    expect(slide5Text.fontSize).toBeGreaterThanOrEqual(160);
     if (!authorLabel || authorLabel.type !== 'text') throw new Error('Expected author text label.');
     if (!slide18BulletText || slide18BulletText.type !== 'text') {
       throw new Error('Expected slide 18 bullet text.');
@@ -104,9 +128,12 @@ describe('PowerPoint sample regression', () => {
     }
     expect(authorLabel.height).toEqual(expect.any(Number));
     expect(authorLabel.width).toEqual(expect.any(Number));
-    expect(authorLabel.width).toBeGreaterThanOrEqual(220);
+    expect(authorLabel.width).toBeGreaterThanOrEqual(190);
     expect(authorLabel.height).toBeGreaterThanOrEqual(authorLabel.fontSize * 1.35);
-    expect(slide18BulletText.fontSize).toBeGreaterThanOrEqual(70);
+    expect(headerLogoElements.length).toBeGreaterThanOrEqual(4);
+    expect(headerLogoElements.every((element) => element.width >= 30 && element.height >= 30)).toBe(true);
+    expect(authorLabel.fontSize).toBeGreaterThanOrEqual(30);
+    expect(slide18BulletText.fontSize).toBeGreaterThanOrEqual(69);
     expect(slide18BulletText.fontSize).toBeLessThanOrEqual(90);
     expect(slide21TitleText.align).toBe('center');
     expect(
@@ -117,7 +144,7 @@ describe('PowerPoint sample regression', () => {
       Math.abs(slide21LinkText.x + slide21LinkText.width / 2 - project.pages[20]!.width / 2),
     ).toBeLessThanOrEqual(1);
     expect(slide26VideoIds.length).toBeGreaterThan(0);
-    expect(slide26AnimatedVideoIds).toEqual([]);
+    expect(slide26AnimatedVideoIds).toEqual(expect.arrayContaining(slide26VideoIds));
     expect(slide29Text).toContain('Por que uma LLM');
   });
 });

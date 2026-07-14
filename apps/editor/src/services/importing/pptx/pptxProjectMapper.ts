@@ -26,6 +26,45 @@ const IMAGE_FIT = {
   aspectRatioTolerance: 0.03,
 };
 
+const TEXT_CONTRAST = {
+  minimumRatio: 2,
+};
+
+function parseHexChannel(value: string, start: number) {
+  return Number.parseInt(value.slice(start, start + 2), 16);
+}
+
+function getRelativeLuminance(color: string) {
+  const normalized = color.replace(/^#/, '');
+  if (!/^[0-9a-f]{6}$/i.test(normalized)) return undefined;
+  const channels = [
+    parseHexChannel(normalized, 0),
+    parseHexChannel(normalized, 2),
+    parseHexChannel(normalized, 4),
+  ] as const;
+  const [red, green, blue] = channels.map((channel) => {
+    const value = channel / 255;
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  }) as [number, number, number];
+  return red * 0.2126 + green * 0.7152 + blue * 0.0722;
+}
+
+function getContrastRatio(firstColor: string, secondColor: string) {
+  const firstLuminance = getRelativeLuminance(firstColor);
+  const secondLuminance = getRelativeLuminance(secondColor);
+  if (firstLuminance === undefined || secondLuminance === undefined) return Number.POSITIVE_INFINITY;
+  const lighter = Math.max(firstLuminance, secondLuminance);
+  const darker = Math.min(firstLuminance, secondLuminance);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function getReadableTextFill(fill: string, backgroundColor: string) {
+  if (getContrastRatio(fill, backgroundColor) >= TEXT_CONTRAST.minimumRatio) return fill;
+  return getContrastRatio('#FFFFFF', backgroundColor) >= getContrastRatio('#000000', backgroundColor)
+    ? '#FFFFFF'
+    : '#000000';
+}
+
 function createAssetId(path: string, index: number) {
   const slug = path
     .toLowerCase()
@@ -100,21 +139,6 @@ function getInsetTextFrame(object: Extract<PptxSlideObject, { kind: 'text' }>) {
   };
 }
 
-function getHorizontallyAnchoredX(
-  object: Extract<PptxSlideObject, { kind: 'text' }>,
-  frame: ReturnType<typeof getInsetTextFrame>,
-  width: number,
-  pageWidth: number,
-) {
-  if (object.style.align === 'center') {
-    return clampFrameStart(frame.x + frame.width / 2 - width / 2, width, pageWidth);
-  }
-  if (object.style.align === 'right') {
-    return clampFrameStart(frame.x + frame.width - width, width, pageWidth);
-  }
-  return clampFrameStart(frame.x, width, pageWidth);
-}
-
 function getVerticallyAnchoredY(
   object: Extract<PptxSlideObject, { kind: 'text' }>,
   frame: ReturnType<typeof getInsetTextFrame>,
@@ -130,53 +154,6 @@ function getVerticallyAnchoredY(
   return clampFrameStart(frame.y, height, pageHeight);
 }
 
-function getFittedTextFrame(
-  object: Extract<PptxSlideObject, { kind: 'text' }>,
-  pageWidth: number,
-  pageHeight: number,
-  fontSize = object.style.fontSize,
-) {
-  const frame = getInsetTextFrame(object);
-  const lines = getTextLines(object.text);
-  const longestLineUnits = Math.max(...lines.map(getTextLineUnits), 1);
-  const preferredWidth = Math.ceil(
-    longestLineUnits * fontSize * TEXT_FRAME_FIT.averageCharacterWidth +
-      fontSize * TEXT_FRAME_FIT.horizontalPaddingRatio,
-  );
-  const width = Math.min(pageWidth, Math.max(frame.width, preferredWidth));
-  const x = getHorizontallyAnchoredX(object, frame, width, pageWidth);
-
-  const contentWidth = Math.max(
-    fontSize,
-    width - fontSize * TEXT_FRAME_FIT.horizontalPaddingRatio,
-  );
-  const lineCapacity = Math.max(
-    1,
-    contentWidth / (fontSize * TEXT_FRAME_FIT.averageCharacterWidth),
-  );
-  const visualLineCount = lines.reduce(
-    (count, line) => count + Math.max(1, Math.ceil(getTextLineUnits(line) / lineCapacity)),
-    0,
-  );
-  const fittedHeight = Math.ceil(
-    visualLineCount * fontSize * object.style.lineHeight +
-      fontSize * TEXT_FRAME_FIT.heightPaddingRatio,
-  );
-  let height =
-    frame.height > fittedHeight * TEXT_FRAME_FIT.shrinkOversizedHeightRatio
-      ? fittedHeight
-      : Math.max(frame.height, fittedHeight);
-  height = Math.min(pageHeight, height);
-  const y = getVerticallyAnchoredY(object, frame, height, pageHeight);
-
-  return {
-    height,
-    width,
-    x,
-    y,
-  };
-}
-
 function getAutoFitTextFrame(
   object: Extract<PptxSlideObject, { kind: 'text' }>,
   pageWidth: number,
@@ -188,6 +165,30 @@ function getAutoFitTextFrame(
     width: Math.min(pageWidth, frame.width),
     x: clampFrameStart(frame.x, frame.width, pageWidth),
     y: getVerticallyAnchoredY(object, frame, Math.min(pageHeight, frame.height), pageHeight),
+  };
+}
+
+function getBoundedTextFrame(
+  object: Extract<PptxSlideObject, { kind: 'text' }>,
+  pageWidth: number,
+  pageHeight: number,
+  fontSize = object.style.fontSize,
+) {
+  const frame = getFixedTextFrame(object, pageWidth, pageHeight);
+  const visualLineCount = getVisualLineCount(object.text, frame.width, fontSize);
+  const fittedHeight = Math.ceil(
+    visualLineCount * fontSize * object.style.lineHeight +
+      fontSize * TEXT_FRAME_FIT.heightPaddingRatio,
+  );
+  const height =
+    frame.height > fittedHeight * TEXT_FRAME_FIT.shrinkOversizedHeightRatio
+      ? fittedHeight
+      : frame.height;
+  const insetFrame = getInsetTextFrame(object);
+  return {
+    ...frame,
+    height,
+    y: getVerticallyAnchoredY(object, insetFrame, height, pageHeight),
   };
 }
 
@@ -240,8 +241,14 @@ function getAutoFitFontSize(
   pageWidth: number,
   pageHeight: number,
 ) {
-  if (object.textBox.autoFit !== 'shrink-text') return object.style.fontSize;
-  const frame = getAutoFitTextFrame(object, pageWidth, pageHeight);
+  const shouldFitText =
+    object.textBox.autoFit === 'shrink-text' ||
+    (object.placeholderRole !== undefined && object.style.fontSize >= 128);
+  if (!shouldFitText) return object.style.fontSize;
+  const frame =
+    object.textBox.autoFit === 'shrink-text'
+      ? getAutoFitTextFrame(object, pageWidth, pageHeight)
+      : getFixedTextFrame(object, pageWidth, pageHeight);
   if (textFitsFrame(object, frame, object.style.fontSize)) return object.style.fontSize;
   let lower = TEXT_FRAME_FIT.minimumAutoFitFontSize;
   let upper = object.style.fontSize;
@@ -295,6 +302,18 @@ function getCoverCrop(
   };
 }
 
+function getImportSource(object: PptxSlideObject, pageId: string, layoutId?: string) {
+  return {
+    format: 'pptx' as const,
+    pageId,
+    shapeId: object.sourceShapeId,
+    source: object.source,
+    ...(layoutId ? { layoutId } : {}),
+    ...(object.placeholderIndex ? { placeholderIndex: object.placeholderIndex } : {}),
+    ...(object.placeholderRole ? { placeholderRole: object.placeholderRole } : {}),
+  };
+}
+
 function mapObject(
   object: PptxSlideObject,
   pptxPackage: PptxPackage,
@@ -303,6 +322,7 @@ function mapObject(
   pageId: string,
   pageWidth: number,
   pageHeight: number,
+  backgroundColor: string,
   layoutId?: string,
 ): DesignElement | undefined {
   if (object.kind === 'text') {
@@ -314,7 +334,7 @@ function mapObject(
         ? getAutoFitTextFrame(object, pageWidth, pageHeight)
         : object.placeholderRole
           ? getFixedTextFrame(object, pageWidth, pageHeight)
-        : getFittedTextFrame(object, pageWidth, pageHeight, fontSize);
+          : getBoundedTextFrame(object, pageWidth, pageHeight, fontSize);
     return {
       id: object.id,
       type: 'text',
@@ -326,7 +346,9 @@ function mapObject(
       opacity: object.opacity ?? 1,
       ...(layoutId ? { templateSource: { layoutId, type: 'layout' as const } } : {}),
       ...(object.placeholderRole ? { placeholderRole: object.placeholderRole } : {}),
+      importSource: getImportSource(object, pageId, layoutId),
       ...style,
+      fill: getReadableTextFill(style.fill, backgroundColor),
       fontSize,
     };
   }
@@ -341,6 +363,7 @@ function mapObject(
       opacity: object.opacity ?? 1,
       ...(layoutId ? { templateSource: { layoutId, type: 'layout' as const } } : {}),
       ...(object.placeholderRole ? { placeholderRole: object.placeholderRole } : {}),
+      importSource: getImportSource(object, pageId, layoutId),
       shape: object.shape,
       ...(object.fill ? { fill: object.fill } : {}),
       ...(object.stroke ? { stroke: object.stroke } : {}),
@@ -370,6 +393,7 @@ function mapObject(
     opacity: object.opacity ?? 1,
     ...(layoutId ? { templateSource: { layoutId, type: 'layout' as const } } : {}),
     ...(object.placeholderRole ? { placeholderRole: object.placeholderRole } : {}),
+    importSource: getImportSource(object, pageId, layoutId),
   };
   if (object.kind === 'video') {
     return {
@@ -418,6 +442,7 @@ function createLayout(
       layout.id,
       pageWidth,
       pageHeight,
+      layout.backgroundColor,
       layout.id,
     );
     if (!element) continue;
@@ -478,7 +503,16 @@ function map(deck: PptxDeck, pptxPackage: PptxPackage): ProjectDocument {
       : createSlideFallbackLayout(slide, pptxPackage, assets, warnings, deck.width, deck.height);
     if (layout) slideLayouts[layout.id] = layout;
     for (const object of slide.objects.sort((left, right) => left.zIndex - right.zIndex)) {
-      const element = mapObject(object, pptxPackage, assets, warnings, slide.id, deck.width, deck.height);
+      const element = mapObject(
+        object,
+        pptxPackage,
+        assets,
+        warnings,
+        slide.id,
+        deck.width,
+        deck.height,
+        slide.backgroundColor,
+      );
       if (!element) continue;
       elements[element.id] = element;
       elementIds.push(element.id);

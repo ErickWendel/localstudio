@@ -2,8 +2,10 @@ import type { PlaceholderRole } from '../../../domain/documents/model';
 import type {
   ParseContext,
   PptxTextBox,
+  PptxTextBoxOverrides,
   PptxTextDefaults,
   PptxTextStyle,
+  PptxTextStyleOverrides,
   PptxTheme,
 } from './pptx-parser-model';
 import { pptxParserDefaults } from './pptx-parser-model';
@@ -89,6 +91,10 @@ function getFirstParagraph(shape: Element) {
   return body ? pptxXml.firstDescendant(body, 'p') : undefined;
 }
 
+function getTextBody(shape: Element) {
+  return pptxXml.firstDescendant(shape, 'txBody');
+}
+
 function getFirstRunProperties(paragraph: Element | undefined) {
   const run = paragraph ? pptxXml.firstDescendant(paragraph, 'r') : undefined;
   return run ? pptxXml.firstDescendant(run, 'rPr') : undefined;
@@ -99,13 +105,21 @@ function getParagraphDefaultRunProperties(paragraphProperties: Element | undefin
 }
 
 function getListParagraphProperties(shape: Element) {
-  const listStyle = pptxXml.firstDescendant(shape, 'lstStyle');
-  return listStyle ? pptxXml.firstDescendant(listStyle, 'lvl1pPr') : undefined;
+  const textBody = getTextBody(shape);
+  const listStyle = textBody ? pptxXml.childElements(textBody, 'lstStyle')[0] : undefined;
+  return listStyle ? pptxXml.childElements(listStyle, 'lvl1pPr')[0] : undefined;
 }
 
 function getListDefaultRunProperties(shape: Element) {
   const listParagraphProperties = getListParagraphProperties(shape);
   return listParagraphProperties ? pptxXml.firstDescendant(listParagraphProperties, 'defRPr') : undefined;
+}
+
+function getTextBodyListDefaultRunProperties(shape: Element) {
+  const textBody = getTextBody(shape);
+  const listStyle = textBody ? pptxXml.childElements(textBody, 'lstStyle')[0] : undefined;
+  const listParagraphProperties = listStyle ? pptxXml.childElements(listStyle, 'lvl1pPr')[0] : undefined;
+  return listParagraphProperties ? pptxXml.childElements(listParagraphProperties, 'defRPr')[0] : undefined;
 }
 
 function getFirstAttribute(name: string, ...elements: Array<Element | undefined>) {
@@ -123,6 +137,38 @@ function hasEnabledBold(...elements: Array<Element | undefined>) {
     if (value === '0') return false;
   }
   return false;
+}
+
+function hasTypeface(...runProperties: Array<Element | undefined>) {
+  return Boolean(getTypeface(...runProperties));
+}
+
+function hasFill(theme: PptxTheme | undefined, ...elements: Array<Element | undefined>) {
+  return elements.some((element) => Boolean(pptxVisualStyle.getHexColor(element, '', theme)));
+}
+
+function hasLineSpacing(...paragraphProperties: Array<Element | undefined>) {
+  return paragraphProperties.some((properties) =>
+    Boolean(properties ? pptxXml.firstDescendant(properties, 'lnSpc') : undefined),
+  );
+}
+
+function getLocalStyleSources(shape: Element) {
+  const paragraph = getFirstParagraph(shape);
+  const paragraphProperties = paragraph ? pptxXml.firstDescendant(paragraph, 'pPr') : undefined;
+  const runProperties = getFirstRunProperties(paragraph);
+  const paragraphDefaultRunProperties = getParagraphDefaultRunProperties(paragraphProperties);
+  const textBodyListDefaultRunProperties = getTextBodyListDefaultRunProperties(shape);
+  const listParagraphProperties = getListParagraphProperties(shape);
+  const listDefaultRunProperties = getListDefaultRunProperties(shape);
+  return {
+    listDefaultRunProperties,
+    listParagraphProperties,
+    paragraphDefaultRunProperties,
+    paragraphProperties,
+    runProperties,
+    textBodyListDefaultRunProperties,
+  };
 }
 
 function getRoleParagraphProperties(
@@ -211,12 +257,14 @@ function getTextStyle(
   theme: PptxTheme | undefined,
   placeholderRole?: PlaceholderRole,
 ): PptxTextStyle {
-  const paragraph = getFirstParagraph(shape);
-  const paragraphProperties = paragraph ? pptxXml.firstDescendant(paragraph, 'pPr') : undefined;
-  const runProperties = getFirstRunProperties(paragraph);
-  const paragraphDefaultRunProperties = getParagraphDefaultRunProperties(paragraphProperties);
-  const listParagraphProperties = getListParagraphProperties(shape);
-  const listDefaultRunProperties = getListDefaultRunProperties(shape);
+  const {
+    listDefaultRunProperties,
+    listParagraphProperties,
+    paragraphDefaultRunProperties,
+    paragraphProperties,
+    runProperties,
+    textBodyListDefaultRunProperties,
+  } = getLocalStyleSources(shape);
   const verticalAlign = getVerticalAlign(shape);
   const roleParagraphProperties = getRoleParagraphProperties(placeholderRole, textDefaults);
   const roleRunProperties = getRoleRunProperties(placeholderRole, textDefaults);
@@ -233,6 +281,7 @@ function getTextStyle(
       'sz',
       runProperties,
       paragraphDefaultRunProperties,
+      textBodyListDefaultRunProperties,
       listDefaultRunProperties,
       roleRunProperties,
       inheritedRunProperties,
@@ -243,6 +292,7 @@ function getTextStyle(
   const font = getTypeface(
     runProperties,
     paragraphDefaultRunProperties,
+    textBodyListDefaultRunProperties,
     listDefaultRunProperties,
     roleRunProperties,
     inheritedRunProperties,
@@ -253,6 +303,7 @@ function getTextStyle(
   const bold = hasEnabledBold(
     runProperties,
     paragraphDefaultRunProperties,
+    textBodyListDefaultRunProperties,
     listDefaultRunProperties,
     roleRunProperties,
     inheritedRunProperties,
@@ -263,6 +314,7 @@ function getTextStyle(
     'cap',
     runProperties,
     paragraphDefaultRunProperties,
+    textBodyListDefaultRunProperties,
     listDefaultRunProperties,
     roleRunProperties,
     inheritedRunProperties,
@@ -277,6 +329,7 @@ function getTextStyle(
       theme,
       runProperties,
       paragraphDefaultRunProperties,
+      textBodyListDefaultRunProperties,
       listDefaultRunProperties,
       roleRunProperties,
       inheritedRunProperties,
@@ -304,6 +357,33 @@ function getTextFill(theme: PptxTheme | undefined, ...elements: Array<Element | 
   return pptxParserDefaults.textStyle.fill;
 }
 
+function getTextStyleOverrides(shape: Element, theme: PptxTheme | undefined): PptxTextStyleOverrides {
+  const {
+    listDefaultRunProperties,
+    listParagraphProperties,
+    paragraphDefaultRunProperties,
+    paragraphProperties,
+    runProperties,
+    textBodyListDefaultRunProperties,
+  } = getLocalStyleSources(shape);
+  const runSources = [
+    runProperties,
+    paragraphDefaultRunProperties,
+    textBodyListDefaultRunProperties,
+    listDefaultRunProperties,
+  ];
+  const overrides: PptxTextStyleOverrides = {};
+  if (getFirstAttribute('algn', paragraphProperties, listParagraphProperties)) overrides.align = true;
+  if (getFirstAttribute('cap', ...runSources)) overrides.capitalization = true;
+  if (hasFill(theme, ...runSources, shape)) overrides.fill = true;
+  if (hasTypeface(...runSources)) overrides.fontFamily = true;
+  if (getFirstAttribute('sz', ...runSources)) overrides.fontSize = true;
+  if (getFirstAttribute('b', ...runSources)) overrides.fontWeight = true;
+  if (hasLineSpacing(paragraphProperties, listParagraphProperties)) overrides.lineHeight = true;
+  if (pptxXml.firstDescendant(shape, 'bodyPr')?.getAttribute('anchor')) overrides.verticalAlign = true;
+  return overrides;
+}
+
 function applyRunCapitalization(text: string, runProperties: Element | undefined) {
   const capitalization = runProperties?.getAttribute('cap');
   if (capitalization === 'all') return text.toLocaleUpperCase();
@@ -322,7 +402,7 @@ function getParagraphText(paragraph: Element) {
 }
 
 function getTextParagraphs(shape: Element) {
-  const body = pptxXml.firstDescendant(shape, 'txBody');
+  const body = getTextBody(shape);
   const paragraphs = body ? pptxXml.descendants(body, 'p') : [];
   return paragraphs
     .map((paragraph) => getParagraphText(paragraph).replace(/[ \t\r\f\v]+/g, ' ').trim())
@@ -377,6 +457,23 @@ function getTextBox(shape: Element, scaleX: number, scaleY: number): PptxTextBox
   };
 }
 
+function getTextBoxOverrides(shape: Element): PptxTextBoxOverrides {
+  const bodyProperties = pptxXml.firstDescendant(shape, 'bodyPr');
+  const overrides: PptxTextBoxOverrides = {};
+  if (!bodyProperties) return overrides;
+  if (pptxXml.firstDescendant(bodyProperties, 'normAutofit')) overrides.autoFit = true;
+  if (bodyProperties.getAttribute('anchor')) overrides.verticalAlign = true;
+  if (
+    bodyProperties.getAttribute('bIns') !== null ||
+    bodyProperties.getAttribute('lIns') !== null ||
+    bodyProperties.getAttribute('rIns') !== null ||
+    bodyProperties.getAttribute('tIns') !== null
+  ) {
+    overrides.insets = true;
+  }
+  return overrides;
+}
+
 export const pptxTextParser = {
   applyTextStyle,
   getMasterTextDefaults,
@@ -386,7 +483,9 @@ export const pptxTextParser = {
   getPlaceholderType,
   getPresentationTextDefaults,
   getTextBox,
+  getTextBoxOverrides,
   getTextParagraphs,
   getTextStyle,
+  getTextStyleOverrides,
   parseSpeakerNotes,
 };

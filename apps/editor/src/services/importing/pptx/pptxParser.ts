@@ -99,6 +99,9 @@ function parseTextObject(
     (idScope === 'slide' ? '' : pptxTextParser.getPlaceholderFallbackText(placeholderRole));
   if (!rawText) return undefined;
   const style = pptxTextParser.getTextStyle(shape, scaleY, textDefaults, scope.theme, placeholderRole);
+  const styleOverrides = pptxTextParser.getTextStyleOverrides(shape, scope.theme);
+  const textBox = pptxTextParser.getTextBox(shape, scaleX, scaleY);
+  const textBoxOverrides = pptxTextParser.getTextBoxOverrides(shape);
   const text = pptxTextParser.applyTextStyle(rawText, style);
   if (!text) return undefined;
   const frame = parseFrame(shape, scaleX, scaleY, scope.groupTransform);
@@ -118,8 +121,10 @@ function parseTextObject(
     source: idScope,
     sourceShapeId: shapeId,
     style,
+    ...(Object.keys(styleOverrides).length > 0 ? { styleOverrides } : {}),
     text,
-    textBox: pptxTextParser.getTextBox(shape, scaleX, scaleY),
+    textBox,
+    ...(Object.keys(textBoxOverrides).length > 0 ? { textBoxOverrides } : {}),
     zIndex,
   };
 }
@@ -658,11 +663,47 @@ function findInheritedPlaceholder(
   const exactMatch = object.placeholderIndex
     ? candidates.find((candidate) => candidate.placeholderIndex === object.placeholderIndex)
     : undefined;
-  return exactMatch ?? candidates.at(-1);
+  if (exactMatch) return exactMatch;
+  if (candidates.length <= 1) return candidates[0];
+  if ('frameSource' in object && object.frameSource === 'inherited') return candidates.at(-1);
+  return [...candidates].sort((left, right) =>
+    getPlaceholderGeometryScore(object, left) - getPlaceholderGeometryScore(object, right),
+  )[0];
+}
+
+function getPlaceholderGeometryScore(object: PptxSlideObject, candidate: PptxSlideObject) {
+  const objectCenterX = object.frame.x + object.frame.width / 2;
+  const objectCenterY = object.frame.y + object.frame.height / 2;
+  const candidateCenterX = candidate.frame.x + candidate.frame.width / 2;
+  const candidateCenterY = candidate.frame.y + candidate.frame.height / 2;
+  const centerDistance =
+    (objectCenterX - candidateCenterX) ** 2 + (objectCenterY - candidateCenterY) ** 2;
+  const areaDelta = Math.abs(
+    object.frame.width * object.frame.height - candidate.frame.width * candidate.frame.height,
+  );
+  return centerDistance + areaDelta * 0.01;
 }
 
 function textBoxMatchesDefaults(object: Extract<PptxSlideObject, { kind: 'text' }>) {
-  return object.textBox.autoFit === 'none' && object.textBox.verticalAlign === 'top';
+  return (
+    !object.textBoxOverrides &&
+    object.textBox.autoFit === 'none' &&
+    object.textBox.verticalAlign === 'top'
+  );
+}
+
+function inheritTextBox(
+  object: Extract<PptxSlideObject, { kind: 'text' }>,
+  inheritedObject: Extract<PptxSlideObject, { kind: 'text' }>,
+) {
+  if (textBoxMatchesDefaults(object)) return inheritedObject.textBox;
+  const textBoxOverrides = object.textBoxOverrides ?? {};
+  return {
+    ...inheritedObject.textBox,
+    ...(textBoxOverrides.autoFit ? { autoFit: object.textBox.autoFit } : {}),
+    ...(textBoxOverrides.insets ? { insets: object.textBox.insets } : {}),
+    ...(textBoxOverrides.verticalAlign ? { verticalAlign: object.textBox.verticalAlign } : {}),
+  };
 }
 
 function inheritPlaceholderTextObject(
@@ -671,14 +712,20 @@ function inheritPlaceholderTextObject(
 ) : Extract<PptxSlideObject, { kind: 'text' }> {
   const inheritedStyle = inheritedObject.style;
   const inheritsFrame = object.frameSource === 'inherited';
-  const textBox = textBoxMatchesDefaults(object) ? inheritedObject.textBox : object.textBox;
+  const textBox = inheritTextBox(object, inheritedObject);
+  const styleOverrides = object.styleOverrides ?? {};
   const style = {
     ...inheritedStyle,
     align: object.style.align,
+    ...(styleOverrides.fill ? { fill: object.style.fill } : {}),
+    ...(styleOverrides.fontFamily ? { fontFamily: object.style.fontFamily } : {}),
+    ...(styleOverrides.fontSize ? { fontSize: object.style.fontSize } : {}),
     fontWeight:
-      object.style.fontWeight === pptxParserDefaults.textStyle.fontWeight
+      !styleOverrides.fontWeight && object.style.fontWeight === pptxParserDefaults.textStyle.fontWeight
         ? inheritedStyle.fontWeight
         : object.style.fontWeight,
+    ...(styleOverrides.lineHeight ? { lineHeight: object.style.lineHeight } : {}),
+    ...(styleOverrides.verticalAlign ? { verticalAlign: object.style.verticalAlign } : {}),
     ...(object.style.capitalization ? { capitalization: object.style.capitalization } : {}),
   };
   return {

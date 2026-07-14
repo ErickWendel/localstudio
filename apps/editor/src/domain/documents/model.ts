@@ -150,6 +150,15 @@ export interface ProjectFont {
 export type DesignElement = TextElement | ImageElement | GifElement | VideoElement | ShapeElement;
 
 export type ElementTemplateSource = { layoutId: string; type: 'layout' };
+export type ElementImportSource = {
+  format: 'pptx';
+  pageId: string;
+  shapeId: string;
+  source: 'layout' | 'master' | 'slide';
+  layoutId?: string;
+  placeholderIndex?: string;
+  placeholderRole?: PlaceholderRole;
+};
 export type PlaceholderRole = 'body' | 'footer' | 'slideNumber' | 'title';
 
 export interface PresentationTheme {
@@ -202,6 +211,7 @@ export interface BaseElement {
   opacity: number;
   templateSource?: ElementTemplateSource;
   placeholderRole?: PlaceholderRole;
+  importSource?: ElementImportSource;
 }
 
 export interface TextElement extends BaseElement {
