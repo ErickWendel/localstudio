@@ -89,6 +89,10 @@ function getFirstParagraph(shape: Element) {
   return body ? pptxXml.firstDescendant(body, 'p') : undefined;
 }
 
+function getTextBody(shape: Element) {
+  return pptxXml.firstDescendant(shape, 'txBody');
+}
+
 function getFirstRunProperties(paragraph: Element | undefined) {
   const run = paragraph ? pptxXml.firstDescendant(paragraph, 'r') : undefined;
   return run ? pptxXml.firstDescendant(run, 'rPr') : undefined;
@@ -99,8 +103,9 @@ function getParagraphDefaultRunProperties(paragraphProperties: Element | undefin
 }
 
 function getListParagraphProperties(shape: Element) {
-  const listStyle = pptxXml.firstDescendant(shape, 'lstStyle');
-  return listStyle ? pptxXml.firstDescendant(listStyle, 'lvl1pPr') : undefined;
+  const textBody = getTextBody(shape);
+  const listStyle = textBody ? pptxXml.childElements(textBody, 'lstStyle')[0] : undefined;
+  return listStyle ? pptxXml.childElements(listStyle, 'lvl1pPr')[0] : undefined;
 }
 
 function getListDefaultRunProperties(shape: Element) {
@@ -322,7 +327,7 @@ function getParagraphText(paragraph: Element) {
 }
 
 function getTextParagraphs(shape: Element) {
-  const body = pptxXml.firstDescendant(shape, 'txBody');
+  const body = getTextBody(shape);
   const paragraphs = body ? pptxXml.descendants(body, 'p') : [];
   return paragraphs
     .map((paragraph) => getParagraphText(paragraph).replace(/[ \t\r\f\v]+/g, ' ').trim())
