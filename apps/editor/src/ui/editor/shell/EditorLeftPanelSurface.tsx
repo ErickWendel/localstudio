@@ -36,7 +36,9 @@ export function EditorLeftPanelSurface({
       activePageId={vm.activePageId}
       selection={vm.selection}
       availableFonts={vm.availableFonts}
+      localFonts={vm.localFontOptions}
       onDownloadFont={isHistoryReadOnly ? undefined : vm.downloadFontForSelection}
+      onImportLocalFont={isHistoryReadOnly ? undefined : vm.importLocalFontForSelection}
       onSelectElement={isHistoryReadOnly ? undefined : onSelectElement}
       onSetElementVisibility={isHistoryReadOnly ? undefined : vm.setElementVisibility}
       onSetElementLock={isHistoryReadOnly ? undefined : vm.setElementLock}

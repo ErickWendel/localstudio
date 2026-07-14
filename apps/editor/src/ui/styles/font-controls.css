@@ -1,16 +1,35 @@
 .font-control-row {
+  display: block;
+}
+
+.font-picker-trigger {
+  align-items: center;
+  background: #050d10;
+  border: 1px solid rgba(55, 253, 118, 0.36);
+  border-radius: 6px;
+  color: var(--ew-text);
+  cursor: pointer;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 38px;
-  gap: 8px;
-  align-items: end;
-}
-
-.font-control-select {
+  font-size: 13px;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  height: 40px;
   min-width: 0;
+  padding: 0 10px;
+  text-align: left;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+  width: 100%;
 }
 
-.font-add-button,
-.font-search-submit,
+.font-picker-trigger:hover,
+.font-picker-trigger:focus-visible,
+.font-picker-trigger[aria-expanded='true'] {
+  border-color: var(--ew-green);
+  box-shadow: 0 0 16px rgba(55, 253, 118, 0.1);
+  outline: 0;
+}
+
 .font-download-result {
   border: 1px solid rgba(55, 253, 118, 0.24);
   border-radius: 6px;
@@ -23,32 +42,11 @@
     transform 140ms ease;
 }
 
-.font-add-button,
-.font-search-submit {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 38px;
-  width: 38px;
-  height: 40px;
-  min-height: 0;
-  padding: 0;
-}
-
-.font-add-button:hover,
-.font-add-button:focus-visible,
-.font-search-submit:hover,
-.font-search-submit:focus-visible,
 .font-download-result:hover,
 .font-download-result:focus-visible {
   border-color: var(--ew-green);
   box-shadow: 0 0 16px rgba(55, 253, 118, 0.1);
   outline: 0;
-}
-
-.font-add-button[aria-expanded='true'] {
-  color: #000;
-  background: var(--ew-green);
 }
 
 .font-download-panel {
@@ -61,9 +59,7 @@
 }
 
 .font-download-search {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 38px;
-  gap: 8px;
+  display: block;
 }
 
 .font-download-search-box {
@@ -76,6 +72,39 @@
 .font-download-results {
   display: grid;
   gap: 6px;
+  max-height: min(46vh, 440px);
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-color: rgba(55, 253, 118, 0.65) rgba(255, 255, 255, 0.08);
+  scrollbar-width: thin;
+}
+
+.font-download-results::-webkit-scrollbar {
+  width: 8px;
+}
+
+.font-download-results::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+}
+
+.font-download-results::-webkit-scrollbar-thumb {
+  background: rgba(55, 253, 118, 0.65);
+  border-radius: 999px;
+}
+
+.font-result-group {
+  display: grid;
+  gap: 5px;
+}
+
+.font-result-group h4 {
+  color: var(--ew-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  margin: 3px 0 0;
+  text-transform: uppercase;
 }
 
 .font-download-result {
@@ -89,6 +118,15 @@
   font: inherit;
   font-size: 12px;
   text-align: left;
+}
+
+.font-preview-result {
+  font-size: 15px;
+}
+
+.font-result-check {
+  color: var(--ew-green);
+  font-size: 17px;
 }
 
 .font-download-result:disabled {

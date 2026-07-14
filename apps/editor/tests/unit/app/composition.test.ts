@@ -5,6 +5,7 @@ import { BrowserImageGenerationService } from '../../../src/services/image-gener
 import { DisabledProjectRepository } from '../../../src/services/storage/disabledProjectRepository';
 import { OpfsProjectRepository } from '../../../src/services/storage/opfsProjectRepository';
 import { BrowserStockMediaService } from '../../../src/services/stock-media/stockMediaService';
+import { BrowserLocalFontMirrorService } from '../../../src/services/fonts/localFontMirrorService';
 
 describe('createAppServices', () => {
   const testWindow = window as Window & { showDirectoryPicker?: unknown };
@@ -72,6 +73,10 @@ describe('createAppServices', () => {
 
   it('wires the browser stock media service', () => {
     expect(createAppServices().stockMediaService).toBeInstanceOf(BrowserStockMediaService);
+  });
+
+  it('wires the browser local font mirror service', () => {
+    expect(createAppServices().localFontMirrorService).toBeInstanceOf(BrowserLocalFontMirrorService);
   });
 
   it('starts new app services with a blank project by default', () => {

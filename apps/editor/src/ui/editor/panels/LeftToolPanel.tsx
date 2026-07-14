@@ -62,6 +62,7 @@ interface LeftToolPanelProps {
   languageDetectionProviderStates?: AiProviderState[];
   translationLanguageOptions?: Array<{ code: string; flag: string; label: string }>;
   availableFonts?: FontCatalogItem[];
+  localFonts?: FontCatalogItem[];
   languageDetectionPreparation?: {
     progress: number;
     sourceLanguage?: string;
@@ -83,6 +84,7 @@ interface LeftToolPanelProps {
   };
   onDownloadModel?: ((id: string) => Promise<void>) | undefined;
   onDownloadFont?: ((family: string) => Promise<void>) | undefined;
+  onImportLocalFont?: ((family: string) => Promise<void>) | undefined;
   onRemoveModel?: ((id: string) => Promise<void>) | undefined;
   onCreateImageOptionsChange?: ((options: CreateImagePromptOptions) => void) | undefined;
   stockGifResults?: StockMediaItem[];
@@ -174,6 +176,7 @@ export function LeftToolPanel({
   languageDetectionProviderStates,
   translationLanguageOptions,
   availableFonts,
+  localFonts,
   languageDetectionPreparation,
   translationPreparation,
   translationTargetAttention,
@@ -183,6 +186,7 @@ export function LeftToolPanel({
   promptPreparation,
   onDownloadModel,
   onDownloadFont,
+  onImportLocalFont,
   onRemoveModel,
   onCreateImageOptionsChange,
   stockGifResults,
@@ -341,8 +345,10 @@ export function LeftToolPanel({
             activePageId={activePageId}
             selection={selection}
             {...(availableFonts ? { availableFonts } : {})}
+            {...(localFonts ? { localFonts } : {})}
             {...(focusFontControlKey ? { focusFontControlKey } : {})}
             {...(onDownloadFont ? { onDownloadFont } : {})}
+            {...(onImportLocalFont ? { onImportLocalFont } : {})}
             {...(onAlignSelectedElement ? { onAlignSelectedElement } : {})}
             {...(onSetElementLock ? { onSetElementLock } : {})}
             {...(onSetSelectedElementZOrder ? { onSetSelectedElementZOrder } : {})}

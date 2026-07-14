@@ -83,6 +83,10 @@
   color: var(--ew-dim);
 }
 
+.mirror-needs-save {
+  color: #f6c453;
+}
+
 .mirror-syncing {
   color: #f6c453;
 }

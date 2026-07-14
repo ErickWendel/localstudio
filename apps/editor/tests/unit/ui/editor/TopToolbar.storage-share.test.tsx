@@ -69,7 +69,10 @@ describe('TopToolbar storage and sharing actions', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Mirror disabled' })).toBeDisabled();
+    const unsavedMirrorButton = screen.getByRole('button', { name: 'Save deck before mirroring' });
+    expect(unsavedMirrorButton).not.toBeDisabled();
+    await user.click(unsavedMirrorButton);
+    expect(onMirrorNow).toHaveBeenCalledTimes(1);
 
     rerender(
       <TopToolbar
@@ -84,7 +87,7 @@ describe('TopToolbar storage and sharing actions', () => {
     const disabledMirrorButton = screen.getByRole('button', { name: 'Mirror disabled' });
     expect(disabledMirrorButton).not.toBeDisabled();
     await user.click(disabledMirrorButton);
-    expect(onMirrorNow).toHaveBeenCalledTimes(1);
+    expect(onMirrorNow).toHaveBeenCalledTimes(2);
 
     rerender(
       <TopToolbar
@@ -112,7 +115,7 @@ describe('TopToolbar storage and sharing actions', () => {
     expect(mirrorButton).toHaveClass('mirror-synced');
     await user.click(mirrorButton);
     expect(onMirrorToggle).toHaveBeenCalledWith(false);
-    expect(onMirrorNow).toHaveBeenCalledTimes(1);
+    expect(onMirrorNow).toHaveBeenCalledTimes(2);
   });
 
   it('opens mirror settings from the status icon when mirroring was disabled in settings', async () => {

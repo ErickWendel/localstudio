@@ -18,6 +18,8 @@ interface EditorToolbarSurfaceProps {
   onNewProject: () => void;
   onOpenKeyboardShortcuts: () => void;
   onOpenPresenterView: () => void;
+  onLocalProjectSetupCancel?: () => void;
+  onLocalProjectSetupConfirm?: () => void;
   onShare: () => void;
   onStartAiSetupTour: () => void;
   onStartPresenterMode: (options?: { fromBeginning?: boolean }) => void;
@@ -36,6 +38,8 @@ export function EditorToolbarSurface({
   onNewProject,
   onOpenKeyboardShortcuts,
   onOpenPresenterView,
+  onLocalProjectSetupCancel,
+  onLocalProjectSetupConfirm,
   onShare,
   onStartAiSetupTour,
   onStartPresenterMode,
@@ -58,9 +62,14 @@ export function EditorToolbarSurface({
         vm.localProjectSetupOpen ? (
           <LocalProjectSetupPanel
             initialName={vm.project.name}
-            onCancel={vm.closeLocalProjectSetup}
+            onCancel={() => {
+              vm.closeLocalProjectSetup();
+              onLocalProjectSetupCancel?.();
+            }}
             onConfirm={(projectName) => {
-              void vm.confirmLocalProjectSetup(projectName);
+              void vm.confirmLocalProjectSetup(projectName).then((saved) => {
+                if (saved) onLocalProjectSetupConfirm?.();
+              });
             }}
           />
         ) : null

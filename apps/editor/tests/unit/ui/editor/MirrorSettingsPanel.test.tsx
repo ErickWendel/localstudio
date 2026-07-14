@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { MirrorSettingsPanel } from '../../../../src/ui/editor/panels/MirrorSettingsPanel';
 import type { MinioMirrorConfig } from '../../../../src/services/mirror/minioMirrorService';
+import type { LocalFontMirrorProgress } from '../../../../src/services/contracts/interfaces';
 
 const config: MinioMirrorConfig = {
   accessKey: 'localstudio',
@@ -16,6 +17,18 @@ const config: MinioMirrorConfig = {
   prefix: 'mirrors',
 };
 
+const localFontMirrorSettings = {
+  enabled: false,
+  folderLabel: undefined,
+  supported: true,
+  systemHint: '~/Library/Fonts or /Library/Fonts',
+};
+
+type TestConnectionHandler = (
+  config: MinioMirrorConfig,
+  options?: { onProgress?: (progress: LocalFontMirrorProgress) => void },
+) => Promise<string | void>;
+
 describe('MirrorSettingsPanel', () => {
   it('closes when clicking outside the panel', async () => {
     const user = userEvent.setup();
@@ -26,9 +39,12 @@ describe('MirrorSettingsPanel', () => {
         <button type="button">Outside target</button>
         <MirrorSettingsPanel
           config={config}
+          localFontMirrorSettings={localFontMirrorSettings}
           mirrorState={{ enabled: true, status: 'idle' }}
+          onChooseLocalFontFolder={vi.fn()}
           onClose={onClose}
           onEnabledChange={vi.fn()}
+          onLocalFontMirrorEnabledChange={vi.fn()}
           onSave={vi.fn()}
           onTestConnection={vi.fn()}
         />
@@ -44,14 +60,17 @@ describe('MirrorSettingsPanel', () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
     const onSave = vi.fn();
-    const onTestConnection = vi.fn(() => Promise.resolve());
+    const onTestConnection = vi.fn<TestConnectionHandler>(() => Promise.resolve());
 
     render(
       <MirrorSettingsPanel
         config={config}
+        localFontMirrorSettings={localFontMirrorSettings}
         mirrorState={{ enabled: true, status: 'idle' }}
+        onChooseLocalFontFolder={vi.fn()}
         onClose={onClose}
         onEnabledChange={vi.fn()}
+        onLocalFontMirrorEnabledChange={vi.fn()}
         onSave={onSave}
         onTestConnection={onTestConnection}
       />,
@@ -71,9 +90,7 @@ describe('MirrorSettingsPanel', () => {
     await user.clear(screen.getByLabelText('Prefix'));
     await user.type(screen.getByLabelText('Prefix'), 'public-projects');
     await user.click(screen.getByRole('button', { name: 'Test connection' }));
-    expect(onTestConnection).toHaveBeenCalledWith(
-      expect.objectContaining({ prefix: 'public-projects' }),
-    );
+    expect(onTestConnection.mock.calls[0]?.[0]).toMatchObject({ prefix: 'public-projects' });
     expect(await screen.findByText('S3-compatible connection is ready.')).toBeInTheDocument();
     expect(
       screen.getByText('Local S3-compatible default login: localstudio / localstudio123'),
@@ -98,10 +115,13 @@ describe('MirrorSettingsPanel', () => {
     render(
       <MirrorSettingsPanel
         config={config}
+        localFontMirrorSettings={localFontMirrorSettings}
         mirrorState={{ enabled: true, status: 'idle' }}
         onBack={onBack}
+        onChooseLocalFontFolder={vi.fn()}
         onClose={vi.fn()}
         onEnabledChange={vi.fn()}
+        onLocalFontMirrorEnabledChange={vi.fn()}
         onSave={vi.fn()}
         onTestConnection={vi.fn()}
       />,
@@ -112,24 +132,77 @@ describe('MirrorSettingsPanel', () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
+  it('opens the font folder picker when local font mirroring is enabled', async () => {
+    const user = userEvent.setup();
+    const onChooseLocalFontFolder = vi.fn(() => Promise.resolve());
+    const onLocalFontMirrorEnabledChange = vi.fn();
+
+    render(
+      <MirrorSettingsPanel
+        config={config}
+        localFontMirrorSettings={localFontMirrorSettings}
+        mirrorState={{ enabled: true, status: 'idle' }}
+        onChooseLocalFontFolder={onChooseLocalFontFolder}
+        onClose={vi.fn()}
+        onEnabledChange={vi.fn()}
+        onLocalFontMirrorEnabledChange={onLocalFontMirrorEnabledChange}
+        onSave={vi.fn()}
+        onTestConnection={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('checkbox', { name: /Off/i }));
+
+    expect(onChooseLocalFontFolder).toHaveBeenCalledTimes(1);
+    expect(onLocalFontMirrorEnabledChange).not.toHaveBeenCalledWith(true);
+  });
+
+  it('disables local font mirroring without opening the folder picker', async () => {
+    const user = userEvent.setup();
+    const onChooseLocalFontFolder = vi.fn(() => Promise.resolve());
+    const onLocalFontMirrorEnabledChange = vi.fn();
+
+    render(
+      <MirrorSettingsPanel
+        config={config}
+        localFontMirrorSettings={{ ...localFontMirrorSettings, enabled: true }}
+        mirrorState={{ enabled: true, status: 'idle' }}
+        onChooseLocalFontFolder={onChooseLocalFontFolder}
+        onClose={vi.fn()}
+        onEnabledChange={vi.fn()}
+        onLocalFontMirrorEnabledChange={onLocalFontMirrorEnabledChange}
+        onSave={vi.fn()}
+        onTestConnection={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('checkbox', { name: /Enabled/i }));
+
+    expect(onChooseLocalFontFolder).not.toHaveBeenCalled();
+    expect(onLocalFontMirrorEnabledChange).toHaveBeenCalledWith(false);
+  });
+
   it('lets users disable mirroring from settings and keeps saving settings disabled while off', async () => {
     const user = userEvent.setup();
     const onEnabledChange = vi.fn();
     const onSave = vi.fn();
-    const onTestConnection = vi.fn(() => Promise.resolve());
+    const onTestConnection = vi.fn<TestConnectionHandler>(() => Promise.resolve());
 
     function StatefulMirrorSettingsPanel() {
       const [enabled, setEnabled] = useState(true);
       return (
         <MirrorSettingsPanel
           config={config}
+          localFontMirrorSettings={localFontMirrorSettings}
           mirrorDisabledBySettings={!enabled}
           mirrorState={{ enabled, status: enabled ? 'idle' : 'disabled' }}
+          onChooseLocalFontFolder={vi.fn()}
           onClose={vi.fn()}
           onEnabledChange={(nextEnabled) => {
             setEnabled(nextEnabled);
             onEnabledChange(nextEnabled);
           }}
+          onLocalFontMirrorEnabledChange={vi.fn()}
           onSave={onSave}
           onTestConnection={onTestConnection}
         />
@@ -154,7 +227,7 @@ describe('MirrorSettingsPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Enable mirroring' }));
 
     expect(onEnabledChange).toHaveBeenLastCalledWith(true);
-    expect(onTestConnection).toHaveBeenCalledWith(config);
+    expect(onTestConnection.mock.calls.at(-1)?.[0]).toEqual(config);
     expect(await screen.findByText('S3-compatible connection is ready.')).toBeInTheDocument();
   });
 });

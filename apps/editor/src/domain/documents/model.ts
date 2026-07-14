@@ -136,11 +136,11 @@ export interface Asset {
 export interface ProjectFont {
   id: string;
   family: string;
-  source: 'google-fonts';
+  source: 'google-fonts' | 'uploaded';
   requestedFamily: string;
   fontStyle: 'normal' | 'italic';
   fontWeight: number;
-  mimeType: 'font/woff2';
+  mimeType: 'font/woff2' | 'font/woff' | 'font/ttf' | 'font/otf';
   fileName: string;
   storage: 'inline' | 'file' | 'remote';
   objectUrl?: string;

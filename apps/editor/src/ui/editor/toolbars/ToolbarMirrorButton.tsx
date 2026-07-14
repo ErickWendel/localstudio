@@ -17,9 +17,9 @@ export function ToolbarMirrorButton({
   onMirrorToggle,
   onOpenMirrorSettings,
 }: ToolbarMirrorButtonProps) {
-  const disabled = !persistenceEnabled;
-  const label = disabled
-    ? 'Mirror disabled'
+  const needsLocalSave = !persistenceEnabled;
+  const label = needsLocalSave
+    ? 'Save deck before mirroring'
     : !mirrorState.enabled
       ? 'Mirror disabled'
       : mirrorState.status === 'syncing'
@@ -32,10 +32,11 @@ export function ToolbarMirrorButton({
   const className = [
     'stitch-icon-button',
     'mirror-status-button',
-    disabled || !mirrorState.enabled ? 'mirror-disabled' : '',
-    !disabled && mirrorState.status === 'syncing' ? 'mirror-syncing' : '',
-    !disabled && mirrorState.status === 'synced' ? 'mirror-synced' : '',
-    !disabled && mirrorState.status === 'failed' ? 'mirror-failed' : '',
+    needsLocalSave ? 'mirror-needs-save' : '',
+    !needsLocalSave && !mirrorState.enabled ? 'mirror-disabled' : '',
+    !needsLocalSave && mirrorState.status === 'syncing' ? 'mirror-syncing' : '',
+    !needsLocalSave && mirrorState.status === 'synced' ? 'mirror-synced' : '',
+    !needsLocalSave && mirrorState.status === 'failed' ? 'mirror-failed' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -43,12 +44,15 @@ export function ToolbarMirrorButton({
   return (
     <button
       className={className}
-      disabled={disabled}
       title={mirrorState.error ?? label}
       type="button"
       aria-label={label}
       data-tour-id="mirror-status"
       onClick={() => {
+        if (needsLocalSave) {
+          onMirrorNow?.();
+          return;
+        }
         if (mirrorDisabledBySettings) {
           onOpenMirrorSettings?.();
           return;

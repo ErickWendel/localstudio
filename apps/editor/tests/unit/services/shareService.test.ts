@@ -55,6 +55,25 @@ function createProjectWithInlineAsset(): ProjectDocument {
   return project;
 }
 
+function createProjectWithInlineFont(): ProjectDocument {
+  const project = createProjectWithInlineAsset();
+  project.fonts = {
+    acme: {
+      id: 'acme',
+      family: 'Acme Sans',
+      requestedFamily: 'Acme Sans',
+      source: 'uploaded',
+      fontStyle: 'normal',
+      fontWeight: 700,
+      mimeType: 'font/woff2',
+      fileName: 'acme-sans.woff2',
+      storage: 'inline',
+      objectUrl: 'data:font/woff2;base64,Zm9udA==',
+    },
+  };
+  return project;
+}
+
 describe('BrowserShareService', () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -121,6 +140,36 @@ describe('BrowserShareService', () => {
           },
         },
       },
+    });
+  });
+
+  it('publishes project fonts as public remote font files', async () => {
+    const uploadedBodies = new Map<string, Blob>();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'PUT') {
+        uploadedBodies.set(getRequestUrl(input), init.body as Blob);
+        return Promise.resolve(new Response('', { status: 200 }));
+      }
+      return Promise.resolve(new Response('', { status: 404 }));
+    });
+    const mirrorService = new minioMirrorService.MinioMirrorService({ fetch: fetchMock });
+    mirrorService.saveConfig(config);
+    const service = new BrowserShareService({
+      mirrorService,
+      origin: 'https://localstudio.test',
+    });
+
+    await service.createShare(createProjectWithInlineFont());
+
+    const fontUrl =
+      'http://localhost:9000/localstudio/mirrors/public-shares/00000000-0000-4000-8000-000000000001/fonts/acme-sans.woff2';
+    const shareUrl =
+      'http://localhost:9000/localstudio/mirrors/public-shares/00000000-0000-4000-8000-000000000001/share.json';
+    expect(Array.from(uploadedBodies.keys())).toContain(fontUrl);
+    const sharePayload = JSON.parse(await uploadedBodies.get(shareUrl)!.text()) as PublicSharePayloadFixture;
+    expect(sharePayload.project.fonts?.acme).toMatchObject({
+      objectUrl: fontUrl,
+      storage: 'remote',
     });
   });
 

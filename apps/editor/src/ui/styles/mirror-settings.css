@@ -24,3 +24,164 @@
   font-size: 12px;
   padding: 0 9px;
 }
+
+.mirror-settings-section {
+  border: 1px solid rgba(122, 255, 199, 0.14);
+  border-radius: 6px;
+  background:
+    linear-gradient(135deg, rgba(55, 253, 118, 0.06), transparent 36%),
+    rgba(5, 13, 16, 0.62);
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.mirror-settings-section-heading {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.mirror-settings-section-heading h3 {
+  color: var(--ew-text);
+  font-size: 14px;
+  margin: 0 0 4px;
+}
+
+.mirror-settings-section-heading p,
+.mirror-settings-font-warning {
+  color: var(--ew-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.mirror-settings-font-toggle {
+  align-items: center;
+  border: 1px solid rgba(122, 255, 199, 0.2);
+  border-radius: 999px;
+  color: var(--ew-text);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 800;
+  gap: 8px;
+  min-height: 30px;
+  padding: 4px 9px 4px 5px;
+  white-space: nowrap;
+}
+
+.mirror-settings-font-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mirror-settings-font-toggle-track {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  display: inline-flex;
+  height: 18px;
+  padding: 2px;
+  width: 32px;
+}
+
+.mirror-settings-font-toggle-thumb {
+  background: var(--ew-muted);
+  border-radius: 999px;
+  height: 12px;
+  transform: translateX(0);
+  transition:
+    background-color 140ms ease,
+    transform 140ms ease;
+  width: 12px;
+}
+
+.mirror-settings-font-toggle input:checked + .mirror-settings-font-toggle-track {
+  background: rgba(55, 253, 118, 0.14);
+  border-color: rgba(55, 253, 118, 0.38);
+}
+
+.mirror-settings-font-toggle input:checked + .mirror-settings-font-toggle-track .mirror-settings-font-toggle-thumb {
+  background: var(--ew-green);
+  transform: translateX(14px);
+}
+
+.mirror-settings-font-toggle:focus-within {
+  box-shadow: 0 0 0 2px rgba(55, 253, 118, 0.16);
+}
+
+.mirror-settings-font-hint {
+  align-items: flex-start;
+  color: var(--ew-muted);
+  display: flex;
+  font-size: 12px;
+  gap: 7px;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.mirror-settings-font-hint .material-symbols-outlined {
+  color: var(--ew-green-fixed);
+  font-size: 16px;
+  margin-top: 1px;
+}
+
+.mirror-settings-font-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mirror-settings-font-action {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(122, 255, 199, 0.18);
+  border-radius: 6px;
+  color: var(--ew-text);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 800;
+  gap: 8px;
+  justify-content: center;
+  min-height: 34px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0 10px;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.mirror-settings-font-action:hover:not(:disabled) {
+  background: rgba(55, 253, 118, 0.08);
+  border-color: rgba(55, 253, 118, 0.34);
+  color: var(--ew-green);
+}
+
+.mirror-settings-font-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.mirror-settings-font-action .material-symbols-outlined {
+  color: var(--ew-green-fixed);
+  font-size: 17px;
+}
+
+.mirror-settings-font-action span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mirror-settings-font-warning {
+  color: color-mix(in srgb, var(--ew-green-fixed) 68%, #f6c453);
+}

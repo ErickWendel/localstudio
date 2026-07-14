@@ -5,6 +5,7 @@ import type {
   ExportService,
   FontImportService,
   ImageGenerationService,
+  LocalFontMirrorService,
   MagicEraserService,
   MirrorService,
   ModelSetupService,
@@ -34,6 +35,7 @@ import { BrowserPptxImportService } from '../services/importing/pptx/pptxImportS
 import { BrowserPptxExportService } from '../services/exporting/pptxExportService';
 import { BrowserStockMediaService } from '../services/stock-media/stockMediaService';
 import { BrowserGoogleFontsImportService } from '../services/fonts/googleFontsImportService';
+import { BrowserLocalFontMirrorService } from '../services/fonts/localFontMirrorService';
 import { webGpuLanguageDetectionRuntime } from '../services/translation/webGpuLanguageDetectionRuntime';
 import { webGpuTextGenerationRuntime } from '../services/prompting/webGpuTextGenerationRuntime';
 import { minioMirrorService } from '../services/mirror/minioMirrorService';
@@ -48,6 +50,7 @@ export interface AppServices {
   projectRepository: ProjectRepository;
   exportService: ExportService;
   fontImportService: FontImportService;
+  localFontMirrorService: LocalFontMirrorService;
   presentationImportService: PresentationImportService;
   presentationExportService: PresentationExportService;
   shareService: ShareService;
@@ -92,6 +95,7 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     projectRepository: createProjectRepository(persistenceMode),
     exportService: new BrowserExportService(),
     fontImportService: new BrowserGoogleFontsImportService(),
+    localFontMirrorService: new BrowserLocalFontMirrorService(),
     presentationImportService: new BrowserPptxImportService(),
     presentationExportService: new BrowserPptxExportService(),
     shareService: new BrowserShareService({ mirrorService }),

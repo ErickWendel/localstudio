@@ -13,6 +13,8 @@ import { EditorShell } from '../../../../src/ui/editor/shell/EditorShell';
 import { editorShellTestHarness } from './EditorShell.test-harness';
 
 const {
+  RecordingMirrorService,
+  SavingProjectRepository,
   createAppServices,
   enableSyncedSharing,
   waitForShareButtonReady,
@@ -29,18 +31,48 @@ describe('EditorShell export and share workflows', () => {
     vi.restoreAllMocks();
   });
 
-  it('opens Share before MinIO is synced and disables only public link creation', () => {
-    render(<EditorShell services={createAppServices()} />);
+  it('saves the local project before opening Share when mirror storage is configured', async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem('ew-canvas-ai.persistence-enabled', 'false');
+    const services = createAppServices({ skipStoredProjectLoad: true });
+    services.projectRepository = new SavingProjectRepository();
+    services.mirrorService = new RecordingMirrorService();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'Share' }));
+
+    expect(screen.getByRole('dialog', { name: 'Save local project' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Project folder name')).toHaveValue('Untitled AI Deck');
+
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
 
     expect(screen.getByRole('heading', { name: 'Share design' })).toBeInTheDocument();
     expect(
       screen.getByText('Public links cannot be created without remote storage.'),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Copy link' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Configure mirror storage' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Download' })).not.toBeDisabled();
     expect(screen.getByRole('button', { name: 'Present' })).not.toBeDisabled();
+  });
+
+  it('saves the local project before opening mirror settings when storage is not configured', async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem('ew-canvas-ai.persistence-enabled', 'false');
+    const services = createAppServices();
+    services.projectRepository = new SavingProjectRepository();
+    services.mirrorService = new RecordingMirrorService(null);
+
+    render(<EditorShell services={services} />);
+
+    await user.click(screen.getByRole('button', { name: 'Share' }));
+
+    expect(screen.getByRole('dialog', { name: 'Save local project' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+
+    expect(screen.getByRole('dialog', { name: 'Mirror settings' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Share design' })).not.toBeInTheDocument();
   });
 
   it('exports the current slide as a PNG file', async () => {

@@ -190,7 +190,7 @@ describe('EditorShell mirror workflows', () => {
       });
     });
 
-    expect(await screen.findByRole('button', { name: 'Mirror disabled' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Save deck before mirroring' })).toBeInTheDocument();
     expect(secondMirrorService.syncProject).not.toHaveBeenCalled();
   });
 

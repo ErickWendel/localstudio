@@ -5,7 +5,9 @@ interface SharePanelProps {
   projectName: string;
   share?: ShareMetadata | undefined;
   publicLinkUnavailableReason?: string | undefined;
+  shareProgressLabel?: string | undefined;
   onClose: () => void;
+  onConfigurePublicLink?: () => void;
   onCopyLink: () => Promise<ShareMetadata>;
   onDownload: () => void;
   onPresent: () => void;
@@ -24,7 +26,9 @@ export function SharePanel({
   projectName,
   share,
   publicLinkUnavailableReason,
+  shareProgressLabel,
   onClose,
+  onConfigurePublicLink,
   onCopyLink,
   onDownload,
   onPresent,
@@ -36,13 +40,17 @@ export function SharePanel({
   const statusLabel = getStatusLabel(currentShare, isCopying);
   const shareAccessDescription =
     copyError ??
+    shareProgressLabel ??
     publicLinkUnavailableReason ??
     (currentShare
       ? 'Unlisted: anyone with the link can view.'
       : 'Create a public view link for this deck.');
 
   async function handleCopyLink() {
-    if (publicLinkUnavailable) return;
+    if (publicLinkUnavailable) {
+      onConfigurePublicLink?.();
+      return;
+    }
     setIsCopying(true);
     setCopyError(undefined);
     try {
@@ -83,7 +91,7 @@ export function SharePanel({
         className="share-copy-link-button font-orbitron"
         type="button"
         data-loading={isCopying ? 'true' : 'false'}
-        disabled={isCopying || publicLinkUnavailable}
+        disabled={isCopying}
         title={publicLinkUnavailableReason}
         onClick={() => {
           void handleCopyLink();
@@ -92,7 +100,7 @@ export function SharePanel({
         <span className="material-symbols-outlined" aria-hidden="true">
           link
         </span>
-        Copy link
+        {publicLinkUnavailable ? 'Configure mirror storage' : 'Copy link'}
       </button>
 
       {currentShare ? (

@@ -1,10 +1,18 @@
 import { type Download, type Page } from '@playwright/test';
 
 import { EditorAppPage } from '../pages/editor-app.page';
+import { installFakeOpfs } from '../support/fake-opfs';
 import { expect } from '../support/journey-test';
+import { remoteMirrorImportConfig } from './remote-mirror-import-config';
 
 export const imageExportJourneyPage = {
   async downloadActivePagePng(page: Page, baseURL: string): Promise<Download> {
+    await installFakeOpfs(page, { directoryPicker: true });
+    await page.addInitScript((config) => {
+      window.localStorage.setItem('localstudio.minioMirror.config', JSON.stringify(config));
+      window.localStorage.setItem('ew-canvas-ai.mirror-enabled', 'false');
+    }, remoteMirrorImportConfig);
+
     const editor = new EditorAppPage(page, baseURL);
     await editor.gotoNewProject();
     await editor.renameProject('E2E Image Export');
@@ -14,6 +22,11 @@ export const imageExportJourneyPage = {
 
     const downloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Share' }).click();
+    const localSave = page.getByRole('dialog', { name: 'Save local project' });
+    if (await localSave.isVisible({ timeout: 1_000 }).catch(() => false)) {
+      await localSave.getByRole('button', { name: 'Choose folder' }).click();
+    }
+    await expect(page.getByRole('complementary', { name: 'Share design panel' })).toBeVisible();
     await page.getByRole('button', { name: 'Download' }).click();
     return downloadPromise;
   },

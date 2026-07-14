@@ -1,24 +1,29 @@
 import { EditorAppPage } from '../pages/editor-app.page';
+import { installFakeOpfs } from '../support/fake-opfs';
 import { expect, test, withIsolatedDevServer } from '../support/journey-test';
 
 const getServer = withIsolatedDevServer(test);
 
 test.describe('editor share and storage journey', () => {
   test('opens share and storage surfaces without connecting to remote storage', async ({ page }) => {
+    await installFakeOpfs(page, { directoryPicker: true });
     const editor = new EditorAppPage(page, getServer().baseURL);
     await editor.gotoNewProject();
 
     await page.getByRole('button', { name: 'Share' }).click();
-    await expect(page.getByRole('complementary', { name: 'Share design panel' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Copy link' })).toBeDisabled();
-    await expect(page.getByText('Public links cannot be created without remote storage.')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Download' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Present', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Public view link', exact: true })).toBeDisabled();
-    await expect(page.getByRole('button', { name: 'Embed code', exact: true })).toBeDisabled();
-    await page.getByRole('button', { name: 'Close share panel' }).click();
+    const localSave = page.getByRole('dialog', { name: 'Save local project' });
+    await expect(localSave).toBeVisible();
+    await localSave.getByRole('button', { name: 'Choose folder' }).click();
 
-    await expect(page.getByRole('button', { name: 'Version history' })).toBeDisabled();
+    const mirrorSettings = page.getByRole('dialog', { name: 'Mirror settings' });
+    await expect(mirrorSettings).toBeVisible();
+    await expect(mirrorSettings.getByRole('heading', { name: 'Mirror project storage' })).toBeVisible();
+    await expect(mirrorSettings.getByRole('heading', { name: 'Mirror my local fonts' })).toBeVisible();
+    await mirrorSettings.getByRole('button', { name: 'Close mirror settings' }).focus();
+    await page.keyboard.press('Enter');
+    await expect(mirrorSettings).toBeHidden();
+
+    await expect(page.getByRole('button', { name: 'Version history' })).toBeEnabled();
     await page.getByRole('button', { name: 'Mirror settings' }).click();
     await expect(page.getByRole('dialog', { name: /settings|Mirror settings/i })).toBeVisible();
   });

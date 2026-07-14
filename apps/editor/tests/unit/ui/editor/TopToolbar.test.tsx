@@ -315,7 +315,7 @@ describe('TopToolbar', () => {
       .map((button) => button.getAttribute('aria-label'));
     expect(editingActionLabels).toEqual([
       'Persistence disabled',
-      'Mirror disabled',
+      'Save deck before mirroring',
       'Version history',
       'Undo',
       'Redo',

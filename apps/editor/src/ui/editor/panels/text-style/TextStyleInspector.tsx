@@ -3,8 +3,8 @@ import {
   AlignLeft,
   AlignRight,
   Bold,
+  ChevronDown,
   Download,
-  Plus,
   Search,
 } from 'lucide-react';
 import type { FormEvent, RefObject } from 'react';
@@ -19,10 +19,12 @@ export interface TextStyleControls {
   fontDownloadOpen: boolean;
   fontDownloadStatus?: string | undefined;
   fontFamilyOptions: string[];
+  localFontFamilyOptions: string[];
   fontSearchInput: string;
   fontSearchQuery: string;
-  fontSelectRef: RefObject<HTMLSelectElement | null>;
+  fontSelectRef: RefObject<HTMLButtonElement | null>;
   hasFontDownload: boolean;
+  onApplyFontFamily: (family: string) => Promise<void>;
   onDownloadFontFamily: (family: string) => Promise<void>;
   onFontSearchInputChange: (value: string) => void;
   onFontSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -32,6 +34,11 @@ export interface TextStyleControls {
 const regularTextWeight = 400;
 const boldTextWeight = 800;
 
+function fontMatchesQuery(fontFamily: string, query: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+  return !normalizedQuery || fontFamily.toLowerCase().includes(normalizedQuery);
+}
+
 export function TextStyleInspector({
   downloadingFontFamily,
   element,
@@ -39,10 +46,12 @@ export function TextStyleInspector({
   fontDownloadOpen,
   fontDownloadStatus,
   fontFamilyOptions,
+  localFontFamilyOptions,
   fontSearchInput,
   fontSearchQuery,
   fontSelectRef,
   hasFontDownload,
+  onApplyFontFamily,
   onDownloadFontFamily,
   onFontSearchInputChange,
   onFontSearchSubmit,
@@ -53,39 +62,30 @@ export function TextStyleInspector({
   onUpdateStyle: (patch: ElementStylePatch) => void;
 }) {
   const selectedTextIsBold = element.fontWeight >= boldTextWeight;
+  const fontQuery = fontSearchQuery.trim();
+  const matchingProjectFonts = fontFamilyOptions.filter((fontFamily) => fontMatchesQuery(fontFamily, fontQuery));
+  const matchingLocalFonts = localFontFamilyOptions.filter((fontFamily) => fontMatchesQuery(fontFamily, fontQuery));
 
   return (
     <section className="movie-panel-section" aria-label="Selected text controls">
       <h3>Typography</h3>
       <div className="text-inspector-stack">
         <div className="font-control-row">
-          <label className="text-inspector-field ew-field-scope ew-grid-compact text-inspector-field-full">
+          <div className="text-inspector-field ew-field-scope ew-grid-compact text-inspector-field-full">
             <span className="text-inspector-label ew-strong-label">Font</span>
-            <select
+            <button
               aria-label="Selected text font"
+              aria-expanded={fontDownloadOpen}
+              className="font-picker-trigger"
               ref={fontSelectRef}
-              value={element.fontFamily}
-              onChange={(event) => {
-                onUpdateStyle({ fontFamily: event.target.value });
-              }}
+              style={{ fontFamily: element.fontFamily }}
+              type="button"
+              onClick={onToggleFontDownload}
             >
-              {fontFamilyOptions.map((fontFamily) => (
-                <option key={fontFamily} value={fontFamily}>
-                  {fontFamily}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            aria-expanded={fontDownloadOpen}
-            aria-label="Download additional font"
-            className="font-add-button"
-            title="Download additional font"
-            type="button"
-            onClick={onToggleFontDownload}
-          >
-            <Plus size={16} />
-          </button>
+              <span className="ew-ellipsis">{element.fontFamily}</span>
+              <ChevronDown size={15} aria-hidden="true" />
+            </button>
+          </div>
         </div>
         {fontDownloadOpen ? (
           <div className="font-download-panel">
@@ -94,7 +94,7 @@ export function TextStyleInspector({
                 <Search size={16} aria-hidden="true" />
                 <input
                   aria-label="Search downloadable fonts"
-                  placeholder="Search Google Fonts"
+                  placeholder="Search project, local, or Google fonts"
                   type="search"
                   value={fontSearchInput}
                   onChange={(event) => {
@@ -102,38 +102,90 @@ export function TextStyleInspector({
                   }}
                 />
               </label>
-              <button className="font-search-submit" type="submit" aria-label="Search fonts">
-                <Search size={16} />
-              </button>
             </form>
-            {fontSearchQuery ? (
-              <div className="font-download-results" aria-label="Downloadable font results">
-                {filteredDownloadableFonts.length > 0 ? (
-                  filteredDownloadableFonts.map((font) => (
+            <div className="font-download-results" aria-label="Downloadable font results">
+              {matchingProjectFonts.length > 0 ? (
+                <section className="font-result-group" aria-label="Project font results">
+                  <h4>Project fonts</h4>
+                  {matchingProjectFonts.map((fontFamily) => (
                     <button
-                      aria-label={`Download ${font.family}`}
-                      className="font-download-result"
-                      disabled={!hasFontDownload || downloadingFontFamily === font.family}
-                      key={font.family}
+                      aria-label={`Apply ${fontFamily}`}
+                      className="font-download-result font-preview-result"
+                      key={fontFamily}
                       type="button"
                       onClick={() => {
-                        void onDownloadFontFamily(font.family);
+                        void onApplyFontFamily(fontFamily);
                       }}
                     >
-                      <span className="ew-ellipsis">{font.family}</span>
+                      <span className="ew-ellipsis" style={{ fontFamily }}>
+                        {fontFamily}
+                      </span>
+                      {element.fontFamily === fontFamily ? (
+                        <span className="material-symbols-outlined font-result-check" aria-hidden="true">
+                          check
+                        </span>
+                      ) : null}
+                    </button>
+                  ))}
+                </section>
+              ) : null}
+              {matchingLocalFonts.length > 0 ? (
+                <section className="font-result-group" aria-label="Local font folder results">
+                  <h4>Local font folder</h4>
+                  {matchingLocalFonts.map((fontFamily) => (
+                    <button
+                      aria-label={`Add ${fontFamily} from local fonts`}
+                      className="font-download-result font-preview-result"
+                      disabled={downloadingFontFamily === fontFamily}
+                      key={fontFamily}
+                      type="button"
+                      onClick={() => {
+                        void onApplyFontFamily(fontFamily);
+                      }}
+                    >
+                      <span className="ew-ellipsis" style={{ fontFamily }}>
+                        {fontFamily}
+                      </span>
                       <Download size={15} />
                     </button>
-                  ))
-                ) : (
-                  <p className="panel-muted">No Google Fonts match that search.</p>
-                )}
-              </div>
-            ) : null}
-            {fontDownloadStatus ? (
-              <div className="panel-muted" role="status">
-                {fontDownloadStatus}
-              </div>
-            ) : null}
+                  ))}
+                </section>
+              ) : null}
+              {fontSearchQuery ? (
+                <section className="font-result-group" aria-label="Google font results">
+                  <h4>Google Fonts</h4>
+                  {filteredDownloadableFonts.length > 0 ? (
+                    filteredDownloadableFonts.map((font) => (
+                      <button
+                        aria-label={`Download ${font.family}`}
+                        className="font-download-result"
+                        disabled={!hasFontDownload || downloadingFontFamily === font.family}
+                        key={font.family}
+                        type="button"
+                        onClick={() => {
+                          void onDownloadFontFamily(font.family);
+                        }}
+                      >
+                        <span className="ew-ellipsis">{font.family}</span>
+                        <Download size={15} />
+                      </button>
+                    ))
+                  ) : (
+                    <p className="panel-muted">No Google Fonts match that search.</p>
+                  )}
+                </section>
+              ) : null}
+              {matchingProjectFonts.length === 0 &&
+              matchingLocalFonts.length === 0 &&
+              (!fontSearchQuery || filteredDownloadableFonts.length === 0) ? (
+                <p className="panel-muted">No fonts match that search.</p>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+        {fontDownloadStatus ? (
+          <div className="panel-muted" role="status">
+            {fontDownloadStatus}
           </div>
         ) : null}
         <div className="text-inspector-pair">
