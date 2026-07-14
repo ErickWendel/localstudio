@@ -1,7 +1,7 @@
 .project-group {
   gap: 8px;
   min-width: 0;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
 }
 
 .project-play-shell {
@@ -13,8 +13,9 @@
 }
 
 .project-title {
+  width: clamp(48px, calc(100vw - 1305px), 150px);
   min-width: 0;
-  max-width: 150px;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   border: 0;
@@ -31,6 +32,13 @@
 .project-title-button {
   cursor: text;
   padding: 0;
+}
+
+.project-title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .project-title-button:hover {
@@ -98,7 +106,9 @@
 }
 
 .project-title-input {
-  width: min(220px, 24vw);
+  width: clamp(80px, calc(100vw - 1260px), 220px);
+  min-width: 0;
+  flex: 0 0 auto;
   height: 26px;
   border: 1px solid var(--ew-green);
   border-radius: 4px;
@@ -115,6 +125,7 @@
 .local-only-badge {
   display: inline-flex;
   align-items: center;
+  flex: 0 0 auto;
   height: 22px;
   padding: 0 8px;
   border: 1px solid var(--ew-border);
@@ -137,4 +148,10 @@
 
 .toolbar-icon-group {
   position: relative;
+}
+
+@media (max-width: 1280px) {
+  .project-group {
+    gap: 4px;
+  }
 }
