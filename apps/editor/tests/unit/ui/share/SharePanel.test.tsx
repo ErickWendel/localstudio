@@ -50,6 +50,7 @@ describe('SharePanel', () => {
     const onCopyLink = vi.fn();
     const onDownload = vi.fn();
     const onPresent = vi.fn();
+    const onConfigurePublicLink = vi.fn();
     const message = 'Public links cannot be created without remote storage.';
 
     render(
@@ -57,6 +58,7 @@ describe('SharePanel', () => {
         projectName="Untitled AI Deck"
         publicLinkUnavailableReason={message}
         onClose={vi.fn()}
+        onConfigurePublicLink={onConfigurePublicLink}
         onCopyLink={onCopyLink}
         onDownload={onDownload}
         onPresent={onPresent}
@@ -64,15 +66,17 @@ describe('SharePanel', () => {
     );
 
     expect(screen.getByText(message)).toBeInTheDocument();
-    const copyButton = screen.getByRole('button', { name: 'Copy link' });
-    expect(copyButton).toBeDisabled();
-    expect(copyButton).toHaveAttribute('title', message);
-    expect(copyButton).toHaveAttribute('data-loading', 'false');
+    const configureButton = screen.getByRole('button', { name: 'Configure mirror storage' });
+    expect(configureButton).toBeEnabled();
+    expect(configureButton).toHaveAttribute('title', message);
+    expect(configureButton).toHaveAttribute('data-loading', 'false');
 
+    await user.click(configureButton);
     await user.click(screen.getByRole('button', { name: 'Download' }));
     await user.click(screen.getByRole('button', { name: 'Present' }));
 
     expect(onCopyLink).not.toHaveBeenCalled();
+    expect(onConfigurePublicLink).toHaveBeenCalledTimes(1);
     expect(onDownload).toHaveBeenCalledTimes(1);
     expect(onPresent).toHaveBeenCalledTimes(1);
   });
