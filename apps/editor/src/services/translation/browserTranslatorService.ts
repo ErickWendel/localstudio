@@ -362,7 +362,7 @@ class BrowserTranslatorService implements TranslatorService {
     providers?: TranslationProvider[],
     private readonly storage = providerSelection.getBrowserProviderStorage(),
     textGenerationRuntime: TextGenerationRuntime = new webGpuTextGenerationRuntime.TransformersTextGenerationRuntime(),
-    private readonly languageDetectionRuntime: LanguageDetectionRuntime = new webGpuLanguageDetectionRuntime.TransformersLanguageDetectionRuntime(),
+    languageDetectionRuntime: LanguageDetectionRuntime = new webGpuLanguageDetectionRuntime.TransformersLanguageDetectionRuntime(),
   ) {
     this.providers = providers ?? [
       new ChromeTranslationProvider(),

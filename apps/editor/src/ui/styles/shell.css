@@ -13,8 +13,7 @@
 
 .top-toolbar,
 .left-tool-panel,
-.pages-panel,
-.right-panel {
+.pages-panel {
   background: var(--ew-panel);
   border-color: rgba(55, 253, 118, 0.16);
 }
@@ -38,7 +37,6 @@
 .toolbar-menu,
 .toolbar-icon-group,
 .zoom-group,
-.rail-actions,
 .language-chip,
 .export-button,
 .project-group {

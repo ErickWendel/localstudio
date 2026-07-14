@@ -1,4 +1,3 @@
-import type { ShapeElement } from '../../../domain/documents/model';
 import type { ElementAnimationBuild } from '../../../domain/documents/model';
 import type { ElementAnimationRenderState } from './canvas-element-props';
 
@@ -51,7 +50,7 @@ function getPerimeter(width: number, height: number) {
   return Math.max(1, width * 2 + height * 2);
 }
 
-function getState(element: ShapeElement, state: ElementAnimationRenderState) {
+function getState(state: ElementAnimationRenderState) {
   if (state.activeBuild?.effect !== 'line-draw') {
     return {
       direction: undefined,

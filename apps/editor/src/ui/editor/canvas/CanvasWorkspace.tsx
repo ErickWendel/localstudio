@@ -1026,7 +1026,7 @@ export function CanvasWorkspace({
                 };
 
                 if (element.type === 'shape') {
-                  const lineDrawState = shapeLineDraw.getState(element, animationState);
+                  const lineDrawState = shapeLineDraw.getState(animationState);
                   return (
                     <CanvasShapeElement
                       commonProps={commonProps}

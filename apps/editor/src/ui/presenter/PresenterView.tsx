@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
+import type { CSSProperties, ChangeEvent as ReactChangeEvent, PointerEvent as ReactPointerEvent } from 'react';
 import type { Page, ProjectDocument, SelectionState } from '../../domain/documents/model';
 import { pageVisibility } from '../../domain/documents/pageVisibility';
 import type {
@@ -336,6 +336,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     [snapshot],
   );
   const activePage = snapshot ? getActivePage(snapshot.project, snapshot.activePageId) : undefined;
+  const activePageId = activePage?.id;
   const activePageIndex = activePage
     ? Math.max(0, visiblePages.findIndex((page) => page.id === activePage.id))
     : 0;
@@ -346,6 +347,12 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     hour: 'numeric',
     minute: '2-digit',
   });
+
+  function updateSpeakerNotes(event: ReactChangeEvent<HTMLTextAreaElement>) {
+    const notes = event.target.value;
+    if (!activePageId) return;
+    postCommand({ command: 'update-notes', notes, pageId: activePageId });
+  }
 
   function toggleTimer() {
     if (timerPaused) {
@@ -877,12 +884,11 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
           ref={notesRef}
           aria-label="Speaker notes"
           className={speakerNotes ? 'presenter-notes-textarea' : 'presenter-notes-textarea presenter-notes-empty'}
+          defaultValue={speakerNotes}
+          key={activePage.id}
           placeholder="Add notes to your design"
           style={{ fontSize: `${notesFontSize}px` }}
-          value={speakerNotes}
-          onChange={(event) =>
-            postCommand({ command: 'update-notes', notes: event.target.value, pageId: activePage.id })
-          }
+          onChange={updateSpeakerNotes}
         />
         <div className="presenter-notes-zoom" aria-label="Notes zoom controls">
           <button

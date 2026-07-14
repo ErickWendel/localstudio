@@ -31,7 +31,8 @@ export class EditorAppPage extends BasePage {
 
   async renameProject(name: string) {
     await this.page.getByRole('button', { name: /Edit project name/i }).click();
-    const input = this.page.getByLabel('Project name');
+    const input = this.page.getByRole('textbox', { name: 'Project name' });
+    await expect(input).toBeVisible();
     await input.fill(name);
     await input.press('Enter');
     await expect(this.page.getByRole('button', { name: `Edit project name ${name}` })).toBeVisible();
