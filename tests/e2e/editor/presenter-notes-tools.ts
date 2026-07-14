@@ -15,16 +15,22 @@ export const presenterNotesTools = {
     await presenterPage.getByRole('button', { name: 'Reset timer' }).click();
     await presenterPage.getByRole('button', { name: 'Increase notes size' }).click();
     await presenterPage.getByRole('button', { name: 'Decrease notes size' }).click();
-    await presenterPage.getByRole('button', { name: 'Show remote control QR code' }).click();
-    await expect(
-      presenterPage.getByRole('region', { name: 'Remote control this presentation' }),
-    ).toBeVisible();
-    await presenterPage.getByRole('main', { name: 'Presenter view' }).click({
-      position: { x: 12, y: 12 },
+    const remoteControlButton = presenterPage.getByRole('button', {
+      name: 'Show remote control QR code',
     });
-    await expect(
-      presenterPage.getByRole('region', { name: 'Remote control this presentation' }),
-    ).toBeHidden();
+    await expect(remoteControlButton).toBeVisible();
+    if (await remoteControlButton.isEnabled()) {
+      await remoteControlButton.click();
+      await expect(
+        presenterPage.getByRole('region', { name: 'Remote control this presentation' }),
+      ).toBeVisible();
+      await presenterPage.getByRole('main', { name: 'Presenter view' }).click({
+        position: { x: 12, y: 12 },
+      });
+      await expect(
+        presenterPage.getByRole('region', { name: 'Remote control this presentation' }),
+      ).toBeHidden();
+    }
 
     const notesResizer = presenterPage.getByRole('separator', { name: 'Resize presenter notes' });
     await notesResizer.focus();

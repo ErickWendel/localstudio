@@ -434,7 +434,6 @@ export class BrowserPresenterSessionService {
 
 class TestPresenterRemotePeerControlHost implements PresenterRemotePeerControl {
   private readonly options: PresenterRemotePeerControlHostOptions;
-  private lastState: PresenterRemoteState | undefined;
 
   constructor(options: PresenterRemotePeerControlHostOptions) {
     this.options = options;
@@ -455,7 +454,7 @@ class TestPresenterRemotePeerControlHost implements PresenterRemotePeerControl {
   }
 
   publishState(state: PresenterRemoteState) {
-    this.lastState = state;
+    void state;
   }
 
   publishPreviewBatch(batch: PresenterRemotePreviewBatch) {
@@ -464,7 +463,7 @@ class TestPresenterRemotePeerControlHost implements PresenterRemotePeerControl {
   }
 
   close() {
-    this.lastState = undefined;
+    // Test host has no persistent transport to close.
   }
 }
 

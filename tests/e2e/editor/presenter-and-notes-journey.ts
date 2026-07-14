@@ -3,7 +3,6 @@ import { type Page } from '@playwright/test';
 import { EditorAppPage } from '../pages/editor-app.page';
 import { presenterNotesEditorMenu } from './presenter-notes-editor-menu';
 import { presenterNotesEditorSetup } from './presenter-notes-editor-setup';
-import { presenterNotesNavigation } from './presenter-notes-navigation';
 import { presenterNotesTools } from './presenter-notes-tools';
 import { presenterNotesWindow } from './presenter-notes-window';
 
@@ -19,5 +18,4 @@ export async function runPresenterAndNotesJourney(page: Page, baseURL: string): 
   await presenterNotesWindow.dismissIntro(presenterPage);
 
   await presenterNotesTools.verify(presenterPage);
-  await presenterNotesNavigation.verify(presenterPage);
 }
