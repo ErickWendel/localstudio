@@ -13,6 +13,8 @@ const {
 describe('EditorShell workspace controls', () => {
   afterEach(() => {
     window.history.pushState({}, '', '/editor/');
+    window.localStorage.removeItem('localstudio.editorSpeakerNotesHeight');
+    window.localStorage.removeItem('localstudio.editorSpeakerNotesWidth');
     vi.restoreAllMocks();
   });
 
@@ -202,5 +204,42 @@ describe('EditorShell workspace controls', () => {
 
     fireEvent.click(notesToggle);
     expect(screen.queryByRole('heading', { name: 'Page 1 - Slide 1' })).not.toBeInTheDocument();
+  });
+
+  it('resizes speaker notes with the drag handle', () => {
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: 1280,
+    });
+    Object.defineProperty(window, 'innerHeight', {
+      configurable: true,
+      value: 1000,
+    });
+    render(<EditorShell services={createAppServices()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle notes panel' }));
+
+    const notesEditor = screen.getByRole('region', { name: 'Speaker notes editor' });
+    const widthResizer = screen.getByRole('separator', { name: 'Resize speaker notes width' });
+    const heightResizer = screen.getByRole('separator', { name: 'Resize speaker notes height' });
+    expect(notesEditor).toHaveStyle({
+      '--speaker-notes-height': '760px',
+      '--speaker-notes-width': '360px',
+    });
+
+    fireEvent.pointerDown(widthResizer, { clientX: 380, pointerId: 1 });
+    fireEvent.pointerMove(window, { clientX: 500 });
+    fireEvent.pointerUp(window);
+
+    fireEvent.pointerDown(heightResizer, { clientY: 220, pointerId: 2 });
+    fireEvent.pointerMove(window, { clientY: 120 });
+    fireEvent.pointerUp(window);
+
+    expect(notesEditor).toHaveStyle({ '--speaker-notes-height': '860px' });
+    expect(notesEditor).toHaveStyle({ '--speaker-notes-width': '480px' });
+    expect(widthResizer).toHaveAttribute('aria-valuenow', '480');
+    expect(heightResizer).toHaveAttribute('aria-valuenow', '860');
+    expect(window.localStorage.getItem('localstudio.editorSpeakerNotesHeight')).toBe('860');
+    expect(window.localStorage.getItem('localstudio.editorSpeakerNotesWidth')).toBe('480');
   });
 });

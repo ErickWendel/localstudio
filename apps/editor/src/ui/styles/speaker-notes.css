@@ -3,13 +3,13 @@
   left: 20px;
   bottom: 10px;
   z-index: 55;
-  width: min(360px, calc(100% - 40px));
-  height: calc(100% - 28px);
-  max-height: 760px;
+  width: min(var(--speaker-notes-width, 360px), calc(100% - 40px));
+  height: min(var(--speaker-notes-height, 760px), calc(100% - 28px));
   pointer-events: none;
 }
 
 .speaker-notes-card {
+  position: relative;
   height: 100%;
   min-height: 360px;
   display: grid;
@@ -104,4 +104,63 @@
   font-size: 14px;
   line-height: 1;
   padding: 0 18px 14px;
+}
+
+.speaker-notes-width-resizer {
+  position: absolute;
+  top: 8px;
+  right: -7px;
+  bottom: 8px;
+  width: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.speaker-notes-width-resizer span {
+  width: 2px;
+  height: 48px;
+  border-radius: 999px;
+  background: rgba(191, 255, 209, 0.18);
+  transition:
+    background-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.speaker-notes-width-resizer:hover span,
+.speaker-notes-width-resizer:focus-visible span,
+.speaker-notes-height-resizer:hover span,
+.speaker-notes-height-resizer:focus-visible span {
+  background: var(--ew-green-fixed);
+  box-shadow: 0 0 14px rgba(55, 253, 118, 0.32);
+}
+
+.speaker-notes-width-resizer:focus-visible,
+.speaker-notes-height-resizer:focus-visible {
+  outline: 0;
+}
+
+.speaker-notes-height-resizer {
+  position: absolute;
+  top: -7px;
+  right: 8px;
+  left: 8px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.speaker-notes-height-resizer span {
+  width: 48px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(191, 255, 209, 0.18);
+  transition:
+    background-color 140ms ease,
+    box-shadow 140ms ease;
 }
