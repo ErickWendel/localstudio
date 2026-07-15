@@ -3266,6 +3266,7 @@ export function useEditorViewModel(services: AppServices) {
     playPresentationPreview,
     advanceAnimationPreview,
     advancePresentationPreview,
+    clearAnimationPreview,
     rewindPresentationPreview,
     updateTextContent,
     setElementVisibility,
