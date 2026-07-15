@@ -15,8 +15,8 @@ test.describe('editor AI tools status journey', () => {
     await expect(page.getByRole('button', { name: /Download all|Ready/ })).toBeVisible();
     await expect(page.getByLabel('LLM Model', { exact: true }).first()).toBeVisible();
     await expect(page.getByLabel('Translation Model', { exact: true })).toBeVisible();
-    await expect(page.getByText('Image Editing Models')).toBeVisible();
-    await expect(page.getByText('Image Generation Models')).toBeVisible();
+    await expect(page.getByRole('article', { name: 'Image Editing Models' })).toBeVisible();
+    await expect(page.getByRole('article', { name: 'Image Generation Models' })).toBeVisible();
     await expect(page.getByLabel('Create image prompt')).toBeVisible();
     await expect(
       page.getByRole('button', { name: /Download|Prepare|Create image/ }).first(),

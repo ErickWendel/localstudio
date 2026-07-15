@@ -83,7 +83,11 @@ describe('AiToolsPanel', () => {
     const progressBar = within(imageGenerationCard).getByLabelText('Image Generation Models progress');
     expect(progressBar.querySelector('span')).toHaveStyle({ width: '42%' });
     expect(within(imageGenerationCard).getByText('42%')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Preparing...' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Downloading...' })).toBeDisabled();
+    expect(screen.getByLabelText('Image Generation Models download progress')).toHaveAttribute(
+      'aria-valuenow',
+      '42',
+    );
 
     resolveDownload?.();
 
@@ -142,6 +146,56 @@ describe('AiToolsPanel', () => {
 
     expect(calls).toEqual(['prompt', 'language-detection', 'translation', 'image-generation-models']);
     expect(onDownloadModel).toHaveBeenCalledWith('image-generation-models');
+  });
+
+  it('shows setup progress for each downloading AI feature', () => {
+    const imageGenerationState: ModelState = {
+      id: 'image-generation-models',
+      label: 'Image Generation Models',
+      description: 'Text-to-image model for generated slide assets.',
+      progress: 72,
+      provider: 'transformers',
+      required: false,
+      status: 'downloading',
+    };
+
+    render(
+      <AiToolsPanel
+        languageDetectionPreparation={{ progress: 41, status: 'downloading' }}
+        languageDetectionProviderStates={[languageDetectionProvider]}
+        modelStates={[imageGenerationState]}
+        onDownloadModel={() => Promise.resolve()}
+        onPrepareLanguageDetectionProvider={() => Promise.resolve()}
+        onPreparePromptApi={() => Promise.resolve()}
+        onPrepareTranslationProvider={() => Promise.resolve()}
+        promptPreparation={{ availability: 'downloading', progress: 28, status: 'downloading' }}
+        promptProviderStates={[gemmaProvider]}
+        translationPreparation={{ progress: 64, status: 'downloading' }}
+        translationProviderStates={[translateGemmaProvider]}
+      />,
+    );
+
+    const setup = screen.getByLabelText('AI feature setup');
+
+    expect(setup).toHaveTextContent('Downloading required AI features...');
+    expect(within(setup).getByLabelText('Gemma 4 E2B download progress')).toHaveAttribute(
+      'aria-valuenow',
+      '28',
+    );
+    expect(
+      within(setup).getByLabelText('XLM-RoBERTa Base 270M download progress'),
+    ).toHaveAttribute('aria-valuenow', '41');
+    expect(within(setup).getByLabelText('TranslateGemma 4B download progress')).toHaveAttribute(
+      'aria-valuenow',
+      '64',
+    );
+    expect(
+      within(setup).getByLabelText('Image Generation Models download progress'),
+    ).toHaveAttribute('aria-valuenow', '72');
+    expect(within(setup).getByText('Downloading 28%')).toBeInTheDocument();
+    expect(within(setup).getByText('Downloading 41%')).toBeInTheDocument();
+    expect(within(setup).getByText('Downloading 64%')).toBeInTheDocument();
+    expect(within(setup).getByText('Downloading 72%')).toBeInTheDocument();
   });
 
   it('hides the setup action when all downloadable AI features are ready', () => {

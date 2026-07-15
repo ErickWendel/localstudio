@@ -186,6 +186,7 @@ export function AiToolsPanel({
       id: selectedPromptProvider?.id ?? 'prompt-provider',
       label: selectedPromptProvider?.label ?? 'LLM model',
       onPrepare: onPreparePromptApi,
+      progress: promptProgress,
       status: promptStatus,
     },
     {
@@ -193,6 +194,7 @@ export function AiToolsPanel({
       id: selectedLanguageDetectionProvider?.id ?? 'language-detection-provider',
       label: selectedLanguageDetectionProvider?.label ?? 'Language detection model',
       onPrepare: onPrepareLanguageDetectionProvider,
+      progress: languageDetectionProgress,
       status: languageDetectionStatus,
     },
     {
@@ -200,12 +202,14 @@ export function AiToolsPanel({
       id: selectedTranslationProvider?.id ?? 'translation-provider',
       label: selectedTranslationProvider?.label ?? 'Translation model',
       onPrepare: onPrepareTranslationProvider,
+      progress: translationProviderProgress,
       status: translationProviderStatus,
     },
     ...visibleModelStates.map((model) => ({
       id: model.id,
       label: model.label,
       onPrepare: onDownloadModel ? () => onDownloadModel(model.id) : undefined,
+      progress: model.status === 'ready' ? 100 : model.progress,
       status: getModelProgressStatus(model.status),
     })),
   ];
