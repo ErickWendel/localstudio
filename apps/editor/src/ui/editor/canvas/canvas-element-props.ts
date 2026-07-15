@@ -35,6 +35,7 @@ export interface CommonElementProps {
 export interface ElementAnimationRenderState {
   activeBuild: ElementAnimationPreviewBuild | undefined;
   hidden: boolean;
+  mediaActionPending: boolean;
   preset: AnimationPresetRenderState | undefined;
   playbackRunId: number | undefined;
   progress: number;

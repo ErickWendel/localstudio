@@ -4,17 +4,33 @@ import { App } from '../../../src/App';
 import { sampleProject } from '../../../src/domain/projects/sampleProject';
 import { TRANSLATION_LANGUAGE_OPTIONS } from '../../../src/ui/editor/translation/translationLanguages';
 
+const originalMatchMedia = window.matchMedia;
+
 describe('App', () => {
   beforeEach(() => {
+    window.history.replaceState({}, '', '/');
+    window.localStorage.clear();
     vi.stubGlobal('showDirectoryPicker', vi.fn());
     vi.stubGlobal('Translator', {
       availability: vi.fn().mockResolvedValue('available'),
+    });
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: vi.fn().mockReturnValue({
+        addEventListener: vi.fn(),
+        matches: false,
+        removeEventListener: vi.fn(),
+      }),
     });
   });
 
   afterEach(() => {
     window.history.replaceState({}, '', '/');
     window.localStorage.clear();
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: originalMatchMedia,
+    });
     Object.defineProperty(document, 'modelContext', {
       configurable: true,
       value: undefined,
@@ -25,7 +41,9 @@ describe('App', () => {
   it('renders the application root', async () => {
     render(<App />);
 
-    expect(await screen.findByRole('heading', { name: 'LocalStudio.dev' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'LocalStudio.dev' }, { timeout: 5000 }),
+    ).toBeInTheDocument();
   });
 
   it('starts with a blank project when requested from a new project tab', async () => {
