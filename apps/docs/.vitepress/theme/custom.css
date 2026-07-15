@@ -1,0 +1,168 @@
+:root {
+  --vp-c-brand-1: #15733a;
+  --vp-c-brand-2: #1d9f51;
+  --vp-c-brand-3: #37fd76;
+  --vp-c-brand-soft: rgba(55, 253, 118, 0.14);
+  --vp-c-bg: #f4fff6;
+  --vp-c-bg-alt: #e9f6ec;
+  --vp-c-bg-elv: #ffffff;
+  --vp-c-bg-soft: #eef9f1;
+  --vp-c-text-1: #06130a;
+  --vp-c-text-2: #39483d;
+  --vp-c-text-3: #647369;
+  --vp-c-divider: rgba(21, 115, 58, 0.18);
+  --vp-c-gutter: rgba(21, 115, 58, 0.18);
+  --vp-font-family-base: var(--ls-font-body);
+  --vp-font-family-mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(90deg, #15733a, #009bc2);
+  --vp-button-brand-bg: #15733a;
+  --vp-button-brand-hover-bg: #10612f;
+  --vp-button-brand-text: #ffffff;
+  --vp-button-alt-bg: rgba(21, 115, 58, 0.1);
+  --vp-button-alt-hover-bg: rgba(21, 115, 58, 0.16);
+  --vp-sidebar-bg-color: #edf8f0;
+  --vp-nav-bg-color: rgba(244, 255, 246, 0.84);
+}
+
+.dark {
+  --vp-c-brand-1: var(--ls-green-fixed);
+  --vp-c-brand-2: var(--ls-green);
+  --vp-c-brand-3: var(--ls-green-hover);
+  --vp-c-brand-soft: rgba(55, 253, 118, 0.16);
+  --vp-c-bg: var(--ls-bg);
+  --vp-c-bg-alt: #071009;
+  --vp-c-bg-elv: var(--ls-panel);
+  --vp-c-bg-soft: var(--ls-panel-low);
+  --vp-c-text-1: var(--ls-text);
+  --vp-c-text-2: var(--ls-muted);
+  --vp-c-text-3: var(--ls-dim);
+  --vp-c-divider: rgba(105, 255, 137, 0.18);
+  --vp-c-gutter: rgba(105, 255, 137, 0.18);
+  --vp-home-hero-name-background: linear-gradient(90deg, var(--ls-green-fixed), var(--ls-cyan));
+  --vp-button-brand-bg: var(--ls-green);
+  --vp-button-brand-hover-bg: var(--ls-green-hover);
+  --vp-button-brand-text: var(--ls-on-primary);
+  --vp-button-alt-bg: rgba(55, 253, 118, 0.1);
+  --vp-button-alt-hover-bg: rgba(55, 253, 118, 0.16);
+  --vp-sidebar-bg-color: #071009;
+  --vp-nav-bg-color: rgba(12, 22, 13, 0.84);
+}
+
+body {
+  font-family: var(--ls-font-body);
+}
+
+.VPNav,
+.VPSidebar {
+  backdrop-filter: blur(18px);
+}
+
+.VPNavBarTitle .title,
+.VPHomeHero .name,
+.VPHomeHero .text,
+.VPDoc h1,
+.VPDoc h2,
+.VPDoc h3,
+.VPFeature .title {
+  font-family: var(--ls-font-display);
+  letter-spacing: 0;
+}
+
+.VPHomeHero .text {
+  max-width: 760px;
+}
+
+.VPFeature,
+.custom-block,
+.VPDoc table {
+  border-radius: 8px;
+}
+
+.VPFeature {
+  border-color: var(--vp-c-divider);
+  background:
+    linear-gradient(135deg, var(--vp-c-brand-soft), transparent 42%),
+    var(--vp-c-bg-soft);
+}
+
+.VPButton {
+  border-radius: 6px;
+  font-family: var(--ls-font-display);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.VPSidebarItem.level-0 > .item > .text {
+  font-family: var(--ls-font-display);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.VPSidebarItem.is-active > .item .link > .text {
+  color: var(--vp-c-brand-1);
+}
+
+.VPDoc a {
+  text-underline-offset: 4px;
+}
+
+.VPDoc img,
+.VPDoc video {
+  overflow: hidden;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg-alt);
+}
+
+.vp-doc :focus-visible,
+.VPNav :focus-visible,
+.VPSidebar :focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 3px;
+}
+
+.localstudio-workflow-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin: 28px 0;
+}
+
+.localstudio-workflow-grid a {
+  display: grid;
+  gap: 8px;
+  min-height: 128px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  padding: 18px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  text-decoration: none;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.localstudio-workflow-grid a:hover {
+  border-color: var(--vp-c-brand-1);
+  box-shadow: 0 18px 40px rgba(21, 115, 58, 0.14);
+  transform: translateY(-2px);
+}
+
+.dark .localstudio-workflow-grid a:hover {
+  box-shadow: 0 18px 40px rgba(55, 253, 118, 0.14);
+}
+
+.localstudio-workflow-grid strong {
+  font-family: var(--ls-font-display);
+}
+
+.localstudio-media-note {
+  border-left: 3px solid var(--vp-c-brand-1);
+  padding: 12px 14px;
+  background: var(--vp-c-brand-soft);
+  color: var(--vp-c-text-2);
+}

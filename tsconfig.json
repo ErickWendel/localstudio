@@ -13,6 +13,7 @@
   },
   "files": ["playwright.config.ts"],
   "references": [
+    { "path": "./packages/app-routes" },
     { "path": "./packages/brand" },
     { "path": "./packages/presenter-remote" },
     { "path": "./apps/landing" },

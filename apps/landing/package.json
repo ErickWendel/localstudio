@@ -10,6 +10,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@localstudio/app-routes": "*",
     "@localstudio/brand": "*",
     "@localstudio/presenter-remote": "*",
     "lucide-react": "^1.21.0",

@@ -3,10 +3,12 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { networkInterfaces } from 'node:os';
 import { basename, dirname, extname, join, normalize, resolve, sep } from 'node:path';
+import { localStudioAppRoutes } from '@localstudio/app-routes';
 
 const host = process.env.HOST ?? '0.0.0.0';
 const port = getPort();
 const root = resolve(process.cwd(), process.env.DIST_DIR ?? 'dist');
+const docsEntryPath = localStudioAppRoutes.docs.gettingStartedAnchor;
 const localPowerPointSampleConfig = {
   fileName: 'fullstack-monitoring-jsnation-11062026.pptx',
   path:
@@ -27,6 +29,7 @@ server.listen(port, host, () => {
   console.log('  /');
   console.log('  /editor/');
   console.log('  /joystick/');
+  console.log('  /docs/');
 });
 
 async function handleRequest(rawUrl, response) {
@@ -38,6 +41,10 @@ async function handleRequest(rawUrl, response) {
   }
   if (pathname === '/__localstudio/network-origin') {
     serveLocalNetworkOrigin(response);
+    return;
+  }
+  if (pathname === '/docs' || pathname === '/docs/') {
+    serveRedirect(response, docsEntryPath);
     return;
   }
 
@@ -124,6 +131,7 @@ async function resolveFilePath(pathname) {
   if (shouldServeIndex(pathname)) {
     if (pathname.startsWith('/editor/')) return safeJoin(root, '/editor/index.html');
     if (pathname.startsWith('/joystick/')) return safeJoin(root, '/joystick/index.html');
+    if (pathname.startsWith('/docs/')) return resolveDocsHtml(pathname);
     if (pathname.startsWith('/webmcp/') || pathname === '/webmcp') {
       return safeJoin(root, '/webmcp/index.html');
     }
@@ -131,6 +139,24 @@ async function resolveFilePath(pathname) {
   }
 
   return undefined;
+}
+
+function serveRedirect(response, location) {
+  response.statusCode = 302;
+  response.setHeader('Location', location);
+  response.end();
+}
+
+async function resolveDocsHtml(pathname) {
+  const docsPath = pathname === '/docs/' ? '/docs/index.html' : `${pathname}.html`;
+  const docsFile = safeJoin(root, docsPath);
+  if (docsFile && (await isFile(docsFile))) return docsFile;
+
+  const nestedIndexPath = pathname.endsWith('/') ? `${pathname}index.html` : `${pathname}/index.html`;
+  const nestedIndexFile = safeJoin(root, nestedIndexPath);
+  if (nestedIndexFile && (await isFile(nestedIndexFile))) return nestedIndexFile;
+
+  return safeJoin(root, '/docs/index.html');
 }
 
 function shouldServeIndex(pathname) {

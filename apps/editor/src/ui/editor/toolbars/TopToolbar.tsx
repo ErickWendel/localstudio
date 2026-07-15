@@ -1,3 +1,4 @@
+import { localStudioAppRoutes } from '@localstudio/app-routes';
 import { localStudioLogoMark } from '@localstudio/brand/logo';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ProjectDocument } from '../../../domain/documents/model';
@@ -92,6 +93,7 @@ type HeaderMenuAction = HeaderMenuActionItem | HeaderMenuSeparator | HeaderMenuS
 
 const menuLabels: HeaderMenu[] = ['File', 'Edit', 'View', 'Help'];
 const githubIssuesUrl = 'https://github.com/ErickWendel/localstudio/issues/new/choose';
+const docsUrl = localStudioAppRoutes.docs.gettingStartedAnchor;
 
 export function TopToolbar({
   project,
@@ -283,6 +285,12 @@ export function TopToolbar({
       },
     ],
     Help: [
+      {
+        label: 'Docs',
+        onSelect: () => {
+          window.open(docsUrl, '_blank', 'noopener,noreferrer');
+        },
+      },
       { label: 'AI Setup Tour', disabled: !onStartAiSetupTour, onSelect: onStartAiSetupTour },
       {
         label: 'Keyboard Shortcuts',
