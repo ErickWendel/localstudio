@@ -58,6 +58,43 @@
   opacity: 0.68;
 }
 
+.ai-setup-task-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ai-setup-task {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.ai-setup-task-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  color: var(--ew-muted);
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.ai-setup-task-meta span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-setup-task-meta strong {
+  flex: 0 0 auto;
+  color: var(--ew-text);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
 .tool-card,
 .model-row {
   display: grid;
