@@ -3,25 +3,297 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300..800&family=Orbitron:wght@400..900&display=swap"
-      media="print"
-      onload="this.media = 'all'"
+    <meta
+      name="description"
+      content="LocalStudio.dev editor is a browser-native AI slide workspace for creating, editing, importing, presenting, and sharing local-first decks."
     />
-    <noscript>
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300..800&family=Orbitron:wght@400..900&display=swap"
-      />
-    </noscript>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <style>
+      :root {
+        color-scheme: dark;
+        --ew-bg: #0c160d;
+        --ew-panel: #101b12;
+        --ew-panel-low: #151e15;
+        --ew-border: #40493f;
+        --ew-green: #37fd76;
+        --ew-green-fixed: #69ff89;
+        --ew-text: #fff;
+        --ew-muted: #c1c9bd;
+        --ew-dim: #8a9388;
+        --ls-cyan: #36d7ff;
+        --ls-danger: #ff6b6b;
+        --ls-yellow: #f2ff5e;
+      }
+
+      body {
+        min-width: 0;
+        min-height: 100vh;
+        margin: 0;
+        color: var(--ew-text);
+        background: var(--ew-bg);
+        font-family:
+          Open Sans,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          Segoe UI,
+          sans-serif;
+      }
+
+      .editor-mobile-unavailable {
+        box-sizing: border-box;
+        min-height: 100dvh;
+        display: none;
+        align-content: center;
+        gap: 22px;
+        padding: 20px 22px 24px;
+        overflow: hidden;
+        background:
+          linear-gradient(
+              90deg,
+              color-mix(in srgb, var(--ew-green) 10%, transparent) 1px,
+              transparent 1px
+            )
+            0 0 / 24px 24px,
+          linear-gradient(
+            180deg,
+            color-mix(in srgb, var(--ew-panel) 86%, var(--ls-cyan)) 0%,
+            var(--ew-panel-low) 48%,
+            var(--ew-bg) 100%
+          );
+      }
+
+      .editor-mobile-fallback-active .editor-mobile-unavailable {
+        display: grid;
+      }
+
+      .editor-mobile-fallback-active #root {
+        display: none;
+      }
+
+      .editor-mobile-unavailable__plate {
+        aspect-ratio: 1.04;
+        justify-self: center;
+        width: min(84vw, 292px);
+        position: relative;
+      }
+
+      .editor-mobile-unavailable__browser,
+      .editor-mobile-unavailable__phone {
+        box-sizing: border-box;
+        border: 1px solid color-mix(in srgb, var(--ew-border) 82%, var(--ew-green));
+        box-shadow: 0 28px 70px color-mix(in srgb, #000 34%, transparent);
+      }
+
+      .editor-mobile-unavailable__browser {
+        background: var(--ew-muted);
+        border-radius: 16px 16px 0 0;
+        gap: 7px;
+        height: 34px;
+        padding: 12px 16px;
+        display: flex;
+        position: absolute;
+        inset: 10% 0 16%;
+      }
+
+      .editor-mobile-unavailable__browser span {
+        border-radius: 999px;
+        width: 8px;
+        height: 8px;
+        background: var(--ls-danger);
+      }
+
+      .editor-mobile-unavailable__browser span:nth-child(2) {
+        background: var(--ls-yellow);
+      }
+
+      .editor-mobile-unavailable__browser span:nth-child(3) {
+        background: var(--ew-green);
+      }
+
+      .editor-mobile-unavailable__canvas {
+        border: 1px solid color-mix(in srgb, var(--ew-border) 78%, transparent);
+        border-top: 0;
+        border-radius: 0 0 18px 18px;
+        place-items: center;
+        display: grid;
+        position: absolute;
+        inset: calc(10% + 34px) 0 16%;
+        background:
+          linear-gradient(
+            135deg,
+            color-mix(in srgb, var(--ls-cyan) 24%, transparent),
+            color-mix(in srgb, var(--ew-green) 8%, transparent)
+          ),
+          var(--ew-muted);
+      }
+
+      .editor-mobile-unavailable__slide {
+        aspect-ratio: 16 / 10;
+        width: 62%;
+        display: grid;
+        align-content: center;
+        gap: 9px;
+        padding: 18px;
+        background: var(--ew-text);
+        border-radius: 6px;
+        box-shadow: 0 18px 35px color-mix(in srgb, var(--ew-bg) 34%, transparent);
+      }
+
+      .editor-mobile-unavailable__slide span {
+        height: 8px;
+        display: block;
+        background: var(--ew-panel);
+        border-radius: 999px;
+      }
+
+      .editor-mobile-unavailable__slide span:first-child {
+        width: 72%;
+        height: 14px;
+        background: var(--ls-danger);
+      }
+
+      .editor-mobile-unavailable__slide span:nth-child(2) {
+        width: 46%;
+        background: var(--ls-yellow);
+      }
+
+      .editor-mobile-unavailable__slide span:nth-child(3) {
+        width: 88%;
+        background: var(--ew-dim);
+      }
+
+      .editor-mobile-unavailable__phone {
+        aspect-ratio: 0.52;
+        width: 34%;
+        min-width: 96px;
+        display: grid;
+        grid-template-rows: 18px 1fr auto;
+        gap: 14px;
+        padding: 12px 12px 18px;
+        position: absolute;
+        right: 6%;
+        bottom: 0;
+        transform: rotate(7deg);
+        text-align: center;
+        background: #000;
+        border-radius: 28px;
+      }
+
+      .editor-mobile-unavailable__phone-notch {
+        justify-self: center;
+        width: 42px;
+        height: 5px;
+        background: color-mix(in srgb, var(--ew-muted) 36%, transparent);
+        border-radius: 999px;
+      }
+
+      .editor-mobile-unavailable__phone-line {
+        align-self: center;
+        height: 1px;
+        background: repeating-linear-gradient(
+          90deg,
+          color-mix(in srgb, var(--ew-muted) 42%, transparent) 0 10px,
+          transparent 10px 15px
+        );
+      }
+
+      .editor-mobile-unavailable__phone strong {
+        color: var(--ew-text);
+        font-size: 0.7rem;
+        line-height: 1.1;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .editor-mobile-unavailable__copy {
+        justify-self: center;
+        width: min(100%, 460px);
+        display: grid;
+        gap: 12px;
+        text-align: left;
+      }
+
+      .editor-mobile-unavailable__eyebrow {
+        margin: 0;
+        color: var(--ew-green-fixed);
+        font-size: 0.78rem;
+        line-height: 1.2;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .editor-mobile-unavailable__copy h1 {
+        max-width: 14ch;
+        margin: 0;
+        color: var(--ew-text);
+        font-size: clamp(2.15rem, 12vw, 3.4rem);
+        line-height: 0.92;
+        font-weight: 800;
+      }
+
+      .editor-mobile-unavailable__copy p:last-of-type {
+        margin: 0;
+        color: var(--ew-muted);
+        font-size: 0.95rem;
+        line-height: 1.55;
+        font-weight: 500;
+      }
+
+      .editor-mobile-unavailable__link {
+        justify-self: start;
+        min-height: 42px;
+        display: inline-flex;
+        align-items: center;
+        padding: 0 16px;
+        color: #001b0a;
+        background: var(--ew-green-fixed);
+        border-radius: 6px;
+        font-weight: 800;
+        text-decoration: none;
+      }
+    </style>
     <title>LocalStudio.dev</title>
   </head>
   <body>
+    <main
+      class="editor-mobile-unavailable"
+      aria-labelledby="editor-mobile-unavailable-title"
+      data-static-mobile-fallback
+    >
+      <div class="editor-mobile-unavailable__plate" aria-hidden="true">
+        <div class="editor-mobile-unavailable__browser">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+        <div class="editor-mobile-unavailable__canvas">
+          <div class="editor-mobile-unavailable__slide">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
+        <div class="editor-mobile-unavailable__phone">
+          <div class="editor-mobile-unavailable__phone-notch"></div>
+          <div class="editor-mobile-unavailable__phone-line"></div>
+          <strong>Desktop required</strong>
+        </div>
+      </div>
+      <section class="editor-mobile-unavailable__copy">
+        <p class="editor-mobile-unavailable__eyebrow">LocalStudio editor</p>
+        <h1 id="editor-mobile-unavailable-title">Open this workspace on a desktop screen.</h1>
+        <p>
+          The editor is built for precise slide layout, file access, keyboard shortcuts, and wide
+          tool panels. Mobile editing is disabled so work does not open in a cramped or unstable
+          view.
+        </p>
+        <a class="editor-mobile-unavailable__link" href="/">Go to LocalStudio</a>
+      </section>
+    </main>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module" src="/src/boot.ts"></script>
   </body>
 </html>

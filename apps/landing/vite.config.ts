@@ -7,6 +7,26 @@ import { presenterRemoteSignalingRoute } from '../../scripts/vite/presenterRemot
 
 const siteBase = process.env.LOCALSTUDIO_BASE_PATH ?? '/';
 
+function getCssAsset(asset: unknown) {
+  if (!asset || typeof asset !== 'object') {
+    return null;
+  }
+
+  const candidate = asset as { fileName?: unknown; source?: unknown; type?: unknown };
+  if (candidate.type !== 'asset' || typeof candidate.fileName !== 'string') {
+    return null;
+  }
+
+  if (!candidate.fileName.endsWith('.css') || typeof candidate.source !== 'string') {
+    return null;
+  }
+
+  return {
+    fileName: candidate.fileName,
+    source: candidate.source,
+  };
+}
+
 function editorPreviewRouteFallback() {
   return {
     name: 'editor-preview-route-fallback',
@@ -19,17 +39,32 @@ function editorPreviewRouteFallback() {
   };
 }
 
-function nonBlockingStylesheetLinks(): Plugin {
+function inlineStylesheetLinks(): Plugin {
   return {
-    name: 'non-blocking-stylesheet-links',
+    name: 'inline-stylesheet-links',
     apply: 'build',
     transformIndexHtml: {
       order: 'post',
-      handler(html) {
-        return html.replaceAll(
-          /<link rel="stylesheet"([^>]*?)href="([^"]+\.css)"([^>]*?)>/g,
-          '<link rel="preload"$1href="$2"$3 as="style" onload="this.onload = null; this.rel = \'stylesheet\'">\n    <noscript><link rel="stylesheet"$1href="$2"$3></noscript>',
-        );
+      handler(html, context) {
+        const cssAssets = Object.entries(context.bundle ?? {}).flatMap(([bundleKey, asset]) => {
+          const cssAsset = getCssAsset(asset);
+          return cssAsset ? [{ ...cssAsset, bundleKey }] : [];
+        });
+
+        return cssAssets.reduce((nextHtml, asset) => {
+          const escapedFileName = asset.fileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const stylesheetLinkPattern = new RegExp(
+            `<link rel="stylesheet"([^>]*?)href="([^"]*${escapedFileName})"([^>]*?)>`,
+            'g',
+          );
+
+          delete context.bundle?.[asset.bundleKey];
+
+          return nextHtml.replace(
+            stylesheetLinkPattern,
+            `<style data-inline-stylesheet="${asset.fileName}">\n${asset.source}\n</style>`,
+          );
+        }, html);
       },
     },
   };
@@ -42,7 +77,7 @@ export default defineConfig({
     localPowerPointSampleRoute(),
     presenterRemoteSignalingRoute(),
     editorPreviewRouteFallback(),
-    nonBlockingStylesheetLinks(),
+    inlineStylesheetLinks(),
     react(),
   ],
   build: {

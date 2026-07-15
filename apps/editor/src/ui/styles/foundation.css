@@ -1,4 +1,3 @@
-
 :root {
   font-family: var(--ls-font-body);
   background: var(--ew-bg);
@@ -41,7 +40,15 @@ button {
 }
 
 .material-symbols-outlined {
+  width: 1em;
+  overflow: hidden;
+  color: transparent;
+  font-family: 'Material Symbols Outlined';
   font-size: 20px;
   font-variation-settings: 'FILL' 0;
   line-height: 1;
+}
+
+.material-symbols-ready .material-symbols-outlined {
+  color: inherit;
 }

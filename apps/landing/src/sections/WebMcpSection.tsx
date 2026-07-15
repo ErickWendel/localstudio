@@ -10,6 +10,10 @@ const webMcpImage = {
   height: 2378,
 } as const;
 
+function getWebMcpDesktopSrcSet() {
+  return `${webMcpImage.srcSet}, ${webMcpImage.largeSrcSet}`;
+}
+
 export function WebMcpSection() {
   return (
     <section id="webmcp" className="webmcp-section" aria-labelledby="webmcp-title">
@@ -37,7 +41,7 @@ export function WebMcpSection() {
             <source
               media="(min-width: 900px)"
               type="image/webp"
-              srcSet={webMcpImage.largeSrcSet}
+              srcSet={getWebMcpDesktopSrcSet()}
               sizes="645px"
             />
             <source

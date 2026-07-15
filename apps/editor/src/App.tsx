@@ -1,13 +1,10 @@
-import { lazy, Suspense, useMemo } from 'react';
-import { createAppServices } from './app/composition';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { publicBasePath } from './app/routing/publicBasePath';
-import { sampleProject } from './domain/projects/sampleProject';
+import { EditorMobileUnavailable } from './ui/editor/shell/EditorMobileUnavailable';
 
-const EditorShell = lazy(() =>
-  import('./ui/editor/shell/EditorShell').then((module) => ({ default: module.EditorShell })),
-);
-const PublicDeckViewer = lazy(() =>
-  import('./ui/share/PublicDeckViewer').then((module) => ({ default: module.PublicDeckViewer })),
+const EditorApp = lazy(() => import('./EditorApp').then((module) => ({ default: module.EditorApp })));
+const PublicDeckApp = lazy(() =>
+  import('./PublicDeckApp').then((module) => ({ default: module.PublicDeckApp })),
 );
 const PresenterView = lazy(() =>
   import('./ui/presenter/PresenterView').then((module) => ({ default: module.PresenterView })),
@@ -20,6 +17,14 @@ const WebMcpShowcasePage = lazy(() =>
 
 function normalizeRoutePath(pathname: string) {
   return pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
+}
+
+const editorMobileViewportQuery = '(max-width: 760px)';
+
+function isMobileEditorViewport() {
+  if (typeof window === 'undefined' || !window.matchMedia) return false;
+  if (isWebMcpEnabled()) return false;
+  return window.matchMedia(editorMobileViewportQuery).matches;
 }
 
 export function App() {
@@ -35,15 +40,9 @@ export function App() {
 
   const shareRoute = getShareRoute(window.location.pathname);
   if (shareRoute) {
-    const services = createAppServices();
     return (
       <Suspense fallback={null}>
-        <PublicDeckViewer
-          shareId={shareRoute.shareId}
-          fontImportService={services.fontImportService}
-          shareService={services.shareService}
-          embed={shareRoute.embed}
-        />
+        <PublicDeckApp embed={shareRoute.embed} shareId={shareRoute.shareId} />
       </Suspense>
     );
   }
@@ -56,7 +55,7 @@ export function App() {
     );
   }
 
-  return <EditorApp />;
+  return <EditorRoute />;
 }
 
 function getPresenterSessionId() {
@@ -107,31 +106,35 @@ function stripBasePath(pathname: string) {
   return `/${pathname.slice(basePath.length)}`;
 }
 
-function EditorApp() {
-  const services = useMemo(() => {
-    const url = new URL(window.location.href);
-    const storedProjectName = url.searchParams.get('project');
-    const shouldStartBlankProject =
-      url.searchParams.get('newProject') === '1' || !storedProjectName;
-    if (shouldStartBlankProject) {
-      url.searchParams.delete('newProject');
-      url.searchParams.delete('project');
-      window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+function isWebMcpEnabled() {
+  return new URL(window.location.href).searchParams.get('webmcp') === '1';
+}
+
+function EditorRoute() {
+  const [mobileEditorUnavailable, setMobileEditorUnavailable] = useState(isMobileEditorViewport);
+
+  useEffect(() => {
+    if (isWebMcpEnabled()) return undefined;
+    if (!window.matchMedia) return undefined;
+    const mediaQuery = window.matchMedia(editorMobileViewportQuery);
+    function syncMobileEditorAvailability(event: MediaQueryList | MediaQueryListEvent) {
+      setMobileEditorUnavailable(event.matches);
     }
 
-    return createAppServices(
-      shouldStartBlankProject
-        ? {
-            initialProject: sampleProject.createBlankProject(),
-            skipStoredProjectLoad: true,
-          }
-        : { storedProjectName },
-    );
+    syncMobileEditorAvailability(mediaQuery);
+    mediaQuery.addEventListener('change', syncMobileEditorAvailability);
+    return () => {
+      mediaQuery.removeEventListener('change', syncMobileEditorAvailability);
+    };
   }, []);
+
+  if (mobileEditorUnavailable) {
+    return <EditorMobileUnavailable />;
+  }
 
   return (
     <Suspense fallback={null}>
-      <EditorShell services={services} />
+      <EditorApp />
     </Suspense>
   );
 }

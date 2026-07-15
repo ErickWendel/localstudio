@@ -297,7 +297,12 @@ export function LeftToolPanel({
       data-tour-id="left-tool-panel"
       style={{ '--left-tool-content-width': `${contentWidth}px` } as CSSProperties}
     >
-      <nav className="left-tool-rail" aria-label="Tool menu" data-tour-id="left-tool-rail">
+      <nav
+        className="left-tool-rail"
+        aria-label="Tool menu"
+        data-tour-id="left-tool-rail"
+        role="tablist"
+      >
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = panelOpen && item.id === activeTab;
