@@ -95,6 +95,21 @@ describe('editor view model text helpers', () => {
     expect(nextProject.elements['text-title']?.height).toBeGreaterThan(120);
   });
 
+  it('fits the text frame height when only the font family changes', () => {
+    const project = sampleProject.createSampleProject();
+    const originalHeight = project.elements['text-title']!.height;
+
+    const nextProject = editorViewModelText.updateElementStyle(project, 'text-title', {
+      fontFamily: 'Inter',
+    });
+
+    expect(nextProject.elements['text-title']).toMatchObject({
+      fontFamily: 'Inter',
+    });
+    expect(nextProject.elements['text-title']?.height).toBeLessThan(originalHeight);
+    expect(nextProject.elements['text-title']?.height).toBeGreaterThan(96);
+  });
+
   it('merges downloaded fonts before applying the selected family', () => {
     const project = sampleProject.createSampleProject();
     const font: ProjectFont = {

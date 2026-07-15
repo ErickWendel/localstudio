@@ -33,10 +33,14 @@ test.describe('editor text theme and layout journey', () => {
     await editor.openTool('Design');
     await expect(page.getByLabel('Selected text font size')).toHaveValue('48');
     await expect(page.getByLabel('Selected text color')).toHaveValue('#00779a');
+    await page.getByLabel('Selected text font', { exact: true }).click();
+    await page.getByRole('button', { name: 'Apply Orbitron' }).click();
     await page
       .getByRole('tablist', { name: 'Movie inspector sections' })
       .getByRole('tab', { name: 'Arrange' })
       .click();
+    await expect.poll(async () => Number(await page.getByLabel('Selected element height').inputValue()))
+      .toBeLessThan(120);
     await expect(page.getByRole('button', { name: 'Group', exact: true })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Ungroup' })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Distribute' })).toBeDisabled();

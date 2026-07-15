@@ -31,6 +31,16 @@ function ensureTextElementMinimumHeight(project: ProjectDocument, elementId: str
   }).execute(project);
 }
 
+function fitTextElementHeightToContent(project: ProjectDocument, elementId: string) {
+  const element = project.elements[elementId];
+  if (!element || element.type !== 'text') return project;
+  const contentHeight = textTranslationLayout.getMinimumTextFrameHeight(element);
+  if (element.height === contentHeight) return project;
+  return new basicCommands.UpdateElementFrameCommand(elementId, {
+    height: contentHeight,
+  }).execute(project);
+}
+
 function updateTextContent(project: ProjectDocument, elementId: string, text: string) {
   return ensureTextElementMinimumHeight(
     new basicCommands.UpdateTextContentCommand(elementId, text).execute(project),
@@ -43,10 +53,10 @@ function updateElementStyle(
   elementId: string,
   patch: ElementStylePatch,
 ) {
-  return ensureTextElementMinimumHeight(
-    new basicCommands.UpdateElementStyleCommand(elementId, patch).execute(project),
-    elementId,
-  );
+  const nextProject = new basicCommands.UpdateElementStyleCommand(elementId, patch).execute(project);
+  if (patch.fontFamily !== undefined) return fitTextElementHeightToContent(nextProject, elementId);
+  if (patch.fontSize === undefined) return nextProject;
+  return ensureTextElementMinimumHeight(nextProject, elementId);
 }
 
 function applyFontFamilyWithFonts(input: {
