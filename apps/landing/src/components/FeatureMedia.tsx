@@ -18,6 +18,12 @@ export function FeatureMedia({ feature }: { feature: keyof typeof featureMediaIm
       >
         <picture className="feature-media-picture">
           <source
+            media="(min-width: 900px)"
+            type="image/webp"
+            srcSet={mediaImage.largeSrcSet}
+            sizes="645px"
+          />
+          <source
             type="image/webp"
             srcSet={mediaImage.srcSet}
             sizes="(max-width: 760px) 92vw, 645px"
