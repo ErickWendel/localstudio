@@ -292,7 +292,7 @@ jobs:
         with:
           pattern: playwright-browser-coverage-editor-shard-*
           path: coverage-input/editor
-          merge-multiple: true
+          merge-multiple: false
 
       - name: Generate aggregate editor E2E coverage report
         run: npx playwright test --project=chromium --output=test-results/coverage-report-only tests/e2e/support/coverage-report-only.spec.ts
