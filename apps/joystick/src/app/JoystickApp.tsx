@@ -363,16 +363,8 @@ export function JoystickApp({
     sendRemoteCommand({ command, type: 'command' });
   }
 
-  function navigateSlide(direction: 'next' | 'previous') {
+  function navigateBuild(direction: 'next' | 'previous') {
     if (!connected) return;
-    const currentIndex = displayedRemoteState?.activePageIndex;
-    const targetIndex =
-      typeof currentIndex === 'number' ? currentIndex + (direction === 'next' ? 1 : -1) : undefined;
-    const targetPage = typeof targetIndex === 'number' ? pages[targetIndex] : undefined;
-    if (targetPage) {
-      sendRemoteCommand({ command: 'go-to-page', pageId: targetPage.id, type: 'command' });
-      return;
-    }
     sendCommand(direction);
   }
 
@@ -530,8 +522,8 @@ export function JoystickApp({
           <div className="joystick-stream-top-controls" aria-label="Remote controls">
             <button
               type="button"
-              onClick={() => navigateSlide('previous')}
-              aria-label="Previous slide"
+              onClick={() => navigateBuild('previous')}
+              aria-label="Previous build"
             >
               <ChevronLeft size={20} />
             </button>
@@ -570,7 +562,7 @@ export function JoystickApp({
           <StreamPreview
             fallbackPreview={displayedRemoteState?.slidePreview}
             stream={remoteStream}
-            onNavigate={navigateSlide}
+            onNavigate={navigateBuild}
           />
         </section>
         <div ref={streamUpcomingRef}>
@@ -728,7 +720,7 @@ export function JoystickApp({
       <section className="joystick-stage" aria-label="Current slide">
         <SlidePreview
           preview={displayedRemoteState?.slidePreview}
-          onNavigate={navigateSlide}
+          onNavigate={navigateBuild}
           renderMediaAssets={renderStructuredMediaAssets}
         />
       </section>
