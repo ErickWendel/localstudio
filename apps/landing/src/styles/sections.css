@@ -85,10 +85,18 @@
   animation: feature-scanline-pass 4.8s var(--motion-ease, cubic-bezier(0.4, 0, 0.2, 1)) infinite;
 }
 
+.feature-media-picture,
 .feature-media-image {
   position: absolute;
   inset: 0;
   z-index: 5;
+}
+
+.feature-media-picture {
+  display: block;
+}
+
+.feature-media-image {
   width: 100%;
   height: 100%;
   object-fit: contain;
@@ -244,9 +252,13 @@
   animation: webmcp-cursor-path 4.4s var(--motion-ease, cubic-bezier(0.4, 0, 0.2, 1)) infinite;
 }
 
+.webmcp-media picture,
 .webmcp-media img {
   display: block;
   width: 100%;
+}
+
+.webmcp-media img {
   height: auto;
 }
 

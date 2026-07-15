@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300..800&family=Orbitron:wght@400..900&display=swap');
-
 :root {
   color-scheme: dark;
   --ls-bg: #0c160d;
@@ -18,8 +16,9 @@
   --ls-dim: #8a9388;
   --ls-danger: #ff6b6b;
   --ls-on-primary: #002108;
-  --ls-font-display: 'Orbitron', Helvetica, sans-serif;
-  --ls-font-body: 'Open Sans', Helvetica, sans-serif;
+  --ls-font-display:
+    'Orbitron', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ls-font-body: 'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
   --ew-bg: var(--ls-bg);
   --ew-black: var(--ls-black);
