@@ -17,7 +17,7 @@ export const featureMediaImages = {
   translate: {
     src: '/translate-showcase-editor.png',
     alt: 'LocalStudio translate menu selecting Portuguese as the target language',
-    aspectRatio: '3328 / 2392',
+    aspectRatio: '4112 / 2332',
   },
   presenter: {
     src: '/present-with-confidence-showcase.png',
