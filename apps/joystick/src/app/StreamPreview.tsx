@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { MouseEvent } from 'react';
 import type { PresenterRemoteSlidePreview } from '@localstudio/presenter-remote/protocol';
 import { SlideCanvas } from './SlideCanvas';
 import { useHorizontalSwipeNavigation } from './use-horizontal-swipe-navigation';
@@ -66,12 +67,13 @@ export function StreamPreview({
       });
   }
 
-  function handleClick() {
+  function handleClick(event: MouseEvent<HTMLButtonElement>) {
     if (videoRef.current && playbackBlockedRef.current) {
       requestVideoPlayback();
       return;
     }
-    onNavigate('next');
+    const bounds = event.currentTarget.getBoundingClientRect();
+    onNavigate(event.clientX - bounds.left < bounds.width / 2 ? 'previous' : 'next');
   }
 
   return (

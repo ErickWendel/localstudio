@@ -1,14 +1,14 @@
 {
   "id": "/joystick/",
-  "name": "LocalStudio 🕹️",
-  "short_name": "LocalStudio 🕹️",
-  "description": "Remote control for LocalStudio presenter mode.",
+  "name": "LocalStack 🕹️",
+  "short_name": "LocalStack 🕹️",
+  "description": "LocalStack joystick for LocalStudio presenter mode.",
   "start_url": "/joystick",
   "scope": "/joystick",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
-  "background_color": "#0c160d",
-  "theme_color": "#0c160d",
+  "background_color": "#07140d",
+  "theme_color": "#07140d",
   "orientation": "portrait",
   "icons": [
     {

@@ -345,7 +345,7 @@ describe('JoystickApp', () => {
     expect(screen.queryByText('MacBook Pro')).not.toBeInTheDocument();
   });
 
-  it('sends slide jump commands from the slide preview after a session is selected', async () => {
+  it('sends build commands from the slide preview after a session is selected', async () => {
     const user = userEvent.setup();
     const service = new InMemoryPresenterRemoteSignalingService({
       randomCode: () => 'ABCD-1234',
@@ -380,13 +380,11 @@ describe('JoystickApp', () => {
     const preview = await screen.findByRole('button', { name: 'Current slide preview' });
     await user.click(preview);
 
-    expect(screen.getByText('Command sent: go-to-page')).toBeInTheDocument();
-    expect(service.takeCommands('ABCD-1234')).toEqual([
-      { command: 'go-to-page', pageId: 'page-2', type: 'command' },
-    ]);
+    expect(screen.getByText('Command sent: next')).toBeInTheDocument();
+    expect(service.takeCommands('ABCD-1234')).toEqual([{ command: 'next', type: 'command' }]);
   });
 
-  it('connects from a peer URL and sends slide commands over the PeerJS data connection', async () => {
+  it('connects from a peer URL and sends build commands over the PeerJS data connection', async () => {
     const user = userEvent.setup();
     render(<JoystickApp initialUrl="https://localstudio.test/joystick?peer=control-peer-1" />);
     const client = peerControlClientMock.instances[0];
@@ -416,11 +414,58 @@ describe('JoystickApp', () => {
     await user.click(preview);
 
     expect(client?.sendCommand).toHaveBeenCalledWith({
-      command: 'go-to-page',
-      pageId: 'page-2',
+      command: 'next',
       type: 'command',
     });
-    expect(screen.getByText('Command sent: go-to-page')).toBeInTheDocument();
+    expect(screen.getByText('Command sent: next')).toBeInTheDocument();
+  });
+
+  it('sends a previous build command from the left half of the slide preview', async () => {
+    const service = new InMemoryPresenterRemoteSignalingService({
+      randomCode: () => 'ABCD-1234',
+      randomId: () => 'session-1',
+    });
+    service.registerSession({ presenterLabel: 'MacBook Pro', ttlMs: 60_000 });
+    service.publishState('ABCD-1234', {
+      activePageId: 'page-2',
+      activePageIndex: 1,
+      buildsRemaining: 0,
+      connectedControllerCount: 1,
+      deckName: 'Launch Deck',
+      notes: '',
+      pageCount: 2,
+      pages: [
+        { id: 'page-1', name: 'Intro' },
+        { id: 'page-2', name: 'Roadmap' },
+      ],
+      presenterMode: 'presenting',
+      shortcuts: ['previous', 'next'],
+      timer: { elapsedMs: 0, paused: false },
+      type: 'state',
+    });
+
+    render(
+      <JoystickApp
+        initialUrl="https://localstudio.test/joystick?code=ABCD-1234"
+        signalingService={service}
+      />,
+    );
+
+    const preview = await screen.findByRole('button', { name: 'Current slide preview' });
+    vi.spyOn(preview, 'getBoundingClientRect').mockReturnValue({
+      bottom: 200,
+      height: 200,
+      left: 0,
+      right: 300,
+      toJSON: () => ({}),
+      top: 0,
+      width: 300,
+      x: 0,
+      y: 0,
+    });
+    fireEvent.click(preview, { clientX: 80 });
+
+    expect(service.takeCommands('ABCD-1234')).toEqual([{ command: 'previous', type: 'command' }]);
   });
 
   it('stores a successful PeerJS presenter id for home screen launches', async () => {
@@ -600,8 +645,7 @@ describe('JoystickApp', () => {
     await user.click(await screen.findByRole('button', { name: 'Presenter stream preview' }));
 
     expect(client?.sendCommand).toHaveBeenCalledWith({
-      command: 'go-to-page',
-      pageId: 'page-2',
+      command: 'next',
       type: 'command',
     });
   });
@@ -732,9 +776,7 @@ describe('JoystickApp', () => {
     fireEvent.touchStart(preview, { changedTouches: [{ clientX: 260 }] });
     fireEvent.touchEnd(preview, { changedTouches: [{ clientX: 120 }] });
 
-    expect(service.takeCommands('ABCD-1234')).toEqual([
-      { command: 'go-to-page', pageId: 'page-3', type: 'command' },
-    ]);
+    expect(service.takeCommands('ABCD-1234')).toEqual([{ command: 'next', type: 'command' }]);
   });
 
   it('toggles timer commands from the presenter timer state', async () => {

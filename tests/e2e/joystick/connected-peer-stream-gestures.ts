@@ -27,4 +27,8 @@ export async function exerciseConnectedPeerStreamGestures(joystickPage: Page, pr
   });
   await expect(presenterPage.getByLabel('Presenter status')).toContainText('Current: Slide 3 of 3');
   await expect(joystickPage.getByLabel('Slide position')).toContainText('3 / 3');
+
+  await streamPreview.click({ position: { x: 24, y: 96 } });
+  await expect(presenterPage.getByLabel('Presenter status')).toContainText('Current: Slide 2 of 3');
+  await expect(joystickPage.getByLabel('Slide position')).toContainText('2 / 3');
 }
