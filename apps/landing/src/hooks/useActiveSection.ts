@@ -1,41 +1,49 @@
 import { useEffect, useState } from 'react';
 
 const landingSectionIds = ['top', 'features', 'webmcp', 'requirements'];
+const sectionObserverThresholds = [0, 0.18, 0.34, 0.5, 0.66, 0.82, 1];
 
 export function useActiveSection() {
   const [activeSectionId, setActiveSectionId] = useState('top');
 
   useEffect(() => {
-    let frameId = 0;
+    if (!('IntersectionObserver' in window)) {
+      return;
+    }
 
-    const updateActiveSection = () => {
-      const anchorLine = window.innerHeight * 0.34;
-      const sectionId =
-        landingSectionIds
-          .map((id) => {
-            const section = document.getElementById(id);
-            const distance = section ? Math.abs(section.getBoundingClientRect().top - anchorLine) : Number.POSITIVE_INFINITY;
+    const visibleSectionRatios = new Map<string, number>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          visibleSectionRatios.set(
+            entry.target.id,
+            entry.isIntersecting ? entry.intersectionRatio : 0,
+          );
+        }
 
-            return { distance, id };
-          })
-          .sort((firstSection, secondSection) => firstSection.distance - secondSection.distance)[0]?.id ?? 'top';
+        const nextSectionId = landingSectionIds.reduce(
+          (currentSectionId, sectionId) =>
+            (visibleSectionRatios.get(sectionId) ?? 0) >
+            (visibleSectionRatios.get(currentSectionId) ?? 0)
+              ? sectionId
+              : currentSectionId,
+          'top',
+        );
 
-      setActiveSectionId(sectionId);
-    };
+        setActiveSectionId(nextSectionId);
+      },
+      { rootMargin: '-18% 0px -48% 0px', threshold: sectionObserverThresholds },
+    );
 
-    const requestActiveSectionUpdate = () => {
-      cancelAnimationFrame(frameId);
-      frameId = requestAnimationFrame(updateActiveSection);
-    };
-
-    updateActiveSection();
-    window.addEventListener('scroll', requestActiveSectionUpdate, { passive: true });
-    window.addEventListener('resize', requestActiveSectionUpdate);
+    for (const sectionId of landingSectionIds) {
+      const section = document.getElementById(sectionId);
+      if (section) {
+        observer.observe(section);
+      }
+    }
 
     return () => {
-      cancelAnimationFrame(frameId);
-      window.removeEventListener('scroll', requestActiveSectionUpdate);
-      window.removeEventListener('resize', requestActiveSectionUpdate);
+      observer.disconnect();
     };
   }, []);
 

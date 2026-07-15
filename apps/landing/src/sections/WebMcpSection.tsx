@@ -3,7 +3,7 @@ import { Reveal } from '../components/Reveal';
 
 const webMcpImage = {
   src: '/webmcp-showcase.png',
-  srcSet: '/webmcp-showcase-645.webp 645w, /webmcp-showcase-1290.webp 1290w',
+  srcSet: '/webmcp-showcase-645.webp 645w',
   alt: 'WebMCP showcase page discovering tools and controlling the LocalStudio editor',
   width: 4040,
   height: 2378,
