@@ -58,6 +58,17 @@ body {
   backdrop-filter: blur(18px);
 }
 
+.VPNavBarTitle {
+  min-width: 0;
+  max-width: 280px;
+}
+
+.VPNavBarTitle .title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .VPNavBarTitle .title,
 .VPHomeHero .name,
 .VPHomeHero .text,

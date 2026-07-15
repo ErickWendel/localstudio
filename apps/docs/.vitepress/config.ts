@@ -53,6 +53,7 @@ export default defineConfig({
     },
   },
   themeConfig: {
+    siteTitle: 'LocalStudio.dev',
     logo: {
       light: '/localstudio-logo-black.svg',
       dark: '/localstudio-logo-white.svg',
