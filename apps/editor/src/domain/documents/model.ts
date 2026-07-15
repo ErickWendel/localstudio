@@ -222,6 +222,7 @@ export interface TextElement extends BaseElement {
   fontWeight: number;
   fill: string;
   align: 'left' | 'center' | 'right';
+  hyperlink?: string;
   lineHeight?: number;
   verticalAlign?: 'bottom' | 'middle' | 'top';
 }

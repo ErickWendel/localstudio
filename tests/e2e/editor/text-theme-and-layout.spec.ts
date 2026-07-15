@@ -20,8 +20,15 @@ test.describe('editor text theme and layout journey', () => {
     await toolbar.getByRole('spinbutton', { name: 'Text font size' }).fill('48');
     await toolbar.getByRole('button', { name: 'Bold text' }).click();
     await toolbar.getByRole('button', { name: 'Align text right' }).click();
+    await toolbar.getByRole('button', { name: 'Edit text hyperlink' }).click();
+    await toolbar.getByRole('textbox', { name: 'Text hyperlink URL' }).fill('localstudio.dev');
+    await toolbar.getByRole('button', { name: 'Apply' }).click();
     await toolbar.getByLabel('Text color').fill('#00779a');
     await expect(toolbar.getByRole('button', { name: 'Bold text' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(toolbar.getByRole('button', { name: 'Edit text hyperlink' })).toHaveAttribute(
       'aria-pressed',
       'true',
     );

@@ -182,10 +182,12 @@ function addTextElement(slide: PptxGenJS.Slide, element: Extract<DesignElement, 
     fit: 'shrink',
     fontFace: element.fontFamily,
     fontSize: element.fontSize,
+    ...(element.hyperlink ? { hyperlink: { url: element.hyperlink } } : {}),
     margin: 0,
     objectName: element.id,
     rotate: element.rotation,
     transparency: getTransparency(element.opacity),
+    ...(element.hyperlink ? { underline: { style: 'sng' as const } } : {}),
     valign: element.verticalAlign ?? 'top',
   });
 }

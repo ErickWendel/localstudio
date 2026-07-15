@@ -84,6 +84,29 @@ describe('editor view model text helpers', () => {
     expect(patch.height).toBeGreaterThan(1);
   });
 
+  it('does not reserve phantom lines for a single unbroken URL when resized narrower', () => {
+    const baseProject = sampleProject.createSampleProject();
+    const project = {
+      ...baseProject,
+      elements: {
+        ...baseProject.elements,
+        'text-title': {
+          ...baseProject.elements['text-title']!,
+          fontSize: 96,
+          text: 'https://github.com/obra/superpower',
+        },
+      },
+    };
+
+    const patch = editorViewModelText.getFramePatchWithTextMinimum(project, 'text-title', {
+      height: 1,
+      width: 420,
+    });
+
+    expect(patch.width).toBe(420);
+    expect(patch.height).toBeLessThan(130);
+  });
+
   it('expands a text element after style updates increase font size', () => {
     const project = createProjectWithShortTitleFrame();
 

@@ -66,6 +66,7 @@ describe('presenter remote protocol', () => {
               fontSize: 64,
               fontWeight: 800,
               height: 120,
+              hyperlink: 'https://localstudio.dev',
               id: 'title',
               kind: 'text',
               opacity: 1,

@@ -181,5 +181,13 @@ describe('ScrollingCanvasWorkspace', () => {
 
     await user.click(screen.getByRole('button', { name: 'Align text left' }));
     expect(onUpdateElementStyle).toHaveBeenCalledWith('text-subtitle', { align: 'left' });
+
+    await user.click(screen.getByRole('button', { name: 'Edit text hyperlink' }));
+    await user.clear(screen.getByRole('textbox', { name: 'Text hyperlink URL' }));
+    await user.type(screen.getByRole('textbox', { name: 'Text hyperlink URL' }), 'localstudio.dev');
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onUpdateElementStyle).toHaveBeenCalledWith('text-subtitle', {
+      hyperlink: 'https://localstudio.dev',
+    });
   });
 });

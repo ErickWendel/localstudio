@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { ElementStylePatch } from '../../../domain/commands/elements/basicCommands';
 import type { TextElement } from '../../../domain/documents/model';
 
@@ -15,6 +16,13 @@ const FONT_SIZE_STEP = 4;
 const REGULAR_WEIGHT = 600;
 const BOLD_WEIGHT = 800;
 
+function normalizeHyperlink(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^(https?:|mailto:|tel:)/i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
 export function TextSelectionToolbar({
   disabled = false,
   canTranslateSelection = false,
@@ -24,12 +32,17 @@ export function TextSelectionToolbar({
   onTranslateSelectedText,
   onUpdateElementStyle,
 }: TextSelectionToolbarProps) {
+  const [showLinkEditor, setShowLinkEditor] = useState(false);
+  const [linkDraft, setLinkDraft] = useState({ elementId: element.id, value: element.hyperlink ?? '' });
+  const linkValue = linkDraft.elementId === element.id ? linkDraft.value : (element.hyperlink ?? '');
+
   function updateStyle(patch: ElementStylePatch) {
     if (disabled || element.locked) return;
     onUpdateElementStyle?.(element.id, patch);
   }
 
   const isBold = element.fontWeight >= BOLD_WEIGHT;
+  const hasHyperlink = Boolean(element.hyperlink);
 
   return (
     <div className="text-selection-toolbar" role="toolbar" aria-label="Text editing controls">
@@ -137,6 +150,61 @@ export function TextSelectionToolbar({
           </button>
         ))}
       </div>
+
+      <button
+        aria-expanded={showLinkEditor}
+        aria-label="Edit text hyperlink"
+        aria-pressed={hasHyperlink}
+        className={
+          hasHyperlink ? 'text-toolbar-button text-toolbar-button-active' : 'text-toolbar-button'
+        }
+        disabled={disabled || element.locked}
+        title="Edit text hyperlink"
+        type="button"
+        onClick={() => {
+          setShowLinkEditor((current) => !current);
+        }}
+      >
+        <span className="material-symbols-outlined" aria-hidden="true">
+          link
+        </span>
+      </button>
+
+      {showLinkEditor ? (
+        <form
+          className="text-toolbar-link-editor"
+          onSubmit={(event) => {
+            event.preventDefault();
+            updateStyle({ hyperlink: normalizeHyperlink(linkValue) });
+            setShowLinkEditor(false);
+          }}
+        >
+          <input
+            aria-label="Text hyperlink URL"
+            disabled={disabled || element.locked}
+            placeholder="https://example.com"
+            type="text"
+            value={linkValue}
+            onChange={(event) => {
+              setLinkDraft({ elementId: element.id, value: event.target.value });
+            }}
+          />
+          <button disabled={disabled || element.locked} type="submit">
+            Apply
+          </button>
+          <button
+            disabled={disabled || element.locked || !hasHyperlink}
+            type="button"
+            onClick={() => {
+              setLinkDraft({ elementId: element.id, value: '' });
+              updateStyle({ hyperlink: null });
+              setShowLinkEditor(false);
+            }}
+          >
+            Clear
+          </button>
+        </form>
+      ) : null}
 
       <button
         aria-label="Animate"

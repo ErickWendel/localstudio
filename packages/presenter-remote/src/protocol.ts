@@ -25,6 +25,7 @@ export type PresenterRemoteSlidePreviewElement =
       fontSize: number;
       fontWeight: number;
       height: number;
+      hyperlink?: string | undefined;
       id: string;
       kind: 'text';
       lineHeight?: number | undefined;
@@ -204,6 +205,7 @@ function isPreviewElement(value: unknown): value is PresenterRemoteSlidePreviewE
       typeof value.fontSize === 'number' &&
       typeof value.fontWeight === 'number' &&
       typeof value.fill === 'string' &&
+      (value.hyperlink === undefined || typeof value.hyperlink === 'string') &&
       (value.align === 'left' || value.align === 'center' || value.align === 'right')
     );
   }
