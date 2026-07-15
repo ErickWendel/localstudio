@@ -25,8 +25,8 @@ as normal assets, translated text updates in place, and project files can be sav
 
 | Landing section | What it proves |
 | --- | --- |
-| About it | Browser-native slide creation with local AI and editable output. |
-| Features | PowerPoint (`.pptx`) import, layered editing, local persistence, and S3-compatible project mirroring. |
+| Watch the workflow | Import, prompt, generate images, translate, save locally, present, and share. |
+| Feature showcase | Every AI action returns to editable slide layers inside the same deck. |
 | WebMCP Showcase | Host pages and agents can discover editor tools and drive the same local-first surface. |
 | Requirements | Chrome-first browser APIs, WebGPU model caches, and local storage expectations. |
 
@@ -34,17 +34,33 @@ as normal assets, translated text updates in place, and project files can be sav
 
 ## Features
 
-### PowerPoint (`.pptx`) import
+### Watch the workflow
 
-Google Slides? Keynote? Export as `.pptx` and import into LocalStudio. Existing decks can become the starting point for
-a local, editable project instead of forcing every presentation to start from a blank canvas or prompt.
+The landing page now walks through the full LocalStudio loop with short product demos. Each step keeps the deck editable
+instead of producing a locked screenshot.
 
-![PowerPoint import](apps/landing/public/powerpoint-import.gif)
+| Workflow | Demo |
+| --- | --- |
+| Bring your own PPT | ![Import an existing presentation into LocalStudio](apps/landing/public/demo-bring-your-ppt.gif) |
+| Prompt-to-slide | ![Generate editable slides from a prompt](apps/landing/public/demo-prompt-to-slides.gif) |
+| Prompt-to-image | ![Generate an image asset and keep composing the same slide](apps/landing/public/demo-prompt-to-image.gif) |
+| Translate | ![Translate slide text in place](apps/landing/public/demo-translate.gif) |
+| Work locally | ![Save project files locally and browse version history](apps/landing/public/demo-work-locally.gif) |
+| Present with confidence | ![Run a LocalStudio deck in presenter mode](apps/landing/public/demo-present-with-confidence.gif) |
+| Share your presentation | ![Publish a portable LocalStudio deck preview](apps/landing/public/demo-share-presentation.gif) |
 
-### Editable AI output
+### Feature showcase
 
-A prompt becomes Konva-ready slide layers, not a flat generated image. The editor keeps the result selectable,
-reorderable, translatable, exportable, and ready for follow-up edits.
+The feature showcase on the landing page focuses on the editor outcomes behind those demos:
+
+- PowerPoint (`.pptx`) import turns existing decks into editable LocalStudio projects.
+- Presenter mode adds speaker notes, slide controls, fullscreen playback, and PWA remote control over peer-to-peer browser connections.
+- Prompt-to-slide creates structured text, image, and shape layers instead of a flat bitmap.
+- Prompt-to-image saves generated assets locally and drops them back onto the canvas as normal image layers.
+- Translation supports selected text, the current page, or the whole deck with language detection and target-language control.
+- Local project history keeps project JSON, assets, cache, and version snapshots in a folder you control.
+- S3-compatible mirroring publishes project JSON, assets, version history, config, public share payloads, and mirrored fonts.
+- Image editing supports click-guided segmentation, mask preview, flip, and crop after extraction.
 
 ### Product workflow
 
@@ -56,7 +72,8 @@ reorderable, translatable, exportable, and ready for follow-up edits.
 | Edit images | Segment an image subject and keep refining before applying the edit. |
 | Create images | Generate an asset from the prompt bar and drop it into the active slide. |
 | Save local projects | Store metadata and assets in a folder instead of a remote workspace. |
-| Share your slides | Use your own S3-compatible storage to publish stable links or reimport projects on other machines. |
+| Present with confidence | Move from editing to delivery with speaker notes, slide controls, and fullscreen playback. |
+| Share your slides | Publish a portable share payload or use S3-compatible storage for stable public links. |
 
 ### Feature proof
 
