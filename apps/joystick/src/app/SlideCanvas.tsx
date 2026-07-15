@@ -106,6 +106,42 @@ export function SlideCanvas({
           );
         }
         if (element.kind === 'text') {
+          if (element.hyperlink) {
+            return (
+              <a
+                aria-label={`Open ${element.text}`}
+                className="joystick-slide-element joystick-slide-text"
+                href={element.hyperlink}
+                key={element.id}
+                rel="noreferrer"
+                style={{
+                  ...style,
+                  alignItems:
+                    element.verticalAlign === 'bottom'
+                      ? 'flex-end'
+                      : element.verticalAlign === 'middle'
+                        ? 'center'
+                        : 'flex-start',
+                  color: element.fill,
+                  fontFamily: element.fontFamily,
+                  fontSize: `${Math.max(compact ? 3 : 5, (element.fontSize / preview.width) * 100)}cqw`,
+                  fontWeight: element.fontWeight,
+                  justifyContent:
+                    element.align === 'right'
+                      ? 'flex-end'
+                      : element.align === 'center'
+                        ? 'center'
+                        : 'flex-start',
+                  lineHeight: element.lineHeight ?? 1.05,
+                  textAlign: element.align,
+                  textDecoration: 'underline',
+                }}
+                target="_blank"
+              >
+                {element.text}
+              </a>
+            );
+          }
           return (
             <span
               className="joystick-slide-element joystick-slide-text"

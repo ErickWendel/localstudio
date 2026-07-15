@@ -90,6 +90,7 @@ function createExportProject(): ProjectDocument {
         fontWeight: 700,
         fill: '#ffcc00',
         align: 'center',
+        hyperlink: 'https://localstudio.dev',
       },
       image: {
         id: 'image',
@@ -274,6 +275,7 @@ describe('BrowserPptxExportService', () => {
 
     const slideRelsXml = readEntry(entries, 'ppt/slides/_rels/slide1.xml.rels');
     const relationshipTargets = readRelationshipTargets(slideRelsXml, 'ppt/slides/slide1.xml');
+    expect(relationshipTargets).toContain('https://localstudio.dev');
     expect(relationshipTargets.some((target) => target.startsWith('ppt/media/'))).toBe(true);
     for (const target of relationshipTargets.filter((item) => item.startsWith('ppt/media/'))) {
       expect(entries[target]).toBeDefined();
@@ -281,6 +283,7 @@ describe('BrowserPptxExportService', () => {
 
     const slideXml = readEntry(entries, 'ppt/slides/slide1.xml');
     expect(slideXml).toContain('Editable title');
+    expect(slideXml).toContain(' u="sng"');
     expect(slideXml).not.toContain('Hidden');
     expect(slideXml).toContain('<p:transition dur="500" advClick="0" advTm="250"><p:fade/></p:transition>');
     expect(slideXml).toContain('<p:timing>');

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createRef } from 'react';
 import type Konva from 'konva';
 import { vi } from 'vitest';
@@ -110,6 +110,85 @@ describe('CanvasWorkspace animation preview', () => {
     fireEvent.mouseDown(container.querySelector('canvas')!);
 
     expect(onAnimationPreviewAdvance).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens linked text without advancing click-triggered presenter builds', () => {
+    const onAnimationPreviewAdvance = vi.fn();
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
+    const stageRef = createRef<Konva.Stage>();
+    const baseProject = sampleProject.createSampleProject();
+    const project = {
+      ...baseProject,
+      elements: {
+        ...baseProject.elements,
+        'text-title': {
+          ...baseProject.elements['text-title']!,
+          hyperlink: 'https://localstudio.dev',
+        },
+      },
+    };
+
+    render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        animationPreview={{
+          activeBuildElementId: 'image-hero',
+          pageId: 'page-1',
+          phase: 'waiting',
+          hiddenElementIds: ['image-hero'],
+          playing: true,
+          waitingForClick: true,
+        }}
+        presentationMode
+        stageRef={stageRef}
+        onAnimationPreviewAdvance={onAnimationPreviewAdvance}
+      />,
+    );
+
+    const textNode = stageRef.current
+      ?.find('Text')
+      .find((node) => (node as Konva.Text).text() === 'AI Design Revolution') as
+      | Konva.Text
+      | undefined;
+    expect(textNode).toBeDefined();
+    const stageContainer = stageRef.current?.container();
+    expect(stageContainer).toBeDefined();
+
+    act(() => {
+      textNode!.fire('mouseenter', { target: textNode });
+    });
+
+    expect(stageContainer!.style.cursor).toBe('pointer');
+    expect(stageContainer).toHaveAttribute('title', 'https://localstudio.dev');
+
+    const preventDefault = vi.fn();
+    const stopPropagation = vi.fn();
+    act(() => {
+      textNode!.fire('mousedown', { evt: { button: 0 }, target: textNode });
+      textNode!.fire('click', {
+        evt: { preventDefault, shiftKey: false, stopPropagation },
+        target: textNode,
+      });
+    });
+
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(stopPropagation).toHaveBeenCalledTimes(1);
+    expect(openSpy).toHaveBeenCalledWith(
+      'https://localstudio.dev',
+      '_blank',
+      'noopener,noreferrer',
+    );
+    expect(onAnimationPreviewAdvance).not.toHaveBeenCalled();
+
+    act(() => {
+      textNode!.fire('mouseleave', { target: textNode });
+    });
+
+    expect(stageContainer!.style.cursor).toBe('');
+    expect(stageContainer).not.toHaveAttribute('title');
+    openSpy.mockRestore();
   });
 
   it('hides canvas quick actions while animation preview is active', () => {

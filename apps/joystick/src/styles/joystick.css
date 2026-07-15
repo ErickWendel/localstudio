@@ -521,6 +521,8 @@ input {
 .joystick-slide-text {
   display: flex;
   overflow: hidden;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.12em;
   white-space: pre-wrap;
 }
 

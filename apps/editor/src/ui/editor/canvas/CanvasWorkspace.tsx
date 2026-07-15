@@ -712,6 +712,20 @@ export function CanvasWorkspace({
     };
   }
 
+  function getLinkedTextElementFromEventTarget(target: Konva.Node) {
+    const elementEntry = Object.entries(nodeRefs.current).find(([, node]) => node === target);
+    if (!elementEntry) return undefined;
+    const element = project.elements[elementEntry[0]];
+    if (!element || element.type !== 'text' || !element.hyperlink) return undefined;
+    return element;
+  }
+
+  function isClickableLinkedText(
+    element: DesignElement,
+  ): element is Extract<DesignElement, { type: 'text' }> {
+    return element.type === 'text' && Boolean(element.hyperlink) && (presentationMode || readOnly);
+  }
+
   function getCommonElementProps(element: DesignElement, options: { interactive?: boolean } = {}): CommonElementProps {
     const isInteractive = options.interactive ?? true;
     const isBackgroundSelectionTarget = element.id === backgroundSelectionTargetId;
@@ -742,6 +756,13 @@ export function CanvasWorkspace({
       y: element.y * scaleY + (animationTransform?.y ?? 0),
       onClick: (event: Konva.KonvaEventObject<MouseEvent>) => {
         if (!isInteractive) return;
+        if (element.type === 'text' && element.hyperlink && (presentationMode || readOnly)) {
+          event.cancelBubble = true;
+          event.evt.preventDefault();
+          event.evt.stopPropagation();
+          window.open(element.hyperlink, '_blank', 'noopener,noreferrer');
+          return;
+        }
         if (canAdvanceAnimationPreviewByClick) {
           event.cancelBubble = true;
           onAnimationPreviewAdvance?.();
@@ -779,11 +800,27 @@ export function CanvasWorkspace({
       },
       onDragMove: handleDragMove,
       onMouseEnter: (event: Konva.KonvaEventObject<MouseEvent>) => {
+        if (isClickableLinkedText(element)) {
+          const container = event.target.getStage()?.container();
+          if (container) {
+            container.style.cursor = 'pointer';
+            container.title = element.hyperlink ?? '';
+          }
+          return;
+        }
         if (!isBackgroundSelectionTarget && !isProcessing) return;
         const container = event.target.getStage()?.container();
         if (container) container.style.cursor = isProcessing ? 'progress' : 'crosshair';
       },
       onMouseLeave: (event: Konva.KonvaEventObject<MouseEvent>) => {
+        if (isClickableLinkedText(element)) {
+          const container = event.target.getStage()?.container();
+          if (container) {
+            container.style.cursor = '';
+            container.removeAttribute('title');
+          }
+          return;
+        }
         if (!isBackgroundSelectionTarget && !isProcessing) return;
         if (isBackgroundSelectionTarget) setBackgroundPreviewPoint(null);
         const container = event.target.getStage()?.container();
@@ -911,6 +948,8 @@ export function CanvasWorkspace({
   }
 
   function handleStagePointerDown(event: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
+    const linkedTextElement = getLinkedTextElementFromEventTarget(event.target);
+    if (linkedTextElement && (presentationMode || readOnly)) return;
     if (canAdvanceAnimationPreviewByClick) {
       movieStartPlayback.playPendingMovieStart(artboardRef.current, project, animationPreview);
       onAnimationPreviewAdvance?.();
@@ -1101,6 +1140,7 @@ export function CanvasWorkspace({
                     lineHeight={element.lineHeight ?? 1.05}
                     padding={TEXT_FRAME_PADDING * scaleY}
                     ref={nodeRef}
+                    {...(element.hyperlink ? { textDecoration: 'underline' } : {})}
                     verticalAlign={element.verticalAlign ?? 'top'}
                     visible={editingTextId !== element.id}
                   />

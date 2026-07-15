@@ -94,7 +94,6 @@ function estimateWrappedLineCount(text: string, fontSize: number, availableWidth
       const wordWidth = estimateSingleLineTextWidth(word, fontSize);
       if (currentLineWidth === 0) {
         currentLineWidth = wordWidth;
-        paragraphLineCount += Math.max(0, Math.ceil(wordWidth / safeAvailableWidth) - 1);
         continue;
       }
 
@@ -106,7 +105,6 @@ function estimateWrappedLineCount(text: string, fontSize: number, availableWidth
 
       paragraphLineCount += 1;
       currentLineWidth = wordWidth;
-      paragraphLineCount += Math.max(0, Math.ceil(wordWidth / safeAvailableWidth) - 1);
     }
 
     return lineCount + paragraphLineCount;

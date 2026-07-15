@@ -291,6 +291,7 @@ function createSlidePreviewElement(
       fontFamily: element.fontFamily,
       fontSize: element.fontSize,
       fontWeight: element.fontWeight,
+      hyperlink: element.hyperlink,
       kind: 'text',
       lineHeight: element.lineHeight,
       text: element.text,

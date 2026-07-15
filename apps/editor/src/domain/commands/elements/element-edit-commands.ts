@@ -142,8 +142,9 @@ class UpdateElementStyleCommand implements EditorCommand {
     let nextElement: DesignElement = { ...element, opacity };
 
     if (element.type === 'text') {
-      nextElement = {
-        ...nextElement,
+      const nextTextElement = {
+        ...element,
+        opacity,
         ...(this.patch.align ? { align: this.patch.align } : {}),
         ...(typeof this.patch.fill === 'string' ? { fill: this.patch.fill } : {}),
         ...(this.patch.fontFamily ? { fontFamily: this.patch.fontFamily } : {}),
@@ -152,6 +153,13 @@ class UpdateElementStyleCommand implements EditorCommand {
           : {}),
         ...(this.patch.fontWeight !== undefined ? { fontWeight: this.patch.fontWeight } : {}),
       };
+      if (typeof this.patch.hyperlink === 'string') {
+        nextTextElement.hyperlink = this.patch.hyperlink;
+      }
+      if (this.patch.hyperlink === null) {
+        delete nextTextElement.hyperlink;
+      }
+      nextElement = nextTextElement;
     }
 
     if (element.type === 'shape') {

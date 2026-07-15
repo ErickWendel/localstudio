@@ -59,6 +59,7 @@ export type ElementStylePatch = Partial<{
   fontFamily: string;
   fontSize: number;
   fontWeight: number;
+  hyperlink: string | null;
   opacity: number;
   stroke: string | null;
   strokeWidth: number;

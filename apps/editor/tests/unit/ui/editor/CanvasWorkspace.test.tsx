@@ -43,6 +43,37 @@ describe('CanvasWorkspace', () => {
     expect(screen.queryByText('Selected Image')).not.toBeInTheDocument();
   });
 
+  it('underlines linked text elements on the canvas', () => {
+    const stageRef = createRef<Konva.Stage>();
+    const baseProject = sampleProject.createSampleProject();
+    const project = {
+      ...baseProject,
+      elements: {
+        ...baseProject.elements,
+        'text-title': {
+          ...baseProject.elements['text-title']!,
+          hyperlink: 'https://localstudio.dev',
+        },
+      },
+    };
+
+    render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['text-title'] }}
+        stageRef={stageRef}
+      />,
+    );
+
+    const textNode = stageRef.current
+      ?.find('Text')
+      .find((node) => (node as Konva.Text).text() === 'AI Design Revolution') as
+      | Konva.Text
+      | undefined;
+    expect(textNode?.textDecoration()).toBe('underline');
+  });
+
   it('uses layout sizing instead of transform scaling for zoom', () => {
     render(
       <CanvasWorkspace
