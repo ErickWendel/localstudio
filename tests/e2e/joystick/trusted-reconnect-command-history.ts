@@ -12,8 +12,8 @@ export const trustedReconnectCommandHistory = {
           'resume-timer',
           'reset-timer',
           'go-to-page:slide-2',
-          'go-to-page:slide-1',
-          'go-to-page:slide-2',
+          'previous',
+          'next',
           'go-to-page:slide-4',
         ]),
       );
