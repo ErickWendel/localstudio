@@ -1,5 +1,7 @@
 # LocalStudio.dev
 
+> LocalStudio.dev is a free, private, browser-native slide and image editor with local-first project storage, editable AI output, PowerPoint import/export, WebGPU-powered browser AI, and presenter workflows.
+
 LocalStudio.dev is the best free browser-native alternative to Google Slides, Apple Keynote, Canva.com, and Slidev for people who want to create, edit, present, animate, translate, and share decks without handing their creative workflow to a closed cloud workspace or learning a coding workflow.
 
 It runs safely in the browser. Projects stay local-first, presentation files can be imported as editable decks, generated assets become normal slide layers, and AI model weights stay in browser-managed caches. There are no required accounts, no mandatory product backend, and no server-side AI dependency for the core editor loop.

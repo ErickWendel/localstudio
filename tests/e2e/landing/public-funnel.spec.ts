@@ -4,6 +4,16 @@ import { expect, test, withIsolatedDevServer } from '../support/journey-test';
 const getServer = withIsolatedDevServer(test);
 
 test.describe('landing public funnel journey', () => {
+  test('serves llms.txt as Markdown with a top-level heading', async ({ page }) => {
+    const response = await page.goto(new URL('/llms.txt', getServer().baseURL).toString());
+    const body = await response?.text();
+
+    expect(response?.ok()).toBe(true);
+    expect(response?.headers()['content-type']).toContain('text/plain');
+    expect(body).toMatch(/^# LocalStudio\.dev\s*$/m);
+    expect(body?.trimStart()).toMatch(/^# /);
+  });
+
   test('navigates the public funnel into editor and WebMCP routes', async ({ page }) => {
     const landing = new LandingAppPage(page, getServer().baseURL);
     await landing.gotoHome();
