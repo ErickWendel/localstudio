@@ -68,7 +68,10 @@ function getInitialCode(initialUrl: string) {
 }
 
 function getInitialPeerId(initialUrl: string) {
-  return joystickRemoteLink.getPeerId(initialUrl);
+  const peerId = joystickRemoteLink.getPeerId(initialUrl);
+  if (peerId) return peerId;
+  if (getInitialCode(initialUrl)) return '';
+  return joystickSessionStorage.getRememberedPeerId();
 }
 
 function createPeerSession(peerId: string, connectedControllerCount: number) {
@@ -194,6 +197,7 @@ export function JoystickApp({
         setPeerConnectionFailed(false);
         setRemoteState(nextState);
         setRemoteStateReceivedAt(Date.now());
+        joystickSessionStorage.rememberSuccessfulPeer(peerId);
         setSession(createPeerSession(peerId, nextState.connectedControllerCount));
         setResolvingSession(false);
       },
@@ -206,12 +210,16 @@ export function JoystickApp({
         }
         if (nextStatus === 'connected') {
           setPeerConnectionFailed(false);
+          joystickSessionStorage.rememberSuccessfulPeer(peerId);
           setSession((currentSession) => currentSession ?? createPeerSession(peerId, 1));
           setResolvingSession(false);
           return;
         }
         if (nextStatus === 'failed') {
           setPeerConnectionFailed(true);
+          if (peerId === joystickSessionStorage.getRememberedPeerId()) {
+            joystickSessionStorage.forgetRememberedPeer();
+          }
           setResolvingSession(false);
           setSession(undefined);
         }
@@ -369,7 +377,9 @@ export function JoystickApp({
   }
 
   function applyRemoteLink(value: string) {
-    setPeerId(joystickRemoteLink.getPeerId(value));
+    const nextPeerId = joystickRemoteLink.getPeerId(value);
+    if (nextPeerId) joystickSessionStorage.rememberSuccessfulPeer(nextPeerId);
+    setPeerId(nextPeerId);
     setCode(joystickRemoteLink.getCode(value));
   }
 
