@@ -1,3 +1,15 @@
+@media (min-width: 1500px) {
+  .hero-section {
+    grid-template-columns: minmax(420px, 560px) minmax(760px, 1060px);
+    justify-content: center;
+    gap: clamp(72px, 6vw, 132px);
+  }
+
+  .workflow-carousel {
+    justify-self: stretch;
+  }
+}
+
 @media (max-width: 1120px) {
   .hero-section,
   .showcase-row,
