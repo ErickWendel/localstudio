@@ -1,0 +1,260 @@
+- main [ref=e3]:
+  - generic [ref=e4]:
+    - link "LocalStudio.dev beta home" [ref=e5] [cursor=pointer]:
+      - /url: "#top"
+      - generic [ref=e13]: LocalStudio
+      - generic [ref=e14]: Beta
+    - navigation "Landing sections" [ref=e15]:
+      - link "About it" [ref=e16] [cursor=pointer]:
+        - /url: "#top"
+      - link "Features" [ref=e17] [cursor=pointer]:
+        - /url: "#features"
+      - link "WebMCP Showcase" [ref=e18] [cursor=pointer]:
+        - /url: "#webmcp"
+      - link "Requirements" [ref=e19] [cursor=pointer]:
+        - /url: "#requirements"
+      - link "Docs" [ref=e20] [cursor=pointer]:
+        - /url: /docs/guide/getting-started#getting-started
+    - generic [ref=e21]:
+      - link "Star LocalStudio.dev on GitHub" [ref=e22] [cursor=pointer]:
+        - /url: https://github.com/ErickWendel/localstudio
+        - generic "9999 GitHub stars" [ref=e26]: "9159"
+      - link "Open editor" [ref=e27] [cursor=pointer]:
+        - /url: /editor/
+  - region [ref=e30]:
+    - generic [ref=e31]:
+      - paragraph [ref=e32]: Browser-native Canva-style editor
+      - heading "Design slides with local AI, then keep editing." [level=1] [ref=e33]
+      - paragraph [ref=e34]: LocalStudio.dev turns existing presentations, image generation, translation, background removal, and local saving into one continuous slide workflow inside the browser.
+      - link "Open editor" [ref=e36] [cursor=pointer]:
+        - /url: /editor/
+    - generic "Feature workflow carousel" [ref=e40]:
+      - generic [ref=e41]:
+        - paragraph [ref=e42]: Seamless workflow
+        - heading "Prompt-to-slide" [level=2] [ref=e43]
+        - paragraph [ref=e44]: A prompt becomes editable slide layers, not a flat generated image.
+      - tablist "Choose workflow demo" [ref=e45]:
+        - tab "Bring your own PPT" [ref=e46] [cursor=pointer]
+        - tab "Prompt-to-slide" [selected] [ref=e51] [cursor=pointer]
+        - tab "Prompt-to-image" [ref=e64] [cursor=pointer]
+        - tab "Translate" [ref=e69] [cursor=pointer]
+        - tab "Work locally" [ref=e74] [cursor=pointer]
+        - tab "Present with confidence" [ref=e77] [cursor=pointer]
+        - tab "Share your presentation" [ref=e81] [cursor=pointer]
+      - generic "LocalStudio workflow preview" [ref=e88]:
+        - generic [ref=e91]:
+          - generic "Prompt-to-slide workflow generating an editable presentation in LocalStudio" [ref=e92]
+          - generic [ref=e101]:
+            - strong [ref=e102]: Web AI launch plan
+            - generic [ref=e103]: Generate a product story, create assets, translate, and save locally.
+          - generic [ref=e104]:
+            - strong [ref=e105]: Plano de lancamento Web AI
+            - generic [ref=e106]: Gere a historia do produto, crie imagens, traduza e salve localmente.
+          - generic [ref=e107]: Generating editable layers...
+          - generic [ref=e112]:
+            - strong [ref=e113]: Local project folder
+            - generic [ref=e114]: project.json, assets, history
+  - region [ref=e115]:
+    - generic [ref=e116]:
+      - paragraph [ref=e117]: Feature showcase
+      - heading "Every AI action returns to the editor." [level=2] [ref=e118]
+      - paragraph [ref=e119]: The product story is not a pile of separate demos. Each feature keeps the deck editable and moves the same local project forward.
+    - generic [ref=e120]:
+      - article [ref=e121]:
+        - generic [ref=e122]:
+          - paragraph [ref=e123]: PowerPoint (.pptx)
+          - heading "Bring your existing presentations to LocalStudio." [level=3] [ref=e124]
+          - paragraph [ref=e125]: Google Slides? Keynote? Export as .pptx and import into LocalStudio. Your existing presentation becomes the starting point for a local, editable deck.
+          - list [ref=e126]:
+            - listitem [ref=e127]: Import .pptx files from the editor
+            - listitem [ref=e128]: Turn existing decks into editable projects
+            - listitem [ref=e129]: Keep refining with local AI workflows
+        - generic "pptx feature preview" [ref=e131]:
+          - img "LocalStudio editor importing a PowerPoint presentation with the File menu open" [ref=e133]
+      - article [ref=e134]:
+        - generic [ref=e135]:
+          - paragraph [ref=e136]: Presenter mode
+          - heading "Present with confidence from LocalStudio." [level=3] [ref=e137]
+          - paragraph [ref=e138]: Presenter mode gives speakers a dedicated view with timer, notes, and slide controls, while a companion PWA can remotely control the presentation over peer-to-peer browser connections.
+          - list [ref=e139]:
+            - listitem [ref=e140]: Speaker timer and notes
+            - listitem [ref=e141]: Next and previous slide controls
+            - listitem [ref=e142]: PWA remote control over P2P
+            - listitem [ref=e143]: Fullscreen presenter playback
+        - generic "presenter feature preview" [ref=e145]:
+          - img "LocalStudio presenter mode with speaker notes and phone remote controls" [ref=e147]
+      - article [ref=e148]:
+        - generic [ref=e149]:
+          - paragraph [ref=e150]: Prompt-to-slide
+          - heading "Generate a real slide structure, then keep editing every layer." [level=3] [ref=e151]
+          - paragraph [ref=e152]: The prompt flow creates editable text, image, and shape layers on the active page instead of locking the result into one flat bitmap.
+          - list [ref=e153]:
+            - listitem [ref=e154]: Structured JSON slide tasks
+            - listitem [ref=e155]: Progressive layer updates
+            - listitem [ref=e156]: Konva-ready editable objects
+        - generic "prompt feature preview" [ref=e158]:
+          - img "LocalStudio prompt-to-slide editor with an AI Design Revolution slide" [ref=e160]
+      - article [ref=e161]:
+        - generic [ref=e162]:
+          - paragraph [ref=e163]: Prompt-to-image
+          - heading "Create image assets without leaving the deck." [level=3] [ref=e164]
+          - paragraph [ref=e165]: Prompt-to-image is part of the same prompt surface, so a generated asset lands back on the canvas as a normal editable layer.
+          - list [ref=e166]:
+            - listitem [ref=e167]: Image prompts inside the prompt bar
+            - listitem [ref=e168]: Size, steps, and seed controls
+            - listitem [ref=e169]: Generated assets saved locally
+        - generic "image feature preview" [ref=e171]:
+          - img "LocalStudio prompt-to-image editor with a generated AI chip image on a slide" [ref=e173]
+      - article [ref=e174]:
+        - generic [ref=e175]:
+          - paragraph [ref=e176]: Translate
+          - heading "Translate selected text, the current page, or the whole deck." [level=3] [ref=e177]
+          - paragraph [ref=e178]: Translation stays inside the editor context with target-language setup and layout-preserving text updates.
+          - list [ref=e179]:
+            - listitem [ref=e180]: Target language control
+            - listitem [ref=e181]: Language detection
+            - listitem [ref=e182]: Selected text, page, or deck scopes
+        - generic "translate feature preview" [ref=e184]:
+          - img "LocalStudio translate menu selecting Portuguese as the target language" [ref=e186]
+      - article [ref=e187]:
+        - generic [ref=e188]:
+          - paragraph [ref=e189]: Work locally
+          - heading "Project files, assets, and history stay in a folder you control." [level=3] [ref=e190]
+          - paragraph [ref=e191]: "The editor is local-first: project JSON, assets, cache, and version snapshots live on disk while model weights stay in browser-managed caches."
+          - list [ref=e192]:
+            - listitem [ref=e193]: File System Access API
+            - listitem [ref=e194]: Local version history
+            - listitem [ref=e195]: No account or cloud workspace required
+        - generic "local feature preview" [ref=e197]:
+          - img "LocalStudio project history panel showing saved local versions" [ref=e199]
+      - article [ref=e200]:
+        - generic [ref=e201]:
+          - paragraph [ref=e202]: S3-compatible mirror
+          - heading "S3-compatible projects can still publish public links." [level=3] [ref=e203]
+          - paragraph [ref=e204]: MinIO works as the local/self-hosted example, while the same project mirror shape fits AWS S3, R2, or any compatible endpoint. You can also mirror local fonts so shared decks keep their typography for viewers.
+          - list [ref=e205]:
+            - listitem [ref=e206]: Project JSON and assets
+            - listitem [ref=e207]: Version history and config
+            - listitem [ref=e208]: Public share payloads with mirrored fonts
+        - generic "s3 feature preview" [ref=e210]:
+          - img "LocalStudio S3-compatible mirror settings beside a MinIO object browser" [ref=e212]
+      - article [ref=e213]:
+        - generic [ref=e214]:
+          - paragraph [ref=e215]: Edit images
+          - heading "Use segmentation tools like normal editor actions." [level=3] [ref=e216]
+          - paragraph [ref=e217]: Background removal, flip, and crop sit next to ordinary layer controls so AI image editing feels like part of the canvas.
+          - list [ref=e218]:
+            - listitem [ref=e219]: Click-guided subject selection
+            - listitem [ref=e220]: Blue mask preview
+            - listitem [ref=e221]: Flip and crop after extraction
+        - generic "edit feature preview" [ref=e223]:
+          - img "LocalStudio edit images workflow showing background removal segmentation on an image layer" [ref=e225]
+  - region [ref=e226]:
+    - generic [ref=e227]:
+      - paragraph [ref=e228]: Watch the workflow
+      - heading "From imported deck to editable slides, still local." [level=2] [ref=e229]
+      - paragraph [ref=e230]: "LocalStudio.dev keeps the core creation loop in the browser: import presentations, prompt, edit layers, translate, segment, generate, and save to disk."
+    - generic "Watch workflow steps" [ref=e231]:
+      - article [ref=e232]:
+        - heading "Import presentations" [level=3] [ref=e237]
+        - paragraph [ref=e238]: Google Slides? Keynote? Export as .pptx and import into LocalStudio as an editable project.
+        - generic [ref=e239]: PowerPoint (.pptx)
+      - article [ref=e240]:
+        - heading "Prompt to slides" [level=3] [ref=e253]
+        - paragraph [ref=e254]: Turn a plain-language request into Konva-ready slide objects with structured JSON.
+        - generic [ref=e255]: Editable slide layers
+      - article [ref=e256]:
+        - heading "Translate the deck" [level=3] [ref=e261]
+        - paragraph [ref=e262]: Translate one text layer, one page, or the whole deck while preserving layout intent.
+        - generic [ref=e263]: In-place text updates
+      - article [ref=e264]:
+        - heading "Edit images" [level=3] [ref=e268]
+        - paragraph [ref=e269]: Click the subject, preview the segment mask, and keep refining before cutting.
+        - generic [ref=e270]: Canvas image action
+      - article [ref=e271]:
+        - heading "Create images" [level=3] [ref=e276]
+        - paragraph [ref=e277]: Generate an asset from the prompt bar and drop it directly into the active slide.
+        - generic [ref=e278]: Normal image layer
+      - article [ref=e279]:
+        - heading "Save local projects" [level=3] [ref=e282]
+        - paragraph [ref=e283]: Store metadata and assets in a folder you control instead of a remote workspace.
+        - generic [ref=e284]: Local project files
+      - article [ref=e285]:
+        - heading "Share your slides" [level=3] [ref=e292]
+        - paragraph [ref=e293]: Use your own external storage to publish stable links or reimport it into different machines.
+        - generic [ref=e294]: Bring your bucket
+  - region [ref=e295]:
+    - generic [ref=e296]:
+      - paragraph [ref=e297]: Why Web AI
+      - heading "Model choice is a product feature." [level=2] [ref=e298]
+    - generic [ref=e299]:
+      - paragraph [ref=e300]: Chrome built-in APIs are the fast path when available. WebGPU models keep the app useful in other browsers and give power users explicit control over which local model backs each workflow.
+      - generic [ref=e301]:
+        - generic [ref=e302]: Built-in APIs
+        - generic [ref=e306]: External WebGPU models
+        - generic [ref=e310]: Browser-managed model cache
+  - region [ref=e314]:
+    - generic [ref=e315]:
+      - generic [ref=e316]:
+        - paragraph [ref=e317]: WebMCP showcase
+        - heading "A host page can drive the editor through browser tools." [level=2] [ref=e318]
+        - paragraph [ref=e319]: WebMCP exposes LocalStudio actions as semantic browser tools, so an external page can discover capabilities, create a project, generate assets, translate the deck, and read the resulting project snapshot.
+        - list [ref=e320]:
+          - listitem [ref=e321]: Tool discovery from the editor iframe
+          - listitem [ref=e322]: Prompt, image, translate, and snapshot actions
+          - listitem [ref=e323]: Same local-first editor surface behind every call
+        - link "Open WebMCP demo" [ref=e324] [cursor=pointer]:
+          - /url: /editor/webmcp
+      - img "WebMCP showcase page discovering tools and controlling the LocalStudio editor" [ref=e329]
+  - region [ref=e330]:
+    - generic "Feature details" [ref=e331]:
+      - generic [ref=e332]:
+        - heading "An editor, not a toy demo." [level=2] [ref=e337]
+        - paragraph [ref=e338]: "LocalStudio already treats slides as layered documents: selectable objects, page controls, text editing, translation actions, imported assets, and local persistence are all part of the same editing surface."
+      - list [ref=e339]:
+        - listitem [ref=e340]: Layered slide canvas
+        - listitem [ref=e341]: Pages, thumbnails, and drag reordering
+        - listitem [ref=e342]: Text toolbar with translate actions
+        - listitem [ref=e343]: PNG export and local folder persistence
+  - region [ref=e344]:
+    - generic [ref=e345]:
+      - paragraph [ref=e346]: Requirements
+      - heading "Built for modern browser AI workflows." [level=2] [ref=e347]
+      - paragraph [ref=e348]: LocalStudio runs in the browser, but the models and local project files still need the right browser surface and enough disk space.
+    - generic [ref=e349]:
+      - article [ref=e350]:
+        - heading "Chrome browser" [level=3] [ref=e354]
+        - paragraph [ref=e355]: Preferred browser because LocalStudio uses Chrome-first browser AI and file system APIs as they become available.
+      - article [ref=e356]:
+        - heading "10GB free storage" [level=3] [ref=e360]
+        - paragraph [ref=e361]: Recommended minimum for downloaded model weights, browser-managed caches, generated assets, and local project history.
+  - region [ref=e362]:
+    - generic [ref=e363]:
+      - paragraph [ref=e364]: Thank you
+      - heading "Built on the work of the browser AI community." [level=2] [ref=e365]
+      - paragraph [ref=e366]: Thanks to the Chrome Web Team for pushing built-in AI APIs forward, and to the Hugging Face WebML community for making local browser models easier to discover and run.
+    - generic "Browser AI resources" [ref=e367]:
+      - link "Chrome Built-in AI" [ref=e368] [cursor=pointer]:
+        - /url: https://developer.chrome.com/docs/ai/built-in?utm_source=localstudio.dev&utm_medium=referral&utm_campaign=localstudio_thanks
+      - link "Hugging Face WebML community" [ref=e373] [cursor=pointer]:
+        - /url: https://huggingface.co/webml-community?utm_source=localstudio.dev&utm_medium=referral&utm_campaign=localstudio_thanks
+  - region "Try the browser-native editor." [ref=e378]:
+    - heading "Try the browser-native editor." [level=2] [ref=e379]
+    - link "Open LocalStudio.dev" [ref=e381] [cursor=pointer]:
+      - /url: /editor/
+  - generic "LocalStudio footer" [ref=e384]:
+    - generic [ref=e385]:
+      - link "LocalStudio.dev beta home" [ref=e386] [cursor=pointer]:
+        - /url: "#top"
+        - generic [ref=e394]: LocalStudio
+        - generic [ref=e395]: Beta
+      - paragraph [ref=e396]: Built by Erick Wendel for browser-native AI workflows.
+    - navigation "Erick Wendel social links" [ref=e397]:
+      - link "YouTube" [ref=e398] [cursor=pointer]:
+        - /url: https://www.youtube.com/@ErickWendelAcademy
+      - link "GitHub" [ref=e403] [cursor=pointer]:
+        - /url: https://github.com/erickWendel
+      - link "LinkedIn" [ref=e408] [cursor=pointer]:
+        - /url: https://www.linkedin.com/in/erickwendel/
+    - link "Star the repo" [ref=e413] [cursor=pointer]:
+      - /url: https://github.com/ErickWendel/localstudio
