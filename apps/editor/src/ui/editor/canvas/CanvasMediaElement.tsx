@@ -164,6 +164,32 @@ function CanvasVideoElement({
     previewMode,
   ]);
 
+  useEffect(() => {
+    const video = videoRef.current;
+    if (
+      !video ||
+      !previewMode ||
+      !element.autoplayInPreview ||
+      element.startOnClick ||
+      animationState.hidden ||
+      animationState.activeBuild?.mediaAction === 'play' ||
+      animationState.playbackRunId === undefined
+    ) {
+      return;
+    }
+    stopReversePlayback();
+    video.currentTime = Math.max(0, element.trimStartSeconds);
+    playVideo(video);
+  }, [
+    animationState.activeBuild,
+    animationState.hidden,
+    animationState.playbackRunId,
+    element.autoplayInPreview,
+    element.startOnClick,
+    element.trimStartSeconds,
+    previewMode,
+  ]);
+
   function playReverse(video: HTMLVideoElement) {
     stopReversePlayback();
     video.pause();
@@ -241,11 +267,18 @@ export function CanvasMediaElement({
   scale: { x: number; y: number };
 }) {
   if (element.type === 'gif') {
+    const shouldPlayGif =
+      element.playing &&
+      (!previewMode || !animationState.hidden || Boolean(animationState.activeBuild));
+    const gifPlaybackKey = animationState.activeBuild
+      ? `${element.id}-${animationState.playbackRunId ?? 'static'}-${animationState.activeBuild.id}`
+      : `${element.id}-${animationState.playbackRunId ?? 'static'}-${shouldPlayGif ? 'playing' : 'hidden'}`;
     return (
       <img
         aria-label={assetName}
         className="canvas-media-element"
-        src={element.playing ? assetUrl : undefined}
+        key={gifPlaybackKey}
+        src={shouldPlayGif ? assetUrl : undefined}
         style={getMediaStyle(element, scale, interactive, opacity)}
       />
     );

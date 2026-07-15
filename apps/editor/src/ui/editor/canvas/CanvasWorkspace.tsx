@@ -79,6 +79,7 @@ interface CanvasWorkspaceProps {
         mode?: 'editor' | 'presenter';
         pageId: string;
         phase: 'transition' | 'animation' | 'waiting' | 'complete';
+        playbackRunId?: number;
         playing: boolean;
         waitingForClick: boolean;
       }
@@ -824,6 +825,8 @@ export function CanvasWorkspace({
     return {
       activeBuild,
       hidden: animationPreviewHiddenElementIds.includes(element.id),
+      playbackRunId:
+        animationPreview?.pageId === activePageId ? animationPreview.playbackRunId : undefined,
       preset: activeBuild
         ? animationPresetEngine.getRenderState({
             bounds: {

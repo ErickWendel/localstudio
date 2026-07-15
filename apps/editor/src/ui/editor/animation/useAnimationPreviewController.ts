@@ -10,6 +10,7 @@ export interface AnimationPreviewState {
   mode: 'editor' | 'presenter';
   pageId: string;
   phase: 'transition' | 'animation' | 'waiting' | 'complete';
+  playbackRunId?: number;
   playing: boolean;
   waitingForClick: boolean;
 }
@@ -23,7 +24,9 @@ interface AnimationPreviewControllerOptions {
 }
 
 function getBuildPlaybackDurationMs(build: ElementAnimationBuild) {
-  return Math.max(0, build.durationMs ?? build.delayMs);
+  const durationMs = Math.max(0, build.durationMs ?? build.delayMs);
+  if (build.mediaAction === 'play') return Math.max(75, durationMs);
+  return durationMs;
 }
 
 export function useAnimationPreviewController({
@@ -37,6 +40,7 @@ export function useAnimationPreviewController({
   const animationPreviewQueueRef = useRef<ElementAnimationBuild[]>([]);
   const animationPreviewTimeoutsRef = useRef<number[]>([]);
   const animationPreviewFrameRef = useRef<number | undefined>(undefined);
+  const animationPreviewRunIdRef = useRef(0);
 
   function clearAnimationPreviewTimers() {
     for (const timeoutId of animationPreviewTimeoutsRef.current) {
@@ -196,6 +200,7 @@ export function useAnimationPreviewController({
     animationPreviewQueueRef.current = builds;
     const transitionDelay = page.transition?.delayMs ?? 0;
     if (mode === 'presenter') onPresenterPageChange?.(page.id);
+    animationPreviewRunIdRef.current += 1;
     setAnimationPreview({
       activeBuild: undefined,
       activeBuildElementId: undefined,
@@ -206,6 +211,7 @@ export function useAnimationPreviewController({
       mode,
       pageId: page.id,
       phase: transitionDelay > 0 ? 'transition' : builds.length > 0 ? 'animation' : 'complete',
+      playbackRunId: animationPreviewRunIdRef.current,
       playing: true,
       waitingForClick: false,
     });

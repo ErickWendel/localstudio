@@ -286,6 +286,75 @@ describe('CanvasWorkspace media elements', () => {
     pauseSpy.mockRestore();
   });
 
+  it('restarts autoplay videos when fullscreen presentation playback starts', async () => {
+    const playSpy = vi
+      .spyOn(HTMLMediaElement.prototype, 'play')
+      .mockImplementation(() => Promise.resolve());
+    const pauseSpy = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+    const project = createMediaProject();
+    const { container, rerender } = render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+      />,
+    );
+
+    const video = container.querySelector('video[aria-label="Demo clip"]') as HTMLVideoElement;
+    video.currentTime = 5;
+
+    rerender(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        animationPreview={{
+          activeBuildElementId: undefined,
+          animationProgress: 0,
+          hiddenElementIds: [],
+          mode: 'presenter',
+          pageId: 'page-1',
+          phase: 'complete',
+          playbackRunId: 1,
+          playing: true,
+          waitingForClick: false,
+        }}
+        presentationMode
+        readOnly
+      />,
+    );
+
+    await waitFor(() => expect(playSpy).toHaveBeenCalledTimes(1));
+    expect(video.currentTime).toBe(2);
+
+    video.currentTime = 5;
+    rerender(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        animationPreview={{
+          activeBuildElementId: undefined,
+          animationProgress: 0,
+          hiddenElementIds: [],
+          mode: 'presenter',
+          pageId: 'page-1',
+          phase: 'complete',
+          playbackRunId: 2,
+          playing: true,
+          waitingForClick: false,
+        }}
+        presentationMode
+        readOnly
+      />,
+    );
+
+    await waitFor(() => expect(playSpy).toHaveBeenCalledTimes(2));
+    expect(video.currentTime).toBe(2);
+    playSpy.mockRestore();
+    pauseSpy.mockRestore();
+  });
+
   it('renders GIF media as an animated non-image element', () => {
     const project = createMediaProject();
     const { container } = render(
@@ -297,6 +366,140 @@ describe('CanvasWorkspace media elements', () => {
     );
 
     expect(container.querySelector('img[aria-label="Animated loop"]')).toBeInTheDocument();
+  });
+
+  it('mounts animated GIF sources only when preview playback reaches a hidden build', () => {
+    const project = createMediaProject();
+    project.pages[0]!.animationBuilds = [
+      {
+        id: 'gif-build',
+        elementId: 'gif-demo',
+        effect: 'reveal',
+        trigger: 'after-transition',
+        delayMs: 0,
+        durationMs: 500,
+      },
+    ];
+    const build = project.pages[0]!.animationBuilds[0];
+
+    const { container, rerender } = render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        animationPreview={{
+          activeBuildElementId: undefined,
+          animationProgress: 0,
+          hiddenElementIds: ['gif-demo'],
+          pageId: 'page-1',
+          phase: 'transition',
+          playing: true,
+          waitingForClick: false,
+        }}
+        presentationMode
+        readOnly
+      />,
+    );
+
+    const hiddenGif = container.querySelector(
+      'img[aria-label="Animated loop"]',
+    ) as HTMLImageElement;
+    expect(hiddenGif.getAttribute('src')).toBeNull();
+
+    rerender(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        animationPreview={{
+          activeBuild: build,
+          activeBuildElementId: 'gif-demo',
+          animationProgress: 0,
+          hiddenElementIds: ['gif-demo'],
+          pageId: 'page-1',
+          phase: 'animation',
+          playing: true,
+          waitingForClick: false,
+        }}
+        presentationMode
+        readOnly
+      />,
+    );
+
+    const activeGif = container.querySelector(
+      'img[aria-label="Animated loop"]',
+    ) as HTMLImageElement;
+    expect(activeGif.getAttribute('src')).toBe('blob:gif');
+  });
+
+  it('restarts visible GIFs when fullscreen presentation playback starts', () => {
+    const project = createMediaProject();
+    const { container, rerender } = render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+      />,
+    );
+
+    const editorGif = container.querySelector(
+      'img[aria-label="Animated loop"]',
+    ) as HTMLImageElement;
+    expect(editorGif.getAttribute('src')).toBe('blob:gif');
+
+    rerender(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        animationPreview={{
+          activeBuildElementId: undefined,
+          animationProgress: 0,
+          hiddenElementIds: [],
+          mode: 'presenter',
+          pageId: 'page-1',
+          phase: 'complete',
+          playbackRunId: 1,
+          playing: true,
+          waitingForClick: false,
+        }}
+        presentationMode
+        readOnly
+      />,
+    );
+
+    const firstPresentationGif = container.querySelector(
+      'img[aria-label="Animated loop"]',
+    ) as HTMLImageElement;
+    expect(firstPresentationGif).not.toBe(editorGif);
+    expect(firstPresentationGif.getAttribute('src')).toBe('blob:gif');
+
+    rerender(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        animationPreview={{
+          activeBuildElementId: undefined,
+          animationProgress: 0,
+          hiddenElementIds: [],
+          mode: 'presenter',
+          pageId: 'page-1',
+          phase: 'complete',
+          playbackRunId: 2,
+          playing: true,
+          waitingForClick: false,
+        }}
+        presentationMode
+        readOnly
+      />,
+    );
+
+    const secondPresentationGif = container.querySelector(
+      'img[aria-label="Animated loop"]',
+    ) as HTMLImageElement;
+    expect(secondPresentationGif).not.toBe(firstPresentationGif);
+    expect(secondPresentationGif.getAttribute('src')).toBe('blob:gif');
   });
 
   it('shows the object animation toolbar action for selected media elements', () => {
