@@ -233,6 +233,7 @@ function getContentType(path) {
   if (extension === '.html') return 'text/html; charset=utf-8';
   if (extension === '.css') return 'text/css; charset=utf-8';
   if (extension === '.js') return 'text/javascript; charset=utf-8';
+  if (extension === '.txt') return 'text/plain; charset=utf-8';
   if (extension === '.json') return 'application/json; charset=utf-8';
   if (extension === '.svg') return 'image/svg+xml';
   if (extension === '.wasm') return 'application/wasm';
