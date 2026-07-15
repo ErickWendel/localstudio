@@ -41,6 +41,7 @@ function CanvasVideoElement({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const reverseIntervalRef = useRef<number | undefined>(undefined);
+  const handledMediaActionBuildRef = useRef<string | undefined>(undefined);
   const previousTrimRef = useRef<
     | {
         assetUrl: string | undefined;
@@ -52,7 +53,11 @@ function CanvasVideoElement({
   >(undefined);
   const repeatMode = element.repeatMode ?? (element.loop ? 'loop' : 'none');
   const autoplay =
-    previewMode && element.autoplayInPreview && !element.startOnClick && !animationState.hidden;
+    previewMode &&
+    element.autoplayInPreview &&
+    !element.startOnClick &&
+    !animationState.hidden &&
+    !animationState.mediaActionPending;
 
   function stopReversePlayback() {
     if (reverseIntervalRef.current === undefined) return;
@@ -144,13 +149,16 @@ function CanvasVideoElement({
     const video = videoRef.current;
     if (!video || !previewMode || !element.autoplayInPreview) return;
     if (animationState.activeBuild?.mediaAction === 'play') {
+      const buildPlaybackKey = `${animationState.playbackRunId ?? 'static'}-${animationState.activeBuild.id}`;
+      if (handledMediaActionBuildRef.current === buildPlaybackKey) return;
       stopReversePlayback();
       video.currentTime = Math.max(0, element.trimStartSeconds);
+      handledMediaActionBuildRef.current = buildPlaybackKey;
       if (movieStartPlayback.consumeStartedBuild(video, animationState.activeBuild.id)) return;
       playVideo(video);
       return;
     }
-    if (animationState.hidden || element.startOnClick) {
+    if (animationState.hidden || element.startOnClick || animationState.mediaActionPending) {
       stopReversePlayback();
       video.pause();
       video.currentTime = Math.max(0, element.trimStartSeconds);
@@ -158,6 +166,36 @@ function CanvasVideoElement({
   }, [
     animationState.activeBuild,
     animationState.hidden,
+    animationState.mediaActionPending,
+    animationState.playbackRunId,
+    element.autoplayInPreview,
+    element.startOnClick,
+    element.trimStartSeconds,
+    previewMode,
+  ]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (
+      !video ||
+      !previewMode ||
+      !element.autoplayInPreview ||
+      element.startOnClick ||
+      animationState.hidden ||
+      animationState.activeBuild?.mediaAction === 'play' ||
+      animationState.mediaActionPending ||
+      animationState.playbackRunId === undefined
+    ) {
+      return;
+    }
+    stopReversePlayback();
+    video.currentTime = Math.max(0, element.trimStartSeconds);
+    playVideo(video);
+  }, [
+    animationState.activeBuild,
+    animationState.hidden,
+    animationState.mediaActionPending,
+    animationState.playbackRunId,
     element.autoplayInPreview,
     element.startOnClick,
     element.trimStartSeconds,
@@ -241,11 +279,18 @@ export function CanvasMediaElement({
   scale: { x: number; y: number };
 }) {
   if (element.type === 'gif') {
+    const shouldPlayGif =
+      element.playing &&
+      (!previewMode || !animationState.hidden || Boolean(animationState.activeBuild));
+    const gifPlaybackKey = animationState.activeBuild
+      ? `${element.id}-${animationState.playbackRunId ?? 'static'}-${animationState.activeBuild.id}`
+      : `${element.id}-${animationState.playbackRunId ?? 'static'}-${shouldPlayGif ? 'playing' : 'hidden'}`;
     return (
       <img
         aria-label={assetName}
         className="canvas-media-element"
-        src={element.playing ? assetUrl : undefined}
+        key={gifPlaybackKey}
+        src={shouldPlayGif ? assetUrl : undefined}
         style={getMediaStyle(element, scale, interactive, opacity)}
       />
     );

@@ -189,6 +189,76 @@ describe('useAnimationPreviewController', () => {
     });
   });
 
+  it('keeps automatic zero-duration media-play builds active for a render frame', () => {
+    const project = createProject();
+    project.assets.video = {
+      id: 'video',
+      type: 'video',
+      name: 'Clip',
+      mimeType: 'video/mp4',
+    };
+    project.elements.video = {
+      id: 'video',
+      type: 'video',
+      assetId: 'video',
+      x: 0,
+      y: 0,
+      width: 640,
+      height: 360,
+      rotation: 0,
+      opacity: 1,
+      visible: true,
+      locked: false,
+      loop: false,
+      controls: true,
+      muted: false,
+      autoplayInPreview: true,
+      trimStartSeconds: 0,
+    };
+    project.pages[0]!.elementIds = ['video'];
+    project.pages[0]!.animationBuilds = [
+      {
+        id: 'video-play',
+        elementId: 'video',
+        effect: 'reveal',
+        trigger: 'after-transition',
+        delayMs: 0,
+        durationMs: 0,
+        mediaAction: 'play',
+      },
+    ];
+    const projectRef = { current: project };
+    const activePageIdRef = { current: 'page-1' };
+    const { result } = renderHook(() =>
+      useAnimationPreviewController({
+        activePageIdRef,
+        projectRef,
+        setActivePageId: vi.fn(),
+        setSelectedElementIds: vi.fn(),
+      }),
+    );
+
+    act(() => {
+      result.current.playAnimationPreview('page-1', 'presenter');
+      vi.runOnlyPendingTimers();
+    });
+
+    expect(result.current.animationPreview).toMatchObject({
+      activeBuildElementId: 'video',
+      phase: 'animation',
+      waitingForClick: false,
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(75);
+    });
+
+    expect(result.current.animationPreview).toMatchObject({
+      activeBuildElementId: undefined,
+      phase: 'complete',
+    });
+  });
+
   it('reports the current presenter page synchronously during presentation navigation', () => {
     const projectRef = { current: createProject() };
     const activePageIdRef = { current: 'page-1' };
@@ -228,6 +298,31 @@ describe('useAnimationPreviewController', () => {
     expect(onPresenterPageChange).toHaveBeenCalledWith('page-1');
     expect(onPresenterPageChange).toHaveBeenLastCalledWith('page-2');
     expect(activePageIdRef.current).toBe('page-2');
+  });
+
+  it('assigns a fresh playback run id when replaying the same slide', () => {
+    const projectRef = { current: createProject() };
+    const activePageIdRef = { current: 'page-1' };
+    const { result } = renderHook(() =>
+      useAnimationPreviewController({
+        activePageIdRef,
+        projectRef,
+        setActivePageId: vi.fn(),
+        setSelectedElementIds: vi.fn(),
+      }),
+    );
+
+    act(() => {
+      result.current.playPresentationPreview('page-1');
+    });
+
+    const firstRunId = result.current.animationPreview?.playbackRunId;
+
+    act(() => {
+      result.current.playPresentationPreview('page-1');
+    });
+
+    expect(result.current.animationPreview?.playbackRunId).toBe((firstRunId ?? 0) + 1);
   });
 
   it('skips hidden slides during presenter navigation', () => {

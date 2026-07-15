@@ -79,6 +79,7 @@ interface CanvasWorkspaceProps {
         mode?: 'editor' | 'presenter';
         pageId: string;
         phase: 'transition' | 'animation' | 'waiting' | 'complete';
+        playbackRunId?: number;
         playing: boolean;
         waitingForClick: boolean;
       }
@@ -820,10 +821,19 @@ export function CanvasWorkspace({
   function getElementAnimationState(element: DesignElement): ElementAnimationRenderState {
     const activeBuild =
       activeAnimationBuild?.elementId === element.id ? activeAnimationBuild : undefined;
+    const mediaActionBuild =
+      animationPreview?.pageId === activePageId
+        ? page?.animationBuilds?.find(
+            (build) => build.elementId === element.id && build.mediaAction === 'play',
+          )
+        : undefined;
     const progress = activeBuild ? clampAnimationProgress(animationPreview?.animationProgress) : 1;
     return {
       activeBuild,
       hidden: animationPreviewHiddenElementIds.includes(element.id),
+      mediaActionPending: Boolean(mediaActionBuild),
+      playbackRunId:
+        animationPreview?.pageId === activePageId ? animationPreview.playbackRunId : undefined,
       preset: activeBuild
         ? animationPresetEngine.getRenderState({
             bounds: {
