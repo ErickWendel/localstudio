@@ -4,6 +4,10 @@ import { Reveal } from './Reveal';
 
 type FeatureMediaStyle = CSSProperties & { '--feature-media-ratio'?: string };
 
+function getDesktopSrcSet(srcSet: string, largeSrcSet: string) {
+  return `${srcSet}, ${largeSrcSet}`;
+}
+
 export function FeatureMedia({ feature }: { feature: keyof typeof featureMediaImages }) {
   const mediaImage = featureMediaImages[feature];
   const mediaImageStyle: FeatureMediaStyle = { '--feature-media-ratio': mediaImage.aspectRatio };
@@ -20,7 +24,7 @@ export function FeatureMedia({ feature }: { feature: keyof typeof featureMediaIm
           <source
             media="(min-width: 900px)"
             type="image/webp"
-            srcSet={mediaImage.largeSrcSet}
+            srcSet={getDesktopSrcSet(mediaImage.srcSet, mediaImage.largeSrcSet)}
             sizes="645px"
           />
           <source

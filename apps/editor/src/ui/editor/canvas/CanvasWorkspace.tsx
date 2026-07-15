@@ -1251,7 +1251,11 @@ export function CanvasWorkspace({
               })
             : null}
           {showEditorOverlays ? (
-            <div className="animation-build-badges" aria-label="Animation build badges">
+            <div
+              className="animation-build-badges"
+              aria-label="Animation build badges"
+              role="group"
+            >
               {animationBuildBadges.map(({ build, element, index }) => (
                 <span
                   aria-label={`Animation build ${index + 1} for ${canvasWorkspaceUtils.getElementLabel(element)}`}

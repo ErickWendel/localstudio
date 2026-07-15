@@ -164,6 +164,7 @@ export function EditorAiWorkflowTour({
 
   useEffect(() => {
     if (!editorAiWorkflowTourAvailability.isEnabled()) return undefined;
+    if (!editorAiWorkflowTourStorage.readEnabledOverride()) return undefined;
     if (editorAiWorkflowTourStorage.readSeen()) return undefined;
 
     const timeoutId = window.setTimeout(() => {

@@ -5,11 +5,7 @@ import type {
   PresenterStatePayload,
   PresenterWindowCommand,
 } from './presenterSessionTypes';
-import {
-  PresenterRemotePeerControlHost,
-  type PresenterRemotePeerControlHostOptions,
-} from '@localstudio/presenter-remote/peer-control-host';
-import { getRuntimePeerOptions } from '@localstudio/presenter-remote/peer-options';
+import type { PresenterRemotePeerControlHostOptions } from '@localstudio/presenter-remote/peer-control-host';
 import type { RegisterPresenterRemoteSessionInput } from '@localstudio/presenter-remote/signaling-service';
 import type {
   PresenterRemoteCommand,
@@ -467,13 +463,55 @@ class TestPresenterRemotePeerControlHost implements PresenterRemotePeerControl {
   }
 }
 
+class DeferredPresenterRemotePeerControlHost implements PresenterRemotePeerControl {
+  private readonly options: PresenterRemotePeerControlHostOptions;
+  private host: PresenterRemotePeerControl | undefined;
+  private hostPromise: Promise<PresenterRemotePeerControl> | undefined;
+
+  constructor(options: PresenterRemotePeerControlHostOptions) {
+    this.options = options;
+  }
+
+  async open(): Promise<PresenterRemotePeerSession> {
+    const host = await this.getHost();
+    return host.open();
+  }
+
+  publishState(state: PresenterRemoteState) {
+    this.host?.publishState(state);
+  }
+
+  publishPreviewBatch(batch: PresenterRemotePreviewBatch) {
+    this.host?.publishPreviewBatch(batch);
+  }
+
+  close() {
+    if (this.host) {
+      this.host.close();
+      return;
+    }
+    void this.hostPromise?.then((host) => host.close());
+  }
+
+  private async getHost(): Promise<PresenterRemotePeerControl> {
+    this.hostPromise ??= Promise.all([
+      import('@localstudio/presenter-remote/peer-control-host'),
+      import('@localstudio/presenter-remote/peer-options'),
+    ]).then(([peerControlHostModule, peerOptionsModule]) => {
+      const host = new peerControlHostModule.PresenterRemotePeerControlHost({
+        ...this.options,
+        peerOptions: peerOptionsModule.getRuntimePeerOptions(),
+      });
+      this.host = host;
+      return host;
+    });
+    return this.hostPromise;
+  }
+}
+
 function createDefaultRemotePeerControlHostFactory(): CreatePresenterRemotePeerControlHost {
   if (isTestRuntime()) return (hostOptions) => new TestPresenterRemotePeerControlHost(hostOptions);
-  return (hostOptions) =>
-    new PresenterRemotePeerControlHost({
-      ...hostOptions,
-      peerOptions: getRuntimePeerOptions(),
-    });
+  return (hostOptions) => new DeferredPresenterRemotePeerControlHost(hostOptions);
 }
 
 function isTestRuntime() {

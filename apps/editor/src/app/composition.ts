@@ -31,8 +31,8 @@ import { DisabledProjectRepository } from '../services/storage/disabledProjectRe
 import { OpfsProjectRepository } from '../services/storage/opfsProjectRepository';
 import { modelSetupService } from '../services/model-setup/modelSetupService';
 import { BrowserShareService } from '../services/sharing/shareService';
-import { BrowserPptxImportService } from '../services/importing/pptx/pptxImportService';
-import { BrowserPptxExportService } from '../services/exporting/pptxExportService';
+import { LazyPptxImportService } from '../services/importing/pptx/lazyPptxImportService';
+import { LazyPptxExportService } from '../services/exporting/lazyPptxExportService';
 import { BrowserStockMediaService } from '../services/stock-media/stockMediaService';
 import { BrowserGoogleFontsImportService } from '../services/fonts/googleFontsImportService';
 import { BrowserLocalFontMirrorService } from '../services/fonts/localFontMirrorService';
@@ -96,8 +96,8 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     exportService: new BrowserExportService(),
     fontImportService: new BrowserGoogleFontsImportService(),
     localFontMirrorService: new BrowserLocalFontMirrorService(),
-    presentationImportService: new BrowserPptxImportService(),
-    presentationExportService: new BrowserPptxExportService(),
+    presentationImportService: new LazyPptxImportService(),
+    presentationExportService: new LazyPptxExportService(),
     shareService: new BrowserShareService({ mirrorService }),
     stockMediaService: new BrowserStockMediaService(),
     modelSetupService: browserModelSetupService,

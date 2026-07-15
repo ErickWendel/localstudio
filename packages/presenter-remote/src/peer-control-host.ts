@@ -55,7 +55,7 @@ export class PresenterRemotePeerControlHost {
     this.peer = peer;
     presenterRemoteDebugLog.info('Opening control host peer.');
     peer.on('connection', (connection) => this.registerConnection(connection));
-    peer.on('error', (error) => presenterRemoteDebugLog.error('Control host peer error.', error));
+    peer.on('error', (error) => presenterRemoteDebugLog.warn('Control host peer error.', error));
     const controlPeerId = await Promise.race([
       presenterRemotePeerOpen.waitForPeerId(peer),
       presenterRemotePeerOpen.rejectAfter(

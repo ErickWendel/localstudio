@@ -49,6 +49,7 @@ export function WorkflowPreview({
               autoPlay={!prefersReducedMotion}
               muted
               playsInline
+              poster={demoVideo.posterSrc}
               preload="metadata"
               onLoadedMetadata={(event) => {
                 event.currentTarget.defaultPlaybackRate = workflowDemoPlaybackRate;
@@ -56,7 +57,7 @@ export function WorkflowPreview({
               }}
               onEnded={onDemoEnded}
             >
-              <source src={demoVideo.src} type="video/mp4" />
+              <source media="(min-width: 761px)" src={demoVideo.src} type="video/mp4" />
               <a href={demoVideo.fallbackSrc}>View the workflow demo</a>
             </video>
             <span className="workflow-selection-pulse" aria-hidden="true" />
