@@ -1,8 +1,8 @@
 export const featureMediaImages = {
   pptx: {
-    src: '/powerpoint-import.gif',
-    alt: 'PowerPoint (.pptx) import workflow bringing an existing presentation into LocalStudio',
-    aspectRatio: '2982 / 2390',
+    src: '/bring-your-own-ppt-showcase.png',
+    alt: 'LocalStudio editor importing a PowerPoint presentation with the File menu open',
+    aspectRatio: '4104 / 2390',
   },
   prompt: {
     src: '/prompt-to-slide-showcase.png',
@@ -15,14 +15,14 @@ export const featureMediaImages = {
     aspectRatio: '2970 / 2398',
   },
   translate: {
-    src: '/translate-showcase.png',
-    alt: 'LocalStudio translate editor showing the AI Design Revolution slide translated into Portuguese',
-    aspectRatio: '2980 / 2396',
+    src: '/translate-showcase-editor.png',
+    alt: 'LocalStudio translate menu selecting Portuguese as the target language',
+    aspectRatio: '4112 / 2332',
   },
   presenter: {
-    src: '/presenter-mode.gif',
-    alt: 'LocalStudio presenter mode with speaker timer, notes, and slide controls',
-    aspectRatio: '2982 / 2390',
+    src: '/present-with-confidence-showcase.png',
+    alt: 'LocalStudio presenter mode with speaker notes and phone remote controls',
+    aspectRatio: '4112 / 2312',
   },
   edit: {
     src: '/edit-images-showcase.png',
@@ -35,8 +35,8 @@ export const featureMediaImages = {
     aspectRatio: '4110 / 2402',
   },
   s3: {
-    src: '/s3-projects.gif',
-    alt: 'S3-compatible project storage mirror using MinIO with LocalStudio',
-    aspectRatio: '4110 / 2402',
+    src: '/s3-compatible-showcase.png',
+    alt: 'LocalStudio S3-compatible mirror settings beside a MinIO object browser',
+    aspectRatio: '4112 / 2324',
   },
 } as const;
