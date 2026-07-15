@@ -2,6 +2,7 @@ import { presenterRemoteSessionCode } from '@localstudio/presenter-remote/sessio
 import type { PresenterRemoteSession } from '@localstudio/presenter-remote/protocol';
 
 const rememberedCodeKey = 'localstudio.joystick.lastCode';
+const rememberedPeerIdKey = 'localstudio.joystick.lastPeerId';
 const approvedCodesKey = 'localstudio.joystick.approvedCodes';
 const controllerIdKey = 'localstudio.joystick.controllerId';
 const trustedPresenterDeviceIdsKey = 'localstudio.joystick.trustedPresenterDeviceIds';
@@ -20,6 +21,10 @@ function getStoredValue(key: string) {
 
 function setStoredValue(key: string, value: string) {
   getLocalStorage()?.setItem(key, value);
+}
+
+function removeStoredValue(key: string) {
+  getLocalStorage()?.removeItem(key);
 }
 
 function getStoredStringList(key: string) {
@@ -56,6 +61,20 @@ function getRememberedCode() {
   return presenterRemoteSessionCode.normalize(getStoredValue(rememberedCodeKey) ?? '');
 }
 
+function getRememberedPeerId() {
+  return getStoredValue(rememberedPeerIdKey)?.trim() ?? '';
+}
+
+function rememberSuccessfulPeer(peerId: string) {
+  const trimmedPeerId = peerId.trim();
+  if (!trimmedPeerId) return;
+  setStoredValue(rememberedPeerIdKey, trimmedPeerId);
+}
+
+function forgetRememberedPeer() {
+  removeStoredValue(rememberedPeerIdKey);
+}
+
 function rememberSuccessfulSession(session: PresenterRemoteSession) {
   const code = presenterRemoteSessionCode.normalize(session.code);
   setStoredValue(rememberedCodeKey, code);
@@ -83,8 +102,11 @@ function getControllerId() {
 }
 
 export const joystickSessionStorage = {
+  forgetRememberedPeer,
   getControllerId,
   getNewestTrustedSession,
   getRememberedCode,
+  getRememberedPeerId,
+  rememberSuccessfulPeer,
   rememberSuccessfulSession,
 };

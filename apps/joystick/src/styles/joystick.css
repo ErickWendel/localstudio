@@ -62,7 +62,7 @@ input {
 .joystick-stream-topbar {
   min-width: 0;
   display: grid;
-  grid-template-columns: auto 8px minmax(72px, 1fr) auto auto;
+  grid-template-columns: auto 8px minmax(68px, 1fr) minmax(0, auto) auto;
   align-items: center;
   gap: 8px;
   min-height: 42px;
@@ -81,9 +81,14 @@ input {
 
 .joystick-builds-indicator {
   justify-self: end;
+  min-width: 0;
+  max-width: 52px;
+  overflow: hidden;
   color: var(--ls-green-fixed);
   font-family: var(--ls-font-display);
   font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .joystick-stream-top-controls {
@@ -991,6 +996,28 @@ input {
   color: var(--ls-green-fixed);
   font-size: 13px;
   font-weight: 800;
+}
+
+@media (max-width: 420px) {
+  .joystick-stream-topbar {
+    grid-template-columns: auto 8px minmax(0, 1fr) auto;
+  }
+
+  .joystick-stream-top-controls {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .joystick-stream-top-controls button {
+    width: 100%;
+  }
+
+  .joystick-builds-indicator {
+    grid-column: 4;
+    grid-row: 1;
+    max-width: 48px;
+  }
 }
 
 @media (min-width: 720px) {

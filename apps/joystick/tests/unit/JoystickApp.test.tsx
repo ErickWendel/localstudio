@@ -213,6 +213,25 @@ describe('JoystickApp', () => {
     expect(screen.getByLabelText('Slide position')).toHaveTextContent('1 / 1');
   });
 
+  it('uses an explicit legacy code instead of a remembered PeerJS presenter id', async () => {
+    const service = new InMemoryPresenterRemoteSignalingService({
+      randomCode: () => 'ABCD-1234',
+      randomId: () => 'session-1',
+    });
+    service.registerSession({ presenterLabel: 'MacBook Pro', ttlMs: 60_000 });
+    getTestLocalStorage().setItem('localstudio.joystick.lastPeerId', 'remembered-peer');
+
+    render(
+      <JoystickApp
+        initialUrl="https://localstudio.test/joystick?code=ABCD-1234"
+        signalingService={service}
+      />,
+    );
+
+    expect(await screen.findByLabelText('Connected (1)')).toBeInTheDocument();
+    expect(peerControlClientMock.create).not.toHaveBeenCalled();
+  });
+
   it('stores approved codes and presenter device ids after a successful pairing', async () => {
     const service = new InMemoryPresenterRemoteSignalingService({
       randomCode: () => 'ABCD-1234',
@@ -402,6 +421,44 @@ describe('JoystickApp', () => {
       type: 'command',
     });
     expect(screen.getByText('Command sent: go-to-page')).toBeInTheDocument();
+  });
+
+  it('stores a successful PeerJS presenter id for home screen launches', async () => {
+    render(<JoystickApp initialUrl="https://localstudio.test/joystick?peer=control-peer-1" />);
+
+    expect(await screen.findByLabelText('Connected (1)')).toBeInTheDocument();
+    expect(getTestLocalStorage().getItem('localstudio.joystick.lastPeerId')).toBe(
+      'control-peer-1',
+    );
+  });
+
+  it('reconnects to the remembered PeerJS presenter id without opening the scanner', async () => {
+    getTestLocalStorage().setItem('localstudio.joystick.lastPeerId', 'control-peer-1');
+
+    render(<JoystickApp initialUrl="https://localstudio.test/joystick" />);
+
+    await waitFor(() =>
+      expect(peerControlClientMock.create).toHaveBeenCalledWith(
+        expect.objectContaining({ presenterPeerId: 'control-peer-1' }),
+      ),
+    );
+    expect(screen.queryByRole('button', { name: 'Scan QR' })).toBeNull();
+  });
+
+  it('clears a remembered PeerJS presenter id after a failed reconnect', async () => {
+    getTestLocalStorage().setItem('localstudio.joystick.lastPeerId', 'stale-peer');
+
+    render(<JoystickApp initialUrl="https://localstudio.test/joystick" />);
+    const client = peerControlClientMock.instances[0];
+    expect(client).toBeDefined();
+
+    act(() => {
+      client?.emitStatus('failed');
+    });
+
+    await waitFor(() =>
+      expect(getTestLocalStorage().getItem('localstudio.joystick.lastPeerId')).toBeNull(),
+    );
   });
 
   it('requests PeerJS previews in batches and applies incoming preview batches', async () => {

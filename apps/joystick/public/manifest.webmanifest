@@ -1,7 +1,7 @@
 {
   "id": "/joystick/",
-  "name": "LocalStudio Remote",
-  "short_name": "Remote",
+  "name": "LocalStudio 🕹️",
+  "short_name": "LocalStudio 🕹️",
   "description": "Remote control for LocalStudio presenter mode.",
   "start_url": "/joystick",
   "scope": "/joystick",
