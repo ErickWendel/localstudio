@@ -40,8 +40,11 @@ button {
 }
 
 .material-symbols-outlined {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 1em;
-  overflow: hidden;
+  overflow: visible;
   color: transparent;
   font-family: 'Material Symbols Outlined';
   font-size: 20px;
