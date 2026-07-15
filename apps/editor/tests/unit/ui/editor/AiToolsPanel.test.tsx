@@ -1,4 +1,5 @@
-import { render, screen, within } from '@testing-library/react';
+import { useState } from 'react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { aiModelCatalog } from '../../../../src/services/model-setup/aiModelCatalog';
@@ -42,6 +43,55 @@ const languageDetectionProvider: AiProviderState = {
 };
 
 describe('AiToolsPanel', () => {
+  it('starts visible model row progress when the setup action downloads all features', async () => {
+    const user = userEvent.setup();
+    let resolveDownload: (() => void) | undefined;
+    const imageGenerationState: ModelState = {
+      id: 'image-generation-models',
+      label: 'Image Generation Models',
+      description: 'Text-to-image model for generated slide assets.',
+      progress: 0,
+      provider: 'transformers',
+      required: false,
+      status: 'needs-download',
+    };
+
+    function PanelHarness() {
+      const [modelState, setModelState] = useState(imageGenerationState);
+
+      return (
+        <AiToolsPanel
+          modelStates={[modelState]}
+          onDownloadModel={() =>
+            new Promise<void>((resolve) => {
+              setModelState({ ...imageGenerationState, progress: 42, status: 'downloading' });
+              resolveDownload = () => {
+                setModelState({ ...imageGenerationState, progress: 100, status: 'ready' });
+                resolve();
+              };
+            })
+          }
+        />
+      );
+    }
+
+    render(<PanelHarness />);
+
+    await user.click(screen.getByRole('button', { name: 'Download all' }));
+
+    const imageGenerationCard = screen.getByRole('article', { name: 'Image Generation Models' });
+    const progressBar = within(imageGenerationCard).getByLabelText('Image Generation Models progress');
+    expect(progressBar.querySelector('span')).toHaveStyle({ width: '42%' });
+    expect(within(imageGenerationCard).getByText('42%')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Preparing...' })).toBeDisabled();
+
+    resolveDownload?.();
+
+    await waitFor(() => {
+      expect(within(imageGenerationCard).getByText('Ready')).toBeInTheDocument();
+    });
+  });
+
   it('downloads all pending AI features from one setup action', async () => {
     const user = userEvent.setup();
     const calls: string[] = [];
@@ -90,14 +140,8 @@ describe('AiToolsPanel', () => {
 
     await user.click(screen.getByRole('button', { name: 'Download all' }));
 
-    expect(calls).toEqual([
-      'language-detection',
-      aiModelCatalog.GEMMA_LLM_MODEL_ID,
-      aiModelCatalog.TRANSLATEGEMMA_MODEL_ID,
-      'image-generation-models',
-    ]);
-    expect(onPreparePromptApi).not.toHaveBeenCalled();
-    expect(onPrepareTranslationProvider).not.toHaveBeenCalled();
+    expect(calls).toEqual(['prompt', 'language-detection', 'translation', 'image-generation-models']);
+    expect(onDownloadModel).toHaveBeenCalledWith('image-generation-models');
   });
 
   it('hides the setup action when all downloadable AI features are ready', () => {

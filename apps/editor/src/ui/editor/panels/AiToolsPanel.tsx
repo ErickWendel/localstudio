@@ -95,15 +95,6 @@ function getModelProgressStatus(
   return 'idle';
 }
 
-function getModelSetupTaskStatus(
-  modelStates: ModelState[],
-  modelId: string,
-): 'idle' | 'downloading' | 'ready' | 'failed' {
-  return getModelProgressStatus(
-    modelStates.find((model) => model.id === modelId)?.status ?? 'needs-download',
-  );
-}
-
 export function AiToolsPanel({
   activeSlideLanguage,
   modelStates,
@@ -189,36 +180,14 @@ export function AiToolsPanel({
       model.id !== aiModelCatalog.TRANSLATEGEMMA_MODEL_ID &&
       model.id !== aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID,
   );
-  const hiddenModelSetupTasks = [
-    {
-      id: aiModelCatalog.GEMMA_LLM_MODEL_ID,
-      label: aiModelCatalog.GEMMA_LLM_DISPLAY_NAME,
-      onPrepare: onDownloadModel
-        ? () => onDownloadModel(aiModelCatalog.GEMMA_LLM_MODEL_ID)
-        : undefined,
-      status: getModelSetupTaskStatus(modelStates, aiModelCatalog.GEMMA_LLM_MODEL_ID),
-    },
-    {
-      id: aiModelCatalog.TRANSLATEGEMMA_MODEL_ID,
-      label: aiModelCatalog.TRANSLATEGEMMA_DISPLAY_NAME,
-      onPrepare: onDownloadModel
-        ? () => onDownloadModel(aiModelCatalog.TRANSLATEGEMMA_MODEL_ID)
-        : undefined,
-      status: getModelSetupTaskStatus(modelStates, aiModelCatalog.TRANSLATEGEMMA_MODEL_ID),
-    },
-  ];
   const setupTasks = [
-    ...(selectedPromptProvider?.modelId === aiModelCatalog.GEMMA_LLM_MODEL_ID
-      ? []
-      : [
-          {
-            disabled: selectedPromptProvider?.compatibility === 'incompatible',
-            id: selectedPromptProvider?.id ?? 'prompt-provider',
-            label: selectedPromptProvider?.label ?? 'LLM model',
-            onPrepare: onPreparePromptApi,
-            status: promptStatus,
-          },
-        ]),
+    {
+      disabled: selectedPromptProvider?.compatibility === 'incompatible',
+      id: selectedPromptProvider?.id ?? 'prompt-provider',
+      label: selectedPromptProvider?.label ?? 'LLM model',
+      onPrepare: onPreparePromptApi,
+      status: promptStatus,
+    },
     {
       disabled: selectedLanguageDetectionProvider?.compatibility === 'incompatible',
       id: selectedLanguageDetectionProvider?.id ?? 'language-detection-provider',
@@ -226,18 +195,13 @@ export function AiToolsPanel({
       onPrepare: onPrepareLanguageDetectionProvider,
       status: languageDetectionStatus,
     },
-    ...(selectedTranslationProvider?.modelId === aiModelCatalog.TRANSLATEGEMMA_MODEL_ID
-      ? []
-      : [
-          {
-            disabled: selectedTranslationProvider?.compatibility === 'incompatible',
-            id: selectedTranslationProvider?.id ?? 'translation-provider',
-            label: selectedTranslationProvider?.label ?? 'Translation model',
-            onPrepare: onPrepareTranslationProvider,
-            status: translationProviderStatus,
-          },
-        ]),
-    ...hiddenModelSetupTasks,
+    {
+      disabled: selectedTranslationProvider?.compatibility === 'incompatible',
+      id: selectedTranslationProvider?.id ?? 'translation-provider',
+      label: selectedTranslationProvider?.label ?? 'Translation model',
+      onPrepare: onPrepareTranslationProvider,
+      status: translationProviderStatus,
+    },
     ...visibleModelStates.map((model) => ({
       id: model.id,
       label: model.label,
