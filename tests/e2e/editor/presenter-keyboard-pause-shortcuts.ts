@@ -17,5 +17,8 @@ export const presenterKeyboardPauseShortcuts = {
     await shortcuts.getByRole('button', { name: 'Quit presentation mode' }).click();
     await expect(shortcuts).toBeHidden();
     await expect.poll(() => page.evaluate(() => Boolean(document.fullscreenElement))).toBe(false);
+    await expect(
+      page.locator('.scroll-page-active').getByRole('button', { name: 'Rename Keyboard close' }),
+    ).toBeInViewport();
   },
 };

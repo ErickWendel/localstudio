@@ -443,6 +443,7 @@ export function useEditorViewModel(services: AppServices) {
           presenterPageIdRef.current ?? animationPreviewRef.current?.pageId ?? activePageIdRef.current;
         if (previewPageId && projectRef.current.pages.some((page) => page.id === previewPageId)) {
           setActivePageId(previewPageId);
+          setActivePageFocusKey((current) => current + 1);
         }
         clearAnimationPreview();
         presenterPageIdRef.current = undefined;
