@@ -5,13 +5,20 @@ const getServer = withIsolatedDevServer(test);
 
 test.describe('landing public funnel journey', () => {
   test('serves llms.txt as Markdown with a top-level heading', async ({ page }) => {
-    const response = await page.goto(new URL('/llms.txt', getServer().baseURL).toString());
-    const body = await response?.text();
+    await page.goto(new URL('/', getServer().baseURL).toString());
+    const result = await page.evaluate(async () => {
+      const response = await fetch('/llms.txt');
+      return {
+        contentType: response.headers.get('content-type'),
+        ok: response.ok,
+        text: await response.text(),
+      };
+    });
 
-    expect(response?.ok()).toBe(true);
-    expect(response?.headers()['content-type']).toContain('text/plain');
-    expect(body).toMatch(/^# LocalStudio\.dev\s*$/m);
-    expect(body?.trimStart()).toMatch(/^# /);
+    expect(result.ok).toBe(true);
+    expect(result.contentType).toContain('text/plain');
+    expect(result.text).toMatch(/^# LocalStudio\.dev\s*$/m);
+    expect(result.text.trimStart()).toMatch(/^# /);
   });
 
   test('navigates the public funnel into editor and WebMCP routes', async ({ page }) => {
