@@ -153,6 +153,15 @@ describe('CanvasWorkspace animation preview', () => {
       | Konva.Text
       | undefined;
     expect(textNode).toBeDefined();
+    const stageContainer = stageRef.current?.container();
+    expect(stageContainer).toBeDefined();
+
+    act(() => {
+      textNode!.fire('mouseenter', { target: textNode });
+    });
+
+    expect(stageContainer!.style.cursor).toBe('pointer');
+    expect(stageContainer).toHaveAttribute('title', 'https://localstudio.dev');
 
     const preventDefault = vi.fn();
     const stopPropagation = vi.fn();
@@ -172,6 +181,13 @@ describe('CanvasWorkspace animation preview', () => {
       'noopener,noreferrer',
     );
     expect(onAnimationPreviewAdvance).not.toHaveBeenCalled();
+
+    act(() => {
+      textNode!.fire('mouseleave', { target: textNode });
+    });
+
+    expect(stageContainer!.style.cursor).toBe('');
+    expect(stageContainer).not.toHaveAttribute('title');
     openSpy.mockRestore();
   });
 

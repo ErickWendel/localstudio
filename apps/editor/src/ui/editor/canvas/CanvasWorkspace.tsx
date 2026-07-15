@@ -719,6 +719,12 @@ export function CanvasWorkspace({
     return element;
   }
 
+  function isClickableLinkedText(
+    element: DesignElement,
+  ): element is Extract<DesignElement, { type: 'text' }> {
+    return element.type === 'text' && Boolean(element.hyperlink) && (presentationMode || readOnly);
+  }
+
   function getCommonElementProps(element: DesignElement, options: { interactive?: boolean } = {}): CommonElementProps {
     const isInteractive = options.interactive ?? true;
     const isBackgroundSelectionTarget = element.id === backgroundSelectionTargetId;
@@ -793,11 +799,27 @@ export function CanvasWorkspace({
       },
       onDragMove: handleDragMove,
       onMouseEnter: (event: Konva.KonvaEventObject<MouseEvent>) => {
+        if (isClickableLinkedText(element)) {
+          const container = event.target.getStage()?.container();
+          if (container) {
+            container.style.cursor = 'pointer';
+            container.title = element.hyperlink ?? '';
+          }
+          return;
+        }
         if (!isBackgroundSelectionTarget && !isProcessing) return;
         const container = event.target.getStage()?.container();
         if (container) container.style.cursor = isProcessing ? 'progress' : 'crosshair';
       },
       onMouseLeave: (event: Konva.KonvaEventObject<MouseEvent>) => {
+        if (isClickableLinkedText(element)) {
+          const container = event.target.getStage()?.container();
+          if (container) {
+            container.style.cursor = '';
+            container.removeAttribute('title');
+          }
+          return;
+        }
         if (!isBackgroundSelectionTarget && !isProcessing) return;
         if (isBackgroundSelectionTarget) setBackgroundPreviewPoint(null);
         const container = event.target.getStage()?.container();
