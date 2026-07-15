@@ -144,46 +144,6 @@ describe('presenter remote protocol', () => {
     ).toBe(false);
   });
 
-  it('accepts stream preferences and rejects malformed stream preferences', () => {
-    expect(
-      presenterRemoteProtocol.isStreamPreference({
-        fps: 12,
-        height: 1020,
-        quality: 'high',
-        type: 'stream-preference',
-        width: 1170,
-      }),
-    ).toBe(true);
-
-    expect(
-      presenterRemoteProtocol.isStreamPreference({
-        fps: 0,
-        height: 1020,
-        quality: 'high',
-        type: 'stream-preference',
-        width: 1170,
-      }),
-    ).toBe(false);
-    expect(
-      presenterRemoteProtocol.isStreamPreference({
-        fps: 12,
-        height: Number.NaN,
-        quality: 'high',
-        type: 'stream-preference',
-        width: 1170,
-      }),
-    ).toBe(false);
-    expect(
-      presenterRemoteProtocol.isStreamPreference({
-        fps: 12,
-        height: 1020,
-        quality: 'maximum',
-        type: 'stream-preference',
-        width: 1170,
-      }),
-    ).toBe(false);
-  });
-
   it('normalizes human session codes and rejects ambiguous codes', () => {
     expect(presenterRemoteSessionCode.normalize(' abcd-1234 ')).toBe('ABCD-1234');
     expect(presenterRemoteSessionCode.isValid('ABCD-1234')).toBe(true);

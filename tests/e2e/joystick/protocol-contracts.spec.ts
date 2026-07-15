@@ -48,10 +48,4 @@ test('executes joystick protocol and session code contracts in the browser runti
     rejectsBadStream: true,
     rejectsMissingTimer: true,
   });
-  expect(result.streamPreferenceChecks).toEqual({
-    acceptsAuto: true,
-    acceptsMedium: true,
-    rejectsBadQuality: true,
-    rejectsZeroDimensions: true,
-  });
 });

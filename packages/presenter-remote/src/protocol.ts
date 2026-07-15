@@ -11,14 +11,6 @@ export type PresenterRemoteCommand =
   | { command: 'start-presenting'; type: 'command' }
   | { command: 'update-notes'; notes: string; pageId: string; type: 'command' };
 
-export interface PresenterRemoteStreamPreference {
-  fps: number;
-  height: number;
-  quality: 'auto' | 'high' | 'low' | 'medium';
-  type: 'stream-preference';
-  width: number;
-}
-
 export interface PresenterRemoteTimerState {
   elapsedMs: number;
   paused: boolean;
@@ -270,25 +262,6 @@ function isCommand(value: unknown): value is PresenterRemoteCommand {
   return false;
 }
 
-function isStreamPreference(value: unknown): value is PresenterRemoteStreamPreference {
-  if (!isRecord(value) || value.type !== 'stream-preference') return false;
-  return (
-    typeof value.width === 'number' &&
-    Number.isFinite(value.width) &&
-    value.width > 0 &&
-    typeof value.height === 'number' &&
-    Number.isFinite(value.height) &&
-    value.height > 0 &&
-    typeof value.fps === 'number' &&
-    Number.isFinite(value.fps) &&
-    value.fps > 0 &&
-    (value.quality === 'auto' ||
-      value.quality === 'high' ||
-      value.quality === 'low' ||
-      value.quality === 'medium')
-  );
-}
-
 function isState(value: unknown): value is PresenterRemoteState {
   if (!isRecord(value) || value.type !== 'state') return false;
   if (!isRecord(value.timer)) return false;
@@ -355,5 +328,4 @@ export const presenterRemoteProtocol = {
   isPreviewBatch,
   isSession,
   isState,
-  isStreamPreference,
 } as const;

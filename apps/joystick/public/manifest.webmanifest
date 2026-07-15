@@ -1,17 +1,39 @@
 {
-  "name": "localstudio 🕹️",
-  "short_name": "localstudio 🕹️",
+  "id": "/joystick/",
+  "name": "LocalStudio Remote",
+  "short_name": "Remote",
+  "description": "Remote control for LocalStudio presenter mode.",
   "start_url": "/joystick",
   "scope": "/joystick",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "background_color": "#0c160d",
   "theme_color": "#0c160d",
+  "orientation": "portrait",
   "icons": [
     {
       "src": "/joystick/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/joystick/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/joystick/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/joystick/maskable-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

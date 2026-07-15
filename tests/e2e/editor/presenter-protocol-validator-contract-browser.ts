@@ -17,11 +17,9 @@ export type PresenterProtocolValidatorContractResult = {
   invalidPreviewBatch: boolean;
   invalidSession: boolean;
   invalidState: boolean;
-  invalidStreamPreference: boolean;
   previewBatch: boolean;
   session: boolean;
   state: boolean;
-  streamPreference: boolean;
 };
 
 export async function evaluatePresenterProtocolValidatorContract({
@@ -46,13 +44,6 @@ export async function evaluatePresenterProtocolValidatorContract({
     }),
     invalidSession: presenterRemoteProtocol.isSession({ code: 'ABCD-1234' }),
     invalidState: presenterRemoteProtocol.isState({ ...state, timer: { paused: false } }),
-    invalidStreamPreference: presenterRemoteProtocol.isStreamPreference({
-      fps: 0,
-      height: 720,
-      quality: 'ultra',
-      type: 'stream-preference',
-      width: 1280,
-    }),
     previewBatch: presenterRemoteProtocol.isPreviewBatch({
       previews: [{ id: 'page-1', name: 'Intro', preview }],
       requestId: 'request-1',
@@ -67,12 +58,5 @@ export async function evaluatePresenterProtocolValidatorContract({
       sessionId: 'session-1',
     }),
     state: presenterRemoteProtocol.isState(state),
-    streamPreference: presenterRemoteProtocol.isStreamPreference({
-      fps: 30,
-      height: 720,
-      quality: 'medium',
-      type: 'stream-preference',
-      width: 1280,
-    }),
   };
 }

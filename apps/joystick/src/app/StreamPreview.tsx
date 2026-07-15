@@ -1,53 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import type {
-  PresenterRemoteSlidePreview,
-  PresenterRemoteStreamPreference,
-} from '@localstudio/presenter-remote/protocol';
+import type { PresenterRemoteSlidePreview } from '@localstudio/presenter-remote/protocol';
 import { SlideCanvas } from './SlideCanvas';
 import { useHorizontalSwipeNavigation } from './use-horizontal-swipe-navigation';
-
-const streamPreferenceAspectRatio = 390 / 340;
-
-function getNetworkQualityHint(): PresenterRemoteStreamPreference['quality'] {
-  const connection = (
-    navigator as Navigator & {
-      connection?:
-        | { effectiveType?: string | undefined; saveData?: boolean | undefined }
-        | undefined;
-    }
-  ).connection;
-  if (connection?.saveData) return 'low';
-  if (connection?.effectiveType === '2g' || connection?.effectiveType === 'slow-2g') return 'low';
-  if (connection?.effectiveType === '3g') return 'medium';
-  return window.devicePixelRatio >= 2 ? 'high' : 'medium';
-}
-
-function createStreamPreference(element: HTMLElement): PresenterRemoteStreamPreference {
-  const bounds = element.getBoundingClientRect();
-  const quality = getNetworkQualityHint();
-  const multiplier =
-    quality === 'high' ? Math.min(window.devicePixelRatio || 1, 3) : quality === 'medium' ? 1.5 : 1;
-  const width = Math.max(390, Math.min(1280, Math.round(bounds.width * multiplier)));
-  const height = Math.max(340, Math.min(1120, Math.round(width / streamPreferenceAspectRatio)));
-  return {
-    fps: quality === 'high' ? 12 : quality === 'medium' ? 8 : 6,
-    height,
-    quality,
-    type: 'stream-preference',
-    width,
-  };
-}
 
 export function StreamPreview({
   fallbackPreview,
   onNavigate,
-  onStreamPreference,
   renderFallbackMediaAssets = true,
   stream,
 }: {
   fallbackPreview: PresenterRemoteSlidePreview | undefined;
   onNavigate: (direction: 'next' | 'previous') => void;
-  onStreamPreference: (preference: PresenterRemoteStreamPreference) => void;
   renderFallbackMediaAssets?: boolean;
   stream: MediaStream;
 }) {
@@ -87,24 +50,6 @@ export function StreamPreview({
       if (video.srcObject === stream) video.srcObject = null;
     };
   }, [stream]);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    let lastPreferenceKey = '';
-    const publishPreference = () => {
-      const preference = createStreamPreference(container);
-      const preferenceKey = `${preference.width}x${preference.height}@${preference.fps}:${preference.quality}`;
-      if (preferenceKey === lastPreferenceKey) return;
-      lastPreferenceKey = preferenceKey;
-      onStreamPreference(preference);
-    };
-    publishPreference();
-    if (typeof ResizeObserver === 'undefined') return undefined;
-    const observer = new ResizeObserver(publishPreference);
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, [onStreamPreference, stream]);
 
   function requestVideoPlayback() {
     const video = videoRef.current;

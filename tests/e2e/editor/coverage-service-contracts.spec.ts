@@ -502,11 +502,9 @@ test.describe('editor service contracts coverage batch', () => {
         invalidPreviewBatch: false,
         invalidSession: false,
         invalidState: false,
-        invalidStreamPreference: false,
         previewBatch: true,
         session: true,
         state: true,
-        streamPreference: true,
       });
       expect(protocol.commandResults).toEqual(serviceContractsSupport.commandsAllTrue);
 
