@@ -12,16 +12,19 @@
 Design slides with local AI, then keep editing.
 
 LocalStudio.dev is a browser-native Canva-style editor that turns PowerPoint (`.pptx`) import, prompt generation, image
-creation, translation, background removal, local project history, and S3-compatible projects into one editable slide
-workflow.
+creation, translation, background removal, presenter-mode PWA remote control, local project history, and S3-compatible
+projects into one editable slide workflow.
 
-[Live demo](https://localstudio.dev/) · [WebMCP showcase](https://localstudio.dev/webmcp/) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md)
+[Live demo](https://localstudio.dev/) · [Docs](https://localstudio.dev/docs/) · [WebMCP showcase](https://localstudio.dev/webmcp/) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md)
+
+For usage walkthroughs, start with the hosted docs at [localstudio.dev/docs](https://localstudio.dev/docs/).
 
 ## About It
 
 LocalStudio.dev runs in the browser without a product backend. Your deck remains a layered document: PowerPoint
 (`.pptx`) files can become editable LocalStudio projects, prompts become editable slide objects, generated images stay
-as normal assets, translated text updates in place, and project files can be saved to a local folder you control.
+as normal assets, translated text updates in place, presenter controls can run from the companion PWA, and project files
+can be saved to a local folder you control.
 
 | Landing section | What it proves |
 | --- | --- |
@@ -30,7 +33,7 @@ as normal assets, translated text updates in place, and project files can be sav
 | WebMCP Showcase | Host pages and agents can discover editor tools and drive the same local-first surface. |
 | Requirements | Chrome-first browser APIs, WebGPU model caches, and local storage expectations. |
 
-![LocalStudio prompt-to-slide workflow](apps/landing/public/prompt-to-slide.gif)
+![LocalStudio prompt-to-slide workflow](apps/landing/public/demo-prompt-to-slides.gif)
 
 ## Features
 
@@ -62,42 +65,12 @@ The feature showcase on the landing page focuses on the editor outcomes behind t
 - S3-compatible mirroring publishes project JSON, assets, version history, config, public share payloads, and mirrored fonts.
 - Image editing supports click-guided segmentation, mask preview, flip, and crop after extraction.
 
-### Product workflow
-
-| Workflow | Result |
-| --- | --- |
-| Import existing presentations | Google Slides? Keynote? Export as `.pptx` and import into LocalStudio. |
-| Prompt to slides | Turn a plain-language request into editable slide layers. |
-| Translate the deck | Translate one text layer, one page, or the whole deck while preserving layout intent. |
-| Edit images | Segment an image subject and keep refining before applying the edit. |
-| Create images | Generate an asset from the prompt bar and drop it into the active slide. |
-| Save local projects | Store metadata and assets in a folder instead of a remote workspace. |
-| Present with confidence | Move from editing to delivery with speaker notes, slide controls, and fullscreen playback. |
-| Share your slides | Publish a portable share payload or use S3-compatible storage for stable public links. |
-
-### Feature proof
-
-Prompt-to-image creates a reusable asset inside the same deck.
-
-![Prompt to image](apps/landing/public/prompt-to-image.gif)
-
-Translation updates selected text, a page, or the full deck in place.
-
-![Translate](apps/landing/public/translate.gif)
-
-Image editing removes backgrounds, flips, and expands images as normal layers.
-
-![Edit images](apps/landing/public/edit-images.gif)
-
-Local project history restores saved versions from disk.
-
-![Local project history](apps/landing/public/fs-history.gif)
-
 ### S3-compatible projects
 
 Local projects can still publish public links. S3-compatible storage keeps viewer assets reachable while the editable
 project starts on your machine. MinIO works as the local/self-hosted example, but the same project mirror shape fits AWS
-S3, Cloudflare R2, or any compatible endpoint.
+S3, Cloudflare R2, or any compatible endpoint. Local fonts can be mirrored too, so shared decks keep their typography
+for viewers.
 
 ![S3-compatible project storage](apps/landing/public/s3-projects.gif)
 
@@ -108,6 +81,7 @@ Mirrored payloads include:
 - Version history
 - Local config
 - Public share payloads
+- Mirrored fonts
 
 Keys stay in this browser profile. Scope credentials to the bucket or prefix you intend to use.
 
@@ -132,6 +106,8 @@ project, generate assets, translate the deck, and read the resulting project sna
 - Same local-first editor surface behind every call
 
 [Open the WebMCP showcase](https://localstudio.dev/webmcp/)
+
+![WebMCP showcase](apps/landing/public/webmcp-showcase.png)
 
 ## Requirements
 
@@ -202,6 +178,7 @@ npm run build
 
 - `apps/landing`: product page at `/`
 - `apps/editor`: Web AI editor at `/editor/`
+- `apps/joystick`: presenter remote PWA at `/joystick/`
 - `packages/brand`: shared LocalStudio.dev tokens and CSS
 
 ## Roadmap
