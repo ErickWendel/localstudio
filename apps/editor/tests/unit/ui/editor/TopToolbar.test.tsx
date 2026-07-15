@@ -1,3 +1,4 @@
+import { localStudioAppRoutes } from '@localstudio/app-routes';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
@@ -241,6 +242,22 @@ describe('TopToolbar', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Keyboard Shortcuts' }));
 
     expect(onOpenKeyboardShortcuts).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens docs from the Help menu', () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+
+    render(<TopToolbar project={sampleProject.createSampleProject()} language="PT-BR" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Help' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Docs' }));
+
+    expect(openSpy).toHaveBeenCalledWith(
+      localStudioAppRoutes.docs.gettingStartedAnchor,
+      '_blank',
+      'noopener,noreferrer',
+    );
+    openSpy.mockRestore();
   });
 
   it('starts the AI setup tour from the Help menu', () => {

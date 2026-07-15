@@ -12,6 +12,7 @@
   "dependencies": {
     "@giphy/js-fetch-api": "^5.8.0",
     "@huggingface/transformers": "^4.2.0",
+    "@localstudio/app-routes": "*",
     "@localstudio/brand": "*",
     "@localstudio/presenter-remote": "*",
     "@types/qrcode": "^1.5.6",

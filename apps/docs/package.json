@@ -1,0 +1,19 @@
+{
+  "name": "@localstudio/docs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "npm run typecheck && vitepress build",
+    "dev": "vitepress --host 0.0.0.0",
+    "preview": "vitepress preview --host 0.0.0.0",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit --pretty false"
+  },
+  "dependencies": {
+    "@localstudio/app-routes": "*",
+    "@localstudio/brand": "*",
+    "vitepress": "^1.6.4",
+    "vue": "^3.5.24"
+  }
+}

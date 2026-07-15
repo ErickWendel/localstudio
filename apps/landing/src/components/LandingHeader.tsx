@@ -1,3 +1,4 @@
+import { localStudioAppRoutes } from '@localstudio/app-routes';
 import { ArrowRight } from 'lucide-react';
 import { BrandLockup } from './BrandLockup';
 import { GitHubStarButton } from './GitHubStarButton';
@@ -7,6 +8,7 @@ const navItems = [
   { href: '#features', label: 'Features', sectionId: 'features' },
   { href: '#webmcp', label: 'WebMCP Showcase', sectionId: 'webmcp' },
   { href: '#requirements', label: 'Requirements', sectionId: 'requirements' },
+  { href: localStudioAppRoutes.docs.gettingStartedAnchor, label: 'Docs', sectionId: 'docs' },
 ] as const;
 
 export function LandingHeader({

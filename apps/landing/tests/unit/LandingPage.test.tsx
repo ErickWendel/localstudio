@@ -1,3 +1,4 @@
+import { localStudioAppRoutes } from '@localstudio/app-routes';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -52,6 +53,10 @@ describe('LandingPage', () => {
     expect(screen.getByRole('link', { name: 'Features' })).toHaveAttribute('href', '#features');
     expect(screen.getByRole('link', { name: 'WebMCP Showcase' })).toHaveAttribute('href', '#webmcp');
     expect(screen.getByRole('link', { name: 'Requirements' })).toHaveAttribute('href', '#requirements');
+    expect(screen.getByRole('link', { name: 'Docs' })).toHaveAttribute(
+      'href',
+      localStudioAppRoutes.docs.gettingStartedAnchor,
+    );
     expect(screen.queryByRole('link', { name: 'Workflow' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'S3 Mirror' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Showcase' })).not.toBeInTheDocument();
