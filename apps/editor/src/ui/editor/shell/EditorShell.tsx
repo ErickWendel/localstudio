@@ -839,6 +839,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   useEffect(() => {
     const pageId = vm.activePageId;
     if (!pageId) return undefined;
+    if (!presenterSessionId && !remotePresenterActive) return undefined;
     if (presenterRemoteUnavailable) return undefined;
     let cancelled = false;
     const service = getPresenterSessionService();
