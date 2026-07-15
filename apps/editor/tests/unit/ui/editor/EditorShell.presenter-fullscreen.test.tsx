@@ -96,6 +96,82 @@ describe('EditorShell presenter fullscreen workflows', () => {
     expect(popupClose).not.toHaveBeenCalled();
   });
 
+  it('stops presenter click navigation when the presenter window closes before audience fullscreen', async () => {
+    const project = sampleProject.createSampleProject();
+    project.pages = [
+      {
+        ...project.pages[0]!,
+        transition: { effect: 'reveal', delayMs: 0 },
+        animationBuilds: [],
+      },
+      {
+        id: 'page-2',
+        name: 'Slide 2',
+        width: 1920,
+        height: 1080,
+        background: { type: 'color', color: '#050D10' },
+        elementIds: [],
+        animationBuilds: [],
+      },
+    ];
+    const popupClose = vi.fn();
+    const popup = {
+      close: popupClose,
+      closed: false,
+      location: { href: '' },
+      postMessage: vi.fn(),
+    } as unknown as Window;
+    Object.defineProperty(window, 'open', {
+      configurable: true,
+      value: vi.fn(() => popup),
+    });
+    const { container } = render(
+      <EditorShell services={createAppServices({ initialProject: project })} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Presentation play options' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Presenter view' }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-animation-preview-mode',
+        'presenter',
+      );
+    });
+
+    const presenterSessionId = new URL(popup.location.href).searchParams.get('presenterSession');
+    expect(presenterSessionId).toBeTruthy();
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: {
+          command: 'close',
+          sessionId: presenterSessionId,
+          source: 'localstudio-presenter-window',
+          type: 'command',
+        },
+        origin: window.location.origin,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(popupClose).toHaveBeenCalledTimes(1);
+      expect(screen.getByText('1 / 2')).toBeInTheDocument();
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-animation-preview',
+        'idle',
+      );
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-animation-preview-mode',
+        'idle',
+      );
+      expect(screen.queryByRole('dialog', { name: 'Audience Window' })).not.toBeInTheDocument();
+    });
+
+    fireEvent.mouseDown(container.querySelector('canvas')!);
+
+    expect(screen.getByText('1 / 2')).toBeInTheDocument();
+  });
+
   it('hides page insert controls in fullscreen presenter mode and restores a clean editor state on exit', async () => {
     const user = userEvent.setup();
     let fullscreenElement: Element | null = null;

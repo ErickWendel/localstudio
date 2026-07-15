@@ -322,9 +322,10 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     return presenterSessionServiceRef.current;
   }
 
-  function closePresenterViewSession() {
+  const closePresenterViewSession = useCallback(() => {
     presenterSessionServiceRef.current?.closePresenterWindow();
     presenterFullscreenEnteredRef.current = false;
+    vm.clearAnimationPreview();
     setAudienceFullscreenPromptOpen(false);
     setPresenterRemoteSession(undefined);
     setPresenterRemotePanelOpen(false);
@@ -332,7 +333,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     setPresenterRemoteStreamPeerId(undefined);
     setRemotePresenterActive(false);
     setPresenterSessionId(undefined);
-  }
+  }, [vm]);
 
   const openPresenterView = useCallback(() => {
     if (presenterSessionId) return;
@@ -940,6 +941,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     presenterRemoteStreamPeerId,
     presenterSessionId,
     remotePresenterActive,
+    closePresenterViewSession,
     vm,
   ]);
 
@@ -957,7 +959,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       if (presenterRemoteSession) return;
       queueMicrotask(closePresenterViewSession);
     }
-  }, [presenterRemoteSession, presenterSessionId, vm.isFullscreen]);
+  }, [closePresenterViewSession, presenterRemoteSession, presenterSessionId, vm.isFullscreen]);
 
   useEffect(() => {
     if (!presenterRemoteSession) return;
