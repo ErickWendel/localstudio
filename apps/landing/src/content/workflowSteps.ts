@@ -1,11 +1,19 @@
-import { BrainCircuit, Eraser, FileUp, FolderOpen, ImagePlus, Languages, Sparkles } from 'lucide-react';
+import {
+  BrainCircuit,
+  FileUp,
+  FolderOpen,
+  ImagePlus,
+  Languages,
+  Presentation,
+  Share2,
+} from 'lucide-react';
 
 export const workflowSteps = [
   {
     id: 'pptx',
     icon: FileUp,
-    title: 'Import existing presentations',
-    copy: 'Google Slides? Keynote? Export as .pptx and import into LocalStudio.',
+    title: 'Bring your own PPT',
+    copy: 'Import an existing .pptx file and keep refining the deck inside LocalStudio.',
   },
   {
     id: 'prompt',
@@ -26,21 +34,21 @@ export const workflowSteps = [
     copy: 'Translate selected text, one page, or the full deck in place.',
   },
   {
-    id: 'edit',
-    icon: Eraser,
-    title: 'Edit images',
-    copy: 'Remove the background, then flip or expand the image as a normal layer.',
-  },
-  {
     id: 'local',
     icon: FolderOpen,
     title: 'Work locally',
     copy: 'Save project files to disk and restore from local version history.',
   },
   {
-    id: 'webai',
-    icon: Sparkles,
-    title: 'Powered by Web AI',
-    copy: 'Browser-native AI capabilities keep the workflow fast, private, and local-first.',
+    id: 'present',
+    icon: Presentation,
+    title: 'Present with confidence',
+    copy: 'Move from editing to delivery with speaker notes, slide controls, and fullscreen playback.',
+  },
+  {
+    id: 'share',
+    icon: Share2,
+    title: 'Share your presentation',
+    copy: 'Publish a portable share payload and open the same deck from a public preview link.',
   },
 ] as const;
