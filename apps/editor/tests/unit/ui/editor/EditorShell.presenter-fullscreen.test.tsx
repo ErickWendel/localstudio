@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
+import { BrowserPresenterSessionService } from '../../../../src/services/presenter/presenterSessionService';
 import { EditorShell } from '../../../../src/ui/editor/shell/EditorShell';
 import { editorShellTestHarness } from './EditorShell.test-harness';
 
@@ -22,6 +23,19 @@ describe('EditorShell presenter fullscreen workflows', () => {
   });
 
   it('keeps the remote control panel closed on editor load', async () => {
+    const openRemoteControlSession = vi
+      .spyOn(BrowserPresenterSessionService.prototype, 'openRemoteControlSession')
+      .mockResolvedValue({
+        code: 'peer-1',
+        connectedControllerCount: 0,
+        expiresAt: '2026-07-15T12:00:00.000Z',
+        presenterDeviceId: 'presenter-device-1',
+        presenterLabel: 'MacBook Pro',
+        qrUrl: 'http://localhost:4176/joystick/?peer=peer-1',
+        sessionId: 'remote-session-1',
+        transport: 'peerjs',
+      });
+
     render(<EditorShell services={createAppServices()} />);
 
     await act(async () => {
@@ -29,6 +43,7 @@ describe('EditorShell presenter fullscreen workflows', () => {
       await Promise.resolve();
     });
 
+    expect(openRemoteControlSession).not.toHaveBeenCalled();
     expect(
       screen.queryByRole('region', { name: 'Remote control this presentation' }),
     ).not.toBeInTheDocument();
