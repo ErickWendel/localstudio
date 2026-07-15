@@ -29,10 +29,11 @@ describe('mocked AI model setup flows', () => {
     expect(screen.queryByRole('button', { name: 'Download Required Models' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Download Image Editing Models' }));
 
-    expect(await screen.findByText('Image Editing Models')).toBeInTheDocument();
+    const editingModelsCard = await screen.findByRole('article', { name: 'Image Editing Models' });
+    const generationModelsCard = screen.getByRole('article', { name: 'Image Generation Models' });
     expect(screen.getAllByText('Ready').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Image Editing Models')).toBeInTheDocument();
-    expect(screen.getByText('Image Generation Models')).toBeInTheDocument();
+    expect(within(editingModelsCard).getByText('Image Editing Models')).toBeInTheDocument();
+    expect(within(generationModelsCard).getByText('Image Generation Models')).toBeInTheDocument();
   });
 
   it('prepares Gemma automatically when selected as the LLM model', async () => {

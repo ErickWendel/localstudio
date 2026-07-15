@@ -1,19 +1,13 @@
 import { LandingAppPage } from '../pages/landing-app.page';
 import { expect, test, withIsolatedDevServer } from '../support/journey-test';
+import { evaluatePublicFunnelLlmsContract } from './public-funnel-llms-contract-browser';
 
 const getServer = withIsolatedDevServer(test);
 
 test.describe('landing public funnel journey', () => {
   test('serves llms.txt as Markdown with a top-level heading', async ({ page }) => {
     await page.goto(new URL('/', getServer().baseURL).toString());
-    const result = await page.evaluate(async () => {
-      const response = await fetch('/llms.txt');
-      return {
-        contentType: response.headers.get('content-type'),
-        ok: response.ok,
-        text: await response.text(),
-      };
-    });
+    const result = await page.evaluate(evaluatePublicFunnelLlmsContract);
 
     expect(result.ok).toBe(true);
     expect(result.contentType).toContain('text/plain');
