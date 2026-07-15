@@ -22,11 +22,9 @@ test('executes presenter protocol validator contracts in the browser runtime', a
     invalidPreviewBatch: false,
     invalidSession: false,
     invalidState: false,
-    invalidStreamPreference: false,
     previewBatch: true,
     session: true,
     state: true,
-    streamPreference: true,
   });
   expect(result.commandResults).toEqual(serviceContractsSupport.commandsAllTrue);
 });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent } from 'react';
 import {
   ChevronLeft,
@@ -23,8 +23,9 @@ import type {
   PresenterRemoteCommand,
   PresenterRemoteSession,
   PresenterRemoteState,
-  PresenterRemoteStreamPreference,
 } from '@localstudio/presenter-remote/protocol';
+import { JoystickQrScanner } from './JoystickQrScanner';
+import { joystickRemoteLink } from './joystick-remote-link';
 import { joystickRemotePreviews } from './joystick-remote-previews';
 import { joystickSessionStorage } from './joystick-session-storage';
 import { SlideNavigatorSheet } from './SlideNavigatorSheet';
@@ -63,24 +64,11 @@ interface JoystickAppProps {
 type JoystickSimpleCommand = 'next' | 'pause-timer' | 'previous' | 'reset-timer';
 
 function getInitialCode(initialUrl: string) {
-  const url = new URL(initialUrl);
-  return presenterRemoteSessionCode.normalize(url.searchParams.get('code') ?? '');
-}
-
-function normalizePeerInput(value: string) {
-  const trimmedValue = value.trim();
-  if (!trimmedValue) return '';
-  try {
-    const url = new URL(trimmedValue);
-    return url.searchParams.get('peer')?.trim() ?? trimmedValue;
-  } catch {
-    return trimmedValue;
-  }
+  return joystickRemoteLink.getCode(initialUrl);
 }
 
 function getInitialPeerId(initialUrl: string) {
-  const url = new URL(initialUrl);
-  return normalizePeerInput(url.searchParams.get('peer') ?? '');
+  return joystickRemoteLink.getPeerId(initialUrl);
 }
 
 function createPeerSession(peerId: string, connectedControllerCount: number) {
@@ -363,10 +351,6 @@ export function JoystickApp({
     );
   }
 
-  const sendStreamPreference = useCallback((preference: PresenterRemoteStreamPreference) => {
-    void preference;
-  }, []);
-
   function sendCommand(command: JoystickSimpleCommand) {
     sendRemoteCommand({ command, type: 'command' });
   }
@@ -382,6 +366,11 @@ export function JoystickApp({
       return;
     }
     sendCommand(direction);
+  }
+
+  function applyRemoteLink(value: string) {
+    setPeerId(joystickRemoteLink.getPeerId(value));
+    setCode(joystickRemoteLink.getCode(value));
   }
 
   const connected = status === 'connected' && Boolean(session);
@@ -572,7 +561,6 @@ export function JoystickApp({
             fallbackPreview={displayedRemoteState?.slidePreview}
             stream={remoteStream}
             onNavigate={navigateSlide}
-            onStreamPreference={sendStreamPreference}
           />
         </section>
         <div ref={streamUpcomingRef}>
@@ -701,19 +689,18 @@ export function JoystickApp({
               inputMode="text"
               value={displayedRemoteInput}
               onChange={(event) => {
-                const value = event.target.value;
-                setPeerId(normalizePeerInput(value));
-                setCode(presenterRemoteSessionCode.normalize(value));
+                applyRemoteLink(event.target.value);
               }}
             />
             <button
               type="button"
-              onClick={() => setPeerId(normalizePeerInput(displayedRemoteInput))}
+              onClick={() => applyRemoteLink(displayedRemoteInput)}
               disabled={!displayedRemoteInput.trim()}
             >
               Join
             </button>
           </div>
+          <JoystickQrScanner onScan={applyRemoteLink} />
           {session ? (
             <p className="joystick-presenter-name">{session.presenterLabel}</p>
           ) : peerId && peerConnectionFailed ? (

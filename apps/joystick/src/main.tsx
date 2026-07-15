@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { JoystickApp } from './app/JoystickApp';
 import type { JoystickSignalingService } from './app/JoystickApp';
+import { registerJoystickServiceWorker } from './app/register-joystick-service-worker';
 import './styles/joystick.css';
 
 type JoystickWindow = Window & {
@@ -9,6 +10,8 @@ type JoystickWindow = Window & {
 };
 
 const joystickWindow = window as JoystickWindow;
+
+registerJoystickServiceWorker();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
