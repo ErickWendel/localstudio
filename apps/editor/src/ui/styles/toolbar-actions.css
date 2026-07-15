@@ -8,6 +8,10 @@
 }
 
 .material-symbols-outlined {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
   font-size: 20px;
   font-variation-settings: 'FILL' 0;
   line-height: 1;
