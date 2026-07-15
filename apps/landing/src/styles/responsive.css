@@ -1,3 +1,51 @@
+@media (min-width: 1500px) {
+  .showcase-list,
+  .demo-grid,
+  .web-ai-section,
+  .webmcp-section .showcase-row,
+  .feature-details,
+  .requirements-grid,
+  .thanks-section,
+  .closing-section {
+    width: min(100%, 1640px);
+    margin-inline: auto;
+  }
+
+  .section-heading {
+    width: min(100%, 1640px);
+    max-width: none;
+    margin-inline: auto;
+  }
+
+  .section-heading > * {
+    max-width: 780px;
+  }
+
+  .hero-section {
+    grid-template-columns: minmax(420px, 560px) minmax(760px, 1060px);
+    justify-content: center;
+    gap: clamp(72px, 6vw, 132px);
+  }
+
+  .showcase-row {
+    grid-template-columns: minmax(360px, 480px) minmax(760px, 1060px);
+    justify-content: center;
+    gap: clamp(64px, 5vw, 112px);
+  }
+
+  .showcase-row.reverse {
+    grid-template-columns: minmax(760px, 1060px) minmax(360px, 480px);
+  }
+
+  .showcase-copy {
+    max-width: 480px;
+  }
+
+  .workflow-carousel {
+    justify-self: stretch;
+  }
+}
+
 @media (max-width: 1120px) {
   .hero-section,
   .showcase-row,

@@ -3,7 +3,8 @@ import { Reveal } from '../components/Reveal';
 
 const webMcpImage = {
   src: '/webmcp-showcase.png',
-  srcSet: '/webmcp-showcase-645.webp 645w, /webmcp-showcase-1290.webp 1290w',
+  srcSet: '/webmcp-showcase-645.webp 645w',
+  largeSrcSet: '/webmcp-showcase-1290.webp 1290w',
   alt: 'WebMCP showcase page discovering tools and controlling the LocalStudio editor',
   width: 4040,
   height: 2378,
@@ -33,6 +34,12 @@ export function WebMcpSection() {
         </Reveal>
         <Reveal as="div" className="webmcp-media" delay={100} reveal="webmcp-media">
           <picture>
+            <source
+              media="(min-width: 900px)"
+              type="image/webp"
+              srcSet={webMcpImage.largeSrcSet}
+              sizes="645px"
+            />
             <source
               type="image/webp"
               srcSet={webMcpImage.srcSet}
