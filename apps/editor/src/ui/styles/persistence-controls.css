@@ -11,6 +11,11 @@
   animation: persistencePulse 900ms ease-in-out infinite;
 }
 
+.persistence-error {
+  color: #ffb4ab;
+  animation: persistencePulse 900ms ease-in-out infinite;
+}
+
 .operation-notice {
   position: absolute;
   top: 42px;

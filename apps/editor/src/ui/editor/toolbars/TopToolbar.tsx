@@ -28,6 +28,7 @@ interface TopToolbarProps {
   mirrorDisabledBySettings?: boolean;
   localProjectSetupPanel?: ReactNode;
   persistenceAttention?: boolean;
+  persistenceError?: boolean;
   operationNotice?: OperationNoticeState | undefined;
   saveAnimationKey?: number;
   canTranslateDeck?: boolean;
@@ -111,6 +112,7 @@ export function TopToolbar({
   mirrorDisabledBySettings = false,
   localProjectSetupPanel,
   persistenceAttention = false,
+  persistenceError = false,
   operationNotice,
   saveAnimationKey = 0,
   canTranslateDeck = false,
@@ -535,6 +537,7 @@ export function TopToolbar({
             persistenceAttention={persistenceAttention}
             persistenceAvailable={persistenceAvailable}
             persistenceEnabled={persistenceEnabled}
+            persistenceError={persistenceError}
             persistenceMode={persistenceMode}
             onPersistenceToggle={onPersistenceToggle}
           />

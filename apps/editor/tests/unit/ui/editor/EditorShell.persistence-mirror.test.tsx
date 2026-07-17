@@ -12,6 +12,7 @@ const {
   ImportingProjectRepository,
   RejectingLoadProjectRepository,
   RejectingProjectRepository,
+  RetryingAutosaveProjectRepository,
   SavingProjectRepository,
   VersionHistoryProjectRepository,
   createAppServices,
@@ -19,6 +20,7 @@ const {
 
 describe('EditorShell persistence and mirror workflows', () => {
   afterEach(() => {
+    vi.useRealTimers();
     window.history.pushState({}, '', '/editor/');
     vi.restoreAllMocks();
   });
@@ -98,6 +100,53 @@ describe('EditorShell persistence and mirror workflows', () => {
     await user.type(screen.getByRole('textbox', { name: 'Project name' }), 'Autosaved Deck{Enter}');
 
     expect(repository.savedProjects.at(-1)?.name).toBe('Autosaved Deck');
+  });
+
+  it('retries autosave before marking persistence for re-enable', async () => {
+    vi.useFakeTimers();
+    const services = createAppServices();
+    const repository = new RetryingAutosaveProjectRepository(5);
+    services.projectRepository = repository;
+
+    try {
+      render(<EditorShell services={services} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Choose folder' }));
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
+      window.localStorage.setItem('ew-canvas-ai.persistence-enabled', 'true');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Edit project name Untitled AI Deck' }));
+      const projectNameInput = screen.getByRole('textbox', { name: 'Project name' });
+      fireEvent.change(projectNameInput, { target: { value: 'Autosave Retry Deck' } });
+      fireEvent.blur(projectNameInput);
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(repository.autosaveAttempts).toBe(1);
+      expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
+      expect(screen.queryByText(/Local autosave failed/)).not.toBeInTheDocument();
+      expect(window.localStorage.getItem('ew-canvas-ai.persistence-enabled')).toBe('true');
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(4000);
+      });
+
+      const persistenceButton = screen.getByRole('button', { name: 'Persistence disabled' });
+      expect(repository.autosaveAttempts).toBe(5);
+      expect(persistenceButton).toHaveClass('persistence-error');
+      expect(persistenceButton).toHaveAttribute(
+        'title',
+        'Autosave failed after 5 attempts. Re-enable persistence to continue saving locally.',
+      );
+      expect(window.localStorage.getItem('ew-canvas-ai.persistence-enabled')).toBe('false');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('saves the current project as a new local folder from the File menu', () => {
