@@ -1,9 +1,9 @@
 import {
+  type CSSProperties,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type PointerEvent as ReactPointerEvent,
 } from 'react';
 import type {
   FontCatalogItem,
@@ -46,6 +46,7 @@ export function MirrorSettingsPanel({
   onTestConnection,
 }: MirrorSettingsPanelProps) {
   const panelRef = useRef<HTMLElement>(null);
+  const resizeStartRef = useRef<{ pointerX: number; width: number } | undefined>(undefined);
   const [draft, setDraft] = useState(config);
   const [secretVisible, setSecretVisible] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'ready' | 'failed'>(
@@ -57,7 +58,8 @@ export function MirrorSettingsPanel({
   const [folderError, setFolderError] = useState<string | undefined>();
   const [fontDropdownOpen, setFontDropdownOpen] = useState(false);
   const [fontSearchQuery, setFontSearchQuery] = useState('');
-  const [panelPosition, setPanelPosition] = useState<{ left: number; top: number } | undefined>();
+  const [panelWidth, setPanelWidth] = useState(440);
+  const [resizing, setResizing] = useState(false);
 
   const localFontFamilies = useMemo(
     () =>
@@ -141,36 +143,6 @@ export function MirrorSettingsPanel({
 
   const consoleUrl = draft.endpoint.replace(/\/+$/g, '');
 
-  function startPanelDrag(event: ReactPointerEvent<HTMLDivElement>) {
-    if (isInteractiveDragTarget(event.target)) return;
-    const panel = panelRef.current;
-    if (!panel) return;
-    const rect = panel.getBoundingClientRect();
-    const offsetX = event.clientX - rect.left;
-    const offsetY = event.clientY - rect.top;
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-    setPanelPosition({ left: rect.left, top: rect.top });
-
-    function movePanel(pointerEvent: PointerEvent) {
-      const maxLeft = Math.max(8, window.innerWidth - rect.width - 8);
-      const maxTop = Math.max(8, window.innerHeight - rect.height - 8);
-      setPanelPosition({
-        left: Math.min(Math.max(8, pointerEvent.clientX - offsetX), maxLeft),
-        top: Math.min(Math.max(8, pointerEvent.clientY - offsetY), maxTop),
-      });
-    }
-
-    function stopPanelDrag() {
-      window.removeEventListener('pointermove', movePanel);
-      window.removeEventListener('pointerup', stopPanelDrag);
-      window.removeEventListener('pointercancel', stopPanelDrag);
-    }
-
-    window.addEventListener('pointermove', movePanel);
-    window.addEventListener('pointerup', stopPanelDrag);
-    window.addEventListener('pointercancel', stopPanelDrag);
-  }
-
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
       const target = event.target;
@@ -183,21 +155,46 @@ export function MirrorSettingsPanel({
     return () => document.removeEventListener('pointerdown', handlePointerDown);
   }, [onClose]);
 
+  useEffect(() => {
+    if (!resizing) return undefined;
+
+    function handlePointerMove(event: PointerEvent) {
+      const resizeStart = resizeStartRef.current;
+      if (!resizeStart) return;
+      const maxWidth = Math.min(640, Math.max(320, window.innerWidth - 32));
+      setPanelWidth(
+        Math.min(maxWidth, Math.max(320, resizeStart.width + event.clientX - resizeStart.pointerX)),
+      );
+    }
+
+    function handlePointerUp() {
+      resizeStartRef.current = undefined;
+      setResizing(false);
+    }
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp, { once: true });
+    window.addEventListener('pointercancel', handlePointerUp, { once: true });
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+    };
+  }, [resizing]);
+
   return (
     <aside
       ref={panelRef}
-      className="mirror-settings-panel"
-      style={
-        panelPosition
-          ? { bottom: 'auto', left: panelPosition.left, top: panelPosition.top }
-          : undefined
+      className={
+        resizing ? 'mirror-settings-panel mirror-settings-panel-resizing' : 'mirror-settings-panel'
       }
+      style={{ '--mirror-settings-panel-width': `${panelWidth}px` } as CSSProperties}
       role="dialog"
       aria-modal="false"
       aria-label="Mirror settings"
       data-tour-id="mirror-settings-panel"
     >
-      <div className="mirror-settings-header ew-split-row-start" onPointerDown={startPanelDrag}>
+      <div className="mirror-settings-header ew-split-row-start">
         <div className="settings-panel-title-row">
           {onBack ? (
             <button
@@ -548,11 +545,19 @@ export function MirrorSettingsPanel({
       {connectionStatus === 'ready' && connectionDetail ? (
         <p className="mirror-settings-status">{connectionDetail}</p>
       ) : null}
+      <button
+        aria-label="Resize mirror settings panel"
+        className="mirror-settings-resize-handle"
+        type="button"
+        onPointerDown={(event) => {
+          resizeStartRef.current = {
+            pointerX: event.clientX,
+            width: panelRef.current?.getBoundingClientRect().width ?? panelWidth,
+          };
+          setResizing(true);
+          event.currentTarget.setPointerCapture?.(event.pointerId);
+        }}
+      />
     </aside>
   );
-}
-
-function isInteractiveDragTarget(target: EventTarget) {
-  if (!(target instanceof HTMLElement)) return false;
-  return Boolean(target.closest('button, a, input, textarea, select, [role="button"]'));
 }

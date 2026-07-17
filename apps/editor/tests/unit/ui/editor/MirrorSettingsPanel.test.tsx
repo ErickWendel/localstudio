@@ -119,7 +119,7 @@ describe('MirrorSettingsPanel', () => {
     );
   });
 
-  it('lets users drag the mirror settings panel by its header', () => {
+  it('lets users resize the mirror settings panel from the edge handle', () => {
     render(
       <MirrorSettingsPanel
         config={config}
@@ -147,15 +147,15 @@ describe('MirrorSettingsPanel', () => {
       toJSON: () => ({}),
     });
 
-    fireEvent.pointerDown(screen.getByText('Mirror settings'), {
-      clientX: 26,
-      clientY: 62,
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Resize mirror settings panel' }), {
+      clientX: 456,
+      clientY: 240,
       pointerId: 1,
     });
-    fireEvent.pointerMove(window, { clientX: 120, clientY: 140, pointerId: 1 });
+    fireEvent.pointerMove(window, { clientX: 536, clientY: 240, pointerId: 1 });
     fireEvent.pointerUp(window, { pointerId: 1 });
 
-    expect(panel).toHaveStyle({ bottom: 'auto', left: '110px', top: '130px' });
+    expect(panel).toHaveStyle({ '--mirror-settings-panel-width': '520px' });
   });
 
   it('returns to the settings list from the back button', async () => {

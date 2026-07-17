@@ -19,18 +19,48 @@
     0 0 24px rgba(55, 253, 118, 0.08);
 }
 
-.mirror-settings-header {
-  cursor: grab;
-  touch-action: none;
+.mirror-settings-panel-resizing {
   user-select: none;
 }
 
-.mirror-settings-header:active {
-  cursor: grabbing;
+.mirror-settings-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  bottom: 0;
+  z-index: 20;
+  width: 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: ew-resize;
+  padding: 0;
+}
+
+.mirror-settings-resize-handle::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 1px;
+  background: rgba(55, 253, 118, 0.34);
+}
+
+.mirror-settings-resize-handle:hover::before,
+.mirror-settings-panel-resizing .mirror-settings-resize-handle::before {
+  left: 2px;
+  width: 3px;
+  background: var(--ew-green);
+  box-shadow: 0 0 18px rgba(55, 253, 118, 0.34);
 }
 
 .settings-panel {
   width: min(280px, calc(100vw - 32px));
+}
+
+.mirror-settings-panel {
+  width: min(var(--mirror-settings-panel-width, 440px), calc(100vw - 32px));
 }
 
 .media-integration-settings-panel {
