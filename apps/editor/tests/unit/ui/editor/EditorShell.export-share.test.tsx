@@ -357,8 +357,7 @@ describe('EditorShell export and share workflows', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('creates and shows a public link from the share panel', async () => {
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000301');
+  it('copies and shows the prepared project public link from the share panel', async () => {
     const writeText = vi.fn();
     const execCommand = vi.fn().mockReturnValue(true);
     Object.defineProperty(navigator, 'clipboard', {
@@ -382,8 +381,8 @@ describe('EditorShell export and share workflows', () => {
 
     const expectedPublicUrl = `${
       window.location.origin
-    }/editor/s/00000000-0000-4000-8000-000000000301?src=${encodeURIComponent(
-      'http://localhost:9000/localstudio/mirrors/public-shares/00000000-0000-4000-8000-000000000301/share.json',
+    }/editor/s/project-project-1?src=${encodeURIComponent(
+      'http://localhost:9000/localstudio/mirrors/public-shares/project-project-1/share.json',
     )}`;
     expect(await screen.findByDisplayValue(expectedPublicUrl)).toBeInTheDocument();
     expect(execCommand).toHaveBeenCalledWith('copy');

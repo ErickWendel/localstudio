@@ -77,7 +77,6 @@ function createProjectWithInlineFont(): ProjectDocument {
 describe('BrowserShareService', () => {
   beforeEach(() => {
     window.localStorage.clear();
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000001');
   });
 
   it('publishes a public share payload and local assets to MinIO', async () => {
@@ -102,40 +101,40 @@ describe('BrowserShareService', () => {
 
     const share = await service.createShare(createProjectWithInlineAsset());
 
-    expect(share.shareId).toBe('00000000-0000-4000-8000-000000000001');
+    expect(share.shareId).toBe('project-project-1');
     const publicUrl = new URL(share.publicUrl);
     expect(publicUrl.pathname).toBe('/editor/');
-    expect(publicUrl.searchParams.get('share')).toBe('00000000-0000-4000-8000-000000000001');
+    expect(publicUrl.searchParams.get('share')).toBe('project-project-1');
     expect(publicUrl.searchParams.get('src')).toBe(
-      'http://localhost:9000/localstudio/mirrors/public-shares/00000000-0000-4000-8000-000000000001/share.json',
+      'http://localhost:9000/localstudio/mirrors/public-shares/project-project-1/share.json',
     );
-    expect(share.embedHtml).toContain('/editor/?embed=00000000-0000-4000-8000-000000000001');
+    expect(share.embedHtml).toContain('/editor/?embed=project-project-1');
     expect(share.embedHtml).toContain('src=');
 
     const putUrls = Array.from(uploadedBodies.keys());
     expect(putUrls).toContain(
-      'http://localhost:9000/localstudio/mirrors/public-shares/00000000-0000-4000-8000-000000000001/assets/asset-inline.png',
+      'http://localhost:9000/localstudio/mirrors/public-shares/project-project-1/assets/asset-inline.png',
     );
     expect(putUrls).toContain(
-      'http://localhost:9000/localstudio/mirrors/public-shares/00000000-0000-4000-8000-000000000001/share.json',
+      'http://localhost:9000/localstudio/mirrors/public-shares/project-project-1/share.json',
     );
 
     const sharePayload = JSON.parse(
       await uploadedBodies
         .get(
-          'http://localhost:9000/localstudio/mirrors/public-shares/00000000-0000-4000-8000-000000000001/share.json',
+          'http://localhost:9000/localstudio/mirrors/public-shares/project-project-1/share.json',
         )!
         .text(),
     ) as unknown as PublicSharePayloadFixture;
     expect(sharePayload).toMatchObject({
       schemaVersion: 1,
-      shareId: '00000000-0000-4000-8000-000000000001',
+      shareId: 'project-project-1',
       project: {
         name: 'Untitled AI Deck',
         assets: {
           'asset-inline': {
             objectUrl:
-              'http://localhost:9000/localstudio/mirrors/public-shares/00000000-0000-4000-8000-000000000001/assets/asset-inline.png',
+              'http://localhost:9000/localstudio/mirrors/public-shares/project-project-1/assets/asset-inline.png',
             storage: 'remote',
           },
         },
@@ -162,9 +161,9 @@ describe('BrowserShareService', () => {
     await service.createShare(createProjectWithInlineFont());
 
     const fontUrl =
-      'http://localhost:9000/localstudio/mirrors/public-shares/00000000-0000-4000-8000-000000000001/fonts/acme-sans.woff2';
+      'http://localhost:9000/localstudio/mirrors/public-shares/project-project-1/fonts/acme-sans.woff2';
     const shareUrl =
-      'http://localhost:9000/localstudio/mirrors/public-shares/00000000-0000-4000-8000-000000000001/share.json';
+      'http://localhost:9000/localstudio/mirrors/public-shares/project-project-1/share.json';
     expect(Array.from(uploadedBodies.keys())).toContain(fontUrl);
     const sharePayload = JSON.parse(await uploadedBodies.get(shareUrl)!.text()) as PublicSharePayloadFixture;
     expect(sharePayload.project.fonts?.acme).toMatchObject({
@@ -182,6 +181,23 @@ describe('BrowserShareService', () => {
     await expect(service.createShare(sampleProject.createSampleProject())).rejects.toThrow(
       'Public sharing requires active external storage.',
     );
+  });
+
+  it('returns prepared metadata for a project without uploading share files', () => {
+    const fetchMock = vi.fn();
+    const service = new BrowserShareService({
+      mirrorService: new minioMirrorService.MinioMirrorService({ fetch: fetchMock }),
+      origin: 'https://localstudio.test',
+    });
+
+    const share = service.getProjectShareMetadata(sampleProject.createSampleProject());
+
+    expect(share).toMatchObject({
+      shareId: 'project-project-1',
+      publicUrl: 'https://localstudio.test/editor/?share=project-project-1',
+      status: 'published',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('encodes share ids and escapes embed iframe URLs', () => {

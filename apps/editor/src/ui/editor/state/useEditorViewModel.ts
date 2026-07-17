@@ -1799,19 +1799,29 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function saveMirrorConfig(config: MinioMirrorConfig) {
-    services.mirrorService.saveConfig(config);
+    persistMirrorConfig(config);
     editorPreferences.writeMirrorPreference(true);
-    setMirrorConfig(config);
-    setHasMirrorConfig(true);
     setMirrorDisabledBySettings(false);
-    mirrorConfigRef.current = config;
     setMirrorState({ enabled: true, status: 'idle' });
     setMirrorSettingsOpen(false);
     void syncMirrorNow();
   }
 
-  function setMirrorEnabled(enabled: boolean, options?: { fromSettings?: boolean }) {
+  function persistMirrorConfig(config: MinioMirrorConfig) {
+    services.mirrorService.saveConfig(config);
+    setMirrorConfig(config);
+    setHasMirrorConfig(true);
+    mirrorConfigRef.current = config;
+  }
+
+  function setMirrorEnabled(
+    enabled: boolean,
+    options?: { config?: MinioMirrorConfig | undefined; fromSettings?: boolean },
+  ) {
     if (enabled) {
+      if (options?.config) {
+        persistMirrorConfig(options.config);
+      }
       if (!mirrorConfigRef.current) {
         openMirrorSettings();
         return;
@@ -1827,8 +1837,8 @@ export function useEditorViewModel(services: AppServices) {
     setMirrorState({ enabled: false, status: 'disabled' });
   }
 
-  function setMirrorEnabledFromSettings(enabled: boolean) {
-    setMirrorEnabled(enabled, { fromSettings: true });
+  function setMirrorEnabledFromSettings(enabled: boolean, config: MinioMirrorConfig) {
+    setMirrorEnabled(enabled, { config, fromSettings: true });
   }
 
   async function testMirrorConnection(

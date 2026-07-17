@@ -222,7 +222,6 @@ describe('EditorShell mirror workflows', () => {
     expect(screen.getByRole('dialog', { name: 'Mirror settings' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Enable mirroring' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
 
     expect(await screen.findByRole('button', { name: 'Mirror up to date' })).toHaveClass(
       'mirror-synced',

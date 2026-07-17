@@ -14,8 +14,8 @@ export const remoteMirrorShareSettings = {
       .click();
     await expect(page.getByRole('dialog', { name: 'Mirror settings' })).toBeVisible();
     await page.getByRole('button', { name: 'Enable mirroring' }).click();
-    await expect(page.getByText(/S3-compatible connection is ready|Connection is ready/)).toBeVisible();
-    await page.getByRole('button', { name: 'Save settings' }).click();
+    await expect(page.getByRole('button', { name: /Mirror up to date|Mirror syncing|Mirror ready/ })).toBeVisible();
+    await page.getByRole('button', { name: 'Close mirror settings' }).click();
     await expect(page.getByRole('dialog', { name: 'Mirror settings' })).toBeHidden();
     await expect(page.getByRole('button', { name: /Mirror up to date|Mirror syncing|Mirror ready/ })).toBeVisible();
   },
