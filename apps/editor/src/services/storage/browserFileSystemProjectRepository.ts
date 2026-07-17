@@ -12,6 +12,7 @@ import { assetFileUtils } from './assetFileUtils';
 import { projectVersionHistoryUtils } from './projectVersionHistoryUtils';
 
 interface FileSystemProjectRepositoryOptions {
+  fetch?: typeof fetch;
   pickDirectory?: () => Promise<FileSystemDirectoryHandle>;
   recentProjectStore?: RecentProjectHandleStore;
 }
@@ -128,6 +129,11 @@ async function readProjectNameFromMirrorFiles(files: MirrorFile[]) {
 
 function isNotFoundError(error: unknown) {
   return error instanceof DOMException && error.name === 'NotFoundError';
+}
+
+function getDefaultFetch() {
+  if (typeof globalThis.fetch !== 'function') return undefined;
+  return globalThis.fetch.bind(globalThis);
 }
 
 export class BrowserFileSystemProjectRepository implements ProjectRepository {
@@ -536,7 +542,21 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
 
     for (const [assetId, asset] of Object.entries(project.assets)) {
       if (asset.storage !== 'file' || !asset.fileName) {
-        assets[assetId] = asset;
+        const objectUrl =
+          asset.storage === 'remote'
+            ? await assetFileUtils.remoteObjectUrlToLocalObjectUrl(
+                asset.objectUrl,
+                asset.mimeType,
+                this.options.fetch ?? getDefaultFetch(),
+              )
+            : undefined;
+        if (objectUrl) {
+          const { storage, ...assetWithoutStorage } = asset;
+          void storage;
+          assets[assetId] = { ...assetWithoutStorage, objectUrl };
+        } else {
+          assets[assetId] = asset;
+        }
         continue;
       }
       try {

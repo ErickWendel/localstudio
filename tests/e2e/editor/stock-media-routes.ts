@@ -67,13 +67,13 @@ export const stockMediaRoutes = {
           'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lMFeWAAAAABJRU5ErkJggg==',
           'base64',
         ),
-        contentType: 'image/png',
+        headers: { 'access-control-allow-origin': '*', 'content-type': 'image/png' },
       });
     });
     await page.route('https://media.giphy.com/**', async (route) => {
       await route.fulfill({
         body: Buffer.from('R0lGODlhAQABAAAAACw=', 'base64'),
-        contentType: 'image/gif',
+        headers: { 'access-control-allow-origin': '*', 'content-type': 'image/gif' },
       });
     });
   },

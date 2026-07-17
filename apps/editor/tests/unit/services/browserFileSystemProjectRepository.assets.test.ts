@@ -146,6 +146,59 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
     expect(loaded?.assets['asset-hero']?.objectUrl).toMatch(/^blob:/);
   });
 
+  it('downloads remote image assets on import and saves them as local files', async () => {
+    const directory = new MockDirectoryHandle();
+    const fetchRemoteAsset = vi.fn(() =>
+      Promise.resolve(
+        new Response('remote image', { headers: { 'content-type': 'image/png' } }),
+      ),
+    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('remote image', { headers: { 'content-type': 'image/png' } }),
+    );
+    const createObjectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:remote-image');
+    directory.files.set(
+      'project.json',
+      JSON.stringify({
+        ...sampleProject.createSampleProject(),
+        assets: {
+          'asset-remote': {
+            id: 'asset-remote',
+            type: 'image',
+            name: 'Remote image',
+            mimeType: 'image/png',
+            objectUrl: 'https://images.unsplash.com/legacy-photo.png',
+            storage: 'remote',
+          },
+        },
+      }),
+    );
+    const repository = new BrowserFileSystemProjectRepository({
+      fetch: fetchRemoteAsset as unknown as typeof fetch,
+      pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
+    });
+
+    const loaded = await repository.importProject();
+    if (!loaded) throw new Error('Expected project to load');
+    await repository.saveProject(loaded);
+
+    expect(fetchRemoteAsset).toHaveBeenCalledWith('https://images.unsplash.com/legacy-photo.png');
+    expect(createObjectUrl).toHaveBeenCalled();
+    expect(loaded.assets['asset-remote']).toMatchObject({
+      objectUrl: 'blob:remote-image',
+    });
+    expect(loaded.assets['asset-remote']?.storage).toBeUndefined();
+    const assetsDirectory = directory.directories.get('assets')!;
+    expect(await (assetsDirectory.files.get('asset-remote.png') as Blob).text()).toBe('remote image');
+    const savedProject = JSON.parse(directory.files.get('project.json') as string) as ProjectDocument;
+    expect(savedProject.assets['asset-remote']).toMatchObject({
+      fileName: 'asset-remote.png',
+      storage: 'file',
+    });
+    expect(savedProject.assets['asset-remote']?.objectUrl).toBeUndefined();
+  });
+
   it('keeps hydrated file-backed object URLs out of project.json when saved again', async () => {
     const directory = new MockDirectoryHandle();
     const assetsDirectory = new MockDirectoryHandle();

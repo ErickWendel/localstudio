@@ -40,6 +40,7 @@ describe('BrowserStockMediaService', () => {
   });
 
   it('maps Unsplash search results and tracks the photo download URL', async () => {
+    const createObjectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:unsplash-photo');
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = getRequestUrl(input);
       const headers = input instanceof Request ? input.headers : undefined;
@@ -73,6 +74,11 @@ describe('BrowserStockMediaService', () => {
         expect(headers?.get('authorization')).toBe('Client-ID unsplash-key');
         return Promise.resolve(Response.json({ url: 'https://images.unsplash.com/downloaded' }));
       }
+      if (url === 'https://images.unsplash.com/photo-1?ixid=abc&fm=jpg&w=1080') {
+        return Promise.resolve(
+          new Response('photo-bytes', { headers: { 'content-type': 'image/jpeg' } }),
+        );
+      }
       return Promise.resolve(new Response('', { status: 404 }));
     });
     const service = new BrowserStockMediaService({ fetch: fetchMock });
@@ -96,15 +102,29 @@ describe('BrowserStockMediaService', () => {
       },
     ]);
 
+    await expect(service.downloadMedia(results[0]!)).resolves.toMatchObject({
+      mimeType: 'image/jpeg',
+      objectUrl: 'blob:unsplash-photo',
+    });
     await service.trackImageDownload(results[0]!);
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(createObjectUrl).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it('maps GIPHY search results to animated GIF media', async () => {
+    const createObjectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:giphy-video');
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
-      const url = new URL(getRequestUrl(input));
-      expect(url.origin).toBe('https://api.giphy.com');
+      const rawUrl = getRequestUrl(input);
+      if (rawUrl === 'https://media.giphy.com/media/gif-1/giphy.mp4') {
+        return Promise.resolve(
+          new Response('video-bytes', { headers: { 'content-type': 'video/mp4' } }),
+        );
+      }
+      const url = new URL(rawUrl);
+      if (url.origin !== 'https://api.giphy.com') {
+        return Promise.resolve(new Response('', { status: 404 }));
+      }
       expect(url.pathname).toBe('/v1/gifs/search');
       expect(url.searchParams.get('api_key')).toBe('giphy-key');
       expect(url.searchParams.get('limit')).toBe('30');
@@ -145,7 +165,9 @@ describe('BrowserStockMediaService', () => {
     const service = new BrowserStockMediaService({ fetch: fetchMock });
     service.saveConfig({ unsplashAccessKey: '', giphyApiKey: 'giphy-key' });
 
-    await expect(service.searchGifs('launch')).resolves.toEqual([
+    const results = await service.searchGifs('launch');
+
+    expect(results).toEqual([
       {
         id: 'gif-1',
         provider: 'giphy',
@@ -160,5 +182,11 @@ describe('BrowserStockMediaService', () => {
         height: 270,
       },
     ]);
+    createObjectUrl.mockClear();
+    await expect(service.downloadMedia(results[0]!, results[0]!.videoUrl)).resolves.toMatchObject({
+      mimeType: 'video/mp4',
+      objectUrl: 'blob:giphy-video',
+    });
+    expect(createObjectUrl).toHaveBeenCalledTimes(1);
   });
 });

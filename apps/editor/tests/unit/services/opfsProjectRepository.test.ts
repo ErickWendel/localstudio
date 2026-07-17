@@ -176,6 +176,65 @@ describe('OpfsProjectRepository', () => {
     expect(createObjectUrl).toHaveBeenCalled();
   });
 
+  it('downloads remote assets on OPFS load and saves them as local files', async () => {
+    const root = new MockDirectoryHandle();
+    const storage = new MemoryStorage();
+    const fetchRemoteAsset = vi.fn(() =>
+      Promise.resolve(
+        new Response('remote gif', { headers: { 'content-type': 'image/gif' } }),
+      ),
+    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('remote gif', { headers: { 'content-type': 'image/gif' } }),
+    );
+    const createObjectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:remote-gif');
+    const project: ProjectDocument = {
+      ...sampleProject.createSampleProject(),
+      assets: {
+        'asset-remote': {
+          id: 'asset-remote',
+          type: 'gif',
+          name: 'Remote GIF',
+          mimeType: 'image/gif',
+          objectUrl: 'https://media.giphy.com/media/legacy/giphy.gif',
+          storage: 'remote',
+        },
+      },
+    };
+
+    await new OpfsProjectRepository({
+      getRootDirectory: () => Promise.resolve(root as unknown as FileSystemDirectoryHandle),
+      storage,
+    }).saveProject(project);
+    const projectDirectory = await getProjectDirectory(root, project.name);
+    projectDirectory.files.set('project.json', JSON.stringify(project));
+
+    const repository = new OpfsProjectRepository({
+      fetch: fetchRemoteAsset as unknown as typeof fetch,
+      getRootDirectory: () => Promise.resolve(root as unknown as FileSystemDirectoryHandle),
+      storage,
+    });
+    const loaded = await repository.loadProject();
+    if (!loaded) throw new Error('Expected project to load');
+    await repository.saveProject(loaded);
+
+    expect(fetchRemoteAsset).toHaveBeenCalledWith('https://media.giphy.com/media/legacy/giphy.gif');
+    expect(createObjectUrl).toHaveBeenCalled();
+    expect(loaded.assets['asset-remote']).toMatchObject({
+      objectUrl: 'blob:remote-gif',
+    });
+    expect(loaded.assets['asset-remote']?.storage).toBeUndefined();
+    expect(await (projectDirectory.directories.get('assets')!.files.get('asset-remote.gif') as Blob).text()).toBe('remote gif');
+    const savedProject = JSON.parse(
+      await readMockText(projectDirectory.files.get('project.json')!),
+    ) as ProjectDocument;
+    expect(savedProject.assets['asset-remote']).toMatchObject({
+      fileName: 'asset-remote.gif',
+      storage: 'file',
+    });
+    expect(savedProject.assets['asset-remote']?.objectUrl).toBeUndefined();
+  });
+
   it('persists project fonts under fonts and hydrates object URLs on load', async () => {
     const root = new MockDirectoryHandle();
     const storage = new MemoryStorage();

@@ -4,6 +4,7 @@ import { fitImageWithinPage } from '../../../domain/images/imageSizing';
 import type { ProjectDocument } from '../../../domain/documents/model';
 import { createPrefixedId } from '../../../services/ids/idUtils';
 import type {
+  DownloadedStockMedia,
   StockMediaConfig,
   StockMediaItem,
   StockMediaProviderState,
@@ -123,10 +124,29 @@ export function useStockMediaLibrary({
     );
   }
 
-  function insertRemoteImage(item: StockMediaItem) {
+  async function downloadStockMedia(item: StockMediaItem, sourceUrl?: string) {
+    return stockMediaService.downloadMedia(item, sourceUrl);
+  }
+
+  function setInsertError(item: StockMediaItem) {
+    setStockMediaError((current) => ({
+      ...current,
+      [item.kind === 'image' ? 'images' : 'gifs']: 'Download failed',
+    }));
+  }
+
+  async function insertRemoteImage(item: StockMediaItem) {
     if (item.kind !== 'image') return;
     const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
     if (!page) return;
+
+    let media: DownloadedStockMedia;
+    try {
+      media = await downloadStockMedia(item);
+    } catch {
+      setInsertError(item);
+      return;
+    }
 
     const assetId = createPrefixedId('asset');
     const elementId = createPrefixedId('image');
@@ -144,9 +164,8 @@ export function useStockMediaLibrary({
             id: assetId,
             type: 'image',
             name: item.title,
-            mimeType: 'image/jpeg',
-            objectUrl: item.mediaUrl,
-            storage: 'remote',
+            mimeType: media.mimeType,
+            objectUrl: media.objectUrl,
           },
           element: {
             id: elementId,
@@ -168,10 +187,18 @@ export function useStockMediaLibrary({
     void stockMediaService.trackImageDownload(item).catch(() => undefined);
   }
 
-  function commitRemoteGifElement(item: StockMediaItem) {
+  async function commitRemoteGifElement(item: StockMediaItem) {
     if (item.kind !== 'gif') return;
     const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
     if (!page) return;
+
+    let media: DownloadedStockMedia;
+    try {
+      media = await downloadStockMedia(item);
+    } catch {
+      setInsertError(item);
+      return;
+    }
 
     const assetId = createPrefixedId('asset');
     const elementId = createPrefixedId('gif');
@@ -189,9 +216,8 @@ export function useStockMediaLibrary({
             id: assetId,
             type: 'gif',
             name: item.title,
-            mimeType: 'image/gif',
-            objectUrl: item.mediaUrl,
-            storage: 'remote',
+            mimeType: media.mimeType,
+            objectUrl: media.objectUrl,
           },
           element: {
             id: elementId,
@@ -213,10 +239,18 @@ export function useStockMediaLibrary({
     addRecentStockMedia(item);
   }
 
-  function insertRemoteVideoElement(item: StockMediaItem, videoUrl: string) {
+  async function insertRemoteVideoElement(item: StockMediaItem, videoUrl: string) {
     if (item.kind !== 'gif') return;
     const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
     if (!page) return;
+
+    let media: DownloadedStockMedia;
+    try {
+      media = await downloadStockMedia(item, videoUrl);
+    } catch {
+      setInsertError(item);
+      return;
+    }
 
     const assetId = createPrefixedId('asset');
     const elementId = createPrefixedId('video');
@@ -234,9 +268,8 @@ export function useStockMediaLibrary({
             id: assetId,
             type: 'video',
             name: item.title,
-            mimeType: 'video/mp4',
-            objectUrl: videoUrl,
-            storage: 'remote',
+            mimeType: media.mimeType,
+            objectUrl: media.objectUrl,
           },
           element: {
             id: elementId,
@@ -263,21 +296,21 @@ export function useStockMediaLibrary({
     addRecentStockMedia(item);
   }
 
-  function insertRemoteGif(item: StockMediaItem) {
+  async function insertRemoteGif(item: StockMediaItem) {
     if (item.kind !== 'gif') return;
     if (item.videoUrl) {
-      insertRemoteVideoElement(item, item.videoUrl);
+      await insertRemoteVideoElement(item, item.videoUrl);
     } else {
-      commitRemoteGifElement(item);
+      await commitRemoteGifElement(item);
     }
   }
 
   function insertStockMedia(item: StockMediaItem) {
     if (item.kind === 'gif') {
-      insertRemoteGif(item);
+      void insertRemoteGif(item);
       return;
     }
-    insertRemoteImage(item);
+    void insertRemoteImage(item);
   }
 
   useEffect(() => {

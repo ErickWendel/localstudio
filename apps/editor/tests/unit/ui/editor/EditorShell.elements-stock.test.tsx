@@ -68,7 +68,12 @@ describe('EditorShell elements and stock media workflows', () => {
         expect.stringMatching(/^image-/),
       );
     });
-    expect(stockMediaService.trackedItems).toEqual([stockImage]);
+    expect(stockMediaService.downloadedItems).toEqual([
+      { item: stockImage, sourceUrl: stockImage.mediaUrl },
+    ]);
+    await waitFor(() => {
+      expect(stockMediaService.trackedItems).toEqual([stockImage]);
+    });
   });
 
   it('inserts an Unsplash image before download tracking finishes', async () => {
@@ -107,10 +112,7 @@ describe('EditorShell elements and stock media workflows', () => {
       );
     });
     expect(screen.getByLabelText('Launch GIF').tagName.toLowerCase()).toBe('video');
-    expect(screen.getByLabelText('Launch GIF')).toHaveAttribute(
-      'src',
-      'https://media.giphy.com/media/gif-1/giphy.mp4',
-    );
+    expect(screen.getByLabelText('Launch GIF')).toHaveAttribute('src', 'blob:giphy-video');
   });
 
   it('inserts a GIPHY GIF movie before video metadata finishes loading', async () => {
@@ -130,10 +132,7 @@ describe('EditorShell elements and stock media workflows', () => {
         expect.stringMatching(/^video-/),
       );
     });
-    expect(screen.getByLabelText('Launch GIF')).toHaveAttribute(
-      'src',
-      'https://media.giphy.com/media/gif-1/giphy.mp4',
-    );
+    expect(screen.getByLabelText('Launch GIF')).toHaveAttribute('src', 'blob:giphy-video');
   });
 
   it('shows a generic API key error when stock image search is rejected', async () => {

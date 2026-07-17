@@ -340,6 +340,12 @@ export interface StockMediaItem {
   downloadLocation?: string | undefined;
 }
 
+export interface DownloadedStockMedia {
+  blob: Blob;
+  mimeType: string;
+  objectUrl: string;
+}
+
 export interface StockMediaService {
   loadConfig(): StockMediaConfig | null;
   saveConfig(config: StockMediaConfig): void;
@@ -347,6 +353,7 @@ export interface StockMediaService {
   getProviderState(): StockMediaProviderState;
   searchImages(query: string): Promise<StockMediaItem[]>;
   searchGifs(query: string): Promise<StockMediaItem[]>;
+  downloadMedia(item: StockMediaItem, sourceUrl?: string): Promise<DownloadedStockMedia>;
   trackImageDownload(item: StockMediaItem): Promise<void>;
 }
 
