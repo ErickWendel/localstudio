@@ -16,6 +16,7 @@ test.describe('local font mirror settings', () => {
 
     const editor = new EditorAppPage(page, getServer().baseURL);
     await editor.gotoNewProject();
+    await page.keyboard.press('Escape');
     await page.evaluate(() => {
       window.localStorage.setItem(
         'localstudio.e2e.opfs.file:localstudio-e2e-root/AcmeSans-Regular.woff2',
@@ -23,7 +24,11 @@ test.describe('local font mirror settings', () => {
       );
     });
 
-    await page.getByRole('button', { name: 'Share' }).click();
+    await expect(page.getByRole('button', { name: 'Translation path options' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    await page.getByRole('button', { name: 'Share', exact: true }).click();
     const localSave = page.getByRole('dialog', { name: 'Save local project' });
     await expect(localSave).toBeVisible();
     await localSave.getByRole('button', { name: 'Choose folder' }).click();

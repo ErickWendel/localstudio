@@ -124,6 +124,8 @@
 }
 
 .export-button {
+  position: relative;
+  z-index: 1;
   height: 32px;
   gap: 8px;
   padding: 0 16px;
