@@ -1,4 +1,4 @@
-import type { MinioMirrorConfig } from './minioMirrorService';
+import type { MinioMirrorConfig, MinioMirrorCredentials } from './minioMirrorService';
 
 function encodeKeyPath(key: string) {
   return key.split('/').map(encodeURIComponent).join('/');
@@ -29,8 +29,12 @@ async function hmacHex(key: ArrayBuffer | Uint8Array, value: string) {
   return Array.from(await hmacSha256(key, value), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function getSigningKey(config: MinioMirrorConfig, dateStamp: string) {
-  const kDate = await hmacSha256(new TextEncoder().encode(`AWS4${config.secretKey}`), dateStamp);
+async function getSigningKey(
+  config: MinioMirrorConfig,
+  credentials: MinioMirrorCredentials,
+  dateStamp: string,
+) {
+  const kDate = await hmacSha256(new TextEncoder().encode(`AWS4${credentials.secretKey}`), dateStamp);
   const kRegion = await hmacSha256(kDate, config.region);
   const kService = await hmacSha256(kRegion, 's3');
   return hmacSha256(kService, 'aws4_request');
@@ -48,8 +52,20 @@ function createObjectUrl(config: MinioMirrorConfig, key = '', query: Record<stri
   return url;
 }
 
+function createDefaultPublicBaseUrl(config: MinioMirrorConfig) {
+  const endpoint = new URL(config.endpoint.trim().replace(/\/+$/g, ''));
+  const bucket = encodeURIComponent(config.bucket.trim());
+  if (!bucket) return endpoint.origin;
+  return config.pathStyle
+    ? `${endpoint.origin}/${bucket}`
+    : `${endpoint.protocol}//${bucket}.${endpoint.host}`;
+}
+
 function createPublicObjectUrl(config: MinioMirrorConfig, key: string) {
-  const publicBaseUrl = config.publicBaseUrl.trim().replace(/\/+$/g, '');
+  const publicBaseUrl = (config.publicBaseUrl.trim() || createDefaultPublicBaseUrl(config)).replace(
+    /\/+$/g,
+    '',
+  );
   return `${publicBaseUrl}/${encodeKeyPath(key)}`;
 }
 
@@ -57,6 +73,7 @@ async function createSignedHeaders(
   config: MinioMirrorConfig,
   method: string,
   url: URL,
+  credentials: MinioMirrorCredentials,
   contentType?: string,
 ) {
   const now = new Date();
@@ -94,14 +111,17 @@ async function createSignedHeaders(
     credentialScope,
     Array.from(new Uint8Array(canonicalRequestHash), (byte) => byte.toString(16).padStart(2, '0')).join(''),
   ].join('\n');
-  const signature = await hmacHex(await getSigningKey(config, dateStamp), stringToSign);
+  const signature = await hmacHex(
+    await getSigningKey(config, credentials, dateStamp),
+    stringToSign,
+  );
 
   const requestHeaders = Object.fromEntries(
     Object.entries(signingHeaders).filter(([name]) => name !== 'host'),
   );
   return {
     ...requestHeaders,
-    authorization: `AWS4-HMAC-SHA256 Credential=${config.accessKey}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
+    authorization: `AWS4-HMAC-SHA256 Credential=${credentials.accessKey}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
   };
 }
 
@@ -109,6 +129,7 @@ export const minioObjectUtils = {
   encodeKeyPath,
   sha256Hex,
   createObjectUrl,
+  createDefaultPublicBaseUrl,
   createPublicObjectUrl,
   createSignedHeaders,
 };

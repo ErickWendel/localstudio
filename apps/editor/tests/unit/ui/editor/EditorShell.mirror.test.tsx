@@ -229,6 +229,43 @@ describe('EditorShell mirror workflows', () => {
     );
   });
 
+  it('tests mirror storage without uploading local font test files', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const mirrorService = new RecordingMirrorService();
+    const getTestFontFiles = vi
+      .spyOn(services.localFontMirrorService, 'getTestFontFiles')
+      .mockResolvedValue([
+        new File(['font'], 'local-font.woff2', { type: 'font/woff2' }),
+      ]);
+    const validateTestFontFiles = vi
+      .spyOn(services.localFontMirrorService, 'validateTestFontFiles')
+      .mockResolvedValue({});
+    vi.spyOn(services.localFontMirrorService, 'getSettings').mockReturnValue({
+      enabled: true,
+      folderLabel: 'Local fonts',
+      supported: true,
+      systemHint: '~/Library/Fonts or /Library/Fonts',
+    });
+    vi.spyOn(services.localFontMirrorService, 'listAvailableFonts').mockResolvedValue([]);
+    services.mirrorService = mirrorService;
+    render(<EditorShell services={services} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mirror settings' }));
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('button', {
+        name: 'Mirror settings',
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Test connection' }));
+
+    await waitFor(() => {
+      expect(mirrorService.listProjects).toHaveBeenCalledWith(mirrorConfig);
+    });
+    expect(getTestFontFiles).not.toHaveBeenCalled();
+    expect(validateTestFontFiles).not.toHaveBeenCalled();
+  });
+
   it('displays the remote project name after importing a mirrored project', async () => {
     const services = createAppServices();
     const repository = new RemoteMirrorImportingProjectRepository();

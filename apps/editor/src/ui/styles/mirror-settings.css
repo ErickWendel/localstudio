@@ -15,7 +15,8 @@
 
 .mirror-settings-grid label:first-child,
 .mirror-settings-grid label:nth-child(6),
-.mirror-settings-grid label:nth-child(7) {
+.mirror-settings-grid label:nth-child(7),
+.mirror-settings-grid label:nth-child(8) {
   grid-column: 1 / -1;
 }
 
@@ -184,4 +185,53 @@
 
 .mirror-settings-font-warning {
   color: color-mix(in srgb, var(--ew-green-fixed) 68%, #f6c453);
+}
+
+.mirror-settings-font-browser {
+  display: grid;
+  gap: 8px;
+}
+
+.mirror-settings-font-browser-heading {
+  align-items: center;
+  color: var(--ew-muted);
+  display: flex;
+  font-size: 11px;
+  font-weight: 800;
+  gap: 8px;
+  justify-content: space-between;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mirror-settings-font-browser-heading strong {
+  color: var(--ew-green);
+  font-size: 12px;
+}
+
+.mirror-settings-font-dropdown-trigger {
+  font-size: 12px;
+  font-weight: 800;
+  grid-template-columns: 18px minmax(0, 1fr) 18px;
+  height: 36px;
+}
+
+.mirror-settings-font-dropdown-trigger .material-symbols-outlined {
+  color: var(--ew-green-fixed);
+  font-size: 17px;
+}
+
+.mirror-settings-font-dropdown-trigger span:nth-child(2) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mirror-settings-font-dropdown {
+  padding: 8px;
+}
+
+.mirror-settings-font-results {
+  max-height: 184px;
 }

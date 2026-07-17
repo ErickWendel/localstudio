@@ -169,7 +169,10 @@ async function createMirrorFiles(
     projectName: project.name,
     syncedAt: now().toISOString(),
     files: manifestFiles,
-    ...(config.publicBaseUrl.trim() ? { publicBaseUrl: config.publicBaseUrl.trim() } : {}),
+    publicBaseUrl: (config.publicBaseUrl.trim() || minioObjectUtils.createDefaultPublicBaseUrl(config)).replace(
+      /\/+$/g,
+      '',
+    ),
   };
   files.push(await createFileEntry(MIRROR_MANIFEST_FILE_NAME, storageObjectUtils.jsonBlob(manifest)));
 

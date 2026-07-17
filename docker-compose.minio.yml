@@ -3,8 +3,8 @@ services:
     image: quay.io/minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: localstudio
-      MINIO_ROOT_PASSWORD: localstudio123
+      MINIO_ROOT_USER: localstudio-root
+      MINIO_ROOT_PASSWORD: localstudio-root123
       MINIO_API_CORS_ALLOW_ORIGIN: '*'
     ports:
       - '9000:9000'
@@ -16,13 +16,66 @@ services:
     image: quay.io/minio/mc:latest
     depends_on:
       - minio
-    entrypoint: >
-      /bin/sh -c "
-      until mc alias set local http://minio:9000 localstudio localstudio123; do sleep 1; done;
-      mc mb --ignore-existing local/localstudio;
-      mc anonymous set download local/localstudio;
-      echo 'MinIO bucket localstudio is ready for LocalStudio mirroring.';
-      "
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until mc alias set local http://minio:9000 localstudio-root localstudio-root123; do sleep 1; done;
+        mc mb --ignore-existing local/localstudio;
+        mc admin user remove local localstudio-writer || true;
+        mc admin user remove local localstudio-reader || true;
+        mc admin user add local localstudio-writer localstudio-writer || true;
+        mc admin user add local localstudio-reader localstudio-reader || true;
+        cat >/tmp/localstudio-writer-policy.json <<'EOF'
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "s3:ListBucket",
+                "s3:GetBucketLocation"
+              ],
+              "Resource": ["arn:aws:s3:::localstudio"]
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:DeleteObject"
+              ],
+              "Resource": ["arn:aws:s3:::localstudio/*"]
+            }
+          ]
+        }
+        EOF
+        cat >/tmp/localstudio-reader-policy.json <<'EOF'
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "s3:ListBucket",
+                "s3:GetBucketLocation"
+              ],
+              "Resource": ["arn:aws:s3:::localstudio"]
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["s3:GetObject"],
+              "Resource": ["arn:aws:s3:::localstudio/*"]
+            }
+          ]
+        }
+        EOF
+        mc admin policy create local localstudio-writer /tmp/localstudio-writer-policy.json || true;
+        mc admin policy create local localstudio-reader /tmp/localstudio-reader-policy.json || true;
+        mc admin policy attach local localstudio-writer --user localstudio-writer;
+        mc admin policy attach local localstudio-reader --user localstudio-reader;
+        mc anonymous set download local/localstudio;
+        echo 'MinIO bucket localstudio is ready. Use localstudio-writer for writes and localstudio-reader for read-only public decks.';
 
 volumes:
   minio-data:
