@@ -77,9 +77,11 @@ export type TransformersWorkerResponse =
 interface PendingTransformersRequest {
   onProgress?: ((progress: number, details?: ModelDownloadProgressDetails) => void) | undefined;
   reject: (error: Error) => void;
+  request: TransformersWorkerRequest;
   resolve: (
     result: BackgroundSegmentationResult | LanguageDetectionResult | string | undefined,
   ) => void;
+  webGpuRecoveryAttempts: number;
 }
 
 interface TransformersRuntimeClientOptions {
@@ -117,6 +119,16 @@ interface TransformersOperationsFallback {
     points: SegmentationPoint[],
   ): Promise<BackgroundSegmentationResult>;
 }
+
+const WEBGPU_CONTEXT_LOST_ERROR_PATTERNS = [
+  'external instance reference no longer exists',
+  'failed to create a webgpu compute pipeline',
+  'device is lost',
+  'gpu device was lost',
+  'context lost',
+];
+
+const MAX_WEBGPU_RECOVERY_ATTEMPTS = 1;
 
 export class TransformersRuntimeClient {
   private fallbackOperations: TransformersOperationsFallback | undefined;
@@ -249,17 +261,19 @@ export class TransformersRuntimeClient {
     request: TransformersWorkerRequest,
     options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
   ) {
-    const worker = this.getWorker();
-    if (!worker) return this.executeFallbackRequest(request, options);
-
     return new Promise<BackgroundSegmentationResult | LanguageDetectionResult | string | undefined>(
       (resolve, reject) => {
-        this.pendingRequests.set(request.id, {
+        const pendingRequest: PendingTransformersRequest = {
           onProgress: options?.onProgress,
           reject,
+          request,
           resolve,
-        });
-        worker.postMessage(request);
+          webGpuRecoveryAttempts: 0,
+        };
+
+        if (!this.postWorkerRequest(pendingRequest)) {
+          this.executeFallbackRequest(request, options).then(resolve, reject);
+        }
       },
     );
   }
@@ -300,10 +314,46 @@ export class TransformersRuntimeClient {
     }
     this.pendingRequests.delete(response.id);
     if (response.type === 'error') {
+      if (this.recoverFromWebGpuContextLoss(response.message, pending)) return;
       pending.reject(new Error(response.message));
       return;
     }
     pending.resolve(response.result);
+  }
+
+  private postWorkerRequest(pendingRequest: PendingTransformersRequest) {
+    const worker = this.getWorker();
+    if (!worker) return false;
+    this.pendingRequests.set(pendingRequest.request.id, pendingRequest);
+    try {
+      worker.postMessage(pendingRequest.request);
+      return true;
+    } catch (error) {
+      this.pendingRequests.delete(pendingRequest.request.id);
+      this.resetWorker();
+      pendingRequest.reject(
+        error instanceof Error ? error : new Error('Transformers worker failed.'),
+      );
+      return true;
+    }
+  }
+
+  private recoverFromWebGpuContextLoss(message: string, pendingRequest: PendingTransformersRequest) {
+    if (
+      pendingRequest.webGpuRecoveryAttempts >= MAX_WEBGPU_RECOVERY_ATTEMPTS ||
+      !isRecoverableWebGpuError(message)
+    ) {
+      return false;
+    }
+
+    this.resetWorker();
+    pendingRequest.webGpuRecoveryAttempts += 1;
+    if (this.postWorkerRequest(pendingRequest)) return true;
+    this.executeFallbackRequest(pendingRequest.request).then(
+      pendingRequest.resolve,
+      pendingRequest.reject,
+    );
+    return true;
   }
 
   private rejectAllPending(message: string) {
@@ -311,6 +361,12 @@ export class TransformersRuntimeClient {
       this.pendingRequests.delete(id);
       pending.reject(new Error(message));
     }
+  }
+
+  private resetWorker() {
+    const worker = this.worker;
+    this.worker = undefined;
+    worker?.terminate();
   }
 
   private executeFallbackRequest(
@@ -357,6 +413,13 @@ function createDefaultTransformersWorker() {
   return new Worker(new URL('./transformersRuntime.worker.ts', import.meta.url), {
     type: 'module',
   });
+}
+
+function isRecoverableWebGpuError(message: string) {
+  const normalizedMessage = message.toLowerCase();
+  return WEBGPU_CONTEXT_LOST_ERROR_PATTERNS.some((pattern) =>
+    normalizedMessage.includes(pattern),
+  );
 }
 
 function isLanguageDetectionResult(value: unknown): value is LanguageDetectionResult {

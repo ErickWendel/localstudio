@@ -33,6 +33,7 @@ describe('TransformersRuntimeClient', () => {
     postMessage = vi.fn((message: TransformersWorkerRequest) => {
       this.messages.push(message);
     });
+    terminate = vi.fn();
 
     emit(response: TransformersWorkerResponse) {
       this.onmessage?.({ data: response } as MessageEvent<TransformersWorkerResponse>);
@@ -86,6 +87,34 @@ describe('TransformersRuntimeClient', () => {
     });
 
     worker.emit({ id: message.id, result: 'olá', type: 'result' });
+
+    await expect(generatePromise).resolves.toBe('olá');
+  });
+
+  it('restarts the worker and retries once when WebGPU loses its context', async () => {
+    const failedWorker = new FakeWorker();
+    const recoveredWorker = new FakeWorker();
+    const createWorker = vi
+      .fn<() => Worker>()
+      .mockReturnValueOnce(failedWorker as unknown as Worker)
+      .mockReturnValueOnce(recoveredWorker as unknown as Worker);
+    const client = new TransformersRuntimeClient({ createWorker });
+
+    const generatePromise = client.generateText('model-id', 'hello');
+    const failedMessage = lastWorkerMessage(failedWorker);
+    failedWorker.emit({
+      id: failedMessage.id,
+      message:
+        "failed to call OrtRun(). ERROR_CODE: 1, ERROR_MESSAGE: Non-zero status code returned while running Not node. Name:'/model/embed_tokens_per_layer/Not_audio' Status Message: Failed to create a WebGPU compute pipeline: A valid external Instance reference no longer exists.",
+      type: 'error',
+    });
+
+    expect(failedWorker.terminate).toHaveBeenCalledTimes(1);
+    expect(createWorker).toHaveBeenCalledTimes(2);
+    const recoveredMessage = lastWorkerMessage(recoveredWorker);
+    expect(recoveredMessage).toEqual(failedMessage);
+
+    recoveredWorker.emit({ id: recoveredMessage.id, result: 'olá', type: 'result' });
 
     await expect(generatePromise).resolves.toBe('olá');
   });
