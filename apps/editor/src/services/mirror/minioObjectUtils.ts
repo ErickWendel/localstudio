@@ -52,8 +52,20 @@ function createObjectUrl(config: MinioMirrorConfig, key = '', query: Record<stri
   return url;
 }
 
+function createDefaultPublicBaseUrl(config: MinioMirrorConfig) {
+  const endpoint = new URL(config.endpoint.trim().replace(/\/+$/g, ''));
+  const bucket = encodeURIComponent(config.bucket.trim());
+  if (!bucket) return endpoint.origin;
+  return config.pathStyle
+    ? `${endpoint.origin}/${bucket}`
+    : `${endpoint.protocol}//${bucket}.${endpoint.host}`;
+}
+
 function createPublicObjectUrl(config: MinioMirrorConfig, key: string) {
-  const publicBaseUrl = config.publicBaseUrl.trim().replace(/\/+$/g, '');
+  const publicBaseUrl = (config.publicBaseUrl.trim() || createDefaultPublicBaseUrl(config)).replace(
+    /\/+$/g,
+    '',
+  );
   return `${publicBaseUrl}/${encodeKeyPath(key)}`;
 }
 
@@ -117,6 +129,7 @@ export const minioObjectUtils = {
   encodeKeyPath,
   sha256Hex,
   createObjectUrl,
+  createDefaultPublicBaseUrl,
   createPublicObjectUrl,
   createSignedHeaders,
 };

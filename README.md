@@ -136,13 +136,33 @@ Default local settings:
 - Reader secret key: `localstudio-reader`
 - Root console login: `localstudio-root` / `localstudio-root123`
 - Region: `us-east-1`
-- Public base URL: `http://localhost:9000/localstudio`
 - Prefix: `mirrors`
 - Path-style URLs: enabled
 
 In the editor, open `Settings` -> `Mirror Settings` and enter those values. Use the writer key for project sync,
 public share publishing, and remote mirror cleanup. Use the reader key for read-only deck access, imports, and public
 deck viewers so public links do not expose credentials that can write or modify presentations.
+Public object URLs are derived from the endpoint, bucket, and path-style URL setting.
+The reader policy should allow `s3:ListBucket` on the bucket for Test/Import Remote and `s3:GetObject` on mirrored
+objects for public deck loading, but it should not allow write or delete actions.
+
+Production MinIO/S3-compatible deployments must expose the S3 API endpoint to the browser, not the MinIO Console URL.
+For example, use the ingress/service that targets MinIO port `9000`; the console normally targets `9001`.
+Set CORS so the editor origin can call the S3 API (`MINIO_API_CORS_ALLOW_ORIGIN=*` is acceptable for local/dev; use a
+specific editor origin in production when possible).
+
+Required policies:
+
+- Reader: `s3:ListBucket` and `s3:GetBucketLocation` on `arn:aws:s3:::<bucket>`, plus `s3:GetObject` on
+  `arn:aws:s3:::<bucket>/*`.
+- Writer: `s3:ListBucket` and `s3:GetBucketLocation` on `arn:aws:s3:::<bucket>`, plus `s3:GetObject`, `s3:PutObject`,
+  and `s3:DeleteObject` on `arn:aws:s3:::<bucket>/*`.
+- Public viewers need object download access for published deck payloads and assets. The local compose setup uses
+  anonymous bucket download for this; production can use an equivalent bucket/prefix policy or CDN in front of the
+  bucket.
+
+If reader/writer passwords change, rerun the MinIO bootstrap job or remove/recreate those MinIO users; otherwise MinIO
+may keep the previous credentials and the editor will report `403` on Test connection.
 
 Use `File` -> `Mirror Now` to force an upload, or `File` -> `Import Remote` on another computer to download a mirrored
 project into a new local folder and continue syncing.
@@ -153,7 +173,7 @@ connection checks S3-compatible access only; it does not upload local font test 
 publish or update a public share that needs them.
 
 The dev compose file sets the `localstudio` bucket to public download mode so mirrored files can be shared through the
-public base URL. For production, use a bucket or prefix policy that matches what you intend to publish. Browser-stored
+derived public object URLs. For production, use a bucket or prefix policy that matches what you intend to publish. Browser-stored
 keys are persisted locally, so avoid root credentials outside local development.
 
 ## Quick Start

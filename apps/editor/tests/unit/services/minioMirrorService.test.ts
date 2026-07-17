@@ -157,6 +157,26 @@ describe('minioMirrorService.createMirrorFiles', () => {
 });
 
 describe('minioMirrorService.MinioMirrorService', () => {
+  it('derives public object URLs from endpoint, bucket, and URL mode when no public base is set', () => {
+    const service = new minioMirrorService.MinioMirrorService();
+
+    expect(
+      service.getPublicObjectUrl('mirrors/deck/project.json', {
+        ...config,
+        publicBaseUrl: '',
+      }),
+    ).toBe('http://localhost:9000/localstudio/mirrors/deck/project.json');
+    expect(
+      service.getPublicObjectUrl('mirrors/deck/project.json', {
+        ...config,
+        bucket: 'decks',
+        endpoint: 'https://s3.example.test',
+        pathStyle: false,
+        publicBaseUrl: '',
+      }),
+    ).toBe('https://decks.s3.example.test/mirrors/deck/project.json');
+  });
+
   it('persists MinIO mirror config in browser key-value storage', () => {
     const persistedConfig: MinioMirrorConfig = {
       ...config,
@@ -388,6 +408,15 @@ describe('minioMirrorService.MinioMirrorService', () => {
       .map(([, init]) => getAuthorizationCredential(init));
     expect(getCredentials).toContain('reader-key');
     expect(getCredentials).not.toContain('writer-key');
+  });
+
+  it('explains when reader credentials cannot list remote mirrors', async () => {
+    const fetchMock = vi.fn(() => Promise.resolve(new Response('', { status: 403 })));
+    const service = new minioMirrorService.MinioMirrorService({ fetch: fetchMock });
+
+    await expect(service.listProjects(splitCredentialConfig)).rejects.toThrow(
+      /Reader credentials cannot list the bucket or prefix/,
+    );
   });
 
   it('does not set the forbidden Host header on signed browser requests', async () => {

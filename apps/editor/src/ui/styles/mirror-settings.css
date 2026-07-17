@@ -15,7 +15,8 @@
 
 .mirror-settings-grid label:first-child,
 .mirror-settings-grid label:nth-child(6),
-.mirror-settings-grid label:nth-child(7) {
+.mirror-settings-grid label:nth-child(7),
+.mirror-settings-grid label:nth-child(8) {
   grid-column: 1 / -1;
 }
 

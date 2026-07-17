@@ -81,10 +81,11 @@ describe('MirrorSettingsPanel', () => {
     );
 
     expect(screen.getByRole('dialog', { name: 'Mirror settings' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Endpoint')).toHaveValue('http://localhost:9000');
+    expect(screen.getByLabelText('S3 API endpoint')).toHaveValue('http://localhost:9000');
     expect(screen.getByLabelText('Bucket')).toHaveValue('localstudio');
     expect(screen.getByLabelText('Writer access key')).toHaveValue('localstudio-writer');
     expect(screen.getByLabelText('Reader access key')).toHaveValue('localstudio-reader');
+    expect(screen.queryByLabelText('Public base URL')).not.toBeInTheDocument();
     const writerSecretInput = screen.getByLabelText('Writer secret key');
     const readerSecretInput = screen.getByLabelText('Reader secret key');
     expect(writerSecretInput).toHaveValue('localstudio-writer');
@@ -113,8 +114,44 @@ describe('MirrorSettingsPanel', () => {
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({
         prefix: 'public-projects',
+        publicBaseUrl: 'http://localhost:9000/localstudio',
         readerAccessKey: 'localstudio-reader',
         writerAccessKey: 'localstudio-writer',
+      }),
+    );
+  });
+
+  it('derives public base URL from endpoint, bucket, and URL mode when saving', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+
+    render(
+      <MirrorSettingsPanel
+        config={config}
+        localFontMirrorSettings={localFontMirrorSettings}
+        mirrorState={{ enabled: true, status: 'idle' }}
+        onChooseLocalFontFolder={vi.fn()}
+        onClose={vi.fn()}
+        onEnabledChange={vi.fn()}
+        onLocalFontMirrorEnabledChange={vi.fn()}
+        onSave={onSave}
+        onTestConnection={vi.fn()}
+      />,
+    );
+
+    await user.clear(screen.getByLabelText('S3 API endpoint'));
+    await user.type(screen.getByLabelText('S3 API endpoint'), 'https://s3.example.test');
+    await user.clear(screen.getByLabelText('Bucket'));
+    await user.type(screen.getByLabelText('Bucket'), 'decks');
+    await user.click(screen.getByLabelText('Path-style URLs'));
+    await user.click(screen.getByRole('button', { name: 'Save settings' }));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bucket: 'decks',
+        endpoint: 'https://s3.example.test',
+        pathStyle: false,
+        publicBaseUrl: 'https://decks.s3.example.test',
       }),
     );
   });

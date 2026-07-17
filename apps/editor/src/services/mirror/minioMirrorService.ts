@@ -214,7 +214,14 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
         : '',
     });
     const response = await this.signedFetch(url, 'GET', config, getReaderCredentials(config));
-    if (!response.ok) throw new Error(`Could not list MinIO mirrors (${response.status}).`);
+    if (!response.ok) {
+      if (response.status === 403) {
+        throw new Error(
+          'Reader credentials cannot list the bucket or prefix (403). Grant read-only ListBucket on the bucket for Test/Import Remote, and GetObject on mirrored objects for public deck loading. Also verify the reader secret and region.',
+        );
+      }
+      throw new Error(`Could not list MinIO mirrors (${response.status}).`);
+    }
     const manifestKeys = parseMirrorProjects(await response.text());
     const manifests = await Promise.all(
       manifestKeys.map(async (key) => {

@@ -68,8 +68,14 @@
 
 .mirror-settings-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.mirror-settings-actions .footer-toggle,
+.mirror-settings-actions .export-button {
+  flex: 1 1 118px;
 }
 
 .mirror-settings-toggle-danger {
