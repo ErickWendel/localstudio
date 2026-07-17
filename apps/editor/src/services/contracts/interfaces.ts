@@ -302,6 +302,7 @@ export interface ShareService {
   createShare(project: ProjectDocument): Promise<ShareMetadata>;
   updateShare(shareId: string, project: ProjectDocument): Promise<ShareMetadata>;
   getShare(shareId: string): Promise<ShareRecord | null>;
+  getProjectShareMetadata(project: ProjectDocument): ShareMetadata;
   getPublicUrl(shareId: string): string;
   getEmbedUrl(shareId: string): string;
   getEmbedHtml(shareId: string): string;

@@ -121,7 +121,6 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const [isExportingImages, setIsExportingImages] = useState(false);
   const [sharePanelOpen, setSharePanelOpen] = useState(false);
   const [shareMetadata, setShareMetadata] = useState<ShareMetadata | undefined>();
-  const [shareProgressLabel, setShareProgressLabel] = useState<string | undefined>();
   const stageRef = useRef<Konva.Stage>(null);
   const imageExportStageRef = useRef<Konva.Stage>(null);
   const workspaceRef = useRef<HTMLElement>(null);
@@ -132,6 +131,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const imageExportNoticeTimeoutRef = useRef<number | undefined>(undefined);
   const presenterFullscreenEnteredRef = useRef(false);
   const pendingShareAfterLocalSaveRef = useRef(false);
+  const sharePublishPromiseRef = useRef<Promise<ShareMetadata> | undefined>(undefined);
   const toolbarImageInputRef = useRef<HTMLInputElement>(null);
   const hasSelection = vm.selection.elementIds.length > 0;
   const isHistoryReadOnly = vm.versionHistoryOpen;
@@ -152,6 +152,35 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const publicSharingAvailable = vm.mirrorState.enabled && vm.mirrorState.status === 'synced';
   const publicSharingUnavailableReason = 'Public links cannot be created without remote storage.';
   const hasDirectoryPersistence = services.persistenceMode === 'directory';
+
+  const publishCurrentProjectShare = useCallback(async () => {
+    if (sharePublishPromiseRef.current) return sharePublishPromiseRef.current;
+    const preparedShare = services.shareService.getProjectShareMetadata(vm.project);
+    const shareId = shareMetadata?.shareId ?? preparedShare.shareId;
+    setShareMetadata((current) => ({
+      ...(current ?? preparedShare),
+      shareId,
+      status: 'syncing',
+    }));
+
+    const publishPromise = (async () => {
+      const fontResult = await prepareProjectFontsForPublicShareRef.current();
+      return services.shareService.updateShare(shareId, fontResult.project);
+    })();
+    sharePublishPromiseRef.current = publishPromise;
+    try {
+      const nextShare = await publishPromise;
+      setShareMetadata(nextShare);
+      return nextShare;
+    } catch (error) {
+      setShareMetadata((current) => (current ? { ...current, status: 'sync-failed' } : current));
+      throw error;
+    } finally {
+      if (sharePublishPromiseRef.current === publishPromise) {
+        sharePublishPromiseRef.current = undefined;
+      }
+    }
+  }, [services.shareService, shareMetadata?.shareId, vm.project]);
 
   function exportCurrentPageAsPng() {
     const dataUrl = stageRef.current?.toDataURL({ mimeType: 'image/png', pixelRatio: 2 });
@@ -255,29 +284,14 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   }
 
   async function copyPublicShareLink() {
-    setShareProgressLabel('Checking local fonts');
-    try {
-      const fontResult = await vm.prepareProjectFontsForPublicShare({
-        onProgress: (progress) => setShareProgressLabel(progress.label),
-      });
-      if (fontResult.unresolvedFamilies.length > 0) {
-        setShareProgressLabel(
-          `Publishing with fallback risk for ${fontResult.unresolvedFamilies.join(', ')}`,
-        );
-      } else {
-        setShareProgressLabel('Publishing public link');
-      }
-      const projectToShare = fontResult.project;
-      const nextShare = shareMetadata
-        ? await services.shareService.updateShare(shareMetadata.shareId, projectToShare)
-        : await services.shareService.createShare(projectToShare);
-      const copiedShare: ShareMetadata = { ...nextShare, status: 'copied' };
-      setShareMetadata(copiedShare);
-      copyShareText(copiedShare.publicUrl);
-      return copiedShare;
-    } finally {
-      setShareProgressLabel(undefined);
-    }
+    const preparedShare =
+      shareMetadata?.status === 'published' || shareMetadata?.status === 'copied'
+        ? shareMetadata
+        : await publishCurrentProjectShare();
+    const copiedShare: ShareMetadata = { ...preparedShare, status: 'copied' };
+    setShareMetadata(copiedShare);
+    copyShareText(copiedShare.publicUrl);
+    return copiedShare;
   }
 
   function continueShareAfterLocalSave() {
@@ -1087,9 +1101,8 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   );
 
   useEffect(() => {
-    const shareId = shareMetadata?.shareId;
-    if (!shareId) return undefined;
     if (!publicSharingAvailable) {
+      if (!shareMetadata?.shareId) return undefined;
       const timeoutId = window.setTimeout(() => {
         setShareMetadata((current) => (current ? { ...current, status: 'sync-failed' } : current));
       }, 0);
@@ -1097,26 +1110,14 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         window.clearTimeout(timeoutId);
       };
     }
-    const timeoutId = window.setTimeout(() => {
-      setShareMetadata((current) => (current ? { ...current, status: 'syncing' } : current));
-      void (async () => {
-        const fontResult = await prepareProjectFontsForPublicShareRef.current();
-        return services.shareService.updateShare(shareId, fontResult.project);
-      })()
-        .then((nextShare) => {
-          setShareMetadata(nextShare);
-        })
-        .catch(() => {
-          setShareMetadata((current) =>
-            current ? { ...current, status: 'sync-failed' } : current,
-          );
-        });
-    }, 1000);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [publicSharingAvailable, services.shareService, shareMetadata?.shareId, vm.project]);
+    void publishCurrentProjectShare().catch(() => undefined);
+    return undefined;
+  }, [
+    publishCurrentProjectShare,
+    publicSharingAvailable,
+    shareMetadata?.shareId,
+    vm.mirrorState.status,
+  ]);
 
   return (
     <div className="app-shell">
@@ -1427,7 +1428,6 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         <SharePanel
           projectName={vm.project.name}
           share={shareMetadata}
-          shareProgressLabel={shareProgressLabel}
           onClose={() => {
             setSharePanelOpen(false);
           }}

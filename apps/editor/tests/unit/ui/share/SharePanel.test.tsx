@@ -42,7 +42,7 @@ describe('SharePanel', () => {
     }
   });
 
-  it('shows the not shared state before publishing', () => {
+  it('shows the not shared state before the synced link is available', () => {
     render(
       <SharePanel
         projectName="Untitled AI Deck"
@@ -97,7 +97,7 @@ describe('SharePanel', () => {
     expect(onPresent).toHaveBeenCalledTimes(1);
   });
 
-  it('creates a share and copies the public URL', async () => {
+  it('copies the prepared public URL', async () => {
     const user = userEvent.setup();
     const onCopyLink = vi.fn().mockResolvedValue(createShareMetadata({ status: 'copied' }));
 
@@ -153,9 +153,9 @@ describe('SharePanel', () => {
     expect(writeText).not.toHaveBeenCalled();
   });
 
-  it('shows an error when share publishing fails', async () => {
+  it('shows an error when link copying fails', async () => {
     const user = userEvent.setup();
-    const onCopyLink = vi.fn().mockRejectedValue(new Error('Could not upload share.json'));
+    const onCopyLink = vi.fn().mockRejectedValue(new Error('Could not copy share link'));
 
     render(
       <SharePanel
@@ -170,7 +170,7 @@ describe('SharePanel', () => {
     await user.click(screen.getByRole('button', { name: 'Copy link' }));
 
     expect(await screen.findByText('Share failed')).toBeInTheDocument();
-    expect(screen.getByText('Could not upload share.json')).toBeInTheDocument();
+    expect(screen.getByText('Could not copy share link')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Copy link' })).not.toBeDisabled();
   });
 

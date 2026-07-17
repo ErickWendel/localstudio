@@ -323,7 +323,7 @@ describe('MirrorSettingsPanel', () => {
           onClose={vi.fn()}
           onEnabledChange={(nextEnabled) => {
             setEnabled(nextEnabled);
-            onEnabledChange(nextEnabled);
+            onEnabledChange(nextEnabled, config);
           }}
           onLocalFontMirrorEnabledChange={vi.fn()}
           onSave={onSave}
@@ -340,7 +340,7 @@ describe('MirrorSettingsPanel', () => {
 
     await user.click(screen.getByRole('button', { name: 'Disable mirroring' }));
 
-    expect(onEnabledChange).toHaveBeenCalledWith(false);
+    expect(onEnabledChange).toHaveBeenCalledWith(false, config);
     expect(screen.getByRole('button', { name: 'Enable mirroring' })).toHaveClass(
       'mirror-settings-toggle-success',
     );
@@ -349,7 +349,11 @@ describe('MirrorSettingsPanel', () => {
 
     await user.click(screen.getByRole('button', { name: 'Enable mirroring' }));
 
-    expect(onEnabledChange).toHaveBeenLastCalledWith(true);
+    expect(onEnabledChange).toHaveBeenLastCalledWith(true, config);
+    expect(onTestConnection).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Test connection' }));
+
     expect(onTestConnection.mock.calls.at(-1)?.[0]).toEqual(config);
     expect(await screen.findByText('S3-compatible connection is ready.')).toBeInTheDocument();
   });

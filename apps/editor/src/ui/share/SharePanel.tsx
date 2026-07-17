@@ -15,7 +15,7 @@ interface SharePanelProps {
 }
 
 function getStatusLabel(share: ShareMetadata | undefined, isCopying: boolean) {
-  if (isCopying) return 'Creating link...';
+  if (isCopying) return 'Copying link...';
   if (!share) return 'Not shared yet';
   if (share.status === 'copied') return 'Copied';
   if (share.status === 'syncing') return 'Syncing';
@@ -34,9 +34,10 @@ export function SharePanel({
   onDownload,
   onPresent,
 }: SharePanelProps) {
-  const [currentShare, setCurrentShare] = useState<ShareMetadata | undefined>(share);
+  const [lastCopiedShare, setLastCopiedShare] = useState<ShareMetadata | undefined>();
   const [isCopying, setIsCopying] = useState(false);
   const [copyError, setCopyError] = useState<string | undefined>();
+  const currentShare = share ?? lastCopiedShare;
   const publicLinkUnavailable = Boolean(publicLinkUnavailableReason);
   const statusLabel = getStatusLabel(currentShare, isCopying);
   const shareAccessDescription =
@@ -45,7 +46,7 @@ export function SharePanel({
     publicLinkUnavailableReason ??
     (currentShare
       ? 'Unlisted: anyone with the link can view.'
-      : 'Create a public view link for this deck.');
+      : 'Sync the deck to prepare a public view link.');
 
   async function handleCopyLink() {
     if (publicLinkUnavailable) {
@@ -56,7 +57,7 @@ export function SharePanel({
     setCopyError(undefined);
     try {
       const nextShare = await onCopyLink();
-      setCurrentShare(nextShare);
+      setLastCopiedShare(nextShare);
     } catch (error) {
       setCopyError(error instanceof Error ? error.message : 'Could not create the share link.');
     } finally {

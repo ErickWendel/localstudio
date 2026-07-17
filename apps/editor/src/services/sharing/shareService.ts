@@ -38,6 +38,12 @@ function createShareId() {
   return `share-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function getProjectShareId(project: ProjectDocument) {
+  const normalizedProjectId = project.id.trim().replace(/[^a-zA-Z0-9_-]+/g, '-');
+  if (!normalizedProjectId) return createShareId();
+  return `project-${normalizedProjectId}`;
+}
+
 function cloneProject(project: ProjectDocument): ProjectDocument {
   return JSON.parse(JSON.stringify(project)) as ProjectDocument;
 }
@@ -79,7 +85,7 @@ export class BrowserShareService implements ShareService {
   }
 
   async createShare(project: ProjectDocument): Promise<ShareMetadata> {
-    return this.publishShare(createShareId(), project);
+    return this.publishShare(getProjectShareId(project), project);
   }
 
   async updateShare(shareId: string, project: ProjectDocument): Promise<ShareMetadata> {
@@ -124,6 +130,18 @@ export class BrowserShareService implements ShareService {
 
   getEmbedHtml(shareId: string): string {
     return `<iframe src="${escapeHtmlAttribute(this.getEmbedUrl(shareId))}" width="960" height="540" style="border:0;aspect-ratio:16/9;width:100%;max-width:960px;" allowfullscreen></iframe>`;
+  }
+
+  getProjectShareMetadata(project: ProjectDocument): ShareMetadata {
+    return this.toMetadata(
+      {
+        shareId: getProjectShareId(project),
+        createdAt: project.createdAt,
+        updatedAt: project.updatedAt,
+        project,
+      },
+      'published',
+    );
   }
 
   private getShareSourceUrl() {

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
@@ -60,6 +60,14 @@ describe('PublicDeckViewer', () => {
       );
     });
     return { share, shareService: new BrowserShareService({ fetch: requestFetch }) };
+  }
+
+  function createDeferredResponse() {
+    let resolve!: (response: Response) => void;
+    const promise = new Promise<Response>((nextResolve) => {
+      resolve = nextResolve;
+    });
+    return { promise, resolve };
   }
 
   it('renders a shared deck in read-only mode', async () => {
@@ -136,6 +144,57 @@ describe('PublicDeckViewer', () => {
         }),
       );
     });
+  });
+
+  it('keeps the loading screen until half of the public deck assets are cached', async () => {
+    const project = sampleProject.createBlankProject();
+    project.assets = Object.fromEntries(
+      Array.from({ length: 4 }, (_, index) => [
+        `remote-image-${index}`,
+        {
+          id: `remote-image-${index}`,
+          type: 'image' as const,
+          name: `Remote image ${index}`,
+          mimeType: 'image/png',
+          objectUrl: `https://cdn.localstudio.test/assets/remote-image-${index}.png`,
+          storage: 'remote' as const,
+        },
+      ]),
+    );
+    const deferredResponses = Array.from({ length: 4 }, () => createDeferredResponse());
+    let nextResponseIndex = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => {
+        const response = deferredResponses[nextResponseIndex];
+        nextResponseIndex += 1;
+        return response!.promise;
+      }),
+    );
+    const { share, shareService } = createRemoteShare(
+      '00000000-0000-4000-8000-000000000207',
+      project,
+    );
+
+    render(
+      <PublicDeckViewer
+        shareId={share.shareId}
+        fontImportService={fontImportService}
+        shareService={shareService}
+      />,
+    );
+
+    expect(await screen.findByLabelText('Preparing shared deck')).toBeInTheDocument();
+    act(() => {
+      deferredResponses[0]!.resolve(new Response(null, { status: 204 }));
+    });
+    expect(await screen.findByText('1 / 4 assets ready')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Public presentation')).not.toBeInTheDocument();
+
+    act(() => {
+      deferredResponses[1]!.resolve(new Response(null, { status: 204 }));
+    });
+    expect(await screen.findByLabelText('Public presentation')).toBeInTheDocument();
   });
 
   it('keeps embeds in a compact shared deck layout', async () => {

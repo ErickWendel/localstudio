@@ -122,3 +122,27 @@
   gap: 8px;
   text-align: center;
 }
+
+.public-deck-loading {
+  align-self: center;
+  justify-self: center;
+  width: min(320px, calc(100vw - 48px));
+  display: grid;
+  gap: 10px;
+  text-align: center;
+}
+
+.public-deck-loading-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.public-deck-loading-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ew-green);
+  transition: width 160ms ease;
+}

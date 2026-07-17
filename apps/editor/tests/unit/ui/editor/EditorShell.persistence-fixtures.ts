@@ -183,6 +183,10 @@ class RecordingShareService implements ShareService {
       Promise.resolve(this.records.get(shareId) ?? null),
   );
 
+  getProjectShareMetadata(project: ProjectDocument): ShareMetadata {
+    return this.createMetadata(`project-${project.id}`, project.updatedAt);
+  }
+
   getPublicUrl(shareId: string): string {
     return `${this.origin}/editor/s/${shareId}?src=${encodeURIComponent(
       `http://localhost:9000/localstudio/mirrors/public-shares/${shareId}/share.json`,

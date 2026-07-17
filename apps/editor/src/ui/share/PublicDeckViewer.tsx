@@ -17,6 +17,7 @@ interface PublicDeckViewerProps {
 
 type ViewerState =
   | { status: 'loading' }
+  | { status: 'preloading'; loaded: number; project: ProjectDocument; total: number }
   | { status: 'missing' }
   | { status: 'ready'; project: ProjectDocument };
 
@@ -34,6 +35,11 @@ interface AnimationPreviewState {
 
 function getBuildPlaybackDurationMs(build: ElementAnimationBuild) {
   return Math.max(0, build.durationMs ?? build.delayMs);
+}
+
+function hasReachedPlaybackThreshold(loaded: number, total: number) {
+  if (total === 0) return true;
+  return loaded / total >= 0.5;
 }
 
 export function PublicDeckViewer({
@@ -262,18 +268,43 @@ export function PublicDeckViewer({
     const preloadController = new AbortController();
     void shareService.getShare(shareId).then(async (record) => {
       if (!isActive) return;
-      if (record) {
-        void preloadPublicDeckAssets(record.project, { signal: preloadController.signal });
-        await fontImportService.loadProjectFonts(record.project).catch(() => undefined);
-      }
-      if (!isActive) return;
-      setViewerState(record ? { status: 'ready', project: record.project } : { status: 'missing' });
-      if (record) {
-        playPresentationPage(record.project, 0);
-      } else {
+      if (!record) {
+        setViewerState({ status: 'missing' });
         setActivePageIndex(0);
         setAnimationPreview(undefined);
+        return;
       }
+      const shareRecord = record;
+
+      let hasStartedPlayback = false;
+      function startPlaybackWhenReady(loaded: number, total: number) {
+        if (!isActive || hasStartedPlayback || !hasReachedPlaybackThreshold(loaded, total)) return;
+        hasStartedPlayback = true;
+        setViewerState({ status: 'ready', project: shareRecord.project });
+        playPresentationPage(shareRecord.project, 0);
+      }
+
+      setViewerState({ status: 'preloading', loaded: 0, project: shareRecord.project, total: 0 });
+      await fontImportService.loadProjectFonts(shareRecord.project).catch(() => undefined);
+      if (!isActive) return;
+      await preloadPublicDeckAssets(shareRecord.project, {
+        signal: preloadController.signal,
+        onProgress: (progress) => {
+          if (!isActive) return;
+          setViewerState((current) =>
+            current.status === 'preloading'
+              ? {
+                  status: 'preloading',
+                  loaded: progress.loaded,
+                  project: shareRecord.project,
+                  total: progress.total,
+                }
+              : current,
+          );
+          startPlaybackWhenReady(progress.loaded, progress.total);
+        },
+      });
+      startPlaybackWhenReady(1, 1);
     });
     return () => {
       isActive = false;
@@ -310,6 +341,26 @@ export function PublicDeckViewer({
     return (
       <main className={viewerClassName}>
         <p className="public-deck-status">Loading deck...</p>
+      </main>
+    );
+  }
+
+  if (viewerState.status === 'preloading') {
+    const loadedPercent =
+      viewerState.total > 0 ? Math.min(100, Math.round((viewerState.loaded / viewerState.total) * 100)) : 0;
+    return (
+      <main className={viewerClassName}>
+        <section className="public-deck-loading" aria-label="Preparing shared deck">
+          <p className="public-deck-status">Preparing media...</p>
+          <div className="public-deck-loading-track" aria-hidden="true">
+            <span style={{ width: `${loadedPercent}%` }} />
+          </div>
+          <p className="public-deck-status">
+            {viewerState.total > 0
+              ? `${viewerState.loaded} / ${viewerState.total} assets ready`
+              : 'Checking assets'}
+          </p>
+        </section>
       </main>
     );
   }

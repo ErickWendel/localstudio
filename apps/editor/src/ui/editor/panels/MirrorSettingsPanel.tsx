@@ -23,7 +23,7 @@ interface MirrorSettingsPanelProps {
   onBack?: () => void;
   onChooseLocalFontFolder: () => Promise<void>;
   onClose: () => void;
-  onEnabledChange: (enabled: boolean) => void;
+  onEnabledChange: (enabled: boolean, config: MinioMirrorConfig) => void;
   onLocalFontMirrorEnabledChange: (enabled: boolean) => void;
   onSave: (config: MinioMirrorConfig) => void;
   onTestConnection: (
@@ -539,8 +539,7 @@ export function MirrorSettingsPanel({
             type="button"
             onClick={() => {
               const nextEnabled = !mirrorState.enabled;
-              onEnabledChange(nextEnabled);
-              if (nextEnabled) void testConnection();
+              onEnabledChange(nextEnabled, normalizedDraft());
             }}
           >
             {mirrorState.enabled ? 'Disable mirroring' : 'Enable mirroring'}
