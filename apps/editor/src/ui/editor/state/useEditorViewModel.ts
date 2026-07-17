@@ -38,7 +38,6 @@ import { pptxFontRequests } from '../../../services/importing/pptx/pptxFontReque
 import { pptxImportLogger } from '../../../services/importing/pptx/pptxImportLogger';
 import { minioMirrorService } from '../../../services/mirror/minioMirrorService';
 import type { MinioMirrorConfig } from '../../../services/mirror/minioMirrorService';
-import { storageObjectUtils } from '../../../services/storage/storageObjectUtils';
 import { aiModelCatalog } from '../../../services/model-setup/aiModelCatalog';
 import { imageGenerationModel } from '../../../services/image-generation/imageGenerationModel';
 import { createPrefixedId } from '../../../services/ids/idUtils';
@@ -1781,34 +1780,7 @@ export function useEditorViewModel(services: AppServices) {
     try {
       options?.onProgress?.({ label: 'Checking storage', stage: 'checking-local-fonts' });
       await services.mirrorService.listProjects(config);
-      const testFontFiles = localFontMirrorSettings.enabled
-        ? await services.localFontMirrorService.getTestFontFiles({
-            ...(options?.onProgress ? { onProgress: options.onProgress } : {}),
-          })
-        : [];
-      if (localFontMirrorSettings.enabled && testFontFiles.length > 0) {
-        if (!services.mirrorService.uploadPublicObject) {
-          throw new Error('Mirror storage does not support public font uploads.');
-        }
-        options?.onProgress?.({ label: 'Uploading test fonts', stage: 'uploading-test-fonts' });
-        await Promise.all(
-          testFontFiles.map((file, index) => {
-            const key = storageObjectUtils.joinObjectKey(
-              storageObjectUtils.normalizeObjectKeyPart(config.prefix),
-              'font-mirror-test',
-              `${Date.now().toString(36)}-${index + 1}-${file.name}`,
-            );
-            return services.mirrorService.uploadPublicObject?.(key, file, config) ?? Promise.resolve();
-          }),
-        );
-      }
-      const fontMirrorTestResult = localFontMirrorSettings.enabled
-        ? await services.localFontMirrorService.validateTestFontFiles(testFontFiles, {
-            ...(options?.onProgress ? { onProgress: options.onProgress } : {}),
-          })
-        : {};
       setMirrorState({ enabled: true, status: 'idle' });
-      return fontMirrorTestResult.warning;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'S3-compatible connection failed.';
       setMirrorState({

@@ -1,5 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import type {
+  FontCatalogItem,
   LocalFontMirrorProgress,
   LocalFontMirrorSettings,
   MirrorState,
@@ -9,6 +16,7 @@ import type { MinioMirrorConfig } from '../../../services/mirror/minioMirrorServ
 interface MirrorSettingsPanelProps {
   config: MinioMirrorConfig;
   localFontMirrorSettings: LocalFontMirrorSettings;
+  localFontOptions?: FontCatalogItem[];
   mirrorState: MirrorState;
   mirrorDisabledBySettings?: boolean;
   onBack?: () => void;
@@ -26,6 +34,7 @@ interface MirrorSettingsPanelProps {
 export function MirrorSettingsPanel({
   config,
   localFontMirrorSettings,
+  localFontOptions = [],
   mirrorState,
   mirrorDisabledBySettings = false,
   onBack,
@@ -46,20 +55,47 @@ export function MirrorSettingsPanel({
   const [connectionDetail, setConnectionDetail] = useState<string | undefined>();
   const [folderStatus, setFolderStatus] = useState<'idle' | 'choosing' | 'failed'>('idle');
   const [folderError, setFolderError] = useState<string | undefined>();
+  const [fontDropdownOpen, setFontDropdownOpen] = useState(false);
+  const [fontSearchQuery, setFontSearchQuery] = useState('');
+  const [panelPosition, setPanelPosition] = useState<{ left: number; top: number } | undefined>();
+
+  const localFontFamilies = useMemo(
+    () =>
+      Array.from(new Set(localFontOptions.map((font) => font.family))).sort((left, right) =>
+        left.localeCompare(right),
+      ),
+    [localFontOptions],
+  );
+  const filteredLocalFontFamilies = useMemo(() => {
+    const query = fontSearchQuery.trim().toLowerCase();
+    if (!query) return localFontFamilies.slice(0, 24);
+    return localFontFamilies
+      .filter((family) => family.toLowerCase().includes(query))
+      .slice(0, 24);
+  }, [fontSearchQuery, localFontFamilies]);
 
   function updateDraft(patch: Partial<MinioMirrorConfig>) {
     setDraft((current) => ({ ...current, ...patch }));
   }
 
   function normalizedDraft(): MinioMirrorConfig {
+    const writerAccessKey = draft.writerAccessKey?.trim() || draft.accessKey?.trim() || '';
+    const writerSecretKey = draft.writerSecretKey?.trim() || draft.secretKey?.trim() || '';
+    const readerAccessKey = draft.readerAccessKey?.trim() || writerAccessKey;
+    const readerSecretKey = draft.readerSecretKey?.trim() || writerSecretKey;
     return {
       ...draft,
-      accessKey: draft.accessKey.trim(),
+      accessKey: writerAccessKey,
       bucket: draft.bucket.trim(),
       endpoint: draft.endpoint.trim().replace(/\/+$/g, ''),
       publicBaseUrl: draft.publicBaseUrl.trim().replace(/\/+$/g, ''),
       region: draft.region.trim() || 'us-east-1',
+      readerAccessKey,
+      readerSecretKey,
       prefix: draft.prefix.trim(),
+      secretKey: writerSecretKey,
+      writerAccessKey,
+      writerSecretKey,
     };
   }
 
@@ -103,8 +139,37 @@ export function MirrorSettingsPanel({
     await chooseFontFolder();
   }
 
-  const publicBucketUrl = `${draft.endpoint.replace(/\/+$/g, '')}/${draft.bucket.trim()}`;
   const consoleUrl = draft.endpoint.replace(/\/+$/g, '');
+
+  function startPanelDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    if (isInteractiveDragTarget(event.target)) return;
+    const panel = panelRef.current;
+    if (!panel) return;
+    const rect = panel.getBoundingClientRect();
+    const offsetX = event.clientX - rect.left;
+    const offsetY = event.clientY - rect.top;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    setPanelPosition({ left: rect.left, top: rect.top });
+
+    function movePanel(pointerEvent: PointerEvent) {
+      const maxLeft = Math.max(8, window.innerWidth - rect.width - 8);
+      const maxTop = Math.max(8, window.innerHeight - rect.height - 8);
+      setPanelPosition({
+        left: Math.min(Math.max(8, pointerEvent.clientX - offsetX), maxLeft),
+        top: Math.min(Math.max(8, pointerEvent.clientY - offsetY), maxTop),
+      });
+    }
+
+    function stopPanelDrag() {
+      window.removeEventListener('pointermove', movePanel);
+      window.removeEventListener('pointerup', stopPanelDrag);
+      window.removeEventListener('pointercancel', stopPanelDrag);
+    }
+
+    window.addEventListener('pointermove', movePanel);
+    window.addEventListener('pointerup', stopPanelDrag);
+    window.addEventListener('pointercancel', stopPanelDrag);
+  }
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -122,12 +187,17 @@ export function MirrorSettingsPanel({
     <aside
       ref={panelRef}
       className="mirror-settings-panel"
+      style={
+        panelPosition
+          ? { bottom: 'auto', left: panelPosition.left, top: panelPosition.top }
+          : undefined
+      }
       role="dialog"
       aria-modal="false"
       aria-label="Mirror settings"
       data-tour-id="mirror-settings-panel"
     >
-      <div className="mirror-settings-header ew-split-row-start">
+      <div className="mirror-settings-header ew-split-row-start" onPointerDown={startPanelDrag}>
         <div className="settings-panel-title-row">
           {onBack ? (
             <button
@@ -189,25 +259,53 @@ export function MirrorSettingsPanel({
             />
           </label>
           <label>
-            <span>Access key</span>
+            <span>Writer access key</span>
             <input
-              value={draft.accessKey}
-              onChange={(event) => updateDraft({ accessKey: event.target.value })}
+              value={draft.writerAccessKey ?? draft.accessKey ?? ''}
+              onChange={(event) => updateDraft({ writerAccessKey: event.target.value })}
             />
           </label>
           <label>
-            <span>Secret key</span>
+            <span>Writer secret key</span>
             <span className="mirror-secret-control">
               <input
-                aria-label="Secret key"
+                aria-label="Writer secret key"
                 type={secretVisible ? 'text' : 'password'}
-                value={draft.secretKey}
-                onChange={(event) => updateDraft({ secretKey: event.target.value })}
+                value={draft.writerSecretKey ?? draft.secretKey ?? ''}
+                onChange={(event) => updateDraft({ writerSecretKey: event.target.value })}
               />
               <button
                 className="stitch-icon-button mirror-secret-toggle"
                 type="button"
                 aria-label={secretVisible ? 'Hide secret key' : 'Show secret key'}
+                onClick={() => setSecretVisible((current) => !current)}
+              >
+                <span className="material-symbols-outlined" aria-hidden="true">
+                  {secretVisible ? 'visibility_off' : 'visibility'}
+                </span>
+              </button>
+            </span>
+          </label>
+          <label>
+            <span>Reader access key</span>
+            <input
+              value={draft.readerAccessKey ?? draft.writerAccessKey ?? draft.accessKey ?? ''}
+              onChange={(event) => updateDraft({ readerAccessKey: event.target.value })}
+            />
+          </label>
+          <label>
+            <span>Reader secret key</span>
+            <span className="mirror-secret-control">
+              <input
+                aria-label="Reader secret key"
+                type={secretVisible ? 'text' : 'password'}
+                value={draft.readerSecretKey ?? draft.writerSecretKey ?? draft.secretKey ?? ''}
+                onChange={(event) => updateDraft({ readerSecretKey: event.target.value })}
+              />
+              <button
+                className="stitch-icon-button mirror-secret-toggle"
+                type="button"
+                aria-label={secretVisible ? 'Hide reader secret key' : 'Show reader secret key'}
                 onClick={() => setSecretVisible((current) => !current)}
               >
                 <span className="material-symbols-outlined" aria-hidden="true">
@@ -268,12 +366,16 @@ export function MirrorSettingsPanel({
         </p>
 
         <div className="mirror-settings-help">
-          <p>Local S3-compatible default login: localstudio / localstudio123</p>
+          <p>
+            Public decks should use the read-only key so viewers can load assets without write
+            access.
+          </p>
+          <p>
+            Local S3-compatible defaults: writer localstudio-writer / localstudio-writer; reader
+            localstudio-reader / localstudio-reader
+          </p>
           {connectionStatus === 'ready' ? (
             <div className="mirror-settings-links">
-              <a href={publicBucketUrl} target="_blank" rel="noreferrer">
-                Open public bucket
-              </a>
               <a href={consoleUrl} target="_blank" rel="noreferrer">
                 Open storage console
               </a>
@@ -339,6 +441,78 @@ export function MirrorSettingsPanel({
           ) : null}
           {folderError ? <span className="mirror-settings-font-warning">{folderError}</span> : null}
         </div>
+        {localFontMirrorSettings.folderLabel ? (
+          <div className="mirror-settings-font-browser">
+            <div className="mirror-settings-font-browser-heading">
+              <span>Fonts found in this folder</span>
+              <strong>{localFontFamilies.length}</strong>
+            </div>
+            <button
+              className="font-picker-trigger mirror-settings-font-dropdown-trigger"
+              type="button"
+              aria-expanded={fontDropdownOpen}
+              aria-controls="mirror-settings-font-dropdown"
+              onClick={() => setFontDropdownOpen((current) => !current)}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">
+                text_fields
+              </span>
+              <span>
+                {localFontFamilies.length > 0
+                  ? `${localFontFamilies.length} fonts available`
+                  : 'No readable fonts found'}
+              </span>
+              <span className="material-symbols-outlined" aria-hidden="true">
+                {fontDropdownOpen ? 'expand_less' : 'expand_more'}
+              </span>
+            </button>
+            {fontDropdownOpen ? (
+              <div
+                className="font-download-panel mirror-settings-font-dropdown"
+                id="mirror-settings-font-dropdown"
+              >
+                <label className="layer-search font-download-search-box ew-surface ew-compact-row">
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    search
+                  </span>
+                  <input
+                    aria-label="Search fonts found in this folder"
+                    placeholder="Search fonts"
+                    type="search"
+                    value={fontSearchQuery}
+                    onChange={(event) => setFontSearchQuery(event.target.value)}
+                  />
+                </label>
+                <div className="font-download-results mirror-settings-font-results" role="listbox">
+                  {filteredLocalFontFamilies.length > 0 ? (
+                    <section className="font-result-group" aria-label="Local font folder results">
+                      <h4>Local font folder</h4>
+                      {filteredLocalFontFamilies.map((family) => (
+                        <button
+                          key={family}
+                          className="font-download-result font-preview-result"
+                          type="button"
+                          role="option"
+                          aria-selected="false"
+                          onClick={() => setFontSearchQuery(family)}
+                        >
+                          <span className="ew-ellipsis" style={{ fontFamily: family }}>
+                            {family}
+                          </span>
+                          <span className="material-symbols-outlined font-result-check" aria-hidden="true">
+                            text_fields
+                          </span>
+                        </button>
+                      ))}
+                    </section>
+                  ) : (
+                    <p className="panel-muted">No fonts match that search.</p>
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </section>
 
       <div className="mirror-settings-actions" data-tour-id="mirror-settings-actions">
@@ -376,4 +550,9 @@ export function MirrorSettingsPanel({
       ) : null}
     </aside>
   );
+}
+
+function isInteractiveDragTarget(target: EventTarget) {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(target.closest('button, a, input, textarea, select, [role="button"]'));
 }

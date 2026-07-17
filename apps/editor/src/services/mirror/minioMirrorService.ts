@@ -17,11 +17,20 @@ export interface MinioMirrorConfig {
   endpoint: string;
   bucket: string;
   region: string;
-  accessKey: string;
-  secretKey: string;
+  accessKey?: string;
+  secretKey?: string;
+  writerAccessKey?: string;
+  writerSecretKey?: string;
+  readerAccessKey?: string;
+  readerSecretKey?: string;
   pathStyle: boolean;
   publicBaseUrl: string;
   prefix: string;
+}
+
+export interface MinioMirrorCredentials {
+  accessKey: string;
+  secretKey: string;
 }
 
 interface MinioMirrorServiceOptions {
@@ -33,15 +42,33 @@ interface MinioMirrorServiceOptions {
 const CONFIG_STORAGE_KEY = 'localstudio.minioMirror.config';
 
 const DEFAULT_MINIO_MIRROR_CONFIG: MinioMirrorConfig = {
-  accessKey: 'localstudio',
+  accessKey: 'localstudio-writer',
   bucket: 'localstudio',
   endpoint: 'http://localhost:9000',
   pathStyle: true,
   publicBaseUrl: 'http://localhost:9000/localstudio',
   region: 'us-east-1',
-  secretKey: 'localstudio123',
+  secretKey: 'localstudio-writer',
+  writerAccessKey: 'localstudio-writer',
+  writerSecretKey: 'localstudio-writer',
+  readerAccessKey: 'localstudio-reader',
+  readerSecretKey: 'localstudio-reader',
   prefix: 'mirrors',
 };
+
+const LOCAL_MINIO_SPLIT_CREDENTIALS = {
+  accessKey: 'localstudio-writer',
+  secretKey: 'localstudio-writer',
+  writerAccessKey: 'localstudio-writer',
+  writerSecretKey: 'localstudio-writer',
+  readerAccessKey: 'localstudio-reader',
+  readerSecretKey: 'localstudio-reader',
+} as const;
+
+const LEGACY_LOCAL_MINIO_CREDENTIALS = {
+  accessKey: 'localstudio',
+  secretKey: 'localstudio123',
+} as const;
 
 const DELETE_BATCH_SIZE = 25;
 
@@ -63,6 +90,43 @@ function getProjectRoot(config: MinioMirrorConfig, projectKey: string) {
 
 function getProjectFileKey(config: MinioMirrorConfig, projectKey: string, path: string) {
   return storageObjectUtils.joinObjectKey(getProjectRoot(config, projectKey), path);
+}
+
+function isLegacyLocalMinioConfig(config: MinioMirrorConfig) {
+  return (
+    !config.writerAccessKey &&
+    !config.writerSecretKey &&
+    !config.readerAccessKey &&
+    !config.readerSecretKey &&
+    config.accessKey === LEGACY_LOCAL_MINIO_CREDENTIALS.accessKey &&
+    config.secretKey === LEGACY_LOCAL_MINIO_CREDENTIALS.secretKey &&
+    config.endpoint.replace(/\/+$/g, '') === DEFAULT_MINIO_MIRROR_CONFIG.endpoint &&
+    config.bucket === DEFAULT_MINIO_MIRROR_CONFIG.bucket
+  );
+}
+
+function normalizeMirrorConfig(config: MinioMirrorConfig): MinioMirrorConfig {
+  if (isLegacyLocalMinioConfig(config)) {
+    return {
+      ...config,
+      ...LOCAL_MINIO_SPLIT_CREDENTIALS,
+    };
+  }
+  return config;
+}
+
+function getWriterCredentials(config: MinioMirrorConfig): MinioMirrorCredentials {
+  return {
+    accessKey: config.writerAccessKey || config.accessKey || '',
+    secretKey: config.writerSecretKey || config.secretKey || '',
+  };
+}
+
+function getReaderCredentials(config: MinioMirrorConfig): MinioMirrorCredentials {
+  return {
+    accessKey: config.readerAccessKey || config.writerAccessKey || config.accessKey || '',
+    secretKey: config.readerSecretKey || config.writerSecretKey || config.secretKey || '',
+  };
 }
 
 function parseMirrorProjects(xml: string) {
@@ -104,7 +168,8 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
   }
 
   loadConfig(): MinioMirrorConfig | null {
-    return browserStorage.readStorageJson<MinioMirrorConfig>(this.storage, CONFIG_STORAGE_KEY);
+    const config = browserStorage.readStorageJson<MinioMirrorConfig>(this.storage, CONFIG_STORAGE_KEY);
+    return config ? normalizeMirrorConfig(config) : null;
   }
 
   saveConfig(config: MinioMirrorConfig): void {
@@ -148,7 +213,7 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
         ? `${storageObjectUtils.normalizeObjectKeyPart(config.prefix)}/`
         : '',
     });
-    const response = await this.signedFetch(url, 'GET', config);
+    const response = await this.signedFetch(url, 'GET', config, getReaderCredentials(config));
     if (!response.ok) throw new Error(`Could not list MinIO mirrors (${response.status}).`);
     const manifestKeys = parseMirrorProjects(await response.text());
     const manifests = await Promise.all(
@@ -157,6 +222,7 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
           minioObjectUtils.createObjectUrl(config, key),
           'GET',
           config,
+          getReaderCredentials(config),
         );
         if (!response.ok) return undefined;
         const manifest = (await response.json()) as MirrorManifest;
@@ -179,6 +245,7 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
       ),
       'GET',
       config,
+      getReaderCredentials(config),
     );
     if (!manifestResponse.ok)
       throw new Error(`Could not download MinIO mirror manifest (${manifestResponse.status}).`);
@@ -189,6 +256,7 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
           minioObjectUtils.createObjectUrl(config, getProjectFileKey(config, projectKey, path)),
           'GET',
           config,
+          getReaderCredentials(config),
         );
         if (!response.ok)
           throw new Error(`Could not download mirrored file ${path} (${response.status}).`);
@@ -212,7 +280,7 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
         'max-keys': '1000',
         prefix: projectPrefix,
       });
-      const listResponse = await this.signedFetch(url, 'GET', config);
+      const listResponse = await this.signedFetch(url, 'GET', config, getWriterCredentials(config));
       if (!listResponse.ok)
         throw new Error(`Could not list MinIO mirror objects (${listResponse.status}).`);
 
@@ -224,6 +292,7 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
               minioObjectUtils.createObjectUrl(config, key),
               'DELETE',
               config,
+              getWriterCredentials(config),
             );
             if (!response.ok)
               throw new Error(`Could not delete mirrored object ${key} (${response.status}).`);
@@ -250,6 +319,7 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
       ),
       'GET',
       config,
+      getWriterCredentials(config),
     );
     if (response.status === 404) return null;
     if (!response.ok) throw new Error(`Could not read MinIO mirror manifest (${response.status}).`);
@@ -261,6 +331,7 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
       minioObjectUtils.createObjectUrl(config, key),
       'PUT',
       config,
+      getWriterCredentials(config),
       blob,
       blob.type,
     );
@@ -271,11 +342,18 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
     url: URL,
     method: string,
     config: MinioMirrorConfig,
+    credentials: MinioMirrorCredentials,
     body?: Blob,
     contentType?: string,
   ) {
     const init: RequestInit = {
-      headers: await minioObjectUtils.createSignedHeaders(config, method, url, contentType),
+      headers: await minioObjectUtils.createSignedHeaders(
+        config,
+        method,
+        url,
+        credentials,
+        contentType,
+      ),
       method,
     };
     if (body) init.body = body;

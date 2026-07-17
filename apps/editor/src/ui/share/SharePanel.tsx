@@ -85,6 +85,10 @@ export function SharePanel({
       <section className="share-access-block" aria-label="Share access">
         <span className="share-status-pill">{copyError ? 'Share failed' : statusLabel}</span>
         <p>{shareAccessDescription}</p>
+        <p className="share-access-note">
+          Public links should use a read-only storage key so viewers cannot write or modify
+          presentations.
+        </p>
       </section>
 
       <button

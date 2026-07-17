@@ -130,16 +130,27 @@ Default local settings:
 - API endpoint: `http://localhost:9000`
 - Console: `http://localhost:9001`
 - Bucket: `localstudio`
-- Access key: `localstudio`
-- Secret key: `localstudio123`
+- Writer access key: `localstudio-writer`
+- Writer secret key: `localstudio-writer`
+- Reader access key: `localstudio-reader`
+- Reader secret key: `localstudio-reader`
+- Root console login: `localstudio-root` / `localstudio-root123`
 - Region: `us-east-1`
 - Public base URL: `http://localhost:9000/localstudio`
 - Prefix: `mirrors`
 - Path-style URLs: enabled
 
-In the editor, open `Settings` -> `Mirror Settings` and enter those values. Use `File` -> `Mirror Now` to force an
-upload, or `File` -> `Import Remote` on another computer to download a mirrored project into a new local folder and
-continue syncing.
+In the editor, open `Settings` -> `Mirror Settings` and enter those values. Use the writer key for project sync,
+public share publishing, and remote mirror cleanup. Use the reader key for read-only deck access, imports, and public
+deck viewers so public links do not expose credentials that can write or modify presentations.
+
+Use `File` -> `Mirror Now` to force an upload, or `File` -> `Import Remote` on another computer to download a mirrored
+project into a new local folder and continue syncing.
+
+Local font mirroring can be enabled in the same settings panel. Choose the local font folder, then the panel shows
+`Fonts found in this directory` with a searchable dropdown of the readable fonts from that folder. Testing the storage
+connection checks S3-compatible access only; it does not upload local font test files. Fonts are mirrored when you
+publish or update a public share that needs them.
 
 The dev compose file sets the `localstudio` bucket to public download mode so mirrored files can be shared through the
 public base URL. For production, use a bucket or prefix policy that matches what you intend to publish. Browser-stored

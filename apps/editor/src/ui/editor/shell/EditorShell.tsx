@@ -1477,6 +1477,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         <MirrorSettingsPanel
           config={vm.mirrorConfig}
           localFontMirrorSettings={vm.localFontMirrorSettings}
+          localFontOptions={vm.localFontOptions}
           mirrorState={vm.mirrorState}
           mirrorDisabledBySettings={vm.mirrorDisabledBySettings}
           onBack={() => {

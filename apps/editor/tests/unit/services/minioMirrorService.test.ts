@@ -19,6 +19,19 @@ const config: MinioMirrorConfig = {
   prefix: 'mirrors',
 };
 
+const splitCredentialConfig: MinioMirrorConfig = {
+  bucket: 'localstudio',
+  endpoint: 'http://localhost:9000',
+  pathStyle: true,
+  publicBaseUrl: 'http://localhost:9000/localstudio',
+  region: 'us-east-1',
+  prefix: 'mirrors',
+  writerAccessKey: 'writer-key',
+  writerSecretKey: 'writer-secret',
+  readerAccessKey: 'reader-key',
+  readerSecretKey: 'reader-secret',
+};
+
 class VersionedRepository implements ProjectRepository {
   constructor(
     private readonly versions: VersionHistoryEntry[],
@@ -46,6 +59,11 @@ function getRequestUrl(input: RequestInfo | URL) {
   if (input instanceof URL) return input.toString();
   if (input instanceof Request) return input.url;
   return input;
+}
+
+function getAuthorizationCredential(init: RequestInit | undefined) {
+  const headers = init?.headers as Record<string, string> | undefined;
+  return headers?.authorization?.match(/Credential=([^/]+)/)?.[1];
 }
 
 describe('minioMirrorService.createMirrorFiles', () => {
@@ -140,6 +158,12 @@ describe('minioMirrorService.createMirrorFiles', () => {
 
 describe('minioMirrorService.MinioMirrorService', () => {
   it('persists MinIO mirror config in browser key-value storage', () => {
+    const persistedConfig: MinioMirrorConfig = {
+      ...config,
+      accessKey: 'persisted-access',
+      bucket: 'persisted-bucket',
+      secretKey: 'persisted-secret',
+    };
     const records = new Map<string, string>();
     const storage = {
       getItem: vi.fn((key: string) => records.get(key) ?? null),
@@ -152,18 +176,75 @@ describe('minioMirrorService.MinioMirrorService', () => {
     };
     const service = new minioMirrorService.MinioMirrorService({ storage });
 
-    service.saveConfig(config);
+    service.saveConfig(persistedConfig);
 
     expect(storage.setItem).toHaveBeenCalledWith(
       'localstudio.minioMirror.config',
-      JSON.stringify(config),
+      JSON.stringify(persistedConfig),
     );
-    expect(service.loadConfig()).toEqual(config);
+    expect(service.loadConfig()).toEqual(persistedConfig);
 
     service.clearConfig();
 
     expect(storage.removeItem).toHaveBeenCalledWith('localstudio.minioMirror.config');
     expect(service.loadConfig()).toBeNull();
+  });
+
+  it('migrates the legacy local MinIO default config to split reader and writer defaults', () => {
+    const records = new Map<string, string>([
+      [
+        'localstudio.minioMirror.config',
+        JSON.stringify({
+          accessKey: 'localstudio',
+          bucket: 'localstudio',
+          endpoint: 'http://localhost:9000',
+          pathStyle: true,
+          publicBaseUrl: 'http://localhost:9000/localstudio',
+          region: 'us-east-1',
+          secretKey: 'localstudio123',
+          prefix: 'mirrors',
+        } satisfies MinioMirrorConfig),
+      ],
+    ]);
+    const storage = {
+      getItem: vi.fn((key: string) => records.get(key) ?? null),
+      removeItem: vi.fn(),
+      setItem: vi.fn(),
+    };
+    const service = new minioMirrorService.MinioMirrorService({ storage });
+
+    expect(service.loadConfig()).toMatchObject({
+      accessKey: 'localstudio-writer',
+      secretKey: 'localstudio-writer',
+      writerAccessKey: 'localstudio-writer',
+      writerSecretKey: 'localstudio-writer',
+      readerAccessKey: 'localstudio-reader',
+      readerSecretKey: 'localstudio-reader',
+    });
+  });
+
+  it('keeps custom legacy S3 credentials when no split reader and writer keys exist', () => {
+    const customConfig: MinioMirrorConfig = {
+      accessKey: 'custom-access',
+      bucket: 'custom-bucket',
+      endpoint: 'https://storage.example.test',
+      pathStyle: true,
+      publicBaseUrl: 'https://cdn.example.test/custom-bucket',
+      region: 'us-east-1',
+      secretKey: 'custom-secret',
+      prefix: 'mirrors',
+    };
+    const records = new Map<string, string>([
+      ['localstudio.minioMirror.config', JSON.stringify(customConfig)],
+    ]);
+    const storage = {
+      getItem: vi.fn((key: string) => records.get(key) ?? null),
+      removeItem: vi.fn(),
+      setItem: vi.fn(),
+    };
+    const service = new minioMirrorService.MinioMirrorService({ storage });
+
+    expect(service.loadConfig()).toEqual(customConfig);
   });
 
   it('binds the browser fetch function when no fetch override is provided', async () => {
@@ -237,6 +318,76 @@ describe('minioMirrorService.MinioMirrorService', () => {
       .map(([input]) => getRequestUrl(input));
     expect(putUrls.some((url) => url.endsWith('/project.json'))).toBe(false);
     expect(putUrls.some((url) => url.endsWith('/localstudio-mirror.json'))).toBe(true);
+  });
+
+  it('uses writer credentials when sync checks and uploads mirror files', async () => {
+    const project = sampleProject.createSampleProject();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = getRequestUrl(input);
+      if (init?.method === 'GET' && url.endsWith('localstudio-mirror.json')) {
+        return Promise.resolve(new Response('', { status: 404 }));
+      }
+      if (init?.method === 'PUT') {
+        return Promise.resolve(new Response('', { status: 200 }));
+      }
+      return Promise.resolve(new Response('', { status: 404 }));
+    });
+    const service = new minioMirrorService.MinioMirrorService({
+      fetch: fetchMock,
+      now: () => new Date('2026-06-30T10:00:00.000Z'),
+    });
+
+    await service.syncProject(project, new VersionedRepository([], project), splitCredentialConfig);
+
+    const getCredentials = fetchMock.mock.calls
+      .filter(([, init]) => init?.method === 'GET')
+      .map(([, init]) => getAuthorizationCredential(init));
+    const putCredentials = fetchMock.mock.calls
+      .filter(([, init]) => init?.method === 'PUT')
+      .map(([, init]) => getAuthorizationCredential(init));
+    expect(getCredentials).toContain('writer-key');
+    expect(getCredentials).not.toContain('reader-key');
+    expect(putCredentials).toContain('writer-key');
+    expect(putCredentials).not.toContain('reader-key');
+  });
+
+  it('uses reader credentials when listing remote mirrors', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = getRequestUrl(input);
+      if (init?.method === 'GET' && url.includes('list-type=2')) {
+        return Promise.resolve(
+          new Response(
+            '<ListBucketResult><Contents><Key>mirrors/Client/localstudio-mirror.json</Key></Contents></ListBucketResult>',
+            { status: 200 },
+          ),
+        );
+      }
+      if (init?.method === 'GET' && url.endsWith('/mirrors/Client/localstudio-mirror.json')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              schemaVersion: 1,
+              projectId: 'project-client',
+              projectName: 'Client',
+              syncedAt: '2026-06-30T10:00:00.000Z',
+              publicBaseUrl: splitCredentialConfig.publicBaseUrl,
+              files: {},
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+      return Promise.resolve(new Response('', { status: 404 }));
+    });
+    const service = new minioMirrorService.MinioMirrorService({ fetch: fetchMock });
+
+    await service.listProjects(splitCredentialConfig);
+
+    const getCredentials = fetchMock.mock.calls
+      .filter(([, init]) => init?.method === 'GET')
+      .map(([, init]) => getAuthorizationCredential(init));
+    expect(getCredentials).toContain('reader-key');
+    expect(getCredentials).not.toContain('writer-key');
   });
 
   it('does not set the forbidden Host header on signed browser requests', async () => {

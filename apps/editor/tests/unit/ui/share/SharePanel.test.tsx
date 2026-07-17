@@ -40,6 +40,7 @@ describe('SharePanel', () => {
 
     expect(screen.getByRole('heading', { name: 'Share design' })).toBeInTheDocument();
     expect(screen.getByText('Not shared yet')).toBeInTheDocument();
+    expect(screen.getByText(/Public links should use a read-only storage key/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Copy link' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Public view link' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Embed code' })).toBeDisabled();

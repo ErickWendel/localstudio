@@ -30,6 +30,10 @@
   font-size: 13px;
 }
 
+.share-access-note {
+  padding-top: 2px;
+}
+
 .share-access-block {
   display: grid;
   gap: 8px;

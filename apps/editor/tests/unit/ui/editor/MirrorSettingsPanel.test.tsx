@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
@@ -7,13 +7,17 @@ import type { MinioMirrorConfig } from '../../../../src/services/mirror/minioMir
 import type { LocalFontMirrorProgress } from '../../../../src/services/contracts/interfaces';
 
 const config: MinioMirrorConfig = {
-  accessKey: 'localstudio',
+  accessKey: 'localstudio-writer',
   bucket: 'localstudio',
   endpoint: 'http://localhost:9000',
   pathStyle: true,
   publicBaseUrl: 'http://localhost:9000/localstudio',
+  readerAccessKey: 'localstudio-reader',
+  readerSecretKey: 'localstudio-reader',
   region: 'us-east-1',
-  secretKey: 'localstudio123',
+  secretKey: 'localstudio-writer',
+  writerAccessKey: 'localstudio-writer',
+  writerSecretKey: 'localstudio-writer',
   prefix: 'mirrors',
 };
 
@@ -79,33 +83,79 @@ describe('MirrorSettingsPanel', () => {
     expect(screen.getByRole('dialog', { name: 'Mirror settings' })).toBeInTheDocument();
     expect(screen.getByLabelText('Endpoint')).toHaveValue('http://localhost:9000');
     expect(screen.getByLabelText('Bucket')).toHaveValue('localstudio');
-    const secretInput = screen.getByLabelText('Secret key');
-    expect(secretInput).toHaveValue('localstudio123');
-    expect(secretInput).toHaveAttribute('type', 'password');
+    expect(screen.getByLabelText('Writer access key')).toHaveValue('localstudio-writer');
+    expect(screen.getByLabelText('Reader access key')).toHaveValue('localstudio-reader');
+    const writerSecretInput = screen.getByLabelText('Writer secret key');
+    const readerSecretInput = screen.getByLabelText('Reader secret key');
+    expect(writerSecretInput).toHaveValue('localstudio-writer');
+    expect(readerSecretInput).toHaveValue('localstudio-reader');
+    expect(writerSecretInput).toHaveAttribute('type', 'password');
     expect(screen.getByLabelText('Path-style URLs')).toBeChecked();
 
     await user.click(screen.getByRole('button', { name: 'Show secret key' }));
-    expect(secretInput).toHaveAttribute('type', 'text');
+    expect(writerSecretInput).toHaveAttribute('type', 'text');
+    expect(readerSecretInput).toHaveAttribute('type', 'text');
 
     await user.clear(screen.getByLabelText('Prefix'));
     await user.type(screen.getByLabelText('Prefix'), 'public-projects');
     await user.click(screen.getByRole('button', { name: 'Test connection' }));
     expect(onTestConnection.mock.calls[0]?.[0]).toMatchObject({ prefix: 'public-projects' });
     expect(await screen.findByText('S3-compatible connection is ready.')).toBeInTheDocument();
-    expect(
-      screen.getByText('Local S3-compatible default login: localstudio / localstudio123'),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Open public bucket' })).toHaveAttribute(
-      'href',
-      'http://localhost:9000/localstudio',
-    );
+    expect(screen.getByText(/Public decks should use the read-only key/)).toBeInTheDocument();
+    expect(screen.getByText(/writer localstudio-writer/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Open public bucket' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open storage console' })).toHaveAttribute(
       'href',
       'http://localhost:9000',
     );
 
     await user.click(screen.getByRole('button', { name: 'Save settings' }));
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ prefix: 'public-projects' }));
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prefix: 'public-projects',
+        readerAccessKey: 'localstudio-reader',
+        writerAccessKey: 'localstudio-writer',
+      }),
+    );
+  });
+
+  it('lets users drag the mirror settings panel by its header', () => {
+    render(
+      <MirrorSettingsPanel
+        config={config}
+        localFontMirrorSettings={localFontMirrorSettings}
+        mirrorState={{ enabled: true, status: 'idle' }}
+        onChooseLocalFontFolder={vi.fn()}
+        onClose={vi.fn()}
+        onEnabledChange={vi.fn()}
+        onLocalFontMirrorEnabledChange={vi.fn()}
+        onSave={vi.fn()}
+        onTestConnection={vi.fn()}
+      />,
+    );
+
+    const panel = screen.getByRole('dialog', { name: 'Mirror settings' });
+    vi.spyOn(panel, 'getBoundingClientRect').mockReturnValue({
+      bottom: 452,
+      height: 400,
+      left: 16,
+      right: 456,
+      top: 52,
+      width: 440,
+      x: 16,
+      y: 52,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.pointerDown(screen.getByText('Mirror settings'), {
+      clientX: 26,
+      clientY: 62,
+      pointerId: 1,
+    });
+    fireEvent.pointerMove(window, { clientX: 120, clientY: 140, pointerId: 1 });
+    fireEvent.pointerUp(window, { pointerId: 1 });
+
+    expect(panel).toHaveStyle({ bottom: 'auto', left: '110px', top: '130px' });
   });
 
   it('returns to the settings list from the back button', async () => {
@@ -155,6 +205,42 @@ describe('MirrorSettingsPanel', () => {
 
     expect(onChooseLocalFontFolder).toHaveBeenCalledTimes(1);
     expect(onLocalFontMirrorEnabledChange).not.toHaveBeenCalledWith(true);
+  });
+
+  it('shows searchable fonts found in the selected local font folder', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MirrorSettingsPanel
+        config={config}
+        localFontMirrorSettings={{
+          ...localFontMirrorSettings,
+          enabled: true,
+          folderLabel: 'Fonts',
+        }}
+        localFontOptions={[
+          { family: 'Acme Sans', source: 'local-font-folder' },
+          { family: 'Inter Display', source: 'local-font-folder' },
+          { family: 'Montserrat', source: 'local-font-folder' },
+        ]}
+        mirrorState={{ enabled: true, status: 'idle' }}
+        onChooseLocalFontFolder={vi.fn()}
+        onClose={vi.fn()}
+        onEnabledChange={vi.fn()}
+        onLocalFontMirrorEnabledChange={vi.fn()}
+        onSave={vi.fn()}
+        onTestConnection={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Fonts found in this folder')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /3 fonts available/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /3 fonts available/i }));
+    await user.type(screen.getByLabelText('Search fonts found in this folder'), 'mont');
+
+    expect(screen.getByRole('option', { name: /Montserrat/i })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Acme Sans/i })).not.toBeInTheDocument();
   });
 
   it('disables local font mirroring without opening the folder picker', async () => {
