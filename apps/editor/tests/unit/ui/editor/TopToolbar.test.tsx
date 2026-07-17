@@ -399,6 +399,35 @@ describe('TopToolbar', () => {
     expect(screen.queryByRole('group', { name: 'Translation path' })).not.toBeInTheDocument();
   });
 
+  it('closes the deck translation path menu when users share', async () => {
+    const user = userEvent.setup();
+    const onShare = vi.fn();
+
+    render(
+      <TopToolbar
+        project={sampleProject.createSampleProject()}
+        language="EN"
+        canTranslateDeck
+        translationLanguageOptions={[
+          { code: 'en', flag: '🇺🇸', label: 'English' },
+          { code: 'pt', flag: '🇧🇷', label: 'Portuguese' },
+        ]}
+        translationSourceLanguage="en"
+        translationTargetLanguage="pt"
+        onShare={onShare}
+        onTranslateDeck={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Translation path options' }));
+    expect(screen.getByRole('group', { name: 'Translation path' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Share' }));
+
+    expect(onShare).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('group', { name: 'Translation path' })).not.toBeInTheDocument();
+  });
+
   it('disables the toolbar deck translation icon when no deck text can be translated', () => {
     render(
       <TopToolbar

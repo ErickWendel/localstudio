@@ -205,6 +205,10 @@ export function TopToolbar({
   }, [openMenu]);
 
   function triggerShare() {
+    setOpenMenu(null);
+    setOpenSubmenu(null);
+    setPlayMenuOpen(false);
+    setTranslationMenuOpen(false);
     onShare?.();
   }
 
