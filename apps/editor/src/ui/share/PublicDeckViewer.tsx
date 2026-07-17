@@ -6,6 +6,7 @@ import type {
 } from '../../domain/documents/model';
 import type { FontImportService, ShareService } from '../../services/contracts/interfaces';
 import { CanvasWorkspace } from '../editor/canvas/CanvasWorkspace';
+import { preloadPublicDeckAssets } from './publicDeckAssetPreloader';
 
 interface PublicDeckViewerProps {
   shareId: string;
@@ -258,9 +259,11 @@ export function PublicDeckViewer({
 
   useEffect(() => {
     let isActive = true;
+    const preloadController = new AbortController();
     void shareService.getShare(shareId).then(async (record) => {
       if (!isActive) return;
       if (record) {
+        void preloadPublicDeckAssets(record.project, { signal: preloadController.signal });
         await fontImportService.loadProjectFonts(record.project).catch(() => undefined);
       }
       if (!isActive) return;
@@ -274,6 +277,7 @@ export function PublicDeckViewer({
     });
     return () => {
       isActive = false;
+      preloadController.abort();
     };
   }, [fontImportService, playPresentationPage, shareId, shareService]);
 

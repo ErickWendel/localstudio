@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 import type {
   FontImportResult,
@@ -25,6 +25,11 @@ describe('PublicDeckViewer', () => {
 
   beforeEach(() => {
     window.history.replaceState({}, '', '/');
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(null, { status: 204 }))));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   function getRequestUrl(input: RequestInfo | URL) {
@@ -72,6 +77,65 @@ describe('PublicDeckViewer', () => {
     expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-selected-elements', '');
     expect(screen.getByRole('button', { name: 'Previous slide' })).toBeDisabled();
     expect(screen.getByText('1 / 1')).toBeInTheDocument();
+  });
+
+  it('preloads public deck assets in the browser after the share record loads', async () => {
+    const project = sampleProject.createSampleProject();
+    project.assets['remote-image'] = {
+      id: 'remote-image',
+      type: 'image',
+      name: 'Remote image',
+      mimeType: 'image/png',
+      objectUrl: 'https://cdn.localstudio.test/assets/remote-image.png',
+      storage: 'remote',
+    };
+    project.fonts = {
+      brand: {
+        id: 'brand',
+        family: 'Brand Sans',
+        requestedFamily: 'Brand Sans',
+        source: 'uploaded',
+        fontStyle: 'normal',
+        fontWeight: 700,
+        mimeType: 'font/woff2',
+        fileName: 'brand.woff2',
+        storage: 'remote',
+        objectUrl: 'https://cdn.localstudio.test/fonts/brand.woff2',
+      },
+    };
+    const preloadFetch = vi.mocked(globalThis.fetch);
+    const { share, shareService } = createRemoteShare(
+      '00000000-0000-4000-8000-000000000206',
+      project,
+    );
+
+    render(
+      <PublicDeckViewer
+        shareId={share.shareId}
+        fontImportService={fontImportService}
+        shareService={shareService}
+      />,
+    );
+
+    await screen.findByLabelText('Public presentation');
+    await waitFor(() => {
+      expect(preloadFetch).toHaveBeenCalledWith(
+        'https://cdn.localstudio.test/assets/remote-image.png',
+        expect.objectContaining({
+          cache: 'force-cache',
+          credentials: 'omit',
+          mode: 'cors',
+        }),
+      );
+      expect(preloadFetch).toHaveBeenCalledWith(
+        'https://cdn.localstudio.test/fonts/brand.woff2',
+        expect.objectContaining({
+          cache: 'force-cache',
+          credentials: 'omit',
+          mode: 'cors',
+        }),
+      );
+    });
   });
 
   it('keeps embeds in a compact shared deck layout', async () => {

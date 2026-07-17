@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ShareMetadata } from '../../services/contracts/interfaces';
+import { copyShareText } from './shareClipboard';
 
 interface SharePanelProps {
   projectName: string;
@@ -145,7 +146,7 @@ export function SharePanel({
           disabled={!currentShare}
           onClick={() => {
             if (!currentShare) return;
-            void navigator.clipboard?.writeText(currentShare.embedHtml);
+            copyShareText(currentShare.embedHtml);
           }}
         >
           <span className="share-action-icon material-symbols-outlined" aria-hidden="true">

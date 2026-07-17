@@ -30,6 +30,7 @@ import { VersionHistoryPanel } from '../panels/VersionHistoryPanel';
 import { presentationMovieControls, type MovieHoldState } from '../media/presentationMovieControls';
 import { useEditorViewModel, type OperationNoticeState } from '../state/useEditorViewModel';
 import { SharePanel } from '../../share/SharePanel';
+import { copyShareText } from '../../share/shareClipboard';
 import { KeyboardShortcutsDialog, type KeyboardShortcutAction } from '../../components/KeyboardShortcutsDialog';
 import { editorShellBrowserUtils } from '../browser/editorShellBrowserUtils';
 import { BrowserPresenterSessionService } from '../../../services/presenter/presenterSessionService';
@@ -272,7 +273,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         : await services.shareService.createShare(projectToShare);
       const copiedShare: ShareMetadata = { ...nextShare, status: 'copied' };
       setShareMetadata(copiedShare);
-      await navigator.clipboard?.writeText(copiedShare.publicUrl);
+      copyShareText(copiedShare.publicUrl);
       return copiedShare;
     } finally {
       setShareProgressLabel(undefined);
