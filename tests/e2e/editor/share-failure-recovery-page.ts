@@ -6,19 +6,8 @@ import { expect } from '../support/journey-test';
 import { shareFailureMirrorRoute } from './share-failure-mirror-route';
 
 export const shareFailureRecoveryPage = {
-  async recoverMirrorAndReportClipboardFailure(page: Page, baseURL: string) {
+  async recoverMirrorAndCreatePublicLink(page: Page, baseURL: string) {
     await installFakeOpfs(page);
-    await page.addInitScript(() => {
-      Object.defineProperty(navigator, 'clipboard', {
-        configurable: true,
-        value: {
-          writeText: async () => {
-            await Promise.resolve();
-            throw new Error('Clipboard write denied by test browser');
-          },
-        },
-      });
-    });
 
     const mirrorRoute = await shareFailureMirrorRoute.install(page);
     const editor = new EditorAppPage(page, baseURL);
@@ -52,7 +41,8 @@ export const shareFailureRecoveryPage = {
     ).toBeVisible();
     await page.getByRole('button', { name: 'Share', exact: true }).click();
     await page.getByRole('button', { name: 'Copy link' }).click();
-    await expect(page.getByText('Share failed')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText('Clipboard write denied by test browser')).toBeVisible();
+    await expect(page.getByText('Copied')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByLabel('Published share links')).toContainText('Public URL');
+    await expect(page.getByText('Clipboard write denied by test browser')).toBeHidden();
   },
 };

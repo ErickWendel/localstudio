@@ -55,10 +55,11 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  color: #fff;
-  background: linear-gradient(135deg, #9b37ff, #7c3cff);
+  color: var(--ew-on-primary);
+  background: var(--ew-green);
   border: 0;
-  border-radius: 8px;
+  border-radius: 4px;
+  font-weight: 900;
   cursor: pointer;
 }
 
@@ -105,14 +106,17 @@
 .share-action-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px 8px;
+  gap: 12px;
 }
 
 .share-action-button {
   min-width: 0;
-  display: grid;
+  min-height: 76px;
+  display: inline-grid;
+  grid-template-rows: 40px minmax(28px, auto);
+  align-items: start;
   justify-items: center;
-  gap: 8px;
+  gap: 7px;
   color: #20242c;
   background: transparent;
   border: 0;
@@ -127,17 +131,18 @@
 }
 
 .share-action-icon {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: #363b45;
   background: #eef0f4;
-  border-radius: 999px;
+  border-radius: 4px;
+  font-size: 22px;
 }
 
 .share-action-button-accent .share-action-icon {
-  color: #fff;
-  background: #ff5f0a;
+  color: var(--ew-on-primary);
+  background: var(--ew-green);
 }

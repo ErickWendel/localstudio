@@ -359,12 +359,17 @@ describe('EditorShell export and share workflows', () => {
 
   it('creates and shows a public link from the share panel', async () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000301');
-    const writeText = vi.fn().mockResolvedValue(undefined);
+    const writeText = vi.fn();
+    const execCommand = vi.fn().mockReturnValue(true);
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: {
         writeText,
       },
+    });
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: execCommand,
     });
     const services = createAppServices();
     enableSyncedSharing(services);
@@ -381,7 +386,8 @@ describe('EditorShell export and share workflows', () => {
       'http://localhost:9000/localstudio/mirrors/public-shares/00000000-0000-4000-8000-000000000301/share.json',
     )}`;
     expect(await screen.findByDisplayValue(expectedPublicUrl)).toBeInTheDocument();
-    expect(writeText).toHaveBeenCalledWith(expectedPublicUrl);
+    expect(execCommand).toHaveBeenCalledWith('copy');
+    expect(writeText).not.toHaveBeenCalled();
   });
 
   it('enters fullscreen presentation mode from the share panel', async () => {

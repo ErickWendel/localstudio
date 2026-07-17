@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ShareMetadata } from '../../../../src/services/contracts/interfaces';
 import { SharePanel } from '../../../../src/ui/share/SharePanel';
 
@@ -18,6 +18,8 @@ function createShareMetadata(overrides: Partial<ShareMetadata> = {}): ShareMetad
 }
 
 describe('SharePanel', () => {
+  const execCommandDescriptor = Object.getOwnPropertyDescriptor(document, 'execCommand');
+
   beforeEach(() => {
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -25,6 +27,19 @@ describe('SharePanel', () => {
         writeText: vi.fn().mockResolvedValue(undefined),
       },
     });
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: vi.fn().mockReturnValue(true),
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    if (execCommandDescriptor) {
+      Object.defineProperty(document, 'execCommand', execCommandDescriptor);
+    } else {
+      Reflect.deleteProperty(document, 'execCommand');
+    }
   });
 
   it('shows the not shared state before publishing', () => {
@@ -104,6 +119,38 @@ describe('SharePanel', () => {
     expect(await screen.findByDisplayValue('https://localstudio.test/s/share-panel-id')).toBeInTheDocument();
     expect(screen.getByDisplayValue('<iframe src="https://localstudio.test/embed/share-panel-id"></iframe>')).toBeInTheDocument();
     expect(screen.getByText('Copied')).toBeInTheDocument();
+  });
+
+  it('copies embed code without the Clipboard permissions API', async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText,
+      },
+    });
+    const execCommand = vi.fn().mockReturnValue(true);
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: execCommand,
+    });
+
+    render(
+      <SharePanel
+        projectName="Untitled AI Deck"
+        share={createShareMetadata()}
+        onClose={vi.fn()}
+        onCopyLink={vi.fn()}
+        onDownload={vi.fn()}
+        onPresent={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Embed code' }));
+
+    expect(execCommand).toHaveBeenCalledWith('copy');
+    expect(writeText).not.toHaveBeenCalled();
   });
 
   it('shows an error when share publishing fails', async () => {
