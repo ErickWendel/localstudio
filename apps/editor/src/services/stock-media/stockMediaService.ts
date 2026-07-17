@@ -1,4 +1,5 @@
 import type {
+  DownloadedStockMedia,
   StockMediaConfig,
   StockMediaItem,
   StockMediaProviderState,
@@ -10,6 +11,10 @@ import { createApi } from 'unsplash-js';
 
 const CONFIG_STORAGE_KEY = 'localstudio.ai.stock-media-config';
 const DEFAULT_LIMIT = 30;
+
+function getDefaultFetch() {
+  return globalThis.fetch.bind(globalThis);
+}
 
 interface BrowserStockMediaServiceOptions {
   fetch?: typeof fetch;
@@ -72,6 +77,16 @@ function readString(value: unknown) {
 function readPositiveNumber(value: unknown, fallback: number) {
   const parsed = typeof value === 'number' ? value : Number.parseInt(readString(value), 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function getBlobMimeType(blob: Blob, fallback: string) {
+  return readString(blob.type) || fallback;
+}
+
+function getStockMediaFallbackMimeType(item: StockMediaItem, sourceUrl: string) {
+  if (item.kind === 'image') return 'image/jpeg';
+  if (sourceUrl === item.videoUrl) return 'video/mp4';
+  return 'image/gif';
 }
 
 function isSafeRemoteUrl(value: unknown): value is string {
@@ -156,7 +171,7 @@ export class BrowserStockMediaService implements StockMediaService {
   private readonly storage: BrowserKeyValueStorage | undefined;
 
   constructor(options: BrowserStockMediaServiceOptions = {}) {
-    this.requestFetch = options.fetch ?? fetch;
+    this.requestFetch = options.fetch ?? getDefaultFetch();
     this.storage = options.storage ?? browserStorage.getBrowserLocalStorage();
   }
 
@@ -219,6 +234,22 @@ export class BrowserStockMediaService implements StockMediaService {
         : giphy.trending({ limit: DEFAULT_LIMIT, rating: 'g' }),
     );
     return (payload.data ?? []).map(mapGiphyGif).filter((item): item is StockMediaItem => Boolean(item));
+  }
+
+  async downloadMedia(item: StockMediaItem, sourceUrl = item.mediaUrl): Promise<DownloadedStockMedia> {
+    if (!isSafeRemoteUrl(sourceUrl)) throw new Error('Stock media download URL is invalid.');
+
+    const response = await this.requestFetch(sourceUrl);
+    if (!response.ok) throw new Error('Stock media download failed.');
+
+    const blob = await response.blob();
+    const mimeType = getBlobMimeType(blob, getStockMediaFallbackMimeType(item, sourceUrl));
+    const objectUrlBlob = blob.type === mimeType ? blob : new Blob([blob], { type: mimeType });
+    return {
+      blob,
+      mimeType,
+      objectUrl: URL.createObjectURL(objectUrlBlob),
+    };
   }
 
   private async withConfiguredFetch<T>(operation: () => Promise<T>): Promise<T> {

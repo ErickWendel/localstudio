@@ -2,6 +2,7 @@ import { vi } from 'vitest';
 import type { ProjectDocument } from '../../../../src/domain/documents/model';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 import type {
+  DownloadedStockMedia,
   StockMediaConfig,
   StockMediaItem,
   StockMediaProviderState,
@@ -35,6 +36,7 @@ const stockGif: StockMediaItem = {
 };
 
 class ReadyStockMediaService implements StockMediaService {
+  downloadedItems: Array<{ item: StockMediaItem; sourceUrl: string }> = [];
   trackedItems: StockMediaItem[] = [];
 
   loadConfig(): StockMediaConfig {
@@ -62,6 +64,22 @@ class ReadyStockMediaService implements StockMediaService {
 
   searchGifs(): Promise<StockMediaItem[]> {
     return Promise.resolve([stockGif]);
+  }
+
+  downloadMedia(item: StockMediaItem, sourceUrl = item.mediaUrl): Promise<DownloadedStockMedia> {
+    this.downloadedItems.push({ item, sourceUrl });
+    return Promise.resolve({
+      blob: new Blob(['stock-media'], {
+        type: sourceUrl.endsWith('.mp4') ? 'video/mp4' : item.kind === 'gif' ? 'image/gif' : 'image/jpeg',
+      }),
+      mimeType: sourceUrl.endsWith('.mp4') ? 'video/mp4' : item.kind === 'gif' ? 'image/gif' : 'image/jpeg',
+      objectUrl:
+        sourceUrl === stockGif.videoUrl
+          ? 'blob:giphy-video'
+          : item.kind === 'gif'
+            ? 'blob:giphy-gif'
+            : 'blob:unsplash-image',
+    });
   }
 
   trackImageDownload(item: StockMediaItem): Promise<void> {
