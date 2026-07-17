@@ -54,6 +54,27 @@ class SavingProjectRepository implements ProjectRepository {
   }
 }
 
+class RetryingAutosaveProjectRepository extends SavingProjectRepository {
+  autosaveAttempts = 0;
+  private hasCompletedInitialSave = false;
+
+  constructor(private readonly failingAutosaveAttempts: number) {
+    super();
+  }
+
+  override saveProject(project: ProjectDocument): Promise<void> {
+    if (!this.hasCompletedInitialSave) {
+      this.hasCompletedInitialSave = true;
+      return super.saveProject(project);
+    }
+    this.autosaveAttempts += 1;
+    if (this.autosaveAttempts <= this.failingAutosaveAttempts) {
+      return Promise.reject(new Error('Autosave failed'));
+    }
+    return super.saveProject(project);
+  }
+}
+
 class VersionHistoryProjectRepository extends SavingProjectRepository {
   constructor(
     private readonly project: ProjectDocument,
@@ -259,6 +280,7 @@ export const editorShellPersistenceFixtures = {
   LoadingProjectRepository,
   RecordingMirrorService,
   RecordingShareService,
+  RetryingAutosaveProjectRepository,
   RejectingLoadProjectRepository,
   RejectingProjectRepository,
   RemoteMirrorImportingProjectRepository,

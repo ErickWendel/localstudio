@@ -121,6 +121,8 @@ const PROMPT_API_REQUIRED_MESSAGE = 'LLM model must be prepared before using pro
 const IMAGE_GENERATION_MODEL_REQUIRED_MESSAGE =
   'Download image generation models before creating images.';
 const IMAGE_PROMPT_MODE_REQUIRED_MESSAGE = 'Use Create image from the + menu to generate images.';
+const AUTOSAVE_RETRY_LIMIT = 5;
+const AUTOSAVE_RETRY_DELAY_MS = 1000;
 type TranslationScope = 'selection' | 'slide' | 'deck';
 
 const DECK_TRANSLATION_CONCURRENCY = 3;
@@ -188,9 +190,8 @@ export function useEditorViewModel(services: AppServices) {
   const [missingPowerPointFonts, setMissingPowerPointFonts] = useState<MissingPowerPointFont[]>(
     [],
   );
-  const [hasPersistedLocalProject, setHasPersistedLocalProject] = useState(
-    shouldRestoreStoredProject,
-  );
+  const [hasPersistedLocalProject, setHasPersistedLocalProject] = useState(false);
+  const hasPersistedLocalProjectRef = useRef(hasPersistedLocalProject);
   const [activePageId, setActivePageId] = useState(initialProject.pages[0]?.id ?? '');
   const [activePageFocusKey, setActivePageFocusKey] = useState(0);
   const activePageIdRef = useRef(activePageId);
@@ -273,6 +274,7 @@ export function useEditorViewModel(services: AppServices) {
   const [remoteImportOpen, setRemoteImportOpen] = useState(false);
   const [localProjectSetupOpen, setLocalProjectSetupOpen] = useState(false);
   const [persistenceAttention, setPersistenceAttention] = useState(false);
+  const [persistenceError, setPersistenceError] = useState(false);
   const { operationNotice, showOperationNotice } = useOperationNotice();
   const [isExportingPowerPoint, setIsExportingPowerPoint] = useState(false);
   const [remoteImportStatus, setRemoteImportStatus] = useState<RemoteImportStatus>('loading');
@@ -342,6 +344,7 @@ export function useEditorViewModel(services: AppServices) {
   projectRef.current = project;
   activePageIdRef.current = activePageId;
   selectedElementIdsRef.current = selectedElementIds;
+  hasPersistedLocalProjectRef.current = hasPersistedLocalProject;
   mirrorConfigRef.current = hasMirrorConfig ? mirrorConfig : null;
   queueMirrorSyncRef.current = queueMirrorSync;
   syncMirrorNowRef.current = (projectToSync) => {
@@ -350,7 +353,10 @@ export function useEditorViewModel(services: AppServices) {
   const wasFullscreenRef = useRef(false);
   const presenterPageIdRef = useRef<string | undefined>(undefined);
   const languageDetectionSequenceRef = useRef(0);
+  const initialRestorePendingRef = useRef(shouldRestoreStoredProject);
   const skipNextProjectSaveRef = useRef(shouldRestoreStoredProject);
+  const autosaveRunIdRef = useRef(0);
+  const autosaveRetryTimeoutRef = useRef<number | undefined>(undefined);
   const lastVersionProjectRef = useRef<ProjectDocument>(initialProject);
   const needsFreshPersistenceTargetRef = useRef(false);
   const selection = useMemo<SelectionState>(
@@ -505,14 +511,23 @@ export function useEditorViewModel(services: AppServices) {
           }
           editorViewModelProject.writeProjectNameToUrl(normalizedProject.name);
           setHasPersistedLocalProject(true);
+          setPersistenceError(false);
           if (storedMirrorConfig && shouldEnableStoredMirror) {
             syncMirrorNowRef.current(normalizedProject);
           }
+        } else if (initialRestorePendingRef.current) {
+          setHasPersistedLocalProject(false);
+          setPersistenceEnabled(false);
+          if (typeof window !== 'undefined') {
+            editorPreferences.writePersistencePreference(false);
+          }
         }
+        initialRestorePendingRef.current = false;
         setHasLoadedProject(true);
       })
       .catch(() => {
         if (!isMounted) return;
+        initialRestorePendingRef.current = false;
         setPersistenceEnabled(false);
         setHasLoadedProject(true);
         if (typeof window !== 'undefined') {
@@ -538,39 +553,66 @@ export function useEditorViewModel(services: AppServices) {
       skipNextProjectSaveRef.current = false;
       return;
     }
-    void services.projectRepository
-      .saveProject(project)
-      .then(async () => {
-        setHasPersistedLocalProject(true);
-        setLastEditedAt(project.updatedAt);
-        setSaveAnimationKey((current) => current + 1);
-        if (!services.projectRepository.saveVersion) return;
-        const entry = await services.projectRepository.saveVersion(project, {
-          previousProject: lastVersionProjectRef.current,
-        });
-        lastVersionProjectRef.current = project;
-        setLastEditedAt(entry.createdAt);
-        setVersionHistoryEntries((current) => [
-          entry,
-          ...current.filter((item) => item.id !== entry.id),
-        ]);
-      })
-      .then(() => {
-        queueMirrorSyncRef.current();
-        editorViewModelProject.writeProjectNameToUrl(project.name);
-      })
-      .catch(() => {
-        setPersistenceEnabled(false);
-        if (typeof window !== 'undefined') {
-          editorPreferences.writePersistencePreference(false);
-        }
+    if (autosaveRetryTimeoutRef.current !== undefined) {
+      window.clearTimeout(autosaveRetryTimeoutRef.current);
+      autosaveRetryTimeoutRef.current = undefined;
+    }
+    const autosaveRunId = autosaveRunIdRef.current + 1;
+    autosaveRunIdRef.current = autosaveRunId;
+
+    async function saveProjectWithVersion(projectToSave: ProjectDocument) {
+      await services.projectRepository.saveProject(projectToSave);
+      setHasPersistedLocalProject(true);
+      setLastEditedAt(projectToSave.updatedAt);
+      setSaveAnimationKey((current) => current + 1);
+      if (!services.projectRepository.saveVersion) return;
+      const entry = await services.projectRepository.saveVersion(projectToSave, {
+        previousProject: lastVersionProjectRef.current,
       });
+      lastVersionProjectRef.current = projectToSave;
+      setLastEditedAt(entry.createdAt);
+      setVersionHistoryEntries((current) => [
+        entry,
+        ...current.filter((item) => item.id !== entry.id),
+      ]);
+    }
+
+    function retryAutosave(projectToSave: ProjectDocument, attempt: number) {
+      void saveProjectWithVersion(projectToSave)
+        .then(() => {
+          if (autosaveRunIdRef.current !== autosaveRunId) return;
+          setPersistenceError(false);
+          setPersistenceAttention(false);
+          queueMirrorSyncRef.current();
+          editorViewModelProject.writeProjectNameToUrl(projectToSave.name);
+        })
+        .catch(() => {
+          if (autosaveRunIdRef.current !== autosaveRunId) return;
+          if (attempt < AUTOSAVE_RETRY_LIMIT) {
+            autosaveRetryTimeoutRef.current = window.setTimeout(() => {
+              retryAutosave(projectToSave, attempt + 1);
+            }, AUTOSAVE_RETRY_DELAY_MS);
+            return;
+          }
+          setPersistenceEnabled(false);
+          setPersistenceAttention(false);
+          setPersistenceError(true);
+          if (typeof window !== 'undefined') {
+            editorPreferences.writePersistencePreference(false);
+          }
+        });
+    }
+
+    retryAutosave(project, 1);
   }, [hasLoadedProject, persistenceEnabled, project, services.projectRepository]);
 
   useEffect(() => {
     return () => {
       if (mirrorDebounceRef.current !== undefined) {
         window.clearTimeout(mirrorDebounceRef.current);
+      }
+      if (autosaveRetryTimeoutRef.current !== undefined) {
+        window.clearTimeout(autosaveRetryTimeoutRef.current);
       }
     };
   }, []);
@@ -1239,9 +1281,15 @@ export function useEditorViewModel(services: AppServices) {
 
   function setPersistence(nextEnabled: boolean) {
     if (!nextEnabled) {
+      autosaveRunIdRef.current += 1;
+      if (autosaveRetryTimeoutRef.current !== undefined) {
+        window.clearTimeout(autosaveRetryTimeoutRef.current);
+        autosaveRetryTimeoutRef.current = undefined;
+      }
       setPersistenceEnabled(false);
       setLocalProjectSetupOpen(false);
       setPersistenceAttention(false);
+      setPersistenceError(false);
       showOperationNotice(undefined);
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(false);
@@ -1249,7 +1297,7 @@ export function useEditorViewModel(services: AppServices) {
       return true;
     }
 
-    if (hasPersistedLocalProject) {
+    if (hasPersistedLocalProjectRef.current) {
       return reenablePersistence();
     }
 
@@ -1279,6 +1327,7 @@ export function useEditorViewModel(services: AppServices) {
       skipNextProjectSaveRef.current = true;
       setPersistenceEnabled(true);
       setPersistenceAttention(false);
+      setPersistenceError(false);
       showOperationNotice(undefined);
       setLocalProjectSetupOpen(false);
       editorViewModelProject.writeProjectNameToUrl(projectToSave.name);
@@ -1288,6 +1337,7 @@ export function useEditorViewModel(services: AppServices) {
       return true;
     } catch {
       setPersistenceEnabled(false);
+      setPersistenceError(true);
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(false);
       }
@@ -1321,9 +1371,11 @@ export function useEditorViewModel(services: AppServices) {
     }
     try {
       await persistCurrentProject();
+      setPersistenceError(false);
       editorViewModelProject.writeProjectNameToUrl(projectRef.current.name);
     } catch {
       setPersistenceEnabled(false);
+      setPersistenceError(true);
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(false);
       }
@@ -1347,6 +1399,7 @@ export function useEditorViewModel(services: AppServices) {
       setHasPersistedLocalProject(true);
       setPersistenceEnabled(true);
       setPersistenceAttention(false);
+      setPersistenceError(false);
       showOperationNotice(undefined);
       setLocalProjectSetupOpen(false);
       setLastEditedAt(projectToSave.updatedAt);
@@ -1358,6 +1411,7 @@ export function useEditorViewModel(services: AppServices) {
       }
     } catch {
       setPersistenceEnabled(false);
+      setPersistenceError(true);
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(false);
       }
@@ -1393,6 +1447,7 @@ export function useEditorViewModel(services: AppServices) {
       setHasPersistedLocalProject(true);
       setPersistenceEnabled(true);
       setPersistenceAttention(false);
+      setPersistenceError(false);
       showOperationNotice(undefined);
       setLocalProjectSetupOpen(false);
       editorViewModelProject.writeProjectNameToUrl(nextProject.name);
@@ -1402,6 +1457,7 @@ export function useEditorViewModel(services: AppServices) {
       return true;
     } catch {
       setPersistenceEnabled(false);
+      setPersistenceError(true);
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(false);
       }
@@ -1426,6 +1482,7 @@ export function useEditorViewModel(services: AppServices) {
       skipNextProjectSaveRef.current = true;
       setHasPersistedLocalProject(true);
       setPersistenceEnabled(true);
+      setPersistenceError(false);
       lastVersionProjectRef.current = normalizedProject;
       needsFreshPersistenceTargetRef.current = false;
       setLastEditedAt(normalizedProject.updatedAt);
@@ -1441,6 +1498,7 @@ export function useEditorViewModel(services: AppServices) {
       }
     } catch {
       setPersistenceEnabled(false);
+      setPersistenceError(true);
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(false);
       }
@@ -1553,6 +1611,7 @@ export function useEditorViewModel(services: AppServices) {
       skipNextProjectSaveRef.current = true;
       setHasPersistedLocalProject(false);
       setPersistenceEnabled(false);
+      setPersistenceError(false);
       lastVersionProjectRef.current = normalizedProject;
       needsFreshPersistenceTargetRef.current = true;
       setLastEditedAt(normalizedProject.updatedAt);
@@ -1963,6 +2022,7 @@ export function useEditorViewModel(services: AppServices) {
       skipNextProjectSaveRef.current = true;
       setHasPersistedLocalProject(true);
       setPersistenceEnabled(true);
+      setPersistenceError(false);
       lastVersionProjectRef.current = normalizedProject;
       needsFreshPersistenceTargetRef.current = false;
       setLastEditedAt(normalizedProject.updatedAt);
@@ -3074,6 +3134,7 @@ export function useEditorViewModel(services: AppServices) {
     missingPowerPointFonts,
     mediaImportProgress,
     persistenceAttention,
+    persistenceError,
     operationNotice,
     isExportingPowerPoint,
     mirrorState,

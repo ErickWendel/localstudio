@@ -4,6 +4,7 @@ interface ToolbarPersistenceButtonProps {
   persistenceAttention: boolean;
   persistenceAvailable: boolean;
   persistenceEnabled: boolean;
+  persistenceError: boolean;
   persistenceMode: PersistenceStorageMode;
   onPersistenceToggle: ((enabled: boolean) => void) | undefined;
 }
@@ -12,6 +13,7 @@ export function ToolbarPersistenceButton({
   persistenceAttention,
   persistenceAvailable,
   persistenceEnabled,
+  persistenceError,
   persistenceMode,
   onPersistenceToggle,
 }: ToolbarPersistenceButtonProps) {
@@ -26,6 +28,8 @@ export function ToolbarPersistenceButton({
         : 'Persistence disabled';
   const persistenceTitle = !persistenceAvailable
     ? 'Local project persistence is not available in this browser.'
+    : persistenceError
+      ? 'Autosave failed after 5 attempts. Re-enable persistence to continue saving locally.'
     : persistenceMode === 'opfs'
       ? persistenceEnabled
         ? 'Browser-private project storage is enabled. Files are stored by this browser profile and are not visible in Finder.'
@@ -35,6 +39,8 @@ export function ToolbarPersistenceButton({
         : 'Save this deck to a local folder';
   const className = !persistenceAvailable
     ? 'stitch-icon-button persistence-off persistence-unavailable'
+    : persistenceError
+      ? `stitch-icon-button ${persistenceEnabled ? 'persistence-on' : 'persistence-off'} persistence-error`
     : persistenceEnabled
       ? 'stitch-icon-button persistence-on'
       : persistenceAttention

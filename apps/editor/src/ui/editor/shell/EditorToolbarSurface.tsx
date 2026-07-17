@@ -57,6 +57,7 @@ export function EditorToolbarSurface({
       mirrorState={vm.mirrorState}
       mirrorDisabledBySettings={vm.mirrorDisabledBySettings}
       persistenceAttention={vm.persistenceAttention}
+      persistenceError={vm.persistenceError}
       operationNotice={imageExportNotice ?? vm.operationNotice}
       localProjectSetupPanel={
         vm.localProjectSetupOpen ? (
