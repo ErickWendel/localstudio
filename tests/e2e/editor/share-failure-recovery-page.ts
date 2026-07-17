@@ -26,7 +26,9 @@ export const shareFailureRecoveryPage = {
       .getByRole('button', { name: 'Mirror settings' })
       .click();
     await page.getByRole('button', { name: 'Enable mirroring' }).click();
-    await expect(page.getByText(/Could not list MinIO mirrors \(503\)/)).toBeVisible();
+    await expect(
+      page.getByText(/Could not (?:list MinIO mirrors|read MinIO mirror manifest) \(503\)/),
+    ).toBeVisible();
 
     mirrorRoute.recoverConnection();
     await page.getByRole('button', { name: 'Test connection' }).click();

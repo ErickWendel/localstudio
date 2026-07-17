@@ -46,13 +46,15 @@ test.describe('editor local persistence journey', () => {
     const editor = new EditorAppPage(page, getServer().baseURL);
     await editor.gotoNewProject();
 
-    await page.getByRole('button', { name: 'Persistence disabled' }).click();
+    await page.getByRole('button', { name: 'Persistence disabled' }).focus();
+    await page.keyboard.press('Enter');
     const setupPanel = page.getByRole('dialog', { name: 'Save local project' });
     await expect(setupPanel).toBeVisible();
     await setupPanel.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(setupPanel).toBeHidden();
 
-    await page.getByRole('button', { name: 'Persistence disabled' }).click();
+    await page.getByRole('button', { name: 'Persistence disabled' }).focus();
+    await page.keyboard.press('Enter');
     await setupPanel.getByLabel('Project folder name').fill('');
     await expect(setupPanel.getByRole('button', { name: 'Choose folder' })).toBeDisabled();
     await setupPanel.getByLabel('Project folder name').fill('E2E Folder Deck');
