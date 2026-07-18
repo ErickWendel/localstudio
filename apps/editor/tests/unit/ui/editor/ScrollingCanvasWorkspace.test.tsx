@@ -179,6 +179,7 @@ describe('ScrollingCanvasWorkspace', () => {
     );
     expect(onTranslateSelectedText).toHaveBeenCalledTimes(1);
 
+    await user.click(screen.getByRole('button', { name: 'Text alignment menu' }));
     await user.click(screen.getByRole('button', { name: 'Align text left' }));
     expect(onUpdateElementStyle).toHaveBeenCalledWith('text-subtitle', { align: 'left' });
 

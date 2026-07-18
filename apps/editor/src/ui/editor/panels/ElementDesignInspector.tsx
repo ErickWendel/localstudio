@@ -254,8 +254,12 @@ export function ElementDesignInspector({
                 <option value="" disabled>
                   Align
                 </option>
+                <option value="horizontal-left">Left</option>
                 <option value="horizontal-center">Horizontal center</option>
+                <option value="horizontal-right">Right</option>
+                <option value="vertical-top">Top</option>
                 <option value="vertical-center">Vertical center</option>
+                <option value="vertical-bottom">Bottom</option>
                 <option value="page-center">Page center</option>
               </select>
               <button type="button" disabled>

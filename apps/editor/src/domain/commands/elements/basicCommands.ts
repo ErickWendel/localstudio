@@ -26,7 +26,14 @@ const elementAnimationCommandConstructors = {
   SetElementAnimationBuildsCommand: elementAnimationCommands.SetElementAnimationBuildsCommand,
 };
 
-export type AlignMode = 'horizontal-center' | 'vertical-center' | 'page-center';
+export type AlignMode =
+  | 'horizontal-left'
+  | 'horizontal-center'
+  | 'horizontal-right'
+  | 'vertical-top'
+  | 'vertical-center'
+  | 'vertical-bottom'
+  | 'page-center';
 export type ZOrderMode = 'front' | 'back' | 'forward' | 'backward';
 export type ElementFramePatch = Partial<
   Pick<BaseElement, 'height' | 'rotation' | 'width' | 'x' | 'y'>
@@ -65,6 +72,8 @@ export type ElementStylePatch = Partial<{
   strokeWidth: number;
   startEndpoint: ShapeElement['startEndpoint'];
   endEndpoint: ShapeElement['endEndpoint'];
+  textColorRange: { start: number; end: number };
+  verticalAlign: 'bottom' | 'middle' | 'top';
 }>;
 export type ElementAnimationPatch = Omit<ElementAnimationBuild, 'elementId' | 'id'>;
 

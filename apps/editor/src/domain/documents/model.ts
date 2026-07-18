@@ -222,9 +222,16 @@ export interface TextElement extends BaseElement {
   fontWeight: number;
   fill: string;
   align: 'left' | 'center' | 'right';
+  colorRanges?: TextColorRange[];
   hyperlink?: string;
   lineHeight?: number;
   verticalAlign?: 'bottom' | 'middle' | 'top';
+}
+
+export interface TextColorRange {
+  start: number;
+  end: number;
+  fill: string;
 }
 
 export interface ImageElement extends BaseElement {

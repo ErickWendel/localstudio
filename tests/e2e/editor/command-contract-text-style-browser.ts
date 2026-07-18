@@ -2,10 +2,20 @@
 import { type ProjectDocument } from '../../../apps/editor/src/domain/documents/model';
 
 export type CommandContractTextStyleResult = {
+  bottomY: number | undefined;
   elementCount: number;
+  rightX: number | undefined;
   shapeStroke: string | undefined;
   text: string | undefined;
+  textColorRanges:
+    | Array<{
+        end: number;
+        fill: string;
+        start: number;
+      }>
+    | undefined;
   textFontSize: number | undefined;
+  textVerticalAlign: string | undefined;
 };
 
 export async function evaluateCommandContractTextStyle(
@@ -28,6 +38,19 @@ export async function evaluateCommandContractTextStyle(
       fontSize: 52,
       fontWeight: 700,
       opacity: 0.75,
+      verticalAlign: 'middle',
+    }),
+  );
+  run(
+    new basicCommands.UpdateElementStyleCommand('text-1', {
+      fill: '#ff0000',
+      textColorRange: { start: 0, end: 4 },
+    }),
+  );
+  run(
+    new basicCommands.UpdateElementStyleCommand('text-1', {
+      fill: '#00ff00',
+      textColorRange: { start: 2, end: 7 },
     }),
   );
   run(
@@ -39,6 +62,8 @@ export async function evaluateCommandContractTextStyle(
       strokeWidth: 6,
     }),
   );
+  run(new basicCommands.AlignElementCommand('page-1', 'shape-1', 'horizontal-right'));
+  run(new basicCommands.AlignElementCommand('page-1', 'image-1', 'vertical-bottom'));
   run(new basicCommands.TranslateTextElementsCommand({ 'text-1': { fontSize: 46, text: 'Traduzido' } }));
 
   if (project.elements['text-1']?.text !== 'Traduzido') throw new Error('text should be translated');
@@ -47,9 +72,19 @@ export async function evaluateCommandContractTextStyle(
   }
 
   return {
+    bottomY: project.elements['image-1']?.y,
     elementCount: Object.keys(project.elements).length,
+    rightX: project.elements['shape-1']?.x,
     shapeStroke: project.elements['shape-1']?.stroke,
     text: project.elements['text-1']?.text,
+    textColorRanges:
+      project.elements['text-1']?.type === 'text'
+        ? project.elements['text-1'].colorRanges
+        : undefined,
     textFontSize: project.elements['text-1']?.fontSize,
+    textVerticalAlign:
+      project.elements['text-1']?.type === 'text'
+        ? project.elements['text-1'].verticalAlign
+        : undefined,
   };
 }

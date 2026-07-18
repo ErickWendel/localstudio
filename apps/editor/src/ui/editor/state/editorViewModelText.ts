@@ -1,6 +1,6 @@
 import { basicCommands } from '../../../domain/commands/elements/basicCommands';
 import type { ElementFramePatch, ElementStylePatch } from '../../../domain/commands/elements/basicCommands';
-import type { ProjectDocument, ProjectFont } from '../../../domain/documents/model';
+import type { DesignElement, ProjectDocument, ProjectFont } from '../../../domain/documents/model';
 import { textTranslationLayout } from './text-translation-layout';
 
 function getFramePatchWithTextMinimum(
@@ -59,6 +59,60 @@ function updateElementStyle(
   return ensureTextElementMinimumHeight(nextProject, elementId);
 }
 
+function hasPatchValue(patch: ElementStylePatch) {
+  return Object.keys(patch).length > 0;
+}
+
+function getSupportedStylePatch(input: {
+  element: DesignElement | undefined;
+  patch: ElementStylePatch;
+  textSelection?: { start: number; end: number } | undefined;
+}) {
+  if (!input.element || input.element.locked) return undefined;
+  const sharedPatch: ElementStylePatch = {
+    ...(input.patch.opacity !== undefined ? { opacity: input.patch.opacity } : {}),
+  };
+
+  if (input.element.type === 'text') {
+    const textSelection =
+      input.textSelection && input.textSelection.start < input.textSelection.end
+        ? input.textSelection
+        : undefined;
+    const textPatch: ElementStylePatch = {
+      ...sharedPatch,
+      ...(input.patch.align !== undefined ? { align: input.patch.align } : {}),
+      ...(input.patch.fill !== undefined ? { fill: input.patch.fill } : {}),
+      ...(input.patch.fontFamily !== undefined ? { fontFamily: input.patch.fontFamily } : {}),
+      ...(input.patch.fontSize !== undefined ? { fontSize: input.patch.fontSize } : {}),
+      ...(input.patch.fontWeight !== undefined ? { fontWeight: input.patch.fontWeight } : {}),
+      ...(input.patch.hyperlink !== undefined ? { hyperlink: input.patch.hyperlink } : {}),
+      ...(input.patch.verticalAlign !== undefined
+        ? { verticalAlign: input.patch.verticalAlign }
+        : {}),
+      ...(textSelection && typeof input.patch.fill === 'string'
+        ? { textColorRange: textSelection }
+        : {}),
+    };
+    return hasPatchValue(textPatch) ? textPatch : undefined;
+  }
+
+  if (input.element.type === 'shape') {
+    const shapePatch: ElementStylePatch = {
+      ...sharedPatch,
+      ...(input.patch.fill !== undefined ? { fill: input.patch.fill } : {}),
+      ...(input.patch.stroke !== undefined ? { stroke: input.patch.stroke } : {}),
+      ...(input.patch.strokeWidth !== undefined ? { strokeWidth: input.patch.strokeWidth } : {}),
+      ...(input.patch.startEndpoint !== undefined
+        ? { startEndpoint: input.patch.startEndpoint }
+        : {}),
+      ...(input.patch.endEndpoint !== undefined ? { endEndpoint: input.patch.endEndpoint } : {}),
+    };
+    return hasPatchValue(shapePatch) ? shapePatch : undefined;
+  }
+
+  return hasPatchValue(sharedPatch) ? sharedPatch : undefined;
+}
+
 function applyFontFamilyWithFonts(input: {
   elementId: string;
   font: ProjectFont;
@@ -81,6 +135,7 @@ function applyFontFamilyWithFonts(input: {
 export const editorViewModelText = {
   applyFontFamilyWithFonts,
   ensureTextElementMinimumHeight,
+  getSupportedStylePatch,
   getFramePatchWithTextMinimum,
   updateElementStyle,
   updateTextContent,

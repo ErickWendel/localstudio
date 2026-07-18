@@ -63,15 +63,17 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
     const programmaticScrollRef = useRef(false);
     const scrollerRef = useRef<HTMLDivElement>(null);
     const selectedElement = project.elements[canvasProps.selection.elementIds[0] ?? ''];
+    const selectedTextElements = canvasProps.selection.elementIds
+      .map((elementId) => project.elements[elementId])
+      .filter((element) => element?.type === 'text');
     const showTextToolbar =
       !canvasProps.presentationMode &&
       selectedElement?.type === 'text' &&
-      canvasProps.selection.elementIds.length === 1;
+      selectedTextElements.length === canvasProps.selection.elementIds.length;
     const textToolbarDisabled =
       Boolean(canvasProps.isTranslating) ||
-      Boolean(
-        selectedElement?.type === 'text' &&
-        canvasProps.processingElementIds?.includes(selectedElement.id),
+      selectedTextElements.some((element) =>
+        canvasProps.processingElementIds?.includes(element.id),
       );
     const showPageControls = !canvasProps.presentationMode;
     const activePageIndex = project.pages.findIndex((page) => page.id === activePageId);
@@ -139,6 +141,7 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
           <div className="scrolling-text-toolbar-shell" data-testid="sticky-text-selection-toolbar">
             <TextSelectionToolbar
               element={selectedElement}
+              activeTextSelection={canvasProps.activeTextSelection}
               canTranslateSelection={Boolean(canvasProps.canTranslateSelection)}
               disabled={textToolbarDisabled}
               {...(canvasProps.onOpenAnimations

@@ -280,6 +280,38 @@ export function TextStyleInspector({
               </button>
             );
           })}
+          {([
+            { align: 'top' as const, icon: 'vertical_align_top', label: 'Align selected text top' },
+            {
+              align: 'middle' as const,
+              icon: 'vertical_align_center',
+              label: 'Align selected text middle',
+            },
+            {
+              align: 'bottom' as const,
+              icon: 'vertical_align_bottom',
+              label: 'Align selected text bottom',
+            },
+          ]).map((item) => (
+            <button
+              aria-label={item.label}
+              aria-pressed={(element.verticalAlign ?? 'top') === item.align}
+              className={
+                (element.verticalAlign ?? 'top') === item.align
+                  ? 'text-align-button active'
+                  : 'text-align-button'
+              }
+              key={item.align}
+              type="button"
+              onClick={() => {
+                onUpdateStyle({ verticalAlign: item.align });
+              }}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">
+                {item.icon}
+              </span>
+            </button>
+          ))}
         </div>
       </div>
     </section>

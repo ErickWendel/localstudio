@@ -47,10 +47,17 @@ test.describe('editor element command contracts', () => {
     );
 
     expect(result).toEqual({
+      bottomY: 840,
       elementCount: 4,
+      rightX: 1620,
       shapeStroke: '#ff00aa',
       text: 'Traduzido',
+      textColorRanges: [
+        { end: 2, fill: '#ff0000', start: 0 },
+        { end: 7, fill: '#00ff00', start: 2 },
+      ],
       textFontSize: 46,
+      textVerticalAlign: 'middle',
     });
   });
 });
