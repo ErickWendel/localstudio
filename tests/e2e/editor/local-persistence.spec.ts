@@ -55,10 +55,17 @@ test.describe('editor local persistence journey', () => {
 
     await page.getByRole('button', { name: 'Persistence disabled' }).focus();
     await page.keyboard.press('Enter');
-    await setupPanel.getByLabel('Project folder name').fill('');
+    await expect(setupPanel).toBeVisible();
+    await setupPanel.getByLabel('Project folder name').press('Escape');
+    await expect(setupPanel).toBeHidden();
+
+    await page.getByRole('button', { name: 'Persistence disabled' }).focus();
+    await page.keyboard.press('Enter');
+    const projectFolderNameInput = setupPanel.getByLabel('Project folder name');
+    await projectFolderNameInput.fill('');
     await expect(setupPanel.getByRole('button', { name: 'Choose folder' })).toBeDisabled();
-    await setupPanel.getByLabel('Project folder name').fill('E2E Folder Deck');
-    await setupPanel.getByRole('button', { name: 'Choose folder' }).click();
+    await projectFolderNameInput.fill('E2E Folder Deck');
+    await projectFolderNameInput.press('Enter');
 
     await expect(page.getByRole('button', { name: 'Persistence enabled' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Edit project name E2E Folder Deck' })).toBeVisible();
