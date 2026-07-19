@@ -109,9 +109,36 @@ const initialStates: ModelState[] = [
     required: false,
   },
   {
+    id: aiModelCatalog.TRANSCRIPTION_BALANCED_MODEL_ID,
+    label: aiModelCatalog.TRANSCRIPTION_BALANCED_DISPLAY_NAME,
+    description: 'Browser-local balanced ASR preset for higher-quality presenter recordings.',
+    provider: 'transformers',
+    status: 'needs-download',
+    progress: 0,
+    required: false,
+  },
+  {
+    id: aiModelCatalog.TRANSCRIPTION_EXPERIMENTAL_MODEL_ID,
+    label: aiModelCatalog.TRANSCRIPTION_EXPERIMENTAL_DISPLAY_NAME,
+    description: 'Experimental browser-local ASR preset with a larger download footprint.',
+    provider: 'transformers',
+    status: 'needs-download',
+    progress: 0,
+    required: false,
+  },
+  {
     id: aiModelCatalog.TRANSCRIPT_EMBEDDINGS_MODEL_ID,
     label: aiModelCatalog.TRANSCRIPT_EMBEDDINGS_DISPLAY_NAME,
     description: 'Browser-local transcript embeddings for public Q&A.',
+    provider: 'transformers',
+    status: 'needs-download',
+    progress: 0,
+    required: false,
+  },
+  {
+    id: aiModelCatalog.TRANSCRIPT_EMBEDDINGS_FAST_MODEL_ID,
+    label: aiModelCatalog.TRANSCRIPT_EMBEDDINGS_FAST_DISPLAY_NAME,
+    description: 'Optional faster transcript embeddings preset for public Q&A.',
     provider: 'transformers',
     status: 'needs-download',
     progress: 0,
@@ -142,8 +169,14 @@ function getReadyKey(id: string) {
     return aiModelCatalog.LANGUAGE_DETECTION_READY_KEY;
   if (id === aiModelCatalog.TRANSCRIPTION_LOW_LATENCY_MODEL_ID)
     return aiModelCatalog.TRANSCRIPTION_LOW_LATENCY_READY_KEY;
+  if (id === aiModelCatalog.TRANSCRIPTION_BALANCED_MODEL_ID)
+    return aiModelCatalog.TRANSCRIPTION_BALANCED_READY_KEY;
+  if (id === aiModelCatalog.TRANSCRIPTION_EXPERIMENTAL_MODEL_ID)
+    return aiModelCatalog.TRANSCRIPTION_EXPERIMENTAL_READY_KEY;
   if (id === aiModelCatalog.TRANSCRIPT_EMBEDDINGS_MODEL_ID)
     return aiModelCatalog.TRANSCRIPT_EMBEDDINGS_READY_KEY;
+  if (id === aiModelCatalog.TRANSCRIPT_EMBEDDINGS_FAST_MODEL_ID)
+    return aiModelCatalog.TRANSCRIPT_EMBEDDINGS_FAST_READY_KEY;
   if (id === aiModelCatalog.TRANSCRIPT_QA_MODEL_ID) return aiModelCatalog.TRANSCRIPT_QA_READY_KEY;
   return undefined;
 }
@@ -255,8 +288,14 @@ class BrowserModelSetupService implements ModelSetupService {
       storage?.getItem(aiModelCatalog.LANGUAGE_DETECTION_READY_KEY) === 'true';
     const transcriptionReady =
       storage?.getItem(aiModelCatalog.TRANSCRIPTION_LOW_LATENCY_READY_KEY) === 'true';
+    const transcriptionBalancedReady =
+      storage?.getItem(aiModelCatalog.TRANSCRIPTION_BALANCED_READY_KEY) === 'true';
+    const transcriptionExperimentalReady =
+      storage?.getItem(aiModelCatalog.TRANSCRIPTION_EXPERIMENTAL_READY_KEY) === 'true';
     const transcriptEmbeddingsReady =
       storage?.getItem(aiModelCatalog.TRANSCRIPT_EMBEDDINGS_READY_KEY) === 'true';
+    const transcriptEmbeddingsFastReady =
+      storage?.getItem(aiModelCatalog.TRANSCRIPT_EMBEDDINGS_FAST_READY_KEY) === 'true';
     const transcriptQaReady = storage?.getItem(aiModelCatalog.TRANSCRIPT_QA_READY_KEY) === 'true';
     this.states = initialStates.map((state) =>
       state.id === aiModelCatalog.GEMMA_LLM_MODEL_ID && gemmaLlmReady
@@ -273,12 +312,22 @@ class BrowserModelSetupService implements ModelSetupService {
                 : state.id === aiModelCatalog.TRANSCRIPTION_LOW_LATENCY_MODEL_ID &&
                     transcriptionReady
                   ? { ...state, status: 'ready', progress: 100 }
-                  : state.id === aiModelCatalog.TRANSCRIPT_EMBEDDINGS_MODEL_ID &&
-                      transcriptEmbeddingsReady
+                  : state.id === aiModelCatalog.TRANSCRIPTION_BALANCED_MODEL_ID &&
+                      transcriptionBalancedReady
                     ? { ...state, status: 'ready', progress: 100 }
-                    : state.id === aiModelCatalog.TRANSCRIPT_QA_MODEL_ID && transcriptQaReady
+                    : state.id === aiModelCatalog.TRANSCRIPTION_EXPERIMENTAL_MODEL_ID &&
+                        transcriptionExperimentalReady
                       ? { ...state, status: 'ready', progress: 100 }
-                      : { ...state },
+                      : state.id === aiModelCatalog.TRANSCRIPT_EMBEDDINGS_MODEL_ID &&
+                          transcriptEmbeddingsReady
+                        ? { ...state, status: 'ready', progress: 100 }
+                        : state.id === aiModelCatalog.TRANSCRIPT_EMBEDDINGS_FAST_MODEL_ID &&
+                            transcriptEmbeddingsFastReady
+                          ? { ...state, status: 'ready', progress: 100 }
+                          : state.id === aiModelCatalog.TRANSCRIPT_QA_MODEL_ID &&
+                              transcriptQaReady
+                            ? { ...state, status: 'ready', progress: 100 }
+                            : { ...state },
     );
   }
 
@@ -370,12 +419,33 @@ class BrowserModelSetupService implements ModelSetupService {
         );
         this.storage?.setItem(aiModelCatalog.TRANSCRIPTION_LOW_LATENCY_READY_KEY, 'true');
       }
+      if (id === aiModelCatalog.TRANSCRIPTION_BALANCED_MODEL_ID) {
+        await new TranscriptionRuntimeClient().preload(
+          transcriptionModelCatalog.getTranscriptionPreset('balanced-en'),
+          { onProgress: reportProgress },
+        );
+        this.storage?.setItem(aiModelCatalog.TRANSCRIPTION_BALANCED_READY_KEY, 'true');
+      }
+      if (id === aiModelCatalog.TRANSCRIPTION_EXPERIMENTAL_MODEL_ID) {
+        await new TranscriptionRuntimeClient().preload(
+          transcriptionModelCatalog.getTranscriptionPreset('experimental-live'),
+          { onProgress: reportProgress },
+        );
+        this.storage?.setItem(aiModelCatalog.TRANSCRIPTION_EXPERIMENTAL_READY_KEY, 'true');
+      }
       if (id === aiModelCatalog.TRANSCRIPT_EMBEDDINGS_MODEL_ID) {
         await new TranscriptEmbeddingRuntimeClient().preload(
           transcriptionModelCatalog.getEmbeddingPreset('default-minilm'),
           { onProgress: reportProgress },
         );
         this.storage?.setItem(aiModelCatalog.TRANSCRIPT_EMBEDDINGS_READY_KEY, 'true');
+      }
+      if (id === aiModelCatalog.TRANSCRIPT_EMBEDDINGS_FAST_MODEL_ID) {
+        await new TranscriptEmbeddingRuntimeClient().preload(
+          transcriptionModelCatalog.getEmbeddingPreset('fast-webgpu'),
+          { onProgress: reportProgress },
+        );
+        this.storage?.setItem(aiModelCatalog.TRANSCRIPT_EMBEDDINGS_FAST_READY_KEY, 'true');
       }
       if (id === aiModelCatalog.TRANSCRIPT_QA_MODEL_ID) {
         await this.textGenerationModelLoader.loadTextGenerationModel(
@@ -403,8 +473,14 @@ class BrowserModelSetupService implements ModelSetupService {
         this.storage?.setItem(aiModelCatalog.LANGUAGE_DETECTION_READY_KEY, 'false');
       if (id === aiModelCatalog.TRANSCRIPTION_LOW_LATENCY_MODEL_ID)
         this.storage?.setItem(aiModelCatalog.TRANSCRIPTION_LOW_LATENCY_READY_KEY, 'false');
+      if (id === aiModelCatalog.TRANSCRIPTION_BALANCED_MODEL_ID)
+        this.storage?.setItem(aiModelCatalog.TRANSCRIPTION_BALANCED_READY_KEY, 'false');
+      if (id === aiModelCatalog.TRANSCRIPTION_EXPERIMENTAL_MODEL_ID)
+        this.storage?.setItem(aiModelCatalog.TRANSCRIPTION_EXPERIMENTAL_READY_KEY, 'false');
       if (id === aiModelCatalog.TRANSCRIPT_EMBEDDINGS_MODEL_ID)
         this.storage?.setItem(aiModelCatalog.TRANSCRIPT_EMBEDDINGS_READY_KEY, 'false');
+      if (id === aiModelCatalog.TRANSCRIPT_EMBEDDINGS_FAST_MODEL_ID)
+        this.storage?.setItem(aiModelCatalog.TRANSCRIPT_EMBEDDINGS_FAST_READY_KEY, 'false');
       if (id === aiModelCatalog.TRANSCRIPT_QA_MODEL_ID)
         this.storage?.setItem(aiModelCatalog.TRANSCRIPT_QA_READY_KEY, 'false');
       const message = error instanceof Error ? error.message : 'Model download failed.';
@@ -452,9 +528,24 @@ class BrowserModelSetupService implements ModelSetupService {
         aiModelCatalog.TRANSCRIPTION_LOW_LATENCY_TRANSFORMERS_MODEL_ID,
       );
     }
+    if (id === aiModelCatalog.TRANSCRIPTION_BALANCED_MODEL_ID) {
+      await this.modelCacheStorage.deleteModelArtifacts(
+        aiModelCatalog.TRANSCRIPTION_BALANCED_TRANSFORMERS_MODEL_ID,
+      );
+    }
+    if (id === aiModelCatalog.TRANSCRIPTION_EXPERIMENTAL_MODEL_ID) {
+      await this.modelCacheStorage.deleteModelArtifacts(
+        aiModelCatalog.TRANSCRIPTION_EXPERIMENTAL_TRANSFORMERS_MODEL_ID,
+      );
+    }
     if (id === aiModelCatalog.TRANSCRIPT_EMBEDDINGS_MODEL_ID) {
       await this.modelCacheStorage.deleteModelArtifacts(
         aiModelCatalog.TRANSCRIPT_EMBEDDINGS_TRANSFORMERS_MODEL_ID,
+      );
+    }
+    if (id === aiModelCatalog.TRANSCRIPT_EMBEDDINGS_FAST_MODEL_ID) {
+      await this.modelCacheStorage.deleteModelArtifacts(
+        aiModelCatalog.TRANSCRIPT_EMBEDDINGS_FAST_TRANSFORMERS_MODEL_ID,
       );
     }
     if (id === aiModelCatalog.TRANSCRIPT_QA_MODEL_ID) {

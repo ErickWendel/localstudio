@@ -124,11 +124,29 @@ describe('AiToolsPanel', () => {
       required: false,
       status: 'needs-download',
     };
+    const whisperBaseState: ModelState = {
+      id: 'transcription-balanced-en',
+      label: 'Whisper Base EN',
+      description: 'Browser-local balanced ASR preset for higher-quality presenter recordings.',
+      progress: 0,
+      provider: 'transformers',
+      required: false,
+      status: 'needs-download',
+    };
+    const moonshineState: ModelState = {
+      id: 'transcription-experimental-live',
+      label: 'Moonshine Base ASR',
+      description: 'Experimental browser-local ASR preset with a larger download footprint.',
+      progress: 0,
+      provider: 'transformers',
+      required: false,
+      status: 'needs-download',
+    };
 
     render(
       <AiToolsPanel
         languageDetectionProviderStates={[languageDetectionProvider]}
-        modelStates={[imageGenerationState]}
+        modelStates={[imageGenerationState, whisperBaseState, moonshineState]}
         promptProviderStates={[gemmaProvider]}
         translationProviderStates={[translateGemmaProvider]}
         onDownloadModel={onDownloadModel}
@@ -139,13 +157,22 @@ describe('AiToolsPanel', () => {
     );
 
     expect(screen.getByLabelText('AI feature setup')).toHaveTextContent(
-      '4 features need setup before the AI workflows feel instant.',
+      '6 features need setup before the AI workflows feel instant.',
     );
 
     await user.click(screen.getByRole('button', { name: 'Download all' }));
 
-    expect(calls).toEqual(['prompt', 'language-detection', 'translation', 'image-generation-models']);
+    expect(calls).toEqual([
+      'prompt',
+      'language-detection',
+      'translation',
+      'image-generation-models',
+      'transcription-balanced-en',
+      'transcription-experimental-live',
+    ]);
     expect(onDownloadModel).toHaveBeenCalledWith('image-generation-models');
+    expect(onDownloadModel).toHaveBeenCalledWith('transcription-balanced-en');
+    expect(onDownloadModel).toHaveBeenCalledWith('transcription-experimental-live');
   });
 
   it('shows setup progress for each downloading AI feature', () => {

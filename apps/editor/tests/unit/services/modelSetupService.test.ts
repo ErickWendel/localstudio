@@ -20,7 +20,7 @@ describe('modelSetupService.InMemoryModelSetupService', () => {
     expect(
       states.filter((state) => state.required).every((state) => state.status === 'ready'),
     ).toBe(true);
-    expect(states).toHaveLength(8);
+    expect(states).toHaveLength(11);
     expect(states.find((state) => state.id === aiModelCatalog.GEMMA_LLM_MODEL_ID)).toMatchObject({
       label: aiModelCatalog.GEMMA_LLM_DISPLAY_NAME,
       required: false,
@@ -62,9 +62,30 @@ describe('modelSetupService.InMemoryModelSetupService', () => {
       status: 'needs-download',
     });
     expect(
+      states.find((state) => state.id === aiModelCatalog.TRANSCRIPTION_BALANCED_MODEL_ID),
+    ).toMatchObject({
+      label: aiModelCatalog.TRANSCRIPTION_BALANCED_DISPLAY_NAME,
+      required: false,
+      status: 'needs-download',
+    });
+    expect(
+      states.find((state) => state.id === aiModelCatalog.TRANSCRIPTION_EXPERIMENTAL_MODEL_ID),
+    ).toMatchObject({
+      label: aiModelCatalog.TRANSCRIPTION_EXPERIMENTAL_DISPLAY_NAME,
+      required: false,
+      status: 'needs-download',
+    });
+    expect(
       states.find((state) => state.id === aiModelCatalog.TRANSCRIPT_EMBEDDINGS_MODEL_ID),
     ).toMatchObject({
       label: aiModelCatalog.TRANSCRIPT_EMBEDDINGS_DISPLAY_NAME,
+      required: false,
+      status: 'needs-download',
+    });
+    expect(
+      states.find((state) => state.id === aiModelCatalog.TRANSCRIPT_EMBEDDINGS_FAST_MODEL_ID),
+    ).toMatchObject({
+      label: aiModelCatalog.TRANSCRIPT_EMBEDDINGS_FAST_DISPLAY_NAME,
       required: false,
       status: 'needs-download',
     });
