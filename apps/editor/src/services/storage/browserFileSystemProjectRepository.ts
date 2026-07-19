@@ -51,13 +51,16 @@ async function createFileBackedProjectSnapshot(
   project: ProjectDocument,
   assetsDirectory: FileSystemDirectoryHandle,
   fontsDirectory: FileSystemDirectoryHandle,
+  recordingsDirectory: FileSystemDirectoryHandle,
 ): Promise<ProjectDocument> {
   const projectAssets = project.assets;
   const projectFonts = project.fonts ?? {};
+  const projectRecordings = project.recordings ?? {};
   const projectForDisk: ProjectDocument = {
     ...project,
     assets: { ...projectAssets },
     ...(project.fonts ? { fonts: { ...projectFonts } } : {}),
+    ...(project.recordings ? { recordings: { ...projectRecordings } } : {}),
   };
 
   for (const [assetId, asset] of Object.entries(projectAssets)) {
@@ -103,6 +106,39 @@ async function createFileBackedProjectSnapshot(
     projectForDisk.fonts![fontId] = {
       ...fontForDisk,
       storage: 'file',
+    };
+  }
+
+  for (const [recordingId, recording] of Object.entries(projectRecordings)) {
+    const audio = recording.audio;
+    if (audio.storage === 'file' && audio.fileName) {
+      const audioForDisk = { ...audio };
+      delete audioForDisk.objectUrl;
+      projectForDisk.recordings![recordingId] = {
+        ...recording,
+        audio: audioForDisk,
+      };
+      continue;
+    }
+
+    if (!assetFileUtils.isReadableObjectUrl(audio.objectUrl)) continue;
+    const fileName =
+      audio.fileName ??
+      `${recordingId}.${assetFileUtils.getAssetFileExtension(audio.mimeType)}`;
+    await writeBlobFileToDirectory(
+      recordingsDirectory,
+      fileName,
+      await assetFileUtils.objectUrlToBlob(audio.objectUrl),
+    );
+    const audioForDisk = { ...audio };
+    delete audioForDisk.objectUrl;
+    projectForDisk.recordings![recordingId] = {
+      ...recording,
+      audio: {
+        ...audioForDisk,
+        fileName,
+        storage: 'file',
+      },
     };
   }
 
@@ -214,12 +250,20 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     const directoryHandle = await this.ensureProjectDirectory(project.name, options);
     const assetsDirectory = await directoryHandle.getDirectoryHandle('assets', { create: true });
     const fontsDirectory = await directoryHandle.getDirectoryHandle('fonts', { create: true });
+    const recordingsDirectory = await directoryHandle.getDirectoryHandle('recordings', {
+      create: true,
+    });
     await Promise.all([
       directoryHandle.getDirectoryHandle('cache', { create: true }),
       directoryHandle.getDirectoryHandle('config', { create: true }),
     ]);
 
-    const projectForDisk = await createFileBackedProjectSnapshot(project, assetsDirectory, fontsDirectory);
+    const projectForDisk = await createFileBackedProjectSnapshot(
+      project,
+      assetsDirectory,
+      fontsDirectory,
+      recordingsDirectory,
+    );
     const retainedAssetFileNames = new Set(
       Object.values(projectForDisk.assets)
         .map((asset) => asset.fileName)
@@ -233,6 +277,12 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     }
     await this.addVersionFontFileNames(directoryHandle, retainedFontFileNames);
     await this.removeUnretainedAssetFiles(fontsDirectory, retainedFontFileNames);
+    const retainedRecordingFileNames = new Set<string>();
+    for (const recording of Object.values(projectForDisk.recordings ?? {})) {
+      addRetainedFileName(retainedRecordingFileNames, recording.audio.fileName);
+    }
+    await this.addVersionRecordingFileNames(directoryHandle, retainedRecordingFileNames);
+    await this.removeUnretainedAssetFiles(recordingsDirectory, retainedRecordingFileNames);
     await this.writeJsonFile(directoryHandle, PROJECT_FILE_NAME, projectForDisk);
     const configDirectory = await directoryHandle.getDirectoryHandle('config', { create: true });
     await this.writeJsonFile(configDirectory, PROJECT_CONFIG_FILE_NAME, {
@@ -275,6 +325,9 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     const directoryHandle = await this.ensureProjectDirectory(project.name);
     const assetsDirectory = await directoryHandle.getDirectoryHandle('assets', { create: true });
     const fontsDirectory = await directoryHandle.getDirectoryHandle('fonts', { create: true });
+    const recordingsDirectory = await directoryHandle.getDirectoryHandle('recordings', {
+      create: true,
+    });
     const historyDirectory = await directoryHandle.getDirectoryHandle('history', { create: true });
     const versionsDirectory = await historyDirectory.getDirectoryHandle('versions', {
       create: true,
@@ -300,7 +353,12 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
         : {}),
     };
 
-    const projectForHistory = await createFileBackedProjectSnapshot(project, assetsDirectory, fontsDirectory);
+    const projectForHistory = await createFileBackedProjectSnapshot(
+      project,
+      assetsDirectory,
+      fontsDirectory,
+      recordingsDirectory,
+    );
     await this.writeJsonFile(
       versionsDirectory,
       fileName,
@@ -464,6 +522,17 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     });
   }
 
+  private async addVersionRecordingFileNames(
+    directoryHandle: FileSystemDirectoryHandle,
+    retainedRecordingFileNames: Set<string>,
+  ) {
+    await this.addVersionFileNames(directoryHandle, (versionProject) => {
+      for (const recording of Object.values(versionProject.recordings ?? {})) {
+        addRetainedFileName(retainedRecordingFileNames, recording.audio.fileName);
+      }
+    });
+  }
+
   private async addVersionFileNames(
     directoryHandle: FileSystemDirectoryHandle,
     addProjectFileNames: (versionProject: ProjectDocument) => void,
@@ -537,8 +606,10 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     if (!this.directoryHandle) return project;
     const assets: ProjectDocument['assets'] = {};
     const fonts: ProjectDocument['fonts'] = {};
+    const recordings: ProjectDocument['recordings'] = {};
     let assetsDirectory: FileSystemDirectoryHandle | undefined;
     let fontsDirectory: FileSystemDirectoryHandle | undefined;
+    let recordingsDirectory: FileSystemDirectoryHandle | undefined;
 
     for (const [assetId, asset] of Object.entries(project.assets)) {
       if (asset.storage !== 'file' || !asset.fileName) {
@@ -592,7 +663,35 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
       }
     }
 
-    return { ...project, assets, ...(project.fonts ? { fonts } : {}) };
+    for (const [recordingId, recording] of Object.entries(project.recordings ?? {})) {
+      const audio = recording.audio;
+      if (audio.storage !== 'file' || !audio.fileName) {
+        recordings[recordingId] = recording;
+        continue;
+      }
+      try {
+        recordingsDirectory ??= await this.directoryHandle.getDirectoryHandle('recordings');
+        const fileHandle = await recordingsDirectory.getFileHandle(audio.fileName);
+        const file = await fileHandle.getFile();
+        recordings[recordingId] = {
+          ...recording,
+          audio: {
+            ...audio,
+            objectUrl: URL.createObjectURL(file),
+          },
+        };
+      } catch (error) {
+        if (!isNotFoundError(error) || !options.allowMissingAssetFiles) throw error;
+        recordings[recordingId] = recording;
+      }
+    }
+
+    return {
+      ...project,
+      assets,
+      ...(project.fonts ? { fonts } : {}),
+      ...(project.recordings ? { recordings } : {}),
+    };
   }
 }
 

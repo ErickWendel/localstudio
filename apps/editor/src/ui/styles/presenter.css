@@ -70,6 +70,18 @@
   gap: 8px;
 }
 
+.presenter-transcription-select {
+  width: 170px;
+  height: 40px;
+  border: 1px solid var(--ew-border);
+  border-radius: 6px;
+  padding: 0 10px;
+  color: var(--ew-text);
+  background: var(--ew-panel);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .presenter-control-button,
 .presenter-notes-zoom-button {
   width: 40px;
@@ -89,6 +101,74 @@
   font-size: 20px;
   font-weight: 800;
   line-height: 26px;
+}
+
+.presenter-recording-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 220px;
+  color: var(--ls-cyan);
+  font-size: 14px;
+}
+
+.presenter-transcript-window {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto minmax(160px, auto) minmax(0, 1fr);
+  gap: 24px;
+  padding: 32px;
+  color: var(--ew-text);
+  background: #05080a;
+}
+
+.presenter-transcript-window header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  color: var(--ew-muted);
+  font-size: 14px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.presenter-transcript-window header strong {
+  color: var(--ls-cyan);
+}
+
+.presenter-transcript-current {
+  align-self: center;
+  font-family: var(--ls-font-display);
+  font-size: clamp(40px, 6vw, 78px);
+  font-weight: 800;
+  line-height: 1.08;
+}
+
+.presenter-transcript-list {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.presenter-transcript-list li {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 16px;
+  color: var(--ew-text);
+  font-size: 22px;
+  line-height: 1.35;
+}
+
+.presenter-transcript-list time {
+  color: var(--ew-muted);
+  font-size: 14px;
+  font-weight: 800;
 }
 
 .presenter-stage {

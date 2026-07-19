@@ -1,4 +1,4 @@
-import type { ProjectDocument } from '../../domain/documents/model';
+import type { ProjectDocument, TranscriptRecording } from '../../domain/documents/model';
 import type { AnimationPreviewState } from '../../ui/editor/animation/useAnimationPreviewController';
 import type {
   PresenterRemotePeerSession,
@@ -31,6 +31,7 @@ export type PresenterWindowCommand =
   | { command: 'request-state' }
   | { command: 'reset-timer' }
   | { command: 'resume-timer' }
+  | { audioBlob?: Blob | undefined; command: 'save-recording'; recording: TranscriptRecording }
   | { command: 'start-presenting' }
   | { command: 'update-timer'; timer: PresenterRemoteTimerState }
   | { command: 'update-stream-peer'; peerId?: string | undefined }

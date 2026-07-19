@@ -19,6 +19,7 @@ import type {
   SelectionState,
   ShapeKind,
   SlideTransition,
+  TranscriptRecording,
 } from '../../../domain/documents/model';
 import { sampleProject } from '../../../domain/projects/sampleProject';
 import type { EditorAutomationDelegate } from '../../../services/automation/editorAutomationController';
@@ -3010,6 +3011,17 @@ export function useEditorViewModel(services: AppServices) {
     }));
   }
 
+  function addTranscriptRecording(recording: TranscriptRecording) {
+    commitProject((currentProject) => ({
+      ...currentProject,
+      recordings: {
+        ...(currentProject.recordings ?? {}),
+        [recording.id]: recording,
+      },
+      updatedAt: new Date().toISOString(),
+    }));
+  }
+
   function activateScrolledPage(pageId: string) {
     if (pageId === activePageId) return;
     const page = project.pages.find((item) => item.id === pageId);
@@ -3265,6 +3277,7 @@ export function useEditorViewModel(services: AppServices) {
     renamePage,
     setPageVisibility,
     updatePageSpeakerNotes,
+    addTranscriptRecording,
     togglePagesPanel,
     toggleFullscreen,
     undo,

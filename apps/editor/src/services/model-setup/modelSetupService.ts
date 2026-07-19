@@ -10,6 +10,9 @@ import { browserStorage } from '../browser/browserStorage';
 import type { BrowserKeyValueStorage } from '../browser/browserStorage';
 import { progress } from './progress';
 import { TransformersRuntimeClient } from './transformersRuntimeClient';
+import { TranscriptEmbeddingRuntimeClient } from '../transcription/transcriptEmbeddingRuntimeClient';
+import { TranscriptionRuntimeClient } from '../transcription/transcriptionRuntimeClient';
+import { transcriptionModelCatalog } from '../transcription/transcriptionModelCatalog';
 
 const IMAGE_EDITING_MODEL_ID = 'image-editing-models';
 const IMAGE_EDITING_TRANSFORMERS_MODEL_ID = 'Xenova/slimsam-77-uniform';
@@ -96,6 +99,33 @@ const initialStates: ModelState[] = [
     progress: 0,
     required: false,
   },
+  {
+    id: aiModelCatalog.TRANSCRIPTION_LOW_LATENCY_MODEL_ID,
+    label: aiModelCatalog.TRANSCRIPTION_LOW_LATENCY_DISPLAY_NAME,
+    description: 'Browser-local low-latency ASR for presenter recordings.',
+    provider: 'transformers',
+    status: 'needs-download',
+    progress: 0,
+    required: false,
+  },
+  {
+    id: aiModelCatalog.TRANSCRIPT_EMBEDDINGS_MODEL_ID,
+    label: aiModelCatalog.TRANSCRIPT_EMBEDDINGS_DISPLAY_NAME,
+    description: 'Browser-local transcript embeddings for public Q&A.',
+    provider: 'transformers',
+    status: 'needs-download',
+    progress: 0,
+    required: false,
+  },
+  {
+    id: aiModelCatalog.TRANSCRIPT_QA_MODEL_ID,
+    label: aiModelCatalog.TRANSCRIPT_QA_DISPLAY_NAME,
+    description: 'Small browser-local model for transcript-grounded public Q&A.',
+    provider: 'transformers',
+    status: 'needs-download',
+    progress: 0,
+    required: false,
+  },
 ];
 
 function cloneStates(states: ModelState[]) {
@@ -110,6 +140,11 @@ function getReadyKey(id: string) {
   if (id === aiModelCatalog.TRANSLATEGEMMA_MODEL_ID) return aiModelCatalog.TRANSLATEGEMMA_READY_KEY;
   if (id === aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID)
     return aiModelCatalog.LANGUAGE_DETECTION_READY_KEY;
+  if (id === aiModelCatalog.TRANSCRIPTION_LOW_LATENCY_MODEL_ID)
+    return aiModelCatalog.TRANSCRIPTION_LOW_LATENCY_READY_KEY;
+  if (id === aiModelCatalog.TRANSCRIPT_EMBEDDINGS_MODEL_ID)
+    return aiModelCatalog.TRANSCRIPT_EMBEDDINGS_READY_KEY;
+  if (id === aiModelCatalog.TRANSCRIPT_QA_MODEL_ID) return aiModelCatalog.TRANSCRIPT_QA_READY_KEY;
   return undefined;
 }
 
@@ -218,6 +253,11 @@ class BrowserModelSetupService implements ModelSetupService {
       storage?.getItem(aiModelCatalog.TRANSLATEGEMMA_READY_KEY) === 'true';
     const languageDetectionReady =
       storage?.getItem(aiModelCatalog.LANGUAGE_DETECTION_READY_KEY) === 'true';
+    const transcriptionReady =
+      storage?.getItem(aiModelCatalog.TRANSCRIPTION_LOW_LATENCY_READY_KEY) === 'true';
+    const transcriptEmbeddingsReady =
+      storage?.getItem(aiModelCatalog.TRANSCRIPT_EMBEDDINGS_READY_KEY) === 'true';
+    const transcriptQaReady = storage?.getItem(aiModelCatalog.TRANSCRIPT_QA_READY_KEY) === 'true';
     this.states = initialStates.map((state) =>
       state.id === aiModelCatalog.GEMMA_LLM_MODEL_ID && gemmaLlmReady
         ? { ...state, status: 'ready', progress: 100 }
@@ -230,7 +270,15 @@ class BrowserModelSetupService implements ModelSetupService {
               : state.id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID &&
                   imageGenerationModelReady
                 ? { ...state, status: 'ready', progress: 100 }
-                : { ...state },
+                : state.id === aiModelCatalog.TRANSCRIPTION_LOW_LATENCY_MODEL_ID &&
+                    transcriptionReady
+                  ? { ...state, status: 'ready', progress: 100 }
+                  : state.id === aiModelCatalog.TRANSCRIPT_EMBEDDINGS_MODEL_ID &&
+                      transcriptEmbeddingsReady
+                    ? { ...state, status: 'ready', progress: 100 }
+                    : state.id === aiModelCatalog.TRANSCRIPT_QA_MODEL_ID && transcriptQaReady
+                      ? { ...state, status: 'ready', progress: 100 }
+                      : { ...state },
     );
   }
 
@@ -315,6 +363,32 @@ class BrowserModelSetupService implements ModelSetupService {
         );
         this.storage?.setItem(aiModelCatalog.LANGUAGE_DETECTION_READY_KEY, 'true');
       }
+      if (id === aiModelCatalog.TRANSCRIPTION_LOW_LATENCY_MODEL_ID) {
+        await new TranscriptionRuntimeClient().preload(
+          transcriptionModelCatalog.getTranscriptionPreset('low-latency-en'),
+          { onProgress: reportProgress },
+        );
+        this.storage?.setItem(aiModelCatalog.TRANSCRIPTION_LOW_LATENCY_READY_KEY, 'true');
+      }
+      if (id === aiModelCatalog.TRANSCRIPT_EMBEDDINGS_MODEL_ID) {
+        await new TranscriptEmbeddingRuntimeClient().preload(
+          transcriptionModelCatalog.getEmbeddingPreset('default-minilm'),
+          { onProgress: reportProgress },
+        );
+        this.storage?.setItem(aiModelCatalog.TRANSCRIPT_EMBEDDINGS_READY_KEY, 'true');
+      }
+      if (id === aiModelCatalog.TRANSCRIPT_QA_MODEL_ID) {
+        await this.textGenerationModelLoader.loadTextGenerationModel(
+          aiModelCatalog.TRANSCRIPT_QA_TRANSFORMERS_MODEL_ID,
+          {
+            onProgress: reportProgress,
+          },
+        );
+        await this.textGenerationModelLoader.releaseTextGenerationModel?.(
+          aiModelCatalog.TRANSCRIPT_QA_TRANSFORMERS_MODEL_ID,
+        );
+        this.storage?.setItem(aiModelCatalog.TRANSCRIPT_QA_READY_KEY, 'true');
+      }
       options?.onProgress?.(100);
       return this.setModelState(id, { status: 'ready', progress: 100, error: undefined });
     } catch (error) {
@@ -327,6 +401,12 @@ class BrowserModelSetupService implements ModelSetupService {
         this.storage?.setItem(aiModelCatalog.TRANSLATEGEMMA_READY_KEY, 'false');
       if (id === aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID)
         this.storage?.setItem(aiModelCatalog.LANGUAGE_DETECTION_READY_KEY, 'false');
+      if (id === aiModelCatalog.TRANSCRIPTION_LOW_LATENCY_MODEL_ID)
+        this.storage?.setItem(aiModelCatalog.TRANSCRIPTION_LOW_LATENCY_READY_KEY, 'false');
+      if (id === aiModelCatalog.TRANSCRIPT_EMBEDDINGS_MODEL_ID)
+        this.storage?.setItem(aiModelCatalog.TRANSCRIPT_EMBEDDINGS_READY_KEY, 'false');
+      if (id === aiModelCatalog.TRANSCRIPT_QA_MODEL_ID)
+        this.storage?.setItem(aiModelCatalog.TRANSCRIPT_QA_READY_KEY, 'false');
       const message = error instanceof Error ? error.message : 'Model download failed.';
       return this.setModelState(id, { status: 'failed', progress: 0, error: message });
     }
@@ -365,6 +445,24 @@ class BrowserModelSetupService implements ModelSetupService {
     if (id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID) {
       await this.modelCacheStorage.deleteModelArtifacts(
         imageGenerationModel.IMAGE_GENERATION_TRANSFORMERS_MODEL_ID,
+      );
+    }
+    if (id === aiModelCatalog.TRANSCRIPTION_LOW_LATENCY_MODEL_ID) {
+      await this.modelCacheStorage.deleteModelArtifacts(
+        aiModelCatalog.TRANSCRIPTION_LOW_LATENCY_TRANSFORMERS_MODEL_ID,
+      );
+    }
+    if (id === aiModelCatalog.TRANSCRIPT_EMBEDDINGS_MODEL_ID) {
+      await this.modelCacheStorage.deleteModelArtifacts(
+        aiModelCatalog.TRANSCRIPT_EMBEDDINGS_TRANSFORMERS_MODEL_ID,
+      );
+    }
+    if (id === aiModelCatalog.TRANSCRIPT_QA_MODEL_ID) {
+      await this.textGenerationModelLoader.removeTextGenerationModel?.(
+        aiModelCatalog.TRANSCRIPT_QA_TRANSFORMERS_MODEL_ID,
+      );
+      await this.modelCacheStorage.deleteModelArtifacts(
+        aiModelCatalog.TRANSCRIPT_QA_TRANSFORMERS_MODEL_ID,
       );
     }
 

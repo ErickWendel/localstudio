@@ -9,6 +9,11 @@ const PublicDeckApp = lazy(() =>
 const PresenterView = lazy(() =>
   import('./ui/presenter/PresenterView').then((module) => ({ default: module.PresenterView })),
 );
+const PresenterTranscriptWindow = lazy(() =>
+  import('./ui/presenter/PresenterTranscriptWindow').then((module) => ({
+    default: module.PresenterTranscriptWindow,
+  })),
+);
 const WebMcpShowcasePage = lazy(() =>
   import('./ui/webmcp/WebMcpShowcasePage').then((module) => ({
     default: module.WebMcpShowcasePage,
@@ -38,6 +43,15 @@ export function App() {
     );
   }
 
+  const presenterTranscriptSessionId = getPresenterTranscriptSessionId();
+  if (presenterTranscriptSessionId) {
+    return (
+      <Suspense fallback={null}>
+        <PresenterTranscriptWindow sessionId={presenterTranscriptSessionId} />
+      </Suspense>
+    );
+  }
+
   const shareRoute = getShareRoute(window.location.pathname);
   if (shareRoute) {
     return (
@@ -61,6 +75,12 @@ export function App() {
 function getPresenterSessionId() {
   const url = new URL(window.location.href);
   if (url.searchParams.get('presenter') !== '1') return undefined;
+  return url.searchParams.get('presenterSession') ?? undefined;
+}
+
+function getPresenterTranscriptSessionId() {
+  const url = new URL(window.location.href);
+  if (url.searchParams.get('presenterTranscript') !== '1') return undefined;
   return url.searchParams.get('presenterSession') ?? undefined;
 }
 

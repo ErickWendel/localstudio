@@ -207,6 +207,35 @@ export class BrowserShareService implements ShareService {
       }),
     );
 
+    await Promise.all(
+      Object.entries(projectForShare.recordings ?? {}).map(async ([recordingId, recording]) => {
+        const blob = await assetFileUtils.objectUrlToBlobIfReadable(
+          recording.audio.objectUrl,
+          this.fetchImpl,
+        );
+        if (!blob) return;
+
+        const fileName =
+          recording.audio.fileName ??
+          `${recording.id}.${assetFileUtils.getAssetFileExtension(recording.audio.mimeType)}`;
+        const key = storageObjectUtils.joinObjectKey(
+          getShareRootKey(config, shareId),
+          'recordings',
+          fileName,
+        );
+        await this.mirrorService.uploadPublicObject(key, blob, config);
+        projectForShare.recordings![recordingId] = {
+          ...recording,
+          audio: {
+            ...recording.audio,
+            fileName,
+            objectUrl: this.mirrorService.getPublicObjectUrl(key, config),
+            storage: 'remote',
+          },
+        };
+      }),
+    );
+
     return projectForShare;
   }
 

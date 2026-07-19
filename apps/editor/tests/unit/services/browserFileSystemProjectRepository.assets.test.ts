@@ -242,6 +242,59 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
     expect(savedAsset.objectUrl).toBeUndefined();
   });
 
+  it('moves presenter recording audio into recordings and hydrates it on load', async () => {
+    const directory = new MockDirectoryHandle();
+    const repository = new BrowserFileSystemProjectRepository({
+      pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
+    });
+    const project: ProjectDocument = {
+      ...sampleProject.createSampleProject(),
+      recordings: {
+        recording1: {
+          id: 'recording1',
+          name: 'Presenter recording',
+          createdAt: '2026-07-18T12:00:00.000Z',
+          updatedAt: '2026-07-18T12:00:00.000Z',
+          durationMs: 1200,
+          modelPresetId: 'low-latency-en',
+          audio: {
+            mimeType: 'audio/webm;codecs=opus',
+            objectUrl: 'data:audio/webm;base64,YXVkaW8=',
+            storage: 'inline',
+          },
+          segments: [
+            {
+              id: 'segment1',
+              text: 'Hello audience',
+              startMs: 0,
+              endMs: 1200,
+              final: true,
+            },
+          ],
+        },
+      },
+    };
+    const createObjectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:recording');
+
+    await repository.saveProject(project);
+
+    const recordingsDirectory = directory.directories.get('recordings')!;
+    expect(recordingsDirectory.files.has('recording1.webm')).toBe(true);
+    expect(await (recordingsDirectory.files.get('recording1.webm') as Blob).text()).toBe('audio');
+    const savedProject = JSON.parse(directory.files.get('project.json') as string) as ProjectDocument;
+    expect(savedProject.recordings?.recording1?.audio).toMatchObject({
+      fileName: 'recording1.webm',
+      storage: 'file',
+    });
+    expect(savedProject.recordings?.recording1?.audio.objectUrl).toBeUndefined();
+
+    const loaded = await repository.loadProject();
+
+    expect(loaded?.recordings?.recording1?.audio.objectUrl).toBe('blob:recording');
+    expect(createObjectUrl).toHaveBeenCalled();
+  });
+
   it('rejects when project.json references a missing file-backed asset', async () => {
     const directory = new MockDirectoryHandle();
     directory.files.set(

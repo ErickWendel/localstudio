@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ChangeEvent as ReactChangeEvent, PointerEvent as ReactPointerEvent } from 'react';
-import type { Page, ProjectDocument, SelectionState } from '../../domain/documents/model';
+import { Captions, Mic, MonitorUp, Square } from 'lucide-react';
+import type {
+  Page,
+  ProjectDocument,
+  SelectionState,
+  TranscriptRecording,
+  TranscriptSegment,
+} from '../../domain/documents/model';
 import { pageVisibility } from '../../domain/documents/pageVisibility';
 import type {
   PresenterCommandMessage,
@@ -22,6 +29,11 @@ import { PresenterSlideNavigator } from './PresenterSlideNavigator';
 import { PresenterThumbnail } from './PresenterThumbnail';
 import { presenterRemoteMirror } from './presenterRemoteMirror';
 import { presenterRemoteStreamPublisher } from './presenterRemoteStreamPublisher';
+import { PresenterAudioRecorder } from '../../services/transcription/presenterAudioRecorder';
+import type { PresenterAudioRecorderChunk } from '../../services/transcription/presenterAudioRecorder';
+import { TranscriptionRuntimeClient } from '../../services/transcription/transcriptionRuntimeClient';
+import { transcriptionModelCatalog } from '../../services/transcription/transcriptionModelCatalog';
+import type { TranscriptionModelPresetId } from '../../services/transcription/transcriptionModelCatalog';
 import { presenterRemoteTimerFormat } from '@localstudio/presenter-remote/timer-format';
 
 interface PresenterViewProps {
@@ -37,6 +49,8 @@ const notesMinWidthPx = 280;
 const notesMaxWidthPx = 760;
 const presenterMainMinWidthPx = 520;
 const defaultRemoteStreamSize = presenterRemoteMirror.size;
+const stopTranscriptionWaitMs = 5000;
+const transcriptWindowQueryParam = 'presenterTranscript';
 const presenterShortcutActions = [
   'next-build',
   'previous-build',
@@ -131,10 +145,43 @@ function getBuildsRemaining(payload: PresenterStatePayload, page: Page) {
     page.elementIds.includes(build.elementId),
   );
   if (validBuilds.length === 0) return 0;
-  if (payload.animationPreview?.pageId !== page.id) return validBuilds.length;
-  if (payload.animationPreview.phase === 'complete') return 0;
-  const hiddenElementIds = new Set(payload.animationPreview.hiddenElementIds);
+  const preview = payload.animationPreview;
+  if (!preview || preview.pageId !== page.id) return validBuilds.length;
+  if (preview.phase === 'complete') return 0;
+  const hiddenElementIds = new Set(preview.hiddenElementIds);
   return validBuilds.filter((build) => hiddenElementIds.has(build.elementId)).length;
+}
+
+function createTranscriptId(prefix: string) {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function waitForSettledTranscription(tasks: Array<Promise<void>>) {
+  if (!tasks.length) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    let resolved = false;
+    const finish = () => {
+      if (resolved) return;
+      resolved = true;
+      resolve();
+    };
+    window.setTimeout(finish, stopTranscriptionWaitMs);
+    void Promise.allSettled(tasks).then(finish);
+  });
+}
+
+function getTranscriptChannelName(sessionId: string) {
+  return `localstudio-presenter-transcript-${sessionId}`;
+}
+
+function postTranscriptChannelMessage(
+  channel: BroadcastChannel | undefined,
+  message: unknown,
+) {
+  channel?.postMessage(message);
 }
 
 export function PresenterView({ sessionId = getRouteSessionId() }: PresenterViewProps) {
@@ -148,6 +195,13 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
   const [notesPanelWidth, setNotesPanelWidth] = useState(getInitialNotesWidth);
   const [keyboardShortcutsMode, setKeyboardShortcutsMode] = useState<'dialog' | 'popover' | undefined>();
   const [remotePanelOpen, setRemotePanelOpen] = useState(false);
+  const [recordingStatus, setRecordingStatus] = useState<
+    'idle' | 'downloading' | 'permission-needed' | 'recording' | 'save-failed' | 'saved' | 'transcribing'
+  >('idle');
+  const [recordingError, setRecordingError] = useState<string | undefined>();
+  const [transcriptionPresetId, setTranscriptionPresetId] =
+    useState<TranscriptionModelPresetId>('low-latency-en');
+  const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[]>([]);
   const remoteStreamSize = defaultRemoteStreamSize;
   const [slideNavigatorOpen, setSlideNavigatorOpen] = useState(false);
   const [slideNavigatorIndex, setSlideNavigatorIndex] = useState(0);
@@ -161,9 +215,23 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
   const presenterStageRef = useRef<HTMLElement>(null);
   const presenterRemotePanelRef = useRef<HTMLDivElement>(null);
   const notesRef = useRef<HTMLTextAreaElement>(null);
+  const activePageMetadataRef = useRef<
+    { pageId: string; pageIndex: number; pageName: string } | undefined
+  >(undefined);
+  const recorderRef = useRef<PresenterAudioRecorder | undefined>(undefined);
+  const recordingStartedAtRef = useRef(0);
+  const recordingObjectUrlRef = useRef<string | undefined>(undefined);
+  const transcriptChannelRef = useRef<BroadcastChannel | undefined>(undefined);
+  const transcriptRuntimeRef = useRef(new TranscriptionRuntimeClient());
+  const transcriptSegmentsRef = useRef<TranscriptSegment[]>([]);
+  const transcriptionTasksRef = useRef<Array<Promise<void>>>([]);
   const elapsedMsRef = useRef(0);
   const timerBaseMsRef = useRef(0);
   const resolvedSessionId = sessionId ?? 'presenter';
+  const selectedTranscriptionPreset = useMemo(
+    () => transcriptionModelCatalog.getTranscriptionPreset(transcriptionPresetId),
+    [transcriptionPresetId],
+  );
   const presenterViewStyle = useMemo(
     () => ({ '--presenter-notes-width': `${notesPanelWidth}px` }) as CSSProperties,
     [notesPanelWidth],
@@ -262,6 +330,23 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
   }, [elapsedMs, timerBaseMs]);
 
   useEffect(() => {
+    transcriptChannelRef.current = new BroadcastChannel(getTranscriptChannelName(resolvedSessionId));
+    return () => {
+      transcriptChannelRef.current?.close();
+      transcriptChannelRef.current = undefined;
+    };
+  }, [resolvedSessionId]);
+
+  useEffect(() => {
+    const transcriptRuntime = transcriptRuntimeRef.current;
+    return () => {
+      transcriptRuntime.terminate();
+      recorderRef.current?.revokeObjectUrl();
+      if (recordingObjectUrlRef.current) URL.revokeObjectURL(recordingObjectUrlRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
     const intervalId = window.setInterval(() => {
       setCurrentTime(new Date());
       setTimerNow(Date.now());
@@ -337,6 +422,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
   );
   const activePage = snapshot ? getActivePage(snapshot.project, snapshot.activePageId) : undefined;
   const activePageId = activePage?.id;
+  const activePageName = activePage?.name;
   const activePageIndex = activePage
     ? Math.max(0, visiblePages.findIndex((page) => page.id === activePage.id))
     : 0;
@@ -347,6 +433,27 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     hour: 'numeric',
     minute: '2-digit',
   });
+  const recordingStatusLabel =
+    recordingStatus === 'idle'
+      ? 'Recorder ready'
+      : recordingStatus === 'downloading'
+        ? 'Preparing transcription model'
+        : recordingStatus === 'permission-needed'
+          ? 'Microphone permission needed'
+          : recordingStatus === 'recording'
+            ? `Recording ${transcriptSegments.length} segments`
+            : recordingStatus === 'transcribing'
+              ? 'Transcribing audio'
+              : recordingStatus === 'saved'
+                ? 'Recording saved'
+                : 'Recording failed';
+
+  useEffect(() => {
+    activePageMetadataRef.current =
+      activePageId && activePageName
+        ? { pageId: activePageId, pageIndex: activePageIndex, pageName: activePageName }
+        : undefined;
+  }, [activePageId, activePageIndex, activePageName]);
 
   function updateSpeakerNotes(event: ReactChangeEvent<HTMLTextAreaElement>) {
     const notes = event.target.value;
@@ -379,6 +486,121 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     postCommand({ command: 'reset-timer' });
     publishTimerState({ elapsedMs: 0, paused: false });
   }, [postCommand, publishTimerState]);
+
+  const publishTranscriptState = useCallback(
+    (nextStatus = recordingStatus) => {
+      postTranscriptChannelMessage(transcriptChannelRef.current, {
+        segments: transcriptSegmentsRef.current,
+        sessionId: resolvedSessionId,
+        source: 'localstudio-presenter-transcript',
+        status: nextStatus,
+        type: 'state',
+      });
+    },
+    [recordingStatus, resolvedSessionId],
+  );
+
+  const transcribeChunk = useCallback(
+    (chunk: PresenterAudioRecorderChunk) => {
+      if (chunk.audioData.length === 0) return;
+      const task = (async () => {
+        const text = await transcriptRuntimeRef.current.transcribe(
+          selectedTranscriptionPreset,
+          chunk.audioData,
+        );
+        if (!text) return;
+        const segment: TranscriptSegment = {
+          id: createTranscriptId('segment'),
+          text,
+          startMs: Math.max(0, chunk.startedAtMs - recordingStartedAtRef.current),
+          endMs: Math.max(0, chunk.endedAtMs - recordingStartedAtRef.current),
+          ...activePageMetadataRef.current,
+          final: true,
+        };
+        transcriptSegmentsRef.current = [...transcriptSegmentsRef.current, segment];
+        setTranscriptSegments(transcriptSegmentsRef.current);
+        publishTranscriptState('recording');
+      })().catch((error: unknown) => {
+        setRecordingError(error instanceof Error ? error.message : 'Transcription failed.');
+        setRecordingStatus(recorderRef.current?.isRecording() ? 'recording' : 'save-failed');
+      });
+      transcriptionTasksRef.current = [...transcriptionTasksRef.current, task];
+    },
+    [publishTranscriptState, selectedTranscriptionPreset],
+  );
+
+  const startRecording = useCallback(async () => {
+    try {
+      if (recordingObjectUrlRef.current) URL.revokeObjectURL(recordingObjectUrlRef.current);
+      recordingObjectUrlRef.current = undefined;
+      setRecordingError(undefined);
+      setTranscriptSegments([]);
+      transcriptSegmentsRef.current = [];
+      transcriptionTasksRef.current = [];
+      const recorder = new PresenterAudioRecorder({ onChunk: transcribeChunk });
+      recorderRef.current = recorder;
+      await recorder.start();
+      recordingStartedAtRef.current = Date.now();
+      setRecordingStatus('recording');
+      publishTranscriptState('recording');
+      void transcriptRuntimeRef.current.preload(selectedTranscriptionPreset).catch((error: unknown) => {
+        setRecordingError(
+          error instanceof Error ? error.message : 'Transcription model could not be prepared.',
+        );
+      });
+    } catch (error) {
+      setRecordingError(error instanceof Error ? error.message : 'Microphone permission is required.');
+      setRecordingStatus('permission-needed');
+    }
+  }, [publishTranscriptState, selectedTranscriptionPreset, transcribeChunk]);
+
+  const stopRecording = useCallback(async () => {
+    const recorder = recorderRef.current;
+    if (!recorder) return;
+    try {
+      setRecordingStatus('transcribing');
+      const result = await recorder.stop();
+      await waitForSettledTranscription(transcriptionTasksRef.current);
+      const objectUrl = recorder.getObjectUrl() ?? URL.createObjectURL(result.blob);
+      recordingObjectUrlRef.current = objectUrl;
+      const now = new Date().toISOString();
+      const recordingId = createTranscriptId('recording');
+      const language = selectedTranscriptionPreset.id.endsWith('-en') ? 'en' : undefined;
+      const recording: TranscriptRecording = {
+        id: recordingId,
+        name: `Presenter recording ${new Date(now).toLocaleString()}`,
+        createdAt: now,
+        updatedAt: now,
+        durationMs: result.durationMs,
+        ...(language ? { language } : {}),
+        modelPresetId: selectedTranscriptionPreset.id,
+        audio: {
+          mimeType: result.mimeType,
+          objectUrl,
+          storage: 'inline',
+        },
+        segments: transcriptSegmentsRef.current,
+      };
+      postCommand({ audioBlob: result.blob, command: 'save-recording', recording });
+      setRecordingStatus('saved');
+      publishTranscriptState('saved');
+    } catch (error) {
+      setRecordingError(error instanceof Error ? error.message : 'Recording could not be saved.');
+      setRecordingStatus('save-failed');
+      publishTranscriptState('save-failed');
+    } finally {
+      recorderRef.current = undefined;
+    }
+  }, [postCommand, publishTranscriptState, selectedTranscriptionPreset]);
+
+  const openTranscriptWindow = useCallback(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('presenter');
+    url.searchParams.set(transcriptWindowQueryParam, '1');
+    url.searchParams.set('presenterSession', resolvedSessionId);
+    window.open(url.toString(), `localstudio-transcript-${resolvedSessionId}`, 'popup,width=900,height=760');
+    publishTranscriptState();
+  }, [publishTranscriptState, resolvedSessionId]);
 
   function getPresenterVideos() {
     return Array.from(presenterStageRef.current?.querySelectorAll('video') ?? []);
@@ -756,6 +978,44 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
             <span className="presenter-timer">{presenterRemoteTimerFormat.formatElapsed(elapsedMs)}</span>
           </div>
           <div className="presenter-controls ew-compact-row" aria-label="Presenter controls">
+            <select
+              className="presenter-transcription-select"
+              aria-label="Transcription model preset"
+              disabled={recordingStatus === 'recording' || recordingStatus === 'transcribing'}
+              value={transcriptionPresetId}
+              onChange={(event) =>
+                setTranscriptionPresetId(event.target.value as TranscriptionModelPresetId)
+              }
+            >
+              {transcriptionModelCatalog.transcriptionPresets.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
+            <button
+              className="stitch-icon-button presenter-control-button"
+              type="button"
+              aria-label={recordingStatus === 'recording' ? 'Stop recording' : 'Start recording'}
+              disabled={recordingStatus === 'downloading' || recordingStatus === 'transcribing'}
+              onClick={() => {
+                void (recordingStatus === 'recording' ? stopRecording() : startRecording());
+              }}
+            >
+              {recordingStatus === 'recording' ? (
+                <Square size={18} aria-hidden="true" />
+              ) : (
+                <Mic size={18} aria-hidden="true" />
+              )}
+            </button>
+            <button
+              className="stitch-icon-button presenter-control-button"
+              type="button"
+              aria-label="Open live transcription window"
+              onClick={openTranscriptWindow}
+            >
+              <MonitorUp size={18} aria-hidden="true" />
+            </button>
             <button
               className="stitch-icon-button presenter-control-button"
               type="button"
@@ -829,6 +1089,10 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
           </span>
           <span className="presenter-status-item ew-ellipsis">
             Builds remaining: {buildsRemaining}
+          </span>
+          <span className="presenter-status-item presenter-recording-status ew-ellipsis">
+            <Captions size={18} aria-hidden="true" />
+            {recordingError ?? recordingStatusLabel}
           </span>
         </div>
         <section

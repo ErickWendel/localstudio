@@ -1,4 +1,9 @@
 function getAssetFileExtension(mimeType: string) {
+  if (mimeType.startsWith('audio/ogg')) return 'ogg';
+  if (mimeType.startsWith('audio/mp4')) return 'm4a';
+  if (mimeType.startsWith('audio/mpeg')) return 'mp3';
+  if (mimeType.startsWith('audio/wav')) return 'wav';
+  if (mimeType.startsWith('audio/webm')) return 'webm';
   if (mimeType === 'image/jpeg') return 'jpg';
   if (mimeType === 'image/gif') return 'gif';
   if (mimeType === 'image/webp') return 'webp';

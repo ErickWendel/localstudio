@@ -176,6 +176,65 @@ describe('OpfsProjectRepository', () => {
     expect(createObjectUrl).toHaveBeenCalled();
   });
 
+  it('persists presenter recordings under recordings and hydrates object URLs on load', async () => {
+    const root = new MockDirectoryHandle();
+    const storage = new MemoryStorage();
+    const createObjectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:recording');
+    const project: ProjectDocument = {
+      ...sampleProject.createSampleProject(),
+      recordings: {
+        recording1: {
+          id: 'recording1',
+          name: 'Presenter recording',
+          createdAt: '2026-07-18T12:00:00.000Z',
+          updatedAt: '2026-07-18T12:00:00.000Z',
+          durationMs: 1000,
+          modelPresetId: 'low-latency-en',
+          audio: {
+            mimeType: 'audio/webm;codecs=opus',
+            objectUrl: 'data:audio/webm;base64,YXVkaW8=',
+            storage: 'inline',
+          },
+          segments: [
+            {
+              id: 'segment1',
+              text: 'Welcome to the talk',
+              startMs: 0,
+              endMs: 1000,
+              final: true,
+            },
+          ],
+        },
+      },
+    };
+
+    await new OpfsProjectRepository({
+      getRootDirectory: () => Promise.resolve(root as unknown as FileSystemDirectoryHandle),
+      storage,
+    }).saveProject(project);
+
+    const projectDirectory = await getProjectDirectory(root, project.name);
+    expect(projectDirectory.directories.has('recordings')).toBe(true);
+    expect(
+      await (projectDirectory.directories.get('recordings')!.files.get('recording1.webm') as Blob).text(),
+    ).toBe('audio');
+    const savedProject = JSON.parse(
+      await readMockText(projectDirectory.files.get('project.json')!),
+    ) as ProjectDocument;
+    expect(savedProject.recordings?.recording1?.audio).toMatchObject({
+      fileName: 'recording1.webm',
+      storage: 'file',
+    });
+
+    const loaded = await new OpfsProjectRepository({
+      getRootDirectory: () => Promise.resolve(root as unknown as FileSystemDirectoryHandle),
+      storage,
+    }).loadProject();
+
+    expect(loaded?.recordings?.recording1?.audio.objectUrl).toBe('blob:recording');
+    expect(createObjectUrl).toHaveBeenCalled();
+  });
+
   it('downloads remote assets on OPFS load and saves them as local files', async () => {
     const root = new MockDirectoryHandle();
     const storage = new MemoryStorage();

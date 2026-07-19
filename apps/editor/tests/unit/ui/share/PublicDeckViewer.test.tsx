@@ -87,6 +87,61 @@ describe('PublicDeckViewer', () => {
     expect(screen.getByText('1 / 1')).toBeInTheDocument();
   });
 
+  it('opens transcript panel with public recording audio and segments', async () => {
+    const project = sampleProject.createSampleProject();
+    project.recordings = {
+      recording1: {
+        id: 'recording1',
+        name: 'Presenter recording',
+        createdAt: '2026-07-18T12:00:00.000Z',
+        updatedAt: '2026-07-18T12:00:00.000Z',
+        durationMs: 2400,
+        language: 'en',
+        modelPresetId: 'low-latency-en',
+        audio: {
+          mimeType: 'audio/webm;codecs=opus',
+          objectUrl: 'https://cdn.localstudio.test/recordings/recording1.webm',
+          storage: 'remote',
+        },
+        segments: [
+          {
+            id: 'segment1',
+            text: 'The roadmap includes transcript chat.',
+            startMs: 0,
+            endMs: 2400,
+            final: true,
+          },
+        ],
+      },
+    };
+    const { share, shareService } = createRemoteShare(
+      '00000000-0000-4000-8000-000000000207',
+      project,
+    );
+    const user = userEvent.setup();
+    render(
+      <PublicDeckViewer
+        shareId={share.shareId}
+        fontImportService={fontImportService}
+        shareService={shareService}
+      />,
+    );
+
+    await screen.findByLabelText('Public presentation');
+    await user.click(screen.getByRole('button', { name: 'Open transcript chat' }));
+
+    expect(screen.getByRole('complementary', { name: 'Transcript chat' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Podcast playback' })).toBeInTheDocument();
+    expect(screen.getByText('Podcast mode')).toBeInTheDocument();
+    expect(screen.getByLabelText('Podcast recording')).toHaveValue('recording1');
+    expect(screen.getByRole('heading', { name: 'Presenter recording' })).toBeInTheDocument();
+    expect(screen.getByText('The roadmap includes transcript chat.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Presenter recording audio')).toHaveAttribute(
+      'src',
+      'https://cdn.localstudio.test/recordings/recording1.webm',
+    );
+  });
+
   it('preloads public deck assets in the browser after the share record loads', async () => {
     const project = sampleProject.createSampleProject();
     project.assets['remote-image'] = {

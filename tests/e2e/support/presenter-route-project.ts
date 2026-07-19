@@ -8,6 +8,8 @@ import { presenterRouteSlide } from './presenter-route-slide';
 
 const proofImageUrl =
   'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22320%22%20height%3D%22180%22%3E%3Crect%20width%3D%22320%22%20height%3D%22180%22%20fill%3D%22%232E6B57%22%2F%3E%3Ctext%20x%3D%2224%22%20y%3D%2296%22%20fill%3D%22white%22%20font-size%3D%2228%22%3EProof%3C%2Ftext%3E%3C%2Fsvg%3E';
+const audioUrl =
+  'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
 
 export const presenterRouteProject = {
   create(): ProjectDocument {
@@ -65,6 +67,54 @@ export const presenterRouteProject = {
       id: 'presenter-e2e-project',
       name: 'Presenter route deck',
       pages,
+      recordings: {
+        'route-recording': {
+          id: 'route-recording',
+          name: 'Launch readout audio',
+          createdAt: '2026-07-09T00:05:00.000Z',
+          updatedAt: '2026-07-09T00:05:00.000Z',
+          durationMs: 24_000,
+          language: 'en',
+          modelPresetId: 'low-latency-en',
+          audio: {
+            mimeType: 'audio/wav',
+            objectUrl: audioUrl,
+            storage: 'inline',
+          },
+          segments: [
+            {
+              id: 'route-segment-1',
+              text: 'Open with the launch readout.',
+              startMs: 0,
+              endMs: 7_500,
+              final: true,
+              pageId: 'slide-1',
+              pageIndex: 0,
+              pageName: 'Opening',
+            },
+            {
+              id: 'route-segment-2',
+              text: 'Show the visual proof.',
+              startMs: 8_000,
+              endMs: 15_500,
+              final: true,
+              pageId: 'slide-2',
+              pageIndex: 1,
+              pageName: 'Visual proof',
+            },
+            {
+              id: 'route-segment-3',
+              text: 'Close the story.',
+              startMs: 16_000,
+              endMs: 24_000,
+              final: true,
+              pageId: 'slide-3',
+              pageIndex: 2,
+              pageName: 'Close',
+            },
+          ],
+        },
+      },
       updatedAt: '2026-07-09T00:00:00.000Z',
     };
   },

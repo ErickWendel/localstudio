@@ -1,0 +1,125 @@
+.public-podcast-player {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.public-podcast-transport {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.public-podcast-play {
+  width: 42px;
+  height: 42px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  color: #041008;
+  background: var(--ew-green);
+}
+
+.public-podcast-meta {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.public-podcast-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ew-green);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.public-podcast-meta select {
+  min-width: 0;
+  border: 0;
+  color: var(--ew-text);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.public-podcast-time {
+  display: grid;
+  justify-items: end;
+  color: var(--ew-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.public-podcast-rail {
+  position: relative;
+  display: grid;
+  align-items: center;
+}
+
+.public-podcast-progress {
+  position: absolute;
+  left: 0;
+  width: var(--public-podcast-progress, 0%);
+  height: 6px;
+  border-radius: 999px;
+  pointer-events: none;
+  background: var(--ew-green);
+}
+
+.public-podcast-rail input {
+  width: 100%;
+  accent-color: var(--ew-green);
+}
+
+.public-podcast-chapters {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(96px, 1fr);
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.public-podcast-chapter {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 8px;
+  color: var(--ew-text);
+  background: rgba(255, 255, 255, 0.04);
+  text-align: left;
+}
+
+.public-podcast-chapter span,
+.public-podcast-chapter strong {
+  color: var(--ew-green);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.public-podcast-chapter em {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  color: var(--ew-muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.public-podcast-chapter-active {
+  border-color: rgba(55, 253, 118, 0.54);
+  background: rgba(55, 253, 118, 0.12);
+}

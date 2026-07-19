@@ -933,6 +933,34 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         vm.updatePageSpeakerNotes(message.pageId, message.notes);
         return;
       }
+      if (message.command === 'save-recording') {
+        const editorOwnedRecording = message.audioBlob
+          ? {
+              ...message.recording,
+              audio: {
+                ...message.recording.audio,
+                objectUrl: URL.createObjectURL(message.audioBlob),
+              },
+            }
+          : message.recording;
+        const projectWithRecording = {
+          ...vm.project,
+          recordings: {
+            ...(vm.project.recordings ?? {}),
+            [editorOwnedRecording.id]: editorOwnedRecording,
+          },
+          updatedAt: new Date().toISOString(),
+        };
+        vm.addTranscriptRecording(editorOwnedRecording);
+        getPresenterSessionService().publishState({
+          activePageId: vm.activePageId,
+          animationPreview: vm.animationPreview,
+          presenterMode: presenterSessionId || remotePresenterActive ? 'presenting' : 'ready',
+          project: projectWithRecording,
+          streamPeerId: presenterRemoteStreamPeerId,
+        });
+        return;
+      }
       if (message.command === 'update-stream-peer') {
         setPresenterRemoteStreamPeerId(message.peerId);
         return;

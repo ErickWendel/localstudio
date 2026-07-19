@@ -1,10 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
+import { Bot, Captions, ListMusic, Pause, Play, SendHorizontal, X } from 'lucide-react';
 import type {
   ElementAnimationBuild,
+  Page,
   ProjectDocument,
   SelectionState,
+  TranscriptRecording,
 } from '../../domain/documents/model';
 import type { FontImportService, ShareService } from '../../services/contracts/interfaces';
+import { TranscriptQuestionAnsweringService } from '../../services/transcription/transcriptQuestionAnsweringService';
+import type { TranscriptAnswer } from '../../services/transcription/transcriptQuestionAnsweringService';
+import { webGpuTextGenerationRuntime } from '../../services/prompting/webGpuTextGenerationRuntime';
 import { CanvasWorkspace } from '../editor/canvas/CanvasWorkspace';
 import { preloadPublicDeckAssets } from './publicDeckAssetPreloader';
 
@@ -33,6 +40,59 @@ interface AnimationPreviewState {
   waitingForClick: boolean;
 }
 
+type TranscriptPanelTab = 'ask' | 'transcript';
+
+interface PublicPodcastChapter {
+  id: string;
+  pageIndex: number;
+  pageName: string;
+  startMs: number;
+}
+
+function formatTranscriptTimestamp(milliseconds: number) {
+  const seconds = Math.floor(milliseconds / 1000);
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+function getTranscriptRecordings(project: ProjectDocument): TranscriptRecording[] {
+  return Object.values(project.recordings ?? {}).filter((recording) => recording.segments.length > 0);
+}
+
+function getRecordingTimePercent(currentMs: number, durationMs: number) {
+  if (durationMs <= 0) return 0;
+  return Math.min(100, Math.max(0, (currentMs / durationMs) * 100));
+}
+
+function createPublicPodcastChapters(recording: TranscriptRecording | undefined, pages: Page[]) {
+  if (!recording || pages.length === 0) return [];
+  const pageCount = Math.max(1, pages.length);
+  return pages
+    .map<PublicPodcastChapter>((page, pageIndex) => {
+      const matchingSegment = recording.segments.find(
+        (segment) =>
+          segment.pageId === page.id ||
+          segment.pageIndex === pageIndex ||
+          segment.pageName === page.name,
+      );
+      return {
+        id: `${recording.id}-${page.id}`,
+        pageIndex,
+        pageName: page.name,
+        startMs: matchingSegment?.startMs ?? Math.round((recording.durationMs / pageCount) * pageIndex),
+      };
+    })
+    .sort((first, second) => first.startMs - second.startMs);
+}
+
+function getActivePodcastChapter(chapters: PublicPodcastChapter[], currentTimeMs: number) {
+  if (!chapters.length) return undefined;
+  return chapters.reduce<PublicPodcastChapter | undefined>((activeChapter, chapter) => {
+    if (chapter.startMs > currentTimeMs) return activeChapter;
+    return chapter;
+  }, chapters[0]);
+}
+
 function getBuildPlaybackDurationMs(build: ElementAnimationBuild) {
   return Math.max(0, build.durationMs ?? build.delayMs);
 }
@@ -40,6 +100,183 @@ function getBuildPlaybackDurationMs(build: ElementAnimationBuild) {
 function hasReachedPlaybackThreshold(loaded: number, total: number) {
   if (total === 0) return true;
   return loaded / total >= 0.5;
+}
+
+function PublicTranscriptPodcastPlayer({
+  onSelectPage,
+  pages,
+  recordings,
+}: {
+  onSelectPage: (pageIndex: number) => void;
+  pages: Page[];
+  recordings: TranscriptRecording[];
+}) {
+  const [recordingId, setRecordingId] = useState<string | undefined>();
+  const [currentTimeMs, setCurrentTimeMs] = useState(0);
+  const [durationMs, setDurationMs] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const lastSyncedChapterIdRef = useRef<string | undefined>(undefined);
+  const selectedRecording = useMemo(
+    () =>
+      recordings.find((recording) => recording.id === recordingId) ??
+      recordings.find((recording) => recording.audio.objectUrl) ??
+      recordings[0],
+    [recordingId, recordings],
+  );
+  const chapters = useMemo(
+    () => createPublicPodcastChapters(selectedRecording, pages),
+    [pages, selectedRecording],
+  );
+  const activeChapter = useMemo(
+    () => getActivePodcastChapter(chapters, currentTimeMs),
+    [chapters, currentTimeMs],
+  );
+  const totalMs = durationMs || selectedRecording?.durationMs || 0;
+  const progressPercent = getRecordingTimePercent(currentTimeMs, totalMs);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.load();
+    }
+    lastSyncedChapterIdRef.current = undefined;
+    const timeoutId = window.setTimeout(() => {
+      setCurrentTimeMs(0);
+      setDurationMs(selectedRecording?.durationMs ?? 0);
+      setPlaying(false);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [selectedRecording?.durationMs, selectedRecording?.id]);
+
+  useEffect(() => {
+    if (!playing || !activeChapter) return;
+    if (lastSyncedChapterIdRef.current === activeChapter.id) return;
+    lastSyncedChapterIdRef.current = activeChapter.id;
+    onSelectPage(activeChapter.pageIndex);
+  }, [activeChapter, onSelectPage, playing]);
+
+  function updateProgress() {
+    const audio = audioRef.current;
+    if (!audio) return;
+    setCurrentTimeMs(Math.round(audio.currentTime * 1000));
+    if (Number.isFinite(audio.duration) && audio.duration > 0) {
+      setDurationMs(Math.round(audio.duration * 1000));
+    }
+  }
+
+  function togglePlayback() {
+    const audio = audioRef.current;
+    if (!audio || !selectedRecording?.audio.objectUrl) return;
+    if (playing) {
+      audio.pause();
+      setPlaying(false);
+      return;
+    }
+    void audio.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+  }
+
+  function seekToChapter(chapter: PublicPodcastChapter) {
+    const audio = audioRef.current;
+    if (audio) audio.currentTime = chapter.startMs / 1000;
+    setCurrentTimeMs(chapter.startMs);
+    lastSyncedChapterIdRef.current = chapter.id;
+    onSelectPage(chapter.pageIndex);
+  }
+
+  if (!selectedRecording?.audio.objectUrl) {
+    return <p className="public-deck-status">No public recording audio was published with this deck.</p>;
+  }
+
+  return (
+    <section className="public-podcast-player" aria-label="Podcast playback">
+      <audio
+        ref={audioRef}
+        preload="metadata"
+        src={selectedRecording.audio.objectUrl}
+        onDurationChange={updateProgress}
+        onEnded={() => setPlaying(false)}
+        onLoadedMetadata={updateProgress}
+        onPause={() => setPlaying(false)}
+        onPlay={() => setPlaying(true)}
+        onTimeUpdate={updateProgress}
+      >
+        <track kind="captions" />
+      </audio>
+      <div className="public-podcast-transport">
+        <button
+          className="public-podcast-play"
+          type="button"
+          aria-label={playing ? 'Pause podcast audio' : 'Play podcast audio'}
+          onClick={togglePlayback}
+        >
+          {playing ? <Pause size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
+        </button>
+        <div className="public-podcast-meta">
+          <span>
+            <ListMusic size={15} aria-hidden="true" />
+            Podcast mode
+          </span>
+          <select
+            aria-label="Podcast recording"
+            value={selectedRecording.id}
+            onChange={(event) => setRecordingId(event.target.value)}
+          >
+            {recordings.map((recording) => (
+              <option key={recording.id} value={recording.id}>
+                {recording.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="public-podcast-time" aria-label="Podcast audio time">
+          <span>{formatTranscriptTimestamp(currentTimeMs)}</span>
+          <span>{formatTranscriptTimestamp(totalMs)}</span>
+        </div>
+      </div>
+      <div className="public-podcast-rail">
+        <div
+          className="public-podcast-progress"
+          style={{ '--public-podcast-progress': `${progressPercent}%` } as CSSProperties}
+        />
+        <input
+          aria-label="Seek podcast audio"
+          max={Math.max(1, Math.round(totalMs / 1000))}
+          min={0}
+          step={1}
+          type="range"
+          value={Math.round(currentTimeMs / 1000)}
+          onChange={(event) => {
+            const nextSeconds = Number(event.target.value);
+            const audio = audioRef.current;
+            if (audio) audio.currentTime = nextSeconds;
+            setCurrentTimeMs(nextSeconds * 1000);
+          }}
+        />
+      </div>
+      <div className="public-podcast-chapters" aria-label="Podcast chapters">
+        {chapters.map((chapter) => (
+          <button
+            className={
+              chapter.id === activeChapter?.id
+                ? 'public-podcast-chapter public-podcast-chapter-active'
+                : 'public-podcast-chapter'
+            }
+            key={chapter.id}
+            type="button"
+            aria-label={`Jump to ${chapter.pageName}`}
+            onClick={() => seekToChapter(chapter)}
+          >
+            <span>{formatTranscriptTimestamp(chapter.startMs)}</span>
+            <strong>{chapter.pageIndex + 1}</strong>
+            <em>{chapter.pageName}</em>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 export function PublicDeckViewer({
@@ -55,7 +292,16 @@ export function PublicDeckViewer({
   const animationTimeoutsRef = useRef<number[]>([]);
   const animationFrameRef = useRef<number | undefined>(undefined);
   const runNextAnimationBuildRef = useRef<() => void>(() => undefined);
+  const transcriptQaServiceRef = useRef<TranscriptQuestionAnsweringService | undefined>(undefined);
   const emptySelection = useMemo<SelectionState>(() => ({ pageId: '', elementIds: [] }), []);
+  const [transcriptPanelOpen, setTranscriptPanelOpen] = useState(false);
+  const [transcriptPanelTab, setTranscriptPanelTab] = useState<TranscriptPanelTab>('transcript');
+  const [transcriptQuestion, setTranscriptQuestion] = useState('');
+  const [transcriptAnswer, setTranscriptAnswer] = useState<TranscriptAnswer | undefined>();
+  const [transcriptAnswerStatus, setTranscriptAnswerStatus] = useState<
+    'answering' | 'failed' | 'idle'
+  >('idle');
+  const [transcriptAnswerError, setTranscriptAnswerError] = useState<string | undefined>();
   const viewerClassName = embed
     ? 'public-deck-viewer public-deck-viewer-embed'
     : 'public-deck-viewer public-deck-viewer-present';
@@ -390,6 +636,32 @@ export function PublicDeckViewer({
   }
   const canGoPrevious = activePageIndex > 0;
   const canGoNext = activePageIndex < project.pages.length - 1;
+  const transcriptRecordings = getTranscriptRecordings(project);
+  const hasTranscriptRecordings = transcriptRecordings.length > 0;
+
+  async function answerTranscriptQuestion() {
+    if (!transcriptQuestion.trim() || transcriptAnswerStatus === 'answering') return;
+    setTranscriptAnswerStatus('answering');
+    setTranscriptAnswerError(undefined);
+    try {
+      transcriptQaServiceRef.current ??= new TranscriptQuestionAnsweringService({
+        textGenerationRuntime: new webGpuTextGenerationRuntime.TransformersTextGenerationRuntime(),
+      });
+      const answer = await transcriptQaServiceRef.current.answer(
+        transcriptQuestion,
+        transcriptRecordings,
+      );
+      setTranscriptAnswer(answer);
+      setTranscriptAnswerStatus('idle');
+    } catch (error) {
+      setTranscriptAnswerError(
+        error instanceof Error
+          ? error.message
+          : 'Transcript chat is unavailable in this browser.',
+      );
+      setTranscriptAnswerStatus('failed');
+    }
+  }
 
   return (
     <main
@@ -438,7 +710,126 @@ export function PublicDeckViewer({
             chevron_right
           </span>
         </button>
+        <button
+          className="stitch-icon-button"
+          type="button"
+          aria-label="Open transcript chat"
+          aria-expanded={transcriptPanelOpen}
+          onClick={() => setTranscriptPanelOpen((current) => !current)}
+        >
+          <Bot size={18} aria-hidden="true" />
+        </button>
       </nav>
+      {transcriptPanelOpen ? (
+        <aside className="public-transcript-panel" aria-label="Transcript chat">
+          <header>
+            <div>
+              <span className="public-deck-kicker">Presentation transcript</span>
+              <h2>Ask the recording</h2>
+            </div>
+            <button
+              className="stitch-icon-button"
+              type="button"
+              aria-label="Close transcript chat"
+              onClick={() => setTranscriptPanelOpen(false)}
+            >
+              <X size={18} aria-hidden="true" />
+            </button>
+          </header>
+          {hasTranscriptRecordings ? (
+            <PublicTranscriptPodcastPlayer
+              recordings={transcriptRecordings}
+              pages={project.pages}
+              onSelectPage={(pageIndex) => playPresentationPage(project, pageIndex)}
+            />
+          ) : (
+            <p className="public-deck-status">No presenter recording has been published with this deck.</p>
+          )}
+          <div className="public-transcript-tabs" role="tablist" aria-label="Transcript views">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={transcriptPanelTab === 'transcript'}
+              onClick={() => setTranscriptPanelTab('transcript')}
+            >
+              <Captions size={16} aria-hidden="true" />
+              Transcript
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={transcriptPanelTab === 'ask'}
+              onClick={() => setTranscriptPanelTab('ask')}
+            >
+              <Bot size={16} aria-hidden="true" />
+              Ask
+            </button>
+          </div>
+          {transcriptPanelTab === 'transcript' ? (
+            <section className="public-transcript-list" role="tabpanel">
+              {transcriptRecordings.map((recording) => (
+                <article key={recording.id}>
+                  <h3>{recording.name}</h3>
+                  {recording.audio.objectUrl ? (
+                    <audio aria-label={`${recording.name} audio`} controls src={recording.audio.objectUrl}>
+                      <track kind="captions" />
+                    </audio>
+                  ) : null}
+                  <ol>
+                    {recording.segments.map((segment) => (
+                      <li key={segment.id}>
+                        <time>{formatTranscriptTimestamp(segment.startMs)}</time>
+                        <span>{segment.text}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </article>
+              ))}
+            </section>
+          ) : (
+            <section className="public-transcript-ask" role="tabpanel">
+              <div className="public-transcript-question">
+                <input
+                  value={transcriptQuestion}
+                  onChange={(event) => setTranscriptQuestion(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') void answerTranscriptQuestion();
+                  }}
+                  placeholder="Ask about this presentation"
+                  aria-label="Question for transcript chat"
+                />
+                <button
+                  className="stitch-icon-button"
+                  type="button"
+                  aria-label="Ask transcript"
+                  disabled={transcriptAnswerStatus === 'answering' || !transcriptQuestion.trim()}
+                  onClick={() => void answerTranscriptQuestion()}
+                >
+                  <SendHorizontal size={18} aria-hidden="true" />
+                </button>
+              </div>
+              {transcriptAnswerStatus === 'answering' ? (
+                <p className="public-deck-status">Building transcript answer...</p>
+              ) : null}
+              {transcriptAnswerError ? (
+                <p className="public-deck-status">{transcriptAnswerError}</p>
+              ) : null}
+              {transcriptAnswer ? (
+                <article className="public-transcript-answer">
+                  <p>{transcriptAnswer.text}</p>
+                  <div>
+                    {transcriptAnswer.citations.map((citation) => (
+                      <span key={`${citation.recordingId}-${citation.segmentId}`}>
+                        {formatTranscriptTimestamp(citation.startMs)}
+                      </span>
+                    ))}
+                  </div>
+                </article>
+              ) : null}
+            </section>
+          )}
+        </aside>
+      ) : null}
     </main>
   );
 }
