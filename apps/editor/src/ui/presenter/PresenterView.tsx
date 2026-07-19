@@ -33,7 +33,6 @@ import { PresenterAudioRecorder } from '../../services/transcription/presenterAu
 import type { PresenterAudioRecorderChunk } from '../../services/transcription/presenterAudioRecorder';
 import { TranscriptionRuntimeClient } from '../../services/transcription/transcriptionRuntimeClient';
 import { transcriptionModelCatalog } from '../../services/transcription/transcriptionModelCatalog';
-import type { TranscriptionModelPresetId } from '../../services/transcription/transcriptionModelCatalog';
 import { presenterRemoteTimerFormat } from '@localstudio/presenter-remote/timer-format';
 
 interface PresenterViewProps {
@@ -184,6 +183,25 @@ function postTranscriptChannelMessage(
   channel?.postMessage(message);
 }
 
+function isTranscriptWindowReadyMessage(value: unknown) {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return (
+    record.source === 'localstudio-presenter-transcript-window' &&
+    record.type === 'ready' &&
+    typeof record.sessionId === 'string'
+  );
+}
+
+function normalizeWhisperLanguageCode(languageCode: string | undefined) {
+  if (!languageCode) return undefined;
+  const normalized = languageCode.trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (normalized === 'iw') return 'he';
+  if (normalized === 'zh-hant') return 'zh';
+  return normalized.split('-')[0] || undefined;
+}
+
 export function PresenterView({ sessionId = getRouteSessionId() }: PresenterViewProps) {
   const [snapshot, setSnapshot] = useState<PresenterStatePayload | undefined>();
   const [currentTime, setCurrentTime] = useState(() => new Date());
@@ -199,8 +217,6 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     'idle' | 'downloading' | 'permission-needed' | 'recording' | 'save-failed' | 'saved' | 'transcribing'
   >('idle');
   const [recordingError, setRecordingError] = useState<string | undefined>();
-  const [transcriptionPresetId, setTranscriptionPresetId] =
-    useState<TranscriptionModelPresetId>('low-latency-en');
   const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[]>([]);
   const remoteStreamSize = defaultRemoteStreamSize;
   const [slideNavigatorOpen, setSlideNavigatorOpen] = useState(false);
@@ -229,8 +245,8 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
   const timerBaseMsRef = useRef(0);
   const resolvedSessionId = sessionId ?? 'presenter';
   const selectedTranscriptionPreset = useMemo(
-    () => transcriptionModelCatalog.getTranscriptionPreset(transcriptionPresetId),
-    [transcriptionPresetId],
+    () => transcriptionModelCatalog.getTranscriptionPreset(undefined),
+    [],
   );
   const presenterViewStyle = useMemo(
     () => ({ '--presenter-notes-width': `${notesPanelWidth}px` }) as CSSProperties,
@@ -421,6 +437,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     [snapshot],
   );
   const activePage = snapshot ? getActivePage(snapshot.project, snapshot.activePageId) : undefined;
+  const transcriptionLanguageCode = normalizeWhisperLanguageCode(snapshot?.transcriptionLanguage?.code);
   const activePageId = activePage?.id;
   const activePageName = activePage?.name;
   const activePageIndex = activePage
@@ -500,6 +517,19 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     [recordingStatus, resolvedSessionId],
   );
 
+  useEffect(() => {
+    const channel = transcriptChannelRef.current;
+    if (!channel) return undefined;
+    channel.onmessage = (event: MessageEvent<unknown>) => {
+      if (!isTranscriptWindowReadyMessage(event.data)) return;
+      if ((event.data as { sessionId: string }).sessionId !== resolvedSessionId) return;
+      publishTranscriptState();
+    };
+    return () => {
+      if (channel.onmessage) channel.onmessage = null;
+    };
+  }, [publishTranscriptState, resolvedSessionId]);
+
   const transcribeChunk = useCallback(
     (chunk: PresenterAudioRecorderChunk) => {
       if (chunk.audioData.length === 0) return;
@@ -507,6 +537,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
         const text = await transcriptRuntimeRef.current.transcribe(
           selectedTranscriptionPreset,
           chunk.audioData,
+          { language: transcriptionLanguageCode },
         );
         if (!text) return;
         const segment: TranscriptSegment = {
@@ -526,7 +557,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
       });
       transcriptionTasksRef.current = [...transcriptionTasksRef.current, task];
     },
-    [publishTranscriptState, selectedTranscriptionPreset],
+    [publishTranscriptState, selectedTranscriptionPreset, transcriptionLanguageCode],
   );
 
   const startRecording = useCallback(async () => {
@@ -548,9 +579,11 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
           error instanceof Error ? error.message : 'Transcription model could not be prepared.',
         );
       });
+      return true;
     } catch (error) {
       setRecordingError(error instanceof Error ? error.message : 'Microphone permission is required.');
       setRecordingStatus('permission-needed');
+      return false;
     }
   }, [publishTranscriptState, selectedTranscriptionPreset, transcribeChunk]);
 
@@ -565,14 +598,13 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
       recordingObjectUrlRef.current = objectUrl;
       const now = new Date().toISOString();
       const recordingId = createTranscriptId('recording');
-      const language = selectedTranscriptionPreset.id.endsWith('-en') ? 'en' : undefined;
       const recording: TranscriptRecording = {
         id: recordingId,
         name: `Presenter recording ${new Date(now).toLocaleString()}`,
         createdAt: now,
         updatedAt: now,
         durationMs: result.durationMs,
-        ...(language ? { language } : {}),
+        ...(transcriptionLanguageCode ? { language: transcriptionLanguageCode } : {}),
         modelPresetId: selectedTranscriptionPreset.id,
         audio: {
           mimeType: result.mimeType,
@@ -591,7 +623,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     } finally {
       recorderRef.current = undefined;
     }
-  }, [postCommand, publishTranscriptState, selectedTranscriptionPreset]);
+  }, [postCommand, publishTranscriptState, selectedTranscriptionPreset, transcriptionLanguageCode]);
 
   const openTranscriptWindow = useCallback(() => {
     const url = new URL(window.location.href);
@@ -600,7 +632,13 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     url.searchParams.set('presenterSession', resolvedSessionId);
     window.open(url.toString(), `localstudio-transcript-${resolvedSessionId}`, 'popup,width=900,height=760');
     publishTranscriptState();
-  }, [publishTranscriptState, resolvedSessionId]);
+    const shouldStartRecording =
+      recordingStatus !== 'recording' && recordingStatus !== 'transcribing';
+    if (shouldStartRecording) {
+      void startRecording();
+      return;
+    }
+  }, [publishTranscriptState, recordingStatus, resolvedSessionId, startRecording]);
 
   function getPresenterVideos() {
     return Array.from(presenterStageRef.current?.querySelectorAll('video') ?? []);
@@ -978,21 +1016,6 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
             <span className="presenter-timer">{presenterRemoteTimerFormat.formatElapsed(elapsedMs)}</span>
           </div>
           <div className="presenter-controls ew-compact-row" aria-label="Presenter controls">
-            <select
-              className="presenter-transcription-select"
-              aria-label="Transcription model preset"
-              disabled={recordingStatus === 'recording' || recordingStatus === 'transcribing'}
-              value={transcriptionPresetId}
-              onChange={(event) =>
-                setTranscriptionPresetId(event.target.value as TranscriptionModelPresetId)
-              }
-            >
-              {transcriptionModelCatalog.transcriptionPresets.map((preset) => (
-                <option key={preset.id} value={preset.id}>
-                  {preset.label}
-                </option>
-              ))}
-            </select>
             <button
               className="stitch-icon-button presenter-control-button"
               type="button"

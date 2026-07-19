@@ -20,6 +20,7 @@ export interface PresenterStatePayload {
   remoteSession?: PresenterRemoteSessionMetadata | undefined;
   streamPeerId?: string | undefined;
   timer?: PresenterRemoteTimerState | undefined;
+  transcriptionLanguage?: { code: string; label: string } | undefined;
 }
 
 export type PresenterWindowCommand =

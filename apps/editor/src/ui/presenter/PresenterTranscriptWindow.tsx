@@ -13,6 +13,12 @@ interface PresenterTranscriptStateMessage {
   type: 'state';
 }
 
+interface PresenterTranscriptReadyMessage {
+  sessionId: string;
+  source: 'localstudio-presenter-transcript-window';
+  type: 'ready';
+}
+
 function getTranscriptChannelName(sessionId: string) {
   return `localstudio-presenter-transcript-${sessionId}`;
 }
@@ -46,6 +52,12 @@ export function PresenterTranscriptWindow({ sessionId }: PresenterTranscriptWind
       setSegments(event.data.segments);
       setStatus(event.data.status);
     };
+    const readyMessage: PresenterTranscriptReadyMessage = {
+      sessionId,
+      source: 'localstudio-presenter-transcript-window',
+      type: 'ready',
+    };
+    channel.postMessage(readyMessage);
     return () => {
       channel.close();
     };

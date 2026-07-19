@@ -174,7 +174,6 @@ test.describe('editor presenter recording transcription journey', () => {
     const transcriptPage = await transcriptPopupPromise;
     await expect(transcriptPage.getByRole('main', { name: 'Live transcription' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Start recording' }).click();
     await expect(page.getByLabel('Presenter status')).toContainText('Recording', {
       timeout: 10_000,
     });

@@ -138,7 +138,7 @@ describe('PresenterView', () => {
     expect(screen.getByText(/00:00/)).toBeInTheDocument();
     expect(screen.getByText('Current: Slide 1 of 4')).toBeInTheDocument();
     expect(screen.getByText('Builds remaining: 1')).toBeInTheDocument();
-    expect(screen.getByLabelText('Transcription model preset')).toHaveValue('low-latency-en');
+    expect(screen.queryByLabelText('Transcription model preset')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start recording' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open live transcription window' })).toBeInTheDocument();
     expect(screen.getByText('Recorder ready')).toBeInTheDocument();
@@ -311,7 +311,7 @@ describe('PresenterView', () => {
         createdAt: '2026-07-18T12:00:00.000Z',
         updatedAt: '2026-07-18T12:00:00.000Z',
         durationMs: 20_000,
-        modelPresetId: 'low-latency-en',
+        modelPresetId: 'whisper-base',
         audio: {
           mimeType: 'audio/webm;codecs=opus',
           objectUrl: 'blob:recording1',

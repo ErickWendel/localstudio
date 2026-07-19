@@ -124,19 +124,10 @@ describe('AiToolsPanel', () => {
       required: false,
       status: 'needs-download',
     };
-    const whisperBaseState: ModelState = {
-      id: 'transcription-balanced-en',
-      label: 'Whisper Base EN',
-      description: 'Browser-local balanced ASR preset for higher-quality presenter recordings.',
-      progress: 0,
-      provider: 'transformers',
-      required: false,
-      status: 'needs-download',
-    };
-    const moonshineState: ModelState = {
-      id: 'transcription-experimental-live',
-      label: 'Moonshine Base ASR',
-      description: 'Experimental browser-local ASR preset with a larger download footprint.',
+    const transcriptionState: ModelState = {
+      id: 'transcription-whisper-base',
+      label: 'Whisper Base Transcription',
+      description: 'Browser-local multilingual ASR for presenter recordings.',
       progress: 0,
       provider: 'transformers',
       required: false,
@@ -146,7 +137,7 @@ describe('AiToolsPanel', () => {
     render(
       <AiToolsPanel
         languageDetectionProviderStates={[languageDetectionProvider]}
-        modelStates={[imageGenerationState, whisperBaseState, moonshineState]}
+        modelStates={[imageGenerationState, transcriptionState]}
         promptProviderStates={[gemmaProvider]}
         translationProviderStates={[translateGemmaProvider]}
         onDownloadModel={onDownloadModel}
@@ -157,7 +148,7 @@ describe('AiToolsPanel', () => {
     );
 
     expect(screen.getByLabelText('AI feature setup')).toHaveTextContent(
-      '6 features need setup before the AI workflows feel instant.',
+      '5 features need setup before the AI workflows feel instant.',
     );
 
     await user.click(screen.getByRole('button', { name: 'Download all' }));
@@ -167,12 +158,10 @@ describe('AiToolsPanel', () => {
       'language-detection',
       'translation',
       'image-generation-models',
-      'transcription-balanced-en',
-      'transcription-experimental-live',
+      'transcription-whisper-base',
     ]);
     expect(onDownloadModel).toHaveBeenCalledWith('image-generation-models');
-    expect(onDownloadModel).toHaveBeenCalledWith('transcription-balanced-en');
-    expect(onDownloadModel).toHaveBeenCalledWith('transcription-experimental-live');
+    expect(onDownloadModel).toHaveBeenCalledWith('transcription-whisper-base');
   });
 
   it('shows setup progress for each downloading AI feature', () => {

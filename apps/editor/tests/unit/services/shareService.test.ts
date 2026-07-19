@@ -84,7 +84,7 @@ function createProjectWithRecording(): ProjectDocument {
       updatedAt: '2026-07-18T12:00:00.000Z',
       durationMs: 2400,
       language: 'en',
-      modelPresetId: 'low-latency-en',
+      modelPresetId: 'whisper-base',
       audio: {
         mimeType: 'audio/webm;codecs=opus',
         objectUrl: 'data:audio/webm;base64,YXVkaW8=',

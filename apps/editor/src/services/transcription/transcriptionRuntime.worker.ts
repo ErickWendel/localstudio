@@ -7,7 +7,10 @@ import type {
 } from './transcriptionRuntimeClient';
 import type { TranscriptionModelPreset } from './transcriptionModelCatalog';
 
-type AutomaticSpeechRecognitionPipeline = ((input: Float32Array) => Promise<unknown>) & {
+type AutomaticSpeechRecognitionPipeline = ((
+  input: Float32Array,
+  options?: { language?: string; task?: 'transcribe' },
+) => Promise<unknown>) & {
   dispose?: () => Promise<void> | void;
 };
 
@@ -77,7 +80,10 @@ async function handleRequest(request: TranscriptionWorkerRequest) {
     const pipeline = await loadPipeline(request.preset);
     const audioData = new Float32Array(request.audio);
     if (audioData.length === 0) throw new Error('No microphone audio data was captured.');
-    const result = await pipeline(audioData);
+    const result = await pipeline(audioData, {
+      ...(request.language ? { language: request.language } : {}),
+      task: 'transcribe',
+    });
     postResponse({ id: request.id, text: extractTranscriptText(result), type: 'result' });
   } catch (error) {
     postResponse({

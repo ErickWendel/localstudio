@@ -16,7 +16,7 @@ test.describe('public deck view journey', () => {
         updatedAt: payload.updatedAt,
         durationMs: 2200,
         language: 'en',
-        modelPresetId: 'low-latency-en',
+        modelPresetId: 'whisper-base',
         audio: {
           mimeType: 'audio/webm;codecs=opus',
           objectUrl: 'https://cdn.localstudio.test/recordings/e2e-recording.webm',

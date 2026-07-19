@@ -103,7 +103,7 @@ test.describe('editor public transcript chat journey', () => {
         updatedAt: payload.updatedAt,
         durationMs: 8_000,
         language: 'en',
-        modelPresetId: 'low-latency-en',
+        modelPresetId: 'whisper-base',
         audio: {
           mimeType: 'audio/webm;codecs=opus',
           objectUrl: 'https://cdn.localstudio.test/recordings/failed-chat-recording.webm',
@@ -225,7 +225,7 @@ test.describe('editor public transcript chat journey', () => {
         updatedAt: payload.updatedAt,
         durationMs: 30_000,
         language: 'en',
-        modelPresetId: 'low-latency-en',
+        modelPresetId: 'whisper-base',
         audio: {
           mimeType: 'audio/webm;codecs=opus',
           objectUrl: 'https://cdn.localstudio.test/recordings/public-recording.webm',

@@ -10,6 +10,7 @@ export type TranscriptionWorkerRequest =
   | {
       audio: ArrayBuffer;
       id: string;
+      language?: string | undefined;
       preset: TranscriptionModelPreset;
       type: 'transcribe';
     }
@@ -75,13 +76,18 @@ export class TranscriptionRuntimeClient {
     );
   }
 
-  async transcribe(preset: TranscriptionModelPreset, audioData: Float32Array) {
+  async transcribe(
+    preset: TranscriptionModelPreset,
+    audioData: Float32Array,
+    options?: { language?: string | undefined },
+  ) {
     const audio = new ArrayBuffer(audioData.byteLength);
     new Float32Array(audio).set(audioData);
     const text = await this.request(
       {
         audio,
         id: createRequestId(),
+        ...(options?.language ? { language: options.language } : {}),
         preset,
         type: 'transcribe',
       },

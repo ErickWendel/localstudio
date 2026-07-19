@@ -20,7 +20,7 @@ describe('modelSetupService.InMemoryModelSetupService', () => {
     expect(
       states.filter((state) => state.required).every((state) => state.status === 'ready'),
     ).toBe(true);
-    expect(states).toHaveLength(11);
+    expect(states).toHaveLength(6);
     expect(states.find((state) => state.id === aiModelCatalog.GEMMA_LLM_MODEL_ID)).toMatchObject({
       label: aiModelCatalog.GEMMA_LLM_DISPLAY_NAME,
       required: false,
@@ -55,42 +55,9 @@ describe('modelSetupService.InMemoryModelSetupService', () => {
       required: false,
     });
     expect(
-      states.find((state) => state.id === aiModelCatalog.TRANSCRIPTION_LOW_LATENCY_MODEL_ID),
+      states.find((state) => state.id === aiModelCatalog.TRANSCRIPTION_MODEL_ID),
     ).toMatchObject({
-      label: aiModelCatalog.TRANSCRIPTION_LOW_LATENCY_DISPLAY_NAME,
-      required: false,
-      status: 'needs-download',
-    });
-    expect(
-      states.find((state) => state.id === aiModelCatalog.TRANSCRIPTION_BALANCED_MODEL_ID),
-    ).toMatchObject({
-      label: aiModelCatalog.TRANSCRIPTION_BALANCED_DISPLAY_NAME,
-      required: false,
-      status: 'needs-download',
-    });
-    expect(
-      states.find((state) => state.id === aiModelCatalog.TRANSCRIPTION_EXPERIMENTAL_MODEL_ID),
-    ).toMatchObject({
-      label: aiModelCatalog.TRANSCRIPTION_EXPERIMENTAL_DISPLAY_NAME,
-      required: false,
-      status: 'needs-download',
-    });
-    expect(
-      states.find((state) => state.id === aiModelCatalog.TRANSCRIPT_EMBEDDINGS_MODEL_ID),
-    ).toMatchObject({
-      label: aiModelCatalog.TRANSCRIPT_EMBEDDINGS_DISPLAY_NAME,
-      required: false,
-      status: 'needs-download',
-    });
-    expect(
-      states.find((state) => state.id === aiModelCatalog.TRANSCRIPT_EMBEDDINGS_FAST_MODEL_ID),
-    ).toMatchObject({
-      label: aiModelCatalog.TRANSCRIPT_EMBEDDINGS_FAST_DISPLAY_NAME,
-      required: false,
-      status: 'needs-download',
-    });
-    expect(states.find((state) => state.id === aiModelCatalog.TRANSCRIPT_QA_MODEL_ID)).toMatchObject({
-      label: aiModelCatalog.TRANSCRIPT_QA_DISPLAY_NAME,
+      label: aiModelCatalog.TRANSCRIPTION_DISPLAY_NAME,
       required: false,
       status: 'needs-download',
     });

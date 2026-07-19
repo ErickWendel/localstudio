@@ -75,7 +75,7 @@ export const presenterRouteProject = {
           updatedAt: '2026-07-09T00:05:00.000Z',
           durationMs: 24_000,
           language: 'en',
-          modelPresetId: 'low-latency-en',
+          modelPresetId: 'whisper-base',
           audio: {
             mimeType: 'audio/wav',
             objectUrl: audioUrl,
