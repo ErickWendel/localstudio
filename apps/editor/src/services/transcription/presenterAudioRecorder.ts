@@ -51,6 +51,7 @@ export class PresenterAudioRecorder {
   private chunkStartedAtMs = 0;
   private objectUrl: string | undefined;
   private pcmCapture: PcmCapture | undefined;
+  private realtimeChunkIntervalId: number | undefined;
   private recorder: MediaRecorder | undefined;
   private startedAtMs = 0;
   private stream: MediaStream | undefined;
@@ -62,7 +63,7 @@ export class PresenterAudioRecorder {
     this.mediaRecorderFactory =
       options.mediaRecorderFactory ??
       ((stream, recorderOptions) => new MediaRecorder(stream, recorderOptions));
-    this.timesliceMs = options.timesliceMs ?? 6000;
+    this.timesliceMs = options.timesliceMs ?? 1000;
   }
 
   getObjectUrl() {
@@ -103,7 +104,12 @@ export class PresenterAudioRecorder {
       });
       this.chunkStartedAtMs = endedAtMs;
     });
-    this.recorder.start(this.timesliceMs);
+    this.recorder.start();
+    this.realtimeChunkIntervalId = window.setInterval(() => {
+      if (this.recorder?.state !== 'recording') return;
+      if (typeof this.recorder.requestData !== 'function') return;
+      this.recorder.requestData();
+    }, this.timesliceMs);
   }
 
   stop() {
@@ -148,6 +154,10 @@ export class PresenterAudioRecorder {
   }
 
   private stopStream() {
+    if (this.realtimeChunkIntervalId !== undefined) {
+      window.clearInterval(this.realtimeChunkIntervalId);
+      this.realtimeChunkIntervalId = undefined;
+    }
     this.pcmCapture?.close();
     this.pcmCapture = undefined;
     this.stream?.getTracks().forEach((track) => track.stop());

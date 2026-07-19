@@ -21,17 +21,33 @@ test.describe('editor presenter recording transcription journey', () => {
       timeout: 10_000,
     });
     await expect(page.getByRole('button', { name: 'Start recording' })).toBeEnabled();
+
+    const transientPopup = page
+      .waitForEvent('popup', { timeout: 500 })
+      .catch(() => undefined);
+    await page.getByRole('button', { name: 'Open live transcription window' }).click();
+    await expect(page.getByLabel('Presenter status')).toContainText('Microphone blocked for e2e', {
+      timeout: 10_000,
+    });
+    const popup = await transientPopup;
+    if (popup) {
+      await expect.poll(() => popup.isClosed()).toBe(true);
+    }
   });
 
   test('records presenter audio, streams transcript updates, and exposes saved audio playback', async ({
     page,
   }) => {
     await page.addInitScript(() => {
+      (
+        window as Window & { __LOCALSTUDIO_E2E_TRANSCRIPTION_LANGUAGES?: string[] }
+      ).__LOCALSTUDIO_E2E_TRANSCRIPTION_LANGUAGES = [];
+
       class FakeWorker {
         onerror: ((event: ErrorEvent) => void) | null = null;
         onmessage: ((event: MessageEvent) => void) | null = null;
 
-        postMessage(message: { id?: string; type?: string }) {
+        postMessage(message: { id?: string; language?: string; type?: string }) {
           const id = message.id ?? 'missing-id';
           if (message.type === 'preload') {
             window.setTimeout(() => {
@@ -50,6 +66,20 @@ test.describe('editor presenter recording transcription journey', () => {
             return;
           }
           if (message.type === 'transcribe') {
+            (
+              window as Window & { __LOCALSTUDIO_E2E_TRANSCRIPTION_LANGUAGES?: string[] }
+            ).__LOCALSTUDIO_E2E_TRANSCRIPTION_LANGUAGES?.push(message.language ?? 'auto');
+            window.setTimeout(() => {
+              this.onmessage?.(
+                new MessageEvent('message', {
+                  data: {
+                    id,
+                    text: 'The presenter is explaining',
+                    type: 'partial',
+                  },
+                }),
+              );
+            }, 5);
             window.setTimeout(() => {
               this.onmessage?.(
                 new MessageEvent('message', {
@@ -60,7 +90,7 @@ test.describe('editor presenter recording transcription journey', () => {
                   },
                 }),
               );
-            }, 5);
+            }, 100);
             return;
           }
           window.setTimeout(() => {
@@ -168,6 +198,8 @@ test.describe('editor presenter recording transcription journey', () => {
     });
 
     await presenterRouteStartup.open(page, getServer().baseURL);
+    await expect(page.getByRole('combobox', { name: 'Transcription language' })).toHaveValue('pt');
+    await page.getByRole('combobox', { name: 'Transcription language' }).selectOption('en');
 
     const transcriptPopupPromise = page.waitForEvent('popup');
     await page.getByRole('button', { name: 'Open live transcription window' }).click();
@@ -177,7 +209,8 @@ test.describe('editor presenter recording transcription journey', () => {
     await expect(page.getByLabel('Presenter status')).toContainText('Recording', {
       timeout: 10_000,
     });
-    await expect(transcriptPage.locator('header strong')).toHaveText('recording', {
+    await expect(transcriptPage.getByRole('button', { name: 'Increase text size' })).toBeVisible();
+    await expect(transcriptPage.getByLabel(/Transcription status recording/)).toBeVisible({
       timeout: 10_000,
     });
     await expect(transcriptPage.locator('.presenter-transcript-current')).toContainText(
@@ -189,7 +222,9 @@ test.describe('editor presenter recording transcription journey', () => {
     await expect(page.getByLabel('Presenter status')).toContainText('Recording saved', {
       timeout: 10_000,
     });
-    await expect(transcriptPage.locator('header strong')).toHaveText('saved', { timeout: 10_000 });
+    await expect(transcriptPage.getByLabel(/Transcription status saved/)).toBeVisible({
+      timeout: 10_000,
+    });
 
     await expect(page.getByRole('region', { name: 'Presenter audio playback' })).toBeHidden();
     await expect(page.getByText('Podcast mode')).toBeHidden();
@@ -198,5 +233,12 @@ test.describe('editor presenter recording transcription journey', () => {
       () => window.__LOCALSTUDIO_E2E_PRESENTER__?.commands ?? [],
     );
     expect(commandNames).toContain('save-recording');
+    const transcriptionLanguages = await page.evaluate(
+      () =>
+        (
+          window as Window & { __LOCALSTUDIO_E2E_TRANSCRIPTION_LANGUAGES?: string[] }
+        ).__LOCALSTUDIO_E2E_TRANSCRIPTION_LANGUAGES ?? [],
+    );
+    expect(transcriptionLanguages).toContain('en');
   });
 });

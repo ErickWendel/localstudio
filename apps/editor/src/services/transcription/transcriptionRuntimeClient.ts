@@ -30,6 +30,11 @@ export type TranscriptionWorkerResponse =
   | {
       id: string;
       text?: string;
+      type: 'partial';
+    }
+  | {
+      id: string;
+      text?: string;
       type: 'result';
     }
   | {
@@ -39,6 +44,7 @@ export type TranscriptionWorkerResponse =
     };
 
 interface PendingTranscriptionRequest {
+  onPartial?: ((text: string) => void) | undefined;
   onProgress?: ((progress: number, details?: ModelDownloadProgressDetails) => void) | undefined;
   reject: (error: Error) => void;
   resolve: (text: string | undefined) => void;
@@ -79,7 +85,7 @@ export class TranscriptionRuntimeClient {
   async transcribe(
     preset: TranscriptionModelPreset,
     audioData: Float32Array,
-    options?: { language?: string | undefined },
+    options?: { language?: string | undefined; onPartial?: (text: string) => void },
   ) {
     const audio = new ArrayBuffer(audioData.byteLength);
     new Float32Array(audio).set(audioData);
@@ -91,7 +97,7 @@ export class TranscriptionRuntimeClient {
         preset,
         type: 'transcribe',
       },
-      undefined,
+      options?.onPartial ? { onPartial: options.onPartial } : undefined,
       [audio],
     );
     return text ?? '';
@@ -112,12 +118,16 @@ export class TranscriptionRuntimeClient {
 
   private request(
     request: TranscriptionWorkerRequest,
-    options?: { onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void },
+    options?: {
+      onPartial?: (text: string) => void;
+      onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void;
+    },
     transfer?: Transferable[],
   ) {
     return new Promise<string | undefined>((resolve, reject) => {
       this.ensureWorker();
       this.pendingRequests.set(request.id, {
+        onPartial: options?.onPartial,
         onProgress: options?.onProgress,
         reject,
         resolve,
@@ -135,6 +145,10 @@ export class TranscriptionRuntimeClient {
       if (!pendingRequest) return;
       if (response.type === 'progress') {
         pendingRequest.onProgress?.(response.progress, response.details);
+        return;
+      }
+      if (response.type === 'partial') {
+        pendingRequest.onPartial?.(response.text ?? '');
         return;
       }
       this.pendingRequests.delete(response.id);

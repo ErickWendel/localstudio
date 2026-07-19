@@ -7,45 +7,143 @@ import type {
 } from './transcriptionRuntimeClient';
 import type { TranscriptionModelPreset } from './transcriptionModelCatalog';
 
-type AutomaticSpeechRecognitionPipeline = ((
-  input: Float32Array,
-  options?: { language?: string; task?: 'transcribe' },
-) => Promise<unknown>) & {
-  dispose?: () => Promise<void> | void;
-};
+interface WhisperTokenizer {
+  batch_decode(value: unknown, options?: { skip_special_tokens?: boolean }): unknown;
+}
 
-const pipelines = new Map<string, Promise<AutomaticSpeechRecognitionPipeline>>();
+type WhisperProcessor = (input: Float32Array) => Promise<Record<string, unknown>>;
+
+interface WhisperGenerationModel {
+  dispose?: () => Promise<void> | void;
+  generate(input: Record<string, unknown>): Promise<unknown>;
+}
+
+interface WhisperRuntime {
+  model: WhisperGenerationModel;
+  processor: WhisperProcessor;
+  streamerConstructor: TextStreamerConstructor;
+  tokenizer: WhisperTokenizer;
+  warmedUp: boolean;
+}
+
+interface TextStreamerConstructor {
+  new (
+    tokenizer: WhisperTokenizer,
+    options: {
+      callback_function: (text: string) => void;
+      skip_prompt: boolean;
+      skip_special_tokens: boolean;
+    },
+  ): unknown;
+}
+
+interface TransformersWhisperModule {
+  AutoProcessor: {
+    from_pretrained(
+      modelId: string,
+      options?: { progress_callback?: (progress: unknown) => void },
+    ): Promise<WhisperProcessor>;
+  };
+  AutoTokenizer: {
+    from_pretrained(
+      modelId: string,
+      options?: { progress_callback?: (progress: unknown) => void },
+    ): Promise<WhisperTokenizer>;
+  };
+  TextStreamer: TextStreamerConstructor;
+  WhisperForConditionalGeneration: {
+    from_pretrained(
+      modelId: string,
+      options?: {
+        device?: 'webgpu';
+        dtype?: { decoder_model_merged: 'fp16' | 'fp32' | 'q4' | 'q8'; encoder_model: 'fp32' };
+        progress_callback?: (progress: unknown) => void;
+      },
+    ): Promise<WhisperGenerationModel>;
+  };
+  env: {
+    cacheKey?: string;
+    useBrowserCache?: boolean;
+  };
+  full(size: number[], fillValue: number): unknown;
+}
+
+const maxNewTokens = 64;
+const runtimes = new Map<string, Promise<WhisperRuntime>>();
 
 function postResponse(response: TranscriptionWorkerResponse) {
   self.postMessage(response);
 }
 
 function extractTranscriptText(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.find((item) => typeof item === 'string')?.trim() ?? '';
+  }
   if (!value || typeof value !== 'object') return '';
   const text = (value as { text?: unknown }).text;
   return typeof text === 'string' ? text.trim() : '';
 }
 
-function loadPipeline(
+function createProgressCallback(options?: {
+  onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void;
+}) {
+  return progress.createTransformersProgressCallback(options?.onProgress);
+}
+
+async function importWhisperModule() {
+  const transformers = await import('@huggingface/transformers');
+  return transformers as unknown as TransformersWhisperModule;
+}
+
+function loadRuntime(
   preset: TranscriptionModelPreset,
   options?: {
     onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void;
   },
 ) {
-  const existingPipeline = pipelines.get(preset.modelId);
-  if (existingPipeline) return existingPipeline;
+  const existingRuntime = runtimes.get(preset.modelId);
+  if (existingRuntime) return existingRuntime;
 
-  const pipelinePromise = import('@huggingface/transformers').then(async ({ env, pipeline }) => {
-    env.useBrowserCache = true;
-    env.cacheKey = imageGenerationModel.TRANSFORMERS_CACHE_KEY;
-    return await pipeline('automatic-speech-recognition', preset.modelId, {
-      device: 'webgpu',
-      ...(preset.dtype ? { dtype: preset.dtype } : {}),
-      progress_callback: progress.createTransformersProgressCallback(options?.onProgress),
-    });
+  const runtimePromise = importWhisperModule().then(async (transformers) => {
+    transformers.env.useBrowserCache = true;
+    transformers.env.cacheKey = imageGenerationModel.TRANSFORMERS_CACHE_KEY;
+    const progressCallback = createProgressCallback(options);
+    const [tokenizer, processor, model] = await Promise.all([
+      transformers.AutoTokenizer.from_pretrained(preset.modelId, {
+        progress_callback: progressCallback,
+      }),
+      transformers.AutoProcessor.from_pretrained(preset.modelId, {
+        progress_callback: progressCallback,
+      }),
+      transformers.WhisperForConditionalGeneration.from_pretrained(preset.modelId, {
+        device: 'webgpu',
+        dtype: {
+          decoder_model_merged: preset.dtype ?? 'q4',
+          encoder_model: 'fp32',
+        },
+        progress_callback: progressCallback,
+      }),
+    ]);
+    return {
+      model,
+      processor,
+      streamerConstructor: transformers.TextStreamer,
+      tokenizer,
+      warmedUp: false,
+    };
   });
-  pipelines.set(preset.modelId, pipelinePromise);
-  return pipelinePromise;
+  runtimes.set(preset.modelId, runtimePromise);
+  return runtimePromise;
+}
+
+async function warmUpRuntime(runtime: WhisperRuntime) {
+  if (runtime.warmedUp) return;
+  const transformers = await importWhisperModule();
+  await runtime.model.generate({
+    input_features: transformers.full([1, 80, 3000], 0),
+    max_new_tokens: 1,
+  });
+  runtime.warmedUp = true;
 }
 
 self.onmessage = (event: MessageEvent<TranscriptionWorkerRequest>) => {
@@ -55,7 +153,7 @@ self.onmessage = (event: MessageEvent<TranscriptionWorkerRequest>) => {
 async function handleRequest(request: TranscriptionWorkerRequest) {
   try {
     if (request.type === 'preload') {
-      await loadPipeline(request.preset, {
+      const runtime = await loadRuntime(request.preset, {
         onProgress: (progressValue, details) =>
           postResponse({
             ...(details ? { details } : {}),
@@ -64,27 +162,51 @@ async function handleRequest(request: TranscriptionWorkerRequest) {
             type: 'progress',
           }),
       });
+      await warmUpRuntime(runtime);
       postResponse({ id: request.id, type: 'result' });
       return;
     }
 
     if (request.type === 'dispose') {
-      const pipelinePromise = pipelines.get(request.preset.modelId);
-      pipelines.delete(request.preset.modelId);
-      const pipeline = await pipelinePromise?.catch(() => undefined);
-      await pipeline?.dispose?.();
+      const runtimePromise = runtimes.get(request.preset.modelId);
+      runtimes.delete(request.preset.modelId);
+      const runtime = await runtimePromise?.catch(() => undefined);
+      await runtime?.model.dispose?.();
       postResponse({ id: request.id, type: 'result' });
       return;
     }
 
-    const pipeline = await loadPipeline(request.preset);
+    const runtime = await loadRuntime(request.preset);
+    await warmUpRuntime(runtime);
     const audioData = new Float32Array(request.audio);
     if (audioData.length === 0) throw new Error('No microphone audio data was captured.');
-    const result = await pipeline(audioData, {
-      ...(request.language ? { language: request.language } : {}),
-      task: 'transcribe',
+    const inputFeatures = await runtime.processor(audioData);
+    const partialText: string[] = [];
+    const streamer = new runtime.streamerConstructor(runtime.tokenizer, {
+      callback_function: (text) => {
+        partialText.push(text);
+        postResponse({
+          id: request.id,
+          text: partialText.join('').trim(),
+          type: 'partial',
+        });
+      },
+      skip_prompt: true,
+      skip_special_tokens: true,
     });
-    postResponse({ id: request.id, text: extractTranscriptText(result), type: 'result' });
+    const output = await runtime.model.generate({
+      ...inputFeatures,
+      ...(request.language ? { language: request.language } : {}),
+      max_new_tokens: maxNewTokens,
+      streamer,
+    });
+    postResponse({
+      id: request.id,
+      text: extractTranscriptText(
+        runtime.tokenizer.batch_decode(output, { skip_special_tokens: true }),
+      ),
+      type: 'result',
+    });
   } catch (error) {
     postResponse({
       id: request.id,

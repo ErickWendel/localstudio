@@ -125,6 +125,10 @@ describe('PresenterView', () => {
                 waitingForClick: true,
               },
               project,
+              transcriptionLanguage: {
+                code: 'en',
+                label: 'English',
+              },
             },
             sessionId: 'session-1',
             source: 'localstudio-presenter-main',
@@ -139,6 +143,7 @@ describe('PresenterView', () => {
     expect(screen.getByText('Current: Slide 1 of 4')).toBeInTheDocument();
     expect(screen.getByText('Builds remaining: 1')).toBeInTheDocument();
     expect(screen.queryByLabelText('Transcription model preset')).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Transcription language' })).toHaveValue('en');
     expect(screen.getByRole('button', { name: 'Start recording' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open live transcription window' })).toBeInTheDocument();
     expect(screen.getByText('Recorder ready')).toBeInTheDocument();

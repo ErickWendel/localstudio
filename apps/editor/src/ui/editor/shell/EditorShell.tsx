@@ -87,6 +87,9 @@ export function EditorShell({ services }: EditorShellProps) {
 
 function EditorDesktopShell({ services }: EditorShellProps) {
   const vm = useEditorViewModel(services);
+  const presenterTranscriptionLanguage =
+    vm.translationLanguageOptions.find((language) => language.code === vm.translationTargetLanguage) ??
+    vm.activeSlideLanguage;
   const automationDelegateRef = useRef(vm.automation);
   const prepareProjectFontsForPublicShareRef = useRef(vm.prepareProjectFontsForPublicShare);
   const movieHoldStateRef = useRef<MovieHoldState | undefined>(undefined);
@@ -377,7 +380,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           presenterMode: 'presenting',
           project: vm.project,
           streamPeerId: presenterRemoteStreamPeerId,
-          transcriptionLanguage: vm.activeSlideLanguage,
+          transcriptionLanguage: presenterTranscriptionLanguage,
         });
       })
       .catch(() => {
@@ -397,10 +400,10 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         presenterMode: 'presenting',
         project: vm.project,
         streamPeerId: presenterRemoteStreamPeerId,
-        transcriptionLanguage: vm.activeSlideLanguage,
+        transcriptionLanguage: presenterTranscriptionLanguage,
       });
     }, 0);
-  }, [presenterRemoteStreamPeerId, presenterSessionId, vm]);
+  }, [presenterRemoteStreamPeerId, presenterSessionId, presenterTranscriptionLanguage, vm]);
 
   function enterAudienceFullscreen() {
     setAudienceFullscreenPromptOpen(false);
@@ -874,7 +877,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           presenterMode: presenterSessionId || remotePresenterActive ? 'presenting' : 'ready',
           project: vm.project,
           streamPeerId: presenterRemoteStreamPeerId,
-          transcriptionLanguage: vm.activeSlideLanguage,
+          transcriptionLanguage: presenterTranscriptionLanguage,
         });
       })
       .catch(() => {
@@ -890,7 +893,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     presenterRemoteUnavailable,
     presenterSessionId,
     remotePresenterActive,
-    vm.activeSlideLanguage,
+    presenterTranscriptionLanguage,
     vm.activePageId,
     vm.animationPreview,
     vm.project,
@@ -915,7 +918,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           presenterMode: 'presenting',
           project: vm.project,
           streamPeerId: presenterRemoteStreamPeerId,
-          transcriptionLanguage: vm.activeSlideLanguage,
+          transcriptionLanguage: presenterTranscriptionLanguage,
         });
         return;
       }
@@ -963,7 +966,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           presenterMode: presenterSessionId || remotePresenterActive ? 'presenting' : 'ready',
           project: projectWithRecording,
           streamPeerId: presenterRemoteStreamPeerId,
-          transcriptionLanguage: vm.activeSlideLanguage,
+          transcriptionLanguage: presenterTranscriptionLanguage,
         });
         return;
       }
@@ -978,7 +981,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           presenterMode: presenterSessionId || remotePresenterActive ? 'presenting' : 'ready',
           project: vm.project,
           streamPeerId: presenterRemoteStreamPeerId,
-          transcriptionLanguage: vm.activeSlideLanguage,
+          transcriptionLanguage: presenterTranscriptionLanguage,
         });
         return;
       }
@@ -991,6 +994,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     presenterRemoteSession,
     presenterRemoteStreamPeerId,
     presenterSessionId,
+    presenterTranscriptionLanguage,
     remotePresenterActive,
     closePresenterViewSession,
     vm,
@@ -1020,14 +1024,14 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       presenterMode: presenterSessionId || remotePresenterActive ? 'presenting' : 'ready',
       project: vm.project,
       streamPeerId: presenterRemoteStreamPeerId,
-      transcriptionLanguage: vm.activeSlideLanguage,
+      transcriptionLanguage: presenterTranscriptionLanguage,
     });
   }, [
     presenterRemoteSession,
     presenterRemoteStreamPeerId,
     presenterSessionId,
     remotePresenterActive,
-    vm.activeSlideLanguage,
+    presenterTranscriptionLanguage,
     vm.activePageId,
     vm.animationPreview,
     vm.project,

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import type { TranscriptSegment } from '../../domain/documents/model';
 
 interface PresenterTranscriptWindowProps {
@@ -34,13 +35,14 @@ function isTranscriptStateMessage(value: unknown): value is PresenterTranscriptS
   );
 }
 
-function formatTimestamp(milliseconds: number) {
-  const seconds = Math.floor(milliseconds / 1000);
-  const minutes = Math.floor(seconds / 60);
-  return `${minutes}:${String(seconds % 60).padStart(2, '0')}`;
-}
+const teleprompterDefaultFontSizePx = 72;
+const teleprompterFontStepPx = 8;
+const teleprompterMinFontSizePx = 40;
+const teleprompterMaxFontSizePx = 128;
 
 export function PresenterTranscriptWindow({ sessionId }: PresenterTranscriptWindowProps) {
+  const transcriptTextRef = useRef<HTMLDivElement>(null);
+  const [fontSize, setFontSize] = useState(teleprompterDefaultFontSizePx);
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
   const [status, setStatus] = useState('Waiting for recording');
 
@@ -63,25 +65,47 @@ export function PresenterTranscriptWindow({ sessionId }: PresenterTranscriptWind
     };
   }, [sessionId]);
 
-  const latestSegment = segments.at(-1);
+  const teleprompterText = useMemo(
+    () => segments.map((segment) => segment.text).join(' ').trim(),
+    [segments],
+  );
+
+  useEffect(() => {
+    const element = transcriptTextRef.current;
+    if (!element) return;
+    element.scrollTop = element.scrollHeight;
+  }, [teleprompterText]);
+
+  const decreaseFontSize = () => {
+    setFontSize((current) => Math.max(teleprompterMinFontSizePx, current - teleprompterFontStepPx));
+  };
+  const increaseFontSize = () => {
+    setFontSize((current) => Math.min(teleprompterMaxFontSizePx, current + teleprompterFontStepPx));
+  };
 
   return (
-    <main className="presenter-transcript-window" aria-label="Live transcription">
-      <header>
-        <span>Live transcription</span>
-        <strong>{status}</strong>
-      </header>
-      <section className="presenter-transcript-current" aria-live="polite">
-        {latestSegment?.text ?? 'Start recording in presenter mode.'}
+    <main
+      className="presenter-transcript-window"
+      aria-label="Live transcription"
+      style={{ '--presenter-transcript-font-size': `${fontSize}px` } as CSSProperties}
+    >
+      <div className="presenter-transcript-zoom" aria-label="Teleprompter zoom controls">
+        <button type="button" aria-label="Decrease text size" onClick={decreaseFontSize}>
+          -
+        </button>
+        <span aria-label="Transcript text size">{fontSize}px</span>
+        <button type="button" aria-label="Increase text size" onClick={increaseFontSize}>
+          +
+        </button>
+      </div>
+      <section
+        ref={transcriptTextRef}
+        className="presenter-transcript-current"
+        aria-label={`Transcription status ${status}`}
+        aria-live="polite"
+      >
+        {teleprompterText || 'Start recording in presenter mode.'}
       </section>
-      <ol className="presenter-transcript-list">
-        {segments.map((segment) => (
-          <li key={segment.id}>
-            <time>{formatTimestamp(segment.startMs)}</time>
-            <span>{segment.text}</span>
-          </li>
-        ))}
-      </ol>
     </main>
   );
 }
