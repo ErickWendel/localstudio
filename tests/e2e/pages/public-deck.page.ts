@@ -6,6 +6,10 @@ export class PublicDeckPage extends BasePage {
     super(page, baseURL);
   }
 
+  async goto(path: string) {
+    await this.page.goto(this.url(path), { waitUntil: 'domcontentloaded' });
+  }
+
   async expectReady(embed = false) {
     await expect(
       this.page.getByRole('main', {

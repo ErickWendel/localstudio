@@ -6,6 +6,7 @@ import type { CommonElementProps } from './canvas-element-props';
 interface CanvasReadOnlyMediaElementProps {
   commonProps: CommonElementProps;
   element: GifElement | VideoElement;
+  hidePlaceholder?: boolean;
   label: string;
   nodeRef: (node: Konva.Node | null) => void;
 }
@@ -13,9 +14,20 @@ interface CanvasReadOnlyMediaElementProps {
 export function CanvasReadOnlyMediaElement({
   commonProps,
   element,
+  hidePlaceholder = false,
   label,
   nodeRef,
 }: CanvasReadOnlyMediaElementProps) {
+  if (element.type === 'video' && hidePlaceholder) {
+    return (
+      <Rect
+        {...commonProps}
+        fill="rgba(0,0,0,0.01)"
+        ref={nodeRef}
+      />
+    );
+  }
+
   return (
     <Group {...commonProps} key={element.id} ref={nodeRef}>
       <Rect

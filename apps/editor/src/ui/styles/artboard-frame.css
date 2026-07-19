@@ -47,6 +47,7 @@
   pointer-events: none;
 }
 
+.project-video-preloader img,
 .project-video-preloader video {
   width: 1px;
   height: 1px;
