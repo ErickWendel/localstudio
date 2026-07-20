@@ -143,6 +143,9 @@
 .presenter-transcript-current {
   min-height: 0;
   align-self: stretch;
+  display: grid;
+  align-content: start;
+  gap: 0.58em;
   overflow: auto;
   scrollbar-width: none;
   font-family: var(--ls-font-display);
@@ -151,6 +154,29 @@
   line-height: 1.16;
   letter-spacing: 0;
   text-wrap: balance;
+}
+
+.presenter-transcript-segment {
+  display: grid;
+  gap: 0.14em;
+}
+
+.presenter-transcript-segment p {
+  margin: 0;
+}
+
+.presenter-transcript-slide-marker {
+  width: max-content;
+  border: 1px solid rgba(247, 251, 255, 0.22);
+  border-radius: 6px;
+  padding: 0.18em 0.42em;
+  color: #8df5b5;
+  background: rgba(141, 245, 181, 0.1);
+  font-family: var(--ls-font-body);
+  font-size: 0.24em;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 
 .presenter-transcript-current::-webkit-scrollbar {

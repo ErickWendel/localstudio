@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { TranscriptSegment } from '../../domain/documents/model';
 
@@ -35,13 +35,18 @@ function isTranscriptStateMessage(value: unknown): value is PresenterTranscriptS
   );
 }
 
+function getTeleprompterText(segment: TranscriptSegment) {
+  if (segment.pageIndex === undefined) return segment.text;
+  return segment.text.replace(new RegExp(`^\\[Slide ${segment.pageIndex + 1}\\]\\s*`, 'i'), '');
+}
+
 const teleprompterDefaultFontSizePx = 72;
 const teleprompterFontStepPx = 8;
 const teleprompterMinFontSizePx = 40;
 const teleprompterMaxFontSizePx = 128;
 
 export function PresenterTranscriptWindow({ sessionId }: PresenterTranscriptWindowProps) {
-  const transcriptTextRef = useRef<HTMLDivElement>(null);
+  const transcriptEndRef = useRef<HTMLSpanElement>(null);
   const [fontSize, setFontSize] = useState(teleprompterDefaultFontSizePx);
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
   const [status, setStatus] = useState('Waiting for recording');
@@ -65,16 +70,9 @@ export function PresenterTranscriptWindow({ sessionId }: PresenterTranscriptWind
     };
   }, [sessionId]);
 
-  const teleprompterText = useMemo(
-    () => segments.map((segment) => segment.text).join(' ').trim(),
-    [segments],
-  );
-
   useEffect(() => {
-    const element = transcriptTextRef.current;
-    if (!element) return;
-    element.scrollTop = element.scrollHeight;
-  }, [teleprompterText]);
+    transcriptEndRef.current?.scrollIntoView({ block: 'end' });
+  }, [segments]);
 
   const decreaseFontSize = () => {
     setFontSize((current) => Math.max(teleprompterMinFontSizePx, current - teleprompterFontStepPx));
@@ -99,12 +97,25 @@ export function PresenterTranscriptWindow({ sessionId }: PresenterTranscriptWind
         </button>
       </div>
       <section
-        ref={transcriptTextRef}
         className="presenter-transcript-current"
         aria-label={`Transcription status ${status}`}
         aria-live="polite"
       >
-        {teleprompterText || 'Start recording in presenter mode.'}
+        {segments.length > 0 ? (
+          segments.map((segment) => (
+            <article className="presenter-transcript-segment" key={segment.id}>
+              {segment.pageIndex !== undefined ? (
+                <span className="presenter-transcript-slide-marker">
+                  Slide {segment.pageIndex + 1}
+                </span>
+              ) : null}
+              <p>{getTeleprompterText(segment)}</p>
+            </article>
+          ))
+        ) : (
+          <p>Start recording in presenter mode.</p>
+        )}
+        <span ref={transcriptEndRef} aria-hidden="true" />
       </section>
     </main>
   );

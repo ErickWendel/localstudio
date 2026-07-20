@@ -95,26 +95,14 @@ test.describe('editor presenter recording transcription journey', () => {
           (
             window as Window & { __LOCALSTUDIO_E2E_TRANSCRIPTION_LANGUAGES?: string[] }
           ).__LOCALSTUDIO_E2E_TRANSCRIPTION_LANGUAGES?.push(this.lang);
+          (
+            window as Window & { __LOCALSTUDIO_E2E_SPEECH_RECOGNITION__?: FakeSpeechRecognition }
+          ).__LOCALSTUDIO_E2E_SPEECH_RECOGNITION__ = this;
           window.setTimeout(() => {
-            this.onresult?.({
-              resultIndex: 0,
-              results: [{ 0: { transcript: 'The presenter is explaining' }, isFinal: false }],
-            });
+            this.emitResult([
+              { text: 'The presenter is explaining', final: false },
+            ]);
           }, 5);
-          window.setTimeout(() => {
-            this.onresult?.({
-              resultIndex: 0,
-              results: [
-                {
-                  0: {
-                    transcript:
-                      'The presenter is explaining the podcast playback chapter workflow.',
-                  },
-                  isFinal: true,
-                },
-              ],
-            });
-          }, 100);
         }
 
         stop() {
@@ -123,6 +111,16 @@ test.describe('editor presenter recording transcription journey', () => {
 
         abort() {
           window.setTimeout(() => this.onend?.(), 0);
+        }
+
+        emitResult(results: Array<{ text: string; final: boolean }>) {
+          this.onresult?.({
+            resultIndex: 0,
+            results: results.map((result) => ({
+              0: { transcript: result.text },
+              isFinal: result.final,
+            })),
+          });
         }
       }
 
@@ -163,8 +161,55 @@ test.describe('editor presenter recording transcription journey', () => {
       timeout: 10_000,
     });
     await expect(transcriptPage.locator('.presenter-transcript-current')).toContainText(
-      'The presenter is explaining the podcast playback chapter workflow.',
+      'The presenter is explaining',
       { timeout: 10_000 },
+    );
+    await page.evaluate(() => {
+      (
+        window as Window & {
+          __LOCALSTUDIO_E2E_SPEECH_RECOGNITION__?: {
+            emitResult(results: Array<{ text: string; final: boolean }>): void;
+          };
+        }
+      ).__LOCALSTUDIO_E2E_SPEECH_RECOGNITION__?.emitResult([
+        {
+          text: 'The presenter is explaining the podcast playback chapter workflow.',
+          final: true,
+        },
+      ]);
+    });
+    await expect(transcriptPage.locator('.presenter-transcript-current')).toContainText('Slide 1', {
+      timeout: 10_000,
+    });
+    await page.keyboard.press('Shift+ArrowDown');
+    await expect(page.getByText('Current: Slide 2 of 3')).toBeVisible({ timeout: 10_000 });
+    await page.evaluate(() => {
+      (
+        window as Window & {
+          __LOCALSTUDIO_E2E_SPEECH_RECOGNITION__?: {
+            emitResult(results: Array<{ text: string; final: boolean }>): void;
+          };
+        }
+      ).__LOCALSTUDIO_E2E_SPEECH_RECOGNITION__?.emitResult([
+        {
+          text: 'The presenter is explaining the podcast playback chapter workflow.',
+          final: true,
+        },
+        {
+          text: 'Continuing on the second slide with local audio playback.',
+          final: true,
+        },
+      ]);
+    });
+    await expect(transcriptPage.locator('.presenter-transcript-current')).toContainText('Slide 2', {
+      timeout: 10_000,
+    });
+    await expect(transcriptPage.locator('.presenter-transcript-current')).toContainText(
+      'Continuing on the second slide with local audio playback.',
+      { timeout: 10_000 },
+    );
+    await expect(transcriptPage.locator('.presenter-transcript-current')).not.toContainText(
+      '[Slide 2] Continuing on the second slide with local audio playback.',
     );
 
     await page.getByRole('button', { name: 'Stop recording' }).click();
@@ -182,6 +227,18 @@ test.describe('editor presenter recording transcription journey', () => {
       () => window.__LOCALSTUDIO_E2E_PRESENTER__?.commands ?? [],
     );
     expect(commandNames).toContain('save-recording');
+    const savedRecordingSegments = await page.evaluate(
+      () =>
+        window.__LOCALSTUDIO_E2E_PRESENTER__?.messages.find(
+          (message) => message.command === 'save-recording',
+        )?.recording?.segments.map((segment) => segment.text) ?? [],
+    );
+    expect(savedRecordingSegments).toContain(
+      '[Slide 1] The presenter is explaining the podcast playback chapter workflow.',
+    );
+    expect(savedRecordingSegments).toContain(
+      '[Slide 2] Continuing on the second slide with local audio playback.',
+    );
     const transcriptionLanguages = await page.evaluate(
       () =>
         (

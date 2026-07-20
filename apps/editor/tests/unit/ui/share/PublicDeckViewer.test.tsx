@@ -58,6 +58,17 @@ describe('PublicDeckViewer', () => {
         });
       }
     });
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(function playMedia(
+      this: HTMLMediaElement,
+    ) {
+      this.dispatchEvent(new Event('play'));
+      return Promise.resolve();
+    });
+    vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(function pauseMedia(
+      this: HTMLMediaElement,
+    ) {
+      this.dispatchEvent(new Event('pause'));
+    });
   });
 
   afterEach(() => {
@@ -161,6 +172,13 @@ describe('PublicDeckViewer', () => {
     );
 
     await screen.findByLabelText('Public presentation');
+    expect(screen.getByRole('region', { name: 'Presentation playback' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Play presentation audio' }));
+    expect(screen.getByRole('button', { name: 'Pause presentation audio' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Show captions' }));
+    expect(screen.getByText('The roadmap includes transcript chat.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Open slide chapters' }));
+    expect(screen.getByLabelText('Slide chapter menu')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Open transcript chat' }));
 
     expect(screen.getByRole('complementary', { name: 'Transcript chat' })).toBeInTheDocument();
@@ -168,7 +186,7 @@ describe('PublicDeckViewer', () => {
     expect(screen.getByText('Podcast mode')).toBeInTheDocument();
     expect(screen.getByLabelText('Podcast recording')).toHaveValue('recording1');
     expect(screen.getByRole('heading', { name: 'Presenter recording' })).toBeInTheDocument();
-    expect(screen.getByText('The roadmap includes transcript chat.')).toBeInTheDocument();
+    expect(screen.getAllByText('The roadmap includes transcript chat.')).toHaveLength(2);
     expect(screen.getByLabelText('Presenter recording audio')).toHaveAttribute(
       'src',
       'https://cdn.localstudio.test/recordings/recording1.webm',
@@ -390,6 +408,13 @@ describe('PublicDeckViewer', () => {
 
     await user.click(screen.getByRole('button', { name: 'Previous slide' }));
     expect(screen.getByText('1 / 2')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Jump to slide 2: Slide 2' }));
+    expect(screen.getByText('2 / 2')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Jump to slide 2: Slide 2' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
   });
 
   it('waits for target slide videos and GIFs before changing public deck slides', async () => {

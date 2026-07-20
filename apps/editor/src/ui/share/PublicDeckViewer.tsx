@@ -64,6 +64,10 @@ function getRecordingTimePercent(currentMs: number, durationMs: number) {
   return Math.min(100, Math.max(0, (currentMs / durationMs) * 100));
 }
 
+function stripSlideLabel(text: string) {
+  return text.replace(/^\[Slide \d+\]\s*/i, '').trim();
+}
+
 function createPublicPodcastChapters(recording: TranscriptRecording | undefined, pages: Page[]) {
   if (!recording || pages.length === 0) return [];
   const pageCount = Math.max(1, pages.length);
@@ -91,6 +95,16 @@ function getActivePodcastChapter(chapters: PublicPodcastChapter[], currentTimeMs
     if (chapter.startMs > currentTimeMs) return activeChapter;
     return chapter;
   }, chapters[0]);
+}
+
+function getActiveTranscriptSegment(recording: TranscriptRecording | undefined, currentTimeMs: number) {
+  if (!recording) return undefined;
+  return recording.segments.find((segment, index) => {
+    const nextSegment = recording.segments[index + 1];
+    const segmentEndMs = segment.endMs > segment.startMs ? segment.endMs : nextSegment?.startMs;
+    if (currentTimeMs < segment.startMs) return false;
+    return segmentEndMs === undefined ? true : currentTimeMs < segmentEndMs;
+  });
 }
 
 function getBuildPlaybackDurationMs(build: ElementAnimationBuild) {
@@ -274,6 +288,19 @@ function PublicTranscriptPodcastPlayer({
     onSelectPage(chapter.pageIndex);
   }
 
+  function toggleChapterPlayback(chapter: PublicPodcastChapter) {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const isActiveChapter = chapter.id === activeChapter?.id;
+    if (isActiveChapter && playing) {
+      audio.pause();
+      setPlaying(false);
+      return;
+    }
+    seekToChapter(chapter);
+    void audio.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+  }
+
   if (!selectedRecording?.audio.objectUrl) {
     return <p className="public-deck-status">No public recording audio was published with this deck.</p>;
   }
@@ -344,7 +371,11 @@ function PublicTranscriptPodcastPlayer({
           }}
         />
       </div>
-      <div className="public-podcast-chapters" aria-label="Podcast chapters">
+      <div className="public-podcast-chapters" aria-label="Podcast slides">
+        <div className="public-podcast-chapters-heading">
+          <span>Slides in this recording</span>
+          <strong>{chapters.length}</strong>
+        </div>
         {chapters.map((chapter) => (
           <button
             className={
@@ -354,16 +385,285 @@ function PublicTranscriptPodcastPlayer({
             }
             key={chapter.id}
             type="button"
-            aria-label={`Jump to ${chapter.pageName}`}
-            onClick={() => seekToChapter(chapter)}
+            aria-label={`${chapter.id === activeChapter?.id && playing ? 'Pause' : 'Play'} ${chapter.pageName}`}
+            onClick={() => toggleChapterPlayback(chapter)}
           >
-            <span>{formatTranscriptTimestamp(chapter.startMs)}</span>
-            <strong>{chapter.pageIndex + 1}</strong>
+            <span className="public-podcast-chapter-icon">
+              {chapter.id === activeChapter?.id && playing ? (
+                <Pause size={14} aria-hidden="true" />
+              ) : (
+                <Play size={14} aria-hidden="true" />
+              )}
+            </span>
+            <span className="public-podcast-chapter-time">
+              {formatTranscriptTimestamp(chapter.startMs)}
+            </span>
+            <strong>Slide {chapter.pageIndex + 1}</strong>
             <em>{chapter.pageName}</em>
           </button>
         ))}
       </div>
     </section>
+  );
+}
+
+function PublicDeckPlaybackOverlay({
+  activePageIndex,
+  canGoNext,
+  canGoPrevious,
+  onNext,
+  onOpenTranscript,
+  onPrevious,
+  onSelectPage,
+  pages,
+  recordings,
+}: {
+  activePageIndex: number;
+  canGoNext: boolean;
+  canGoPrevious: boolean;
+  onNext: () => void;
+  onOpenTranscript: () => void;
+  onPrevious: () => void;
+  onSelectPage: (pageIndex: number) => void;
+  pages: Page[];
+  recordings: TranscriptRecording[];
+}) {
+  const [captionsVisible, setCaptionsVisible] = useState(false);
+  const [chaptersOpen, setChaptersOpen] = useState(false);
+  const [currentTimeMs, setCurrentTimeMs] = useState(0);
+  const [durationMs, setDurationMs] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const lastSyncedChapterIdRef = useRef<string | undefined>(undefined);
+  const selectedRecording = useMemo(
+    () => recordings.find((recording) => recording.audio.objectUrl) ?? recordings[0],
+    [recordings],
+  );
+  const chapters = useMemo(
+    () => createPublicPodcastChapters(selectedRecording, pages),
+    [pages, selectedRecording],
+  );
+  const activeChapter = useMemo(
+    () => getActivePodcastChapter(chapters, currentTimeMs),
+    [chapters, currentTimeMs],
+  );
+  const activeSegment = useMemo(
+    () => getActiveTranscriptSegment(selectedRecording, currentTimeMs),
+    [currentTimeMs, selectedRecording],
+  );
+  const captionText = activeSegment ? stripSlideLabel(activeSegment.text) : '';
+  const totalMs = durationMs || selectedRecording?.durationMs || 0;
+  const progressPercent = getRecordingTimePercent(currentTimeMs, totalMs);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.load();
+    }
+    lastSyncedChapterIdRef.current = undefined;
+    const timeoutId = window.setTimeout(() => {
+      setCurrentTimeMs(0);
+      setDurationMs(selectedRecording?.durationMs ?? 0);
+      setPlaying(false);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [selectedRecording?.durationMs, selectedRecording?.id]);
+
+  useEffect(() => {
+    if (!playing || !activeChapter) return;
+    if (lastSyncedChapterIdRef.current === activeChapter.id) return;
+    lastSyncedChapterIdRef.current = activeChapter.id;
+    onSelectPage(activeChapter.pageIndex);
+  }, [activeChapter, onSelectPage, playing]);
+
+  function updateProgress() {
+    const audio = audioRef.current;
+    if (!audio) return;
+    setCurrentTimeMs(Math.round(audio.currentTime * 1000));
+    if (Number.isFinite(audio.duration) && audio.duration > 0) {
+      setDurationMs(Math.round(audio.duration * 1000));
+    }
+  }
+
+  function togglePlayback() {
+    const audio = audioRef.current;
+    if (!audio || !selectedRecording?.audio.objectUrl) return;
+    if (playing) {
+      audio.pause();
+      setPlaying(false);
+      return;
+    }
+    void audio.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+  }
+
+  function seekToTime(nextTimeMs: number) {
+    const nextSeconds = Math.max(0, nextTimeMs) / 1000;
+    const audio = audioRef.current;
+    if (audio) audio.currentTime = nextSeconds;
+    setCurrentTimeMs(Math.round(nextSeconds * 1000));
+  }
+
+  function seekToChapter(chapter: PublicPodcastChapter) {
+    seekToTime(chapter.startMs);
+    lastSyncedChapterIdRef.current = chapter.id;
+    onSelectPage(chapter.pageIndex);
+    setChaptersOpen(false);
+  }
+
+  if (!selectedRecording?.audio.objectUrl) return null;
+
+  return (
+    <>
+      <audio
+        ref={audioRef}
+        preload="metadata"
+        src={selectedRecording.audio.objectUrl}
+        onDurationChange={updateProgress}
+        onEnded={() => setPlaying(false)}
+        onLoadedMetadata={updateProgress}
+        onPause={() => setPlaying(false)}
+        onPlay={() => setPlaying(true)}
+        onTimeUpdate={updateProgress}
+      >
+        <track kind="captions" />
+      </audio>
+      {captionsVisible && captionText ? (
+        <div className="public-deck-caption-overlay" aria-live="polite">
+          {captionText}
+        </div>
+      ) : null}
+      <section className="public-deck-playback-overlay" aria-label="Presentation playback">
+        <div className="public-deck-playback-rail">
+          <div
+            className="public-deck-playback-progress"
+            style={{ '--public-deck-progress': `${progressPercent}%` } as CSSProperties}
+          />
+          {chapters.map((chapter) => (
+            <button
+              key={chapter.id}
+              className={
+                chapter.pageIndex === activePageIndex
+                  ? 'public-deck-playback-chapter-dot public-deck-playback-chapter-dot-active'
+                  : 'public-deck-playback-chapter-dot'
+              }
+              type="button"
+              aria-label={`Seek audio to slide ${chapter.pageIndex + 1}: ${chapter.pageName}`}
+              style={{ '--public-deck-chapter-left': `${getRecordingTimePercent(chapter.startMs, totalMs)}%` } as CSSProperties}
+              onClick={() => seekToChapter(chapter)}
+            />
+          ))}
+          <input
+            aria-label="Seek presentation audio"
+            max={Math.max(1, Math.round(totalMs / 1000))}
+            min={0}
+            step={1}
+            type="range"
+            value={Math.round(currentTimeMs / 1000)}
+            onChange={(event) => seekToTime(Number(event.target.value) * 1000)}
+          />
+        </div>
+        <div className="public-deck-playback-controls">
+          <button
+            className="public-deck-playback-button public-deck-playback-button-primary"
+            type="button"
+            aria-label={playing ? 'Pause presentation audio' : 'Play presentation audio'}
+            onClick={togglePlayback}
+          >
+            {playing ? <Pause size={20} aria-hidden="true" /> : <Play size={20} aria-hidden="true" />}
+          </button>
+          <span className="public-deck-playback-time">
+            {formatTranscriptTimestamp(currentTimeMs)} / {formatTranscriptTimestamp(totalMs)}
+          </span>
+          <span className="public-deck-playback-page-count">
+            {activePageIndex + 1} / {pages.length}
+          </span>
+          <button
+            className="public-deck-playback-chapter-pill"
+            type="button"
+            aria-label="Open slide chapters"
+            aria-expanded={chaptersOpen}
+            onClick={() => setChaptersOpen((current) => !current)}
+          >
+            <ListMusic size={16} aria-hidden="true" />
+            <span>
+              {activeChapter
+                ? `Slide ${activeChapter.pageIndex + 1}: ${activeChapter.pageName}`
+                : selectedRecording.name}
+            </span>
+          </button>
+          <div className="public-deck-playback-spacer" />
+          <button
+            className="public-deck-playback-button"
+            disabled={!canGoPrevious}
+            type="button"
+            aria-label="Previous slide"
+            onClick={onPrevious}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              chevron_left
+            </span>
+          </button>
+          <button
+            className="public-deck-playback-button"
+            disabled={!canGoNext}
+            type="button"
+            aria-label="Next slide"
+            onClick={onNext}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              chevron_right
+            </span>
+          </button>
+          <button
+            className={
+              captionsVisible
+                ? 'public-deck-playback-button public-deck-playback-button-active'
+                : 'public-deck-playback-button'
+            }
+            type="button"
+            aria-label={captionsVisible ? 'Hide captions' : 'Show captions'}
+            aria-pressed={captionsVisible}
+            onClick={() => setCaptionsVisible((current) => !current)}
+          >
+            <Captions size={18} aria-hidden="true" />
+          </button>
+          <button
+            className="public-deck-playback-button"
+            type="button"
+            aria-label="Open transcript chat"
+            onClick={onOpenTranscript}
+          >
+            <Bot size={18} aria-hidden="true" />
+          </button>
+        </div>
+        {chaptersOpen ? (
+          <div className="public-deck-chapters-menu" aria-label="Slide chapter menu">
+            <header>
+              <strong>Slides</strong>
+              <span>{chapters.length}</span>
+            </header>
+            <ol>
+              {chapters.map((chapter) => (
+                <li key={chapter.id}>
+                  <button
+                    className={chapter.pageIndex === activePageIndex ? 'active' : undefined}
+                    type="button"
+                    aria-label={`Play slide ${chapter.pageIndex + 1}: ${chapter.pageName}`}
+                    onClick={() => seekToChapter(chapter)}
+                  >
+                    <span>{formatTranscriptTimestamp(chapter.startMs)}</span>
+                    <strong>Slide {chapter.pageIndex + 1}</strong>
+                    <em>{chapter.pageName}</em>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </div>
+        ) : null}
+      </section>
+    </>
   );
 }
 
@@ -750,6 +1050,9 @@ export function PublicDeckViewer({
   const canGoNext = activePageIndex < project.pages.length - 1;
   const transcriptRecordings = getTranscriptRecordings(project);
   const hasTranscriptRecordings = transcriptRecordings.length > 0;
+  const readyViewerClassName = hasTranscriptRecordings && !embed
+    ? `${viewerClassName} public-deck-viewer-with-playback`
+    : viewerClassName;
 
   async function answerTranscriptQuestion() {
     if (!transcriptQuestion.trim() || transcriptAnswerStatus === 'answering') return;
@@ -777,7 +1080,7 @@ export function PublicDeckViewer({
 
   return (
     <main
-      className={viewerClassName}
+      className={readyViewerClassName}
       aria-label={embed ? 'Embedded shared deck' : 'Public presentation'}
     >
       <ProjectVideoPreloader project={project} />
@@ -794,46 +1097,78 @@ export function PublicDeckViewer({
           onAnimationPreviewAdvance={advancePresentation}
         />
       </section>
-      <nav className="public-deck-controls" aria-label="Slide navigation">
-        <button
-          className="stitch-icon-button"
-          disabled={!canGoPrevious}
-          type="button"
-          aria-label="Previous slide"
-          onClick={() => {
-            rewindPresentation();
-          }}
-        >
-          <span className="material-symbols-outlined" aria-hidden="true">
-            chevron_left
+      {project.pages.length > 1 ? (
+        <nav className="public-deck-slide-dots" aria-label="Jump to slide">
+          {project.pages.map((page, pageIndex) => (
+            <button
+              key={page.id}
+              className={
+                pageIndex === activePageIndex
+                  ? 'public-deck-slide-dot public-deck-slide-dot-active'
+                  : 'public-deck-slide-dot'
+              }
+              type="button"
+              aria-current={pageIndex === activePageIndex ? 'page' : undefined}
+              aria-label={`Jump to slide ${pageIndex + 1}: ${page.name}`}
+              onClick={() => playPresentationPage(project, pageIndex)}
+            />
+          ))}
+        </nav>
+      ) : null}
+      {hasTranscriptRecordings && !embed ? (
+        <PublicDeckPlaybackOverlay
+          activePageIndex={activePageIndex}
+          canGoNext={canGoNext}
+          canGoPrevious={canGoPrevious}
+          recordings={transcriptRecordings}
+          pages={project.pages}
+          onNext={advancePresentation}
+          onOpenTranscript={() => setTranscriptPanelOpen((current) => !current)}
+          onPrevious={rewindPresentation}
+          onSelectPage={(pageIndex) => playPresentationPage(project, pageIndex)}
+        />
+      ) : (
+        <nav className="public-deck-controls" aria-label="Slide navigation">
+          <button
+            className="stitch-icon-button"
+            disabled={!canGoPrevious}
+            type="button"
+            aria-label="Previous slide"
+            onClick={() => {
+              rewindPresentation();
+            }}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              chevron_left
+            </span>
+          </button>
+          <span className="public-deck-page-count">
+            {activePageIndex + 1} / {project.pages.length}
           </span>
-        </button>
-        <span className="public-deck-page-count">
-          {activePageIndex + 1} / {project.pages.length}
-        </span>
-        <button
-          className="stitch-icon-button"
-          disabled={!canGoNext}
-          type="button"
-          aria-label="Next slide"
-          onClick={() => {
-            advancePresentation();
-          }}
-        >
-          <span className="material-symbols-outlined" aria-hidden="true">
-            chevron_right
-          </span>
-        </button>
-        <button
-          className="stitch-icon-button"
-          type="button"
-          aria-label="Open transcript chat"
-          aria-expanded={transcriptPanelOpen}
-          onClick={() => setTranscriptPanelOpen((current) => !current)}
-        >
-          <Bot size={18} aria-hidden="true" />
-        </button>
-      </nav>
+          <button
+            className="stitch-icon-button"
+            disabled={!canGoNext}
+            type="button"
+            aria-label="Next slide"
+            onClick={() => {
+              advancePresentation();
+            }}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              chevron_right
+            </span>
+          </button>
+          <button
+            className="stitch-icon-button"
+            type="button"
+            aria-label="Open transcript chat"
+            aria-expanded={transcriptPanelOpen}
+            onClick={() => setTranscriptPanelOpen((current) => !current)}
+          >
+            <Bot size={18} aria-hidden="true" />
+          </button>
+        </nav>
+      )}
       {transcriptPanelOpen ? (
         <aside className="public-transcript-panel" aria-label="Transcript chat">
           <header>

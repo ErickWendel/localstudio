@@ -30,6 +30,7 @@ function installPresenterRouteInitScript(payload: PresenterRoutePayload) {
   window.__LOCALSTUDIO_E2E_PRESENTER__ = {
     activePageId: sessionState.activePageId,
     commands: sessionState.commands,
+    messages: sessionState.messages,
     notesFor: sessionState.notesFor,
     sendCommand: (command) => {
       window.postMessage(

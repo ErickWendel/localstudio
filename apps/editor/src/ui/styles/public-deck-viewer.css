@@ -88,6 +88,64 @@
   max-height: calc(100vh - 58px);
 }
 
+.public-deck-slide-dots {
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: -6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(10px);
+}
+
+.public-deck-slide-dot {
+  width: 9px;
+  height: 9px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.34);
+  transition:
+    width 140ms ease,
+    background 140ms ease,
+    transform 140ms ease;
+}
+
+.public-deck-slide-dot:hover {
+  background: rgba(255, 255, 255, 0.72);
+  transform: translateY(-1px);
+}
+
+.public-deck-slide-dot:focus-visible {
+  outline: 2px solid var(--ew-green);
+  outline-offset: 3px;
+}
+
+.public-deck-slide-dot-active {
+  width: 30px;
+  background: var(--ew-green);
+}
+
+.public-deck-viewer-present .public-deck-slide-dots {
+  position: absolute;
+  right: 50%;
+  bottom: 72px;
+  z-index: 5;
+  transform: translateX(50%);
+}
+
+.public-deck-viewer-with-playback .public-deck-slide-dots {
+  bottom: 112px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  backdrop-filter: none;
+}
+
 .public-deck-controls {
   display: inline-flex;
   align-items: center;

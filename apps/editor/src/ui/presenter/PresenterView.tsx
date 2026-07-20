@@ -27,6 +27,10 @@ import {
 import { PresenterRemotePanel } from './PresenterRemotePanel';
 import { PresenterSlideNavigator } from './PresenterSlideNavigator';
 import { PresenterThumbnail } from './PresenterThumbnail';
+import {
+  buildPresenterTranscriptSegments,
+  type PresenterTranscriptSlideMarker,
+} from './presenterTranscriptSegments';
 import { presenterRemoteMirror } from './presenterRemoteMirror';
 import { presenterRemoteStreamPublisher } from './presenterRemoteStreamPublisher';
 import { PresenterAudioRecorder } from '../../services/transcription/presenterAudioRecorder';
@@ -243,7 +247,8 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
   const recordingObjectUrlRef = useRef<string | undefined>(undefined);
   const transcriptChannelRef = useRef<BroadcastChannel | undefined>(undefined);
   const speechTranscriberRef = useRef<PresenterSpeechTranscriber | undefined>(undefined);
-  const liveTranscriptSegmentIdRef = useRef<string | undefined>(undefined);
+  const fullTranscriptTextRef = useRef('');
+  const slideTranscriptMarkersRef = useRef<PresenterTranscriptSlideMarker[]>([]);
   const transcriptSegmentsRef = useRef<TranscriptSegment[]>([]);
   const transcriptionLanguageCodeRef = useRef<string | undefined>(undefined);
   const transcriptionLanguageTouchedRef = useRef(false);
@@ -532,6 +537,35 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     [recordingStatus, resolvedSessionId],
   );
 
+  const getCurrentTranscriptMarker = useCallback(
+    (
+      textOffset: number,
+      pageMetadata = activePageMetadataRef.current,
+    ): PresenterTranscriptSlideMarker => ({
+      id: createTranscriptId('slide-marker'),
+      startMs: Math.max(0, Date.now() - recordingStartedAtRef.current),
+      textOffset,
+      ...pageMetadata,
+    }),
+    [],
+  );
+
+  const refreshTranscriptSegments = useCallback(
+    (transcriptText: string, final: boolean) => {
+      const markers = slideTranscriptMarkersRef.current;
+      if (!markers.length) return;
+      const segments = buildPresenterTranscriptSegments(markers, {
+        currentTimeMs: Math.max(0, Date.now() - recordingStartedAtRef.current),
+        final,
+        transcriptText,
+      });
+      transcriptSegmentsRef.current = segments;
+      setTranscriptSegments(segments);
+      publishTranscriptState(final ? 'saved' : 'recording');
+    },
+    [publishTranscriptState],
+  );
+
   useEffect(() => {
     const channel = transcriptChannelRef.current;
     if (!channel) return undefined;
@@ -545,25 +579,40 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     };
   }, [publishTranscriptState, resolvedSessionId]);
 
+  useEffect(() => {
+    if (recordingStatus !== 'recording') return;
+    const currentPage = activePageMetadataRef.current;
+    const lastMarker = slideTranscriptMarkersRef.current.at(-1);
+    if (
+      lastMarker &&
+      lastMarker.pageId === currentPage?.pageId &&
+      lastMarker.pageIndex === currentPage?.pageIndex
+    ) {
+      return;
+    }
+    slideTranscriptMarkersRef.current = [
+      ...slideTranscriptMarkersRef.current,
+      getCurrentTranscriptMarker(fullTranscriptTextRef.current.length),
+    ];
+    refreshTranscriptSegments(fullTranscriptTextRef.current, false);
+  }, [
+    activePageId,
+    activePageIndex,
+    getCurrentTranscriptMarker,
+    recordingStatus,
+    refreshTranscriptSegments,
+  ]);
+
   const updateLiveTranscript = useCallback(
     (text: string, final: boolean) => {
       if (!text.trim()) return;
-      const segmentId = liveTranscriptSegmentIdRef.current ?? createTranscriptId('segment');
-      liveTranscriptSegmentIdRef.current = segmentId;
-      if (text === transcriptSegmentsRef.current[0]?.text) return;
-      const segment: TranscriptSegment = {
-        id: segmentId,
-        text,
-        startMs: 0,
-        endMs: Math.max(0, Date.now() - recordingStartedAtRef.current),
-        ...activePageMetadataRef.current,
-        final,
-      };
-      transcriptSegmentsRef.current = [segment];
-      setTranscriptSegments(transcriptSegmentsRef.current);
-      publishTranscriptState('recording');
+      if (!slideTranscriptMarkersRef.current.length) {
+        slideTranscriptMarkersRef.current = [getCurrentTranscriptMarker(0)];
+      }
+      fullTranscriptTextRef.current = text;
+      refreshTranscriptSegments(text, final);
     },
-    [publishTranscriptState],
+    [getCurrentTranscriptMarker, refreshTranscriptSegments],
   );
 
   const startRecording = useCallback(async () => {
@@ -579,12 +628,15 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
       recordingObjectUrlRef.current = undefined;
       setRecordingError(undefined);
       setTranscriptSegments([]);
-      liveTranscriptSegmentIdRef.current = undefined;
+      fullTranscriptTextRef.current = '';
       transcriptSegmentsRef.current = [];
+      slideTranscriptMarkersRef.current = [];
       const recorder = new PresenterAudioRecorder();
       recorderRef.current = recorder;
       await recorder.start();
       recordingStartedAtRef.current = Date.now();
+      slideTranscriptMarkersRef.current = [getCurrentTranscriptMarker(0)];
+      refreshTranscriptSegments('', false);
       const speechTranscriber = new PresenterSpeechTranscriber({
         onError: (message) => setRecordingError(message),
         onTranscript: (update) => updateLiveTranscript(update.text, update.final),
@@ -605,7 +657,13 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
       setRecordingStatus('permission-needed');
       return false;
     }
-  }, [publishTranscriptState, recordingStatus, updateLiveTranscript]);
+  }, [
+    getCurrentTranscriptMarker,
+    publishTranscriptState,
+    recordingStatus,
+    refreshTranscriptSegments,
+    updateLiveTranscript,
+  ]);
 
   const stopRecording = useCallback(async () => {
     const recorder = recorderRef.current;
@@ -614,7 +672,11 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
       setRecordingStatus('transcribing');
       await speechTranscriberRef.current?.stop();
       const finalTranscriptText = speechTranscriberRef.current?.getText();
-      if (finalTranscriptText) updateLiveTranscript(finalTranscriptText, true);
+      if (finalTranscriptText) {
+        updateLiveTranscript(finalTranscriptText, true);
+      } else {
+        refreshTranscriptSegments(fullTranscriptTextRef.current, true);
+      }
       const result = await recorder.stop();
       const objectUrl = recorder.getObjectUrl() ?? URL.createObjectURL(result.blob);
       recordingObjectUrlRef.current = objectUrl;
@@ -646,7 +708,13 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
       recorderRef.current = undefined;
       speechTranscriberRef.current = undefined;
     }
-  }, [postCommand, publishTranscriptState, transcriptionLanguageCode, updateLiveTranscript]);
+  }, [
+    postCommand,
+    publishTranscriptState,
+    refreshTranscriptSegments,
+    transcriptionLanguageCode,
+    updateLiveTranscript,
+  ]);
 
   const openTranscriptWindow = useCallback(async () => {
     let transcriptWindow: Window | null = null;
@@ -722,10 +790,30 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
   const goToPage = useCallback((index: number) => {
     const page = visiblePages[index];
     if (!page) return false;
+    if (recordingStatus === 'recording') {
+      const lastMarker = slideTranscriptMarkersRef.current.at(-1);
+      if (lastMarker?.pageId !== page.id || lastMarker?.pageIndex !== index) {
+        slideTranscriptMarkersRef.current = [
+          ...slideTranscriptMarkersRef.current,
+          getCurrentTranscriptMarker(fullTranscriptTextRef.current.length, {
+            pageId: page.id,
+            pageIndex: index,
+            pageName: page.name,
+          }),
+        ];
+        refreshTranscriptSegments(fullTranscriptTextRef.current, false);
+      }
+    }
     setSlideNavigatorIndex(index);
     postCommand({ command: 'go-to-page', pageId: page.id });
     return true;
-  }, [postCommand, visiblePages]);
+  }, [
+    getCurrentTranscriptMarker,
+    postCommand,
+    recordingStatus,
+    refreshTranscriptSegments,
+    visiblePages,
+  ]);
 
   const executePresenterShortcut = useCallback((action: KeyboardShortcutAction) => {
     if (action === 'shortcut-toggle') {

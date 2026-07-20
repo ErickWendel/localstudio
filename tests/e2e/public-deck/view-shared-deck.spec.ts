@@ -50,9 +50,21 @@ test.describe('public deck view journey', () => {
     await expect(page.getByText('2 / 2')).toBeVisible();
     await page.keyboard.press('ArrowLeft');
     await expect(page.getByText('1 / 2')).toBeVisible();
-    await page.getByRole('button', { name: 'Open transcript chat' }).click();
-    await expect(page.getByRole('complementary', { name: 'Transcript chat' })).toBeVisible();
+    await page.getByRole('button', { name: 'Jump to slide 2: Closing' }).click();
+    await expect(page.getByText('2 / 2')).toBeVisible();
+    await page.getByRole('button', { name: 'Jump to slide 1: Opening' }).click();
+    await expect(page.getByText('1 / 2')).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Presentation playback' })).toBeVisible();
+    await page.getByRole('button', { name: 'Open slide chapters' }).click();
+    await expect(page.getByLabel('Slide chapter menu')).toBeVisible();
+    await page.getByRole('button', { name: 'Show captions' }).click();
     await expect(page.getByText('Transcript chat is available in the public viewer.')).toBeVisible();
+    await page.getByRole('button', { name: 'Open transcript chat' }).click();
+    const transcriptPanel = page.getByRole('complementary', { name: 'Transcript chat' });
+    await expect(transcriptPanel).toBeVisible();
+    await expect(
+      transcriptPanel.getByText('Transcript chat is available in the public viewer.'),
+    ).toBeVisible();
 
     await publicDeck.goto(`/editor/?embed=e2e-share&src=${shareSrc}`);
     await publicDeck.expectReady(true);
