@@ -7,6 +7,7 @@ import type {
   MirrorProjectSummary,
   MirrorService,
   MirrorState,
+  MirrorSyncProgress,
   ProjectRepository,
   ShareMetadata,
   ShareRecord,
@@ -137,10 +138,12 @@ class RecordingMirrorService implements MirrorService<MinioMirrorConfig> {
       project: ProjectDocument,
       repository: ProjectRepository,
       config: MinioMirrorConfig,
+      options?: { onProgress?: (progress: MirrorSyncProgress) => void },
     ): Promise<MirrorState> => {
       void project;
       void repository;
       void config;
+      void options;
       return Promise.resolve({ enabled: true, status: 'synced' });
     },
   );

@@ -55,6 +55,7 @@ export function EditorToolbarSurface({
       hasSelection={!isHistoryReadOnly && hasSelection}
       persistenceEnabled={vm.persistenceEnabled}
       mirrorState={vm.mirrorState}
+      mirrorSyncProgress={vm.mirrorSyncProgress}
       mirrorDisabledBySettings={vm.mirrorDisabledBySettings}
       persistenceAttention={vm.persistenceAttention}
       persistenceError={vm.persistenceError}

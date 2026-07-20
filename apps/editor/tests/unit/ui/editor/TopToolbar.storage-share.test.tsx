@@ -95,11 +95,18 @@ describe('TopToolbar storage and sharing actions', () => {
         language="PT-BR"
         persistenceEnabled
         mirrorState={{ enabled: true, status: 'syncing' }}
+        mirrorSyncProgress={{ current: 2, label: 'Mirroring assets/logo.png', total: 5 }}
         onMirrorNow={onMirrorNow}
         onMirrorToggle={onMirrorToggle}
       />,
     );
     expect(screen.getByRole('button', { name: 'Mirror syncing' })).toHaveClass('mirror-syncing');
+    expect(screen.getByRole('progressbar', { name: 'Mirror sync progress' })).toHaveAttribute(
+      'aria-valuenow',
+      '40',
+    );
+    expect(screen.getByRole('status', { name: 'Mirror syncing 40%' })).toHaveTextContent('40%');
+    expect(screen.queryByText('Mirroring assets/logo.png')).not.toBeInTheDocument();
 
     rerender(
       <TopToolbar

@@ -28,6 +28,7 @@ import type {
   LocalFontMirrorProgress,
   MirrorProjectSummary,
   MirrorState,
+  MirrorSyncProgress,
   ModelDownloadProgressDetails,
   ModelState,
   PromptApiAvailability,
@@ -262,6 +263,7 @@ export function useEditorViewModel(services: AppServices) {
     enabled: Boolean(storedMirrorConfig) && shouldEnableStoredMirror,
     status: storedMirrorConfig && shouldEnableStoredMirror ? 'idle' : 'disabled',
   }));
+  const [mirrorSyncProgress, setMirrorSyncProgress] = useState<MirrorSyncProgress | undefined>();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mirrorSettingsOpen, setMirrorSettingsOpen] = useState(false);
   const [localFontMirrorSettings, setLocalFontMirrorSettings] = useState(() =>
@@ -1900,6 +1902,7 @@ export function useEditorViewModel(services: AppServices) {
       return;
     }
     mirrorSyncInFlightRef.current = true;
+    setMirrorSyncProgress({ current: 0, label: 'Preparing mirror', total: 1 });
     setMirrorState((current) => {
       const { error, ...rest } = current;
       void error;
@@ -1910,6 +1913,9 @@ export function useEditorViewModel(services: AppServices) {
         projectToSync,
         services.projectRepository,
         mirrorConfigRef.current!,
+        {
+          onProgress: setMirrorSyncProgress,
+        },
       );
       const previousMirroredProjectName = lastMirroredProjectNameRef.current;
       if (
@@ -1929,9 +1935,13 @@ export function useEditorViewModel(services: AppServices) {
       });
     } finally {
       mirrorSyncInFlightRef.current = false;
+      setMirrorSyncProgress(undefined);
       if (mirrorSyncQueuedRef.current) {
+        const shouldSyncLatestProject = projectRef.current !== projectToSync;
         mirrorSyncQueuedRef.current = false;
-        void syncMirrorNow();
+        if (shouldSyncLatestProject) {
+          void syncMirrorNow();
+        }
       }
     }
   }
@@ -3120,6 +3130,7 @@ export function useEditorViewModel(services: AppServices) {
     operationNotice,
     isExportingPowerPoint,
     mirrorState,
+    mirrorSyncProgress,
     mirrorDisabledBySettings,
     mirrorConfig,
     hasMirrorConfig,

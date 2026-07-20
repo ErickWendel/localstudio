@@ -80,6 +80,12 @@ export interface MirrorState {
   error?: string;
 }
 
+export interface MirrorSyncProgress {
+  current: number;
+  total: number;
+  label: string;
+}
+
 export interface MirrorProjectSummary {
   id: string;
   name: string;
@@ -94,6 +100,7 @@ export interface MirrorService<TConfig = unknown> {
     project: ProjectDocument,
     repository: ProjectRepository,
     config: TConfig,
+    options?: { onProgress?: (progress: MirrorSyncProgress) => void },
   ): Promise<MirrorState>;
   listProjects(config: TConfig): Promise<MirrorProjectSummary[]>;
   downloadProject(projectId: string, config: TConfig): Promise<MirrorFile[]>;
