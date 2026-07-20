@@ -50,7 +50,6 @@ test.describe('editor public transcript chat journey', () => {
     await expect(
       page.getByText('No presenter recording has been published with this deck.'),
     ).toBeVisible();
-    await page.getByRole('tab', { name: 'Ask' }).click();
     await page
       .getByRole('textbox', { name: 'Question for transcript chat' })
       .fill('Is there a recording?');
@@ -131,7 +130,6 @@ test.describe('editor public transcript chat journey', () => {
     await publicDeck.expectReady(false);
 
     await page.getByRole('button', { name: 'Open transcript chat' }).click();
-    await page.getByRole('tab', { name: 'Ask' }).click();
     await page
       .getByRole('textbox', { name: 'Question for transcript chat' })
       .fill('Why did setup fail?');
@@ -269,16 +267,18 @@ test.describe('editor public transcript chat journey', () => {
     await expect(page.getByRole('complementary', { name: 'Transcript chat' })).toBeVisible();
     const podcastPlayer = page.getByRole('region', { name: 'Podcast playback' });
     await expect(podcastPlayer).toBeVisible();
-    await expect(podcastPlayer.getByText('Podcast mode')).toBeVisible();
+    await expect(
+      podcastPlayer.locator('.public-podcast-meta').getByText('Podcast mode', { exact: true }),
+    ).toBeVisible();
     await expect(podcastPlayer.getByLabel('Podcast recording')).toHaveValue('public-recording');
     await podcastPlayer.getByRole('button', { name: 'Play podcast audio' }).click();
     await expect(podcastPlayer.getByRole('button', { name: 'Pause podcast audio' })).toBeVisible();
-    await podcastPlayer.getByRole('button', { name: 'Jump to Closing' }).click();
+    await podcastPlayer.getByRole('button', { name: 'Open slide 2: Closing' }).click();
     await expect(page.getByText('2 / 2')).toBeVisible();
-    await expect(page.getByText('Podcast mode uses slide chapters')).toBeVisible();
-    await expect(page.getByLabel('Public launch recording audio')).toBeVisible();
+    await expect(
+      podcastPlayer.getByRole('button', { name: 'Play transcript segment for slide 1 at 0:00' }),
+    ).toContainText('Podcast mode uses slide chapters');
 
-    await page.getByRole('tab', { name: 'Ask' }).click();
     await page
       .getByRole('textbox', { name: 'Question for transcript chat' })
       .fill('What did the speaker say about podcast chapters?');

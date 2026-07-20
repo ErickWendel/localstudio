@@ -1,5 +1,7 @@
 .public-podcast-player {
+  min-height: 0;
   display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: 10px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
@@ -83,7 +85,7 @@
 
 .public-podcast-chapters {
   display: grid;
-  max-height: 300px;
+  max-height: min(520px, calc((64px * 5) + 42px));
   overflow: auto;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
@@ -115,26 +117,43 @@
   text-align: center;
 }
 
-.public-podcast-chapter {
+.public-podcast-slide {
   min-width: 0;
   display: grid;
-  grid-template-columns: 30px 44px minmax(0, 1fr);
+  grid-template-columns: 22px minmax(82px, 118px) minmax(0, 1fr) 30px;
+  grid-template-areas:
+    'number preview body play'
+    'number preview body play';
   align-items: center;
   gap: 8px;
   border: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 0;
-  padding: 10px;
+  padding: 8px;
   color: var(--ew-text);
   background: transparent;
   text-align: left;
 }
 
-.public-podcast-chapter:hover {
+.public-podcast-slide:hover {
   background: rgba(255, 255, 255, 0.06);
 }
 
+.public-podcast-slide .page-card-number {
+  grid-area: number;
+}
+
+.public-podcast-slide .page-card-preview {
+  grid-area: preview;
+}
+
+.public-podcast-slide-body {
+  grid-area: body;
+  min-width: 0;
+}
+
 .public-podcast-chapter-icon {
+  grid-area: play;
   width: 30px;
   height: 30px;
   display: inline-grid;
@@ -146,21 +165,24 @@
 }
 
 .public-podcast-chapter-time,
-.public-podcast-chapter strong {
+.public-podcast-slide strong {
   color: var(--ew-green);
   font-size: 11px;
   font-weight: 900;
 }
 
-.public-podcast-chapter strong {
+.public-podcast-chapter-time-empty {
+  color: var(--ew-muted);
+}
+
+.public-podcast-slide strong {
   overflow: hidden;
   color: var(--ew-text);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.public-podcast-chapter em {
-  grid-column: 3;
+.public-podcast-slide em {
   overflow: hidden;
   color: var(--ew-muted);
   font-size: 12px;
@@ -178,4 +200,9 @@
 .public-podcast-chapter-active .public-podcast-chapter-icon {
   color: #041008;
   background: var(--ew-green);
+}
+
+.public-podcast-transcript-list {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 10px;
 }
