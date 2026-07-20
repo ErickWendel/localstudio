@@ -189,7 +189,7 @@ describe('OpfsProjectRepository', () => {
           createdAt: '2026-07-18T12:00:00.000Z',
           updatedAt: '2026-07-18T12:00:00.000Z',
           durationMs: 1000,
-          modelPresetId: 'whisper-base',
+          modelPresetId: 'web-speech-api',
           audio: {
             mimeType: 'audio/webm;codecs=opus',
             objectUrl: 'data:audio/webm;base64,YXVkaW8=',

@@ -20,7 +20,7 @@ describe('modelSetupService.InMemoryModelSetupService', () => {
     expect(
       states.filter((state) => state.required).every((state) => state.status === 'ready'),
     ).toBe(true);
-    expect(states).toHaveLength(6);
+    expect(states).toHaveLength(5);
     expect(states.find((state) => state.id === aiModelCatalog.GEMMA_LLM_MODEL_ID)).toMatchObject({
       label: aiModelCatalog.GEMMA_LLM_DISPLAY_NAME,
       required: false,
@@ -53,13 +53,6 @@ describe('modelSetupService.InMemoryModelSetupService', () => {
       description: 'Text-to-image model for generated slide assets.',
       status: 'needs-download',
       required: false,
-    });
-    expect(
-      states.find((state) => state.id === aiModelCatalog.TRANSCRIPTION_MODEL_ID),
-    ).toMatchObject({
-      label: aiModelCatalog.TRANSCRIPTION_DISPLAY_NAME,
-      required: false,
-      status: 'needs-download',
     });
   });
 });

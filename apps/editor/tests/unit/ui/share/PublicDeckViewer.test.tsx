@@ -130,7 +130,7 @@ describe('PublicDeckViewer', () => {
         updatedAt: '2026-07-18T12:00:00.000Z',
         durationMs: 2400,
         language: 'en',
-        modelPresetId: 'whisper-base',
+        modelPresetId: 'web-speech-api',
         audio: {
           mimeType: 'audio/webm;codecs=opus',
           objectUrl: 'https://cdn.localstudio.test/recordings/recording1.webm',

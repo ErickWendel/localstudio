@@ -43,67 +43,6 @@ test.describe('editor presenter recording transcription journey', () => {
         window as Window & { __LOCALSTUDIO_E2E_TRANSCRIPTION_LANGUAGES?: string[] }
       ).__LOCALSTUDIO_E2E_TRANSCRIPTION_LANGUAGES = [];
 
-      class FakeWorker {
-        onerror: ((event: ErrorEvent) => void) | null = null;
-        onmessage: ((event: MessageEvent) => void) | null = null;
-
-        postMessage(message: { id?: string; language?: string; type?: string }) {
-          const id = message.id ?? 'missing-id';
-          if (message.type === 'preload') {
-            window.setTimeout(() => {
-              this.onmessage?.(
-                new MessageEvent('message', {
-                  data: {
-                    details: { file: 'mock-asr.onnx', loaded: 1, total: 2 },
-                    id,
-                    progress: 0.5,
-                    type: 'progress',
-                  },
-                }),
-              );
-              this.onmessage?.(new MessageEvent('message', { data: { id, type: 'result' } }));
-            }, 5);
-            return;
-          }
-          if (message.type === 'transcribe') {
-            (
-              window as Window & { __LOCALSTUDIO_E2E_TRANSCRIPTION_LANGUAGES?: string[] }
-            ).__LOCALSTUDIO_E2E_TRANSCRIPTION_LANGUAGES?.push(message.language ?? 'auto');
-            window.setTimeout(() => {
-              this.onmessage?.(
-                new MessageEvent('message', {
-                  data: {
-                    id,
-                    text: 'The presenter is explaining',
-                    type: 'partial',
-                  },
-                }),
-              );
-            }, 5);
-            window.setTimeout(() => {
-              this.onmessage?.(
-                new MessageEvent('message', {
-                  data: {
-                    id,
-                    text: 'The presenter is explaining the podcast playback chapter workflow.',
-                    type: 'result',
-                  },
-                }),
-              );
-            }, 100);
-            return;
-          }
-          window.setTimeout(() => {
-            this.onmessage?.(new MessageEvent('message', { data: { id, type: 'result' } }));
-          }, 5);
-        }
-
-        terminate() {
-          this.onmessage = null;
-          this.onerror = null;
-        }
-      }
-
       class FakeMediaRecorder extends EventTarget {
         static isTypeSupported(mimeType: string) {
           return mimeType === 'audio/webm;codecs=opus' || mimeType === 'audio/webm';
@@ -136,44 +75,54 @@ test.describe('editor presenter recording transcription journey', () => {
         }
       }
 
-      class FakeAudioContext {
-        destination = {};
+      class FakeSpeechRecognition {
+        continuous = false;
+        interimResults = false;
+        lang = '';
+        maxAlternatives = 0;
+        onend: (() => void) | null = null;
+        onerror: ((event: { error?: string; message?: string }) => void) | null = null;
+        onresult:
+          | ((
+              event: {
+                resultIndex: number;
+                results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }>;
+              },
+            ) => void)
+          | null = null;
 
-        close() {
-          return Promise.resolve();
-        }
-
-        createGain() {
-          return {
-            connect: () => undefined,
-            disconnect: () => undefined,
-            gain: { value: 1 },
-          };
-        }
-
-        createMediaStreamSource() {
-          return {
-            connect: () => undefined,
-            disconnect: () => undefined,
-          };
-        }
-
-        createScriptProcessor() {
-          return {
-            connect() {
-              window.setTimeout(() => {
-                this.onaudioprocess?.({
-                  inputBuffer: {
-                    getChannelData: () => new Float32Array([0.1, 0.2, 0.1, 0]),
+        start() {
+          (
+            window as Window & { __LOCALSTUDIO_E2E_TRANSCRIPTION_LANGUAGES?: string[] }
+          ).__LOCALSTUDIO_E2E_TRANSCRIPTION_LANGUAGES?.push(this.lang);
+          window.setTimeout(() => {
+            this.onresult?.({
+              resultIndex: 0,
+              results: [{ 0: { transcript: 'The presenter is explaining' }, isFinal: false }],
+            });
+          }, 5);
+          window.setTimeout(() => {
+            this.onresult?.({
+              resultIndex: 0,
+              results: [
+                {
+                  0: {
+                    transcript:
+                      'The presenter is explaining the podcast playback chapter workflow.',
                   },
-                });
-              }, 5);
-            },
-            disconnect: () => undefined,
-            onaudioprocess: undefined as
-              | ((event: { inputBuffer: { getChannelData: () => Float32Array } }) => void)
-              | undefined,
-          };
+                  isFinal: true,
+                },
+              ],
+            });
+          }, 100);
+        }
+
+        stop() {
+          window.setTimeout(() => this.onend?.(), 0);
+        }
+
+        abort() {
+          window.setTimeout(() => this.onend?.(), 0);
         }
       }
 
@@ -183,17 +132,17 @@ test.describe('editor presenter recording transcription journey', () => {
           getUserMedia: () => Promise.resolve(new MediaStream()),
         },
       });
-      Object.defineProperty(window, 'AudioContext', {
-        configurable: true,
-        value: FakeAudioContext,
-      });
       Object.defineProperty(window, 'MediaRecorder', {
         configurable: true,
         value: FakeMediaRecorder,
       });
-      Object.defineProperty(window, 'Worker', {
+      Object.defineProperty(window, 'SpeechRecognition', {
         configurable: true,
-        value: FakeWorker,
+        value: FakeSpeechRecognition,
+      });
+      Object.defineProperty(window, 'webkitSpeechRecognition', {
+        configurable: true,
+        value: FakeSpeechRecognition,
       });
     });
 
@@ -239,6 +188,6 @@ test.describe('editor presenter recording transcription journey', () => {
           window as Window & { __LOCALSTUDIO_E2E_TRANSCRIPTION_LANGUAGES?: string[] }
         ).__LOCALSTUDIO_E2E_TRANSCRIPTION_LANGUAGES ?? [],
     );
-    expect(transcriptionLanguages).toContain('en');
+    expect(transcriptionLanguages).toContain('en-US');
   });
 });

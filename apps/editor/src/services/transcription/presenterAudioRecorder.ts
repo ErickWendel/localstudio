@@ -1,5 +1,4 @@
 export interface PresenterAudioRecorderChunk {
-  audioData: Float32Array;
   blob: Blob;
   durationMs: number;
   endedAtMs: number;
@@ -17,11 +16,6 @@ export interface PresenterAudioRecorderOptions {
   mediaRecorderFactory?: (stream: MediaStream, options: MediaRecorderOptions) => MediaRecorder;
   onChunk?: (chunk: PresenterAudioRecorderChunk) => void;
   timesliceMs?: number;
-}
-
-interface PcmCapture {
-  close: () => void;
-  read: () => Float32Array;
 }
 
 const preferredMimeTypes = [
@@ -50,7 +44,6 @@ export class PresenterAudioRecorder {
   private chunks: Blob[] = [];
   private chunkStartedAtMs = 0;
   private objectUrl: string | undefined;
-  private pcmCapture: PcmCapture | undefined;
   private realtimeChunkIntervalId: number | undefined;
   private recorder: MediaRecorder | undefined;
   private startedAtMs = 0;
@@ -86,7 +79,6 @@ export class PresenterAudioRecorder {
     this.revokeObjectUrl();
     this.chunks = [];
     this.stream = await this.getUserMedia({ audio: true });
-    this.pcmCapture = this.createPcmCapture(this.stream);
     const mimeType = getSupportedMimeType();
     this.recorder = this.mediaRecorderFactory(this.stream, { mimeType });
     this.startedAtMs = Date.now();
@@ -96,7 +88,6 @@ export class PresenterAudioRecorder {
       this.chunks.push(event.data);
       const endedAtMs = Date.now();
       this.options.onChunk?.({
-        audioData: this.pcmCapture?.read() ?? new Float32Array(),
         blob: event.data,
         durationMs: endedAtMs - this.chunkStartedAtMs,
         endedAtMs,
@@ -147,6 +138,19 @@ export class PresenterAudioRecorder {
     });
   }
 
+  cancel() {
+    const recorder = this.recorder;
+    if (recorder && recorder.state !== 'inactive') {
+      try {
+        recorder.stop();
+      } catch {
+        // Ignore recorder shutdown errors while abandoning a failed start.
+      }
+    }
+    this.stopStream();
+    this.chunks = [];
+  }
+
   revokeObjectUrl() {
     if (!this.objectUrl) return;
     URL.revokeObjectURL(this.objectUrl);
@@ -158,51 +162,8 @@ export class PresenterAudioRecorder {
       window.clearInterval(this.realtimeChunkIntervalId);
       this.realtimeChunkIntervalId = undefined;
     }
-    this.pcmCapture?.close();
-    this.pcmCapture = undefined;
     this.stream?.getTracks().forEach((track) => track.stop());
     this.stream = undefined;
     this.recorder = undefined;
-  }
-
-  private createPcmCapture(stream: MediaStream): PcmCapture | undefined {
-    const AudioContextConstructor =
-      window.AudioContext ??
-      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextConstructor) return undefined;
-    try {
-      const audioContext = new AudioContextConstructor({ sampleRate: 16_000 });
-      const source = audioContext.createMediaStreamSource(stream);
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
-      const mutedOutput = audioContext.createGain();
-      const chunks: Float32Array[] = [];
-      mutedOutput.gain.value = 0;
-      processor.onaudioprocess = (event) => {
-        chunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
-      };
-      source.connect(processor);
-      processor.connect(mutedOutput);
-      mutedOutput.connect(audioContext.destination);
-      return {
-        close: () => {
-          processor.disconnect();
-          source.disconnect();
-          mutedOutput.disconnect();
-          void audioContext.close();
-        },
-        read: () => {
-          const totalLength = chunks.reduce((total, chunk) => total + chunk.length, 0);
-          const audioData = new Float32Array(totalLength);
-          let offset = 0;
-          for (const chunk of chunks.splice(0)) {
-            audioData.set(chunk, offset);
-            offset += chunk.length;
-          }
-          return audioData;
-        },
-      };
-    } catch {
-      return undefined;
-    }
   }
 }

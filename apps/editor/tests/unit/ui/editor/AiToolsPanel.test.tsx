@@ -124,20 +124,10 @@ describe('AiToolsPanel', () => {
       required: false,
       status: 'needs-download',
     };
-    const transcriptionState: ModelState = {
-      id: 'transcription-whisper-base',
-      label: 'Whisper Base Transcription',
-      description: 'Browser-local multilingual ASR for presenter recordings.',
-      progress: 0,
-      provider: 'transformers',
-      required: false,
-      status: 'needs-download',
-    };
-
     render(
       <AiToolsPanel
         languageDetectionProviderStates={[languageDetectionProvider]}
-        modelStates={[imageGenerationState, transcriptionState]}
+        modelStates={[imageGenerationState]}
         promptProviderStates={[gemmaProvider]}
         translationProviderStates={[translateGemmaProvider]}
         onDownloadModel={onDownloadModel}
@@ -148,7 +138,7 @@ describe('AiToolsPanel', () => {
     );
 
     expect(screen.getByLabelText('AI feature setup')).toHaveTextContent(
-      '5 features need setup before the AI workflows feel instant.',
+      '4 features need setup before the AI workflows feel instant.',
     );
 
     await user.click(screen.getByRole('button', { name: 'Download all' }));
@@ -158,10 +148,8 @@ describe('AiToolsPanel', () => {
       'language-detection',
       'translation',
       'image-generation-models',
-      'transcription-whisper-base',
     ]);
     expect(onDownloadModel).toHaveBeenCalledWith('image-generation-models');
-    expect(onDownloadModel).toHaveBeenCalledWith('transcription-whisper-base');
   });
 
   it('shows setup progress for each downloading AI feature', () => {

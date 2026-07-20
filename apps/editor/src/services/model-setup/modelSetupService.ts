@@ -10,8 +10,6 @@ import { browserStorage } from '../browser/browserStorage';
 import type { BrowserKeyValueStorage } from '../browser/browserStorage';
 import { progress } from './progress';
 import { TransformersRuntimeClient } from './transformersRuntimeClient';
-import { TranscriptionRuntimeClient } from '../transcription/transcriptionRuntimeClient';
-import { transcriptionModelCatalog } from '../transcription/transcriptionModelCatalog';
 
 const IMAGE_EDITING_MODEL_ID = 'image-editing-models';
 const IMAGE_EDITING_TRANSFORMERS_MODEL_ID = 'Xenova/slimsam-77-uniform';
@@ -98,15 +96,6 @@ const initialStates: ModelState[] = [
     progress: 0,
     required: false,
   },
-  {
-    id: aiModelCatalog.TRANSCRIPTION_MODEL_ID,
-    label: aiModelCatalog.TRANSCRIPTION_DISPLAY_NAME,
-    description: 'Browser-local multilingual ASR for presenter recordings.',
-    provider: 'transformers',
-    status: 'needs-download',
-    progress: 0,
-    required: false,
-  },
 ];
 
 function cloneStates(states: ModelState[]) {
@@ -121,7 +110,6 @@ function getReadyKey(id: string) {
   if (id === aiModelCatalog.TRANSLATEGEMMA_MODEL_ID) return aiModelCatalog.TRANSLATEGEMMA_READY_KEY;
   if (id === aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID)
     return aiModelCatalog.LANGUAGE_DETECTION_READY_KEY;
-  if (id === aiModelCatalog.TRANSCRIPTION_MODEL_ID) return aiModelCatalog.TRANSCRIPTION_READY_KEY;
   return undefined;
 }
 
@@ -230,7 +218,6 @@ class BrowserModelSetupService implements ModelSetupService {
       storage?.getItem(aiModelCatalog.TRANSLATEGEMMA_READY_KEY) === 'true';
     const languageDetectionReady =
       storage?.getItem(aiModelCatalog.LANGUAGE_DETECTION_READY_KEY) === 'true';
-    const transcriptionReady = storage?.getItem(aiModelCatalog.TRANSCRIPTION_READY_KEY) === 'true';
     this.states = initialStates.map((state) =>
       state.id === aiModelCatalog.GEMMA_LLM_MODEL_ID && gemmaLlmReady
         ? { ...state, status: 'ready', progress: 100 }
@@ -243,9 +230,7 @@ class BrowserModelSetupService implements ModelSetupService {
               : state.id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID &&
                   imageGenerationModelReady
                 ? { ...state, status: 'ready', progress: 100 }
-                : state.id === aiModelCatalog.TRANSCRIPTION_MODEL_ID && transcriptionReady
-                  ? { ...state, status: 'ready', progress: 100 }
-                  : { ...state },
+                : { ...state },
     );
   }
 
@@ -330,13 +315,6 @@ class BrowserModelSetupService implements ModelSetupService {
         );
         this.storage?.setItem(aiModelCatalog.LANGUAGE_DETECTION_READY_KEY, 'true');
       }
-      if (id === aiModelCatalog.TRANSCRIPTION_MODEL_ID) {
-        await new TranscriptionRuntimeClient().preload(
-          transcriptionModelCatalog.getTranscriptionPreset(undefined),
-          { onProgress: reportProgress },
-        );
-        this.storage?.setItem(aiModelCatalog.TRANSCRIPTION_READY_KEY, 'true');
-      }
       options?.onProgress?.(100);
       return this.setModelState(id, { status: 'ready', progress: 100, error: undefined });
     } catch (error) {
@@ -349,8 +327,6 @@ class BrowserModelSetupService implements ModelSetupService {
         this.storage?.setItem(aiModelCatalog.TRANSLATEGEMMA_READY_KEY, 'false');
       if (id === aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID)
         this.storage?.setItem(aiModelCatalog.LANGUAGE_DETECTION_READY_KEY, 'false');
-      if (id === aiModelCatalog.TRANSCRIPTION_MODEL_ID)
-        this.storage?.setItem(aiModelCatalog.TRANSCRIPTION_READY_KEY, 'false');
       const message = error instanceof Error ? error.message : 'Model download failed.';
       return this.setModelState(id, { status: 'failed', progress: 0, error: message });
     }
@@ -391,10 +367,6 @@ class BrowserModelSetupService implements ModelSetupService {
         imageGenerationModel.IMAGE_GENERATION_TRANSFORMERS_MODEL_ID,
       );
     }
-    if (id === aiModelCatalog.TRANSCRIPTION_MODEL_ID)
-      await this.modelCacheStorage.deleteModelArtifacts(
-        aiModelCatalog.TRANSCRIPTION_TRANSFORMERS_MODEL_ID,
-      );
     return this.setModelState(id, { status: 'needs-download', progress: 0, error: undefined });
   }
 

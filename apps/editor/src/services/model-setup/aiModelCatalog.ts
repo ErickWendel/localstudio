@@ -13,11 +13,6 @@ const LANGUAGE_DETECTION_TRANSFORMERS_MODEL_ID = 'onnx-community/xlm-roberta-bas
 const LANGUAGE_DETECTION_DISPLAY_NAME = 'XLM-RoBERTa Base 270M';
 const LANGUAGE_DETECTION_READY_KEY = 'localstudio.ai.model.language-detection-webgpu.ready';
 
-const TRANSCRIPTION_MODEL_ID = 'transcription-whisper-base';
-const TRANSCRIPTION_TRANSFORMERS_MODEL_ID = 'onnx-community/whisper-base';
-const TRANSCRIPTION_DISPLAY_NAME = 'Whisper Base Transcription';
-const TRANSCRIPTION_READY_KEY = 'localstudio.ai.model.transcription-whisper-base.ready';
-
 export const aiModelCatalog = {
   GEMMA_LLM_MODEL_ID,
   GEMMA_LLM_TRANSFORMERS_MODEL_ID,
@@ -31,8 +26,4 @@ export const aiModelCatalog = {
   LANGUAGE_DETECTION_TRANSFORMERS_MODEL_ID,
   LANGUAGE_DETECTION_DISPLAY_NAME,
   LANGUAGE_DETECTION_READY_KEY,
-  TRANSCRIPTION_MODEL_ID,
-  TRANSCRIPTION_TRANSFORMERS_MODEL_ID,
-  TRANSCRIPTION_DISPLAY_NAME,
-  TRANSCRIPTION_READY_KEY,
 };
