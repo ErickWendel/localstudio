@@ -13,6 +13,7 @@ import { TranscriptQuestionAnsweringService } from '../../services/transcription
 import type { TranscriptAnswer } from '../../services/transcription/transcriptQuestionAnsweringService';
 import { webGpuTextGenerationRuntime } from '../../services/prompting/webGpuTextGenerationRuntime';
 import { CanvasWorkspace } from '../editor/canvas/CanvasWorkspace';
+import { ProjectVideoPreloader } from '../editor/media/ProjectVideoPreloader';
 import { preloadPublicDeckAssets } from './publicDeckAssetPreloader';
 
 interface PublicDeckViewerProps {
@@ -23,8 +24,7 @@ interface PublicDeckViewerProps {
 }
 
 type ViewerState =
-  | { status: 'loading' }
-  | { status: 'preloading'; loaded: number; project: ProjectDocument; total: number }
+  | { status: 'preloading'; loaded: number; project?: ProjectDocument; total: number }
   | { status: 'missing' }
   | { status: 'ready'; project: ProjectDocument };
 
@@ -97,9 +97,97 @@ function getBuildPlaybackDurationMs(build: ElementAnimationBuild) {
   return Math.max(0, build.durationMs ?? build.delayMs);
 }
 
-function hasReachedPlaybackThreshold(loaded: number, total: number) {
+function hasFinishedAssetPreload(loaded: number, total: number) {
   if (total === 0) return true;
-  return loaded / total >= 0.5;
+  return loaded >= total;
+}
+
+const PUBLIC_DECK_PAGE_MEDIA_PRELOAD_TIMEOUT_MS = 5000;
+
+type PageMediaPreloadEntry = { type: 'gif' | 'video'; url: string };
+
+function getPageMediaPreloadEntries(project: ProjectDocument, pageIndex: number) {
+  const page = project.pages[pageIndex];
+  if (!page) return [];
+  const entries = new Map<string, PageMediaPreloadEntry>();
+  for (const elementId of page.elementIds) {
+    const element = project.elements[elementId];
+    if (
+      !element ||
+      (element.type !== 'video' && element.type !== 'gif') ||
+      element.visible === false
+    ) {
+      continue;
+    }
+    const assetUrl = project.assets[element.assetId]?.objectUrl;
+    if (assetUrl) entries.set(`${element.type}:${assetUrl}`, { type: element.type, url: assetUrl });
+  }
+  return Array.from(entries.values());
+}
+
+function preloadPageGif(url: string, signal: AbortSignal) {
+  if (signal.aborted || typeof Image === 'undefined') return Promise.resolve();
+  const image = new Image();
+
+  return new Promise<void>((resolve) => {
+    let timeoutId: number | undefined;
+    const finish = () => {
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+        timeoutId = undefined;
+      }
+      image.removeEventListener('load', finish);
+      image.removeEventListener('error', finish);
+      signal.removeEventListener('abort', finish);
+      resolve();
+    };
+
+    timeoutId = window.setTimeout(finish, PUBLIC_DECK_PAGE_MEDIA_PRELOAD_TIMEOUT_MS);
+    image.addEventListener('load', finish, { once: true });
+    image.addEventListener('error', finish, { once: true });
+    signal.addEventListener('abort', finish, { once: true });
+    image.src = url;
+  });
+}
+
+function preloadPageVideo(url: string, signal: AbortSignal) {
+  if (signal.aborted || typeof document === 'undefined') return Promise.resolve();
+  const video = document.createElement('video');
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = 'auto';
+
+  return new Promise<void>((resolve) => {
+    let timeoutId: number | undefined;
+    const finish = () => {
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+        timeoutId = undefined;
+      }
+      video.removeEventListener('loadeddata', finish);
+      video.removeEventListener('error', finish);
+      signal.removeEventListener('abort', finish);
+      video.removeAttribute('src');
+      video.load();
+      resolve();
+    };
+
+    timeoutId = window.setTimeout(finish, PUBLIC_DECK_PAGE_MEDIA_PRELOAD_TIMEOUT_MS);
+    video.addEventListener('loadeddata', finish, { once: true });
+    video.addEventListener('error', finish, { once: true });
+    signal.addEventListener('abort', finish, { once: true });
+    video.src = url;
+    video.load();
+  });
+}
+
+async function preloadPageMedia(entries: PageMediaPreloadEntry[], signal: AbortSignal) {
+  if (entries.length === 0) return;
+  await Promise.all(
+    entries.map((entry) =>
+      entry.type === 'gif' ? preloadPageGif(entry.url, signal) : preloadPageVideo(entry.url, signal),
+    ),
+  );
 }
 
 function PublicTranscriptPodcastPlayer({
@@ -285,12 +373,17 @@ export function PublicDeckViewer({
   shareService,
   embed = false,
 }: PublicDeckViewerProps) {
-  const [viewerState, setViewerState] = useState<ViewerState>({ status: 'loading' });
+  const [viewerState, setViewerState] = useState<ViewerState>({
+    status: 'preloading',
+    loaded: 0,
+    total: 0,
+  });
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [animationPreview, setAnimationPreview] = useState<AnimationPreviewState | undefined>();
   const animationQueueRef = useRef<ElementAnimationBuild[]>([]);
   const animationTimeoutsRef = useRef<number[]>([]);
   const animationFrameRef = useRef<number | undefined>(undefined);
+  const pagePreloadAbortRef = useRef<AbortController | undefined>(undefined);
   const runNextAnimationBuildRef = useRef<() => void>(() => undefined);
   const transcriptQaServiceRef = useRef<TranscriptQuestionAnsweringService | undefined>(undefined);
   const emptySelection = useMemo<SelectionState>(() => ({ pageId: '', elementIds: [] }), []);
@@ -454,7 +547,7 @@ export function PublicDeckViewer({
     scheduleAnimation,
   ]);
 
-  const playPresentationPage = useCallback(
+  const showPresentationPage = useCallback(
     (project: ProjectDocument, pageIndex: number) => {
       const page = project.pages[pageIndex];
       if (!page) return;
@@ -486,6 +579,28 @@ export function PublicDeckViewer({
       scheduleAnimation(runNextAnimationBuild, transitionDelay);
     },
     [clearAnimationTimers, completeAnimationSlide, runNextAnimationBuild, scheduleAnimation],
+  );
+
+  const playPresentationPage = useCallback(
+    (project: ProjectDocument, pageIndex: number) => {
+      const mediaEntries = getPageMediaPreloadEntries(project, pageIndex);
+      pagePreloadAbortRef.current?.abort();
+      if (mediaEntries.length === 0) {
+        showPresentationPage(project, pageIndex);
+        return;
+      }
+
+      const preloadController = new AbortController();
+      pagePreloadAbortRef.current = preloadController;
+      void preloadPageMedia(mediaEntries, preloadController.signal).then(() => {
+        if (preloadController.signal.aborted) return;
+        if (pagePreloadAbortRef.current === preloadController) {
+          pagePreloadAbortRef.current = undefined;
+        }
+        showPresentationPage(project, pageIndex);
+      });
+    },
+    [showPresentationPage],
   );
 
   const advancePresentation = useCallback(() => {
@@ -524,16 +639,14 @@ export function PublicDeckViewer({
 
       let hasStartedPlayback = false;
       function startPlaybackWhenReady(loaded: number, total: number) {
-        if (!isActive || hasStartedPlayback || !hasReachedPlaybackThreshold(loaded, total)) return;
+        if (!isActive || hasStartedPlayback || !hasFinishedAssetPreload(loaded, total)) return;
         hasStartedPlayback = true;
         setViewerState({ status: 'ready', project: shareRecord.project });
         playPresentationPage(shareRecord.project, 0);
       }
 
       setViewerState({ status: 'preloading', loaded: 0, project: shareRecord.project, total: 0 });
-      await fontImportService.loadProjectFonts(shareRecord.project).catch(() => undefined);
-      if (!isActive) return;
-      await preloadPublicDeckAssets(shareRecord.project, {
+      const assetPreloadPromise = preloadPublicDeckAssets(shareRecord.project, {
         signal: preloadController.signal,
         onProgress: (progress) => {
           if (!isActive) return;
@@ -550,6 +663,11 @@ export function PublicDeckViewer({
           startPlaybackWhenReady(progress.loaded, progress.total);
         },
       });
+      await Promise.all([
+        fontImportService.loadProjectFonts(shareRecord.project).catch(() => undefined),
+        assetPreloadPromise,
+      ]);
+      if (!isActive) return;
       startPlaybackWhenReady(1, 1);
     });
     return () => {
@@ -560,6 +678,7 @@ export function PublicDeckViewer({
 
   useEffect(() => {
     return () => {
+      pagePreloadAbortRef.current?.abort();
       clearAnimationTimers();
     };
   }, [clearAnimationTimers]);
@@ -583,19 +702,12 @@ export function PublicDeckViewer({
     };
   }, [advancePresentation, rewindPresentation, viewerState.status]);
 
-  if (viewerState.status === 'loading') {
-    return (
-      <main className={viewerClassName}>
-        <p className="public-deck-status">Loading deck...</p>
-      </main>
-    );
-  }
-
   if (viewerState.status === 'preloading') {
     const loadedPercent =
       viewerState.total > 0 ? Math.min(100, Math.round((viewerState.loaded / viewerState.total) * 100)) : 0;
     return (
       <main className={viewerClassName}>
+        {viewerState.project ? <ProjectVideoPreloader project={viewerState.project} /> : null}
         <section className="public-deck-loading" aria-label="Preparing shared deck">
           <p className="public-deck-status">Preparing media...</p>
           <div className="public-deck-loading-track" aria-hidden="true">
@@ -668,11 +780,13 @@ export function PublicDeckViewer({
       className={viewerClassName}
       aria-label={embed ? 'Embedded shared deck' : 'Public presentation'}
     >
+      <ProjectVideoPreloader project={project} />
       <section className="public-deck-stage-shell" aria-label="Shared slide preview">
         <CanvasWorkspace
           project={project}
           activePageId={activePage.id}
           selection={{ ...emptySelection, pageId: activePage.id }}
+          hideReadOnlyMediaPlaceholder
           presentationMode
           readOnly
           zoomPercent={100}

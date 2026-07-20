@@ -8,9 +8,29 @@ import type {
   ShareRecord,
 } from '../../../../src/services/contracts/interfaces';
 import { BrowserShareService } from '../../../../src/services/sharing/shareService';
+import { canvasWorkspaceUtils } from '../../../../src/ui/editor/canvas/canvasWorkspaceUtils';
 import { PublicDeckViewer } from '../../../../src/ui/share/PublicDeckViewer';
 
 describe('PublicDeckViewer', () => {
+  let preloadedVideoUrls: string[];
+
+  class MockPreloadImage extends EventTarget {
+    naturalHeight = 480;
+    naturalWidth = 640;
+    private imageSrc = '';
+
+    get src() {
+      return this.imageSrc;
+    }
+
+    set src(value: string) {
+      this.imageSrc = value;
+      queueMicrotask(() => {
+        this.dispatchEvent(new Event('load'));
+      });
+    }
+  }
+
   const fontImportService: FontImportService = {
     listDownloadableFonts() {
       return [];
@@ -24,11 +44,24 @@ describe('PublicDeckViewer', () => {
   };
 
   beforeEach(() => {
+    preloadedVideoUrls = [];
     window.history.replaceState({}, '', '/');
+    vi.stubGlobal('Image', MockPreloadImage);
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(null, { status: 204 }))));
+    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(function loadMedia(
+      this: HTMLMediaElement,
+    ) {
+      if (this instanceof HTMLVideoElement && this.src) {
+        preloadedVideoUrls.push(this.src);
+        queueMicrotask(() => {
+          this.dispatchEvent(new Event('loadeddata'));
+        });
+      }
+    });
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
@@ -142,6 +175,32 @@ describe('PublicDeckViewer', () => {
     );
   });
 
+  it('starts public share routes on the media preparation progress UI', () => {
+    const deferredShare = createDeferredResponse();
+    const sourceUrl =
+      'http://localhost:9000/localstudio/mirrors/public-shares/00000000-0000-4000-8000-000000000208/share.json';
+    window.history.replaceState(
+      {},
+      '',
+      `/editor/s/00000000-0000-4000-8000-000000000208?src=${encodeURIComponent(sourceUrl)}`,
+    );
+    const shareService = new BrowserShareService({
+      fetch: vi.fn(() => deferredShare.promise),
+    });
+
+    render(
+      <PublicDeckViewer
+        shareId="00000000-0000-4000-8000-000000000208"
+        fontImportService={fontImportService}
+        shareService={shareService}
+      />,
+    );
+
+    expect(screen.getByLabelText('Preparing shared deck')).toBeInTheDocument();
+    expect(screen.getByText('Checking assets')).toBeInTheDocument();
+    expect(screen.queryByText('Loading deck...')).not.toBeInTheDocument();
+  });
+
   it('preloads public deck assets in the browser after the share record loads', async () => {
     const project = sampleProject.createSampleProject();
     project.assets['remote-image'] = {
@@ -150,6 +209,22 @@ describe('PublicDeckViewer', () => {
       name: 'Remote image',
       mimeType: 'image/png',
       objectUrl: 'https://cdn.localstudio.test/assets/remote-image.png',
+      storage: 'remote',
+    };
+    project.assets['remote-video'] = {
+      id: 'remote-video',
+      type: 'video',
+      name: 'Remote video',
+      mimeType: 'video/mp4',
+      objectUrl: 'https://cdn.localstudio.test/assets/remote-video.mp4',
+      storage: 'remote',
+    };
+    project.assets['remote-gif'] = {
+      id: 'remote-gif',
+      type: 'gif',
+      name: 'Remote GIF',
+      mimeType: 'image/gif',
+      objectUrl: 'https://cdn.localstudio.test/assets/remote-loop.gif',
       storage: 'remote',
     };
     project.fonts = {
@@ -166,6 +241,7 @@ describe('PublicDeckViewer', () => {
         objectUrl: 'https://cdn.localstudio.test/fonts/brand.woff2',
       },
     };
+    const preloadImageSpy = vi.spyOn(canvasWorkspaceUtils, 'preloadCanvasImage');
     const preloadFetch = vi.mocked(globalThis.fetch);
     const { share, shareService } = createRemoteShare(
       '00000000-0000-4000-8000-000000000206',
@@ -182,14 +258,13 @@ describe('PublicDeckViewer', () => {
 
     await screen.findByLabelText('Public presentation');
     await waitFor(() => {
-      expect(preloadFetch).toHaveBeenCalledWith(
+      expect(preloadImageSpy).toHaveBeenCalledWith(
         'https://cdn.localstudio.test/assets/remote-image.png',
-        expect.objectContaining({
-          cache: 'force-cache',
-          credentials: 'omit',
-          mode: 'cors',
-        }),
       );
+      expect(preloadImageSpy).toHaveBeenCalledWith(
+        'https://cdn.localstudio.test/assets/remote-loop.gif',
+      );
+      expect(preloadedVideoUrls).toContain('https://cdn.localstudio.test/assets/remote-video.mp4');
       expect(preloadFetch).toHaveBeenCalledWith(
         'https://cdn.localstudio.test/fonts/brand.woff2',
         expect.objectContaining({
@@ -201,17 +276,21 @@ describe('PublicDeckViewer', () => {
     });
   });
 
-  it('keeps the loading screen until half of the public deck assets are cached', async () => {
+  it('keeps the loading screen until every public deck asset has been preloaded', async () => {
     const project = sampleProject.createBlankProject();
-    project.assets = Object.fromEntries(
+    project.fonts = Object.fromEntries(
       Array.from({ length: 4 }, (_, index) => [
-        `remote-image-${index}`,
+        `remote-font-${index}`,
         {
-          id: `remote-image-${index}`,
-          type: 'image' as const,
-          name: `Remote image ${index}`,
-          mimeType: 'image/png',
-          objectUrl: `https://cdn.localstudio.test/assets/remote-image-${index}.png`,
+          family: `Remote Font ${index}`,
+          fileName: `remote-font-${index}.woff2`,
+          fontStyle: 'normal' as const,
+          fontWeight: 400,
+          id: `remote-font-${index}`,
+          mimeType: 'font/woff2' as const,
+          objectUrl: `https://cdn.localstudio.test/fonts/remote-font-${index}.woff2`,
+          requestedFamily: `Remote Font ${index}`,
+          source: 'uploaded' as const,
           storage: 'remote' as const,
         },
       ]),
@@ -248,6 +327,18 @@ describe('PublicDeckViewer', () => {
 
     act(() => {
       deferredResponses[1]!.resolve(new Response(null, { status: 204 }));
+    });
+    expect(await screen.findByText('2 / 4 assets ready')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Public presentation')).not.toBeInTheDocument();
+
+    act(() => {
+      deferredResponses[2]!.resolve(new Response(null, { status: 204 }));
+    });
+    expect(await screen.findByText('3 / 4 assets ready')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Public presentation')).not.toBeInTheDocument();
+
+    act(() => {
+      deferredResponses[3]!.resolve(new Response(null, { status: 204 }));
     });
     expect(await screen.findByLabelText('Public presentation')).toBeInTheDocument();
   });
@@ -299,6 +390,135 @@ describe('PublicDeckViewer', () => {
 
     await user.click(screen.getByRole('button', { name: 'Previous slide' }));
     expect(screen.getByText('1 / 2')).toBeInTheDocument();
+  });
+
+  it('waits for target slide videos and GIFs before changing public deck slides', async () => {
+    const user = userEvent.setup();
+    const project = sampleProject.createSampleProject();
+    project.assets['remote-slide-video'] = {
+      id: 'remote-slide-video',
+      type: 'video',
+      name: 'Slide video',
+      mimeType: 'video/mp4',
+      objectUrl: 'https://cdn.localstudio.test/assets/slide-video.mp4',
+      storage: 'remote',
+    };
+    project.assets['remote-slide-gif'] = {
+      id: 'remote-slide-gif',
+      type: 'gif',
+      name: 'Slide GIF',
+      mimeType: 'image/gif',
+      objectUrl: 'https://cdn.localstudio.test/assets/slide-loop.gif',
+      storage: 'remote',
+    };
+    project.elements['video-slide'] = {
+      assetId: 'remote-slide-video',
+      autoplayInPreview: false,
+      controls: false,
+      height: 360,
+      id: 'video-slide',
+      locked: false,
+      loop: false,
+      muted: true,
+      opacity: 1,
+      playAcrossSlides: false,
+      repeatMode: 'none',
+      rotation: 0,
+      startOnClick: false,
+      trimStartSeconds: 0,
+      type: 'video',
+      visible: true,
+      volume: 1,
+      width: 640,
+      x: 200,
+      y: 200,
+    };
+    project.elements['gif-slide'] = {
+      assetId: 'remote-slide-gif',
+      height: 240,
+      id: 'gif-slide',
+      locked: false,
+      opacity: 1,
+      playing: true,
+      rotation: 0,
+      type: 'gif',
+      visible: true,
+      width: 320,
+      x: 900,
+      y: 200,
+    };
+    project.pages.push({
+      id: 'page-2',
+      name: 'Slide 2',
+      width: 1920,
+      height: 1080,
+      background: { type: 'color', color: '#111111' },
+      elementIds: ['video-slide', 'gif-slide'],
+    });
+    const { share, shareService } = createRemoteShare(
+      '00000000-0000-4000-8000-000000000209',
+      project,
+    );
+
+    render(
+      <PublicDeckViewer
+        shareId={share.shareId}
+        fontImportService={fontImportService}
+        shareService={shareService}
+      />,
+    );
+
+    expect(await screen.findByText('1 / 2')).toBeInTheDocument();
+    let releaseTargetSlideGif: (() => void) | undefined;
+    let releaseTargetSlideVideo: (() => void) | undefined;
+    class DelayedTargetSlideImage extends EventTarget {
+      naturalHeight = 480;
+      naturalWidth = 640;
+      private imageSrc = '';
+
+      get src() {
+        return this.imageSrc;
+      }
+
+      set src(value: string) {
+        this.imageSrc = value;
+        if (value.includes('slide-loop.gif')) {
+          releaseTargetSlideGif = () => {
+            this.dispatchEvent(new Event('load'));
+          };
+          return;
+        }
+        queueMicrotask(() => {
+          this.dispatchEvent(new Event('load'));
+        });
+      }
+    }
+    vi.stubGlobal('Image', DelayedTargetSlideImage);
+    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(function loadMedia(
+      this: HTMLMediaElement,
+    ) {
+      if (this instanceof HTMLVideoElement && this.src.includes('slide-video.mp4')) {
+        releaseTargetSlideVideo = () => {
+          this.dispatchEvent(new Event('loadeddata'));
+        };
+      }
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Next slide' }));
+    expect(screen.getByText('1 / 2')).toBeInTheDocument();
+    expect(screen.queryByText('2 / 2')).not.toBeInTheDocument();
+
+    act(() => {
+      releaseTargetSlideVideo?.();
+    });
+    expect(screen.getByText('1 / 2')).toBeInTheDocument();
+    expect(screen.queryByText('2 / 2')).not.toBeInTheDocument();
+
+    act(() => {
+      releaseTargetSlideGif?.();
+    });
+
+    expect(await screen.findByText('2 / 2')).toBeInTheDocument();
   });
 
   it('rewinds shared deck slides with the left arrow key after advancing', async () => {

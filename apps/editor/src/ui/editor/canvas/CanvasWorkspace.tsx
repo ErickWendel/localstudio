@@ -63,6 +63,7 @@ interface CanvasWorkspaceProps {
   stageRef?: RefObject<Konva.Stage | null>;
   presentationMode?: boolean;
   readOnly?: boolean;
+  hideReadOnlyMediaPlaceholder?: boolean;
   zoomPercent?: number;
   backgroundSelectionMode?: boolean;
   backgroundSelectionNotice?: string | undefined;
@@ -176,6 +177,7 @@ export function CanvasWorkspace({
   stageRef,
   presentationMode = false,
   readOnly = false,
+  hideReadOnlyMediaPlaceholder = false,
   zoomPercent = 100,
   backgroundSelectionMode = false,
   backgroundSelectionNotice,
@@ -1108,6 +1110,7 @@ export function CanvasWorkspace({
                       <CanvasReadOnlyMediaElement
                         commonProps={commonProps}
                         element={element}
+                        hidePlaceholder={hideReadOnlyMediaPlaceholder}
                         key={element.id}
                         label={asset?.name ?? (element.type === 'video' ? 'Imported video' : 'Imported GIF')}
                         nodeRef={nodeRef}
