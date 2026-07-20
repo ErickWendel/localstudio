@@ -66,12 +66,15 @@ describe('EditorShell mirror workflows', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
 
     await waitFor(() => {
-      expect(mirrorService.syncProject).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'Untitled AI Deck' }),
-        repository,
-        mirrorConfig,
-      );
+      expect(mirrorService.syncProject).toHaveBeenCalled();
     });
+    const syncCall = mirrorService.syncProject.mock.calls.find(
+      ([syncedProject]) => syncedProject.name === 'Untitled AI Deck',
+    );
+    if (!syncCall) throw new Error('Expected mirror sync for Untitled AI Deck.');
+    expect(syncCall[1]).toBe(repository);
+    expect(syncCall[2]).toEqual(mirrorConfig);
+    expect(typeof syncCall[3]?.onProgress).toBe('function');
   });
 
   it('mirrors the renamed project name from the header bar', async () => {
@@ -106,14 +109,21 @@ describe('EditorShell mirror workflows', () => {
 
     await waitFor(
       () => {
-        expect(mirrorService.syncProject).toHaveBeenCalledWith(
-          expect.objectContaining({ name: 'Renamed Mirror Deck' }),
-          repository,
-          mirrorConfig,
-        );
+        expect(
+          mirrorService.syncProject.mock.calls.some(
+            ([syncedProject]) => syncedProject.name === 'Renamed Mirror Deck',
+          ),
+        ).toBe(true);
       },
       { timeout: 2000 },
     );
+    const renameSyncCall = mirrorService.syncProject.mock.calls.find(
+      ([syncedProject]) => syncedProject.name === 'Renamed Mirror Deck',
+    );
+    if (!renameSyncCall) throw new Error('Expected mirror sync for Renamed Mirror Deck.');
+    expect(renameSyncCall[1]).toBe(repository);
+    expect(renameSyncCall[2]).toEqual(mirrorConfig);
+    expect(typeof renameSyncCall[3]?.onProgress).toBe('function');
     await waitFor(() => {
       expect(mirrorService.deleteProject).toHaveBeenCalledWith('Untitled AI Deck', mirrorConfig);
     });
@@ -148,6 +158,52 @@ describe('EditorShell mirror workflows', () => {
       expect(mirrorService.syncProject).toHaveBeenCalledTimes(2);
     });
     expect(await screen.findByRole('button', { name: 'Mirror up to date' })).toBeInTheDocument();
+  });
+
+  it('does not restart mirror sync when the same project is queued while syncing', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const mirrorService = new RecordingMirrorService();
+    const repository = new DeferredLoadingProjectRepository();
+    let resolveSync: (() => void) | undefined;
+    services.projectRepository = repository;
+    services.mirrorService = mirrorService;
+    mirrorService.syncProject.mockImplementation(
+      (project, projectRepository, config, options) => {
+        void project;
+        void projectRepository;
+        void config;
+        void options;
+        return new Promise((resolve) => {
+          resolveSync = () => resolve({ enabled: true, status: 'synced' });
+        });
+      },
+    );
+
+    render(<EditorShell services={services} />);
+
+    act(() => {
+      repository.resolveLoadedProject({
+        ...services.initialProject,
+        name: 'Mirrored Folder',
+      });
+    });
+
+    await waitFor(() => {
+      expect(mirrorService.syncProject).toHaveBeenCalledTimes(1);
+    });
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Mirror Now' }));
+    expect(mirrorService.syncProject).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      resolveSync?.();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Mirror up to date' })).toBeInTheDocument();
+    });
+    expect(mirrorService.syncProject).toHaveBeenCalledTimes(1);
   });
 
   it('keeps saved mirror config disabled after refreshing the page', async () => {
@@ -330,11 +386,20 @@ describe('EditorShell mirror workflows', () => {
     expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(mirrorService.syncProject).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'mirrored-project', name: 'Mirrored Folder' }),
-        repository,
-        mirrorConfig,
-      );
+      expect(
+        mirrorService.syncProject.mock.calls.some(
+          ([syncedProject]) =>
+            syncedProject.id === 'mirrored-project' && syncedProject.name === 'Mirrored Folder',
+        ),
+      ).toBe(true);
     });
+    const restoredSyncCall = mirrorService.syncProject.mock.calls.find(
+      ([syncedProject]) =>
+        syncedProject.id === 'mirrored-project' && syncedProject.name === 'Mirrored Folder',
+    );
+    if (!restoredSyncCall) throw new Error('Expected mirror sync for Mirrored Folder.');
+    expect(restoredSyncCall[1]).toBe(repository);
+    expect(restoredSyncCall[2]).toEqual(mirrorConfig);
+    expect(typeof restoredSyncCall[3]?.onProgress).toBe('function');
   });
 });

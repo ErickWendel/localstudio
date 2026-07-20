@@ -2,13 +2,18 @@ import { localStudioAppRoutes } from '@localstudio/app-routes';
 import { localStudioLogoMark } from '@localstudio/brand/logo';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ProjectDocument } from '../../../domain/documents/model';
-import type { MirrorState, PersistenceStorageMode } from '../../../services/contracts/interfaces';
+import type {
+  MirrorState,
+  MirrorSyncProgress,
+  PersistenceStorageMode,
+} from '../../../services/contracts/interfaces';
 import type { OperationNoticeState } from '../state/useEditorViewModel';
 import type { TranslationLanguageOption } from '../translation/translationLanguages';
 import { DeckTranslationControl } from './DeckTranslationControl';
 import { GitHubToolbarLink } from './GitHubToolbarLink';
 import { ProjectPlayControl } from './ProjectPlayControl';
 import { ToolbarMirrorButton } from './ToolbarMirrorButton';
+import { ToolbarMirrorProgress } from './ToolbarMirrorProgress';
 import { ToolbarOperationNotice } from './ToolbarOperationNotice';
 import { ToolbarPersistenceButton } from './ToolbarPersistenceButton';
 
@@ -25,6 +30,7 @@ interface TopToolbarProps {
   persistenceMode?: PersistenceStorageMode;
   lastEditedAt?: string | undefined;
   mirrorState?: MirrorState;
+  mirrorSyncProgress?: MirrorSyncProgress | undefined;
   mirrorDisabledBySettings?: boolean;
   localProjectSetupPanel?: ReactNode;
   persistenceAttention?: boolean;
@@ -109,6 +115,7 @@ export function TopToolbar({
   persistenceMode = persistenceAvailable ? 'directory' : 'none',
   lastEditedAt,
   mirrorState = { enabled: false, status: 'disabled' },
+  mirrorSyncProgress,
   mirrorDisabledBySettings = false,
   localProjectSetupPanel,
   persistenceAttention = false,
@@ -551,6 +558,9 @@ export function TopToolbar({
             onMirrorToggle={onMirrorToggle}
             onOpenMirrorSettings={onOpenMirrorSettings}
           />
+          {mirrorState.status === 'syncing' && mirrorSyncProgress ? (
+            <ToolbarMirrorProgress progress={mirrorSyncProgress} />
+          ) : null}
           <button
             className="stitch-icon-button history-save-applied"
             disabled={!persistenceEnabled || !onOpenVersionHistory}

@@ -330,14 +330,25 @@ describe('minioMirrorService.MinioMirrorService', () => {
       fetch: fetchMock,
       now: () => new Date('2026-06-30T10:00:00.000Z'),
     });
+    const progressUpdates: Array<{ current: number; label: string; total: number }> = [];
 
-    await service.syncProject(project, new VersionedRepository([], project), config);
+    await service.syncProject(project, new VersionedRepository([], project), config, {
+      onProgress: (progress) => progressUpdates.push(progress),
+    });
 
     const putUrls = fetchMock.mock.calls
       .filter(([, init]) => init?.method === 'PUT')
       .map(([input]) => getRequestUrl(input));
     expect(putUrls.some((url) => url.endsWith('/project.json'))).toBe(false);
     expect(putUrls.some((url) => url.endsWith('/localstudio-mirror.json'))).toBe(true);
+    expect(progressUpdates[0]).toMatchObject({
+      current: 0,
+      label: 'Checking mirror files',
+    });
+    const finalProgress = progressUpdates.at(-1);
+    if (!finalProgress) throw new Error('Expected mirror progress updates.');
+    expect(finalProgress.current).toBe(finalProgress.total);
+    expect(finalProgress.label).toContain('Mirrored ');
   });
 
   it('uses writer credentials when sync checks and uploads mirror files', async () => {

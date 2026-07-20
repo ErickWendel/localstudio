@@ -3,6 +3,7 @@ import type {
   MirrorProjectSummary,
   MirrorService,
   MirrorState,
+  MirrorSyncProgress,
   ProjectRepository,
 } from '../contracts/interfaces';
 import type { ProjectDocument } from '../../domain/documents/model';
@@ -184,6 +185,7 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
     project: ProjectDocument,
     repository: ProjectRepository,
     config: MinioMirrorConfig,
+    options?: { onProgress?: (progress: MirrorSyncProgress) => void },
   ): Promise<MirrorState> {
     const files = await minioMirrorFiles.createMirrorFiles(project, repository, config, {
       fetch: this.requestFetch,
@@ -191,11 +193,31 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
     });
     const projectKey = getProjectMirrorKey(project.name);
     const remoteManifest = await this.loadRemoteManifest(projectKey, config);
+    const totalFiles = Math.max(files.length, 1);
+    let completedFiles = 0;
+
+    options?.onProgress?.({
+      current: completedFiles,
+      label: 'Checking mirror files',
+      total: totalFiles,
+    });
 
     for (const file of files) {
+      options?.onProgress?.({
+        current: completedFiles,
+        label: `Mirroring ${file.path}`,
+        total: totalFiles,
+      });
       const nextChecksum = await minioObjectUtils.sha256Hex(file.blob);
-      if (remoteManifest?.files[file.path]?.checksum === nextChecksum) continue;
-      await this.putObject(getProjectFileKey(config, projectKey, file.path), file.blob, config);
+      if (remoteManifest?.files[file.path]?.checksum !== nextChecksum) {
+        await this.putObject(getProjectFileKey(config, projectKey, file.path), file.blob, config);
+      }
+      completedFiles += 1;
+      options?.onProgress?.({
+        current: completedFiles,
+        label: `Mirrored ${file.path}`,
+        total: totalFiles,
+      });
     }
 
     return {
