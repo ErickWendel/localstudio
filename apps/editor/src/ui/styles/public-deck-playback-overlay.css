@@ -1,3 +1,28 @@
+.public-deck-viewer-with-playback {
+  --public-deck-chapters-width: min(360px, 28vw);
+}
+
+.public-deck-viewer-with-playback .public-deck-stage-shell,
+.public-deck-viewer-with-playback .public-deck-playback-overlay,
+.public-deck-viewer-with-playback .public-deck-caption-overlay {
+  transition:
+    width 180ms ease,
+    right 180ms ease,
+    transform 180ms ease;
+}
+
+.public-deck-viewer-chapters-open .public-deck-stage-shell {
+  width: calc(100vw - var(--public-deck-chapters-width));
+}
+
+.public-deck-viewer-chapters-open .public-deck-playback-overlay {
+  right: calc(24px + var(--public-deck-chapters-width));
+}
+
+.public-deck-viewer-chapters-open .public-deck-caption-overlay {
+  left: calc((100vw - var(--public-deck-chapters-width)) / 2);
+}
+
 .public-deck-caption-overlay {
   position: absolute;
   left: 50%;
@@ -57,7 +82,7 @@
   width: var(--public-deck-progress, 0%);
   height: 3px;
   border-radius: 999px;
-  background: #ff193f;
+  background: var(--ew-green);
 }
 
 .public-deck-playback-rail input {
@@ -77,12 +102,12 @@
   border: 0;
   border-radius: 999px;
   padding: 0;
-  background: rgba(255, 214, 67, 0.88);
+  background: rgba(255, 255, 255, 0.42);
 }
 
 .public-deck-playback-chapter-dot-active {
   width: 8px;
-  background: #ff193f;
+  background: var(--ew-green);
 }
 
 .public-deck-playback-controls {
@@ -160,75 +185,55 @@
 }
 
 .public-deck-chapters-menu {
-  position: absolute;
-  right: 78px;
-  bottom: 70px;
-  width: min(380px, calc(100vw - 48px));
-  max-height: min(440px, calc(100vh - 180px));
-  overflow: auto;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 10px;
-  background: rgba(20, 24, 23, 0.96);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42);
-}
-
-.public-deck-chapters-menu header {
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 1;
-  display: flex;
-  justify-content: space-between;
-  padding: 12px 14px;
-  background: rgba(20, 24, 23, 0.98);
-  font-size: 14px;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  width: var(--public-deck-chapters-width);
+  border-left: 1px solid var(--ew-border);
+  box-shadow: -18px 0 44px rgba(0, 0, 0, 0.28);
 }
 
-.public-deck-chapters-menu ol {
-  display: grid;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.public-deck-chapters-menu .pages-list {
+  padding-bottom: 116px;
 }
 
-.public-deck-chapters-menu button {
+.public-deck-chapters-menu li {
+  display: block;
+}
+
+.public-deck-chapter-card {
   width: 100%;
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
-  gap: 3px 12px;
-  border: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 0;
-  padding: 12px 14px;
-  color: #fff;
-  background: transparent;
+  cursor: pointer;
+  color: var(--ew-text);
   text-align: left;
 }
 
-.public-deck-chapters-menu button:hover,
-.public-deck-chapters-menu button.active {
-  background: rgba(55, 253, 118, 0.12);
+.public-deck-chapter-card-body {
+  min-width: 0;
 }
 
-.public-deck-chapters-menu span {
-  grid-row: span 2;
+.public-deck-chapter-card-time {
   color: var(--ew-green);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 900;
 }
 
-.public-deck-chapters-menu strong,
-.public-deck-chapters-menu em {
+.public-deck-chapter-card strong,
+.public-deck-chapter-card em {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.public-deck-chapters-menu strong {
+.public-deck-chapter-card strong {
+  color: var(--ew-text);
   font-size: 13px;
 }
 
-.public-deck-chapters-menu em {
-  color: rgba(255, 255, 255, 0.68);
+.public-deck-chapter-card em {
+  color: var(--ew-muted);
   font-size: 12px;
   font-style: normal;
   font-weight: 800;

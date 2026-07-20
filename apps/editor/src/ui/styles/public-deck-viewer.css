@@ -138,14 +138,6 @@
   transform: translateX(50%);
 }
 
-.public-deck-viewer-with-playback .public-deck-slide-dots {
-  bottom: 112px;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  backdrop-filter: none;
-}
-
 .public-deck-controls {
   display: inline-flex;
   align-items: center;

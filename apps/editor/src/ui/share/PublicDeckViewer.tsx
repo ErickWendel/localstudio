@@ -107,15 +107,6 @@ function getActiveTranscriptSegment(recording: TranscriptRecording | undefined, 
   });
 }
 
-function createSlideOnlyChapters(pages: Page[]): PublicPodcastChapter[] {
-  return pages.map((page, pageIndex) => ({
-    id: `slide-only-${page.id}`,
-    pageIndex,
-    pageName: page.name,
-    startMs: pageIndex * 1000,
-  }));
-}
-
 function getBuildPlaybackDurationMs(build: ElementAnimationBuild) {
   return Math.max(0, build.durationMs ?? build.delayMs);
 }
@@ -420,7 +411,9 @@ function PublicDeckPlaybackOverlay({
   activePageIndex,
   canGoNext,
   canGoPrevious,
+  chaptersOpen,
   onNext,
+  onChaptersOpenChange,
   onOpenTranscript,
   onPrevious,
   onSelectPage,
@@ -430,7 +423,9 @@ function PublicDeckPlaybackOverlay({
   activePageIndex: number;
   canGoNext: boolean;
   canGoPrevious: boolean;
+  chaptersOpen: boolean;
   onNext: () => void;
+  onChaptersOpenChange: (open: boolean) => void;
   onOpenTranscript: () => void;
   onPrevious: () => void;
   onSelectPage: (pageIndex: number) => void;
@@ -438,7 +433,6 @@ function PublicDeckPlaybackOverlay({
   recordings: TranscriptRecording[];
 }) {
   const [captionsVisible, setCaptionsVisible] = useState(false);
-  const [chaptersOpen, setChaptersOpen] = useState(false);
   const [currentTimeMs, setCurrentTimeMs] = useState(0);
   const [durationMs, setDurationMs] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -449,10 +443,7 @@ function PublicDeckPlaybackOverlay({
     [recordings],
   );
   const chapters = useMemo(
-    () =>
-      selectedRecording
-        ? createPublicPodcastChapters(selectedRecording, pages)
-        : createSlideOnlyChapters(pages),
+    () => (selectedRecording ? createPublicPodcastChapters(selectedRecording, pages) : []),
     [pages, selectedRecording],
   );
   const activeChapter = useMemo(
@@ -523,7 +514,6 @@ function PublicDeckPlaybackOverlay({
     seekToTime(chapter.startMs);
     lastSyncedChapterIdRef.current = chapter.id;
     onSelectPage(chapter.pageIndex);
-    setChaptersOpen(false);
   }
 
   return (
@@ -605,7 +595,7 @@ function PublicDeckPlaybackOverlay({
             type="button"
             aria-label="Open slide chapters"
             aria-expanded={chaptersOpen}
-            onClick={() => setChaptersOpen((current) => !current)}
+            onClick={() => onChaptersOpenChange(!chaptersOpen)}
           >
             <ListMusic size={16} aria-hidden="true" />
             <span>
@@ -662,31 +652,52 @@ function PublicDeckPlaybackOverlay({
             <Bot size={18} aria-hidden="true" />
           </button>
         </div>
-        {chaptersOpen ? (
-          <div className="public-deck-chapters-menu" aria-label="Slide chapter menu">
-            <header>
-              <strong>Slides</strong>
-              <span>{chapters.length}</span>
-            </header>
-            <ol>
-              {chapters.map((chapter) => (
-                <li key={chapter.id}>
-                  <button
-                    className={chapter.pageIndex === activePageIndex ? 'active' : undefined}
-                    type="button"
-                    aria-label={`Play slide ${chapter.pageIndex + 1}: ${chapter.pageName}`}
-                    onClick={() => seekToChapter(chapter)}
-                  >
-                    <span>{formatTranscriptTimestamp(chapter.startMs)}</span>
+      </section>
+      {chaptersOpen ? (
+        <aside className="public-deck-chapters-menu pages-panel" aria-label="Slide chapter menu">
+          <div className="pages-panel-header">
+            <div>
+              <h2 className="panel-heading">Slides</h2>
+              <p className="panel-muted">{chapters.length} slides</p>
+            </div>
+            <button
+              className="icon-button"
+              type="button"
+              aria-label="Close slide chapters"
+              onClick={() => onChaptersOpenChange(false)}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">
+                close
+              </span>
+            </button>
+          </div>
+          <ol className="pages-list">
+            {chapters.map((chapter) => (
+              <li key={chapter.id}>
+                <button
+                  className={
+                    chapter.pageIndex === activePageIndex
+                      ? 'public-deck-chapter-card page-card page-card-active'
+                      : 'public-deck-chapter-card page-card'
+                  }
+                  type="button"
+                  aria-label={`Play slide ${chapter.pageIndex + 1}: ${chapter.pageName}`}
+                  onClick={() => seekToChapter(chapter)}
+                >
+                  <span className="page-card-number">{chapter.pageIndex + 1}</span>
+                  <span className="public-deck-chapter-card-body page-card-body">
+                    <span className="public-deck-chapter-card-time">
+                      {formatTranscriptTimestamp(chapter.startMs)}
+                    </span>
                     <strong>Slide {chapter.pageIndex + 1}</strong>
                     <em>{chapter.pageName}</em>
-                  </button>
-                </li>
-              ))}
-            </ol>
-          </div>
-        ) : null}
-      </section>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ol>
+        </aside>
+      ) : null}
     </>
   );
 }
@@ -713,6 +724,7 @@ export function PublicDeckViewer({
   const emptySelection = useMemo<SelectionState>(() => ({ pageId: '', elementIds: [] }), []);
   const [transcriptPanelOpen, setTranscriptPanelOpen] = useState(false);
   const [transcriptPanelTab, setTranscriptPanelTab] = useState<TranscriptPanelTab>('transcript');
+  const [slideChaptersOpen, setSlideChaptersOpen] = useState(false);
   const [transcriptQuestion, setTranscriptQuestion] = useState('');
   const [transcriptAnswer, setTranscriptAnswer] = useState<TranscriptAnswer | undefined>();
   const [transcriptAnswerStatus, setTranscriptAnswerStatus] = useState<
@@ -1074,10 +1086,14 @@ export function PublicDeckViewer({
   const canGoNext = activePageIndex < project.pages.length - 1;
   const transcriptRecordings = getTranscriptRecordings(project);
   const hasTranscriptRecordings = transcriptRecordings.length > 0;
-  const showPlaybackOverlay = !embed;
-  const readyViewerClassName = showPlaybackOverlay
-    ? `${viewerClassName} public-deck-viewer-with-playback`
-    : viewerClassName;
+  const showPlaybackOverlay = hasTranscriptRecordings && !embed;
+  const readyViewerClassName = [
+    viewerClassName,
+    showPlaybackOverlay ? 'public-deck-viewer-with-playback' : '',
+    showPlaybackOverlay && slideChaptersOpen ? 'public-deck-viewer-chapters-open' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   async function answerTranscriptQuestion() {
     if (!transcriptQuestion.trim() || transcriptAnswerStatus === 'answering') return;
@@ -1122,7 +1138,7 @@ export function PublicDeckViewer({
           onAnimationPreviewAdvance={advancePresentation}
         />
       </section>
-      {project.pages.length > 1 ? (
+      {project.pages.length > 1 && !showPlaybackOverlay ? (
         <nav className="public-deck-slide-dots" aria-label="Jump to slide">
           {project.pages.map((page, pageIndex) => (
             <button
@@ -1145,8 +1161,10 @@ export function PublicDeckViewer({
           activePageIndex={activePageIndex}
           canGoNext={canGoNext}
           canGoPrevious={canGoPrevious}
+          chaptersOpen={slideChaptersOpen}
           recordings={transcriptRecordings}
           pages={project.pages}
+          onChaptersOpenChange={setSlideChaptersOpen}
           onNext={advancePresentation}
           onOpenTranscript={() => setTranscriptPanelOpen((current) => !current)}
           onPrevious={rewindPresentation}

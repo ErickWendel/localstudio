@@ -6,7 +6,12 @@ import { BrowserPresenterSessionService } from '../../../../src/services/present
 import { EditorShell } from '../../../../src/ui/editor/shell/EditorShell';
 import { editorShellTestHarness } from './EditorShell.test-harness';
 
-const { createAppServices, selectImageLayer, startFullscreenPresentation } = editorShellTestHarness;
+const {
+  SavingProjectRepository,
+  createAppServices,
+  selectImageLayer,
+  startFullscreenPresentation,
+} = editorShellTestHarness;
 
 describe('EditorShell presenter fullscreen workflows', () => {
   afterEach(() => {
@@ -185,6 +190,93 @@ describe('EditorShell presenter fullscreen workflows', () => {
     fireEvent.mouseDown(container.querySelector('canvas')!);
 
     expect(screen.getByText('1 / 2')).toBeInTheDocument();
+  });
+
+  it('saves presenter recordings sent after a partial slide recording', async () => {
+    const popup = {
+      close: vi.fn(),
+      closed: false,
+      location: { href: '' },
+      postMessage: vi.fn(),
+    } as unknown as Window;
+    Object.defineProperty(window, 'open', {
+      configurable: true,
+      value: vi.fn(() => popup),
+    });
+    vi.spyOn(BrowserPresenterSessionService.prototype, 'openRemoteControlSession').mockResolvedValue({
+      code: 'peer-recording',
+      connectedControllerCount: 0,
+      expiresAt: '2026-07-20T21:00:00.000Z',
+      presenterDeviceId: 'presenter-device-recording',
+      presenterLabel: 'MacBook Pro',
+      qrUrl: 'http://localhost:4176/joystick/?peer=peer-recording',
+      sessionId: 'remote-session-recording',
+      transport: 'peerjs',
+    });
+    const repository = new SavingProjectRepository();
+    const services = createAppServices();
+    services.projectRepository = repository;
+    render(<EditorShell services={services} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Choose folder' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Presentation play options' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Presenter view' }));
+    const presenterSessionId = new URL(popup.location.href).searchParams.get('presenterSession');
+    expect(presenterSessionId).toBeTruthy();
+    const audioBlob = new Blob(['partial audio'], { type: 'audio/webm;codecs=opus' });
+
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: {
+          audioBlob,
+          command: 'save-recording',
+          recording: {
+            id: 'partial-recording',
+            name: 'Presenter recording',
+            createdAt: '2026-07-20T20:00:00.000Z',
+            updatedAt: '2026-07-20T20:00:00.000Z',
+            durationMs: 1800,
+            modelPresetId: 'web-speech-api',
+            audio: {
+              mimeType: 'audio/webm;codecs=opus',
+              storage: 'inline',
+            },
+            segments: [
+              {
+                id: 'segment-1',
+                text: '[Slide 1] Partial recording.',
+                startMs: 0,
+                endMs: 1800,
+                final: true,
+                pageId: 'page-1',
+                pageIndex: 0,
+                pageName: 'Slide 1',
+              },
+            ],
+          },
+          sessionId: presenterSessionId,
+          source: 'localstudio-presenter-window',
+          type: 'command',
+        },
+        origin: window.location.origin,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(repository.savedProjects.at(-1)?.recordings?.['partial-recording']).toMatchObject({
+        durationMs: 1800,
+        segments: [
+          expect.objectContaining({
+            text: '[Slide 1] Partial recording.',
+          }),
+        ],
+      });
+    });
   });
 
   it('hides page insert controls in fullscreen presenter mode and restores a clean editor state on exit', async () => {

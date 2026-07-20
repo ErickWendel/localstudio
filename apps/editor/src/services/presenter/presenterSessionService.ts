@@ -332,6 +332,15 @@ export class BrowserPresenterSessionService {
         handler({ command, pageId: event.data.pageId });
         return;
       }
+      if (command === 'save-recording') {
+        if (!event.data.recording || typeof event.data.recording !== 'object') return;
+        handler({
+          audioBlob: event.data.audioBlob instanceof Blob ? event.data.audioBlob : undefined,
+          command,
+          recording: event.data.recording,
+        });
+        return;
+      }
       if (
         command === 'close' ||
         command === 'next' ||
