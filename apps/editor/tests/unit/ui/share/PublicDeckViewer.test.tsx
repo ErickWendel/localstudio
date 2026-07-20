@@ -134,6 +134,15 @@ describe('PublicDeckViewer', () => {
 
   it('opens transcript panel with public recording audio and segments', async () => {
     const project = sampleProject.createSampleProject();
+    project.pages = [
+      project.pages[0]!,
+      {
+        ...project.pages[0]!,
+        id: 'page-2',
+        name: 'Slide 2',
+        background: { type: 'color', color: '#261255' },
+      },
+    ];
     project.recordings = {
       recording1: {
         id: 'recording1',
@@ -153,8 +162,19 @@ describe('PublicDeckViewer', () => {
             id: 'segment1',
             text: 'The roadmap includes transcript chat.',
             startMs: 0,
+            endMs: 1200,
+            final: true,
+            pageIndex: 0,
+            pageName: 'Slide 1',
+          },
+          {
+            id: 'segment2',
+            text: 'The second slide has synced audio.',
+            startMs: 1200,
             endMs: 2400,
             final: true,
+            pageIndex: 1,
+            pageName: 'Slide 2',
           },
         ],
       },
@@ -174,12 +194,18 @@ describe('PublicDeckViewer', () => {
 
     await screen.findByLabelText('Public presentation');
     expect(screen.getByRole('region', { name: 'Presentation playback' })).toBeInTheDocument();
+    const audio = document.querySelector('audio');
+    expect(audio).toBeInstanceOf(HTMLAudioElement);
+    await user.click(screen.getByRole('button', { name: 'Next slide' }));
+    expect(audio?.currentTime).toBe(1.2);
     await user.click(screen.getByRole('button', { name: 'Play presentation audio' }));
     expect(screen.getByRole('button', { name: 'Pause presentation audio' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Show captions' }));
-    expect(screen.getByText('The roadmap includes transcript chat.')).toBeInTheDocument();
+    expect(screen.getByText('The second slide has synced audio.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Open slide chapters' }));
     expect(screen.getByLabelText('Slide chapter menu')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Play slide 1: Slide 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Play slide 2: Slide 2' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Open transcript chat' }));
 
     expect(screen.getByRole('complementary', { name: 'Transcript chat' })).toBeInTheDocument();
@@ -187,7 +213,8 @@ describe('PublicDeckViewer', () => {
     expect(screen.getByText('Podcast mode')).toBeInTheDocument();
     expect(screen.getByLabelText('Podcast recording')).toHaveValue('recording1');
     expect(screen.getByRole('heading', { name: 'Presenter recording' })).toBeInTheDocument();
-    expect(screen.getAllByText('The roadmap includes transcript chat.')).toHaveLength(2);
+    expect(screen.getByText('The roadmap includes transcript chat.')).toBeInTheDocument();
+    expect(screen.getAllByText('The second slide has synced audio.')).toHaveLength(2);
     expect(screen.getByLabelText('Presenter recording audio')).toHaveAttribute(
       'src',
       'https://cdn.localstudio.test/recordings/recording1.webm',

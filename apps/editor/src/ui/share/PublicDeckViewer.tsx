@@ -14,6 +14,7 @@ import type { TranscriptAnswer } from '../../services/transcription/transcriptQu
 import { webGpuTextGenerationRuntime } from '../../services/prompting/webGpuTextGenerationRuntime';
 import { CanvasWorkspace } from '../editor/canvas/CanvasWorkspace';
 import { ProjectVideoPreloader } from '../editor/media/ProjectVideoPreloader';
+import { MiniPagePreview } from '../editor/panels/PageMiniPreview';
 import { preloadPublicDeckAssets } from './publicDeckAssetPreloader';
 
 interface PublicDeckViewerProps {
@@ -44,6 +45,7 @@ type TranscriptPanelTab = 'ask' | 'transcript';
 
 interface PublicPodcastChapter {
   id: string;
+  endMs: number | undefined;
   pageIndex: number;
   pageName: string;
   startMs: number;
@@ -68,24 +70,53 @@ function stripSlideLabel(text: string) {
   return text.replace(/^\[Slide \d+\]\s*/i, '').trim();
 }
 
+function resolveTranscriptSegmentPageIndex(
+  segment: TranscriptRecording['segments'][number],
+  pages: Page[],
+  segmentIndex: number,
+) {
+  if (segment.pageId) {
+    const pageIndex = pages.findIndex((page) => page.id === segment.pageId);
+    if (pageIndex !== -1) return pageIndex;
+  }
+  if (typeof segment.pageIndex === 'number' && segment.pageIndex >= 0 && segment.pageIndex < pages.length) {
+    return segment.pageIndex;
+  }
+  if (segment.pageName) {
+    const pageIndex = pages.findIndex((page) => page.name === segment.pageName);
+    if (pageIndex !== -1) return pageIndex;
+  }
+  return segmentIndex === 0 ? 0 : undefined;
+}
+
 function createPublicPodcastChapters(recording: TranscriptRecording | undefined, pages: Page[]) {
   if (!recording || pages.length === 0) return [];
-  const pageCount = Math.max(1, pages.length);
-  return pages
-    .map<PublicPodcastChapter>((page, pageIndex) => {
-      const matchingSegment = recording.segments.find(
-        (segment) =>
-          segment.pageId === page.id ||
-          segment.pageIndex === pageIndex ||
-          segment.pageName === page.name,
-      );
-      return {
+  const chaptersByPageIndex = new Map<number, PublicPodcastChapter>();
+
+  recording.segments.forEach((segment, segmentIndex) => {
+    const pageIndex = resolveTranscriptSegmentPageIndex(segment, pages, segmentIndex);
+    if (pageIndex === undefined) return;
+    const page = pages[pageIndex];
+    if (!page) return;
+    const currentChapter = chaptersByPageIndex.get(pageIndex);
+    const startMs = Math.max(0, segment.startMs);
+    const endMs = segment.endMs > startMs ? segment.endMs : undefined;
+    if (!currentChapter || startMs < currentChapter.startMs) {
+      chaptersByPageIndex.set(pageIndex, {
         id: `${recording.id}-${page.id}`,
+        endMs,
         pageIndex,
         pageName: page.name,
-        startMs: matchingSegment?.startMs ?? Math.round((recording.durationMs / pageCount) * pageIndex),
-      };
-    })
+        startMs,
+      });
+      return;
+    }
+    if (endMs && (!currentChapter.endMs || endMs > currentChapter.endMs)) {
+      chaptersByPageIndex.set(pageIndex, { ...currentChapter, endMs });
+    }
+  });
+
+  return Array.from(chaptersByPageIndex.values())
     .sort((first, second) => first.startMs - second.startMs);
 }
 
@@ -95,6 +126,20 @@ function getActivePodcastChapter(chapters: PublicPodcastChapter[], currentTimeMs
     if (chapter.startMs > currentTimeMs) return activeChapter;
     return chapter;
   }, chapters[0]);
+}
+
+function getPodcastChapterForPage(chapters: PublicPodcastChapter[], pageIndex: number) {
+  return chapters.find((chapter) => chapter.pageIndex === pageIndex);
+}
+
+function getPodcastChapterEndMs(
+  chapter: PublicPodcastChapter,
+  chapters: PublicPodcastChapter[],
+  totalMs: number,
+) {
+  const chapterIndex = chapters.findIndex((candidate) => candidate.id === chapter.id);
+  const nextChapter = chapterIndex === -1 ? undefined : chapters[chapterIndex + 1];
+  return nextChapter?.startMs ?? chapter.endMs ?? totalMs;
 }
 
 function getActiveTranscriptSegment(recording: TranscriptRecording | undefined, currentTimeMs: number) {
@@ -412,24 +457,20 @@ function PublicDeckPlaybackOverlay({
   canGoNext,
   canGoPrevious,
   chaptersOpen,
-  onNext,
   onChaptersOpenChange,
   onOpenTranscript,
-  onPrevious,
   onSelectPage,
-  pages,
+  project,
   recordings,
 }: {
   activePageIndex: number;
   canGoNext: boolean;
   canGoPrevious: boolean;
   chaptersOpen: boolean;
-  onNext: () => void;
   onChaptersOpenChange: (open: boolean) => void;
   onOpenTranscript: () => void;
-  onPrevious: () => void;
   onSelectPage: (pageIndex: number) => void;
-  pages: Page[];
+  project: ProjectDocument;
   recordings: TranscriptRecording[];
 }) {
   const [captionsVisible, setCaptionsVisible] = useState(false);
@@ -442,6 +483,7 @@ function PublicDeckPlaybackOverlay({
     () => recordings.find((recording) => recording.audio.objectUrl) ?? recordings[0],
     [recordings],
   );
+  const { pages } = project;
   const chapters = useMemo(
     () => (selectedRecording ? createPublicPodcastChapters(selectedRecording, pages) : []),
     [pages, selectedRecording],
@@ -459,6 +501,10 @@ function PublicDeckPlaybackOverlay({
   const hasCaptions = Boolean(captionText);
   const totalMs = durationMs || selectedRecording?.durationMs || Math.max(0, pages.length - 1) * 1000;
   const progressPercent = getRecordingTimePercent(currentTimeMs, totalMs);
+  const chaptersByPageIndex = useMemo(
+    () => new Map(chapters.map((chapter) => [chapter.pageIndex, chapter])),
+    [chapters],
+  );
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -500,6 +546,19 @@ function PublicDeckPlaybackOverlay({
       setPlaying(false);
       return;
     }
+    const activePageChapter = getPodcastChapterForPage(chapters, activePageIndex);
+    if (activePageChapter) {
+      const activePageChapterEndMs = getPodcastChapterEndMs(activePageChapter, chapters, totalMs);
+      const shouldRestartSlideClip =
+        activeChapter?.pageIndex !== activePageIndex ||
+        currentTimeMs < activePageChapter.startMs ||
+        currentTimeMs >= Math.max(activePageChapter.startMs, activePageChapterEndMs - 120);
+      if (shouldRestartSlideClip) {
+        audio.currentTime = activePageChapter.startMs / 1000;
+        setCurrentTimeMs(activePageChapter.startMs);
+        lastSyncedChapterIdRef.current = activePageChapter.id;
+      }
+    }
     void audio.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
   }
 
@@ -514,6 +573,15 @@ function PublicDeckPlaybackOverlay({
     seekToTime(chapter.startMs);
     lastSyncedChapterIdRef.current = chapter.id;
     onSelectPage(chapter.pageIndex);
+  }
+
+  function goToSlide(pageIndex: number) {
+    const chapter = getPodcastChapterForPage(chapters, pageIndex);
+    if (chapter) {
+      seekToChapter(chapter);
+      return;
+    }
+    onSelectPage(pageIndex);
   }
 
   return (
@@ -544,7 +612,15 @@ function PublicDeckPlaybackOverlay({
             className="public-deck-playback-progress"
             style={{ '--public-deck-progress': `${progressPercent}%` } as CSSProperties}
           />
-          {chapters.map((chapter) => (
+          {chapters.map((chapter) => {
+            const chapterEndMs = getPodcastChapterEndMs(chapter, chapters, totalMs);
+            const chapterWidthPercent = Math.max(
+              0.3,
+              getRecordingTimePercent(chapterEndMs, totalMs) -
+                getRecordingTimePercent(chapter.startMs, totalMs),
+            );
+            const page = pages[chapter.pageIndex];
+            return (
             <button
               key={chapter.id}
               className={
@@ -554,10 +630,24 @@ function PublicDeckPlaybackOverlay({
               }
               type="button"
               aria-label={`Seek audio to slide ${chapter.pageIndex + 1}: ${chapter.pageName}`}
-              style={{ '--public-deck-chapter-left': `${getRecordingTimePercent(chapter.startMs, totalMs)}%` } as CSSProperties}
+              style={
+                {
+                  '--public-deck-chapter-left': `${getRecordingTimePercent(chapter.startMs, totalMs)}%`,
+                  '--public-deck-chapter-width': `${chapterWidthPercent}%`,
+                } as CSSProperties
+              }
               onClick={() => seekToChapter(chapter)}
-            />
-          ))}
+            >
+              {page ? (
+                <span className="public-deck-playback-chapter-preview" aria-hidden="true">
+                  <MiniPagePreview page={page} project={project} visible={page.visible ?? true} />
+                  <strong>Slide {chapter.pageIndex + 1}</strong>
+                  <em>{formatTranscriptTimestamp(chapter.startMs)}</em>
+                </span>
+              ) : null}
+            </button>
+            );
+          })}
           <input
             aria-label="Seek presentation audio"
             max={Math.max(1, Math.round(totalMs / 1000))}
@@ -610,7 +700,7 @@ function PublicDeckPlaybackOverlay({
             disabled={!canGoPrevious}
             type="button"
             aria-label="Previous slide"
-            onClick={onPrevious}
+            onClick={() => goToSlide(activePageIndex - 1)}
           >
             <span className="material-symbols-outlined" aria-hidden="true">
               chevron_left
@@ -621,7 +711,7 @@ function PublicDeckPlaybackOverlay({
             disabled={!canGoNext}
             type="button"
             aria-label="Next slide"
-            onClick={onNext}
+            onClick={() => goToSlide(activePageIndex + 1)}
           >
             <span className="material-symbols-outlined" aria-hidden="true">
               chevron_right
@@ -671,31 +761,52 @@ function PublicDeckPlaybackOverlay({
               </span>
             </button>
           </div>
-          <ol className="pages-list">
-            {chapters.map((chapter) => (
-              <li key={chapter.id}>
-                <button
+          <div className="pages-list">
+            {pages.map((page, pageIndex) => {
+              const chapter = chaptersByPageIndex.get(pageIndex);
+              return (
+                <article
                   className={
-                    chapter.pageIndex === activePageIndex
+                    pageIndex === activePageIndex
                       ? 'public-deck-chapter-card page-card page-card-active'
                       : 'public-deck-chapter-card page-card'
                   }
-                  type="button"
-                  aria-label={`Play slide ${chapter.pageIndex + 1}: ${chapter.pageName}`}
-                  onClick={() => seekToChapter(chapter)}
+                  key={page.id}
+                  aria-label={`Slide ${pageIndex + 1}: ${page.name}`}
                 >
-                  <span className="page-card-number">{chapter.pageIndex + 1}</span>
+                  <span className="page-card-number">{pageIndex + 1}</span>
+                  <button
+                    className="page-card-preview"
+                    style={{ aspectRatio: `${page.width} / ${page.height}` }}
+                    type="button"
+                    aria-label={`Play slide ${pageIndex + 1}: ${page.name}`}
+                    onClick={() => {
+                      if (chapter) {
+                        seekToChapter(chapter);
+                        return;
+                      }
+                      onSelectPage(pageIndex);
+                    }}
+                  >
+                    <MiniPagePreview page={page} project={project} visible={page.visible ?? true} />
+                  </button>
                   <span className="public-deck-chapter-card-body page-card-body">
-                    <span className="public-deck-chapter-card-time">
-                      {formatTranscriptTimestamp(chapter.startMs)}
-                    </span>
-                    <strong>Slide {chapter.pageIndex + 1}</strong>
-                    <em>{chapter.pageName}</em>
+                    {chapter ? (
+                      <span className="public-deck-chapter-card-time">
+                        {formatTranscriptTimestamp(chapter.startMs)}
+                      </span>
+                    ) : (
+                      <span className="public-deck-chapter-card-time public-deck-chapter-card-time-empty">
+                        No audio
+                      </span>
+                    )}
+                    <strong>Slide {pageIndex + 1}</strong>
+                    <em>{page.name}</em>
                   </span>
-                </button>
-              </li>
-            ))}
-          </ol>
+                </article>
+              );
+            })}
+          </div>
         </aside>
       ) : null}
     </>
@@ -1163,11 +1274,9 @@ export function PublicDeckViewer({
           canGoPrevious={canGoPrevious}
           chaptersOpen={slideChaptersOpen}
           recordings={transcriptRecordings}
-          pages={project.pages}
+          project={project}
           onChaptersOpenChange={setSlideChaptersOpen}
-          onNext={advancePresentation}
           onOpenTranscript={() => setTranscriptPanelOpen((current) => !current)}
-          onPrevious={rewindPresentation}
           onSelectPage={(pageIndex) => playPresentationPage(project, pageIndex)}
         />
       ) : (

@@ -1,5 +1,5 @@
 .public-deck-viewer-with-playback {
-  --public-deck-chapters-width: min(360px, 28vw);
+  --public-deck-chapters-width: min(410px, 32vw);
 }
 
 .public-deck-viewer-with-playback .public-deck-stage-shell,
@@ -96,18 +96,70 @@
 .public-deck-playback-chapter-dot {
   position: absolute;
   left: var(--public-deck-chapter-left, 0%);
-  width: 4px;
-  height: 10px;
-  transform: translateX(-50%);
+  width: max(4px, var(--public-deck-chapter-width, 4px));
+  height: 8px;
+  transform: translateX(0);
   border: 0;
-  border-radius: 999px;
+  border-radius: 2px;
   padding: 0;
   background: rgba(255, 255, 255, 0.42);
 }
 
+.public-deck-playback-chapter-dot:hover,
 .public-deck-playback-chapter-dot-active {
-  width: 8px;
   background: var(--ew-green);
+}
+
+.public-deck-playback-chapter-preview {
+  position: absolute;
+  left: 50%;
+  bottom: 17px;
+  width: 164px;
+  display: grid;
+  gap: 6px;
+  transform: translateX(-50%) translateY(5px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  padding: 7px;
+  color: #fff;
+  background: rgba(6, 14, 16, 0.96);
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.42);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.public-deck-playback-chapter-dot:hover .public-deck-playback-chapter-preview,
+.public-deck-playback-chapter-dot:focus-visible .public-deck-playback-chapter-preview {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+.public-deck-playback-chapter-preview .page-card-canvas {
+  aspect-ratio: var(--public-deck-slide-preview-aspect, 16 / 9);
+  border-radius: 4px;
+}
+
+.public-deck-playback-chapter-preview strong,
+.public-deck-playback-chapter-preview em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.public-deck-playback-chapter-preview strong {
+  font-size: 12px;
+  text-align: left;
+}
+
+.public-deck-playback-chapter-preview em {
+  color: var(--ew-green);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+  text-align: left;
 }
 
 .public-deck-playback-controls {
@@ -199,15 +251,13 @@
   padding-bottom: 116px;
 }
 
-.public-deck-chapters-menu li {
-  display: block;
+.public-deck-chapter-card {
+  cursor: default;
+  color: var(--ew-text);
 }
 
-.public-deck-chapter-card {
-  width: 100%;
+.public-deck-chapter-card .page-card-preview {
   cursor: pointer;
-  color: var(--ew-text);
-  text-align: left;
 }
 
 .public-deck-chapter-card-body {
@@ -218,6 +268,10 @@
   color: var(--ew-green);
   font-size: 11px;
   font-weight: 900;
+}
+
+.public-deck-chapter-card-time-empty {
+  color: var(--ew-muted);
 }
 
 .public-deck-chapter-card strong,

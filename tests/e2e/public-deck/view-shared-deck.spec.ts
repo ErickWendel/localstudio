@@ -27,8 +27,19 @@ test.describe('public deck view journey', () => {
             id: 'segment-1',
             text: 'Transcript chat is available in the public viewer.',
             startMs: 0,
+            endMs: 1100,
+            final: true,
+            pageIndex: 0,
+            pageName: 'Opening',
+          },
+          {
+            id: 'segment-2',
+            text: 'The closing slide has its own audio chapter.',
+            startMs: 1100,
             endMs: 2200,
             final: true,
+            pageIndex: 1,
+            pageName: 'Closing',
           },
         ],
       },
@@ -55,6 +66,8 @@ test.describe('public deck view journey', () => {
     await page.getByRole('button', { name: 'Open slide chapters' }).click();
     const chapterMenu = page.getByLabel('Slide chapter menu');
     await expect(chapterMenu).toBeVisible();
+    await expect(chapterMenu.getByRole('button', { name: 'Play slide 1: Opening' })).toBeVisible();
+    await expect(chapterMenu.getByRole('button', { name: 'Play slide 2: Closing' })).toBeVisible();
     await chapterMenu.getByRole('button', { name: 'Play slide 2: Closing' }).click();
     await expect(page.getByText('2 / 2')).toBeVisible();
     await chapterMenu.getByRole('button', { name: 'Play slide 1: Opening' }).click();
