@@ -107,6 +107,15 @@ function getActiveTranscriptSegment(recording: TranscriptRecording | undefined, 
   });
 }
 
+function createSlideOnlyChapters(pages: Page[]): PublicPodcastChapter[] {
+  return pages.map((page, pageIndex) => ({
+    id: `slide-only-${page.id}`,
+    pageIndex,
+    pageName: page.name,
+    startMs: pageIndex * 1000,
+  }));
+}
+
 function getBuildPlaybackDurationMs(build: ElementAnimationBuild) {
   return Math.max(0, build.durationMs ?? build.delayMs);
 }
@@ -440,7 +449,10 @@ function PublicDeckPlaybackOverlay({
     [recordings],
   );
   const chapters = useMemo(
-    () => createPublicPodcastChapters(selectedRecording, pages),
+    () =>
+      selectedRecording
+        ? createPublicPodcastChapters(selectedRecording, pages)
+        : createSlideOnlyChapters(pages),
     [pages, selectedRecording],
   );
   const activeChapter = useMemo(
@@ -452,7 +464,9 @@ function PublicDeckPlaybackOverlay({
     [currentTimeMs, selectedRecording],
   );
   const captionText = activeSegment ? stripSlideLabel(activeSegment.text) : '';
-  const totalMs = durationMs || selectedRecording?.durationMs || 0;
+  const hasAudio = Boolean(selectedRecording?.audio.objectUrl);
+  const hasCaptions = Boolean(captionText);
+  const totalMs = durationMs || selectedRecording?.durationMs || Math.max(0, pages.length - 1) * 1000;
   const progressPercent = getRecordingTimePercent(currentTimeMs, totalMs);
 
   useEffect(() => {
@@ -512,23 +526,23 @@ function PublicDeckPlaybackOverlay({
     setChaptersOpen(false);
   }
 
-  if (!selectedRecording?.audio.objectUrl) return null;
-
   return (
     <>
-      <audio
-        ref={audioRef}
-        preload="metadata"
-        src={selectedRecording.audio.objectUrl}
-        onDurationChange={updateProgress}
-        onEnded={() => setPlaying(false)}
-        onLoadedMetadata={updateProgress}
-        onPause={() => setPlaying(false)}
-        onPlay={() => setPlaying(true)}
-        onTimeUpdate={updateProgress}
-      >
-        <track kind="captions" />
-      </audio>
+      {selectedRecording?.audio.objectUrl ? (
+        <audio
+          ref={audioRef}
+          preload="metadata"
+          src={selectedRecording.audio.objectUrl}
+          onDurationChange={updateProgress}
+          onEnded={() => setPlaying(false)}
+          onLoadedMetadata={updateProgress}
+          onPause={() => setPlaying(false)}
+          onPlay={() => setPlaying(true)}
+          onTimeUpdate={updateProgress}
+        >
+          <track kind="captions" />
+        </audio>
+      ) : null}
       {captionsVisible && captionText ? (
         <div className="public-deck-caption-overlay" aria-live="polite">
           {captionText}
@@ -567,8 +581,15 @@ function PublicDeckPlaybackOverlay({
         <div className="public-deck-playback-controls">
           <button
             className="public-deck-playback-button public-deck-playback-button-primary"
+            disabled={!hasAudio}
             type="button"
-            aria-label={playing ? 'Pause presentation audio' : 'Play presentation audio'}
+            aria-label={
+              hasAudio
+                ? playing
+                  ? 'Pause presentation audio'
+                  : 'Play presentation audio'
+                : 'Presentation audio unavailable'
+            }
             onClick={togglePlayback}
           >
             {playing ? <Pause size={20} aria-hidden="true" /> : <Play size={20} aria-hidden="true" />}
@@ -590,7 +611,7 @@ function PublicDeckPlaybackOverlay({
             <span>
               {activeChapter
                 ? `Slide ${activeChapter.pageIndex + 1}: ${activeChapter.pageName}`
-                : selectedRecording.name}
+                : selectedRecording?.name ?? 'Slides'}
             </span>
           </button>
           <div className="public-deck-playback-spacer" />
@@ -622,8 +643,11 @@ function PublicDeckPlaybackOverlay({
                 ? 'public-deck-playback-button public-deck-playback-button-active'
                 : 'public-deck-playback-button'
             }
+            disabled={!hasCaptions}
             type="button"
-            aria-label={captionsVisible ? 'Hide captions' : 'Show captions'}
+            aria-label={
+              hasCaptions ? (captionsVisible ? 'Hide captions' : 'Show captions') : 'Captions unavailable'
+            }
             aria-pressed={captionsVisible}
             onClick={() => setCaptionsVisible((current) => !current)}
           >
@@ -1050,7 +1074,8 @@ export function PublicDeckViewer({
   const canGoNext = activePageIndex < project.pages.length - 1;
   const transcriptRecordings = getTranscriptRecordings(project);
   const hasTranscriptRecordings = transcriptRecordings.length > 0;
-  const readyViewerClassName = hasTranscriptRecordings && !embed
+  const showPlaybackOverlay = !embed;
+  const readyViewerClassName = showPlaybackOverlay
     ? `${viewerClassName} public-deck-viewer-with-playback`
     : viewerClassName;
 
@@ -1115,7 +1140,7 @@ export function PublicDeckViewer({
           ))}
         </nav>
       ) : null}
-      {hasTranscriptRecordings && !embed ? (
+      {showPlaybackOverlay ? (
         <PublicDeckPlaybackOverlay
           activePageIndex={activePageIndex}
           canGoNext={canGoNext}

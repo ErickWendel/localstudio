@@ -128,6 +128,9 @@ describe('PublicDeckViewer', () => {
     expect(screen.queryByRole('heading', { name: 'Untitled AI Deck' })).not.toBeInTheDocument();
     expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-selected-elements', '');
     expect(screen.getByRole('button', { name: 'Previous slide' })).toBeDisabled();
+    expect(screen.getByRole('region', { name: 'Presentation playback' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Presentation audio unavailable' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Captions unavailable' })).toBeDisabled();
     expect(screen.getByText('1 / 1')).toBeInTheDocument();
   });
 
