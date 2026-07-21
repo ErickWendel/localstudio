@@ -9,9 +9,11 @@
 ![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)
 
-Design slides with local AI, then keep editing.
+LocalStudio.dev is a browser-native slide editor for people who want editable decks without handing the whole workflow to a remote workspace.
 
-LocalStudio.dev is a browser-native Canva-style editor that turns PowerPoint (`.pptx`) import, prompt generation, image
+Cloud presentation tools are convenient until sync becomes the product risk. LocalStudio exists for a practical reason: iCloud sync issues can lose or corrupt entire presentations, and translating a deck manually is still slow. LocalStudio keeps the deck as editable local layers and can translate the whole deck with one action when the browser AI setup is ready.
+
+It turns PowerPoint (`.pptx`) import, prompt generation, image
 creation, translation, background removal, presenter-mode PWA remote control, local project history, and S3-compatible
 projects into one editable slide workflow.
 
