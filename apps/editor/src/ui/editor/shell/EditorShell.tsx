@@ -9,6 +9,7 @@ import type {
 } from '../../../services/contracts/interfaces';
 import { editorAutomationController } from '../../../services/automation/editorAutomationController';
 import type { EditorAutomationDelegate } from '../../../services/automation/editorAutomationController';
+import { imageGenerationModel } from '../../../services/image-generation/imageGenerationModel';
 import {
   WebMcpToolAdapter,
   type WebMcpDemoWindow,
@@ -26,6 +27,7 @@ import { ProjectVideoPreloader } from '../media/ProjectVideoPreloader';
 import { localMediaImportConfig } from '../media/localMediaImportConfig';
 import { movieStartPlayback } from '../media/movieStartPlayback';
 import { PromptBar } from '../prompting/PromptBar';
+import type { PromptModelControlState } from '../prompting/PromptModelControl';
 import { RemoteImportPanel } from '../panels/RemoteImportPanel';
 import { CanvasWorkspace } from '../canvas/CanvasWorkspace';
 import { ScrollingCanvasWorkspace } from '../canvas/ScrollingCanvasWorkspace';
@@ -38,7 +40,10 @@ import { copyShareText } from '../../share/shareClipboard';
 import { KeyboardShortcutsDialog, type KeyboardShortcutAction } from '../../components/KeyboardShortcutsDialog';
 import { editorShellBrowserUtils } from '../browser/editorShellBrowserUtils';
 import { BrowserPresenterSessionService } from '../../../services/presenter/presenterSessionService';
-import type { PresenterRemoteSessionMetadata } from '../../../services/presenter/presenterSessionTypes';
+import type {
+  PresenterRemoteSessionMetadata,
+  PresenterStatePayload,
+} from '../../../services/presenter/presenterSessionTypes';
 import { PresenterRemotePanel } from '../../presenter/PresenterRemotePanel';
 import { EditorAiWorkflowTour } from '../tour/EditorAiWorkflowTour';
 import type { EditorAiWorkflowTourHandle } from '../tour/editorAiWorkflowTourTypes';
@@ -58,6 +63,19 @@ interface EditorShellProps {
 }
 
 const editorMobileViewportQuery = '(max-width: 760px)';
+
+function getModelControlPreparation(status: string | undefined, progress: number | undefined) {
+  if (status === 'downloading') {
+    return { availability: 'downloading', progress: progress ?? 0, status: 'downloading' as const };
+  }
+  if (status === 'ready') {
+    return { availability: 'ready', progress: 100, status: 'ready' as const };
+  }
+  if (status === 'failed') {
+    return { availability: 'downloadable', progress: progress ?? 0, status: 'failed' as const };
+  }
+  return { availability: 'downloadable', progress: 0, status: 'idle' as const };
+}
 
 function isMobileEditorViewport() {
   if (typeof window === 'undefined' || !window.matchMedia) return false;
@@ -181,6 +199,60 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       label: recording.name,
       segmentCount: recording.segments.length,
     }));
+  const imageGenerationState = vm.modelStates.find(
+    (model) => model.id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID,
+  );
+  const imageGenerationModelControlState: PromptModelControlState = {
+    label: 'Image generation model',
+    preparation: {
+      ...getModelControlPreparation(imageGenerationState?.status, imageGenerationState?.progress),
+      estimatedRemainingMs: imageGenerationState?.estimatedRemainingMs,
+      loadedBytes: imageGenerationState?.loadedBytes,
+      totalBytes: imageGenerationState?.totalBytes,
+    },
+    options: [
+      {
+        compatibility: imageGenerationState?.status === 'unavailable' ? 'incompatible' : 'compatible',
+        id: imageGenerationModel.IMAGE_GENERATION_MODEL_ID,
+        label: imageGenerationModel.IMAGE_GENERATION_DISPLAY_NAME,
+        modelId: imageGenerationModel.IMAGE_GENERATION_MODEL_ID,
+        readiness: imageGenerationState?.status ?? 'needs-download',
+        selected: true,
+      },
+    ],
+  };
+  const promptModelControlState: PromptModelControlState = {
+    label: 'Prompt model',
+    preparation: vm.promptPreparation,
+    options: vm.promptProviderStates,
+  };
+
+  const createPresenterStatePayload = useCallback(
+    (overrides?: Partial<PresenterStatePayload>): PresenterStatePayload => ({
+      activePageId: vm.activePageId,
+      animationPreview: vm.animationPreview,
+      presenterMode: presenterSessionId || remotePresenterActive ? 'presenting' : 'ready',
+      project: vm.project,
+      promptModel: {
+        options: vm.promptProviderStates,
+        preparation: vm.promptPreparation,
+      },
+      streamPeerId: presenterRemoteStreamPeerId,
+      transcriptionLanguage: presenterTranscriptionLanguage,
+      ...overrides,
+    }),
+    [
+      presenterRemoteStreamPeerId,
+      presenterSessionId,
+      presenterTranscriptionLanguage,
+      remotePresenterActive,
+      vm.activePageId,
+      vm.animationPreview,
+      vm.project,
+      vm.promptPreparation,
+      vm.promptProviderStates,
+    ],
+  );
 
   const publishCurrentProjectShare = useCallback(async (selectedRecordingId?: string) => {
     const inFlightSharePublish = sharePublishPromiseRef.current;
@@ -446,14 +518,9 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       })
       .then((remoteSession) => {
         setPresenterRemoteSession(remoteSession);
-        service.publishState({
-          activePageId: pageId,
-          animationPreview: vm.animationPreview,
-          presenterMode: 'presenting',
-          project: vm.project,
-          streamPeerId: presenterRemoteStreamPeerId,
-          transcriptionLanguage: presenterTranscriptionLanguage,
-        });
+        service.publishState(
+          createPresenterStatePayload({ activePageId: pageId, presenterMode: 'presenting' }),
+        );
       })
       .catch(() => {
         setPresenterRemoteUnavailable(true);
@@ -466,16 +533,11 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     setAudienceFullscreenPromptOpen(true);
     vm.playPresentationPreview(pageId);
     window.setTimeout(() => {
-      service.publishState({
-        activePageId: pageId,
-        animationPreview: vm.animationPreview,
-        presenterMode: 'presenting',
-        project: vm.project,
-        streamPeerId: presenterRemoteStreamPeerId,
-        transcriptionLanguage: presenterTranscriptionLanguage,
-      });
+      service.publishState(
+        createPresenterStatePayload({ activePageId: pageId, presenterMode: 'presenting' }),
+      );
     }, 0);
-  }, [presenterRemoteStreamPeerId, presenterSessionId, presenterTranscriptionLanguage, vm]);
+  }, [createPresenterStatePayload, presenterSessionId, vm]);
 
   function enterAudienceFullscreen() {
     setAudienceFullscreenPromptOpen(false);
@@ -943,14 +1005,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       .then((remoteSession) => {
         if (cancelled) return;
         setPresenterRemoteSession(remoteSession);
-        service.publishState({
-          activePageId: pageId,
-          animationPreview: vm.animationPreview,
-          presenterMode: presenterSessionId || remotePresenterActive ? 'presenting' : 'ready',
-          project: vm.project,
-          streamPeerId: presenterRemoteStreamPeerId,
-          transcriptionLanguage: presenterTranscriptionLanguage,
-        });
+        service.publishState(createPresenterStatePayload({ activePageId: pageId }));
       })
       .catch(() => {
         if (cancelled) return;
@@ -961,14 +1016,11 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       cancelled = true;
     };
   }, [
-    presenterRemoteStreamPeerId,
+    createPresenterStatePayload,
     presenterRemoteUnavailable,
     presenterSessionId,
     remotePresenterActive,
-    presenterTranscriptionLanguage,
     vm.activePageId,
-    vm.animationPreview,
-    vm.project,
   ]);
 
   useEffect(() => {
@@ -984,14 +1036,21 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           vm.playPresentationPreview(firstPageId);
           void vm.toggleFullscreen(workspaceRef.current);
         }
-        getPresenterSessionService().publishState({
-          activePageId: firstPageId,
-          animationPreview: vm.animationPreview,
-          presenterMode: 'presenting',
-          project: vm.project,
-          streamPeerId: presenterRemoteStreamPeerId,
-          transcriptionLanguage: presenterTranscriptionLanguage,
-        });
+        getPresenterSessionService().publishState(
+          createPresenterStatePayload({ activePageId: firstPageId, presenterMode: 'presenting' }),
+        );
+        return;
+      }
+      if (message.command === 'prepare-prompt-api') {
+        void vm.preparePromptApi();
+        return;
+      }
+      if (message.command === 'set-prompt-provider') {
+        void vm.setPromptProvider(message.providerId);
+        return;
+      }
+      if (message.command === 'cancel-prompt-model-download') {
+        void vm.cancelPromptModelDownload(message.modelId);
         return;
       }
       if (message.command === 'next') {
@@ -1032,14 +1091,12 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           updatedAt: new Date().toISOString(),
         };
         vm.addTranscriptRecording(editorOwnedRecording);
-        getPresenterSessionService().publishState({
+        getPresenterSessionService().publishState(createPresenterStatePayload({
           activePageId: vm.activePageId,
           animationPreview: vm.animationPreview,
           presenterMode: presenterSessionId || remotePresenterActive ? 'presenting' : 'ready',
           project: projectWithRecording,
-          streamPeerId: presenterRemoteStreamPeerId,
-          transcriptionLanguage: presenterTranscriptionLanguage,
-        });
+        }));
         return;
       }
       if (message.command === 'update-stream-peer') {
@@ -1047,14 +1104,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         return;
       }
       if (message.command === 'request-state') {
-        getPresenterSessionService().publishState({
-          activePageId: vm.activePageId,
-          animationPreview: vm.animationPreview,
-          presenterMode: presenterSessionId || remotePresenterActive ? 'presenting' : 'ready',
-          project: vm.project,
-          streamPeerId: presenterRemoteStreamPeerId,
-          transcriptionLanguage: presenterTranscriptionLanguage,
-        });
+        getPresenterSessionService().publishState(createPresenterStatePayload());
         return;
       }
       if (message.command === 'close') {
@@ -1063,10 +1113,9 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     });
   }, [
     advancePresentationPreviewFromUserAction,
+    createPresenterStatePayload,
     presenterRemoteSession,
-    presenterRemoteStreamPeerId,
     presenterSessionId,
-    presenterTranscriptionLanguage,
     remotePresenterActive,
     closePresenterViewSession,
     vm,
@@ -1090,24 +1139,8 @@ function EditorDesktopShell({ services }: EditorShellProps) {
 
   useEffect(() => {
     if (!presenterRemoteSession) return;
-    getPresenterSessionService().publishState({
-      activePageId: vm.activePageId,
-      animationPreview: vm.animationPreview,
-      presenterMode: presenterSessionId || remotePresenterActive ? 'presenting' : 'ready',
-      project: vm.project,
-      streamPeerId: presenterRemoteStreamPeerId,
-      transcriptionLanguage: presenterTranscriptionLanguage,
-    });
-  }, [
-    presenterRemoteSession,
-    presenterRemoteStreamPeerId,
-    presenterSessionId,
-    remotePresenterActive,
-    presenterTranscriptionLanguage,
-    vm.activePageId,
-    vm.animationPreview,
-    vm.project,
-  ]);
+    getPresenterSessionService().publishState(createPresenterStatePayload());
+  }, [createPresenterStatePayload, presenterRemoteSession]);
 
   useEffect(() => {
     if (!presenterRemotePanelOpen) return;
@@ -1491,6 +1524,8 @@ function EditorDesktopShell({ services }: EditorShellProps) {
               createImageNotice={vm.createImageNotice}
               createImageStatus={vm.createImageStatus}
               createImageOptions={vm.createImageOptions}
+              createImageModelControlState={imageGenerationModelControlState}
+              slideModelControlState={promptModelControlState}
               generationNotice={vm.promptGenerationNotice}
               generationStatus={vm.promptGenerationStatus}
               isGeneratingImage={vm.isGeneratingImage}
@@ -1498,6 +1533,15 @@ function EditorDesktopShell({ services }: EditorShellProps) {
               selectedImageElementId={vm.selectedImagePromptElementId}
               onCreateImagePromptIntent={() => vm.ensureImageGenerationReadyForPrompt()}
               onCreateImageSubmit={(prompt, options) => vm.generateImageFromPrompt(prompt, options)}
+              onCancelCreateImageModelDownload={vm.cancelModelDownload}
+              onCancelPromptModelDownload={vm.cancelPromptModelDownload}
+              onPrepareCreateImageModel={() =>
+                vm.downloadModel(imageGenerationModel.IMAGE_GENERATION_MODEL_ID)
+              }
+              onPreparePromptApi={vm.preparePromptApi}
+              onPromptProviderChange={(providerId) => {
+                void vm.setPromptProvider(providerId);
+              }}
               onSlidePromptSubmit={(prompt) => vm.generateSlideFromPrompt(prompt)}
               onStopGeneration={vm.stopPromptGeneration}
             />

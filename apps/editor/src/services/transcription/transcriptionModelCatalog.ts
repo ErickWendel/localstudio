@@ -14,8 +14,6 @@ const embeddingPresets: TranscriptEmbeddingPreset[] = [
   },
 ];
 
-const transcriptQuestionAnsweringModelId = 'onnx-community/gemma-3-270m-ONNX';
-
 function getEmbeddingPreset(id: string | undefined): TranscriptEmbeddingPreset {
   return embeddingPresets.find((preset) => preset.id === id) ?? embeddingPresets[0]!;
 }
@@ -23,5 +21,4 @@ function getEmbeddingPreset(id: string | undefined): TranscriptEmbeddingPreset {
 export const transcriptionModelCatalog = {
   embeddingPresets,
   getEmbeddingPreset,
-  transcriptQuestionAnsweringModelId,
 };

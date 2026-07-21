@@ -7,6 +7,8 @@ import type {
   FontImportService,
   ShareRecord,
 } from '../../../../src/services/contracts/interfaces';
+import { aiModelCatalog } from '../../../../src/services/model-setup/aiModelCatalog';
+import { browserPromptService } from '../../../../src/services/prompting/browserPromptService';
 import { BrowserShareService } from '../../../../src/services/sharing/shareService';
 import { canvasWorkspaceUtils } from '../../../../src/ui/editor/canvas/canvasWorkspaceUtils';
 import { PublicDeckViewer } from '../../../../src/ui/share/PublicDeckViewer';
@@ -50,6 +52,17 @@ describe('PublicDeckViewer', () => {
     window.history.replaceState({}, '', '/');
     vi.stubGlobal('Image', MockPreloadImage);
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(null, { status: 204 }))));
+    Object.defineProperty(navigator, 'gpu', {
+      configurable: true,
+      value: {},
+    });
+    Object.defineProperty(window, 'LanguageModel', {
+      configurable: true,
+      value: {
+        availability: vi.fn().mockResolvedValue('available'),
+        create: vi.fn().mockResolvedValue({ destroy: vi.fn(), prompt: vi.fn() }),
+      },
+    });
     vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(function loadMedia(
       this: HTMLMediaElement,
     ) {
@@ -98,6 +111,14 @@ describe('PublicDeckViewer', () => {
   });
 
   afterEach(() => {
+    Object.defineProperty(window, 'LanguageModel', {
+      configurable: true,
+      value: undefined,
+    });
+    Object.defineProperty(navigator, 'gpu', {
+      configurable: true,
+      value: undefined,
+    });
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -142,6 +163,7 @@ describe('PublicDeckViewer', () => {
 
   it('renders a shared deck in read-only mode', async () => {
     const { share, shareService } = createRemoteShare('00000000-0000-4000-8000-000000000201');
+    const user = userEvent.setup();
     render(
       <PublicDeckViewer
         shareId={share.shareId}
@@ -156,6 +178,9 @@ describe('PublicDeckViewer', () => {
     expect(screen.getByRole('button', { name: 'Previous slide' })).toBeDisabled();
     expect(screen.queryByRole('region', { name: 'Presentation playback' })).not.toBeInTheDocument();
     expect(screen.getByText('1 / 1')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open transcript chat' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Open presentation AI' }));
+    expect(screen.getByRole('complementary', { name: 'Transcript chat' })).toBeInTheDocument();
   });
 
   it('opens transcript panel with public recording audio and segments', async () => {
@@ -268,7 +293,8 @@ describe('PublicDeckViewer', () => {
     await user.click(screen.getByRole('button', { name: 'Jump to slide 3: Slide 3' }));
     expect(screen.queryByText('The second slide has synced audio.')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Jump to slide 2: Slide 2' }));
-    await user.click(screen.getByRole('button', { name: 'Open transcript chat' }));
+    expect(screen.getByRole('button', { name: 'Open transcript chat' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Open presentation AI' }));
 
     expect(screen.getByRole('complementary', { name: 'Transcript chat' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Podcast playback' })).toBeInTheDocument();
@@ -285,6 +311,30 @@ describe('PublicDeckViewer', () => {
     expect(screen.queryByRole('tab', { name: 'Ask' })).not.toBeInTheDocument();
     expect(screen.getByRole('form', { name: 'Transcript question prompt' })).toHaveClass('prompt-bar');
     expect(screen.getByRole('textbox', { name: 'Question for transcript chat' }).tagName).toBe('TEXTAREA');
+    const transcriptModelSelect = await screen.findByRole('combobox', {
+      name: 'Transcript answer model',
+    });
+    expect(transcriptModelSelect).toHaveValue(browserPromptService.CHROME_PROMPT_PROVIDER_ID);
+    expect(Array.from((transcriptModelSelect as HTMLSelectElement).options)).toEqual([
+      expect.objectContaining({
+        text: 'Chrome Built-in Prompt API',
+        value: browserPromptService.CHROME_PROMPT_PROVIDER_ID,
+      }),
+      expect.objectContaining({
+        text: aiModelCatalog.GEMMA_LLM_DISPLAY_NAME,
+        value: browserPromptService.GEMMA_PROMPT_PROVIDER_ID,
+      }),
+    ]);
+    await user.selectOptions(
+      transcriptModelSelect,
+      browserPromptService.GEMMA_PROMPT_PROVIDER_ID,
+    );
+    await waitFor(() => {
+      expect(transcriptModelSelect).toHaveValue(browserPromptService.GEMMA_PROMPT_PROVIDER_ID);
+    });
+    expect(
+      screen.getByRole('button', { name: `Download ${aiModelCatalog.GEMMA_LLM_DISPLAY_NAME}` }),
+    ).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Summarize this presentation in 3 bullets' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Presenter recording' })).toBeInTheDocument();
     expect(screen.getByText('The roadmap includes transcript chat.')).toBeInTheDocument();

@@ -2,6 +2,10 @@ import { ImagePlus, Mic, Plus, SendHorizontal, Square, X } from 'lucide-react';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { IconButton } from '../../components/IconButton';
 import type { CreateImagePromptOptions } from '../media/imagePromptOptions';
+import {
+  PromptModelControl,
+  type PromptModelControlState,
+} from './PromptModelControl';
 import { promptRecipes } from './promptRecipes';
 
 interface PromptBarProps {
@@ -11,10 +15,17 @@ interface PromptBarProps {
   generationStatus?: string | undefined;
   isGeneratingImage?: boolean;
   isGeneratingSlide?: boolean;
+  createImageModelControlState?: PromptModelControlState | undefined;
+  slideModelControlState?: PromptModelControlState | undefined;
   selectedImageElementId?: string | undefined;
   createImageOptions: CreateImagePromptOptions;
   onCreateImagePromptIntent?: () => boolean | Promise<boolean>;
   onCreateImageSubmit?: (prompt: string, options: CreateImagePromptOptions) => Promise<void>;
+  onCancelCreateImageModelDownload?: ((modelId: string) => Promise<void>) | undefined;
+  onCancelPromptModelDownload?: ((modelId: string) => Promise<void>) | undefined;
+  onPrepareCreateImageModel?: (() => Promise<void>) | undefined;
+  onPreparePromptApi?: (() => Promise<void>) | undefined;
+  onPromptProviderChange?: ((providerId: string) => void) | undefined;
   onSlidePromptSubmit?: (prompt: string) => Promise<void>;
   onStopGeneration?: () => void;
 }
@@ -26,10 +37,17 @@ export function PromptBar({
   generationStatus,
   isGeneratingImage = false,
   isGeneratingSlide,
+  createImageModelControlState,
+  slideModelControlState,
   selectedImageElementId,
   createImageOptions,
   onCreateImagePromptIntent,
   onCreateImageSubmit,
+  onCancelCreateImageModelDownload,
+  onCancelPromptModelDownload,
+  onPrepareCreateImageModel,
+  onPreparePromptApi,
+  onPromptProviderChange,
   onSlidePromptSubmit,
   onStopGeneration,
 }: PromptBarProps) {
@@ -44,6 +62,8 @@ export function PromptBar({
       ? promptRecipes.imagePromptExamples
       : promptRecipes.slidePromptExamples;
   const isProcessing = isGeneratingSlide || isGeneratingImage || localSubmissionActive;
+  const activeModelControlState =
+    activeMode === 'create-image' ? createImageModelControlState : slideModelControlState;
 
   useLayoutEffect(() => {
     const input = inputRef.current;
@@ -225,6 +245,19 @@ export function PromptBar({
           />
         </div>
         <div className="prompt-submit-actions" data-tour-id="prompt-submit-actions">
+          {activeModelControlState ? (
+            <PromptModelControl
+              disabled={isProcessing}
+              state={activeModelControlState}
+              onCancelDownload={
+                activeMode === 'create-image'
+                  ? onCancelCreateImageModelDownload
+                  : onCancelPromptModelDownload
+              }
+              onPrepare={activeMode === 'create-image' ? onPrepareCreateImageModel : onPreparePromptApi}
+              onProviderChange={activeMode === 'create-image' ? undefined : onPromptProviderChange}
+            />
+          ) : null}
           <IconButton disabled={isProcessing} label="Record voice prompt">
             <Mic size={16} />
           </IconButton>

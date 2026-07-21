@@ -26,8 +26,9 @@ export const imageExportJourneyPage = {
     if (await localSave.isVisible({ timeout: 1_000 }).catch(() => false)) {
       await localSave.getByRole('button', { name: 'Choose folder' }).click();
     }
-    await expect(page.getByRole('complementary', { name: 'Share design panel' })).toBeVisible();
-    await page.getByRole('button', { name: 'Download' }).click();
+    const sharePanel = page.getByRole('complementary', { name: 'Share design panel' });
+    await expect(sharePanel).toBeVisible();
+    await sharePanel.getByRole('button', { exact: true, name: 'Download' }).click();
     return downloadPromise;
   },
 

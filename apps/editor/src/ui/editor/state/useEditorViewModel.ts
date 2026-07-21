@@ -244,6 +244,8 @@ export function useEditorViewModel(services: AppServices) {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [aiToolsAttentionModelId, setAiToolsAttentionModelId] = useState<string | undefined>();
   const [pageLanguageCodes, setPageLanguageCodes] = useState<Record<string, string>>({});
+  const modelDownloadRunIdsRef = useRef<Record<string, number>>({});
+  const promptPreparationRunIdRef = useRef(0);
   const promptGenerationRunIdRef = useRef(0);
   const [elementClipboard, setElementClipboard] = useState<ElementClipboardState>({
     assets: {},
@@ -691,6 +693,9 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   async function downloadModel(id: string) {
+    const runId = (modelDownloadRunIdsRef.current[id] ?? 0) + 1;
+    modelDownloadRunIdsRef.current = { ...modelDownloadRunIdsRef.current, [id]: runId };
+    const isCurrentRun = () => modelDownloadRunIdsRef.current[id] === runId;
     setModelStates((currentStates) =>
       currentStates.map((state) =>
         state.id === id && state.status !== 'ready'
@@ -700,6 +705,7 @@ export function useEditorViewModel(services: AppServices) {
     );
     const next = await services.modelSetupService.downloadModel(id, {
       onProgress: (progress, details) => {
+        if (!isCurrentRun()) return;
         setModelStates((currentStates) =>
           currentStates.map((state) =>
             state.id === id
@@ -709,6 +715,7 @@ export function useEditorViewModel(services: AppServices) {
         );
       },
     });
+    if (!isCurrentRun()) return;
     setModelStates((currentStates) =>
       currentStates.map((state) => (state.id === id ? next : state)),
     );
@@ -727,6 +734,14 @@ export function useEditorViewModel(services: AppServices) {
       setCreateImageNotice(undefined);
       setAiToolsAttentionModelId(undefined);
     }
+  }
+
+  async function cancelModelDownload(id: string) {
+    modelDownloadRunIdsRef.current = {
+      ...modelDownloadRunIdsRef.current,
+      [id]: (modelDownloadRunIdsRef.current[id] ?? 0) + 1,
+    };
+    await removeModel(id);
   }
 
   async function removeModel(id: string) {
@@ -816,6 +831,9 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   async function preparePromptApi() {
+    const runId = promptPreparationRunIdRef.current + 1;
+    promptPreparationRunIdRef.current = runId;
+    const isCurrentRun = () => promptPreparationRunIdRef.current === runId;
     setPromptApiNotice(undefined);
     setPromptApiAttention(false);
     setPromptPreparation((current) => ({
@@ -826,6 +844,7 @@ export function useEditorViewModel(services: AppServices) {
     try {
       await services.promptService.preparePromptApi({
         onProgress: (progress, details) => {
+          if (!isCurrentRun()) return;
           setPromptPreparation((current) => ({
             ...current,
             availability: progress >= 100 ? 'ready' : current.availability,
@@ -837,6 +856,7 @@ export function useEditorViewModel(services: AppServices) {
           }));
         },
       });
+      if (!isCurrentRun()) return;
       setPromptPreparation({ availability: 'ready', progress: 100, status: 'ready' });
       setModelStates(await services.modelSetupService.getModelStates());
       if (services.promptService.getProviderStates) {
@@ -844,6 +864,7 @@ export function useEditorViewModel(services: AppServices) {
       }
       setPromptApiNotice('Prompt API ready');
     } catch (error: unknown) {
+      if (!isCurrentRun()) return;
       const selectedProvider = promptProviderStates.find((provider) => provider.selected);
       if (selectedProvider?.modelId) {
         await services.modelSetupService.removeModel?.(selectedProvider.modelId);
@@ -858,6 +879,14 @@ export function useEditorViewModel(services: AppServices) {
         error instanceof Error ? error.message : 'Chrome Prompt API could not be prepared.',
       );
     }
+  }
+
+  async function cancelPromptModelDownload(modelId: string) {
+    promptPreparationRunIdRef.current += 1;
+    setPromptApiNotice(undefined);
+    setPromptApiAttention(false);
+    setPromptPreparation({ availability: 'downloadable', progress: 0, status: 'idle' });
+    await cancelModelDownload(modelId);
   }
 
   async function setPromptProvider(providerId: string) {
@@ -3256,6 +3285,7 @@ export function useEditorViewModel(services: AppServices) {
     generateSlideFromPrompt,
     generateImageFromPrompt,
     stopPromptGeneration,
+    cancelPromptModelDownload,
     setCreateImageOptions,
     setPromptProvider,
     setTranslationProvider,
@@ -3273,6 +3303,7 @@ export function useEditorViewModel(services: AppServices) {
     translateDeck: () => requestTranslation('deck'),
     downloadRequiredModels,
     downloadModel,
+    cancelModelDownload,
     removeModel,
     selectElement,
     selectAllElementsOnActivePage,

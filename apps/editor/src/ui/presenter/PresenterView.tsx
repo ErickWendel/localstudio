@@ -37,6 +37,7 @@ import { PresenterAudioRecorder } from '../../services/transcription/presenterAu
 import { PresenterSpeechTranscriber } from '../../services/transcription/presenterSpeechTranscriber';
 import { TRANSLATION_LANGUAGE_OPTIONS } from '../editor/translation/translationLanguages';
 import { presenterRemoteTimerFormat } from '@localstudio/presenter-remote/timer-format';
+import { PromptModelControl } from '../editor/prompting/PromptModelControl';
 
 interface PresenterViewProps {
   sessionId?: string;
@@ -1183,6 +1184,24 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
                 </select>
               </label>
             </div>
+            {snapshot.promptModel ? (
+              <PromptModelControl
+                compact
+                disabled={recordingStatus === 'downloading' || recordingStatus === 'transcribing'}
+                state={snapshot.promptModel}
+                onCancelDownload={(modelId) => {
+                  postCommand({ command: 'cancel-prompt-model-download', modelId });
+                  return Promise.resolve();
+                }}
+                onPrepare={() => {
+                  postCommand({ command: 'prepare-prompt-api' });
+                  return Promise.resolve();
+                }}
+                onProviderChange={(providerId) => {
+                  postCommand({ command: 'set-prompt-provider', providerId });
+                }}
+              />
+            ) : null}
             <button
               className="stitch-icon-button presenter-control-button"
               type="button"

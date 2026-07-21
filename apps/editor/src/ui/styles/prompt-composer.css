@@ -224,6 +224,140 @@
   min-width: 0;
 }
 
+.prompt-model-control {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.prompt-model-select-shell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 116px;
+  max-width: 170px;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--ew-text);
+}
+
+.prompt-model-select-shell select {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  appearance: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 0 26px 0 11px;
+}
+
+.prompt-model-select-shell select:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.prompt-model-select-shell svg {
+  position: absolute;
+  right: 8px;
+  pointer-events: none;
+  color: var(--ew-muted);
+}
+
+.prompt-model-download-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(55, 253, 118, 0.42);
+  border-radius: 999px;
+  background: rgba(55, 253, 118, 0.12);
+  color: var(--ew-green);
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+
+.prompt-model-download-button:hover:not(:disabled),
+.prompt-model-download-button:focus-visible {
+  border-color: rgba(55, 253, 118, 0.72);
+  background: rgba(55, 253, 118, 0.2);
+  outline: 0;
+  transform: translateY(-1px);
+}
+
+.prompt-model-download-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.66;
+}
+
+.prompt-model-progress {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 12;
+  display: grid;
+  gap: 7px;
+  min-width: 190px;
+  border: 1px solid rgba(55, 253, 118, 0.28);
+  border-radius: 8px;
+  background: #111;
+  padding: 9px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.48);
+}
+
+.prompt-model-cancel-button {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.38);
+  color: var(--ew-text);
+  cursor: pointer;
+}
+
+.prompt-model-cancel-button:hover:not(:disabled),
+.prompt-model-cancel-button:focus-visible {
+  border-color: rgba(255, 122, 122, 0.6);
+  color: #ff9a9a;
+  outline: 0;
+}
+
+.prompt-model-cancel-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.prompt-model-progress .download-progress-copy {
+  padding-right: 28px;
+  font-size: 11px;
+}
+
+.prompt-model-control-compact .prompt-model-select-shell {
+  min-width: 132px;
+  max-width: 176px;
+  height: 40px;
+}
+
 .prompt-bar textarea:disabled {
   color: rgba(236, 255, 233, 0.72);
   opacity: 1;
