@@ -12,6 +12,7 @@ interface WebMcpToolLike {
 }
 
 interface BrowserModelContext {
+  executeTool?: (tool: WebMcpToolLike, inputArgsJson: string) => unknown;
   getTools(options: { fromOrigins: string[] }): Promise<WebMcpToolLike[]>;
 }
 
@@ -73,7 +74,12 @@ function getLocalDemoTools(iframe: HTMLIFrameElement) {
   return isWebMcpToolLikeArray(tools) ? tools : undefined;
 }
 
-function callTool(tool: WebMcpToolLike, input: Record<string, unknown>) {
+function callTool(
+  tool: WebMcpToolLike,
+  input: Record<string, unknown>,
+  modelContext = getBrowserModelContext(),
+) {
+  if (modelContext?.executeTool) return Promise.resolve(modelContext.executeTool(tool, JSON.stringify(input)));
   const callable = tool.call ?? tool.execute ?? tool.invoke;
   if (!callable) throw new Error(`${tool.name} is not callable in this WebMCP runtime.`);
   return Promise.resolve(callable(input));

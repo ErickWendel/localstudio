@@ -311,6 +311,33 @@ describe('App', () => {
     expect(screen.getByText('Read snapshot completed.')).toBeInTheDocument();
   });
 
+  it('runs WebMCP descriptor tools through the browser runtime executor', async () => {
+    const createProjectTool = { name: 'create_project', description: 'Create project' };
+    const executeTool = vi.fn().mockResolvedValue({ ok: true, data: { name: 'Runtime Deck' } });
+    window.history.replaceState({}, '', '/webmcp');
+    Object.defineProperty(document, 'modelContext', {
+      configurable: true,
+      value: {
+        executeTool,
+        getTools: vi.fn().mockResolvedValue([createProjectTool]),
+      },
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Create project' }));
+    fireEvent.change(screen.getByLabelText('Create project command input'), {
+      target: { value: 'Runtime Deck' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send Create project' }));
+
+    await waitFor(() => {
+      expect(executeTool).toHaveBeenCalledWith(createProjectTool, JSON.stringify({ name: 'Runtime Deck' }));
+    });
+    expect(screen.getByText('Create project completed.')).toBeInTheDocument();
+  });
+
   it('focuses the matching workflow step when a discovered tool is selected', async () => {
     window.history.replaceState({}, '', '/webmcp');
     Object.defineProperty(document, 'modelContext', {
