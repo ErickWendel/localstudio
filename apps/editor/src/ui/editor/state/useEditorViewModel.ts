@@ -2031,6 +2031,7 @@ export function useEditorViewModel(services: AppServices) {
     setRemoteImportStatus('importing');
     setRemoteImportError(undefined);
     try {
+      await services.projectRepository.prepareImportMirrorFiles?.();
       const files = await services.mirrorService.downloadProject(projectId, config);
       const importedProject = await services.projectRepository.importMirrorFiles(files);
       const normalizedProject = editorViewModelProject.normalizeProjectDocument(importedProject);

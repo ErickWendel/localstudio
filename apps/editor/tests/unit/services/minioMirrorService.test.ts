@@ -542,6 +542,82 @@ describe('minioMirrorService.MinioMirrorService', () => {
     expect(getCredentials).not.toContain('writer-key');
   });
 
+  it('lists remote mirrors by most recent sync time first', async () => {
+    const manifests = new Map([
+      [
+        '/mirrors/Older/localstudio-mirror.json',
+        {
+          projectId: 'project-older',
+          projectName: 'Older',
+          syncedAt: '2026-07-21T08:53:00.000Z',
+        },
+      ],
+      [
+        '/mirrors/Invalid/localstudio-mirror.json',
+        {
+          projectId: 'project-invalid',
+          projectName: 'Invalid',
+          syncedAt: 'not-a-date',
+        },
+      ],
+      [
+        '/mirrors/Newest/localstudio-mirror.json',
+        {
+          projectId: 'project-newest',
+          projectName: 'Newest',
+          syncedAt: '2026-07-21T13:40:00.000Z',
+        },
+      ],
+      [
+        '/mirrors/Middle/localstudio-mirror.json',
+        {
+          projectId: 'project-middle',
+          projectName: 'Middle',
+          syncedAt: '2026-07-21T09:25:00.000Z',
+        },
+      ],
+    ]);
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(getRequestUrl(input));
+      if (init?.method === 'GET' && url.searchParams.get('list-type') === '2') {
+        return Promise.resolve(
+          new Response(
+            '<ListBucketResult>' +
+              '<Contents><Key>mirrors/Older/localstudio-mirror.json</Key></Contents>' +
+              '<Contents><Key>mirrors/Invalid/localstudio-mirror.json</Key></Contents>' +
+              '<Contents><Key>mirrors/Newest/localstudio-mirror.json</Key></Contents>' +
+              '<Contents><Key>mirrors/Middle/localstudio-mirror.json</Key></Contents>' +
+              '</ListBucketResult>',
+            { status: 200 },
+          ),
+        );
+      }
+      const manifest = manifests.get(url.pathname.replace(/^\/localstudio/, ''));
+      if (init?.method === 'GET' && manifest) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              schemaVersion: 1,
+              publicBaseUrl: splitCredentialConfig.publicBaseUrl,
+              files: {},
+              ...manifest,
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+      return Promise.resolve(new Response('', { status: 404 }));
+    });
+    const service = new minioMirrorService.MinioMirrorService({ fetch: fetchMock });
+
+    await expect(service.listProjects(splitCredentialConfig)).resolves.toEqual([
+      { id: 'Newest', name: 'Newest', syncedAt: '2026-07-21T13:40:00.000Z' },
+      { id: 'Middle', name: 'Middle', syncedAt: '2026-07-21T09:25:00.000Z' },
+      { id: 'Older', name: 'Older', syncedAt: '2026-07-21T08:53:00.000Z' },
+      { id: 'Invalid', name: 'Invalid', syncedAt: 'not-a-date' },
+    ]);
+  });
+
   it('explains when reader credentials cannot list remote mirrors', async () => {
     const fetchMock = vi.fn(() => Promise.resolve(new Response('', { status: 403 })));
     const service = new minioMirrorService.MinioMirrorService({ fetch: fetchMock });

@@ -280,6 +280,32 @@ describe('BrowserFileSystemProjectRepository', () => {
     expect(projectDirectory.directories.get('config')?.files.has('localstudio.json')).toBe(true);
   });
 
+  it('can choose the mirrored import destination before remote files download', async () => {
+    const directory = new MockDirectoryHandle('Projects');
+    const project = sampleProject.createSampleProject();
+    const pickDirectory = vi.fn(() =>
+      Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
+    );
+    const repository = new BrowserFileSystemProjectRepository({
+      pickDirectory,
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
+    });
+
+    await repository.prepareImportMirrorFiles();
+    const importedProject = await repository.importMirrorFiles([
+      {
+        path: 'project.json',
+        blob: new Blob([JSON.stringify({ ...project, name: 'Prepared Remote Mirror' })], {
+          type: 'application/json',
+        }),
+      },
+    ]);
+
+    expect(pickDirectory).toHaveBeenCalledTimes(1);
+    expect(importedProject.name).toBe('Prepared Remote Mirror');
+    expect(directory.directories.has('Prepared Remote Mirror')).toBe(true);
+  });
+
   it('keeps imported projects loadable when a mirrored asset file is missing locally', async () => {
     const directory = new MockDirectoryHandle('Projects');
     const project = {

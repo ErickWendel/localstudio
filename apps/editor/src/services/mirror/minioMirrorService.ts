@@ -150,6 +150,20 @@ function parseObjectList(xml: string) {
   };
 }
 
+function getSyncedAtTime(project: MirrorProjectSummary) {
+  const time = new Date(project.syncedAt).getTime();
+  return Number.isNaN(time) ? Number.NEGATIVE_INFINITY : time;
+}
+
+function compareMirrorProjectsBySyncedAt(
+  leftProject: MirrorProjectSummary,
+  rightProject: MirrorProjectSummary,
+) {
+  const timeDifference = getSyncedAtTime(rightProject) - getSyncedAtTime(leftProject);
+  if (timeDifference !== 0) return timeDifference;
+  return leftProject.name.localeCompare(rightProject.name);
+}
+
 function chunkArray<T>(items: T[], size: number) {
   const chunks: T[][] = [];
   for (let index = 0; index < items.length; index += size) {
@@ -291,7 +305,9 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
         };
       }),
     );
-    return manifests.filter((item): item is MirrorProjectSummary => Boolean(item));
+    return manifests
+      .filter((item): item is MirrorProjectSummary => Boolean(item))
+      .sort(compareMirrorProjectsBySyncedAt);
   }
 
   async downloadProject(projectKey: string, config: MinioMirrorConfig): Promise<MirrorFile[]> {

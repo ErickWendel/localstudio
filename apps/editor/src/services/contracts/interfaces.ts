@@ -59,6 +59,7 @@ export interface ProjectRepository {
     options?: { projectDirectoryName?: string },
   ): Promise<void>;
   getVersionHistory?(): Promise<VersionHistoryEntry[]>;
+  prepareImportMirrorFiles?(): Promise<void>;
   saveVersion?(
     project: ProjectDocument,
     metadata: VersionSnapshotMetadata,

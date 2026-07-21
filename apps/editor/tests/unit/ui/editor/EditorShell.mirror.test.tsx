@@ -359,6 +359,13 @@ describe('EditorShell mirror workflows', () => {
     expect(
       await screen.findByRole('button', { name: 'Edit project name Remote Mirror Deck' }),
     ).toBeInTheDocument();
+    expect(repository.prepareImportMirrorFiles).toHaveBeenCalledTimes(1);
+    const prepareCallOrder = repository.prepareImportMirrorFiles.mock.invocationCallOrder[0];
+    const downloadCallOrder = mirrorService.downloadProject.mock.invocationCallOrder[0];
+    if (!prepareCallOrder || !downloadCallOrder) {
+      throw new Error('Expected remote import preparation and download calls.');
+    }
+    expect(prepareCallOrder).toBeLessThan(downloadCallOrder);
     expect(repository.importedFilePaths).toContain('project.json');
     expect(window.location.search).toBe('?project=Remote+Mirror+Deck');
   });

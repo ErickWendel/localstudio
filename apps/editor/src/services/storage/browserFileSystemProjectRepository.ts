@@ -175,6 +175,7 @@ function getDefaultFetch() {
 export class BrowserFileSystemProjectRepository implements ProjectRepository {
   private directoryHandle: FileSystemDirectoryHandle | null = null;
   private parentDirectoryHandle: FileSystemDirectoryHandle | null = null;
+  private pendingMirrorImportDirectoryHandle: FileSystemDirectoryHandle | null = null;
   private projectDirectoryName: string | null = null;
   private readonly recentProjectStore: RecentProjectHandleStore;
 
@@ -191,11 +192,17 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     return project;
   }
 
+  async prepareImportMirrorFiles(): Promise<void> {
+    const pickDirectory = this.options.pickDirectory ?? getBrowserDirectoryPicker();
+    this.pendingMirrorImportDirectoryHandle = await pickDirectory();
+  }
+
   async importMirrorFiles(files: MirrorFile): Promise<ProjectDocument>;
   async importMirrorFiles(files: MirrorFile[]): Promise<ProjectDocument>;
   async importMirrorFiles(files: MirrorFile | MirrorFile[]): Promise<ProjectDocument> {
     const pickDirectory = this.options.pickDirectory ?? getBrowserDirectoryPicker();
-    const selectedDirectoryHandle = await pickDirectory();
+    const selectedDirectoryHandle = this.pendingMirrorImportDirectoryHandle ?? (await pickDirectory());
+    this.pendingMirrorImportDirectoryHandle = null;
     const mirrorFiles = Array.isArray(files) ? files : [files];
     const projectDirectoryName = await readProjectNameFromMirrorFiles(mirrorFiles);
     this.parentDirectoryHandle = projectDirectoryName ? selectedDirectoryHandle : null;

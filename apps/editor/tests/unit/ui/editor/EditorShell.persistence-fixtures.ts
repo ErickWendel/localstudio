@@ -241,6 +241,8 @@ class ImportingProjectRepository implements ProjectRepository {
 class RemoteMirrorImportingProjectRepository implements ProjectRepository {
   importedFilePaths: string[] = [];
 
+  prepareImportMirrorFiles = vi.fn((): Promise<void> => Promise.resolve());
+
   loadProject(): Promise<ProjectDocument | null> {
     return Promise.resolve(null);
   }
