@@ -42,6 +42,24 @@ describe('ChromePromptService slide generation', () => {
     expect(destroy).toHaveBeenCalled();
   });
 
+  it('generates general text without a structured response constraint', async () => {
+    const prompt = vi.fn().mockResolvedValue('Transcript answer');
+    Object.defineProperty(window, 'LanguageModel', {
+      configurable: true,
+      value: {
+        availability: vi.fn().mockResolvedValue('available'),
+        create: vi.fn().mockResolvedValue({ prompt, destroy: vi.fn() }),
+      },
+    });
+
+    const service = new ChromePromptService();
+
+    await expect(service.generateText('Summarize this transcript')).resolves.toBe(
+      'Transcript answer',
+    );
+    expect(prompt).toHaveBeenCalledWith('Summarize this transcript', undefined);
+  });
+
   it('generates one validated element for a task', async () => {
     const prompt = vi.fn().mockResolvedValue(JSON.stringify({
       type: 'text',

@@ -111,6 +111,21 @@ describe('browserPromptService.GemmaPromptProvider structured JSON generation', 
     expect(progress.at(-1)).toBe(100);
   });
 
+  it('generates general text with the supported Gemma model', async () => {
+    const runtime = new TestTextGenerationRuntime();
+    runtime.generate.mockResolvedValue('Transcript answer');
+    const provider = new browserPromptService.GemmaPromptProvider(runtime);
+
+    await expect(provider.generateText('Summarize this transcript')).resolves.toBe(
+      'Transcript answer',
+    );
+    expect(runtime.generate).toHaveBeenCalledWith(
+      aiModelCatalog.GEMMA_LLM_TRANSFORMERS_MODEL_ID,
+      'Summarize this transcript',
+      undefined,
+    );
+  });
+
   it('normalizes left-image hero layout geometry after Gemma output', async () => {
     const modelSetupService: ModelSetupService = {
       getModelStates: vi.fn().mockResolvedValue([]),

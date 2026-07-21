@@ -1,5 +1,8 @@
 import type { TranscriptRecording, TranscriptSegment } from '../../domain/documents/model';
-import type { TextGenerationRuntime } from '../prompting/webGpuTextGenerationRuntime';
+import type {
+  TextGenerationInput,
+  TextGenerationOptions,
+} from '../prompting/webGpuTextGenerationRuntime';
 import { TranscriptEmbeddingRuntimeClient } from './transcriptEmbeddingRuntimeClient';
 import type { TranscriptEmbeddingPreset } from './transcriptionModelCatalog';
 import { transcriptionModelCatalog } from './transcriptionModelCatalog';
@@ -28,8 +31,9 @@ interface TranscriptIndexEntry {
 interface TranscriptQuestionAnsweringServiceOptions {
   embeddingClient?: TranscriptEmbeddingRuntimeClient;
   embeddingPreset?: TranscriptEmbeddingPreset;
-  modelId?: string;
-  textGenerationRuntime: TextGenerationRuntime;
+  textGenerator: {
+    generate(prompt: TextGenerationInput, options?: TextGenerationOptions): Promise<string>;
+  };
 }
 
 function normalizeSegments(recordings: TranscriptRecording[]) {
@@ -70,7 +74,6 @@ function createPrompt(question: string, citations: TranscriptAnswerCitation[]) {
 export class TranscriptQuestionAnsweringService {
   private readonly embeddingClient: TranscriptEmbeddingRuntimeClient;
   private readonly embeddingPreset: TranscriptEmbeddingPreset;
-  private readonly modelId: string;
   private index: TranscriptIndexEntry[] = [];
   private indexedRecordingIds = '';
 
@@ -78,7 +81,6 @@ export class TranscriptQuestionAnsweringService {
     this.embeddingClient = options.embeddingClient ?? new TranscriptEmbeddingRuntimeClient();
     this.embeddingPreset =
       options.embeddingPreset ?? transcriptionModelCatalog.getEmbeddingPreset(undefined);
-    this.modelId = options.modelId ?? transcriptionModelCatalog.transcriptQuestionAnsweringModelId;
   }
 
   async answer(question: string, recordings: TranscriptRecording[]): Promise<TranscriptAnswer> {
@@ -105,8 +107,7 @@ export class TranscriptQuestionAnsweringService {
       startMs: match.segment.startMs,
       text: match.segment.text,
     }));
-    const text = await this.options.textGenerationRuntime.generate(
-      this.modelId,
+    const text = await this.options.textGenerator.generate(
       createPrompt(trimmedQuestion, citations),
       {
         do_sample: false,
