@@ -7,11 +7,11 @@ import { ClosingSection } from './sections/ClosingSection';
 import { DemoSection } from './sections/DemoSection';
 import { FeaturesSection } from './sections/FeaturesSection';
 import { HeroSection } from './sections/HeroSection';
+import { PricingSection } from './sections/PricingSection';
 import { RequirementsSection } from './sections/RequirementsSection';
 import { ShowcaseSection } from './sections/ShowcaseSection';
 import { ThanksSection } from './sections/ThanksSection';
 import { WebAiSection } from './sections/WebAiSection';
-import { WebMcpSection } from './sections/WebMcpSection';
 
 export function LandingPage() {
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -25,8 +25,8 @@ export function LandingPage() {
       <ShowcaseSection />
       <DemoSection />
       <WebAiSection />
-      <WebMcpSection />
       <FeaturesSection />
+      <PricingSection />
       <RequirementsSection />
       <ThanksSection />
       <ClosingSection />

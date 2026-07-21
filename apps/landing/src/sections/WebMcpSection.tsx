@@ -16,7 +16,7 @@ function getWebMcpDesktopSrcSet() {
 
 export function WebMcpSection() {
   return (
-    <section id="webmcp" className="webmcp-section" aria-labelledby="webmcp-title">
+    <div id="webmcp" className="webmcp-section" aria-labelledby="webmcp-title">
       <div className="showcase-row">
         <Reveal as="div" className="showcase-copy" reveal="webmcp-copy">
           <p className="eyebrow">WebMCP showcase</p>
@@ -61,6 +61,6 @@ export function WebMcpSection() {
           <span className="webmcp-cursor-path" aria-hidden="true" />
         </Reveal>
       </div>
-    </section>
+    </div>
   );
 }

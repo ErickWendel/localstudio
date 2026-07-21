@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-const landingSectionIds = ['top', 'features', 'webmcp', 'requirements'];
+const landingSectionIds = ['top', 'features', 'pricing', 'requirements'];
 const sectionObserverThresholds = [0, 0.18, 0.34, 0.5, 0.66, 0.82, 1];
 
 export function useActiveSection() {

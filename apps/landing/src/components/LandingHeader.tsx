@@ -6,9 +6,9 @@ import { GitHubStarButton } from './GitHubStarButton';
 const navItems = [
   { href: '#top', label: 'About it', sectionId: 'top' },
   { href: '#features', label: 'Features', sectionId: 'features' },
-  { href: '#webmcp', label: 'WebMCP Showcase', sectionId: 'webmcp' },
   { href: '#requirements', label: 'Requirements', sectionId: 'requirements' },
   { href: localStudioAppRoutes.docs.gettingStartedAnchor, label: 'Docs', sectionId: 'docs' },
+  { href: '#pricing', label: 'Pricing', sectionId: 'pricing' },
 ] as const;
 
 export function LandingHeader({
