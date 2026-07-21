@@ -72,6 +72,7 @@ const LEGACY_LOCAL_MINIO_CREDENTIALS = {
 } as const;
 
 const DELETE_BATCH_SIZE = 25;
+const MIRROR_UPLOAD_CONCURRENCY = 3;
 
 function getProjectMirrorKey(projectName: string) {
   return projectName.trim().replace(/[\\/]+/g, '-');
@@ -157,6 +158,24 @@ function chunkArray<T>(items: T[], size: number) {
   return chunks;
 }
 
+async function runWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  task: (item: T) => Promise<void>,
+) {
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(1, concurrency), items.length);
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < items.length) {
+        const item = items[nextIndex];
+        nextIndex += 1;
+        if (item) await task(item);
+      }
+    }),
+  );
+}
+
 class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
   private readonly requestFetch: typeof fetch;
   private readonly now: () => Date;
@@ -202,7 +221,10 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
       total: totalFiles,
     });
 
-    for (const file of files) {
+    const manifestFile = files.find((file) => file.path === minioMirrorFiles.MIRROR_MANIFEST_FILE_NAME);
+    const contentFiles = files.filter((file) => file.path !== minioMirrorFiles.MIRROR_MANIFEST_FILE_NAME);
+
+    const syncFile = async (file: MirrorFile) => {
       options?.onProgress?.({
         current: completedFiles,
         label: `Mirroring ${file.path}`,
@@ -218,6 +240,12 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
         label: `Mirrored ${file.path}`,
         total: totalFiles,
       });
+    };
+
+    await runWithConcurrency(contentFiles, MIRROR_UPLOAD_CONCURRENCY, syncFile);
+
+    if (manifestFile) {
+      await syncFile(manifestFile);
     }
 
     return {
