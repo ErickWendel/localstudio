@@ -1,5 +1,5 @@
 import { collectReferencedAssetIds } from '../../domain/assets/assetUsage';
-import type { Asset, ProjectDocument } from '../../domain/documents/model';
+import type { Asset, ProjectDocument, TranscriptRecordingAudio } from '../../domain/documents/model';
 import { assetFileUtils } from '../storage/assetFileUtils';
 import type { MirrorFile, ProjectRepository } from '../contracts/interfaces';
 import type { MinioMirrorConfig } from './minioMirrorService';
@@ -46,6 +46,20 @@ function cloneProjectWithoutObjectUrls(project: ProjectDocument): ProjectDocumen
               const nextFont = { ...font };
               delete nextFont.objectUrl;
               return [fontId, nextFont];
+            }),
+          ),
+        }
+      : {}),
+    ...(project.recordings
+      ? {
+          recordings: Object.fromEntries(
+            Object.entries(project.recordings).map(([recordingId, recording]) => {
+              const nextRecording = {
+                ...recording,
+                audio: { ...recording.audio },
+              };
+              delete nextRecording.audio.objectUrl;
+              return [recordingId, nextRecording];
             }),
           ),
         }
@@ -112,6 +126,28 @@ async function createMirrorFiles(
       files.push(await createFileEntry(`fonts/${font.fileName}`, blob));
     } else {
       projectForMirror.fonts![fontId] = { ...font };
+    }
+  }
+
+  for (const [recordingId, recording] of Object.entries(project.recordings ?? {})) {
+    const fileName =
+      recording.audio.fileName ??
+      `${recording.id}.${assetFileUtils.getAssetFileExtension(recording.audio.mimeType)}`;
+    const blob = await objectUrlToBlob(recording.audio, requestFetch);
+    if (blob) {
+      const audioForMirror: TranscriptRecordingAudio = {
+        ...recording.audio,
+        fileName,
+        storage: 'file',
+      };
+      delete audioForMirror.objectUrl;
+      projectForMirror.recordings![recordingId] = {
+        ...recording,
+        audio: audioForMirror,
+      };
+      files.push(await createFileEntry(`recordings/${fileName}`, blob));
+    } else {
+      projectForMirror.recordings![recordingId] = { ...recording };
     }
   }
 

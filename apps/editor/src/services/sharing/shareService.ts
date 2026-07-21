@@ -1,14 +1,19 @@
 import { publicBasePath } from '../../app/routing/publicBasePath';
 import { collectReferencedAssetIds } from '../../domain/assets/assetUsage';
 import type { ProjectDocument } from '../../domain/documents/model';
-import type { ShareMetadata, ShareRecord, ShareService } from '../contracts/interfaces';
+import type {
+  ShareMetadata,
+  SharePublishOptions,
+  ShareRecord,
+  ShareService,
+} from '../contracts/interfaces';
 import { minioMirrorService } from '../mirror/minioMirrorService';
 import type { MinioMirrorConfig } from '../mirror/minioMirrorService';
 import { assetFileUtils } from '../storage/assetFileUtils';
 import { storageObjectUtils } from '../storage/storageObjectUtils';
 
 const PUBLIC_STORAGE_UNAVAILABLE_MESSAGE = 'Public sharing requires active external storage.';
-const SHARE_FILE_NAME = 'share.json';
+const SHARE_POINTER_FILE_EXTENSION = 'json';
 
 interface BrowserShareServiceOptions {
   basePath?: string;
@@ -19,6 +24,11 @@ interface BrowserShareServiceOptions {
 
 interface PublicSharePayload extends ShareRecord {
   schemaVersion: 1;
+}
+
+interface ShareProgressReporter {
+  active(label: string): void;
+  complete(label: string): void;
 }
 
 function getDefaultOrigin() {
@@ -44,16 +54,28 @@ function getProjectShareId(project: ProjectDocument) {
   return `project-${normalizedProjectId}`;
 }
 
+function getProjectMirrorKey(projectName: string) {
+  return projectName.trim().replace(/[\\/]+/g, '-');
+}
+
 function cloneProject(project: ProjectDocument): ProjectDocument {
   return JSON.parse(JSON.stringify(project)) as ProjectDocument;
 }
 
-function getShareRootKey(config: MinioMirrorConfig, shareId: string) {
-  return storageObjectUtils.joinObjectKey(storageObjectUtils.normalizeObjectKeyPart(config.prefix), 'public-shares', shareId);
+function getMirrorFileKey(config: MinioMirrorConfig, projectName: string, path: string) {
+  return storageObjectUtils.joinObjectKey(
+    storageObjectUtils.normalizeObjectKeyPart(config.prefix),
+    getProjectMirrorKey(projectName),
+    path,
+  );
 }
 
-function getShareFileKey(config: MinioMirrorConfig, shareId: string) {
-  return storageObjectUtils.joinObjectKey(getShareRootKey(config, shareId), SHARE_FILE_NAME);
+function getSharePointerFileKey(config: MinioMirrorConfig, shareId: string) {
+  return storageObjectUtils.joinObjectKey(
+    storageObjectUtils.normalizeObjectKeyPart(config.prefix),
+    'shares',
+    `${shareId}.${SHARE_POINTER_FILE_EXTENSION}`,
+  );
 }
 
 function publicViewerUrl(origin: string, basePath: string, route: 'share' | 'embed', shareId: string, shareUrl: string) {
@@ -71,6 +93,28 @@ function escapeHtmlAttribute(value: string) {
     .replaceAll('>', '&gt;');
 }
 
+function createShareProgressReporter(total: number, options?: SharePublishOptions): ShareProgressReporter {
+  let current = 0;
+  const safeTotal = Math.max(1, total);
+
+  function emit(label: string) {
+    options?.onProgress?.({ current, total: safeTotal, label });
+  }
+
+  return {
+    active: emit,
+    complete(label: string) {
+      current = Math.min(safeTotal, current + 1);
+      emit(label);
+    },
+  };
+}
+
+function shouldUseMirroredObjectUrl(storage: 'inline' | 'file' | 'remote' | undefined, objectUrl: string | undefined) {
+  if (storage === 'remote') return false;
+  return storage === 'file' || assetFileUtils.isReadableObjectUrl(objectUrl);
+}
+
 export class BrowserShareService implements ShareService {
   private readonly basePath: string;
   private readonly fetchImpl: typeof fetch | undefined;
@@ -84,12 +128,16 @@ export class BrowserShareService implements ShareService {
     this.origin = options.origin ?? getDefaultOrigin();
   }
 
-  async createShare(project: ProjectDocument): Promise<ShareMetadata> {
-    return this.publishShare(getProjectShareId(project), project);
+  async createShare(project: ProjectDocument, options?: SharePublishOptions): Promise<ShareMetadata> {
+    return this.publishShare(getProjectShareId(project), project, options);
   }
 
-  async updateShare(shareId: string, project: ProjectDocument): Promise<ShareMetadata> {
-    return this.publishShare(shareId, project);
+  async updateShare(
+    shareId: string,
+    project: ProjectDocument,
+    options?: SharePublishOptions,
+  ): Promise<ShareMetadata> {
+    return this.publishShare(shareId, project, options);
   }
 
   async getShare(shareId: string): Promise<ShareRecord | null> {
@@ -117,14 +165,14 @@ export class BrowserShareService implements ShareService {
   getPublicUrl(shareId: string): string {
     const config = this.mirrorService.loadConfig();
     if (!config) return publicViewerUrl(this.origin, this.basePath, 'share', shareId, '');
-    const shareUrl = this.mirrorService.getPublicObjectUrl(getShareFileKey(config, shareId), config);
+    const shareUrl = this.mirrorService.getPublicObjectUrl(getSharePointerFileKey(config, shareId), config);
     return publicViewerUrl(this.origin, this.basePath, 'share', shareId, shareUrl);
   }
 
   getEmbedUrl(shareId: string): string {
     const config = this.mirrorService.loadConfig();
     if (!config) return publicViewerUrl(this.origin, this.basePath, 'embed', shareId, '');
-    const shareUrl = this.mirrorService.getPublicObjectUrl(getShareFileKey(config, shareId), config);
+    const shareUrl = this.mirrorService.getPublicObjectUrl(getSharePointerFileKey(config, shareId), config);
     return publicViewerUrl(this.origin, this.basePath, 'embed', shareId, shareUrl);
   }
 
@@ -149,12 +197,18 @@ export class BrowserShareService implements ShareService {
     return new URL(window.location.href).searchParams.get('src') ?? undefined;
   }
 
-  private async publishShare(shareId: string, project: ProjectDocument): Promise<ShareMetadata> {
+  private async publishShare(
+    shareId: string,
+    project: ProjectDocument,
+    options?: SharePublishOptions,
+  ): Promise<ShareMetadata> {
     const config = this.mirrorService.loadConfig();
     if (!config) throw new Error(PUBLIC_STORAGE_UNAVAILABLE_MESSAGE);
 
     const now = new Date().toISOString();
-    const projectForShare = await this.createPublicProject(project, config, shareId);
+    const progress = createShareProgressReporter(1, options);
+    progress.active('Preparing public share');
+    const projectForShare = this.createPublicProject(project, config);
     const payload: PublicSharePayload = {
       schemaVersion: 1,
       shareId,
@@ -162,68 +216,50 @@ export class BrowserShareService implements ShareService {
       updatedAt: now,
       project: projectForShare,
     };
-    await this.mirrorService.uploadPublicObject(getShareFileKey(config, shareId), storageObjectUtils.jsonBlob(payload), config);
+    progress.active('Publishing share link');
+    await this.mirrorService.uploadPublicObject(getSharePointerFileKey(config, shareId), storageObjectUtils.jsonBlob(payload), config);
+    progress.complete('Published share link');
     return this.toMetadata(payload, 'published');
   }
 
-  private async createPublicProject(
+  private createPublicProject(
     project: ProjectDocument,
     config: MinioMirrorConfig,
-    shareId: string,
-  ): Promise<ProjectDocument> {
+  ): ProjectDocument {
     const projectForShare = cloneProject(project);
     const referencedAssetIds = collectReferencedAssetIds(projectForShare);
 
-    await Promise.all(
-      Object.entries(projectForShare.assets).map(async ([assetId, asset]) => {
-        if (!referencedAssetIds.has(assetId)) return;
-        const blob = await assetFileUtils.objectUrlToBlobIfReadable(asset.objectUrl, this.fetchImpl);
-        if (!blob) return;
-
-        const fileName = asset.fileName ?? `${asset.id}.${assetFileUtils.getAssetFileExtension(asset.mimeType)}`;
-        const key = storageObjectUtils.joinObjectKey(getShareRootKey(config, shareId), 'assets', fileName);
-        await this.mirrorService.uploadPublicObject(key, blob, config);
+    for (const [assetId, asset] of Object.entries(projectForShare.assets)) {
+      if (!referencedAssetIds.has(assetId)) continue;
+      const fileName = asset.fileName ?? `${asset.id}.${assetFileUtils.getAssetFileExtension(asset.mimeType)}`;
+      if (shouldUseMirroredObjectUrl(asset.storage, asset.objectUrl)) {
+        const key = getMirrorFileKey(config, project.name, `assets/${fileName}`);
         projectForShare.assets[assetId] = {
           ...asset,
           objectUrl: this.mirrorService.getPublicObjectUrl(key, config),
           storage: 'remote',
           fileName,
         };
-      }),
-    );
+      }
+    }
 
-    await Promise.all(
-      Object.entries(projectForShare.fonts ?? {}).map(async ([fontId, font]) => {
-        const blob = await assetFileUtils.objectUrlToBlobIfReadable(font.objectUrl, this.fetchImpl);
-        if (!blob) return;
-
-        const key = storageObjectUtils.joinObjectKey(getShareRootKey(config, shareId), 'fonts', font.fileName);
-        await this.mirrorService.uploadPublicObject(key, blob, config);
+    for (const [fontId, font] of Object.entries(projectForShare.fonts ?? {})) {
+      if (shouldUseMirroredObjectUrl(font.storage, font.objectUrl)) {
+        const key = getMirrorFileKey(config, project.name, `fonts/${font.fileName}`);
         projectForShare.fonts![fontId] = {
           ...font,
           objectUrl: this.mirrorService.getPublicObjectUrl(key, config),
           storage: 'remote',
         };
-      }),
-    );
+      }
+    }
 
-    await Promise.all(
-      Object.entries(projectForShare.recordings ?? {}).map(async ([recordingId, recording]) => {
-        const blob = await assetFileUtils.objectUrlToBlobIfReadable(
-          recording.audio.objectUrl,
-          this.fetchImpl,
-        );
-        if (!blob) return;
-
-        const fileName =
-          recording.audio.fileName ??
-          `${recording.id}.${assetFileUtils.getAssetFileExtension(recording.audio.mimeType)}`;
-        const key = storageObjectUtils.joinObjectKey(
-          getShareRootKey(config, shareId),
-          'recordings',
-          fileName,
-        );
-        await this.mirrorService.uploadPublicObject(key, blob, config);
+    for (const [recordingId, recording] of Object.entries(projectForShare.recordings ?? {})) {
+      const fileName =
+        recording.audio.fileName ??
+        `${recording.id}.${assetFileUtils.getAssetFileExtension(recording.audio.mimeType)}`;
+      if (shouldUseMirroredObjectUrl(recording.audio.storage, recording.audio.objectUrl)) {
+        const key = getMirrorFileKey(config, project.name, `recordings/${fileName}`);
         projectForShare.recordings![recordingId] = {
           ...recording,
           audio: {
@@ -233,8 +269,8 @@ export class BrowserShareService implements ShareService {
             storage: 'remote',
           },
         };
-      }),
-    );
+      }
+    }
 
     return projectForShare;
   }

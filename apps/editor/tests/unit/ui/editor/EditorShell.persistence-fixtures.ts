@@ -192,13 +192,13 @@ class RecordingShareService implements ShareService {
 
   getPublicUrl(shareId: string): string {
     return `${this.origin}/editor/s/${shareId}?src=${encodeURIComponent(
-      `http://localhost:9000/localstudio/mirrors/public-shares/${shareId}/share.json`,
+      `http://localhost:9000/localstudio/mirrors/shares/${shareId}.json`,
     )}`;
   }
 
   getEmbedUrl(shareId: string): string {
     return `${this.origin}/editor/embed/${shareId}?src=${encodeURIComponent(
-      `http://localhost:9000/localstudio/mirrors/public-shares/${shareId}/share.json`,
+      `http://localhost:9000/localstudio/mirrors/shares/${shareId}.json`,
     )}`;
   }
 

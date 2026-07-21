@@ -66,6 +66,39 @@ function getAuthorizationCredential(init: RequestInit | undefined) {
   return headers?.authorization?.match(/Credential=([^/]+)/)?.[1];
 }
 
+function createProjectWithInlineMirrorAssets(assetCount: number): ProjectDocument {
+  const project = sampleProject.createSampleProject();
+  const firstPage = project.pages[0];
+  if (!firstPage) throw new Error('Sample project must contain a page.');
+  for (let index = 0; index < assetCount; index += 1) {
+    const assetId = `parallel-asset-${index}`;
+    project.assets[assetId] = {
+      id: assetId,
+      type: 'image',
+      mimeType: 'image/png',
+      name: `Parallel asset ${index}`,
+      objectUrl: 'data:image/png;base64,aW1hZ2U=',
+      storage: 'inline',
+    };
+    const elementId = `parallel-image-${index}`;
+    project.elements[elementId] = {
+      id: elementId,
+      type: 'image',
+      assetId,
+      x: 40 + index,
+      y: 60 + index,
+      width: 120,
+      height: 80,
+      rotation: 0,
+      opacity: 1,
+      locked: false,
+      visible: true,
+    };
+    firstPage.elementIds.push(elementId);
+  }
+  return project;
+}
+
 describe('minioMirrorService.createMirrorFiles', () => {
   it('creates a complete portable project mirror payload', async () => {
     const project = sampleProject.createSampleProject();
@@ -153,6 +186,60 @@ describe('minioMirrorService.createMirrorFiles', () => {
       fileName: 'montserrat-700.woff2',
       storage: 'file',
     });
+  });
+
+  it('includes presenter recording audio files in mirror payloads', async () => {
+    const project: ProjectDocument = {
+      ...sampleProject.createSampleProject(),
+      recordings: {
+        recording1: {
+          id: 'recording1',
+          name: 'Presenter recording',
+          createdAt: '2026-07-18T12:00:00.000Z',
+          updatedAt: '2026-07-18T12:00:00.000Z',
+          durationMs: 2400,
+          language: 'en',
+          modelPresetId: 'web-speech-api',
+          audio: {
+            mimeType: 'audio/webm;codecs=opus',
+            objectUrl: 'data:audio/webm;base64,YXVkaW8=',
+            storage: 'inline',
+          },
+          segments: [
+            {
+              id: 'segment1',
+              text: 'Mirrored transcript audio.',
+              startMs: 0,
+              endMs: 2400,
+              final: true,
+            },
+          ],
+        },
+      },
+    };
+
+    const files = await minioMirrorService.createMirrorFiles(
+      project,
+      new VersionedRepository([], project),
+      config,
+    );
+
+    expect(files.map((file) => file.path)).toContain('recordings/recording1.webm');
+    const projectJson = JSON.parse(
+      await files.find((file) => file.path === 'project.json')!.blob.text(),
+    ) as ProjectDocument;
+    expect(projectJson.recordings?.recording1).toMatchObject({
+      audio: {
+        fileName: 'recording1.webm',
+        storage: 'file',
+      },
+      segments: [
+        {
+          text: 'Mirrored transcript audio.',
+        },
+      ],
+    });
+    expect(projectJson.recordings?.recording1?.audio.objectUrl).toBeUndefined();
   });
 });
 
@@ -349,6 +436,40 @@ describe('minioMirrorService.MinioMirrorService', () => {
     if (!finalProgress) throw new Error('Expected mirror progress updates.');
     expect(finalProgress.current).toBe(finalProgress.total);
     expect(finalProgress.label).toContain('Mirrored ');
+  });
+
+  it('uploads changed mirror content files in bounded parallel and commits the manifest last', async () => {
+    const project = createProjectWithInlineMirrorAssets(5);
+    let activePuts = 0;
+    let maxActivePuts = 0;
+    const putOrder: string[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = getRequestUrl(input);
+      if (init?.method === 'GET' && url.endsWith('localstudio-mirror.json')) {
+        return new Response('', { status: 404 });
+      }
+      if (init?.method === 'PUT') {
+        activePuts += 1;
+        maxActivePuts = Math.max(maxActivePuts, activePuts);
+        await new Promise((resolve) => {
+          setTimeout(resolve, url.endsWith('localstudio-mirror.json') ? 0 : 10);
+        });
+        activePuts -= 1;
+        putOrder.push(url);
+        return new Response('', { status: 200 });
+      }
+      return new Response('', { status: 404 });
+    });
+    const service = new minioMirrorService.MinioMirrorService({
+      fetch: fetchMock,
+      now: () => new Date('2026-06-30T10:00:00.000Z'),
+    });
+
+    await service.syncProject(project, new VersionedRepository([], project), config);
+
+    expect(maxActivePuts).toBeGreaterThan(1);
+    expect(maxActivePuts).toBeLessThanOrEqual(3);
+    expect(putOrder.at(-1)).toContain('localstudio-mirror.json');
   });
 
   it('uses writer credentials when sync checks and uploads mirror files', async () => {

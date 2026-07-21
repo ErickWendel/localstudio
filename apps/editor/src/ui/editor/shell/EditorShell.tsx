@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type Konva from 'konva';
 import type { AppServices } from '../../../app/composition';
+import type { ProjectDocument } from '../../../domain/documents/model';
 import { pageVisibility } from '../../../domain/documents/pageVisibility';
-import type { ShareMetadata } from '../../../services/contracts/interfaces';
+import type {
+  ShareMetadata,
+  SharePublishProgress,
+} from '../../../services/contracts/interfaces';
 import { editorAutomationController } from '../../../services/automation/editorAutomationController';
 import type { EditorAutomationDelegate } from '../../../services/automation/editorAutomationController';
 import {
@@ -59,6 +63,10 @@ function isMobileEditorViewport() {
   if (typeof window === 'undefined' || !window.matchMedia) return false;
   if (editorShellBrowserUtils.isWebMcpEnabled()) return false;
   return window.matchMedia(editorMobileViewportQuery).matches;
+}
+
+function getProjectPublishSignature(project: ProjectDocument) {
+  return `${project.id}:${project.updatedAt}`;
 }
 
 export function EditorShell({ services }: EditorShellProps) {
@@ -125,6 +133,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const [isExportingImages, setIsExportingImages] = useState(false);
   const [sharePanelOpen, setSharePanelOpen] = useState(false);
   const [shareMetadata, setShareMetadata] = useState<ShareMetadata | undefined>();
+  const [sharePublishProgress, setSharePublishProgress] = useState<SharePublishProgress | undefined>();
   const stageRef = useRef<Konva.Stage>(null);
   const imageExportStageRef = useRef<Konva.Stage>(null);
   const workspaceRef = useRef<HTMLElement>(null);
@@ -135,6 +144,11 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const imageExportNoticeTimeoutRef = useRef<number | undefined>(undefined);
   const presenterFullscreenEnteredRef = useRef(false);
   const pendingShareAfterLocalSaveRef = useRef(false);
+  const lastPublishedShareSelectionRef = useRef<{
+    projectSignature: string;
+    selectedRecordingId?: string | undefined;
+    shareId: string;
+  } | undefined>(undefined);
   const sharePublishPromiseRef = useRef<{
     promise: Promise<ShareMetadata>;
     selectedRecordingId?: string | undefined;
@@ -189,11 +203,19 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       return services.shareService.updateShare(
         shareId,
         createProjectForSelectedShareRecording(fontResult.project, selectedRecordingId),
+        {
+          onProgress: setSharePublishProgress,
+        },
       );
     })();
     sharePublishPromiseRef.current = { promise: publishPromise, selectedRecordingId };
     try {
       const nextShare = await publishPromise;
+      lastPublishedShareSelectionRef.current = {
+        projectSignature: getProjectPublishSignature(vm.project),
+        selectedRecordingId,
+        shareId: nextShare.shareId,
+      };
       setShareMetadata(nextShare);
       return nextShare;
     } catch (error) {
@@ -203,8 +225,38 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       if (sharePublishPromiseRef.current?.promise === publishPromise) {
         sharePublishPromiseRef.current = undefined;
       }
+      setSharePublishProgress(undefined);
     }
   }, [services.shareService, shareMetadata?.shareId, vm.project]);
+
+  function getReusablePublishedShare(
+    share: ShareMetadata | undefined,
+    selectedRecordingId: string | undefined,
+  ): ShareMetadata | undefined {
+    if (!share || (share.status !== 'published' && share.status !== 'copied')) return undefined;
+    const lastPublishedShareSelection = lastPublishedShareSelectionRef.current;
+    if (
+      lastPublishedShareSelection?.shareId === share.shareId &&
+      lastPublishedShareSelection.selectedRecordingId === selectedRecordingId
+    ) {
+      return share;
+    }
+    return undefined;
+  }
+
+  const hasPublishedCurrentProjectShare = useCallback((
+    share: ShareMetadata | undefined,
+    selectedRecordingId: string | undefined,
+    project: ProjectDocument,
+  ) => {
+    if (!share || (share.status !== 'published' && share.status !== 'copied')) return false;
+    const lastPublishedShareSelection = lastPublishedShareSelectionRef.current;
+    return (
+      lastPublishedShareSelection?.shareId === share.shareId &&
+      lastPublishedShareSelection.selectedRecordingId === selectedRecordingId &&
+      lastPublishedShareSelection.projectSignature === getProjectPublishSignature(project)
+    );
+  }, []);
 
   function exportCurrentPageAsPng() {
     const dataUrl = stageRef.current?.toDataURL({ mimeType: 'image/png', pixelRatio: 2 });
@@ -308,7 +360,9 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   }
 
   async function copyPublicShareLink(selectedRecordingId?: string) {
-    const preparedShare = await publishCurrentProjectShare(selectedRecordingId);
+    const preparedShare =
+      getReusablePublishedShare(shareMetadata, selectedRecordingId) ??
+      (await publishCurrentProjectShare(selectedRecordingId));
     const copiedShare: ShareMetadata = { ...preparedShare, status: 'copied' };
     setShareMetadata(copiedShare);
     copyShareText(copiedShare.publicUrl);
@@ -1169,13 +1223,17 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         window.clearTimeout(timeoutId);
       };
     }
+    if (!shareMetadata?.shareId) return undefined;
+    if (hasPublishedCurrentProjectShare(shareMetadata, undefined, vm.project)) return undefined;
     void publishCurrentProjectShare().catch(() => undefined);
     return undefined;
   }, [
+    hasPublishedCurrentProjectShare,
     publishCurrentProjectShare,
     publicSharingAvailable,
-    shareMetadata?.shareId,
+    shareMetadata,
     vm.mirrorState.status,
+    vm.project,
   ]);
 
   return (
@@ -1488,6 +1546,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           projectName={vm.project.name}
           recordingOptions={shareRecordingOptions}
           share={shareMetadata}
+          shareProgress={sharePublishProgress}
           onClose={() => {
             setSharePanelOpen(false);
           }}
