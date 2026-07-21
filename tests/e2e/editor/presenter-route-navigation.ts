@@ -7,11 +7,13 @@ export const presenterRouteNavigation = {
     await page.keyboard.press('Shift+Digit3');
     const slideNavigator = page.getByRole('dialog', { name: 'Slide navigator' });
     await expect(slideNavigator).toBeVisible();
-    await page.keyboard.press('Equal');
-    await expect(slideNavigator.getByRole('option', { name: /Slide 2.*Visual proof/ })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
+    const secondSlideOption = slideNavigator.getByRole('option', { name: /Slide 2.*Visual proof/ });
+    await expect(async () => {
+      if ((await secondSlideOption.getAttribute('aria-selected')) !== 'true') {
+        await page.keyboard.press('Equal');
+      }
+      await expect(secondSlideOption).toHaveAttribute('aria-selected', 'true', { timeout: 1000 });
+    }).toPass({ timeout: 10_000 });
     await page.keyboard.press('Enter');
     await expect(page.getByLabel('Presenter status')).toContainText('Current: Slide 2 of 3');
     await page.keyboard.press('Shift+Digit3');

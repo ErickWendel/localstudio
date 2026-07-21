@@ -1,0 +1,208 @@
+.public-podcast-player {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.025)),
+    #131917;
+}
+
+.public-podcast-transport {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.public-podcast-play {
+  width: 42px;
+  height: 42px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  color: #041008;
+  background: var(--ew-green);
+}
+
+.public-podcast-meta {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.public-podcast-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ew-green);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.public-podcast-meta select {
+  min-width: 0;
+  border: 0;
+  color: var(--ew-text);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.public-podcast-time {
+  display: grid;
+  justify-items: end;
+  color: var(--ew-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.public-podcast-rail {
+  position: relative;
+  display: grid;
+  align-items: center;
+}
+
+.public-podcast-progress {
+  position: absolute;
+  left: 0;
+  width: var(--public-podcast-progress, 0%);
+  height: 6px;
+  border-radius: 999px;
+  pointer-events: none;
+  background: var(--ew-green);
+}
+
+.public-podcast-rail input {
+  width: 100%;
+  accent-color: var(--ew-green);
+}
+
+.public-podcast-chapters {
+  display: grid;
+  max-height: min(520px, calc((64px * 5) + 42px));
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.public-podcast-chapters-heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  color: var(--ew-muted);
+  background: rgba(19, 25, 23, 0.96);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.public-podcast-chapters-heading strong {
+  min-width: 24px;
+  border-radius: 999px;
+  padding: 2px 7px;
+  color: #041008;
+  background: var(--ew-green);
+  text-align: center;
+}
+
+.public-podcast-slide {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 22px minmax(82px, 118px) minmax(0, 1fr) 30px;
+  grid-template-areas:
+    'number preview body play'
+    'number preview body play';
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0;
+  padding: 8px;
+  color: var(--ew-text);
+  background: transparent;
+  text-align: left;
+}
+
+.public-podcast-slide:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.public-podcast-slide .page-card-number {
+  grid-area: number;
+}
+
+.public-podcast-slide .page-card-preview {
+  grid-area: preview;
+}
+
+.public-podcast-slide-body {
+  grid-area: body;
+  min-width: 0;
+}
+
+.public-podcast-chapter-icon {
+  grid-area: play;
+  width: 30px;
+  height: 30px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  color: var(--ew-green);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.public-podcast-chapter-time,
+.public-podcast-slide strong {
+  color: var(--ew-green);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.public-podcast-chapter-time-empty {
+  color: var(--ew-muted);
+}
+
+.public-podcast-slide strong {
+  overflow: hidden;
+  color: var(--ew-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.public-podcast-slide em {
+  overflow: hidden;
+  color: var(--ew-muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.public-podcast-chapter-active {
+  box-shadow: inset 3px 0 0 var(--ew-green);
+  background: rgba(55, 253, 118, 0.12);
+}
+
+.public-podcast-chapter-active .public-podcast-chapter-icon {
+  color: #041008;
+  background: var(--ew-green);
+}
+
+.public-podcast-transcript-list {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 10px;
+}

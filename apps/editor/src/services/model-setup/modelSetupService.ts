@@ -367,7 +367,6 @@ class BrowserModelSetupService implements ModelSetupService {
         imageGenerationModel.IMAGE_GENERATION_TRANSFORMERS_MODEL_ID,
       );
     }
-
     return this.setModelState(id, { status: 'needs-download', progress: 0, error: undefined });
   }
 

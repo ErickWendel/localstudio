@@ -13,6 +13,7 @@ import { PublicDeckViewer } from '../../../../src/ui/share/PublicDeckViewer';
 
 describe('PublicDeckViewer', () => {
   let preloadedVideoUrls: string[];
+  let fullscreenElement: Element | null;
 
   class MockPreloadImage extends EventTarget {
     naturalHeight = 480;
@@ -45,6 +46,7 @@ describe('PublicDeckViewer', () => {
 
   beforeEach(() => {
     preloadedVideoUrls = [];
+    fullscreenElement = null;
     window.history.replaceState({}, '', '/');
     vi.stubGlobal('Image', MockPreloadImage);
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(null, { status: 204 }))));
@@ -57,6 +59,41 @@ describe('PublicDeckViewer', () => {
           this.dispatchEvent(new Event('loadeddata'));
         });
       }
+    });
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(function playMedia(
+      this: HTMLMediaElement,
+    ) {
+      this.dispatchEvent(new Event('play'));
+      return Promise.resolve();
+    });
+    vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(function pauseMedia(
+      this: HTMLMediaElement,
+    ) {
+      this.dispatchEvent(new Event('pause'));
+    });
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: vi.fn(),
+    });
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      get: () => fullscreenElement,
+    });
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+      configurable: true,
+      value: vi.fn(() => {
+        fullscreenElement = document.querySelector('[aria-label="Public presentation"]');
+        document.dispatchEvent(new Event('fullscreenchange'));
+        return Promise.resolve();
+      }),
+    });
+    Object.defineProperty(document, 'exitFullscreen', {
+      configurable: true,
+      value: vi.fn(() => {
+        fullscreenElement = null;
+        document.dispatchEvent(new Event('fullscreenchange'));
+        return Promise.resolve();
+      }),
     });
   });
 
@@ -117,7 +154,182 @@ describe('PublicDeckViewer', () => {
     expect(screen.queryByRole('heading', { name: 'Untitled AI Deck' })).not.toBeInTheDocument();
     expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-selected-elements', '');
     expect(screen.getByRole('button', { name: 'Previous slide' })).toBeDisabled();
+    expect(screen.queryByRole('region', { name: 'Presentation playback' })).not.toBeInTheDocument();
     expect(screen.getByText('1 / 1')).toBeInTheDocument();
+  });
+
+  it('opens transcript panel with public recording audio and segments', async () => {
+    const project = sampleProject.createSampleProject();
+    project.pages = [
+      project.pages[0]!,
+      {
+        ...project.pages[0]!,
+        id: 'page-2',
+        name: 'Slide 2',
+        background: { type: 'color', color: '#261255' },
+      },
+      {
+        ...project.pages[0]!,
+        id: 'page-3',
+        name: 'Slide 3',
+        background: { type: 'color', color: '#143522' },
+      },
+    ];
+    project.recordings = {
+      recording1: {
+        id: 'recording1',
+        name: 'Presenter recording',
+        createdAt: '2026-07-18T12:00:00.000Z',
+        updatedAt: '2026-07-18T12:00:00.000Z',
+        durationMs: 2400,
+        language: 'en',
+        modelPresetId: 'web-speech-api',
+        audio: {
+          mimeType: 'audio/webm;codecs=opus',
+          objectUrl: 'https://cdn.localstudio.test/recordings/recording1.webm',
+          storage: 'remote',
+        },
+        segments: [
+          {
+            id: 'segment1',
+            text: 'The roadmap includes transcript chat.',
+            startMs: 0,
+            endMs: 1200,
+            final: true,
+            pageIndex: 0,
+            pageName: 'Slide 1',
+          },
+          {
+            id: 'segment2',
+            text: 'The second slide has synced audio.',
+            startMs: 1200,
+            endMs: 2400,
+            final: true,
+            pageIndex: 1,
+            pageName: 'Slide 2',
+          },
+        ],
+      },
+    };
+    const { share, shareService } = createRemoteShare(
+      '00000000-0000-4000-8000-000000000207',
+      project,
+    );
+    const user = userEvent.setup();
+    render(
+      <PublicDeckViewer
+        shareId={share.shareId}
+        fontImportService={fontImportService}
+        shareService={shareService}
+      />,
+    );
+
+    await screen.findByLabelText('Public presentation');
+    expect(screen.getByRole('region', { name: 'Presentation playback' })).toBeInTheDocument();
+    let audio = document.querySelector('audio');
+    expect(audio).toBeInstanceOf(HTMLAudioElement);
+    expect(screen.getByRole('button', { name: 'Jump to slide 1: Slide 1' })).toHaveStyle({
+      '--public-deck-chapter-preview-left': '0px',
+      '--public-deck-chapter-preview-x': '0%',
+    });
+    expect(screen.getByRole('button', { name: 'Jump to slide 3: Slide 3' })).toHaveStyle({
+      '--public-deck-chapter-preview-left': '100%',
+      '--public-deck-chapter-preview-x': '-100%',
+    });
+    await user.click(screen.getByRole('button', { name: 'Next slide' }));
+    expect(audio?.currentTime).toBe(1.2);
+    await user.click(screen.getByRole('button', { name: 'Jump to slide 3: Slide 3' }));
+    expect(screen.getByText('3 / 3')).toBeInTheDocument();
+    expect(audio?.currentTime).toBe(1.2);
+    await user.click(screen.getByRole('button', { name: 'Jump to slide 1: Slide 1' }));
+    expect(audio?.currentTime).toBe(0);
+    await user.click(screen.getByRole('button', { name: 'Jump to slide 2: Slide 2' }));
+    expect(audio?.currentTime).toBe(1.2);
+    expect(document.querySelector('.public-deck-playback-progress')).toHaveStyle({
+      '--public-deck-progress': '25%',
+    });
+    await user.click(screen.getByRole('button', { name: 'Present slide fullscreen' }));
+    expect(screen.getByLabelText('Public presentation')).toHaveClass(
+      'public-deck-viewer-slide-fullscreen',
+    );
+    expect(screen.queryByRole('region', { name: 'Presentation playback' })).not.toBeInTheDocument();
+    act(() => {
+      void document.exitFullscreen();
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('region', { name: 'Presentation playback' })).toBeInTheDocument();
+    });
+    audio = document.querySelector('audio');
+    expect(audio).toBeInstanceOf(HTMLAudioElement);
+    await user.click(screen.getByRole('button', { name: 'Play presentation audio' }));
+    expect(screen.getByRole('button', { name: 'Pause presentation audio' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Show captions' }));
+    expect(screen.getByText('The second slide has synced audio.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Jump to slide 3: Slide 3' }));
+    expect(screen.queryByText('The second slide has synced audio.')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Jump to slide 2: Slide 2' }));
+    await user.click(screen.getByRole('button', { name: 'Open transcript chat' }));
+
+    expect(screen.getByRole('complementary', { name: 'Transcript chat' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Podcast playback' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Presentation slides')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open slide 1: Slide 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open slide 2: Slide 2' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open slide 3: Slide 3' })).toBeInTheDocument();
+    expect(screen.getByText('Podcast mode')).toBeInTheDocument();
+    expect(screen.getByLabelText('Podcast recording')).toHaveValue('recording1');
+    await waitFor(() => {
+      expect(screen.getByLabelText('Podcast audio time')).toHaveTextContent('0:010:02');
+    });
+    expect(screen.queryByLabelText('Presenter recording audio')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Ask' })).not.toBeInTheDocument();
+    expect(screen.getByRole('form', { name: 'Transcript question prompt' })).toHaveClass('prompt-bar');
+    expect(screen.getByRole('textbox', { name: 'Question for transcript chat' }).tagName).toBe('TEXTAREA');
+    expect(screen.getByRole('button', { name: 'Summarize this presentation in 3 bullets' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Presenter recording' })).toBeInTheDocument();
+    expect(screen.getByText('The roadmap includes transcript chat.')).toBeInTheDocument();
+    expect(screen.getAllByText('The second slide has synced audio.')).toHaveLength(2);
+    const panelAudio = document.querySelectorAll('audio')[1];
+    expect(panelAudio).toBeInstanceOf(HTMLAudioElement);
+    await user.click(screen.getByRole('button', { name: 'Open slide 1: Slide 1' }));
+    expect(panelAudio?.currentTime).toBe(0);
+    await user.click(screen.getByRole('button', { name: 'Play slide 2' }));
+    expect(panelAudio?.currentTime).toBe(1.2);
+    await waitFor(() => {
+      expect(screen.getByText('2 / 3')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: 'Pause slide 2' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Pause presentation audio' })).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(audio?.currentTime).toBe(1.2);
+    });
+    act(() => {
+      if (!panelAudio) return;
+      panelAudio.currentTime = 2.4;
+      panelAudio.dispatchEvent(new Event('timeupdate'));
+    });
+    await waitFor(() => {
+      expect(screen.getByText('0:02 / 0:02')).toBeInTheDocument();
+    });
+    await user.click(
+      screen.getByRole('button', { name: 'Play transcript segment for slide 2 at 0:01' }),
+    );
+    expect(panelAudio?.currentTime).toBe(1.2);
+    act(() => {
+      if (!audio) return;
+      audio.currentTime = 2.4;
+      audio.dispatchEvent(new Event('timeupdate'));
+    });
+    await waitFor(() => {
+      expect(screen.getByLabelText('Podcast audio time')).toHaveTextContent('0:020:02');
+    });
+    expect(
+      screen
+        .getByRole('button', { name: 'Play transcript segment for slide 2 at 0:01' })
+        .closest('li'),
+    ).toHaveClass('public-transcript-segment-active-slide');
   });
 
   it('starts public share routes on the media preparation progress UI', () => {
@@ -335,6 +547,13 @@ describe('PublicDeckViewer', () => {
 
     await user.click(screen.getByRole('button', { name: 'Previous slide' }));
     expect(screen.getByText('1 / 2')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Jump to slide 2: Slide 2' }));
+    expect(screen.getByText('2 / 2')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Jump to slide 2: Slide 2' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
   });
 
   it('waits for target slide videos and GIFs before changing public deck slides', async () => {

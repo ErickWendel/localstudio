@@ -77,6 +77,7 @@
   gap: 10px;
 }
 
+.share-recording-picker,
 .share-link-fields label {
   display: grid;
   gap: 6px;
@@ -85,6 +86,7 @@
   font-weight: 700;
 }
 
+.share-recording-picker select,
 .share-link-fields input,
 .share-link-fields textarea {
   width: 100%;
@@ -96,6 +98,10 @@
   font: inherit;
   font-size: 12px;
   padding: 10px;
+}
+
+.share-recording-picker select {
+  min-height: 38px;
 }
 
 .share-link-fields textarea {

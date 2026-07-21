@@ -74,6 +74,36 @@ function createProjectWithInlineFont(): ProjectDocument {
   return project;
 }
 
+function createProjectWithRecording(): ProjectDocument {
+  const project = createProjectWithInlineAsset();
+  project.recordings = {
+    recording1: {
+      id: 'recording1',
+      name: 'Presenter recording',
+      createdAt: '2026-07-18T12:00:00.000Z',
+      updatedAt: '2026-07-18T12:00:00.000Z',
+      durationMs: 2400,
+      language: 'en',
+      modelPresetId: 'web-speech-api',
+      audio: {
+        mimeType: 'audio/webm;codecs=opus',
+        objectUrl: 'data:audio/webm;base64,YXVkaW8=',
+        storage: 'inline',
+      },
+      segments: [
+        {
+          id: 'segment1',
+          text: 'The roadmap includes transcript chat.',
+          startMs: 0,
+          endMs: 2400,
+          final: true,
+        },
+      ],
+    },
+  };
+  return project;
+}
+
 describe('BrowserShareService', () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -169,6 +199,44 @@ describe('BrowserShareService', () => {
     expect(sharePayload.project.fonts?.acme).toMatchObject({
       objectUrl: fontUrl,
       storage: 'remote',
+    });
+  });
+
+  it('publishes presenter recording audio and transcript data with public shares', async () => {
+    const uploadedBodies = new Map<string, Blob>();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'PUT') {
+        uploadedBodies.set(getRequestUrl(input), init.body as Blob);
+        return Promise.resolve(new Response('', { status: 200 }));
+      }
+      return Promise.resolve(new Response('', { status: 404 }));
+    });
+    const mirrorService = new minioMirrorService.MinioMirrorService({ fetch: fetchMock });
+    mirrorService.saveConfig(config);
+    const service = new BrowserShareService({
+      mirrorService,
+      origin: 'https://localstudio.test',
+    });
+
+    await service.createShare(createProjectWithRecording());
+
+    const recordingUrl =
+      'http://localhost:9000/localstudio/mirrors/public-shares/project-project-1/recordings/recording1.webm';
+    const shareUrl =
+      'http://localhost:9000/localstudio/mirrors/public-shares/project-project-1/share.json';
+    expect(Array.from(uploadedBodies.keys())).toContain(recordingUrl);
+    expect(await uploadedBodies.get(recordingUrl)!.text()).toBe('audio');
+    const sharePayload = JSON.parse(await uploadedBodies.get(shareUrl)!.text()) as PublicSharePayloadFixture;
+    expect(sharePayload.project.recordings?.recording1).toMatchObject({
+      audio: {
+        objectUrl: recordingUrl,
+        storage: 'remote',
+      },
+      segments: [
+        {
+          text: 'The roadmap includes transcript chat.',
+        },
+      ],
     });
   });
 

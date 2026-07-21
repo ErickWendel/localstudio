@@ -226,4 +226,64 @@ describe('BrowserPresenterSessionService', () => {
     expect(commandHandler).toHaveBeenCalledWith({ command: 'go-to-page', pageId: 'page-2' });
     unsubscribe();
   });
+
+  it('forwards saved presenter recordings from the active presenter session', () => {
+    const popup = { location: { href: '' }, postMessage: vi.fn(), closed: false } as unknown as Window;
+    const commandHandler = vi.fn();
+    const service = new BrowserPresenterSessionService({
+      href: 'https://localstudio.test/editor/',
+      openWindow: vi.fn(() => popup),
+      randomId: () => 'session-7',
+      targetWindow: window,
+    });
+    const project = sampleProject.createSampleProject();
+    const audioBlob = new Blob(['partial talk audio'], { type: 'audio/webm;codecs=opus' });
+    const recording = {
+      id: 'recording-1',
+      name: 'Presenter recording',
+      createdAt: '2026-07-20T20:00:00.000Z',
+      updatedAt: '2026-07-20T20:00:00.000Z',
+      durationMs: 1800,
+      modelPresetId: 'web-speech-api',
+      audio: {
+        mimeType: 'audio/webm;codecs=opus',
+        storage: 'inline' as const,
+      },
+      segments: [
+        {
+          id: 'segment-1',
+          text: '[Slide 1] Partial slide recording.',
+          startMs: 0,
+          endMs: 1800,
+          final: true,
+          pageId: project.pages[0]!.id,
+          pageIndex: 0,
+          pageName: project.pages[0]!.name,
+        },
+      ],
+    };
+    service.openPresenterWindow();
+    const unsubscribe = service.subscribeToCommands(commandHandler);
+
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        origin: 'https://localstudio.test',
+        data: {
+          audioBlob,
+          command: 'save-recording',
+          recording,
+          sessionId: 'session-7',
+          source: 'localstudio-presenter-window',
+          type: 'command',
+        },
+      }),
+    );
+
+    expect(commandHandler).toHaveBeenCalledWith({
+      audioBlob,
+      command: 'save-recording',
+      recording,
+    });
+    unsubscribe();
+  });
 });

@@ -47,6 +47,7 @@ import type { ImageExportFrame } from './editor-image-export';
 import { editorShortcutActions } from './editor-shortcut-actions';
 import { PresentationSlideNavigator } from './PresentationSlideNavigator';
 import { SpeakerNotesEditor } from './SpeakerNotesEditor';
+import { createProjectForSelectedShareRecording } from './createProjectForSelectedShareRecording';
 
 interface EditorShellProps {
   services: AppServices;
@@ -87,6 +88,9 @@ export function EditorShell({ services }: EditorShellProps) {
 
 function EditorDesktopShell({ services }: EditorShellProps) {
   const vm = useEditorViewModel(services);
+  const presenterTranscriptionLanguage =
+    vm.translationLanguageOptions.find((language) => language.code === vm.translationTargetLanguage) ??
+    vm.activeSlideLanguage;
   const automationDelegateRef = useRef(vm.automation);
   const prepareProjectFontsForPublicShareRef = useRef(vm.prepareProjectFontsForPublicShare);
   const movieHoldStateRef = useRef<MovieHoldState | undefined>(undefined);
@@ -131,7 +135,10 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const imageExportNoticeTimeoutRef = useRef<number | undefined>(undefined);
   const presenterFullscreenEnteredRef = useRef(false);
   const pendingShareAfterLocalSaveRef = useRef(false);
-  const sharePublishPromiseRef = useRef<Promise<ShareMetadata> | undefined>(undefined);
+  const sharePublishPromiseRef = useRef<{
+    promise: Promise<ShareMetadata>;
+    selectedRecordingId?: string | undefined;
+  } | undefined>(undefined);
   const toolbarImageInputRef = useRef<HTMLInputElement>(null);
   const hasSelection = vm.selection.elementIds.length > 0;
   const isHistoryReadOnly = vm.versionHistoryOpen;
@@ -152,9 +159,23 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const publicSharingAvailable = vm.mirrorState.enabled && vm.mirrorState.status === 'synced';
   const publicSharingUnavailableReason = 'Public links cannot be created without remote storage.';
   const hasDirectoryPersistence = services.persistenceMode === 'directory';
+  const shareRecordingOptions = Object.values(vm.project.recordings ?? {})
+    .filter((recording) => recording.audio.objectUrl && recording.segments.length > 0)
+    .sort((first, second) => Date.parse(second.createdAt) - Date.parse(first.createdAt))
+    .map((recording) => ({
+      id: recording.id,
+      label: recording.name,
+      segmentCount: recording.segments.length,
+    }));
 
-  const publishCurrentProjectShare = useCallback(async () => {
-    if (sharePublishPromiseRef.current) return sharePublishPromiseRef.current;
+  const publishCurrentProjectShare = useCallback(async (selectedRecordingId?: string) => {
+    const inFlightSharePublish = sharePublishPromiseRef.current;
+    if (inFlightSharePublish && inFlightSharePublish.selectedRecordingId === selectedRecordingId) {
+      return inFlightSharePublish.promise;
+    }
+    if (inFlightSharePublish) {
+      await inFlightSharePublish.promise.catch(() => undefined);
+    }
     const preparedShare = services.shareService.getProjectShareMetadata(vm.project);
     const shareId = shareMetadata?.shareId ?? preparedShare.shareId;
     setShareMetadata((current) => ({
@@ -165,9 +186,12 @@ function EditorDesktopShell({ services }: EditorShellProps) {
 
     const publishPromise = (async () => {
       const fontResult = await prepareProjectFontsForPublicShareRef.current();
-      return services.shareService.updateShare(shareId, fontResult.project);
+      return services.shareService.updateShare(
+        shareId,
+        createProjectForSelectedShareRecording(fontResult.project, selectedRecordingId),
+      );
     })();
-    sharePublishPromiseRef.current = publishPromise;
+    sharePublishPromiseRef.current = { promise: publishPromise, selectedRecordingId };
     try {
       const nextShare = await publishPromise;
       setShareMetadata(nextShare);
@@ -176,7 +200,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       setShareMetadata((current) => (current ? { ...current, status: 'sync-failed' } : current));
       throw error;
     } finally {
-      if (sharePublishPromiseRef.current === publishPromise) {
+      if (sharePublishPromiseRef.current?.promise === publishPromise) {
         sharePublishPromiseRef.current = undefined;
       }
     }
@@ -283,11 +307,8 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     window.open(url.toString(), '_blank', 'noopener,noreferrer');
   }
 
-  async function copyPublicShareLink() {
-    const preparedShare =
-      shareMetadata?.status === 'published' || shareMetadata?.status === 'copied'
-        ? shareMetadata
-        : await publishCurrentProjectShare();
+  async function copyPublicShareLink(selectedRecordingId?: string) {
+    const preparedShare = await publishCurrentProjectShare(selectedRecordingId);
     const copiedShare: ShareMetadata = { ...preparedShare, status: 'copied' };
     setShareMetadata(copiedShare);
     copyShareText(copiedShare.publicUrl);
@@ -377,6 +398,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           presenterMode: 'presenting',
           project: vm.project,
           streamPeerId: presenterRemoteStreamPeerId,
+          transcriptionLanguage: presenterTranscriptionLanguage,
         });
       })
       .catch(() => {
@@ -396,9 +418,10 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         presenterMode: 'presenting',
         project: vm.project,
         streamPeerId: presenterRemoteStreamPeerId,
+        transcriptionLanguage: presenterTranscriptionLanguage,
       });
     }, 0);
-  }, [presenterRemoteStreamPeerId, presenterSessionId, vm]);
+  }, [presenterRemoteStreamPeerId, presenterSessionId, presenterTranscriptionLanguage, vm]);
 
   function enterAudienceFullscreen() {
     setAudienceFullscreenPromptOpen(false);
@@ -872,6 +895,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           presenterMode: presenterSessionId || remotePresenterActive ? 'presenting' : 'ready',
           project: vm.project,
           streamPeerId: presenterRemoteStreamPeerId,
+          transcriptionLanguage: presenterTranscriptionLanguage,
         });
       })
       .catch(() => {
@@ -887,6 +911,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     presenterRemoteUnavailable,
     presenterSessionId,
     remotePresenterActive,
+    presenterTranscriptionLanguage,
     vm.activePageId,
     vm.animationPreview,
     vm.project,
@@ -911,6 +936,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           presenterMode: 'presenting',
           project: vm.project,
           streamPeerId: presenterRemoteStreamPeerId,
+          transcriptionLanguage: presenterTranscriptionLanguage,
         });
         return;
       }
@@ -933,6 +959,35 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         vm.updatePageSpeakerNotes(message.pageId, message.notes);
         return;
       }
+      if (message.command === 'save-recording') {
+        const editorOwnedRecording = message.audioBlob
+          ? {
+              ...message.recording,
+              audio: {
+                ...message.recording.audio,
+                objectUrl: URL.createObjectURL(message.audioBlob),
+              },
+            }
+          : message.recording;
+        const projectWithRecording = {
+          ...vm.project,
+          recordings: {
+            ...(vm.project.recordings ?? {}),
+            [editorOwnedRecording.id]: editorOwnedRecording,
+          },
+          updatedAt: new Date().toISOString(),
+        };
+        vm.addTranscriptRecording(editorOwnedRecording);
+        getPresenterSessionService().publishState({
+          activePageId: vm.activePageId,
+          animationPreview: vm.animationPreview,
+          presenterMode: presenterSessionId || remotePresenterActive ? 'presenting' : 'ready',
+          project: projectWithRecording,
+          streamPeerId: presenterRemoteStreamPeerId,
+          transcriptionLanguage: presenterTranscriptionLanguage,
+        });
+        return;
+      }
       if (message.command === 'update-stream-peer') {
         setPresenterRemoteStreamPeerId(message.peerId);
         return;
@@ -944,6 +999,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           presenterMode: presenterSessionId || remotePresenterActive ? 'presenting' : 'ready',
           project: vm.project,
           streamPeerId: presenterRemoteStreamPeerId,
+          transcriptionLanguage: presenterTranscriptionLanguage,
         });
         return;
       }
@@ -956,6 +1012,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     presenterRemoteSession,
     presenterRemoteStreamPeerId,
     presenterSessionId,
+    presenterTranscriptionLanguage,
     remotePresenterActive,
     closePresenterViewSession,
     vm,
@@ -985,12 +1042,14 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       presenterMode: presenterSessionId || remotePresenterActive ? 'presenting' : 'ready',
       project: vm.project,
       streamPeerId: presenterRemoteStreamPeerId,
+      transcriptionLanguage: presenterTranscriptionLanguage,
     });
   }, [
     presenterRemoteSession,
     presenterRemoteStreamPeerId,
     presenterSessionId,
     remotePresenterActive,
+    presenterTranscriptionLanguage,
     vm.activePageId,
     vm.animationPreview,
     vm.project,
@@ -1427,6 +1486,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       {sharePanelOpen ? (
         <SharePanel
           projectName={vm.project.name}
+          recordingOptions={shareRecordingOptions}
           share={shareMetadata}
           onClose={() => {
             setSharePanelOpen(false);

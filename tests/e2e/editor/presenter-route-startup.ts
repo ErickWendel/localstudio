@@ -6,6 +6,21 @@ import { presenterRouteHarness } from '../support/presenter-route-harness';
 export const presenterRouteStartup = {
   async open(page: Page, baseURL: string): Promise<void> {
     await page.setViewportSize({ width: 1280, height: 820 });
+    await page.addInitScript(() => {
+      Object.defineProperty(HTMLMediaElement.prototype, 'duration', {
+        configurable: true,
+        get() {
+          return 24;
+        },
+      });
+      HTMLMediaElement.prototype.play = function play() {
+        this.dispatchEvent(new Event('play'));
+        return Promise.resolve();
+      };
+      HTMLMediaElement.prototype.pause = function pause() {
+        this.dispatchEvent(new Event('pause'));
+      };
+    });
     await presenterRouteHarness.install(page);
 
     await page.goto(`${baseURL}/editor/?presenter=1&presenterSession=e2e-presenter`);

@@ -2,14 +2,21 @@ import { useState } from 'react';
 import type { ShareMetadata } from '../../services/contracts/interfaces';
 import { copyShareText } from './shareClipboard';
 
+export interface ShareRecordingOption {
+  id: string;
+  label: string;
+  segmentCount: number;
+}
+
 interface SharePanelProps {
   projectName: string;
+  recordingOptions?: ShareRecordingOption[] | undefined;
   share?: ShareMetadata | undefined;
   publicLinkUnavailableReason?: string | undefined;
   shareProgressLabel?: string | undefined;
   onClose: () => void;
   onConfigurePublicLink?: () => void;
-  onCopyLink: () => Promise<ShareMetadata>;
+  onCopyLink: (selectedRecordingId?: string) => Promise<ShareMetadata>;
   onDownload: () => void;
   onPresent: () => void;
 }
@@ -25,6 +32,7 @@ function getStatusLabel(share: ShareMetadata | undefined, isCopying: boolean) {
 
 export function SharePanel({
   projectName,
+  recordingOptions = [],
   share,
   publicLinkUnavailableReason,
   shareProgressLabel,
@@ -34,6 +42,8 @@ export function SharePanel({
   onDownload,
   onPresent,
 }: SharePanelProps) {
+  const defaultRecordingId = recordingOptions[0]?.id;
+  const [selectedRecordingId, setSelectedRecordingId] = useState<string | undefined>(defaultRecordingId);
   const [lastCopiedShare, setLastCopiedShare] = useState<ShareMetadata | undefined>();
   const [isCopying, setIsCopying] = useState(false);
   const [copyError, setCopyError] = useState<string | undefined>();
@@ -47,6 +57,11 @@ export function SharePanel({
     (currentShare
       ? 'Unlisted: anyone with the link can view.'
       : 'Sync the deck to prepare a public view link.');
+  const showRecordingPicker = recordingOptions.length > 1;
+  const activeSelectedRecordingId =
+    selectedRecordingId && recordingOptions.some((recording) => recording.id === selectedRecordingId)
+      ? selectedRecordingId
+      : defaultRecordingId;
 
   async function handleCopyLink() {
     if (publicLinkUnavailable) {
@@ -56,7 +71,7 @@ export function SharePanel({
     setIsCopying(true);
     setCopyError(undefined);
     try {
-      const nextShare = await onCopyLink();
+      const nextShare = await onCopyLink(activeSelectedRecordingId);
       setLastCopiedShare(nextShare);
     } catch (error) {
       setCopyError(error instanceof Error ? error.message : 'Could not create the share link.');
@@ -108,6 +123,23 @@ export function SharePanel({
         </span>
         {publicLinkUnavailable ? 'Configure mirror storage' : 'Copy link'}
       </button>
+
+      {showRecordingPicker ? (
+        <label className="share-recording-picker">
+          Recording for public share
+          <select
+            value={activeSelectedRecordingId ?? ''}
+            disabled={isCopying}
+            onChange={(event) => setSelectedRecordingId(event.target.value || undefined)}
+          >
+            {recordingOptions.map((recording) => (
+              <option key={recording.id} value={recording.id}>
+                {recording.label} · {recording.segmentCount} transcript segments
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
 
       {currentShare ? (
         <section className="share-link-fields" aria-label="Published share links">

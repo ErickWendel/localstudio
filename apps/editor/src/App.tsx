@@ -9,6 +9,16 @@ const PublicDeckApp = lazy(() =>
 const PresenterView = lazy(() =>
   import('./ui/presenter/PresenterView').then((module) => ({ default: module.PresenterView })),
 );
+const PresenterTranscriptWindow = lazy(() =>
+  import('./ui/presenter/PresenterTranscriptWindow').then((module) => ({
+    default: module.PresenterTranscriptWindow,
+  })),
+);
+const E2ECoverageDiagnosticsPage = lazy(() =>
+  import('./ui/e2e/E2ECoverageDiagnosticsPage').then((module) => ({
+    default: module.E2ECoverageDiagnosticsPage,
+  })),
+);
 const WebMcpShowcasePage = lazy(() =>
   import('./ui/webmcp/WebMcpShowcasePage').then((module) => ({
     default: module.WebMcpShowcasePage,
@@ -29,11 +39,28 @@ function isMobileEditorViewport() {
 
 export function App() {
   const pathname = normalizeRoutePath(window.location.pathname);
+  if (isE2ECoverageDiagnosticsRoute()) {
+    return (
+      <Suspense fallback={null}>
+        <E2ECoverageDiagnosticsPage />
+      </Suspense>
+    );
+  }
+
   const presenterSessionId = getPresenterSessionId();
   if (presenterSessionId) {
     return (
       <Suspense fallback={null}>
         <PresenterView sessionId={presenterSessionId} />
+      </Suspense>
+    );
+  }
+
+  const presenterTranscriptSessionId = getPresenterTranscriptSessionId();
+  if (presenterTranscriptSessionId) {
+    return (
+      <Suspense fallback={null}>
+        <PresenterTranscriptWindow sessionId={presenterTranscriptSessionId} />
       </Suspense>
     );
   }
@@ -61,6 +88,12 @@ export function App() {
 function getPresenterSessionId() {
   const url = new URL(window.location.href);
   if (url.searchParams.get('presenter') !== '1') return undefined;
+  return url.searchParams.get('presenterSession') ?? undefined;
+}
+
+function getPresenterTranscriptSessionId() {
+  const url = new URL(window.location.href);
+  if (url.searchParams.get('presenterTranscript') !== '1') return undefined;
   return url.searchParams.get('presenterSession') ?? undefined;
 }
 
@@ -108,6 +141,10 @@ function stripBasePath(pathname: string) {
 
 function isWebMcpEnabled() {
   return new URL(window.location.href).searchParams.get('webmcp') === '1';
+}
+
+function isE2ECoverageDiagnosticsRoute() {
+  return new URL(window.location.href).searchParams.get('e2eCoverageDiagnostics') === '1';
 }
 
 function EditorRoute() {

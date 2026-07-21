@@ -27,6 +27,7 @@ export interface ProjectDocument {
   pages: Page[];
   assets: Record<string, Asset>;
   fonts?: Record<string, ProjectFont>;
+  recordings?: Record<string, TranscriptRecording>;
   elements: Record<string, DesignElement>;
   themes?: Record<string, PresentationTheme>;
   themeId?: string;
@@ -145,6 +146,36 @@ export interface ProjectFont {
   storage: 'inline' | 'file' | 'remote';
   objectUrl?: string;
   sourceUrl?: string;
+}
+
+export interface TranscriptRecording {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  durationMs: number;
+  language?: string;
+  modelPresetId: string;
+  audio: TranscriptRecordingAudio;
+  segments: TranscriptSegment[];
+}
+
+export interface TranscriptRecordingAudio {
+  mimeType: string;
+  fileName?: string;
+  objectUrl?: string;
+  storage?: 'file' | 'inline' | 'remote';
+}
+
+export interface TranscriptSegment {
+  id: string;
+  text: string;
+  startMs: number;
+  endMs: number;
+  pageId?: string;
+  pageIndex?: number;
+  pageName?: string;
+  final: boolean;
 }
 
 export type DesignElement = TextElement | ImageElement | GifElement | VideoElement | ShapeElement;

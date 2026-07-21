@@ -57,6 +57,8 @@
 @import './styles/mirror-settings-details.css';
 @import './styles/remote-import.css';
 @import './styles/public-deck-viewer.css';
+@import './styles/public-deck-playback-overlay.css';
+@import './styles/public-podcast-player.css';
 @import './styles/share-panel.css';
 @import './styles/speaker-notes.css';
 @import './styles/presentation-overlays.css';

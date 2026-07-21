@@ -5,6 +5,7 @@ export type PresenterRouteSessionState = {
   activePageId: () => string;
   commands: string[];
   handleCommand: (command: PresenterWindowCommand) => void;
+  messages: PresenterWindowCommand[];
   notesFor: (pageId: string) => string | undefined;
 };
 
@@ -14,6 +15,7 @@ export function createPresenterRouteSessionState(
 ): PresenterRouteSessionState {
   let currentPayload = payload;
   const commands: string[] = [];
+  const messages: PresenterWindowCommand[] = [];
 
   const scheduleState = () => {
     window.setTimeout(() => sendState(currentPayload), 0);
@@ -37,6 +39,7 @@ export function createPresenterRouteSessionState(
     activePageId: () => currentPayload.activePageId,
     commands,
     handleCommand: (command) => {
+      messages.push(command);
       if (command.command === 'go-to-page') {
         commands.push(`${command.command}:${command.pageId}`);
         updateActivePage(command.pageId);
@@ -63,6 +66,7 @@ export function createPresenterRouteSessionState(
       if (command.command === 'previous') moveActivePage(-1);
       if (command.command === 'request-state') scheduleState();
     },
+    messages,
     notesFor: (pageId) =>
       currentPayload.project.pages.find((projectPage) => projectPage.id === pageId)?.speakerNotes,
   };

@@ -125,6 +125,10 @@ describe('PresenterView', () => {
                 waitingForClick: true,
               },
               project,
+              transcriptionLanguage: {
+                code: 'en',
+                label: 'English',
+              },
             },
             sessionId: 'session-1',
             source: 'localstudio-presenter-main',
@@ -138,6 +142,12 @@ describe('PresenterView', () => {
     expect(screen.getByText(/00:00/)).toBeInTheDocument();
     expect(screen.getByText('Current: Slide 1 of 4')).toBeInTheDocument();
     expect(screen.getByText('Builds remaining: 1')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Transcription model preset')).not.toBeInTheDocument();
+    expect(screen.getByText('I will speak in:')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Transcription language' })).toHaveValue('en');
+    expect(screen.getByRole('button', { name: 'Start recording' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open live transcription window' })).toBeInTheDocument();
+    expect(screen.getByText('Recorder ready')).toBeInTheDocument();
     expect(screen.getByLabelText('Speaker notes')).toHaveValue(
       'Open with the Web AI timing story.',
     );
@@ -279,6 +289,84 @@ describe('PresenterView', () => {
       }),
       window.location.origin,
     );
+  });
+
+  it('keeps podcast playback out of presenter mode when recordings exist', () => {
+    const opener = { postMessage: vi.fn() };
+    Object.defineProperty(window, 'opener', {
+      configurable: true,
+      value: opener,
+    });
+    vi.spyOn(window.HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+    vi.spyOn(window.HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+    window.localStorage.setItem('localstudio.presenterWindowIntroDismissed', '1');
+    render(<PresenterView sessionId="session-1" />);
+    const project = sampleProject.createSampleProject();
+    project.pages.push({
+      background: { type: 'color', color: '#111111' },
+      elementIds: [],
+      height: 1080,
+      id: 'page-2',
+      name: 'Slide 2',
+      width: 1920,
+    });
+    project.recordings = {
+      recording1: {
+        id: 'recording1',
+        name: 'Launch talk audio',
+        createdAt: '2026-07-18T12:00:00.000Z',
+        updatedAt: '2026-07-18T12:00:00.000Z',
+        durationMs: 20_000,
+        modelPresetId: 'web-speech-api',
+        audio: {
+          mimeType: 'audio/webm;codecs=opus',
+          objectUrl: 'blob:recording1',
+          storage: 'inline',
+        },
+        segments: [
+          {
+            id: 'segment-1',
+            text: 'Opening',
+            startMs: 0,
+            endMs: 5_000,
+            final: true,
+            pageId: 'page-1',
+            pageIndex: 0,
+            pageName: 'Slide 1',
+          },
+          {
+            id: 'segment-2',
+            text: 'Second section',
+            startMs: 10_000,
+            endMs: 15_000,
+            final: true,
+            pageId: 'page-2',
+            pageIndex: 1,
+            pageName: 'Slide 2',
+          },
+        ],
+      },
+    };
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          origin: window.location.origin,
+          data: {
+            payload: {
+              activePageId: 'page-1',
+              animationPreview: undefined,
+              project,
+            },
+            sessionId: 'session-1',
+            source: 'localstudio-presenter-main',
+            type: 'state',
+          },
+        }),
+      );
+    });
+
+    expect(screen.queryByRole('region', { name: 'Presenter audio playback' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Podcast mode')).not.toBeInTheDocument();
   });
 
   it('accepts timer commands from the editor session and publishes timer state', () => {

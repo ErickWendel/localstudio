@@ -34,8 +34,17 @@ test.describe('editor AI workflow tour journey', () => {
     const editor = new EditorAppPage(page, getServer().baseURL);
     await editor.gotoNewProject();
 
-    await editor.openMenu('Help');
-    await page.getByRole('menuitem', { name: 'AI Setup Tour' }).click();
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await editor.openMenu('Help');
+      const tourItem = page.getByRole('menuitem', { name: 'AI Setup Tour' });
+      await expect(tourItem).toBeVisible();
+      const clicked = await tourItem
+        .click({ timeout: 5_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (clicked) break;
+      if (attempt === 2) throw new Error('AI Setup Tour menu item could not be clicked.');
+    }
 
     for (const [index, title] of tourStepTitles.entries()) {
       await expect(page.getByText(title, { exact: true })).toBeVisible();

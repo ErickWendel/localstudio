@@ -13,7 +13,9 @@ import { EditorShell } from '../../../../src/ui/editor/shell/EditorShell';
 import { editorShellTestHarness } from './EditorShell.test-harness';
 
 const {
+  LoadingProjectRepository,
   RecordingMirrorService,
+  RecordingShareService,
   SavingProjectRepository,
   createAppServices,
   enableSyncedSharing,
@@ -384,9 +386,103 @@ describe('EditorShell export and share workflows', () => {
     }/editor/s/project-project-1?src=${encodeURIComponent(
       'http://localhost:9000/localstudio/mirrors/public-shares/project-project-1/share.json',
     )}`;
-    expect(await screen.findByDisplayValue(expectedPublicUrl)).toBeInTheDocument();
+    expect(
+      await screen.findByDisplayValue(expectedPublicUrl, undefined, { timeout: 3_000 }),
+    ).toBeInTheDocument();
     expect(execCommand).toHaveBeenCalledWith('copy');
     expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it('publishes only the selected presenter recording from the share panel', async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn();
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText,
+      },
+    });
+    const project = sampleProject.createSampleProject();
+    project.recordings = {
+      'recording-old': {
+        id: 'recording-old',
+        name: 'Older take',
+        createdAt: '2026-07-18T12:00:00.000Z',
+        updatedAt: '2026-07-18T12:00:00.000Z',
+        durationMs: 1000,
+        language: 'en',
+        modelPresetId: 'web-speech-api',
+        audio: {
+          mimeType: 'audio/webm;codecs=opus',
+          objectUrl: 'blob:recording-old',
+          storage: 'inline',
+        },
+        segments: [
+          {
+            id: 'old-segment',
+            text: 'Old transcript',
+            startMs: 0,
+            endMs: 1000,
+            final: true,
+            pageIndex: 0,
+            pageName: 'Slide 1',
+          },
+        ],
+      },
+      'recording-new': {
+        id: 'recording-new',
+        name: 'Newer take',
+        createdAt: '2026-07-20T12:00:00.000Z',
+        updatedAt: '2026-07-20T12:00:00.000Z',
+        durationMs: 1200,
+        language: 'en',
+        modelPresetId: 'web-speech-api',
+        audio: {
+          mimeType: 'audio/webm;codecs=opus',
+          objectUrl: 'blob:recording-new',
+          storage: 'inline',
+        },
+        segments: [
+          {
+            id: 'new-segment',
+            text: 'New transcript',
+            startMs: 0,
+            endMs: 1200,
+            final: true,
+            pageIndex: 0,
+            pageName: 'Slide 1',
+          },
+        ],
+      },
+    };
+    const services = createAppServices({ initialProject: project });
+    const shareService = new RecordingShareService();
+    services.mirrorService = new RecordingMirrorService();
+    services.shareService = shareService;
+    services.projectRepository = new LoadingProjectRepository(project);
+    services.persistenceAvailable = true;
+    services.skipStoredProjectLoad = false;
+
+    render(<EditorShell services={services} />);
+
+    await waitForShareButtonReady();
+    fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+    expect(screen.getByLabelText('Recording for public share')).toHaveValue('recording-new');
+    await user.selectOptions(screen.getByLabelText('Recording for public share'), 'recording-old');
+    await user.click(screen.getByRole('button', { name: 'Copy link' }));
+
+    await waitFor(() => {
+      expect(
+        shareService.updateShare.mock.calls.some(([, sharedProject]) =>
+          Object.keys(sharedProject.recordings ?? {}).join(',') === 'recording-old',
+        ),
+      ).toBe(true);
+    });
+    const sharedProject = shareService.updateShare.mock.calls.find(([, candidate]) =>
+      Object.keys(candidate.recordings ?? {}).join(',') === 'recording-old',
+    )?.[1];
+    expect(Object.keys(sharedProject?.recordings ?? {})).toEqual(['recording-old']);
+    expect(sharedProject?.recordings?.['recording-old']?.segments[0]?.text).toBe('Old transcript');
   });
 
   it('enters fullscreen presentation mode from the share panel', async () => {

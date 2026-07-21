@@ -6,6 +6,7 @@ import type {
 export type E2EPresenterHarness = {
   activePageId: () => string;
   commands: string[];
+  messages: PresenterWindowCommand[];
   notesFor: (pageId: string) => string | undefined;
   sendCommand: (command: 'pause-timer' | 'reset-timer' | 'resume-timer') => void;
 };

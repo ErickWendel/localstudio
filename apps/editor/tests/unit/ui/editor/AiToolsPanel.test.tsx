@@ -124,7 +124,6 @@ describe('AiToolsPanel', () => {
       required: false,
       status: 'needs-download',
     };
-
     render(
       <AiToolsPanel
         languageDetectionProviderStates={[languageDetectionProvider]}
@@ -144,7 +143,12 @@ describe('AiToolsPanel', () => {
 
     await user.click(screen.getByRole('button', { name: 'Download all' }));
 
-    expect(calls).toEqual(['prompt', 'language-detection', 'translation', 'image-generation-models']);
+    expect(calls).toEqual([
+      'prompt',
+      'language-detection',
+      'translation',
+      'image-generation-models',
+    ]);
     expect(onDownloadModel).toHaveBeenCalledWith('image-generation-models');
   });
 

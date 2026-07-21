@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ChangeEvent as ReactChangeEvent, PointerEvent as ReactPointerEvent } from 'react';
-import type { Page, ProjectDocument, SelectionState } from '../../domain/documents/model';
+import { AlertTriangle, Captions, Languages, Mic, MonitorUp, Square } from 'lucide-react';
+import type {
+  Page,
+  ProjectDocument,
+  SelectionState,
+  TranscriptRecording,
+  TranscriptSegment,
+} from '../../domain/documents/model';
 import { pageVisibility } from '../../domain/documents/pageVisibility';
 import type {
   PresenterCommandMessage,
@@ -20,8 +27,15 @@ import {
 import { PresenterRemotePanel } from './PresenterRemotePanel';
 import { PresenterSlideNavigator } from './PresenterSlideNavigator';
 import { PresenterThumbnail } from './PresenterThumbnail';
+import {
+  buildPresenterTranscriptSegments,
+  type PresenterTranscriptSlideMarker,
+} from './presenterTranscriptSegments';
 import { presenterRemoteMirror } from './presenterRemoteMirror';
 import { presenterRemoteStreamPublisher } from './presenterRemoteStreamPublisher';
+import { PresenterAudioRecorder } from '../../services/transcription/presenterAudioRecorder';
+import { PresenterSpeechTranscriber } from '../../services/transcription/presenterSpeechTranscriber';
+import { TRANSLATION_LANGUAGE_OPTIONS } from '../editor/translation/translationLanguages';
 import { presenterRemoteTimerFormat } from '@localstudio/presenter-remote/timer-format';
 
 interface PresenterViewProps {
@@ -37,6 +51,8 @@ const notesMinWidthPx = 280;
 const notesMaxWidthPx = 760;
 const presenterMainMinWidthPx = 520;
 const defaultRemoteStreamSize = presenterRemoteMirror.size;
+const transcriptWindowQueryParam = 'presenterTranscript';
+const webSpeechTranscriptionModelId = 'web-speech-api';
 const presenterShortcutActions = [
   'next-build',
   'previous-build',
@@ -131,10 +147,74 @@ function getBuildsRemaining(payload: PresenterStatePayload, page: Page) {
     page.elementIds.includes(build.elementId),
   );
   if (validBuilds.length === 0) return 0;
-  if (payload.animationPreview?.pageId !== page.id) return validBuilds.length;
-  if (payload.animationPreview.phase === 'complete') return 0;
-  const hiddenElementIds = new Set(payload.animationPreview.hiddenElementIds);
+  const preview = payload.animationPreview;
+  if (!preview || preview.pageId !== page.id) return validBuilds.length;
+  if (preview.phase === 'complete') return 0;
+  const hiddenElementIds = new Set(preview.hiddenElementIds);
   return validBuilds.filter((build) => hiddenElementIds.has(build.elementId)).length;
+}
+
+function createTranscriptId(prefix: string) {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function getTranscriptChannelName(sessionId: string) {
+  return `localstudio-presenter-transcript-${sessionId}`;
+}
+
+function postTranscriptChannelMessage(
+  channel: BroadcastChannel | undefined,
+  message: unknown,
+) {
+  channel?.postMessage(message);
+}
+
+function isTranscriptWindowReadyMessage(value: unknown) {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return (
+    record.source === 'localstudio-presenter-transcript-window' &&
+    record.type === 'ready' &&
+    typeof record.sessionId === 'string'
+  );
+}
+
+function isTranscriptWindowClosedMessage(value: unknown) {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return (
+    record.source === 'localstudio-presenter-transcript-window' &&
+    record.type === 'closed' &&
+    typeof record.sessionId === 'string'
+  );
+}
+
+function normalizeSpeechLanguageCode(languageCode: string | undefined) {
+  if (!languageCode) return undefined;
+  const normalized = languageCode.trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (normalized === 'iw') return 'he-IL';
+  if (normalized === 'pt') return 'pt-BR';
+  if (normalized === 'en') return 'en-US';
+  if (normalized === 'zh-hant') return 'zh-TW';
+  if (normalized === 'zh') return 'zh-CN';
+  return languageCode;
+}
+
+function getLanguageMatchCode(languageCode: string | undefined) {
+  return normalizeSpeechLanguageCode(languageCode)?.toLowerCase().split('-')[0];
+}
+
+function getPresenterLanguageOption(languageCode: string | undefined) {
+  const normalized = getLanguageMatchCode(languageCode);
+  return (
+    TRANSLATION_LANGUAGE_OPTIONS.find(
+      (language) => getLanguageMatchCode(language.code) === normalized,
+    ) ?? TRANSLATION_LANGUAGE_OPTIONS.find((language) => language.code === 'pt')!
+  );
 }
 
 export function PresenterView({ sessionId = getRouteSessionId() }: PresenterViewProps) {
@@ -148,6 +228,14 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
   const [notesPanelWidth, setNotesPanelWidth] = useState(getInitialNotesWidth);
   const [keyboardShortcutsMode, setKeyboardShortcutsMode] = useState<'dialog' | 'popover' | undefined>();
   const [remotePanelOpen, setRemotePanelOpen] = useState(false);
+  const [recordingStatus, setRecordingStatus] = useState<
+    'idle' | 'downloading' | 'permission-needed' | 'recording' | 'save-failed' | 'saved' | 'transcribing'
+  >('idle');
+  const [recordingError, setRecordingError] = useState<string | undefined>();
+  const [selectedTranscriptionLanguageCode, setSelectedTranscriptionLanguageCode] = useState(
+    () => getPresenterLanguageOption(undefined).code,
+  );
+  const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[]>([]);
   const remoteStreamSize = defaultRemoteStreamSize;
   const [slideNavigatorOpen, setSlideNavigatorOpen] = useState(false);
   const [slideNavigatorIndex, setSlideNavigatorIndex] = useState(0);
@@ -161,6 +249,19 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
   const presenterStageRef = useRef<HTMLElement>(null);
   const presenterRemotePanelRef = useRef<HTMLDivElement>(null);
   const notesRef = useRef<HTMLTextAreaElement>(null);
+  const activePageMetadataRef = useRef<
+    { pageId: string; pageIndex: number; pageName: string } | undefined
+  >(undefined);
+  const recorderRef = useRef<PresenterAudioRecorder | undefined>(undefined);
+  const recordingStartedAtRef = useRef(0);
+  const recordingObjectUrlRef = useRef<string | undefined>(undefined);
+  const transcriptChannelRef = useRef<BroadcastChannel | undefined>(undefined);
+  const speechTranscriberRef = useRef<PresenterSpeechTranscriber | undefined>(undefined);
+  const fullTranscriptTextRef = useRef('');
+  const slideTranscriptMarkersRef = useRef<PresenterTranscriptSlideMarker[]>([]);
+  const transcriptSegmentsRef = useRef<TranscriptSegment[]>([]);
+  const transcriptionLanguageCodeRef = useRef<string | undefined>(undefined);
+  const transcriptionLanguageTouchedRef = useRef(false);
   const elapsedMsRef = useRef(0);
   const timerBaseMsRef = useRef(0);
   const resolvedSessionId = sessionId ?? 'presenter';
@@ -262,6 +363,22 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
   }, [elapsedMs, timerBaseMs]);
 
   useEffect(() => {
+    transcriptChannelRef.current = new BroadcastChannel(getTranscriptChannelName(resolvedSessionId));
+    return () => {
+      transcriptChannelRef.current?.close();
+      transcriptChannelRef.current = undefined;
+    };
+  }, [resolvedSessionId]);
+
+  useEffect(() => {
+    return () => {
+      void speechTranscriberRef.current?.stop();
+      recorderRef.current?.revokeObjectUrl();
+      if (recordingObjectUrlRef.current) URL.revokeObjectURL(recordingObjectUrlRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
     const intervalId = window.setInterval(() => {
       setCurrentTime(new Date());
       setTimerNow(Date.now());
@@ -336,7 +453,14 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     [snapshot],
   );
   const activePage = snapshot ? getActivePage(snapshot.project, snapshot.activePageId) : undefined;
+  const currentSnapshotLanguageCode = snapshot?.transcriptionLanguage?.code;
+  const selectedTranscriptionLanguage = useMemo(
+    () => getPresenterLanguageOption(selectedTranscriptionLanguageCode),
+    [selectedTranscriptionLanguageCode],
+  );
+  const transcriptionLanguageCode = normalizeSpeechLanguageCode(selectedTranscriptionLanguage.code);
   const activePageId = activePage?.id;
+  const activePageName = activePage?.name;
   const activePageIndex = activePage
     ? Math.max(0, visiblePages.findIndex((page) => page.id === activePage.id))
     : 0;
@@ -347,6 +471,36 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     hour: 'numeric',
     minute: '2-digit',
   });
+  const recordingStatusLabel =
+    recordingStatus === 'idle'
+      ? 'Recorder ready'
+    : recordingStatus === 'downloading'
+        ? 'Starting live transcription'
+        : recordingStatus === 'permission-needed'
+          ? 'Microphone permission needed'
+          : recordingStatus === 'recording'
+            ? `Recording ${transcriptSegments.length} segments`
+            : recordingStatus === 'transcribing'
+              ? 'Transcribing audio'
+              : recordingStatus === 'saved'
+                ? 'Recording saved'
+                : 'Recording failed';
+
+  useEffect(() => {
+    if (transcriptionLanguageTouchedRef.current) return;
+    setSelectedTranscriptionLanguageCode(getPresenterLanguageOption(currentSnapshotLanguageCode).code);
+  }, [currentSnapshotLanguageCode]);
+
+  useEffect(() => {
+    transcriptionLanguageCodeRef.current = transcriptionLanguageCode;
+  }, [transcriptionLanguageCode]);
+
+  useEffect(() => {
+    activePageMetadataRef.current =
+      activePageId && activePageName
+        ? { pageId: activePageId, pageIndex: activePageIndex, pageName: activePageName }
+        : undefined;
+  }, [activePageId, activePageIndex, activePageName]);
 
   function updateSpeakerNotes(event: ReactChangeEvent<HTMLTextAreaElement>) {
     const notes = event.target.value;
@@ -380,6 +534,241 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     publishTimerState({ elapsedMs: 0, paused: false });
   }, [postCommand, publishTimerState]);
 
+  const publishTranscriptState = useCallback(
+    (nextStatus = recordingStatus) => {
+      postTranscriptChannelMessage(transcriptChannelRef.current, {
+        segments: transcriptSegmentsRef.current,
+        sessionId: resolvedSessionId,
+        source: 'localstudio-presenter-transcript',
+        status: nextStatus,
+        type: 'state',
+      });
+    },
+    [recordingStatus, resolvedSessionId],
+  );
+
+  const getCurrentTranscriptMarker = useCallback(
+    (
+      textOffset: number,
+      pageMetadata = activePageMetadataRef.current,
+    ): PresenterTranscriptSlideMarker => ({
+      id: createTranscriptId('slide-marker'),
+      startMs: Math.max(0, Date.now() - recordingStartedAtRef.current),
+      textOffset,
+      ...pageMetadata,
+    }),
+    [],
+  );
+
+  const refreshTranscriptSegments = useCallback(
+    (transcriptText: string, final: boolean) => {
+      const markers = slideTranscriptMarkersRef.current;
+      if (!markers.length) return;
+      const segments = buildPresenterTranscriptSegments(markers, {
+        currentTimeMs: Math.max(0, Date.now() - recordingStartedAtRef.current),
+        final,
+        transcriptText,
+      });
+      transcriptSegmentsRef.current = segments;
+      setTranscriptSegments(segments);
+      publishTranscriptState(final ? 'saved' : 'recording');
+    },
+    [publishTranscriptState],
+  );
+
+  useEffect(() => {
+    if (recordingStatus !== 'recording') return;
+    const currentPage = activePageMetadataRef.current;
+    const lastMarker = slideTranscriptMarkersRef.current.at(-1);
+    if (
+      lastMarker &&
+      lastMarker.pageId === currentPage?.pageId &&
+      lastMarker.pageIndex === currentPage?.pageIndex
+    ) {
+      return;
+    }
+    slideTranscriptMarkersRef.current = [
+      ...slideTranscriptMarkersRef.current,
+      getCurrentTranscriptMarker(fullTranscriptTextRef.current.length),
+    ];
+    refreshTranscriptSegments(fullTranscriptTextRef.current, false);
+  }, [
+    activePageId,
+    activePageIndex,
+    getCurrentTranscriptMarker,
+    recordingStatus,
+    refreshTranscriptSegments,
+  ]);
+
+  const updateLiveTranscript = useCallback(
+    (text: string, final: boolean) => {
+      if (!text.trim()) return;
+      if (!slideTranscriptMarkersRef.current.length) {
+        slideTranscriptMarkersRef.current = [getCurrentTranscriptMarker(0)];
+      }
+      fullTranscriptTextRef.current = text;
+      refreshTranscriptSegments(text, final);
+    },
+    [getCurrentTranscriptMarker, refreshTranscriptSegments],
+  );
+
+  const startRecording = useCallback(async () => {
+    if (
+      recordingStatus === 'recording' ||
+      recordingStatus === 'downloading' ||
+      recordingStatus === 'transcribing'
+    ) {
+      return false;
+    }
+    try {
+      if (recordingObjectUrlRef.current) URL.revokeObjectURL(recordingObjectUrlRef.current);
+      recordingObjectUrlRef.current = undefined;
+      setRecordingError(undefined);
+      setTranscriptSegments([]);
+      fullTranscriptTextRef.current = '';
+      transcriptSegmentsRef.current = [];
+      slideTranscriptMarkersRef.current = [];
+      const recorder = new PresenterAudioRecorder();
+      recorderRef.current = recorder;
+      await recorder.start();
+      recordingStartedAtRef.current = Date.now();
+      slideTranscriptMarkersRef.current = [getCurrentTranscriptMarker(0)];
+      refreshTranscriptSegments('', false);
+      const speechTranscriber = new PresenterSpeechTranscriber({
+        onError: (message) => setRecordingError(message),
+        onTranscript: (update) => updateLiveTranscript(update.text, update.final),
+      });
+      try {
+        speechTranscriber.start(transcriptionLanguageCodeRef.current);
+      } catch (error) {
+        recorder.cancel();
+        recorderRef.current = undefined;
+        throw error;
+      }
+      speechTranscriberRef.current = speechTranscriber;
+      setRecordingStatus('recording');
+      publishTranscriptState('recording');
+      return true;
+    } catch (error) {
+      setRecordingError(error instanceof Error ? error.message : 'Microphone permission is required.');
+      setRecordingStatus('permission-needed');
+      return false;
+    }
+  }, [
+    getCurrentTranscriptMarker,
+    publishTranscriptState,
+    recordingStatus,
+    refreshTranscriptSegments,
+    updateLiveTranscript,
+  ]);
+
+  const stopRecording = useCallback(async () => {
+    const recorder = recorderRef.current;
+    if (!recorder) return;
+    try {
+      setRecordingStatus('transcribing');
+      await speechTranscriberRef.current?.stop();
+      const finalTranscriptText = speechTranscriberRef.current?.getText();
+      if (finalTranscriptText) {
+        updateLiveTranscript(finalTranscriptText, true);
+      } else {
+        refreshTranscriptSegments(fullTranscriptTextRef.current, true);
+      }
+      const result = await recorder.stop();
+      const objectUrl = recorder.getObjectUrl() ?? URL.createObjectURL(result.blob);
+      recordingObjectUrlRef.current = objectUrl;
+      const now = new Date().toISOString();
+      const recordingId = createTranscriptId('recording');
+      const recording: TranscriptRecording = {
+        id: recordingId,
+        name: `Presenter recording ${new Date(now).toLocaleString()}`,
+        createdAt: now,
+        updatedAt: now,
+        durationMs: result.durationMs,
+        ...(transcriptionLanguageCode ? { language: transcriptionLanguageCode } : {}),
+        modelPresetId: webSpeechTranscriptionModelId,
+        audio: {
+          mimeType: result.mimeType,
+          objectUrl,
+          storage: 'inline',
+        },
+        segments: transcriptSegmentsRef.current,
+      };
+      postCommand({ audioBlob: result.blob, command: 'save-recording', recording });
+      setRecordingStatus('saved');
+      publishTranscriptState('saved');
+    } catch (error) {
+      setRecordingError(error instanceof Error ? error.message : 'Recording could not be saved.');
+      setRecordingStatus('save-failed');
+      publishTranscriptState('save-failed');
+    } finally {
+      recorderRef.current = undefined;
+      speechTranscriberRef.current = undefined;
+    }
+  }, [
+    postCommand,
+    publishTranscriptState,
+    refreshTranscriptSegments,
+    transcriptionLanguageCode,
+    updateLiveTranscript,
+  ]);
+
+  useEffect(() => {
+    const channel = transcriptChannelRef.current;
+    if (!channel) return undefined;
+    channel.onmessage = (event: MessageEvent<unknown>) => {
+      if (isTranscriptWindowReadyMessage(event.data)) {
+        if ((event.data as { sessionId: string }).sessionId !== resolvedSessionId) return;
+        publishTranscriptState();
+        return;
+      }
+      if (!isTranscriptWindowClosedMessage(event.data)) return;
+      if ((event.data as { sessionId: string }).sessionId !== resolvedSessionId) return;
+      if (recordingStatus === 'recording') {
+        void stopRecording();
+      }
+    };
+    return () => {
+      if (channel.onmessage) channel.onmessage = null;
+    };
+  }, [publishTranscriptState, recordingStatus, resolvedSessionId, stopRecording]);
+
+  const openTranscriptWindow = useCallback(async () => {
+    if (recordingStatus !== 'recording') {
+      setRecordingError('You should choose your microphone first.');
+      const started = await startRecording();
+      if (started) {
+        setRecordingError('You should choose your microphone first. Click live transcription again after choosing your microphone.');
+      }
+      return;
+    }
+    setRecordingError(undefined);
+    const transcriptWindow = window.open(
+      'about:blank',
+      `localstudio-transcript-${resolvedSessionId}`,
+      'popup,width=900,height=760',
+    );
+    if (!transcriptWindow) {
+      setRecordingError('Live transcription window was blocked by the browser.');
+      return;
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.delete('presenter');
+    url.searchParams.set(transcriptWindowQueryParam, '1');
+    url.searchParams.set('presenterSession', resolvedSessionId);
+    transcriptWindow.location.href = url.toString();
+    publishTranscriptState();
+  }, [publishTranscriptState, recordingStatus, resolvedSessionId, startRecording]);
+
+  const handleTranscriptionLanguageChange = useCallback(
+    (event: ReactChangeEvent<HTMLSelectElement>) => {
+      transcriptionLanguageTouchedRef.current = true;
+      setSelectedTranscriptionLanguageCode(event.target.value);
+      void speechTranscriberRef.current?.setLanguage(normalizeSpeechLanguageCode(event.target.value));
+    },
+    [],
+  );
+
   function getPresenterVideos() {
     return Array.from(presenterStageRef.current?.querySelectorAll('video') ?? []);
   }
@@ -412,10 +801,30 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
   const goToPage = useCallback((index: number) => {
     const page = visiblePages[index];
     if (!page) return false;
+    if (recordingStatus === 'recording') {
+      const lastMarker = slideTranscriptMarkersRef.current.at(-1);
+      if (lastMarker?.pageId !== page.id || lastMarker?.pageIndex !== index) {
+        slideTranscriptMarkersRef.current = [
+          ...slideTranscriptMarkersRef.current,
+          getCurrentTranscriptMarker(fullTranscriptTextRef.current.length, {
+            pageId: page.id,
+            pageIndex: index,
+            pageName: page.name,
+          }),
+        ];
+        refreshTranscriptSegments(fullTranscriptTextRef.current, false);
+      }
+    }
     setSlideNavigatorIndex(index);
     postCommand({ command: 'go-to-page', pageId: page.id });
     return true;
-  }, [postCommand, visiblePages]);
+  }, [
+    getCurrentTranscriptMarker,
+    postCommand,
+    recordingStatus,
+    refreshTranscriptSegments,
+    visiblePages,
+  ]);
 
   const executePresenterShortcut = useCallback((action: KeyboardShortcutAction) => {
     if (action === 'shortcut-toggle') {
@@ -756,6 +1165,50 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
             <span className="presenter-timer">{presenterRemoteTimerFormat.formatElapsed(elapsedMs)}</span>
           </div>
           <div className="presenter-controls ew-compact-row" aria-label="Presenter controls">
+            <div className="presenter-speaking-language">
+              <span className="presenter-speaking-language-prefix">I will speak in:</span>
+              <label className="presenter-transcription-language">
+                <Languages size={16} aria-hidden="true" />
+                <select
+                  aria-label="Transcription language"
+                  disabled={recordingStatus === 'downloading' || recordingStatus === 'transcribing'}
+                  value={selectedTranscriptionLanguage.code}
+                  onChange={handleTranscriptionLanguageChange}
+                >
+                  {TRANSLATION_LANGUAGE_OPTIONS.map((language) => (
+                    <option key={language.code} value={language.code}>
+                      {language.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <button
+              className="stitch-icon-button presenter-control-button"
+              type="button"
+              aria-label={recordingStatus === 'recording' ? 'Stop recording' : 'Start recording'}
+              disabled={recordingStatus === 'downloading' || recordingStatus === 'transcribing'}
+              onClick={() => {
+                void (recordingStatus === 'recording' ? stopRecording() : startRecording());
+              }}
+            >
+              {recordingStatus === 'recording' ? (
+                <Square size={18} aria-hidden="true" />
+              ) : (
+                <Mic size={18} aria-hidden="true" />
+              )}
+            </button>
+            <button
+              className="stitch-icon-button presenter-control-button"
+              type="button"
+              aria-label="Open live transcription window"
+              disabled={recordingStatus === 'downloading' || recordingStatus === 'transcribing'}
+              onClick={() => {
+                void openTranscriptWindow();
+              }}
+            >
+              <MonitorUp size={18} aria-hidden="true" />
+            </button>
             <button
               className="stitch-icon-button presenter-control-button"
               type="button"
@@ -823,13 +1276,26 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
             </button>
           </div>
         </header>
-        <div className="presenter-status-row" aria-label="Presenter status">
-          <span className="presenter-status-item ew-ellipsis">
-            Current: Slide {activePageIndex + 1} of {visiblePages.length}
-          </span>
-          <span className="presenter-status-item ew-ellipsis">
-            Builds remaining: {buildsRemaining}
-          </span>
+        <div className="presenter-status-stack" aria-label="Presenter status">
+          <div className="presenter-status-row">
+            <span className="presenter-status-item ew-ellipsis">
+              Current: Slide {activePageIndex + 1} of {visiblePages.length}
+            </span>
+            <span className="presenter-status-item ew-ellipsis">
+              Builds remaining: {buildsRemaining}
+            </span>
+            <span className="presenter-status-item presenter-recording-status ew-ellipsis">
+              <Captions size={18} aria-hidden="true" />
+              {recordingStatusLabel}
+              {recordingError ? <span className="presenter-sr-status-warning">{recordingError}</span> : null}
+            </span>
+          </div>
+          {recordingError ? (
+            <div className="presenter-recording-alert" role="alert">
+              <AlertTriangle size={18} aria-hidden="true" />
+              <span>{recordingError}</span>
+            </div>
+          ) : null}
         </div>
         <section
           className="presenter-stage"

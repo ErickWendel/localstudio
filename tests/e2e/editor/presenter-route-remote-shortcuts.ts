@@ -16,7 +16,13 @@ export const presenterRouteRemoteShortcuts = {
       });
     });
 
-    await page.getByRole('button', { name: 'Show remote control QR code' }).click();
+    const remoteButton = page.getByRole('button', { name: 'Show remote control QR code' });
+    await expect(async () => {
+      if ((await remoteButton.getAttribute('aria-expanded')) !== 'true') {
+        await remoteButton.click();
+      }
+      await expect(remoteButton).toHaveAttribute('aria-expanded', 'true', { timeout: 1000 });
+    }).toPass({ timeout: 10_000 });
     const remotePanel = page.getByRole('region', { name: 'Remote control this presentation' });
     await expect(remotePanel).toBeVisible();
     await expect(remotePanel.getByRole('img', { name: 'Remote control QR code' })).toBeVisible();

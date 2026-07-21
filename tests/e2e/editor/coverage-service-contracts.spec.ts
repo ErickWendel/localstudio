@@ -16,6 +16,8 @@ import { evaluateAutomationControllerSnapshotContract } from './automation-contr
 import { evaluateAutomationControllerTranslationContract } from './automation-controller-translation-contract-browser';
 import { evaluateAssetFileUtilsContract } from './asset-file-utils-contract-browser';
 import { bonsaiRuntimeContractPage } from './bonsai-runtime-contract-page';
+import { evaluateEditorHighCoverageContract } from './editor-high-coverage-contract-browser';
+import { evaluateEditorShellShareRecordingContract } from './editor-shell-share-recording-contract-browser';
 import { mirrorFileContractProject } from './mirror-file-contract-project';
 import { mirrorFileContractRuntimePage } from './mirror-file-contract-runtime-page';
 import { modelDownloadContractPage } from './model-download-contract-page';
@@ -24,6 +26,7 @@ import { evaluateModelReadinessContract } from './model-readiness-contract-brows
 import { movieControlsContractPage } from './movie-controls-contract-page';
 import { evaluateMockedAiContract } from './mocked-ai-contract-browser';
 import { evaluatePptxImportLoggerContract } from './pptx-import-logger-contract-browser';
+import { pptxPatcherContractFixtures } from './pptx-patcher-contract-fixtures';
 import { evaluatePresenterLoggingContract } from './presenter-logging-contract-browser';
 import { evaluatePresenterOptionsContract } from './presenter-options-contract-browser';
 import { evaluatePresenterPeerTransportContract } from './presenter-peer-transport-contract-browser';
@@ -129,6 +132,79 @@ test.describe('editor service contracts coverage batch', () => {
           evaluateAutomationControllerSnapshotContract,
         ),
       ).resolves.toMatchObject({ snapshotPageCount: 1 });
+    });
+
+    await test.step('editor shell share recording selection', async () => {
+      await gotoNewProject(page);
+      const result = await page.evaluate(evaluateEditorShellShareRecordingContract, {
+        editorSourceRoot: serviceContractsSupport.editorSourceRoot,
+      });
+
+      expect(result).toEqual({
+        missingSelectionKeepsAll: ['first', 'second'],
+        noSelectionKeepsIdentity: true,
+        selectedRecordingIds: ['second'],
+      });
+    });
+
+    await test.step('high-value editor runtime coverage contracts', async () => {
+      await gotoNewProject(page);
+      const result = await page.evaluate(evaluateEditorHighCoverageContract, {
+        editorSourceRoot: serviceContractsSupport.editorSourceRoot,
+        pptx: pptxPatcherContractFixtures.createInput(),
+      });
+
+      expect(result.generatedTexts).toEqual(['plain', 'chat content', 'nested chat', 'object text']);
+      expect(result.detectedLanguages).toEqual([{ language: 'pt', score: 0.91 }, { language: 'en' }]);
+      expect(result.parsingErrors).toHaveLength(2);
+      expect(result.patchedWarningCodes).toEqual(
+        expect.arrayContaining([
+          'existing-warning',
+          'pptx-animation-effect-downgraded',
+          'pptx-animation-target-missing',
+          'pptx-slide-file-missing',
+        ]),
+      );
+      expect(result.progress).toMatchObject({
+        estimated: 1500,
+        invalidEstimate: null,
+        mapped: 40,
+      });
+      expect(result.remote).toMatchObject({
+        activePageName: 'Opening',
+        emptyPageCount: 0,
+        skeletonRemaining: 1,
+        timerInvalid: false,
+        timerValid: true,
+      });
+      expect(result.remote.batchCount).toBeGreaterThan(0);
+      expect(result.remote.slidePreviewElements).toBeGreaterThan(0);
+      expect(result.recorder).toMatchObject({
+        objectUrl: 'blob:contract-audio',
+        recordingBeforePause: true,
+        revokedUrls: ['blob:contract-audio'],
+        stopBeforeStartMessage: 'Recorder has not started.',
+        stoppedTracks: 1,
+        type: 'audio/webm',
+      });
+      expect(result.recorder.chunkCount).toBeGreaterThan(0);
+      expect(result.session).toMatchObject({
+        blockedStatus: 'blocked',
+        postedCommands: 1,
+        previewCount: 1,
+        remoteClosed: true,
+      });
+      expect(result.session.stateCount).toBeGreaterThan(0);
+      expect(result.speech).toMatchObject({
+        changedSpeechLanguage: 'en-US',
+        errors: [
+          'Microphone permission is required for live transcription.',
+          'Network down',
+        ],
+        text: 'ola mundo',
+      });
+      expect(result.speech.updates).toContainEqual({ final: false, text: 'ola mundo' });
+      expect(result.speech.updates).toContainEqual({ final: true, text: 'ola mundo' });
     });
 
     await test.step('mocked AI', async () => {

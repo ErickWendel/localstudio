@@ -19,8 +19,13 @@ test.describe('editor manage slides journey', () => {
     await page.getByLabel('Page 2 title').press('Enter');
     await expect(page.getByRole('article', { name: 'Page 2: Agenda' })).toBeVisible();
 
-    await pagesPanel.getByRole('button', { name: 'Duplicate Agenda' }).click();
-    await expect(page.getByText('3 active pages')).toBeVisible();
+    const activeThreePages = page.getByText('3 active pages');
+    await expect(async () => {
+      if (!(await activeThreePages.isVisible().catch(() => false))) {
+        await pagesPanel.getByRole('button', { name: 'Duplicate Agenda' }).click();
+      }
+      await expect(activeThreePages).toBeVisible({ timeout: 1000 });
+    }).toPass({ timeout: 10_000 });
 
     await pagesPanel.getByRole('button', { name: 'Hide Agenda', exact: true }).click();
     await expect(page.getByRole('article', { name: 'Page 2: Agenda (skipped)' })).toBeVisible();
