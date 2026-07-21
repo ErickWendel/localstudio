@@ -53,12 +53,19 @@ describe('LandingPage', () => {
     expect(screen.queryByLabelText('LocalStudio workflow path')).not.toBeInTheDocument();
     expect(screen.queryByText('Live editor')).not.toBeInTheDocument();
     expect(screen.queryByText('Browser API')).not.toBeInTheDocument();
+    const navigationLinks = within(
+      screen.getByRole('navigation', { name: 'Landing sections' }),
+    ).getAllByRole('link');
+    expect(navigationLinks.map((link) => link.textContent)).toEqual([
+      'About it',
+      'Features',
+      'Requirements',
+      'Docs',
+      'Pricing',
+    ]);
     expect(screen.getByRole('link', { name: 'About it' })).toHaveAttribute('href', '#top');
     expect(screen.getByRole('link', { name: 'Features' })).toHaveAttribute('href', '#features');
-    expect(screen.getByRole('link', { name: 'WebMCP Showcase' })).toHaveAttribute(
-      'href',
-      '#webmcp',
-    );
+    expect(screen.queryByRole('link', { name: 'WebMCP Showcase' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Requirements' })).toHaveAttribute(
       'href',
       '#requirements',
@@ -67,6 +74,7 @@ describe('LandingPage', () => {
       'href',
       localStudioAppRoutes.docs.gettingStartedAnchor,
     );
+    expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute('href', '#pricing');
     expect(screen.queryByRole('link', { name: 'Workflow' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'S3 Mirror' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Showcase' })).not.toBeInTheDocument();
@@ -87,6 +95,7 @@ describe('LandingPage', () => {
     expect(screen.getByRole('link', { name: 'About it' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'About it' })).toHaveAttribute('href', '#top');
     expect(screen.getByRole('link', { name: 'Features' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('link', { name: 'Pricing' })).not.toHaveAttribute('aria-current');
   });
 
   it('adds scroll reveal contracts to hero, media, cards, and calls to action', () => {

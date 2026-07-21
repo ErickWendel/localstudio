@@ -4,6 +4,8 @@
   .web-ai-section,
   .webmcp-section .showcase-row,
   .feature-details,
+  .pricing-grid,
+  .pricing-trust-row,
   .requirements-grid,
   .thanks-section,
   .closing-section {
@@ -53,8 +55,17 @@
   .web-ai-section,
   .webmcp-section .showcase-row,
   .feature-details,
+  .pricing-grid,
   .thanks-section {
     grid-template-columns: 1fr;
+  }
+
+  .pricing-card {
+    min-height: auto;
+  }
+
+  .pricing-trust-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .landing-header {
@@ -202,6 +213,15 @@
 
   .requirements-grid {
     grid-template-columns: 1fr;
+  }
+
+  .pricing-waitlist-row,
+  .pricing-trust-row {
+    grid-template-columns: 1fr;
+  }
+
+  .pricing-waitlist-row button {
+    width: 100%;
   }
 
   .landing-footer {

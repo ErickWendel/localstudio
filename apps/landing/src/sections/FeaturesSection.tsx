@@ -1,6 +1,7 @@
 import { Layers3 } from 'lucide-react';
 import { Reveal } from '../components/Reveal';
 import { editorProof } from '../content/editorProof';
+import { WebMcpSection } from './WebMcpSection';
 
 export function FeaturesSection() {
   return (
@@ -22,6 +23,7 @@ export function FeaturesSection() {
           ))}
         </ul>
       </div>
+      <WebMcpSection />
     </section>
   );
 }
