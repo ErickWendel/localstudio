@@ -1182,7 +1182,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   }, [hasSelection, isHistoryReadOnly, vm]);
 
   useEffect(() => {
-    if (!editorShellBrowserUtils.isWebMcpEnabled()) return undefined;
+    if (!editorShellBrowserUtils.isWebMcpProtocolEnabled()) return undefined;
     const delegate: EditorAutomationDelegate = {
       createProject: (input) => automationDelegateRef.current.createProject(input),
       generateSlides: (input) => automationDelegateRef.current.generateSlides(input),

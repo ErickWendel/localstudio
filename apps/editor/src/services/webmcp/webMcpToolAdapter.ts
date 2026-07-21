@@ -66,6 +66,19 @@ function translateInput(input: ToolInput): TranslateTextAutomationInput {
   };
 }
 
+function isCleanupCallback(value: unknown): value is () => void {
+  return typeof value === 'function';
+}
+
+function isDuplicateToolNameError(error: unknown) {
+  if (!(error instanceof DOMException || error instanceof Error)) return false;
+  return error.name === 'InvalidStateError' && error.message.includes('Duplicate tool name');
+}
+
+function collectCleanup(cleanups: Array<() => void>, value: unknown) {
+  if (isCleanupCallback(value)) cleanups.push(value);
+}
+
 export class WebMcpToolAdapter {
   constructor(private readonly controller: ControllerLike) {}
 
@@ -137,12 +150,25 @@ export class WebMcpToolAdapter {
 
   register(modelContext: WebMcpModelContext): () => void {
     const tools = this.createTools();
+    const cleanups: Array<() => void> = [];
     if (modelContext.registerTools) {
-      modelContext.registerTools(tools);
+      try {
+        collectCleanup(cleanups, modelContext.registerTools(tools));
+      } catch (error) {
+        if (!isDuplicateToolNameError(error)) throw error;
+      }
     } else {
-      tools.forEach((tool) => modelContext.registerTool?.(tool));
+      tools.forEach((tool) => {
+        try {
+          collectCleanup(cleanups, modelContext.registerTool?.(tool));
+        } catch (error) {
+          if (!isDuplicateToolNameError(error)) throw error;
+        }
+      });
     }
 
-    return () => undefined;
+    return () => {
+      cleanups.forEach((cleanup) => cleanup());
+    };
   }
 }

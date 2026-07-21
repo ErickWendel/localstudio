@@ -40,9 +40,9 @@ describe('EditorShell', () => {
     vi.restoreAllMocks();
   });
 
-  it('registers WebMCP tools when explicitly enabled', async () => {
+  it('registers WebMCP tools by default', async () => {
     const registerTools = vi.fn<(tools: WebMcpTool[]) => void>();
-    window.history.pushState({}, '', '/editor/?webmcp=1');
+    window.history.pushState({}, '', '/editor/');
     Object.defineProperty(document, 'modelContext', {
       configurable: true,
       value: { registerTools },
@@ -63,8 +63,25 @@ describe('EditorShell', () => {
     ]);
   });
 
+  it('can disable WebMCP protocol registration from the editor URL', async () => {
+    const registerTools = vi.fn<(tools: WebMcpTool[]) => void>();
+    window.history.pushState({}, '', '/editor/?webmcp=0');
+    Object.defineProperty(document, 'modelContext', {
+      configurable: true,
+      value: { registerTools },
+    });
+
+    render(<EditorShell services={createAppServices()} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'LocalStudio.dev' })).toBeInTheDocument();
+    });
+    expect(registerTools).not.toHaveBeenCalled();
+    expect((window as WebMcpDemoWindow).localStudioWebMcpTools).toBeUndefined();
+  });
+
   it('exposes same-origin demo tools when WebMCP runtime is unavailable', async () => {
-    window.history.pushState({}, '', '/editor/?webmcp=1');
+    window.history.pushState({}, '', '/editor/');
 
     render(<EditorShell services={createAppServices()} />);
 
