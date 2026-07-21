@@ -409,7 +409,9 @@ describe('DesignPanel', () => {
     expect(onUpdateElementStyle).not.toHaveBeenCalledWith('text-test', {
       fontFamily: 'Acme Sans',
     });
-    expect(screen.queryByRole('button', { name: 'Add Acme Sans from local fonts' })).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'Add Acme Sans from local fonts' })).not.toBeInTheDocument();
+    });
     expect(screen.getByRole('status')).toHaveTextContent('Acme Sans added to mirrored fonts');
   });
 
