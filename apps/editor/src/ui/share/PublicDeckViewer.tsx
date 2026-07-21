@@ -2309,16 +2309,18 @@ export function PublicDeckViewer({
           >
             <ListMusic size={18} aria-hidden="true" />
           </button>
-          <button
-            className="stitch-icon-button"
-            type="button"
-            aria-label="Open presentation AI"
-            aria-expanded={transcriptPanelOpen}
-            title="Open presentation AI"
-            onClick={() => setTranscriptPanelOpen(true)}
-          >
-            <Sparkles size={18} aria-hidden="true" />
-          </button>
+          {hasTranscriptRecordings ? (
+            <button
+              className="stitch-icon-button"
+              type="button"
+              aria-label="Open presentation AI"
+              aria-expanded={transcriptPanelOpen}
+              title="Open presentation AI"
+              onClick={() => setTranscriptPanelOpen(true)}
+            >
+              <Sparkles size={18} aria-hidden="true" />
+            </button>
+          ) : null}
           <button
             className="stitch-icon-button"
             type="button"

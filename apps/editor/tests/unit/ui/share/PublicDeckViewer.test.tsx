@@ -179,7 +179,7 @@ describe('PublicDeckViewer', () => {
     expect(screen.getByText('1 / 1')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Open transcript chat' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open slide list' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Open presentation AI' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Open presentation AI' })).not.toBeInTheDocument();
   });
 
   it('opens transcript panel with public recording audio and segments', async () => {
