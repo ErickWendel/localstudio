@@ -14,6 +14,11 @@ const PresenterTranscriptWindow = lazy(() =>
     default: module.PresenterTranscriptWindow,
   })),
 );
+const E2ECoverageDiagnosticsPage = lazy(() =>
+  import('./ui/e2e/E2ECoverageDiagnosticsPage').then((module) => ({
+    default: module.E2ECoverageDiagnosticsPage,
+  })),
+);
 const WebMcpShowcasePage = lazy(() =>
   import('./ui/webmcp/WebMcpShowcasePage').then((module) => ({
     default: module.WebMcpShowcasePage,
@@ -34,6 +39,14 @@ function isMobileEditorViewport() {
 
 export function App() {
   const pathname = normalizeRoutePath(window.location.pathname);
+  if (isE2ECoverageDiagnosticsRoute()) {
+    return (
+      <Suspense fallback={null}>
+        <E2ECoverageDiagnosticsPage />
+      </Suspense>
+    );
+  }
+
   const presenterSessionId = getPresenterSessionId();
   if (presenterSessionId) {
     return (
@@ -128,6 +141,10 @@ function stripBasePath(pathname: string) {
 
 function isWebMcpEnabled() {
   return new URL(window.location.href).searchParams.get('webmcp') === '1';
+}
+
+function isE2ECoverageDiagnosticsRoute() {
+  return new URL(window.location.href).searchParams.get('e2eCoverageDiagnostics') === '1';
 }
 
 function EditorRoute() {

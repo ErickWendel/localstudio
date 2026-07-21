@@ -13,7 +13,18 @@ export const presenterNotesEditorMenu = {
 
     await page.keyboard.press('Escape');
     await editor.openMenu('Help');
-    await page.getByRole('menuitem', { name: 'Keyboard Shortcuts' }).click();
+    await expect(async () => {
+      const keyboardShortcutsItem = page.getByRole('menuitem', { name: 'Keyboard Shortcuts' });
+      if (!(await page.getByRole('dialog', { name: 'Keyboard shortcuts' }).isVisible().catch(() => false))) {
+        if (!(await keyboardShortcutsItem.isVisible().catch(() => false))) {
+          await editor.openMenu('Help');
+        }
+        await keyboardShortcutsItem.click({ force: true });
+      }
+      await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeVisible({
+        timeout: 1000,
+      });
+    }).toPass({ timeout: 10_000 });
     await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toContainText(
       'Open the slide navigator',
     );

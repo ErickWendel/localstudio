@@ -17,8 +17,17 @@ export class EditorAppPage extends BasePage {
   }
 
   async openMenu(name: 'Edit' | 'File' | 'Help' | 'View') {
-    await this.page.getByRole('button', { name, exact: true }).click({ timeout: 30_000 });
-    await expect(this.page.getByRole('menu', { name: `${name} menu` })).toBeVisible();
+    if (await this.page.getByRole('menu').isVisible().catch(() => false)) {
+      await this.page.keyboard.press('Escape');
+    }
+    const menu = this.page.getByRole('menu', { name: `${name} menu` });
+    const button = this.page.getByRole('button', { name, exact: true });
+    await button.click({ timeout: 30_000 });
+    if (!(await menu.isVisible().catch(() => false))) {
+      await this.page.keyboard.press('Escape').catch(() => undefined);
+      await button.click({ timeout: 30_000 });
+    }
+    await expect(menu).toBeVisible();
   }
 
   async openTool(tab: 'AI Tools' | 'Animate' | 'Assets' | 'Design' | 'Elements' | 'Layout' | 'Text') {

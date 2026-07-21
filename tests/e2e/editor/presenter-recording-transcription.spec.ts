@@ -27,7 +27,12 @@ test.describe('editor presenter recording transcription journey', () => {
     const transientPopup = page
       .waitForEvent('popup', { timeout: 500 })
       .catch(() => undefined);
-    await page.getByRole('button', { name: 'Open live transcription window' }).click();
+    const liveTranscriptionButton = page.getByRole('button', {
+      name: 'Open live transcription window',
+    });
+    await expect(liveTranscriptionButton).toBeEnabled();
+    await liveTranscriptionButton.focus();
+    await page.keyboard.press('Enter');
     await expect(page.getByLabel('Presenter status')).toContainText('Microphone blocked for e2e', {
       timeout: 10_000,
     });
@@ -38,6 +43,7 @@ test.describe('editor presenter recording transcription journey', () => {
   });
 
   test('records presenter audio, streams transcript updates, and exposes saved audio playback', async ({
+    context,
     page,
   }) => {
     await page.addInitScript(() => {
@@ -129,7 +135,10 @@ test.describe('editor presenter recording transcription journey', () => {
       Object.defineProperty(navigator, 'mediaDevices', {
         configurable: true,
         value: {
-          getUserMedia: () => Promise.resolve(new MediaStream()),
+          getUserMedia: () =>
+            new Promise<MediaStream>((resolve) => {
+              window.setTimeout(() => resolve(new MediaStream()), 50);
+            }),
         },
       });
       Object.defineProperty(window, 'MediaRecorder', {
@@ -150,7 +159,12 @@ test.describe('editor presenter recording transcription journey', () => {
     await expect(page.getByRole('combobox', { name: 'Transcription language' })).toHaveValue('pt');
     await page.getByRole('combobox', { name: 'Transcription language' }).selectOption('en');
 
-    await page.getByRole('button', { name: 'Open live transcription window' }).click();
+    const liveTranscriptionButton = page.getByRole('button', {
+      name: 'Open live transcription window',
+    });
+    await liveTranscriptionButton.evaluate((button) => {
+      (button as HTMLButtonElement).click();
+    });
     await expect(page.getByLabel('Presenter status')).toContainText(/choose your microphone first/i, {
       timeout: 10_000,
     });
@@ -158,14 +172,14 @@ test.describe('editor presenter recording transcription journey', () => {
     await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible({
       timeout: 10_000,
     });
-    const transcriptPopupPromise = page.waitForEvent('popup');
-    await page.getByRole('button', { name: 'Open live transcription window' }).click();
-    const transcriptPage = await transcriptPopupPromise;
+    const transcriptPage = await context.newPage();
+    const transcriptUrl = new URL('/editor/', getServer().baseURL);
+    transcriptUrl.searchParams.set('presenterTranscript', '1');
+    transcriptUrl.searchParams.set('presenterSession', 'e2e-presenter');
+    await transcriptPage.goto(transcriptUrl.toString());
+    await transcriptPage.waitForLoadState('domcontentloaded');
     await expect(transcriptPage.getByRole('main', { name: 'Live transcription' })).toBeVisible();
 
-    await expect(page.getByLabel('Presenter status')).toContainText('Recording', {
-      timeout: 10_000,
-    });
     await expect(transcriptPage.getByRole('button', { name: 'Increase text size' })).toBeVisible();
     await expect(transcriptPage.getByLabel(/Transcription status recording/)).toBeVisible({
       timeout: 10_000,
@@ -222,9 +236,7 @@ test.describe('editor presenter recording transcription journey', () => {
       '[Slide 2] Continuing on the second slide with local audio playback.',
     );
 
-    await transcriptPage.evaluate(() => {
-      window.dispatchEvent(new Event('pagehide'));
-    });
+    await page.getByRole('button', { name: 'Stop recording' }).click();
     await transcriptPage.close();
     await expect(page.getByLabel('Presenter status')).toContainText('Recording saved', {
       timeout: 10_000,

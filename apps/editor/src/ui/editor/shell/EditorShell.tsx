@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type Konva from 'konva';
 import type { AppServices } from '../../../app/composition';
-import type { ProjectDocument } from '../../../domain/documents/model';
 import { pageVisibility } from '../../../domain/documents/pageVisibility';
 import type { ShareMetadata } from '../../../services/contracts/interfaces';
 import { editorAutomationController } from '../../../services/automation/editorAutomationController';
@@ -48,27 +47,13 @@ import type { ImageExportFrame } from './editor-image-export';
 import { editorShortcutActions } from './editor-shortcut-actions';
 import { PresentationSlideNavigator } from './PresentationSlideNavigator';
 import { SpeakerNotesEditor } from './SpeakerNotesEditor';
+import { createProjectForSelectedShareRecording } from './createProjectForSelectedShareRecording';
 
 interface EditorShellProps {
   services: AppServices;
 }
 
 const editorMobileViewportQuery = '(max-width: 760px)';
-
-function createProjectForSelectedShareRecording(
-  project: ProjectDocument,
-  selectedRecordingId?: string,
-): ProjectDocument {
-  if (!selectedRecordingId) return project;
-  const selectedRecording = project.recordings?.[selectedRecordingId];
-  if (!selectedRecording) return project;
-  return {
-    ...project,
-    recordings: {
-      [selectedRecordingId]: selectedRecording,
-    },
-  };
-}
 
 function isMobileEditorViewport() {
   if (typeof window === 'undefined' || !window.matchMedia) return false;
