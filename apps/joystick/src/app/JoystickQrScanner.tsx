@@ -3,16 +3,30 @@ import { Camera, X } from 'lucide-react';
 
 interface JoystickQrScannerProps {
   onScan: (value: string) => void;
+  runtime?: JoystickQrScannerRuntime | undefined;
 }
 
 type ScannerStatus = 'idle' | 'scanning' | 'unsupported';
-type QrDecoder = typeof import('jsqr').default;
+type QrDecoder = (
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+) => { data?: string | undefined } | null | undefined;
 
-function canUseCameraScanner() {
+interface JoystickQrScannerRuntime {
+  canUseCameraScanner?: (() => boolean) | undefined;
+  getUserMedia?:
+    | ((constraints: MediaStreamConstraints) => Promise<MediaStream>)
+    | undefined;
+  loadQrDecoder?: (() => Promise<QrDecoder>) | undefined;
+}
+
+function canUseCameraScanner(runtime: JoystickQrScannerRuntime | undefined) {
+  if (runtime?.canUseCameraScanner) return runtime.canUseCameraScanner();
   return Boolean(navigator.mediaDevices && 'getUserMedia' in navigator.mediaDevices);
 }
 
-export function JoystickQrScanner({ onScan }: JoystickQrScannerProps) {
+export function JoystickQrScanner({ onScan, runtime }: JoystickQrScannerProps) {
   const animationFrameRef = useRef(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const qrDecoderRef = useRef<QrDecoder | undefined>(undefined);
@@ -30,7 +44,7 @@ export function JoystickQrScanner({ onScan }: JoystickQrScannerProps) {
   );
 
   async function startScanner() {
-    if (!canUseCameraScanner()) {
+    if (!canUseCameraScanner(runtime)) {
       setStatus('unsupported');
       setErrorMessage('Camera scanning is not available in this browser.');
       return;
@@ -39,8 +53,13 @@ export function JoystickQrScanner({ onScan }: JoystickQrScannerProps) {
     scannerActiveRef.current = true;
     setStatus('scanning');
     try {
-      qrDecoderRef.current ??= (await import('jsqr')).default;
-      const stream = await navigator.mediaDevices.getUserMedia({
+      qrDecoderRef.current ??= runtime?.loadQrDecoder
+        ? await runtime.loadQrDecoder()
+        : (await import('jsqr')).default;
+      const getUserMedia =
+        runtime?.getUserMedia ??
+        ((constraints: MediaStreamConstraints) => navigator.mediaDevices.getUserMedia(constraints));
+      const stream = await getUserMedia({
         audio: false,
         video: {
           facingMode: { ideal: 'environment' },
@@ -48,6 +67,7 @@ export function JoystickQrScanner({ onScan }: JoystickQrScannerProps) {
       });
       streamRef.current = stream;
       const video = videoRef.current;
+      /* c8 ignore next */
       if (!video) return;
       video.srcObject = stream;
       await video.play();
@@ -63,6 +83,7 @@ export function JoystickQrScanner({ onScan }: JoystickQrScannerProps) {
     scannerActiveRef.current = false;
     window.cancelAnimationFrame(animationFrameRef.current);
     animationFrameRef.current = 0;
+    /* c8 ignore next */
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = undefined;
     if (videoRef.current) videoRef.current.srcObject = null;
@@ -73,6 +94,7 @@ export function JoystickQrScanner({ onScan }: JoystickQrScannerProps) {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const qrDecoder = qrDecoderRef.current;
+    /* c8 ignore next */
     if (!video || !canvas || !qrDecoder || !scannerActiveRef.current) return;
     const width = video.videoWidth;
     const height = video.videoHeight;

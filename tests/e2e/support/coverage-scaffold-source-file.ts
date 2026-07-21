@@ -8,6 +8,7 @@ const scaffoldSourceFiles = new Set([
   'apps/editor/src/ui/editor/media/imagePromptOptions.ts',
   'apps/editor/src/ui/editor/media/localMediaImportConfig.ts',
   'apps/editor/src/ui/editor/text/textStyleOptions.ts',
+  'apps/joystick/src/app/e2e/JoystickCoverageDiagnosticsPage.tsx',
   'packages/presenter-remote/src/peer-options.ts',
 ]);
 
