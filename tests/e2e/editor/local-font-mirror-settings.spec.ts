@@ -79,12 +79,12 @@ test.describe('local font mirror settings', () => {
 
     const storedKeys = Array.from(storedObjects.keys());
     const mirroredFontKey = storedKeys.find(
-      (key) => key.includes('/public-shares/') && key.includes('/fonts/font-acme-sans-'),
+      (key) => key.includes('/fonts/font-acme-sans-'),
     );
-    expect(mirroredFontKey).toMatch(/public-shares\/.+\/fonts\/font-acme-sans-\d+-acmesans-regular-woff2\.woff2$/);
+    expect(mirroredFontKey).toMatch(/mirrors\/.+\/fonts\/font-acme-sans-\d+-acmesans-regular-woff2\.woff2$/);
     expect(storedKeys.some((key) => key.includes('/fonts/uploaded-font-'))).toBe(false);
 
-    const shareKey = storedKeys.find((key) => key.endsWith('/share.json'));
+    const shareKey = storedKeys.find((key) => key.match(/\/shares\/.+\.json$/));
     expect(shareKey).toBeTruthy();
     const sharePayload = JSON.parse(storedObjects.get(shareKey!)!.body.toString()) as {
       project: { fonts?: Record<string, { fileName: string; objectUrl: string; storage: string }> };
