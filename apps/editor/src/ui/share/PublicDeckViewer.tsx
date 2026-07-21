@@ -28,7 +28,10 @@ import { modelSetupService } from '../../services/model-setup/modelSetupService'
 import { browserPromptService } from '../../services/prompting/browserPromptService';
 import { webGpuTextGenerationRuntime } from '../../services/prompting/webGpuTextGenerationRuntime';
 import { TranscriptQuestionAnsweringService } from '../../services/transcription/transcriptQuestionAnsweringService';
-import type { TranscriptAnswer } from '../../services/transcription/transcriptQuestionAnsweringService';
+import type {
+  TranscriptAnswer,
+  TranscriptQuestionContext,
+} from '../../services/transcription/transcriptQuestionAnsweringService';
 import { CanvasWorkspace } from '../editor/canvas/CanvasWorkspace';
 import { ProjectVideoPreloader } from '../editor/media/ProjectVideoPreloader';
 import { MiniPagePreview } from '../editor/panels/PageMiniPreview';
@@ -88,6 +91,28 @@ function formatTranscriptTimestamp(milliseconds: number) {
 
 function getTranscriptRecordings(project: ProjectDocument): TranscriptRecording[] {
   return Object.values(project.recordings ?? {}).filter((recording) => recording.segments.length > 0);
+}
+
+function getTranscriptQuestionContext(
+  project: ProjectDocument,
+  page: Page,
+  pageIndex: number,
+): TranscriptQuestionContext {
+  const text = page.elementIds.flatMap((elementId) => {
+    const element = project.elements[elementId];
+    if (element?.type !== 'text' || element.visible === false || !element.text.trim()) return [];
+    return [element.text.trim()];
+  });
+  return {
+    currentSlide: {
+      id: page.id,
+      index: pageIndex,
+      name: page.name,
+      ...(page.speakerNotes ? { speakerNotes: page.speakerNotes } : {}),
+      text,
+      totalSlides: project.pages.length,
+    },
+  };
 }
 
 function getRecordingTimePercent(currentMs: number, durationMs: number) {
@@ -1744,6 +1769,11 @@ export function PublicDeckViewer({
   const canGoPrevious = activePageIndex > 0;
   const canGoNext = activePageIndex < project.pages.length - 1;
   const transcriptRecordings = getTranscriptRecordings(project);
+  const transcriptQuestionContext = getTranscriptQuestionContext(
+    project,
+    activePage,
+    activePageIndex,
+  );
   const hasTranscriptRecordings = transcriptRecordings.length > 0;
   const showPlaybackOverlay = hasTranscriptRecordings && !embed;
   const readyViewerClassName = [
@@ -1867,9 +1897,11 @@ export function PublicDeckViewer({
       const answer = await transcriptQaServiceRef.current.answer(
         trimmedQuestion,
         transcriptRecordings,
+        transcriptQuestionContext,
       );
       if (transcriptAnswerRunIdRef.current !== runId) return;
       setTranscriptAnswer(answer);
+      setTranscriptQuestion('');
       setTranscriptAnswerStatus('idle');
     } catch (error) {
       if (transcriptAnswerRunIdRef.current !== runId) return;

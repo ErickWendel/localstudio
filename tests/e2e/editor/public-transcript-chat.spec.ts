@@ -173,10 +173,12 @@ test.describe('editor public transcript chat journey', () => {
           create: () =>
             Promise.resolve({
               destroy() {},
-              prompt: () =>
-                Promise.resolve(
+              prompt: (prompt: string) => {
+                Object.assign(window, { __lastTranscriptPrompt: prompt });
+                return Promise.resolve(
                   'The transcript says podcast mode uses slide chapters so viewers can jump to the right section.',
-                ),
+                );
+              },
             }),
         },
       });
@@ -329,7 +331,35 @@ test.describe('editor public transcript chat journey', () => {
     await expect(page.getByText('The transcript says podcast mode uses slide chapters')).toBeVisible({
       timeout: 10_000,
     });
+    await expect(page.getByRole('textbox', { name: 'Question for transcript chat' })).toBeEmpty();
     await expect(page.locator('.public-transcript-answer span').first()).toHaveText('0:00');
+
+    await page.getByRole('button', { name: 'What was explained on the current slide?' }).click();
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            () =>
+              (window as typeof window & { __lastTranscriptPrompt?: string })
+                .__lastTranscriptPrompt,
+          ),
+        { timeout: 10_000 },
+      )
+      .toContain('Question: What was explained on the current slide?');
+    const currentSlidePrompt = await page.evaluate(
+      () =>
+        (window as typeof window & { __lastTranscriptPrompt?: string }).__lastTranscriptPrompt ?? '',
+    );
+    expect(currentSlidePrompt).toContain('Slide 2 of 2');
+    expect(currentSlidePrompt).toContain('Name: Closing');
+    expect(currentSlidePrompt).toContain('Shared deck closing');
+    expect(currentSlidePrompt).toContain(
+      'Podcast mode uses slide chapters so viewers can jump to the right section.',
+    );
+    expect(currentSlidePrompt).toContain(
+      'The public deck keeps the transcript searchable alongside playback.',
+    );
+    expect(currentSlidePrompt).toContain('Question: What was explained on the current slide?');
 
     await page
       .getByRole('textbox', { name: 'Question for transcript chat' })
