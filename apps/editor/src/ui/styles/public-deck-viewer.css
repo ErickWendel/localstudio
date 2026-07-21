@@ -83,6 +83,38 @@
   border-radius: 0;
 }
 
+.public-deck-viewer-slide-fullscreen {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  padding: 0;
+  background: #000;
+}
+
+.public-deck-viewer-slide-fullscreen .public-deck-stage-shell {
+  width: 100vw;
+  height: 100vh;
+  min-height: 100vh;
+}
+
+.public-deck-viewer-slide-fullscreen .public-deck-stage-shell .ew-viewport-stage {
+  width: 100vw;
+  height: 100vh;
+}
+
+.public-deck-viewer-slide-fullscreen .public-deck-stage-shell .canvas-frame {
+  width: min(100vw, calc(100vh * 16 / 9));
+  max-height: 100vh;
+}
+
+.public-deck-viewer-slide-fullscreen .public-deck-playback-overlay,
+.public-deck-viewer-slide-fullscreen .public-deck-controls,
+.public-deck-viewer-slide-fullscreen .public-deck-slide-dots,
+.public-deck-viewer-slide-fullscreen .public-transcript-panel,
+.public-deck-viewer-slide-fullscreen .public-deck-caption-overlay {
+  display: none;
+}
+
 .public-deck-viewer-embed .public-deck-stage-shell .canvas-frame {
   width: 100%;
   max-height: calc(100vh - 58px);

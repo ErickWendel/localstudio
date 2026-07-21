@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ChangeEvent as ReactChangeEvent, PointerEvent as ReactPointerEvent } from 'react';
-import { Captions, Mic, MonitorUp, Square } from 'lucide-react';
+import { AlertTriangle, Captions, Languages, Mic, MonitorUp, Square } from 'lucide-react';
 import type {
   Page,
   ProjectDocument,
@@ -178,6 +178,16 @@ function isTranscriptWindowReadyMessage(value: unknown) {
   return (
     record.source === 'localstudio-presenter-transcript-window' &&
     record.type === 'ready' &&
+    typeof record.sessionId === 'string'
+  );
+}
+
+function isTranscriptWindowClosedMessage(value: unknown) {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return (
+    record.source === 'localstudio-presenter-transcript-window' &&
+    record.type === 'closed' &&
     typeof record.sessionId === 'string'
   );
 }
@@ -567,19 +577,6 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
   );
 
   useEffect(() => {
-    const channel = transcriptChannelRef.current;
-    if (!channel) return undefined;
-    channel.onmessage = (event: MessageEvent<unknown>) => {
-      if (!isTranscriptWindowReadyMessage(event.data)) return;
-      if ((event.data as { sessionId: string }).sessionId !== resolvedSessionId) return;
-      publishTranscriptState();
-    };
-    return () => {
-      if (channel.onmessage) channel.onmessage = null;
-    };
-  }, [publishTranscriptState, resolvedSessionId]);
-
-  useEffect(() => {
     if (recordingStatus !== 'recording') return;
     const currentPage = activePageMetadataRef.current;
     const lastMarker = slideTranscriptMarkersRef.current.at(-1);
@@ -716,27 +713,41 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     updateLiveTranscript,
   ]);
 
-  const openTranscriptWindow = useCallback(async () => {
-    let transcriptWindow: Window | null = null;
-    if (recordingStatus !== 'recording') {
-      transcriptWindow = window.open(
-        'about:blank',
-        `localstudio-transcript-${resolvedSessionId}`,
-        'popup,width=900,height=760',
-      );
-      const started = await startRecording();
-      if (!started) {
-        transcriptWindow?.close();
+  useEffect(() => {
+    const channel = transcriptChannelRef.current;
+    if (!channel) return undefined;
+    channel.onmessage = (event: MessageEvent<unknown>) => {
+      if (isTranscriptWindowReadyMessage(event.data)) {
+        if ((event.data as { sessionId: string }).sessionId !== resolvedSessionId) return;
+        publishTranscriptState();
         return;
       }
+      if (!isTranscriptWindowClosedMessage(event.data)) return;
+      if ((event.data as { sessionId: string }).sessionId !== resolvedSessionId) return;
+      if (recordingStatus === 'recording') {
+        void stopRecording();
+      }
+    };
+    return () => {
+      if (channel.onmessage) channel.onmessage = null;
+    };
+  }, [publishTranscriptState, recordingStatus, resolvedSessionId, stopRecording]);
+
+  const openTranscriptWindow = useCallback(async () => {
+    if (recordingStatus !== 'recording') {
+      setRecordingError('You should choose your microphone first.');
+      const started = await startRecording();
+      if (started) {
+        setRecordingError('You should choose your microphone first. Click live transcription again after choosing your microphone.');
+      }
+      return;
     }
-    if (!transcriptWindow || transcriptWindow.closed) {
-      transcriptWindow = window.open(
-        'about:blank',
-        `localstudio-transcript-${resolvedSessionId}`,
-        'popup,width=900,height=760',
-      );
-    }
+    setRecordingError(undefined);
+    const transcriptWindow = window.open(
+      'about:blank',
+      `localstudio-transcript-${resolvedSessionId}`,
+      'popup,width=900,height=760',
+    );
     if (!transcriptWindow) {
       setRecordingError('Live transcription window was blocked by the browser.');
       return;
@@ -1154,21 +1165,24 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
             <span className="presenter-timer">{presenterRemoteTimerFormat.formatElapsed(elapsedMs)}</span>
           </div>
           <div className="presenter-controls ew-compact-row" aria-label="Presenter controls">
-            <label className="presenter-transcription-language">
-              <span>Language</span>
-              <select
-                aria-label="Transcription language"
-                disabled={recordingStatus === 'downloading' || recordingStatus === 'transcribing'}
-                value={selectedTranscriptionLanguage.code}
-                onChange={handleTranscriptionLanguageChange}
-              >
-                {TRANSLATION_LANGUAGE_OPTIONS.map((language) => (
-                  <option key={language.code} value={language.code}>
-                    {language.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="presenter-speaking-language">
+              <span className="presenter-speaking-language-prefix">I will speak in:</span>
+              <label className="presenter-transcription-language">
+                <Languages size={16} aria-hidden="true" />
+                <select
+                  aria-label="Transcription language"
+                  disabled={recordingStatus === 'downloading' || recordingStatus === 'transcribing'}
+                  value={selectedTranscriptionLanguage.code}
+                  onChange={handleTranscriptionLanguageChange}
+                >
+                  {TRANSLATION_LANGUAGE_OPTIONS.map((language) => (
+                    <option key={language.code} value={language.code}>
+                      {language.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
             <button
               className="stitch-icon-button presenter-control-button"
               type="button"
@@ -1262,17 +1276,26 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
             </button>
           </div>
         </header>
-        <div className="presenter-status-row" aria-label="Presenter status">
-          <span className="presenter-status-item ew-ellipsis">
-            Current: Slide {activePageIndex + 1} of {visiblePages.length}
-          </span>
-          <span className="presenter-status-item ew-ellipsis">
-            Builds remaining: {buildsRemaining}
-          </span>
-          <span className="presenter-status-item presenter-recording-status ew-ellipsis">
-            <Captions size={18} aria-hidden="true" />
-            {recordingError ?? recordingStatusLabel}
-          </span>
+        <div className="presenter-status-stack" aria-label="Presenter status">
+          <div className="presenter-status-row">
+            <span className="presenter-status-item ew-ellipsis">
+              Current: Slide {activePageIndex + 1} of {visiblePages.length}
+            </span>
+            <span className="presenter-status-item ew-ellipsis">
+              Builds remaining: {buildsRemaining}
+            </span>
+            <span className="presenter-status-item presenter-recording-status ew-ellipsis">
+              <Captions size={18} aria-hidden="true" />
+              {recordingStatusLabel}
+              {recordingError ? <span className="presenter-sr-status-warning">{recordingError}</span> : null}
+            </span>
+          </div>
+          {recordingError ? (
+            <div className="presenter-recording-alert" role="alert">
+              <AlertTriangle size={18} aria-hidden="true" />
+              <span>{recordingError}</span>
+            </div>
+          ) : null}
         </div>
         <section
           className="presenter-stage"

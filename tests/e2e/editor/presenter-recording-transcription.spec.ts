@@ -4,6 +4,8 @@ import { presenterRouteStartup } from './presenter-route-startup';
 const getServer = withIsolatedDevServer(test);
 
 test.describe('editor presenter recording transcription journey', () => {
+  test.describe.configure({ mode: 'serial' });
+
   test('shows microphone permission errors from presenter recording controls', async ({ page }) => {
     await page.addInitScript(() => {
       Object.defineProperty(navigator, 'mediaDevices', {
@@ -148,6 +150,14 @@ test.describe('editor presenter recording transcription journey', () => {
     await expect(page.getByRole('combobox', { name: 'Transcription language' })).toHaveValue('pt');
     await page.getByRole('combobox', { name: 'Transcription language' }).selectOption('en');
 
+    await page.getByRole('button', { name: 'Open live transcription window' }).click();
+    await expect(page.getByLabel('Presenter status')).toContainText(/choose your microphone first/i, {
+      timeout: 10_000,
+    });
+    await expect(page.getByRole('alert')).toContainText(/choose your microphone first/i);
+    await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible({
+      timeout: 10_000,
+    });
     const transcriptPopupPromise = page.waitForEvent('popup');
     await page.getByRole('button', { name: 'Open live transcription window' }).click();
     const transcriptPage = await transcriptPopupPromise;
@@ -212,11 +222,11 @@ test.describe('editor presenter recording transcription journey', () => {
       '[Slide 2] Continuing on the second slide with local audio playback.',
     );
 
-    await page.getByRole('button', { name: 'Stop recording' }).click();
-    await expect(page.getByLabel('Presenter status')).toContainText('Recording saved', {
-      timeout: 10_000,
+    await transcriptPage.evaluate(() => {
+      window.dispatchEvent(new Event('pagehide'));
     });
-    await expect(transcriptPage.getByLabel(/Transcription status saved/)).toBeVisible({
+    await transcriptPage.close();
+    await expect(page.getByLabel('Presenter status')).toContainText('Recording saved', {
       timeout: 10_000,
     });
 

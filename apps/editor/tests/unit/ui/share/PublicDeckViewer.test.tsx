@@ -13,6 +13,7 @@ import { PublicDeckViewer } from '../../../../src/ui/share/PublicDeckViewer';
 
 describe('PublicDeckViewer', () => {
   let preloadedVideoUrls: string[];
+  let fullscreenElement: Element | null;
 
   class MockPreloadImage extends EventTarget {
     naturalHeight = 480;
@@ -45,6 +46,7 @@ describe('PublicDeckViewer', () => {
 
   beforeEach(() => {
     preloadedVideoUrls = [];
+    fullscreenElement = null;
     window.history.replaceState({}, '', '/');
     vi.stubGlobal('Image', MockPreloadImage);
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(null, { status: 204 }))));
@@ -72,6 +74,26 @@ describe('PublicDeckViewer', () => {
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
       configurable: true,
       value: vi.fn(),
+    });
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      get: () => fullscreenElement,
+    });
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+      configurable: true,
+      value: vi.fn(() => {
+        fullscreenElement = document.querySelector('[aria-label="Public presentation"]');
+        document.dispatchEvent(new Event('fullscreenchange'));
+        return Promise.resolve();
+      }),
+    });
+    Object.defineProperty(document, 'exitFullscreen', {
+      configurable: true,
+      value: vi.fn(() => {
+        fullscreenElement = null;
+        document.dispatchEvent(new Event('fullscreenchange'));
+        return Promise.resolve();
+      }),
     });
   });
 
@@ -204,7 +226,7 @@ describe('PublicDeckViewer', () => {
 
     await screen.findByLabelText('Public presentation');
     expect(screen.getByRole('region', { name: 'Presentation playback' })).toBeInTheDocument();
-    const audio = document.querySelector('audio');
+    let audio = document.querySelector('audio');
     expect(audio).toBeInstanceOf(HTMLAudioElement);
     expect(screen.getByRole('button', { name: 'Jump to slide 1: Slide 1' })).toHaveStyle({
       '--public-deck-chapter-preview-left': '0px',
@@ -226,6 +248,19 @@ describe('PublicDeckViewer', () => {
     expect(document.querySelector('.public-deck-playback-progress')).toHaveStyle({
       '--public-deck-progress': '25%',
     });
+    await user.click(screen.getByRole('button', { name: 'Present slide fullscreen' }));
+    expect(screen.getByLabelText('Public presentation')).toHaveClass(
+      'public-deck-viewer-slide-fullscreen',
+    );
+    expect(screen.queryByRole('region', { name: 'Presentation playback' })).not.toBeInTheDocument();
+    act(() => {
+      void document.exitFullscreen();
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('region', { name: 'Presentation playback' })).toBeInTheDocument();
+    });
+    audio = document.querySelector('audio');
+    expect(audio).toBeInstanceOf(HTMLAudioElement);
     await user.click(screen.getByRole('button', { name: 'Play presentation audio' }));
     expect(screen.getByRole('button', { name: 'Pause presentation audio' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Show captions' }));
@@ -243,7 +278,9 @@ describe('PublicDeckViewer', () => {
     expect(screen.getByRole('button', { name: 'Open slide 3: Slide 3' })).toBeInTheDocument();
     expect(screen.getByText('Podcast mode')).toBeInTheDocument();
     expect(screen.getByLabelText('Podcast recording')).toHaveValue('recording1');
-    expect(screen.getByLabelText('Podcast audio time')).toHaveTextContent('0:010:02');
+    await waitFor(() => {
+      expect(screen.getByLabelText('Podcast audio time')).toHaveTextContent('0:010:02');
+    });
     expect(screen.queryByLabelText('Presenter recording audio')).not.toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: 'Ask' })).not.toBeInTheDocument();
     expect(screen.getByRole('form', { name: 'Transcript question prompt' })).toHaveClass('prompt-bar');
@@ -258,12 +295,36 @@ describe('PublicDeckViewer', () => {
     expect(panelAudio?.currentTime).toBe(0);
     await user.click(screen.getByRole('button', { name: 'Play slide 2' }));
     expect(panelAudio?.currentTime).toBe(1.2);
-    expect(screen.getByText('2 / 3')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('2 / 3')).toBeInTheDocument();
+    });
     expect(screen.getByRole('button', { name: 'Pause slide 2' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Pause presentation audio' })).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(audio?.currentTime).toBe(1.2);
+    });
+    act(() => {
+      if (!panelAudio) return;
+      panelAudio.currentTime = 2.4;
+      panelAudio.dispatchEvent(new Event('timeupdate'));
+    });
+    await waitFor(() => {
+      expect(screen.getByText('0:02 / 0:02')).toBeInTheDocument();
+    });
     await user.click(
       screen.getByRole('button', { name: 'Play transcript segment for slide 2 at 0:01' }),
     );
     expect(panelAudio?.currentTime).toBe(1.2);
+    act(() => {
+      if (!audio) return;
+      audio.currentTime = 2.4;
+      audio.dispatchEvent(new Event('timeupdate'));
+    });
+    await waitFor(() => {
+      expect(screen.getByLabelText('Podcast audio time')).toHaveTextContent('0:020:02');
+    });
     expect(
       screen
         .getByRole('button', { name: 'Play transcript segment for slide 2 at 0:01' })

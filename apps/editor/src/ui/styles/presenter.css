@@ -29,7 +29,7 @@
   min-height: 0;
   min-width: 0;
   display: grid;
-  grid-template-rows: 70px 44px minmax(0, 1fr) minmax(120px, 21vh);
+  grid-template-rows: 70px auto minmax(0, 1fr) minmax(120px, 21vh);
 }
 
 .presenter-topbar {
@@ -78,23 +78,42 @@
   background: var(--ew-panel);
 }
 
-.presenter-transcription-language {
+.presenter-speaking-language {
   height: 40px;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 10px 0 12px;
+  gap: 0;
+  overflow: hidden;
   border: 1px solid var(--ew-border);
   border-radius: 6px;
   background: var(--ew-panel);
+}
+
+.presenter-speaking-language-prefix {
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
   color: var(--ew-muted);
   font-size: 11px;
   font-weight: 900;
   text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.presenter-transcription-language {
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-left: 1px solid var(--ew-border);
+  padding: 0 10px;
+  color: var(--ew-green);
+  background: rgba(55, 253, 118, 0.05);
 }
 
 .presenter-transcription-language select {
-  width: 138px;
+  width: 132px;
   border: 0;
   color: var(--ew-text);
   background: transparent;
@@ -103,13 +122,19 @@
   outline: none;
 }
 
+.presenter-status-stack {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  padding: 0 36px 8px;
+}
+
 .presenter-status-row {
   min-width: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 0 36px 8px;
   color: var(--ew-text);
   font-size: 20px;
   font-weight: 800;
@@ -124,6 +149,39 @@
   min-width: 220px;
   color: var(--ls-cyan);
   font-size: 14px;
+}
+
+.presenter-sr-status-warning {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.presenter-recording-alert {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid rgba(34, 211, 238, 0.38);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #dffbff;
+  background:
+    linear-gradient(135deg, rgba(34, 211, 238, 0.14), rgba(55, 253, 118, 0.08)),
+    rgba(4, 18, 20, 0.96);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.presenter-recording-alert svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--ls-cyan);
 }
 
 .presenter-transcript-window {

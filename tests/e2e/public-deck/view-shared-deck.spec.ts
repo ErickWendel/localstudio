@@ -7,6 +7,25 @@ const getServer = withIsolatedDevServer(test);
 test.describe('public deck view journey', () => {
   test('views shared and embedded decks through mocked public payloads', async ({ page }) => {
     await page.addInitScript(() => {
+      Object.defineProperty(document, 'fullscreenElement', {
+        configurable: true,
+        get() {
+          return (window as Window & { __localstudioFullscreenElement?: Element | null })
+            .__localstudioFullscreenElement ?? null;
+        },
+      });
+      Element.prototype.requestFullscreen = function requestFullscreen() {
+        (window as Window & { __localstudioFullscreenElement?: Element | null })
+          .__localstudioFullscreenElement = document.querySelector('[aria-label="Public presentation"]');
+        document.dispatchEvent(new Event('fullscreenchange'));
+        return Promise.resolve();
+      };
+      document.exitFullscreen = function exitFullscreen() {
+        (window as Window & { __localstudioFullscreenElement?: Element | null })
+          .__localstudioFullscreenElement = null;
+        document.dispatchEvent(new Event('fullscreenchange'));
+        return Promise.resolve();
+      };
       Object.defineProperty(HTMLMediaElement.prototype, 'duration', {
         configurable: true,
         get() {
@@ -113,6 +132,11 @@ test.describe('public deck view journey', () => {
       'style',
       /--public-deck-chapter-preview-left: 100%/,
     );
+    await page.getByRole('button', { name: 'Present slide fullscreen' }).click();
+    await expect(page.getByLabel('Public presentation')).toHaveClass(/public-deck-viewer-slide-fullscreen/);
+    await expect(page.getByRole('region', { name: 'Presentation playback' })).toBeHidden();
+    await page.evaluate(() => document.exitFullscreen());
+    await expect(page.getByRole('region', { name: 'Presentation playback' })).toBeVisible();
     await page.getByRole('button', { name: 'Open transcript chat' }).click();
     const transcriptPanel = page.getByRole('complementary', { name: 'Transcript chat' });
     await expect(transcriptPanel).toBeVisible();
@@ -124,6 +148,13 @@ test.describe('public deck view journey', () => {
     await expect(page.getByText('2 / 3')).toBeVisible();
     await transcriptPanel.getByRole('button', { name: 'Play slide 2' }).click();
     await expect(transcriptPanel.getByRole('button', { name: 'Pause slide 2' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Pause presentation audio' })).toBeVisible();
+    await expect(page.getByText('0:01 / 0:02')).toBeVisible();
+    await page.locator('audio').nth(1).evaluate((audio: HTMLAudioElement) => {
+      audio.currentTime = 2.2;
+      audio.dispatchEvent(new Event('timeupdate'));
+    });
+    await expect(page.getByText('0:02 / 0:02')).toBeVisible();
     await expect(page.getByText('2 / 3')).toBeVisible();
     await transcriptPanel.getByRole('button', { name: 'Open slide 1: Opening' }).click();
     await expect(page.getByText('1 / 3')).toBeVisible();

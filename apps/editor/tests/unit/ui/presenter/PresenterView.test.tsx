@@ -143,6 +143,7 @@ describe('PresenterView', () => {
     expect(screen.getByText('Current: Slide 1 of 4')).toBeInTheDocument();
     expect(screen.getByText('Builds remaining: 1')).toBeInTheDocument();
     expect(screen.queryByLabelText('Transcription model preset')).not.toBeInTheDocument();
+    expect(screen.getByText('I will speak in:')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Transcription language' })).toHaveValue('en');
     expect(screen.getByRole('button', { name: 'Start recording' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open live transcription window' })).toBeInTheDocument();

@@ -121,6 +121,35 @@ describe('SharePanel', () => {
     expect(screen.getByText('Copied')).toBeInTheDocument();
   });
 
+  it('lets speakers choose which saved recording is published with the public link', async () => {
+    const user = userEvent.setup();
+    const onCopyLink = vi.fn().mockResolvedValue(createShareMetadata({ status: 'copied' }));
+
+    render(
+      <SharePanel
+        projectName="Untitled AI Deck"
+        recordingOptions={[
+          { id: 'recording-new', label: 'Presenter recording 2', segmentCount: 3 },
+          { id: 'recording-old', label: 'Presenter recording 1', segmentCount: 2 },
+        ]}
+        onClose={vi.fn()}
+        onCopyLink={onCopyLink}
+        onDownload={vi.fn()}
+        onPresent={vi.fn()}
+      />,
+    );
+
+    const recordingPicker = screen.getByLabelText('Recording for public share');
+    expect(recordingPicker).toHaveValue('recording-new');
+
+    await user.selectOptions(recordingPicker, 'recording-old');
+    await user.click(screen.getByRole('button', { name: 'Copy link' }));
+
+    await waitFor(() => {
+      expect(onCopyLink).toHaveBeenCalledWith('recording-old');
+    });
+  });
+
   it('copies embed code without the Clipboard permissions API', async () => {
     const user = userEvent.setup();
     const writeText = vi.fn().mockResolvedValue(undefined);

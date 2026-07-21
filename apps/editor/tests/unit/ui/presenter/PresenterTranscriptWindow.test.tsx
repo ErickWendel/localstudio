@@ -93,5 +93,12 @@ describe('PresenterTranscriptWindow', () => {
     expect(screen.queryByText('[Slide 1] Opening remarks.')).not.toBeInTheDocument();
     expect(screen.queryByText('[Slide 2] Follow-up details.')).not.toBeInTheDocument();
     expect(scrollIntoView).toHaveBeenCalledWith({ block: 'end' });
+
+    window.dispatchEvent(new Event('pagehide'));
+    expect(channels[0]?.postMessage).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      source: 'localstudio-presenter-transcript-window',
+      type: 'closed',
+    });
   });
 });

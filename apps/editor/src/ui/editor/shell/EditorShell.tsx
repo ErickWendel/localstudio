@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type Konva from 'konva';
 import type { AppServices } from '../../../app/composition';
+import type { ProjectDocument } from '../../../domain/documents/model';
 import { pageVisibility } from '../../../domain/documents/pageVisibility';
 import type { ShareMetadata } from '../../../services/contracts/interfaces';
 import { editorAutomationController } from '../../../services/automation/editorAutomationController';
@@ -53,6 +54,21 @@ interface EditorShellProps {
 }
 
 const editorMobileViewportQuery = '(max-width: 760px)';
+
+function createProjectForSelectedShareRecording(
+  project: ProjectDocument,
+  selectedRecordingId?: string,
+): ProjectDocument {
+  if (!selectedRecordingId) return project;
+  const selectedRecording = project.recordings?.[selectedRecordingId];
+  if (!selectedRecording) return project;
+  return {
+    ...project,
+    recordings: {
+      [selectedRecordingId]: selectedRecording,
+    },
+  };
+}
 
 function isMobileEditorViewport() {
   if (typeof window === 'undefined' || !window.matchMedia) return false;
@@ -134,7 +150,10 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const imageExportNoticeTimeoutRef = useRef<number | undefined>(undefined);
   const presenterFullscreenEnteredRef = useRef(false);
   const pendingShareAfterLocalSaveRef = useRef(false);
-  const sharePublishPromiseRef = useRef<Promise<ShareMetadata> | undefined>(undefined);
+  const sharePublishPromiseRef = useRef<{
+    promise: Promise<ShareMetadata>;
+    selectedRecordingId?: string | undefined;
+  } | undefined>(undefined);
   const toolbarImageInputRef = useRef<HTMLInputElement>(null);
   const hasSelection = vm.selection.elementIds.length > 0;
   const isHistoryReadOnly = vm.versionHistoryOpen;
@@ -155,9 +174,23 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const publicSharingAvailable = vm.mirrorState.enabled && vm.mirrorState.status === 'synced';
   const publicSharingUnavailableReason = 'Public links cannot be created without remote storage.';
   const hasDirectoryPersistence = services.persistenceMode === 'directory';
+  const shareRecordingOptions = Object.values(vm.project.recordings ?? {})
+    .filter((recording) => recording.audio.objectUrl && recording.segments.length > 0)
+    .sort((first, second) => Date.parse(second.createdAt) - Date.parse(first.createdAt))
+    .map((recording) => ({
+      id: recording.id,
+      label: recording.name,
+      segmentCount: recording.segments.length,
+    }));
 
-  const publishCurrentProjectShare = useCallback(async () => {
-    if (sharePublishPromiseRef.current) return sharePublishPromiseRef.current;
+  const publishCurrentProjectShare = useCallback(async (selectedRecordingId?: string) => {
+    const inFlightSharePublish = sharePublishPromiseRef.current;
+    if (inFlightSharePublish && inFlightSharePublish.selectedRecordingId === selectedRecordingId) {
+      return inFlightSharePublish.promise;
+    }
+    if (inFlightSharePublish) {
+      await inFlightSharePublish.promise.catch(() => undefined);
+    }
     const preparedShare = services.shareService.getProjectShareMetadata(vm.project);
     const shareId = shareMetadata?.shareId ?? preparedShare.shareId;
     setShareMetadata((current) => ({
@@ -168,9 +201,12 @@ function EditorDesktopShell({ services }: EditorShellProps) {
 
     const publishPromise = (async () => {
       const fontResult = await prepareProjectFontsForPublicShareRef.current();
-      return services.shareService.updateShare(shareId, fontResult.project);
+      return services.shareService.updateShare(
+        shareId,
+        createProjectForSelectedShareRecording(fontResult.project, selectedRecordingId),
+      );
     })();
-    sharePublishPromiseRef.current = publishPromise;
+    sharePublishPromiseRef.current = { promise: publishPromise, selectedRecordingId };
     try {
       const nextShare = await publishPromise;
       setShareMetadata(nextShare);
@@ -179,7 +215,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       setShareMetadata((current) => (current ? { ...current, status: 'sync-failed' } : current));
       throw error;
     } finally {
-      if (sharePublishPromiseRef.current === publishPromise) {
+      if (sharePublishPromiseRef.current?.promise === publishPromise) {
         sharePublishPromiseRef.current = undefined;
       }
     }
@@ -286,11 +322,8 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     window.open(url.toString(), '_blank', 'noopener,noreferrer');
   }
 
-  async function copyPublicShareLink() {
-    const preparedShare =
-      shareMetadata?.status === 'published' || shareMetadata?.status === 'copied'
-        ? shareMetadata
-        : await publishCurrentProjectShare();
+  async function copyPublicShareLink(selectedRecordingId?: string) {
+    const preparedShare = await publishCurrentProjectShare(selectedRecordingId);
     const copiedShare: ShareMetadata = { ...preparedShare, status: 'copied' };
     setShareMetadata(copiedShare);
     copyShareText(copiedShare.publicUrl);
@@ -1468,6 +1501,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       {sharePanelOpen ? (
         <SharePanel
           projectName={vm.project.name}
+          recordingOptions={shareRecordingOptions}
           share={shareMetadata}
           onClose={() => {
             setSharePanelOpen(false);

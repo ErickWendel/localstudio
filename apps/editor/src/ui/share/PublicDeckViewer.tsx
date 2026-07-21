@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { Captions, ListMusic, Pause, Play, SendHorizontal, Square, X } from 'lucide-react';
+import { Captions, ListMusic, Maximize2, Pause, Play, SendHorizontal, Square, X } from 'lucide-react';
 import type {
   ElementAnimationBuild,
   Page,
@@ -47,6 +47,16 @@ interface PublicPodcastChapter {
   pageIndex: number;
   pageName: string;
   startMs: number;
+}
+
+type PublicPlaybackSource = 'overlay' | 'podcast';
+
+interface PublicPlaybackSync {
+  currentTimeMs: number;
+  durationMs: number;
+  playing: boolean;
+  recordingId: string;
+  source: PublicPlaybackSource;
 }
 
 function formatTranscriptTimestamp(milliseconds: number) {
@@ -400,12 +410,16 @@ function PublicTranscriptPromptComposer({
 function PublicTranscriptPodcastPlayer({
   activePageIndex,
   onSelectPage,
+  onPlaybackSync,
+  playbackSync,
   project,
   pages,
   recordings,
 }: {
   activePageIndex: number;
   onSelectPage: (pageIndex: number) => void;
+  onPlaybackSync: (sync: PublicPlaybackSync) => void;
+  playbackSync: PublicPlaybackSync | undefined;
   project: ProjectDocument;
   pages: Page[];
   recordings: TranscriptRecording[];
@@ -415,6 +429,7 @@ function PublicTranscriptPodcastPlayer({
   const [durationMs, setDurationMs] = useState(0);
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const suppressMediaSyncRef = useRef(false);
   const transcriptSegmentRefs = useRef(new Map<string, HTMLButtonElement>());
   const lastSyncedChapterIdRef = useRef<string | undefined>(undefined);
   const selectedRecording = useMemo(
@@ -447,6 +462,17 @@ function PublicTranscriptPodcastPlayer({
     [chapters],
   );
 
+  function publishPlaybackSync(nextTimeMs = currentTimeMs, nextPlaying = playing) {
+    if (!selectedRecording) return;
+    onPlaybackSync({
+      currentTimeMs: nextTimeMs,
+      durationMs: totalMs,
+      playing: nextPlaying,
+      recordingId: selectedRecording.id,
+      source: 'podcast',
+    });
+  }
+
   useEffect(() => {
     const audio = audioRef.current;
     if (audio) {
@@ -462,6 +488,28 @@ function PublicTranscriptPodcastPlayer({
     }, 0);
     return () => window.clearTimeout(timeoutId);
   }, [selectedRecording?.durationMs, selectedRecording?.id]);
+
+  useEffect(() => {
+    if (!playbackSync || playbackSync.source === 'podcast') return;
+    if (playbackSync.recordingId !== selectedRecording?.id) return;
+    const audio = audioRef.current;
+    if (audio && Math.abs(audio.currentTime * 1000 - playbackSync.currentTimeMs) > 250) {
+      audio.currentTime = playbackSync.currentTimeMs / 1000;
+    }
+    if (!playbackSync.playing && audio) {
+      suppressMediaSyncRef.current = true;
+      audio.pause();
+      window.setTimeout(() => {
+        suppressMediaSyncRef.current = false;
+      }, 0);
+    }
+    const timeoutId = window.setTimeout(() => {
+      setCurrentTimeMs(playbackSync.currentTimeMs);
+      setDurationMs(playbackSync.durationMs || selectedRecording?.durationMs || 0);
+      setPlaying(playbackSync.playing);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [playbackSync, selectedRecording?.durationMs, selectedRecording?.id]);
 
   useEffect(() => {
     if (playing || !activePageChapter) return;
@@ -497,10 +545,12 @@ function PublicTranscriptPodcastPlayer({
     const audio = audioRef.current;
     if (!audio) return;
     const nextCurrentTimeMs = Math.round(audio.currentTime * 1000);
-    setCurrentTimeMs(Math.min(nextCurrentTimeMs, selectedRecording?.durationMs ?? nextCurrentTimeMs));
+    const clampedCurrentTimeMs = Math.min(nextCurrentTimeMs, selectedRecording?.durationMs ?? nextCurrentTimeMs);
+    setCurrentTimeMs(clampedCurrentTimeMs);
     if (!selectedRecording?.durationMs && Number.isFinite(audio.duration) && audio.duration > 0) {
       setDurationMs(Math.round(audio.duration * 1000));
     }
+    publishPlaybackSync(clampedCurrentTimeMs, playing);
   }
 
   function syncIdleAudioToActivePageChapter(audio: HTMLAudioElement) {
@@ -517,6 +567,7 @@ function PublicTranscriptPodcastPlayer({
     if (playing) {
       audio.pause();
       setPlaying(false);
+      publishPlaybackSync(currentTimeMs, false);
       return;
     }
     if (activePageChapter) {
@@ -535,7 +586,12 @@ function PublicTranscriptPodcastPlayer({
     if (timeDifferenceMs > 250) {
       audio.currentTime = currentTimeMs / 1000;
     }
-    void audio.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+    void audio.play()
+      .then(() => {
+        setPlaying(true);
+        publishPlaybackSync(Math.round(audio.currentTime * 1000), true);
+      })
+      .catch(() => setPlaying(false));
   }
 
   function seekToChapter(chapter: PublicPodcastChapter) {
@@ -544,6 +600,7 @@ function PublicTranscriptPodcastPlayer({
     setCurrentTimeMs(chapter.startMs);
     lastSyncedChapterIdRef.current = chapter.id;
     onSelectPage(chapter.pageIndex);
+    publishPlaybackSync(chapter.startMs, playing);
   }
 
   function toggleChapterPlayback(chapter: PublicPodcastChapter) {
@@ -553,10 +610,16 @@ function PublicTranscriptPodcastPlayer({
     if (isActiveChapter && playing) {
       audio.pause();
       setPlaying(false);
+      publishPlaybackSync(currentTimeMs, false);
       return;
     }
     seekToChapter(chapter);
-    void audio.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+    void audio.play()
+      .then(() => {
+        setPlaying(true);
+        publishPlaybackSync(chapter.startMs, true);
+      })
+      .catch(() => setPlaying(false));
   }
 
   function playSegment(segment: TranscriptRecording['segments'][number], segmentIndex: number) {
@@ -569,7 +632,12 @@ function PublicTranscriptPodcastPlayer({
     const nextChapter = getPodcastChapterForPage(chapters, pageIndex);
     lastSyncedChapterIdRef.current = nextChapter?.id;
     onSelectPage(pageIndex);
-    void audio.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+    void audio.play()
+      .then(() => {
+        setPlaying(true);
+        publishPlaybackSync(nextTimeMs, true);
+      })
+      .catch(() => setPlaying(false));
   }
 
   function selectSlide(pageIndex: number) {
@@ -596,8 +664,15 @@ function PublicTranscriptPodcastPlayer({
         onLoadedMetadata={(event) => {
           if (!syncIdleAudioToActivePageChapter(event.currentTarget)) updateProgress();
         }}
-        onPause={() => setPlaying(false)}
-        onPlay={() => setPlaying(true)}
+        onPause={() => {
+          setPlaying(false);
+          if (suppressMediaSyncRef.current) return;
+          publishPlaybackSync(currentTimeMs, false);
+        }}
+        onPlay={() => {
+          setPlaying(true);
+          publishPlaybackSync(currentTimeMs, true);
+        }}
         onTimeUpdate={updateProgress}
       >
         <track kind="captions" />
@@ -619,7 +694,20 @@ function PublicTranscriptPodcastPlayer({
           <select
             aria-label="Podcast recording"
             value={selectedRecording.id}
-            onChange={(event) => setRecordingId(event.target.value)}
+            onChange={(event) => {
+              const nextRecordingId = event.target.value;
+              setRecordingId(nextRecordingId);
+              const nextRecording = recordings.find((recording) => recording.id === nextRecordingId);
+              if (nextRecording) {
+                onPlaybackSync({
+                  currentTimeMs: 0,
+                  durationMs: nextRecording.durationMs,
+                  playing: false,
+                  recordingId: nextRecording.id,
+                  source: 'podcast',
+                });
+              }
+            }}
           >
             {recordings.map((recording) => (
               <option key={recording.id} value={recording.id}>
@@ -650,6 +738,7 @@ function PublicTranscriptPodcastPlayer({
             const audio = audioRef.current;
             if (audio) audio.currentTime = nextSeconds;
             setCurrentTimeMs(nextSeconds * 1000);
+            publishPlaybackSync(nextSeconds * 1000, playing);
           }}
         />
       </div>
@@ -759,16 +848,22 @@ function PublicDeckPlaybackOverlay({
   activePageIndex,
   canGoNext,
   canGoPrevious,
+  onEnterSlideFullscreen,
   onOpenTranscript,
+  onPlaybackSync,
   onSelectPage,
+  playbackSync,
   project,
   recordings,
 }: {
   activePageIndex: number;
   canGoNext: boolean;
   canGoPrevious: boolean;
+  onEnterSlideFullscreen: () => void;
   onOpenTranscript: () => void;
+  onPlaybackSync: (sync: PublicPlaybackSync) => void;
   onSelectPage: (pageIndex: number) => void;
+  playbackSync: PublicPlaybackSync | undefined;
   project: ProjectDocument;
   recordings: TranscriptRecording[];
 }) {
@@ -777,10 +872,14 @@ function PublicDeckPlaybackOverlay({
   const [durationMs, setDurationMs] = useState(0);
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const suppressMediaSyncRef = useRef(false);
   const lastSyncedChapterIdRef = useRef<string | undefined>(undefined);
   const selectedRecording = useMemo(
-    () => recordings.find((recording) => recording.audio.objectUrl) ?? recordings[0],
-    [recordings],
+    () =>
+      recordings.find((recording) => recording.id === playbackSync?.recordingId) ??
+      recordings.find((recording) => recording.audio.objectUrl) ??
+      recordings[0],
+    [playbackSync?.recordingId, recordings],
   );
   const { pages } = project;
   const chapters = useMemo(
@@ -814,6 +913,17 @@ function PublicDeckPlaybackOverlay({
   const progressPercent =
     lastRecordedSlidePercent * (getRecordingTimePercent(currentTimeMs, totalMs) / 100);
 
+  function publishPlaybackSync(nextTimeMs = currentTimeMs, nextPlaying = playing) {
+    if (!selectedRecording) return;
+    onPlaybackSync({
+      currentTimeMs: nextTimeMs,
+      durationMs: totalMs,
+      playing: nextPlaying,
+      recordingId: selectedRecording.id,
+      source: 'overlay',
+    });
+  }
+
   useEffect(() => {
     const audio = audioRef.current;
     if (audio) {
@@ -829,6 +939,28 @@ function PublicDeckPlaybackOverlay({
     }, 0);
     return () => window.clearTimeout(timeoutId);
   }, [selectedRecording?.durationMs, selectedRecording?.id]);
+
+  useEffect(() => {
+    if (!playbackSync || playbackSync.source === 'overlay') return;
+    if (playbackSync.recordingId !== selectedRecording?.id) return;
+    const audio = audioRef.current;
+    if (audio && Math.abs(audio.currentTime * 1000 - playbackSync.currentTimeMs) > 250) {
+      audio.currentTime = playbackSync.currentTimeMs / 1000;
+    }
+    if (!playbackSync.playing && audio) {
+      suppressMediaSyncRef.current = true;
+      audio.pause();
+      window.setTimeout(() => {
+        suppressMediaSyncRef.current = false;
+      }, 0);
+    }
+    const timeoutId = window.setTimeout(() => {
+      setCurrentTimeMs(playbackSync.currentTimeMs);
+      setDurationMs(playbackSync.durationMs || selectedRecording?.durationMs || 0);
+      setPlaying(playbackSync.playing);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [playbackSync, selectedRecording?.durationMs, selectedRecording?.id]);
 
   useEffect(() => {
     if (!playing || !activeChapter) return;
@@ -853,10 +985,12 @@ function PublicDeckPlaybackOverlay({
   function updateProgress() {
     const audio = audioRef.current;
     if (!audio) return;
-    setCurrentTimeMs(Math.round(audio.currentTime * 1000));
+    const nextCurrentTimeMs = Math.round(audio.currentTime * 1000);
+    setCurrentTimeMs(nextCurrentTimeMs);
     if (!selectedRecording?.durationMs && Number.isFinite(audio.duration) && audio.duration > 0) {
       setDurationMs(Math.round(audio.duration * 1000));
     }
+    publishPlaybackSync(nextCurrentTimeMs, playing);
   }
 
   function togglePlayback() {
@@ -865,6 +999,7 @@ function PublicDeckPlaybackOverlay({
     if (playing) {
       audio.pause();
       setPlaying(false);
+      publishPlaybackSync(currentTimeMs, false);
       return;
     }
     const activePageChapter = getPodcastChapterForPage(chapters, activePageIndex);
@@ -880,7 +1015,12 @@ function PublicDeckPlaybackOverlay({
         lastSyncedChapterIdRef.current = activePageChapter.id;
       }
     }
-    void audio.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+    void audio.play()
+      .then(() => {
+        setPlaying(true);
+        publishPlaybackSync(Math.round(audio.currentTime * 1000), true);
+      })
+      .catch(() => setPlaying(false));
   }
 
   function seekToTime(nextTimeMs: number) {
@@ -888,6 +1028,7 @@ function PublicDeckPlaybackOverlay({
     const audio = audioRef.current;
     if (audio) audio.currentTime = nextSeconds;
     setCurrentTimeMs(Math.round(nextSeconds * 1000));
+    publishPlaybackSync(Math.round(nextSeconds * 1000), playing);
   }
 
   function seekToChapter(chapter: PublicPodcastChapter) {
@@ -915,8 +1056,15 @@ function PublicDeckPlaybackOverlay({
           onDurationChange={updateProgress}
           onEnded={() => setPlaying(false)}
           onLoadedMetadata={updateProgress}
-          onPause={() => setPlaying(false)}
-          onPlay={() => setPlaying(true)}
+          onPause={() => {
+            setPlaying(false);
+            if (suppressMediaSyncRef.current) return;
+            publishPlaybackSync(currentTimeMs, false);
+          }}
+          onPlay={() => {
+            setPlaying(true);
+            publishPlaybackSync(currentTimeMs, true);
+          }}
           onTimeUpdate={updateProgress}
         >
           <track kind="captions" />
@@ -1050,6 +1198,14 @@ function PublicDeckPlaybackOverlay({
           >
             <Captions size={18} aria-hidden="true" />
           </button>
+          <button
+            className="public-deck-playback-button"
+            type="button"
+            aria-label="Present slide fullscreen"
+            onClick={onEnterSlideFullscreen}
+          >
+            <Maximize2 size={18} aria-hidden="true" />
+          </button>
         </div>
       </section>
     </>
@@ -1078,6 +1234,9 @@ export function PublicDeckViewer({
   const transcriptAnswerRunIdRef = useRef(0);
   const emptySelection = useMemo<SelectionState>(() => ({ pageId: '', elementIds: [] }), []);
   const [transcriptPanelOpen, setTranscriptPanelOpen] = useState(false);
+  const [publicPlaybackSync, setPublicPlaybackSync] = useState<PublicPlaybackSync | undefined>();
+  const [slideOnlyFullscreen, setSlideOnlyFullscreen] = useState(false);
+  const publicViewerRef = useRef<HTMLElement | null>(null);
   const [transcriptQuestion, setTranscriptQuestion] = useState('');
   const [transcriptAnswer, setTranscriptAnswer] = useState<TranscriptAnswer | undefined>();
   const [transcriptAnswerStatus, setTranscriptAnswerStatus] = useState<
@@ -1087,6 +1246,16 @@ export function PublicDeckViewer({
   const viewerClassName = embed
     ? 'public-deck-viewer public-deck-viewer-embed'
     : 'public-deck-viewer public-deck-viewer-present';
+
+  const enterSlideOnlyFullscreen = useCallback(() => {
+    setTranscriptPanelOpen(false);
+    setSlideOnlyFullscreen(true);
+    const viewerElement = publicViewerRef.current;
+    if (!viewerElement?.requestFullscreen) return;
+    void viewerElement.requestFullscreen().catch(() => {
+      setSlideOnlyFullscreen(false);
+    });
+  }, []);
 
   const clearAnimationTimers = useCallback(() => {
     for (const timeoutId of animationTimeoutsRef.current) {
@@ -1391,6 +1560,19 @@ export function PublicDeckViewer({
     };
   }, [advancePresentation, rewindPresentation, viewerState.status]);
 
+  useEffect(() => {
+    function handleFullscreenChange() {
+      if (document.fullscreenElement !== publicViewerRef.current) {
+        setSlideOnlyFullscreen(false);
+      }
+    }
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
   if (viewerState.status === 'preloading') {
     const loadedPercent =
       viewerState.total > 0 ? Math.min(100, Math.round((viewerState.loaded / viewerState.total) * 100)) : 0;
@@ -1443,7 +1625,8 @@ export function PublicDeckViewer({
   const readyViewerClassName = [
     viewerClassName,
     showPlaybackOverlay ? 'public-deck-viewer-with-playback' : '',
-    showPlaybackOverlay && transcriptPanelOpen ? 'public-deck-viewer-transcript-open' : '',
+    showPlaybackOverlay && transcriptPanelOpen && !slideOnlyFullscreen ? 'public-deck-viewer-transcript-open' : '',
+    slideOnlyFullscreen ? 'public-deck-viewer-slide-fullscreen' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -1485,6 +1668,7 @@ export function PublicDeckViewer({
 
   return (
     <main
+      ref={publicViewerRef}
       className={readyViewerClassName}
       aria-label={embed ? 'Embedded shared deck' : 'Public presentation'}
     >
@@ -1520,17 +1704,20 @@ export function PublicDeckViewer({
           ))}
         </nav>
       ) : null}
-      {showPlaybackOverlay ? (
+      {showPlaybackOverlay && !slideOnlyFullscreen ? (
         <PublicDeckPlaybackOverlay
           activePageIndex={activePageIndex}
           canGoNext={canGoNext}
           canGoPrevious={canGoPrevious}
+          playbackSync={publicPlaybackSync}
           recordings={transcriptRecordings}
           project={project}
+          onEnterSlideFullscreen={enterSlideOnlyFullscreen}
           onOpenTranscript={() => setTranscriptPanelOpen((current) => !current)}
+          onPlaybackSync={setPublicPlaybackSync}
           onSelectPage={(pageIndex) => playPresentationPage(project, pageIndex)}
         />
-      ) : (
+      ) : !slideOnlyFullscreen ? (
         <nav className="public-deck-controls" aria-label="Slide navigation">
           <button
             className="stitch-icon-button"
@@ -1571,8 +1758,8 @@ export function PublicDeckViewer({
             <ListMusic size={18} aria-hidden="true" />
           </button>
         </nav>
-      )}
-      {transcriptPanelOpen ? (
+      ) : null}
+      {transcriptPanelOpen && !slideOnlyFullscreen ? (
         <aside className="public-transcript-panel" aria-label="Transcript chat">
           <header>
             <div>
@@ -1591,9 +1778,11 @@ export function PublicDeckViewer({
           {hasTranscriptRecordings ? (
             <PublicTranscriptPodcastPlayer
               activePageIndex={activePageIndex}
+              playbackSync={publicPlaybackSync}
               recordings={transcriptRecordings}
               project={project}
               pages={project.pages}
+              onPlaybackSync={setPublicPlaybackSync}
               onSelectPage={(pageIndex) => playPresentationPage(project, pageIndex)}
             />
           ) : (

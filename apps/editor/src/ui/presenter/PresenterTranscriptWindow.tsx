@@ -17,7 +17,7 @@ interface PresenterTranscriptStateMessage {
 interface PresenterTranscriptReadyMessage {
   sessionId: string;
   source: 'localstudio-presenter-transcript-window';
-  type: 'ready';
+  type: 'closed' | 'ready';
 }
 
 function getTranscriptChannelName(sessionId: string) {
@@ -64,8 +64,20 @@ export function PresenterTranscriptWindow({ sessionId }: PresenterTranscriptWind
       source: 'localstudio-presenter-transcript-window',
       type: 'ready',
     };
+    const closedMessage: PresenterTranscriptReadyMessage = {
+      sessionId,
+      source: 'localstudio-presenter-transcript-window',
+      type: 'closed',
+    };
+    function postClosedMessage() {
+      channel.postMessage(closedMessage);
+    }
     channel.postMessage(readyMessage);
+    window.addEventListener('beforeunload', postClosedMessage);
+    window.addEventListener('pagehide', postClosedMessage);
     return () => {
+      window.removeEventListener('beforeunload', postClosedMessage);
+      window.removeEventListener('pagehide', postClosedMessage);
       channel.close();
     };
   }, [sessionId]);
