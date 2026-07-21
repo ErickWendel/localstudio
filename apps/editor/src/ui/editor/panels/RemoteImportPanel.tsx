@@ -12,12 +12,27 @@ export type RemoteImportStatus =
 
 interface RemoteImportPanelProps {
   error?: string | undefined;
+  progress?: RemoteImportProgressState | undefined;
   projects: MirrorProjectSummary[];
   status: RemoteImportStatus;
   onClose: () => void;
   onDeleteProject?: (projectId: string) => void;
   onImportProject: (projectId: string) => void;
 }
+
+interface RemoteImportProgressState {
+  detail: string;
+  progress: number;
+  stage: 'choosing-folder' | 'downloading' | 'writing-files' | 'opening';
+  title: string;
+}
+
+const remoteImportStageLabels: Record<RemoteImportProgressState['stage'], string> = {
+  'choosing-folder': 'Choosing folder',
+  downloading: 'Downloading files',
+  'writing-files': 'Saving locally',
+  opening: 'Opening editor',
+};
 
 function formatSyncedAt(value: string) {
   const date = new Date(value);
@@ -30,6 +45,7 @@ function formatSyncedAt(value: string) {
 
 export function RemoteImportPanel({
   error,
+  progress,
   projects,
   status,
   onClose,
@@ -64,7 +80,7 @@ export function RemoteImportPanel({
       <div className="settings-panel-header ew-split-row-start">
         <div>
           <h2>Import remote</h2>
-          <p>Choose a mirrored project from MinIO.</p>
+          <p>Choose a mirrored project from remote storage.</p>
         </div>
         <button
           className="stitch-icon-button"
@@ -86,6 +102,30 @@ export function RemoteImportPanel({
         <p className="remote-import-status remote-import-status-error">
           {error ?? 'Could not import the remote mirror.'}
         </p>
+      ) : null}
+      {progress ? (
+        <div className="remote-import-progress-card" role="status" aria-live="polite">
+          <div className="remote-import-progress-icon" aria-hidden="true">
+            <span className="material-symbols-outlined">cloud_sync</span>
+          </div>
+          <div className="remote-import-progress-copy">
+            <span className="remote-import-progress-stage">
+              {remoteImportStageLabels[progress.stage]}
+            </span>
+            <strong>{progress.title}</strong>
+            <p>{progress.detail}</p>
+          </div>
+          <div
+            className="remote-import-progress"
+            role="progressbar"
+            aria-label="Remote import progress"
+            aria-valuemax={100}
+            aria-valuemin={0}
+            aria-valuenow={Math.round(progress.progress)}
+          >
+            <span style={{ width: `${progress.progress}%` }} />
+          </div>
+        </div>
       ) : null}
 
       {projects.length > 0 ? (

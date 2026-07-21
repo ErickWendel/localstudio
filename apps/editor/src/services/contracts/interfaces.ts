@@ -59,6 +59,7 @@ export interface ProjectRepository {
     options?: { projectDirectoryName?: string },
   ): Promise<void>;
   getVersionHistory?(): Promise<VersionHistoryEntry[]>;
+  prepareImportMirrorFiles?(): Promise<void>;
   saveVersion?(
     project: ProjectDocument,
     metadata: VersionSnapshotMetadata,
@@ -86,6 +87,14 @@ export interface MirrorSyncProgress {
   label: string;
 }
 
+export interface MirrorDownloadProgress {
+  currentFile?: string | undefined;
+  downloadedBytes: number;
+  downloadedFiles: number;
+  totalBytes: number;
+  totalFiles: number;
+}
+
 export interface MirrorProjectSummary {
   id: string;
   name: string;
@@ -103,7 +112,11 @@ export interface MirrorService<TConfig = unknown> {
     options?: { onProgress?: (progress: MirrorSyncProgress) => void },
   ): Promise<MirrorState>;
   listProjects(config: TConfig): Promise<MirrorProjectSummary[]>;
-  downloadProject(projectId: string, config: TConfig): Promise<MirrorFile[]>;
+  downloadProject(
+    projectId: string,
+    config: TConfig,
+    options?: { onProgress?: (progress: MirrorDownloadProgress) => void },
+  ): Promise<MirrorFile[]>;
   deleteProject?(projectId: string, config: TConfig): Promise<void>;
   getPublicObjectUrl?(key: string, config: TConfig): string;
   uploadPublicObject?(key: string, blob: Blob, config: TConfig): Promise<void>;

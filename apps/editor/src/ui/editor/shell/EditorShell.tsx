@@ -1659,6 +1659,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       {vm.remoteImportOpen ? (
         <RemoteImportPanel
           error={vm.remoteImportError}
+          progress={vm.remoteImportProgress}
           projects={vm.remoteImportProjects}
           status={vm.remoteImportStatus}
           onClose={vm.closeRemoteImport}

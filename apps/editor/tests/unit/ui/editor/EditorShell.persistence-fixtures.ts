@@ -4,6 +4,7 @@ import type { ProjectDocument } from '../../../../src/domain/documents/model';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 import type {
   MirrorFile,
+  MirrorDownloadProgress,
   MirrorProjectSummary,
   MirrorService,
   MirrorState,
@@ -158,7 +159,18 @@ class RecordingMirrorService implements MirrorService<MinioMirrorConfig> {
 
   listProjects = vi.fn((): Promise<MirrorProjectSummary[]> => Promise.resolve([]));
 
-  downloadProject = vi.fn((): Promise<MirrorFile[]> => Promise.resolve([]));
+  downloadProject = vi.fn(
+    (
+      projectId: string,
+      config: MinioMirrorConfig,
+      options?: { onProgress?: (progress: MirrorDownloadProgress) => void },
+    ): Promise<MirrorFile[]> => {
+      void projectId;
+      void config;
+      void options;
+      return Promise.resolve([]);
+    },
+  );
 
   deleteProject = vi.fn((): Promise<void> => Promise.resolve());
 }
@@ -240,6 +252,8 @@ class ImportingProjectRepository implements ProjectRepository {
 
 class RemoteMirrorImportingProjectRepository implements ProjectRepository {
   importedFilePaths: string[] = [];
+
+  prepareImportMirrorFiles = vi.fn((): Promise<void> => Promise.resolve());
 
   loadProject(): Promise<ProjectDocument | null> {
     return Promise.resolve(null);

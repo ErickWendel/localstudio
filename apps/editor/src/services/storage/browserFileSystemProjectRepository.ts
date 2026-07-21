@@ -42,6 +42,7 @@ const PROJECT_FILE_NAME = 'project.json';
 const PROJECT_CONFIG_FILE_NAME = 'localstudio.json';
 const VERSION_HISTORY_FILE_NAME = 'manifest.json';
 const VERSION_HISTORY_LIMIT = 100;
+const MIRROR_IMPORT_WRITE_CONCURRENCY = 6;
 
 function addRetainedFileName(fileNames: Set<string>, fileName: string | undefined) {
   if (fileName) fileNames.add(fileName);
@@ -156,6 +157,24 @@ async function writeBlobFileToDirectory(
   await writable.close();
 }
 
+async function runWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  task: (item: T) => Promise<void>,
+) {
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(1, concurrency), items.length);
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < items.length) {
+        const item = items[nextIndex];
+        nextIndex += 1;
+        if (item) await task(item);
+      }
+    }),
+  );
+}
+
 async function readProjectNameFromMirrorFiles(files: MirrorFile[]) {
   const projectFile = files.find((file) => file.path === PROJECT_FILE_NAME);
   if (!projectFile) return undefined;
@@ -175,6 +194,7 @@ function getDefaultFetch() {
 export class BrowserFileSystemProjectRepository implements ProjectRepository {
   private directoryHandle: FileSystemDirectoryHandle | null = null;
   private parentDirectoryHandle: FileSystemDirectoryHandle | null = null;
+  private pendingMirrorImportDirectoryHandle: FileSystemDirectoryHandle | null = null;
   private projectDirectoryName: string | null = null;
   private readonly recentProjectStore: RecentProjectHandleStore;
 
@@ -191,11 +211,17 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     return project;
   }
 
+  async prepareImportMirrorFiles(): Promise<void> {
+    const pickDirectory = this.options.pickDirectory ?? getBrowserDirectoryPicker();
+    this.pendingMirrorImportDirectoryHandle = await pickDirectory();
+  }
+
   async importMirrorFiles(files: MirrorFile): Promise<ProjectDocument>;
   async importMirrorFiles(files: MirrorFile[]): Promise<ProjectDocument>;
   async importMirrorFiles(files: MirrorFile | MirrorFile[]): Promise<ProjectDocument> {
     const pickDirectory = this.options.pickDirectory ?? getBrowserDirectoryPicker();
-    const selectedDirectoryHandle = await pickDirectory();
+    const selectedDirectoryHandle = this.pendingMirrorImportDirectoryHandle ?? (await pickDirectory());
+    this.pendingMirrorImportDirectoryHandle = null;
     const mirrorFiles = Array.isArray(files) ? files : [files];
     const projectDirectoryName = await readProjectNameFromMirrorFiles(mirrorFiles);
     this.parentDirectoryHandle = projectDirectoryName ? selectedDirectoryHandle : null;
@@ -203,10 +229,9 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     this.directoryHandle = projectDirectoryName
       ? await selectedDirectoryHandle.getDirectoryHandle(projectDirectoryName, { create: true })
       : selectedDirectoryHandle;
-    await this.ensureReadWritePermission(this.directoryHandle);
-    for (const file of mirrorFiles) {
-      await this.writeMirrorFile(this.directoryHandle, file);
-    }
+    await runWithConcurrency(mirrorFiles, MIRROR_IMPORT_WRITE_CONCURRENCY, (file) =>
+      this.writeMirrorFile(this.directoryHandle!, file),
+    );
     const project = await this.readProjectFromDirectory(this.directoryHandle, {
       allowMissingAssetFiles: true,
     });

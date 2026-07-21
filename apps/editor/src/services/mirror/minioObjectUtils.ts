@@ -25,8 +25,11 @@ async function hmacSha256(key: ArrayBuffer | Uint8Array, value: string) {
   return new Uint8Array(await crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(value)));
 }
 
-async function hmacHex(key: ArrayBuffer | Uint8Array, value: string) {
-  return Array.from(await hmacSha256(key, value), (byte) => byte.toString(16).padStart(2, '0')).join('');
+async function hmacHexWithCryptoKey(key: CryptoKey, value: string) {
+  return Array.from(
+    new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value))),
+    (byte) => byte.toString(16).padStart(2, '0'),
+  ).join('');
 }
 
 async function getSigningKey(
@@ -38,6 +41,29 @@ async function getSigningKey(
   const kRegion = await hmacSha256(kDate, config.region);
   const kService = await hmacSha256(kRegion, 's3');
   return hmacSha256(kService, 'aws4_request');
+}
+
+const signingKeyCache = new Map<string, Promise<CryptoKey>>();
+
+async function getSigningCryptoKey(
+  config: MinioMirrorConfig,
+  credentials: MinioMirrorCredentials,
+  dateStamp: string,
+) {
+  const cacheKey = `${credentials.secretKey}\n${config.region}\n${dateStamp}`;
+  const cachedKey = signingKeyCache.get(cacheKey);
+  if (cachedKey) return cachedKey;
+  const keyPromise = getSigningKey(config, credentials, dateStamp).then((signingKey) =>
+    crypto.subtle.importKey(
+      'raw',
+      toArrayBuffer(signingKey),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign'],
+    ),
+  );
+  signingKeyCache.set(cacheKey, keyPromise);
+  return keyPromise;
 }
 
 function createObjectUrl(config: MinioMirrorConfig, key = '', query: Record<string, string> = {}) {
@@ -111,8 +137,8 @@ async function createSignedHeaders(
     credentialScope,
     Array.from(new Uint8Array(canonicalRequestHash), (byte) => byte.toString(16).padStart(2, '0')).join(''),
   ].join('\n');
-  const signature = await hmacHex(
-    await getSigningKey(config, credentials, dateStamp),
+  const signature = await hmacHexWithCryptoKey(
+    await getSigningCryptoKey(config, credentials, dateStamp),
     stringToSign,
   );
 
