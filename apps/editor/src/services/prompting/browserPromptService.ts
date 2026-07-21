@@ -19,7 +19,11 @@ import { buildSlideElementPrompt } from './slideElementPrompt';
 import { slideLayoutPresets } from './slideLayoutPresets';
 import { slideTaskPrompt } from './slideTaskPrompt';
 import { webGpuTextGenerationRuntime } from './webGpuTextGenerationRuntime';
-import type { TextGenerationInput, TextGenerationRuntime } from './webGpuTextGenerationRuntime';
+import type {
+  TextGenerationInput,
+  TextGenerationOptions,
+  TextGenerationRuntime,
+} from './webGpuTextGenerationRuntime';
 
 const CHROME_PROMPT_PROVIDER_ID = 'chrome-prompt-api';
 const GEMMA_PROMPT_PROVIDER_ID = 'gemma-4-webgpu';
@@ -49,6 +53,18 @@ interface PromptProvider {
       existingElements: GeneratedSlideElement[];
     },
   ): Promise<GeneratedSlideElement>;
+  generateText(prompt: TextGenerationInput, options?: TextGenerationOptions): Promise<string>;
+}
+
+function formatChromePromptInput(prompt: TextGenerationInput) {
+  if (typeof prompt === 'string') return prompt;
+  return prompt
+    .map((message) => {
+      const content =
+        typeof message.content === 'string' ? message.content : JSON.stringify(message.content);
+      return `${message.role}: ${content}`;
+    })
+    .join('\n\n');
 }
 
 class ChromePromptProvider implements PromptProvider {
@@ -87,6 +103,10 @@ class ChromePromptProvider implements PromptProvider {
     },
   ): Promise<GeneratedSlideElement> {
     return this.chromePromptService.generateSlideElementFromTask(task, context);
+  }
+
+  generateText(prompt: TextGenerationInput): Promise<string> {
+    return this.chromePromptService.generateText(formatChromePromptInput(prompt));
   }
 }
 
@@ -238,6 +258,14 @@ class GemmaPromptProvider implements PromptProvider {
     });
   }
 
+  generateText(prompt: TextGenerationInput, options?: TextGenerationOptions): Promise<string> {
+    return this.runtimeClient.generate(
+      aiModelCatalog.GEMMA_LLM_TRANSFORMERS_MODEL_ID,
+      prompt,
+      options,
+    );
+  }
+
   private async generateStructuredJson<T>(options: GemmaStructuredJsonOptions<T>) {
     const response = await this.runtimeClient.generate(
       aiModelCatalog.GEMMA_LLM_TRANSFORMERS_MODEL_ID,
@@ -366,6 +394,10 @@ class BrowserPromptService implements PromptService {
     },
   ): Promise<GeneratedSlideElement> {
     return this.getSelectedProvider().generateSlideElementFromTask(task, context);
+  }
+
+  generateText(prompt: TextGenerationInput, options?: TextGenerationOptions): Promise<string> {
+    return this.getSelectedProvider().generateText(prompt, options);
   }
 
   private getSelectedProvider() {

@@ -44,8 +44,10 @@ test.describe('editor public transcript chat journey', () => {
     await publicDeck.expectReady(false);
 
     const transcriptButton = page.getByRole('button', { name: 'Open transcript chat' });
+    const presentationAiButton = page.getByRole('button', { name: 'Open presentation AI' });
     await expect(transcriptButton).toBeEnabled();
-    await transcriptButton.click();
+    await expect(presentationAiButton).toBeEnabled();
+    await presentationAiButton.click();
     await expect(page.getByRole('complementary', { name: 'Transcript chat' })).toBeVisible();
     await expect(
       page.getByText('No presenter recording has been published with this deck.'),
@@ -59,21 +61,41 @@ test.describe('editor public transcript chat journey', () => {
 
   test('surfaces transcript chat model failures in the public viewer', async ({ page }) => {
     await page.addInitScript(() => {
+      Object.defineProperty(window, 'LanguageModel', {
+        configurable: true,
+        value: {
+          availability: () => Promise.resolve('available'),
+          create: () =>
+            Promise.resolve({
+              destroy() {},
+              prompt: () => Promise.reject(new Error('Transcript answer generation failed.')),
+            }),
+        },
+      });
       class FailingWorker {
         onerror: ((event: ErrorEvent) => void) | null = null;
         onmessage: ((event: MessageEvent) => void) | null = null;
 
-        postMessage(message: { id?: string; type?: string }) {
+        postMessage(message: { id?: string; texts?: string[]; type?: string }) {
           const id = message.id ?? 'missing-id';
           window.setTimeout(() => {
+            if (message.type === 'embed') {
+              this.onmessage?.(
+                new MessageEvent('message', {
+                  data: {
+                    embeddings: (message.texts ?? []).map(() => [1, 0, 0]),
+                    id,
+                    type: 'result',
+                  },
+                }),
+              );
+              return;
+            }
             this.onmessage?.(
               new MessageEvent('message', {
                 data: {
                   id,
-                  message:
-                    message.type === 'embed'
-                      ? 'Transcript embeddings are unavailable in this browser.'
-                      : 'Transcript answer generation failed.',
+                  message: 'Transcript answer generation failed.',
                   type: 'error',
                 },
               }),
@@ -135,7 +157,7 @@ test.describe('editor public transcript chat journey', () => {
       .fill('Why did setup fail?');
     await page.getByRole('button', { name: 'Ask transcript' }).click();
 
-    await expect(page.getByText('Transcript embeddings are unavailable in this browser.')).toBeVisible({
+    await expect(page.getByText('Transcript answer generation failed.')).toBeVisible({
       timeout: 10_000,
     });
   });
@@ -144,6 +166,22 @@ test.describe('editor public transcript chat journey', () => {
     page,
   }) => {
     await page.addInitScript(() => {
+      Object.defineProperty(window, 'LanguageModel', {
+        configurable: true,
+        value: {
+          availability: () => Promise.resolve('available'),
+          create: () =>
+            Promise.resolve({
+              destroy() {},
+              prompt: (prompt: string) => {
+                Object.assign(window, { __lastTranscriptPrompt: prompt });
+                return Promise.resolve(
+                  'The transcript says podcast mode uses slide chapters so viewers can jump to the right section.',
+                );
+              },
+            }),
+        },
+      });
       Object.defineProperty(HTMLMediaElement.prototype, 'duration', {
         configurable: true,
         get() {
@@ -265,6 +303,12 @@ test.describe('editor public transcript chat journey', () => {
 
     await page.getByRole('button', { name: 'Open transcript chat' }).click();
     await expect(page.getByRole('complementary', { name: 'Transcript chat' })).toBeVisible();
+    const transcriptModelSelect = page.getByRole('combobox', { name: 'Transcript answer model' });
+    await expect(transcriptModelSelect).toHaveValue('chrome-prompt-api');
+    await expect(transcriptModelSelect.getByRole('option')).toHaveText([
+      'Chrome Built-in Prompt API',
+      'Gemma 4 E2B',
+    ]);
     const podcastPlayer = page.getByRole('region', { name: 'Podcast playback' });
     await expect(podcastPlayer).toBeVisible();
     await expect(
@@ -287,7 +331,35 @@ test.describe('editor public transcript chat journey', () => {
     await expect(page.getByText('The transcript says podcast mode uses slide chapters')).toBeVisible({
       timeout: 10_000,
     });
+    await expect(page.getByRole('textbox', { name: 'Question for transcript chat' })).toBeEmpty();
     await expect(page.locator('.public-transcript-answer span').first()).toHaveText('0:00');
+
+    await page.getByRole('button', { name: 'What was explained on the current slide?' }).click();
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            () =>
+              (window as typeof window & { __lastTranscriptPrompt?: string })
+                .__lastTranscriptPrompt,
+          ),
+        { timeout: 10_000 },
+      )
+      .toContain('Question: What was explained on the current slide?');
+    const currentSlidePrompt = await page.evaluate(
+      () =>
+        (window as typeof window & { __lastTranscriptPrompt?: string }).__lastTranscriptPrompt ?? '',
+    );
+    expect(currentSlidePrompt).toContain('Slide 2 of 2');
+    expect(currentSlidePrompt).toContain('Name: Closing');
+    expect(currentSlidePrompt).toContain('Shared deck closing');
+    expect(currentSlidePrompt).toContain(
+      'Podcast mode uses slide chapters so viewers can jump to the right section.',
+    );
+    expect(currentSlidePrompt).toContain(
+      'The public deck keeps the transcript searchable alongside playback.',
+    );
+    expect(currentSlidePrompt).toContain('Question: What was explained on the current slide?');
 
     await page
       .getByRole('textbox', { name: 'Question for transcript chat' })

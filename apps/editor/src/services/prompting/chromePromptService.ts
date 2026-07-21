@@ -131,14 +131,22 @@ export class ChromePromptService implements PromptService {
     );
   }
 
+  generateText(prompt: string): Promise<string> {
+    return this.promptText(prompt);
+  }
+
   private async promptWithStructuredOutput(prompt: string, responseConstraint: unknown) {
+    return this.promptText(prompt, { responseConstraint });
+  }
+
+  private async promptText(prompt: string, options?: { responseConstraint?: unknown }) {
     const languageModel = getLanguageModelApi();
     if (!languageModel?.create) throw new Error('Chrome Prompt API is unavailable.');
 
     const session = await languageModel.create();
     try {
       if (!session.prompt) throw new Error('Chrome Prompt API session cannot generate text.');
-      return await session.prompt(prompt, { responseConstraint });
+      return await session.prompt(prompt, options);
     } finally {
       session.destroy?.();
     }

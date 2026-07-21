@@ -18,6 +18,9 @@ export const aiWebGpuGemmaProvidersFlow = {
     await expect(page.getByRole('button', { name: 'Remove LLM Model' })).toBeVisible({
       timeout: 30_000,
     });
+    await expect(
+      page.getByRole('combobox', { exact: true, name: 'Image generation model' }),
+    ).toHaveValue('image-generation-models');
     await page.getByRole('combobox', { name: 'Language Detection Model' }).selectOption('language-detection-webgpu');
     await expect(page.getByRole('button', { name: 'Remove Language Detection Model' })).toBeVisible({
       timeout: 30_000,
@@ -28,6 +31,9 @@ export const aiWebGpuGemmaProvidersFlow = {
     });
 
     await page.getByRole('button', { name: 'Remove Create image mode' }).click();
+    await expect(page.getByRole('combobox', { name: 'Prompt model' })).toHaveValue(
+      'gemma-4-webgpu',
+    );
     await page
       .getByRole('textbox', { name: 'Slide structure prompt' })
       .fill('Create a title and subtitle slide about WebGPU model QA');

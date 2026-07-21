@@ -298,6 +298,16 @@ export interface ShareMetadata {
   status: ShareStatus;
 }
 
+export interface SharePublishProgress {
+  current: number;
+  total: number;
+  label: string;
+}
+
+export interface SharePublishOptions {
+  onProgress?: (progress: SharePublishProgress) => void;
+}
+
 export interface ShareRecord {
   shareId: string;
   createdAt: string;
@@ -306,8 +316,8 @@ export interface ShareRecord {
 }
 
 export interface ShareService {
-  createShare(project: ProjectDocument): Promise<ShareMetadata>;
-  updateShare(shareId: string, project: ProjectDocument): Promise<ShareMetadata>;
+  createShare(project: ProjectDocument, options?: SharePublishOptions): Promise<ShareMetadata>;
+  updateShare(shareId: string, project: ProjectDocument, options?: SharePublishOptions): Promise<ShareMetadata>;
   getShare(shareId: string): Promise<ShareRecord | null>;
   getProjectShareMetadata(project: ProjectDocument): ShareMetadata;
   getPublicUrl(shareId: string): string;

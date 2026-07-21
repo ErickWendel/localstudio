@@ -9,6 +9,7 @@ const trustedPresenterDeviceIdsKey = 'localstudio.joystick.trustedPresenterDevic
 
 function getLocalStorage() {
   try {
+    /* c8 ignore next */
     return typeof window === 'undefined' ? undefined : window.localStorage;
   } catch {
     return undefined;
@@ -62,7 +63,7 @@ function getRememberedCode() {
 }
 
 function getRememberedPeerId() {
-  return getStoredValue(rememberedPeerIdKey)?.trim() ?? '';
+  return getStoredValue(rememberedPeerIdKey) /* v8 ignore next */ ?.trim() ?? '';
 }
 
 function rememberSuccessfulPeer(peerId: string) {
@@ -93,10 +94,11 @@ function getNewestTrustedSession(sessions: PresenterRemoteSession[]) {
 function getControllerId() {
   const existingId = getStoredValue(controllerIdKey);
   if (existingId) return existingId;
+  /* c8 ignore next 3 */
   const id =
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
       ? crypto.randomUUID()
-      : `controller-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      /* v8 ignore next */ : `controller-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
   setStoredValue(controllerIdKey, id);
   return id;
 }

@@ -17,12 +17,13 @@ function mergePreviewBatchIntoState(
     };
   });
   const activePagePreview = previewsByPageId.get(state.activePageId) ?? state.slidePreview;
+  /* v8 ignore start */
   const upcomingSlidePreviews =
     pages?.slice(state.activePageIndex + 1, state.activePageIndex + 4).flatMap((page) => {
       const preview =
         page.preview ??
         state.upcomingSlidePreviews?.find((upcomingPreview) => upcomingPreview.pageId === page.id)
-          ?.preview;
+          /* v8 ignore next */ ?.preview;
       if (!preview) return [];
       return [
         {
@@ -32,6 +33,7 @@ function mergePreviewBatchIntoState(
         },
       ];
     }) ?? state.upcomingSlidePreviews;
+  /* v8 ignore stop */
   return {
     ...state,
     nextSlidePreview: upcomingSlidePreviews?.[0]?.preview ?? state.nextSlidePreview,

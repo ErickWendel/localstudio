@@ -1,4 +1,8 @@
 import type { ProjectDocument, TranscriptRecording } from '../../domain/documents/model';
+import type {
+  ModelDownloadProgressDetails,
+  ModelStatus,
+} from '../contracts/interfaces';
 import type { AnimationPreviewState } from '../../ui/editor/animation/useAnimationPreviewController';
 import type {
   PresenterRemotePeerSession,
@@ -15,6 +19,23 @@ export type PresenterRemoteSessionMetadata = PresenterRemoteSession & {
 export interface PresenterStatePayload {
   activePageId: string;
   animationPreview: AnimationPreviewState | undefined;
+  promptModel?:
+    | {
+        options: Array<{
+          compatibility: 'compatible' | 'incompatible' | 'unknown';
+          id: string;
+          label: string;
+          modelId?: string | undefined;
+          readiness: ModelStatus;
+          selected: boolean;
+        }>;
+        preparation: ModelDownloadProgressDetails & {
+          availability: string;
+          progress: number;
+          status: 'idle' | 'downloading' | 'ready' | 'failed';
+        };
+      }
+    | undefined;
   project: ProjectDocument;
   presenterMode?: 'presenting' | 'ready' | undefined;
   remoteSession?: PresenterRemoteSessionMetadata | undefined;
@@ -24,14 +45,17 @@ export interface PresenterStatePayload {
 }
 
 export type PresenterWindowCommand =
+  | { command: 'cancel-prompt-model-download'; modelId: string }
   | { command: 'close' }
   | { command: 'go-to-page'; pageId: string }
   | { command: 'next' }
   | { command: 'pause-timer' }
   | { command: 'previous' }
+  | { command: 'prepare-prompt-api' }
   | { command: 'request-state' }
   | { command: 'reset-timer' }
   | { command: 'resume-timer' }
+  | { command: 'set-prompt-provider'; providerId: string }
   | { audioBlob?: Blob | undefined; command: 'save-recording'; recording: TranscriptRecording }
   | { command: 'start-presenting' }
   | { command: 'update-timer'; timer: PresenterRemoteTimerState }

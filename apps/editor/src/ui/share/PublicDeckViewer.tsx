@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { Captions, ListMusic, Maximize2, Pause, Play, SendHorizontal, Square, X } from 'lucide-react';
+import {
+  Captions,
+  ListMusic,
+  Maximize2,
+  Pause,
+  Play,
+  SendHorizontal,
+  Sparkles,
+  Square,
+  X,
+} from 'lucide-react';
 import type {
   ElementAnimationBuild,
   Page,
@@ -8,10 +18,20 @@ import type {
   SelectionState,
   TranscriptRecording,
 } from '../../domain/documents/model';
-import type { FontImportService, ShareService } from '../../services/contracts/interfaces';
-import { TranscriptQuestionAnsweringService } from '../../services/transcription/transcriptQuestionAnsweringService';
-import type { TranscriptAnswer } from '../../services/transcription/transcriptQuestionAnsweringService';
+import type {
+  AiProviderState,
+  FontImportService,
+  ModelDownloadProgressDetails,
+  ShareService,
+} from '../../services/contracts/interfaces';
+import { modelSetupService } from '../../services/model-setup/modelSetupService';
+import { browserPromptService } from '../../services/prompting/browserPromptService';
 import { webGpuTextGenerationRuntime } from '../../services/prompting/webGpuTextGenerationRuntime';
+import { TranscriptQuestionAnsweringService } from '../../services/transcription/transcriptQuestionAnsweringService';
+import type {
+  TranscriptAnswer,
+  TranscriptQuestionContext,
+} from '../../services/transcription/transcriptQuestionAnsweringService';
 import {
   KeyboardShortcutsDialog,
   type KeyboardShortcutAction,
@@ -25,6 +45,10 @@ import {
   type MovieHoldState,
 } from '../editor/media/presentationMovieControls';
 import { MiniPagePreview } from '../editor/panels/PageMiniPreview';
+import {
+  PromptModelControl,
+  type PromptModelControlState,
+} from '../editor/prompting/PromptModelControl';
 import { preloadPublicDeckAssets } from './publicDeckAssetPreloader';
 
 interface PublicDeckViewerProps {
@@ -180,9 +204,50 @@ function getTranscriptRecordings(project: ProjectDocument): TranscriptRecording[
   return Object.values(project.recordings ?? {}).filter((recording) => recording.segments.length > 0);
 }
 
+function getTranscriptQuestionContext(
+  project: ProjectDocument,
+  page: Page,
+  pageIndex: number,
+): TranscriptQuestionContext {
+  const text = page.elementIds.flatMap((elementId) => {
+    const element = project.elements[elementId];
+    if (element?.type !== 'text' || element.visible === false || !element.text.trim()) return [];
+    return [element.text.trim()];
+  });
+  return {
+    currentSlide: {
+      id: page.id,
+      index: pageIndex,
+      name: page.name,
+      ...(page.speakerNotes ? { speakerNotes: page.speakerNotes } : {}),
+      text,
+      totalSlides: project.pages.length,
+    },
+  };
+}
+
 function getRecordingTimePercent(currentMs: number, durationMs: number) {
   if (durationMs <= 0) return 0;
   return Math.min(100, Math.max(0, (currentMs / durationMs) * 100));
+}
+
+function getTranscriptModelPreparation(
+  provider: AiProviderState | undefined,
+): PromptModelControlState['preparation'] {
+  if (provider?.readiness === 'ready') {
+    return { availability: 'ready', progress: 100, status: 'ready' };
+  }
+  if (provider?.readiness === 'downloading') {
+    return { availability: 'downloading', progress: 4, status: 'downloading' };
+  }
+  return {
+    availability:
+      provider?.compatibility === 'incompatible' || provider?.readiness === 'unavailable'
+        ? 'unavailable'
+        : 'downloadable',
+    progress: 0,
+    status: 'idle',
+  };
 }
 
 function getSlidePositionPercent(pageIndex: number, pageCount: number) {
@@ -400,7 +465,11 @@ function PublicTranscriptPromptComposer({
   answer,
   error,
   isAnswering,
+  modelControlState,
   question,
+  onCancelModelDownload,
+  onPrepareModel,
+  onProviderChange,
   onQuestionChange,
   onStop,
   onSubmit,
@@ -408,7 +477,11 @@ function PublicTranscriptPromptComposer({
   answer: TranscriptAnswer | undefined;
   error: string | undefined;
   isAnswering: boolean;
+  modelControlState: PromptModelControlState;
   question: string;
+  onCancelModelDownload: (modelId: string) => Promise<void>;
+  onPrepareModel: () => Promise<void>;
+  onProviderChange: (providerId: string) => void;
   onQuestionChange: (question: string) => void;
   onStop: () => void;
   onSubmit: (question: string) => void;
@@ -493,6 +566,13 @@ function PublicTranscriptPromptComposer({
           />
         </div>
         <div className="prompt-submit-actions" data-tour-id="prompt-submit-actions">
+          <PromptModelControl
+            disabled={isAnswering}
+            state={modelControlState}
+            onCancelDownload={onCancelModelDownload}
+            onPrepare={onPrepareModel}
+            onProviderChange={onProviderChange}
+          />
           {isAnswering ? (
             <button
               className="icon-button icon-button-danger"
@@ -1351,6 +1431,15 @@ function PublicDeckPlaybackOverlay({
           <button
             className="public-deck-playback-button"
             type="button"
+            aria-label="Open presentation AI"
+            title="Open presentation AI"
+            onClick={onOpenTranscript}
+          >
+            <Sparkles size={18} aria-hidden="true" />
+          </button>
+          <button
+            className="public-deck-playback-button"
+            type="button"
             aria-label="Show keyboard shortcuts"
             aria-expanded={keyboardShortcutsOpen}
             onClick={onToggleKeyboardShortcuts}
@@ -1392,8 +1481,19 @@ export function PublicDeckViewer({
   const pagePreloadAbortRef = useRef<AbortController | undefined>(undefined);
   const runNextAnimationBuildRef = useRef<() => void>(() => undefined);
   const movieHoldStateRef = useRef<MovieHoldState | undefined>(undefined);
+  const transcriptTextGenerationRuntimeRef = useRef<
+    | InstanceType<typeof webGpuTextGenerationRuntime.TransformersTextGenerationRuntime>
+    | undefined
+  >(undefined);
+  const transcriptModelSetupServiceRef = useRef<
+    InstanceType<typeof modelSetupService.BrowserModelSetupService> | undefined
+  >(undefined);
+  const transcriptPromptServiceRef = useRef<
+    InstanceType<typeof browserPromptService.BrowserPromptService> | undefined
+  >(undefined);
   const transcriptQaServiceRef = useRef<TranscriptQuestionAnsweringService | undefined>(undefined);
   const transcriptAnswerRunIdRef = useRef(0);
+  const transcriptModelPreparationRunIdRef = useRef(0);
   const emptySelection = useMemo<SelectionState>(() => ({ pageId: '', elementIds: [] }), []);
   const [transcriptPanelOpen, setTranscriptPanelOpen] = useState(false);
   const [slideListOpen, setSlideListOpen] = useState(false);
@@ -1407,6 +1507,55 @@ export function PublicDeckViewer({
     'answering' | 'failed' | 'idle'
   >('idle');
   const [transcriptAnswerError, setTranscriptAnswerError] = useState<string | undefined>();
+  const [transcriptPromptProviderStates, setTranscriptPromptProviderStates] = useState<
+    AiProviderState[]
+  >([]);
+  const [transcriptModelPreparation, setTranscriptModelPreparation] = useState<
+    PromptModelControlState['preparation']
+  >({
+    availability: 'downloadable',
+    progress: 0,
+    status: 'idle',
+  });
+
+  const getTranscriptPromptServices = useCallback(() => {
+    transcriptTextGenerationRuntimeRef.current ??=
+      new webGpuTextGenerationRuntime.TransformersTextGenerationRuntime();
+    transcriptModelSetupServiceRef.current ??=
+      new modelSetupService.BrowserModelSetupService(
+        undefined,
+        undefined,
+        undefined,
+        transcriptTextGenerationRuntimeRef.current,
+      );
+    transcriptPromptServiceRef.current ??= new browserPromptService.BrowserPromptService(
+      transcriptModelSetupServiceRef.current,
+      undefined,
+      undefined,
+      transcriptTextGenerationRuntimeRef.current,
+    );
+    return {
+      modelSetup: transcriptModelSetupServiceRef.current,
+      promptService: transcriptPromptServiceRef.current,
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void getTranscriptPromptServices()
+      .promptService.getProviderStates()
+      .then((providers) => {
+        if (!active) return;
+        setTranscriptPromptProviderStates(providers);
+        setTranscriptModelPreparation(
+          getTranscriptModelPreparation(providers.find((provider) => provider.selected)),
+        );
+      });
+    return () => {
+      active = false;
+    };
+  }, [getTranscriptPromptServices]);
+
   const viewerClassName = embed
     ? 'public-deck-viewer public-deck-viewer-embed'
     : 'public-deck-viewer public-deck-viewer-present';
@@ -1896,6 +2045,11 @@ export function PublicDeckViewer({
   const canGoPrevious = activePageIndex > 0;
   const canGoNext = activePageIndex < project.pages.length - 1;
   const transcriptRecordings = getTranscriptRecordings(project);
+  const transcriptQuestionContext = getTranscriptQuestionContext(
+    project,
+    activePage,
+    activePageIndex,
+  );
   const hasTranscriptRecordings = transcriptRecordings.length > 0;
   const showPlaybackOverlay = hasTranscriptRecordings && !embed;
   const readyViewerClassName = [
@@ -1906,6 +2060,90 @@ export function PublicDeckViewer({
   ]
     .filter(Boolean)
     .join(' ');
+  const transcriptModelControlState: PromptModelControlState = {
+    label: 'Transcript answer model',
+    preparation: transcriptModelPreparation,
+    options: transcriptPromptProviderStates,
+  };
+
+  async function prepareTranscriptAnswerModel() {
+    const selectedProvider = transcriptPromptProviderStates.find((provider) => provider.selected);
+    if (selectedProvider?.readiness === 'ready') return true;
+    if (selectedProvider?.compatibility === 'incompatible') {
+      throw new Error(selectedProvider.disabledReason ?? `${selectedProvider.label} is unavailable.`);
+    }
+    const runId = transcriptModelPreparationRunIdRef.current + 1;
+    transcriptModelPreparationRunIdRef.current = runId;
+    const isCurrentRun = () => transcriptModelPreparationRunIdRef.current === runId;
+    setTranscriptModelPreparation((current) => ({
+      ...current,
+      availability: 'downloading',
+      progress: Math.max(current.progress, 4),
+      status: 'downloading',
+    }));
+    try {
+      const { promptService } = getTranscriptPromptServices();
+      await promptService.preparePromptApi({
+        onProgress: (progress: number, details?: ModelDownloadProgressDetails) => {
+          if (!isCurrentRun()) return;
+          setTranscriptModelPreparation({
+            availability: progress >= 100 ? 'ready' : 'downloading',
+            progress: Math.max(4, Math.min(100, Math.round(progress))),
+            status: progress >= 100 ? 'ready' : 'downloading',
+            ...details,
+          });
+        },
+      });
+      if (!isCurrentRun()) return false;
+      const providers = await promptService.getProviderStates();
+      if (!isCurrentRun()) return false;
+      const preparedProvider = providers.find((provider) => provider.selected);
+      if (preparedProvider?.readiness !== 'ready') {
+        throw new Error(`${preparedProvider?.label ?? 'Transcript answer model'} could not be prepared.`);
+      }
+      setTranscriptPromptProviderStates(providers);
+      setTranscriptModelPreparation({
+        availability: 'ready',
+        progress: 100,
+        status: 'ready',
+      });
+      return true;
+    } catch (error) {
+      if (!isCurrentRun()) return false;
+      setTranscriptModelPreparation({
+        availability: 'downloadable',
+        progress: 0,
+        status: 'failed',
+      });
+      setTranscriptAnswerError(
+        error instanceof Error ? error.message : 'Transcript answer model could not be prepared.',
+      );
+      throw error;
+    }
+  }
+
+  async function cancelTranscriptAnswerModelDownload(modelId: string) {
+    transcriptModelPreparationRunIdRef.current += 1;
+    const { modelSetup, promptService } = getTranscriptPromptServices();
+    await modelSetup.removeModel(modelId);
+    const providers = await promptService.getProviderStates();
+    setTranscriptPromptProviderStates(providers);
+    setTranscriptModelPreparation(
+      getTranscriptModelPreparation(providers.find((provider) => provider.selected)),
+    );
+  }
+
+  async function setTranscriptPromptProvider(providerId: string) {
+    transcriptModelPreparationRunIdRef.current += 1;
+    const providers = await getTranscriptPromptServices().promptService.setSelectedProvider(
+      providerId,
+    );
+    setTranscriptPromptProviderStates(providers);
+    setTranscriptModelPreparation(
+      getTranscriptModelPreparation(providers.find((provider) => provider.selected)),
+    );
+    setTranscriptAnswerError(undefined);
+  }
 
   async function answerTranscriptQuestion(question = transcriptQuestion) {
     const trimmedQuestion = question.trim();
@@ -1914,16 +2152,32 @@ export function PublicDeckViewer({
     transcriptAnswerRunIdRef.current = runId;
     setTranscriptAnswerStatus('answering');
     setTranscriptAnswerError(undefined);
+    if (transcriptRecordings.length === 0) {
+      setTranscriptAnswer({
+        citations: [],
+        text: 'No transcript text is available for this presentation.',
+      });
+      setTranscriptAnswerStatus('idle');
+      return;
+    }
     try {
+      const isModelReady = await prepareTranscriptAnswerModel();
+      if (!isModelReady) return;
+      if (transcriptAnswerRunIdRef.current !== runId) return;
       transcriptQaServiceRef.current ??= new TranscriptQuestionAnsweringService({
-        textGenerationRuntime: new webGpuTextGenerationRuntime.TransformersTextGenerationRuntime(),
+        textGenerator: {
+          generate: (prompt, options) =>
+            getTranscriptPromptServices().promptService.generateText(prompt, options),
+        },
       });
       const answer = await transcriptQaServiceRef.current.answer(
         trimmedQuestion,
         transcriptRecordings,
+        transcriptQuestionContext,
       );
       if (transcriptAnswerRunIdRef.current !== runId) return;
       setTranscriptAnswer(answer);
+      setTranscriptQuestion('');
       setTranscriptAnswerStatus('idle');
     } catch (error) {
       if (transcriptAnswerRunIdRef.current !== runId) return;
@@ -2004,7 +2258,7 @@ export function PublicDeckViewer({
           recordings={transcriptRecordings}
           project={project}
           onEnterSlideFullscreen={enterSlideOnlyFullscreen}
-          onOpenTranscript={() => setTranscriptPanelOpen((current) => !current)}
+          onOpenTranscript={() => setTranscriptPanelOpen(true)}
           onPlaybackSync={setPublicPlaybackSync}
           onSelectPage={(pageIndex) => playPresentationPage(project, pageIndex)}
           onToggleKeyboardShortcuts={() => setKeyboardShortcutsOpen((current) => !current)}
@@ -2054,6 +2308,16 @@ export function PublicDeckViewer({
             }}
           >
             <ListMusic size={18} aria-hidden="true" />
+          </button>
+          <button
+            className="stitch-icon-button"
+            type="button"
+            aria-label="Open presentation AI"
+            aria-expanded={transcriptPanelOpen}
+            title="Open presentation AI"
+            onClick={() => setTranscriptPanelOpen(true)}
+          >
+            <Sparkles size={18} aria-hidden="true" />
           </button>
           <button
             className="stitch-icon-button"
@@ -2121,7 +2385,15 @@ export function PublicDeckViewer({
             answer={transcriptAnswer}
             error={transcriptAnswerError}
             isAnswering={transcriptAnswerStatus === 'answering'}
+            modelControlState={transcriptModelControlState}
             question={transcriptQuestion}
+            onCancelModelDownload={cancelTranscriptAnswerModelDownload}
+            onPrepareModel={async () => {
+              await prepareTranscriptAnswerModel();
+            }}
+            onProviderChange={(providerId) => {
+              void setTranscriptPromptProvider(providerId);
+            }}
             onQuestionChange={setTranscriptQuestion}
             onStop={stopTranscriptAnswer}
             onSubmit={(question) => void answerTranscriptQuestion(question)}

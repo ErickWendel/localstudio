@@ -384,13 +384,47 @@ describe('EditorShell export and share workflows', () => {
     const expectedPublicUrl = `${
       window.location.origin
     }/editor/s/project-project-1?src=${encodeURIComponent(
-      'http://localhost:9000/localstudio/mirrors/public-shares/project-project-1/share.json',
+      'http://localhost:9000/localstudio/mirrors/shares/project-project-1.json',
     )}`;
     expect(
       await screen.findByDisplayValue(expectedPublicUrl, undefined, { timeout: 3_000 }),
     ).toBeInTheDocument();
     expect(execCommand).toHaveBeenCalledWith('copy');
     expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it('copies an already published public link without uploading the project again', async () => {
+    const execCommand = vi.fn().mockReturnValue(true);
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: execCommand,
+    });
+    const services = createAppServices();
+    const shareService = new RecordingShareService();
+    services.mirrorService = new RecordingMirrorService();
+    services.shareService = shareService;
+    services.projectRepository = new LoadingProjectRepository(sampleProject.createSampleProject());
+    services.persistenceAvailable = true;
+    services.skipStoredProjectLoad = false;
+
+    render(<EditorShell services={services} />);
+
+    await waitForShareButtonReady();
+    fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Copied')).toBeInTheDocument();
+    });
+    expect(execCommand).toHaveBeenCalledWith('copy');
+    expect(shareService.updateShare).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link' }));
+
+    await waitFor(() => {
+      expect(execCommand).toHaveBeenCalledTimes(2);
+    });
+    expect(shareService.updateShare).toHaveBeenCalledTimes(1);
   });
 
   it('publishes only the selected presenter recording from the share panel', async () => {
