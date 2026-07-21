@@ -618,6 +618,81 @@ describe('minioMirrorService.MinioMirrorService', () => {
     ]);
   });
 
+  it('reports mirrored file download progress', async () => {
+    const progressEvents: Array<{
+      downloadedBytes: number;
+      downloadedFiles: number;
+      totalBytes: number;
+      totalFiles: number;
+    }> = [];
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = getRequestUrl(input);
+      if (init?.method === 'GET' && url.endsWith('/mirrors/Client/localstudio-mirror.json')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              schemaVersion: 1,
+              projectId: 'project-client',
+              projectName: 'Client',
+              syncedAt: '2026-06-30T10:00:00.000Z',
+              publicBaseUrl: splitCredentialConfig.publicBaseUrl,
+              files: {
+                'project.json': {
+                  checksum: 'project',
+                  path: 'project.json',
+                  size: 15,
+                },
+                'assets/hero.png': {
+                  checksum: 'hero',
+                  path: 'assets/hero.png',
+                  size: 10,
+                },
+              },
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+      if (init?.method === 'GET' && url.endsWith('/mirrors/Client/project.json')) {
+        return Promise.resolve(new Response('{"name":"Deck"}', { status: 200 }));
+      }
+      if (init?.method === 'GET' && url.endsWith('/mirrors/Client/assets/hero.png')) {
+        return Promise.resolve(new Response('image-data!', { status: 200 }));
+      }
+      return Promise.resolve(new Response('', { status: 404 }));
+    });
+    const service = new minioMirrorService.MinioMirrorService({ fetch: fetchMock });
+
+    const files = await service.downloadProject('Client', splitCredentialConfig, {
+      onProgress: (progress) => {
+        progressEvents.push({
+          downloadedBytes: progress.downloadedBytes,
+          downloadedFiles: progress.downloadedFiles,
+          totalBytes: progress.totalBytes,
+          totalFiles: progress.totalFiles,
+        });
+      },
+    });
+
+    expect(files.map((file) => file.path).sort()).toEqual([
+      'assets/hero.png',
+      'localstudio-mirror.json',
+      'project.json',
+    ]);
+    expect(progressEvents.at(0)).toMatchObject({
+      downloadedBytes: 0,
+      downloadedFiles: 0,
+      totalBytes: 25,
+      totalFiles: 2,
+    });
+    expect(progressEvents.at(-1)).toMatchObject({
+      downloadedBytes: 25,
+      downloadedFiles: 2,
+      totalBytes: 25,
+      totalFiles: 2,
+    });
+  });
+
   it('explains when reader credentials cannot list remote mirrors', async () => {
     const fetchMock = vi.fn(() => Promise.resolve(new Response('', { status: 403 })));
     const service = new minioMirrorService.MinioMirrorService({ fetch: fetchMock });

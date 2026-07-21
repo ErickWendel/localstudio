@@ -27,6 +27,7 @@ import type {
   AiProviderState,
   FontCatalogItem,
   LocalFontMirrorProgress,
+  MirrorDownloadProgress,
   MirrorProjectSummary,
   MirrorState,
   MirrorSyncProgress,
@@ -118,6 +119,13 @@ export type RemoteImportStatus =
   | 'deleting'
   | 'failed';
 
+export interface RemoteImportProgressState {
+  detail: string;
+  progress: number;
+  stage: 'choosing-folder' | 'downloading' | 'writing-files' | 'opening';
+  title: string;
+}
+
 const PROMPT_API_REQUIRED_MESSAGE = 'LLM model must be prepared before using prompt-to-slides.';
 const IMAGE_GENERATION_MODEL_REQUIRED_MESSAGE =
   'Download image generation models before creating images.';
@@ -127,6 +135,41 @@ const AUTOSAVE_RETRY_DELAY_MS = 1000;
 type TranslationScope = 'selection' | 'slide' | 'deck';
 
 const DECK_TRANSLATION_CONCURRENCY = 3;
+
+function formatRemoteImportBytes(bytes: number) {
+  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${Math.max(0, Math.round(bytes))} B`;
+}
+
+function getRemoteImportDownloadRatio(progress: MirrorDownloadProgress) {
+  if (progress.totalBytes > 0) return progress.downloadedBytes / progress.totalBytes;
+  if (progress.totalFiles > 0) return progress.downloadedFiles / progress.totalFiles;
+  return 0;
+}
+
+function formatRemoteImportDownloadDetail(progress: MirrorDownloadProgress) {
+  if (progress.totalBytes > 0) {
+    return `Downloaded ${formatRemoteImportBytes(progress.downloadedBytes)} of ${formatRemoteImportBytes(
+      progress.totalBytes,
+    )} from remote storage.`;
+  }
+  if (progress.totalFiles > 0) {
+    return `Downloaded ${progress.downloadedFiles} of ${progress.totalFiles} files from remote storage.`;
+  }
+  return 'Preparing mirrored project files from remote storage.';
+}
+
+function createRemoteImportDownloadProgress(progress: MirrorDownloadProgress) {
+  const ratio = Math.max(0, Math.min(1, getRemoteImportDownloadRatio(progress)));
+  return {
+    detail: formatRemoteImportDownloadDetail(progress),
+    progress: 24 + ratio * 44,
+    stage: 'downloading' as const,
+    title: 'Downloading remote mirror',
+  };
+}
 
 function getFirstFontFamily(fontFamily: string) {
   return fontFamily
@@ -284,6 +327,8 @@ export function useEditorViewModel(services: AppServices) {
   const [remoteImportStatus, setRemoteImportStatus] = useState<RemoteImportStatus>('loading');
   const [remoteImportProjects, setRemoteImportProjects] = useState<MirrorProjectSummary[]>([]);
   const [remoteImportError, setRemoteImportError] = useState<string | undefined>();
+  const [remoteImportProgress, setRemoteImportProgress] =
+    useState<RemoteImportProgressState | undefined>();
   const [mirrorConfig, setMirrorConfig] = useState<MinioMirrorConfig>(
     () => storedMirrorConfig ?? minioMirrorService.DEFAULT_MINIO_MIRROR_CONFIG,
   );
@@ -1961,7 +2006,7 @@ export function useEditorViewModel(services: AppServices) {
       setMirrorState({
         enabled: true,
         status: 'failed',
-        error: error instanceof Error ? error.message : 'MinIO mirror sync failed.',
+        error: error instanceof Error ? error.message : 'Remote storage sync failed.',
       });
     } finally {
       mirrorSyncInFlightRef.current = false;
@@ -2003,6 +2048,7 @@ export function useEditorViewModel(services: AppServices) {
     setRemoteImportOpen(true);
     setRemoteImportStatus('loading');
     setRemoteImportError(undefined);
+    setRemoteImportProgress(undefined);
     try {
       const mirrors = await services.mirrorService.listProjects(config);
       if (mirrors.length === 0) {
@@ -2014,13 +2060,14 @@ export function useEditorViewModel(services: AppServices) {
       setRemoteImportStatus('ready');
     } catch (error: unknown) {
       setRemoteImportStatus('failed');
+      setRemoteImportProgress(undefined);
       setRemoteImportError(
         error instanceof Error ? error.message : 'Could not list mirrored projects.',
       );
       setMirrorState({
         enabled: Boolean(config),
         status: 'failed',
-        error: error instanceof Error ? error.message : 'MinIO mirror import failed.',
+        error: error instanceof Error ? error.message : 'Remote storage import failed.',
       });
     }
   }
@@ -2030,11 +2077,39 @@ export function useEditorViewModel(services: AppServices) {
     if (!config || !services.projectRepository.importMirrorFiles) return;
     setRemoteImportStatus('importing');
     setRemoteImportError(undefined);
+    setRemoteImportProgress({
+      detail: 'Choose where LocalStudio should save the mirrored project files.',
+      progress: 8,
+      stage: 'choosing-folder',
+      title: 'Choose destination folder',
+    });
     try {
       await services.projectRepository.prepareImportMirrorFiles?.();
-      const files = await services.mirrorService.downloadProject(projectId, config);
+      setRemoteImportProgress({
+        detail: 'Downloading the mirrored project manifest and files from remote storage.',
+        progress: 24,
+        stage: 'downloading',
+        title: 'Downloading remote mirror',
+      });
+      const files = await services.mirrorService.downloadProject(projectId, config, {
+        onProgress: (progress) => {
+          setRemoteImportProgress(createRemoteImportDownloadProgress(progress));
+        },
+      });
+      setRemoteImportProgress({
+        detail: 'Writing project files into the selected local folder.',
+        progress: 72,
+        stage: 'writing-files',
+        title: 'Saving local copy',
+      });
       const importedProject = await services.projectRepository.importMirrorFiles(files);
       const normalizedProject = editorViewModelProject.normalizeProjectDocument(importedProject);
+      setRemoteImportProgress({
+        detail: 'Loading fonts, pages, and editing state for the imported project.',
+        progress: 92,
+        stage: 'opening',
+        title: 'Opening project',
+      });
       await editorViewModelRuntime.loadProjectFonts(normalizedProject, services.fontImportService);
       setProject(normalizedProject);
       setActivePageId(normalizedProject.pages[0]?.id ?? '');
@@ -2058,14 +2133,16 @@ export function useEditorViewModel(services: AppServices) {
       editorViewModelProject.writeProjectNameToUrl(normalizedProject.name);
       editorPreferences.writePersistencePreference(true);
       setMirrorState({ enabled: true, status: 'synced', lastSyncedAt: new Date().toISOString() });
+      setRemoteImportProgress(undefined);
       setRemoteImportOpen(false);
     } catch (error: unknown) {
       setRemoteImportStatus('failed');
-      setRemoteImportError(error instanceof Error ? error.message : 'MinIO mirror import failed.');
+      setRemoteImportProgress(undefined);
+      setRemoteImportError(error instanceof Error ? error.message : 'Remote storage import failed.');
       setMirrorState({
         enabled: Boolean(config),
         status: 'failed',
-        error: error instanceof Error ? error.message : 'MinIO mirror import failed.',
+        error: error instanceof Error ? error.message : 'Remote storage import failed.',
       });
     }
   }
@@ -2092,7 +2169,7 @@ export function useEditorViewModel(services: AppServices) {
       setMirrorState({
         enabled: Boolean(config),
         status: 'failed',
-        error: error instanceof Error ? error.message : 'MinIO mirror delete failed.',
+        error: error instanceof Error ? error.message : 'Remote storage delete failed.',
       });
     }
   }
@@ -3192,6 +3269,7 @@ export function useEditorViewModel(services: AppServices) {
     remoteImportStatus,
     remoteImportProjects,
     remoteImportError,
+    remoteImportProgress,
     versionHistoryOpen,
     versionHistoryEntries,
     selectedVersionId,

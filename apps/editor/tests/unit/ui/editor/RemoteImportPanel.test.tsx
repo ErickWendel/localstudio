@@ -62,4 +62,33 @@ describe('RemoteImportPanel', () => {
     expect(onDeleteProject).toHaveBeenCalledWith('project-alpha');
     expect(onImportProject).not.toHaveBeenCalled();
   });
+
+  it('shows detailed progress while importing a selected remote project', () => {
+    const onClose = vi.fn();
+    const onImportProject = vi.fn();
+
+    render(
+      <RemoteImportPanel
+        progress={{
+          detail: 'Downloading the mirrored project manifest and files from remote storage.',
+          progress: 36,
+          stage: 'downloading',
+          title: 'Downloading remote mirror',
+        }}
+        projects={[
+          { id: 'project-alpha', name: 'Alpha Deck', syncedAt: '2026-06-30T12:00:00.000Z' },
+        ]}
+        status="importing"
+        onClose={onClose}
+        onImportProject={onImportProject}
+      />,
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent('Downloading remote mirror');
+    expect(screen.getByRole('progressbar', { name: 'Remote import progress' })).toHaveAttribute(
+      'aria-valuenow',
+      '36',
+    );
+    expect(screen.getByRole('button', { name: 'Import Alpha Deck' })).toBeDisabled();
+  });
 });

@@ -9,6 +9,77 @@
   color: #ffb4ab;
 }
 
+.remote-import-progress-card {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 10px 12px;
+  align-items: center;
+  border: 1px solid rgba(125, 211, 252, 0.24);
+  border-radius: 6px;
+  background: rgba(8, 18, 26, 0.78);
+  padding: 12px;
+}
+
+.remote-import-progress-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(125, 211, 252, 0.34);
+  border-radius: 50%;
+  background: rgba(125, 211, 252, 0.1);
+  color: #7dd3fc;
+}
+
+.remote-import-progress-icon span {
+  animation: remoteImportSpin 1200ms linear infinite;
+  font-size: 22px;
+}
+
+.remote-import-progress-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.remote-import-progress-stage {
+  color: #7dd3fc;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.remote-import-progress-copy strong {
+  color: var(--ew-text);
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.remote-import-progress-copy p {
+  margin: 0;
+  color: var(--ew-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.remote-import-progress {
+  grid-column: 1 / -1;
+  height: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.remote-import-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #37fd76, #7dd3fc);
+  transition: width 180ms ease;
+}
+
 .remote-import-list {
   display: grid;
   gap: 8px;
@@ -128,4 +199,10 @@
 .remote-import-confirm-actions button:disabled {
   cursor: wait;
   opacity: 0.64;
+}
+
+@keyframes remoteImportSpin {
+  to {
+    transform: rotate(360deg);
+  }
 }

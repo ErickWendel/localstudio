@@ -1,5 +1,6 @@
 import type {
   MirrorFile,
+  MirrorDownloadProgress,
   MirrorProjectSummary,
   MirrorService,
   MirrorState,
@@ -72,6 +73,7 @@ const LEGACY_LOCAL_MINIO_CREDENTIALS = {
 } as const;
 
 const DELETE_BATCH_SIZE = 25;
+const MIRROR_DOWNLOAD_CONCURRENCY = 12;
 const MIRROR_UPLOAD_CONCURRENCY = 3;
 
 function getProjectMirrorKey(projectName: string) {
@@ -188,6 +190,27 @@ async function runWithConcurrency<T>(
       }
     }),
   );
+}
+
+async function mapWithConcurrency<T, TResult>(
+  items: T[],
+  concurrency: number,
+  task: (item: T, index: number) => Promise<TResult>,
+) {
+  const results = new Array<TResult>(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(1, concurrency), items.length);
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < items.length) {
+        const item = items[nextIndex];
+        const index = nextIndex;
+        nextIndex += 1;
+        if (item) results[index] = await task(item, index);
+      }
+    }),
+  );
+  return results;
 }
 
 class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
@@ -310,7 +333,11 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
       .sort(compareMirrorProjectsBySyncedAt);
   }
 
-  async downloadProject(projectKey: string, config: MinioMirrorConfig): Promise<MirrorFile[]> {
+  async downloadProject(
+    projectKey: string,
+    config: MinioMirrorConfig,
+    options?: { onProgress?: (progress: MirrorDownloadProgress) => void },
+  ): Promise<MirrorFile[]> {
     const manifestResponse = await this.signedFetch(
       minioObjectUtils.createObjectUrl(
         config,
@@ -323,18 +350,48 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
     if (!manifestResponse.ok)
       throw new Error(`Could not download MinIO mirror manifest (${manifestResponse.status}).`);
     const manifest = (await manifestResponse.json()) as MirrorManifest;
-    const files = await Promise.all(
-      Object.keys(manifest.files).map(async (path) => {
+    const manifestFiles = Object.entries(manifest.files).map(([path, file]) => ({
+      ...file,
+      path: file.path || path,
+    }));
+    const totalFiles = manifestFiles.length;
+    const totalBytes = manifestFiles.reduce(
+      (total, file) => total + Math.max(0, file.size || 0),
+      0,
+    );
+    let completedBytes = 0;
+    let downloadedFiles = 0;
+
+    const reportProgress = (currentFile?: string) => {
+      options?.onProgress?.({
+        currentFile,
+        downloadedBytes: Math.min(totalBytes || completedBytes, completedBytes),
+        downloadedFiles,
+        totalBytes,
+        totalFiles,
+      });
+    };
+
+    reportProgress();
+    const files = await mapWithConcurrency(
+      manifestFiles,
+      MIRROR_DOWNLOAD_CONCURRENCY,
+      async (file) => {
         const response = await this.signedFetch(
-          minioObjectUtils.createObjectUrl(config, getProjectFileKey(config, projectKey, path)),
+          minioObjectUtils.createObjectUrl(config, getProjectFileKey(config, projectKey, file.path)),
           'GET',
           config,
           getReaderCredentials(config),
         );
         if (!response.ok)
-          throw new Error(`Could not download mirrored file ${path} (${response.status}).`);
-        return { path, blob: await response.blob() };
-      }),
+          throw new Error(`Could not download mirrored file ${file.path} (${response.status}).`);
+        const expectedBytes = Math.max(0, file.size || 0);
+        const blob = await response.blob();
+        completedBytes += expectedBytes || blob.size;
+        downloadedFiles += 1;
+        reportProgress(file.path);
+        return { path: file.path, blob };
+      },
     );
     files.push({
       path: minioMirrorFiles.MIRROR_MANIFEST_FILE_NAME,

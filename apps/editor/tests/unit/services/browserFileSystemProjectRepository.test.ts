@@ -306,6 +306,28 @@ describe('BrowserFileSystemProjectRepository', () => {
     expect(directory.directories.has('Prepared Remote Mirror')).toBe(true);
   });
 
+  it('uses the picked parent permission when importing a mirrored project folder', async () => {
+    const directory = new MockDirectoryHandle('Projects', 'granted', 'denied');
+    const project = sampleProject.createSampleProject();
+    const repository = new BrowserFileSystemProjectRepository({
+      pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
+    });
+
+    await repository.prepareImportMirrorFiles();
+    const importedProject = await repository.importMirrorFiles([
+      {
+        path: 'project.json',
+        blob: new Blob([JSON.stringify({ ...project, name: 'Remote Child Import' })], {
+          type: 'application/json',
+        }),
+      },
+    ]);
+
+    expect(importedProject.name).toBe('Remote Child Import');
+    expect(directory.directories.has('Remote Child Import')).toBe(true);
+  });
+
   it('keeps imported projects loadable when a mirrored asset file is missing locally', async () => {
     const directory = new MockDirectoryHandle('Projects');
     const project = {
