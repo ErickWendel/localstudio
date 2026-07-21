@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import type { ShareMetadata } from '../../services/contracts/interfaces';
+import type {
+  ShareMetadata,
+  SharePublishProgress,
+} from '../../services/contracts/interfaces';
 import { copyShareText } from './shareClipboard';
 
 export interface ShareRecordingOption {
@@ -13,7 +16,7 @@ interface SharePanelProps {
   recordingOptions?: ShareRecordingOption[] | undefined;
   share?: ShareMetadata | undefined;
   publicLinkUnavailableReason?: string | undefined;
-  shareProgressLabel?: string | undefined;
+  shareProgress?: SharePublishProgress | undefined;
   onClose: () => void;
   onConfigurePublicLink?: () => void;
   onCopyLink: (selectedRecordingId?: string) => Promise<ShareMetadata>;
@@ -35,7 +38,7 @@ export function SharePanel({
   recordingOptions = [],
   share,
   publicLinkUnavailableReason,
-  shareProgressLabel,
+  shareProgress,
   onClose,
   onConfigurePublicLink,
   onCopyLink,
@@ -50,9 +53,12 @@ export function SharePanel({
   const currentShare = share ?? lastCopiedShare;
   const publicLinkUnavailable = Boolean(publicLinkUnavailableReason);
   const statusLabel = getStatusLabel(currentShare, isCopying);
+  const progressPercent = shareProgress
+    ? Math.round((shareProgress.current / shareProgress.total) * 100)
+    : 0;
   const shareAccessDescription =
     copyError ??
-    shareProgressLabel ??
+    shareProgress?.label ??
     publicLinkUnavailableReason ??
     (currentShare
       ? 'Unlisted: anyone with the link can view.'
@@ -102,6 +108,18 @@ export function SharePanel({
       <section className="share-access-block" aria-label="Share access">
         <span className="share-status-pill">{copyError ? 'Share failed' : statusLabel}</span>
         <p>{shareAccessDescription}</p>
+        {shareProgress ? (
+          <div
+            className="share-publish-progress"
+            role="progressbar"
+            aria-label="Share publish progress"
+            aria-valuemin={0}
+            aria-valuemax={shareProgress.total}
+            aria-valuenow={shareProgress.current}
+          >
+            <span style={{ width: `${progressPercent}%` }} />
+          </div>
+        ) : null}
         <p className="share-access-note">
           Public links should use a read-only storage key so viewers cannot write or modify
           presentations.

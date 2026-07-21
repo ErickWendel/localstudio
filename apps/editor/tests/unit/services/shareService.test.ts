@@ -109,8 +109,9 @@ describe('BrowserShareService', () => {
     window.localStorage.clear();
   });
 
-  it('publishes a public share payload and local assets to MinIO', async () => {
+  it('publishes a mirror-backed public share payload without re-uploading assets', async () => {
     const uploadedBodies = new Map<string, Blob>();
+    const progressEvents: Array<{ current: number; total: number; label: string }> = [];
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = getRequestUrl(input);
       if (init?.method === 'GET') {
@@ -129,31 +130,28 @@ describe('BrowserShareService', () => {
       origin: 'https://localstudio.test',
     });
 
-    const share = await service.createShare(createProjectWithInlineAsset());
+    const share = await service.createShare(createProjectWithInlineAsset(), {
+      onProgress: (progress) => progressEvents.push(progress),
+    });
 
     expect(share.shareId).toBe('project-project-1');
     const publicUrl = new URL(share.publicUrl);
     expect(publicUrl.pathname).toBe('/editor/');
     expect(publicUrl.searchParams.get('share')).toBe('project-project-1');
     expect(publicUrl.searchParams.get('src')).toBe(
-      'http://localhost:9000/localstudio/mirrors/public-shares/project-project-1/share.json',
+      'http://localhost:9000/localstudio/mirrors/shares/project-project-1.json',
     );
     expect(share.embedHtml).toContain('/editor/?embed=project-project-1');
     expect(share.embedHtml).toContain('src=');
 
     const putUrls = Array.from(uploadedBodies.keys());
-    expect(putUrls).toContain(
-      'http://localhost:9000/localstudio/mirrors/public-shares/project-project-1/assets/asset-inline.png',
-    );
-    expect(putUrls).toContain(
-      'http://localhost:9000/localstudio/mirrors/public-shares/project-project-1/share.json',
-    );
+    expect(putUrls).toEqual([
+      'http://localhost:9000/localstudio/mirrors/shares/project-project-1.json',
+    ]);
 
     const sharePayload = JSON.parse(
       await uploadedBodies
-        .get(
-          'http://localhost:9000/localstudio/mirrors/public-shares/project-project-1/share.json',
-        )!
+        .get('http://localhost:9000/localstudio/mirrors/shares/project-project-1.json')!
         .text(),
     ) as unknown as PublicSharePayloadFixture;
     expect(sharePayload).toMatchObject({
@@ -164,15 +162,20 @@ describe('BrowserShareService', () => {
         assets: {
           'asset-inline': {
             objectUrl:
-              'http://localhost:9000/localstudio/mirrors/public-shares/project-project-1/assets/asset-inline.png',
+              'http://localhost:9000/localstudio/mirrors/Untitled%20AI%20Deck/assets/asset-inline.png',
             storage: 'remote',
           },
         },
       },
     });
+    expect(progressEvents).toEqual([
+      { current: 0, total: 1, label: 'Preparing public share' },
+      { current: 0, total: 1, label: 'Publishing share link' },
+      { current: 1, total: 1, label: 'Published share link' },
+    ]);
   });
 
-  it('publishes project fonts as public remote font files', async () => {
+  it('maps public font URLs to existing mirror files', async () => {
     const uploadedBodies = new Map<string, Blob>();
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       if (init?.method === 'PUT') {
@@ -191,10 +194,9 @@ describe('BrowserShareService', () => {
     await service.createShare(createProjectWithInlineFont());
 
     const fontUrl =
-      'http://localhost:9000/localstudio/mirrors/public-shares/project-project-1/fonts/acme-sans.woff2';
-    const shareUrl =
-      'http://localhost:9000/localstudio/mirrors/public-shares/project-project-1/share.json';
-    expect(Array.from(uploadedBodies.keys())).toContain(fontUrl);
+      'http://localhost:9000/localstudio/mirrors/Untitled%20AI%20Deck/fonts/acme-sans.woff2';
+    const shareUrl = 'http://localhost:9000/localstudio/mirrors/shares/project-project-1.json';
+    expect(Array.from(uploadedBodies.keys())).toEqual([shareUrl]);
     const sharePayload = JSON.parse(await uploadedBodies.get(shareUrl)!.text()) as PublicSharePayloadFixture;
     expect(sharePayload.project.fonts?.acme).toMatchObject({
       objectUrl: fontUrl,
@@ -202,7 +204,7 @@ describe('BrowserShareService', () => {
     });
   });
 
-  it('publishes presenter recording audio and transcript data with public shares', async () => {
+  it('maps public recording audio URLs to existing mirror files with transcript data', async () => {
     const uploadedBodies = new Map<string, Blob>();
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       if (init?.method === 'PUT') {
@@ -221,11 +223,9 @@ describe('BrowserShareService', () => {
     await service.createShare(createProjectWithRecording());
 
     const recordingUrl =
-      'http://localhost:9000/localstudio/mirrors/public-shares/project-project-1/recordings/recording1.webm';
-    const shareUrl =
-      'http://localhost:9000/localstudio/mirrors/public-shares/project-project-1/share.json';
-    expect(Array.from(uploadedBodies.keys())).toContain(recordingUrl);
-    expect(await uploadedBodies.get(recordingUrl)!.text()).toBe('audio');
+      'http://localhost:9000/localstudio/mirrors/Untitled%20AI%20Deck/recordings/recording1.webm';
+    const shareUrl = 'http://localhost:9000/localstudio/mirrors/shares/project-project-1.json';
+    expect(Array.from(uploadedBodies.keys())).toEqual([shareUrl]);
     const sharePayload = JSON.parse(await uploadedBodies.get(shareUrl)!.text()) as PublicSharePayloadFixture;
     expect(sharePayload.project.recordings?.recording1).toMatchObject({
       audio: {

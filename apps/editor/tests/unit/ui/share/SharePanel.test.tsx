@@ -121,6 +121,25 @@ describe('SharePanel', () => {
     expect(screen.getByText('Copied')).toBeInTheDocument();
   });
 
+  it('shows publish progress while the public link is syncing', () => {
+    render(
+      <SharePanel
+        projectName="Untitled AI Deck"
+        share={createShareMetadata({ status: 'syncing' })}
+        shareProgress={{ current: 2, total: 5, label: 'Uploading media5.mp4' }}
+        onClose={vi.fn()}
+        onCopyLink={vi.fn()}
+        onDownload={vi.fn()}
+        onPresent={vi.fn()}
+      />,
+    );
+
+    const progress = screen.getByRole('progressbar', { name: 'Share publish progress' });
+    expect(screen.getByText('Uploading media5.mp4')).toBeInTheDocument();
+    expect(progress).toHaveAttribute('aria-valuenow', '2');
+    expect(progress).toHaveAttribute('aria-valuemax', '5');
+  });
+
   it('lets speakers choose which saved recording is published with the public link', async () => {
     const user = userEvent.setup();
     const onCopyLink = vi.fn().mockResolvedValue(createShareMetadata({ status: 'copied' }));

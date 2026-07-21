@@ -154,6 +154,60 @@ describe('minioMirrorService.createMirrorFiles', () => {
       storage: 'file',
     });
   });
+
+  it('includes presenter recording audio files in mirror payloads', async () => {
+    const project: ProjectDocument = {
+      ...sampleProject.createSampleProject(),
+      recordings: {
+        recording1: {
+          id: 'recording1',
+          name: 'Presenter recording',
+          createdAt: '2026-07-18T12:00:00.000Z',
+          updatedAt: '2026-07-18T12:00:00.000Z',
+          durationMs: 2400,
+          language: 'en',
+          modelPresetId: 'web-speech-api',
+          audio: {
+            mimeType: 'audio/webm;codecs=opus',
+            objectUrl: 'data:audio/webm;base64,YXVkaW8=',
+            storage: 'inline',
+          },
+          segments: [
+            {
+              id: 'segment1',
+              text: 'Mirrored transcript audio.',
+              startMs: 0,
+              endMs: 2400,
+              final: true,
+            },
+          ],
+        },
+      },
+    };
+
+    const files = await minioMirrorService.createMirrorFiles(
+      project,
+      new VersionedRepository([], project),
+      config,
+    );
+
+    expect(files.map((file) => file.path)).toContain('recordings/recording1.webm');
+    const projectJson = JSON.parse(
+      await files.find((file) => file.path === 'project.json')!.blob.text(),
+    ) as ProjectDocument;
+    expect(projectJson.recordings?.recording1).toMatchObject({
+      audio: {
+        fileName: 'recording1.webm',
+        storage: 'file',
+      },
+      segments: [
+        {
+          text: 'Mirrored transcript audio.',
+        },
+      ],
+    });
+    expect(projectJson.recordings?.recording1?.audio.objectUrl).toBeUndefined();
+  });
 });
 
 describe('minioMirrorService.MinioMirrorService', () => {

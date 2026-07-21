@@ -348,7 +348,11 @@ function E2EDiagnosticsComponentGallery() {
                 status: 'syncing',
               }
         }
-        shareProgressLabel={shareCopyMode === 'ready' ? undefined : 'Preparing public link'}
+        shareProgress={
+          shareCopyMode === 'ready'
+            ? undefined
+            : { current: 1, total: 3, label: 'Preparing public link' }
+        }
         onClose={() => setShellDiagnostics('share-close')}
         onConfigurePublicLink={() => setShareCopyMode('ready')}
         onCopyLink={async (recordingId) => ({
