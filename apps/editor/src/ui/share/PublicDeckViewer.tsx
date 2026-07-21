@@ -61,6 +61,23 @@ interface PublicPodcastChapter {
 
 type PublicPlaybackSource = 'overlay' | 'podcast';
 
+const nativeControlActivationKeys = new Set([' ', 'Enter', 'Spacebar']);
+
+function isKeyboardShortcutControlActivation(event: KeyboardEvent) {
+  if (!nativeControlActivationKeys.has(event.key)) return false;
+  return (
+    isKeyboardShortcutInteractiveTarget(event.target) ||
+    isKeyboardShortcutInteractiveTarget(document.activeElement)
+  );
+}
+
+function isKeyboardShortcutInteractiveTarget(target: EventTarget | null) {
+  return (
+    target instanceof Element &&
+    Boolean(target.closest('button, a[href], [role="button"], [role="link"]'))
+  );
+}
+
 const publicDeckShortcutActions = [
   'black-screen',
   'cursor-toggle',
@@ -1726,6 +1743,7 @@ export function PublicDeckViewer({
     function handleKeyDown(event: KeyboardEvent) {
       if (viewerState.status !== 'ready') return;
       if (isKeyboardShortcutEditableTarget(event.target)) return;
+      if (isKeyboardShortcutControlActivation(event)) return;
       if (keyboardShortcutsOpen && event.key === 'Escape') {
         event.preventDefault();
         setKeyboardShortcutsOpen(false);

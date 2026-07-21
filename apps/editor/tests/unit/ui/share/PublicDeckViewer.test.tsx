@@ -555,6 +555,12 @@ describe('PublicDeckViewer', () => {
       'page',
     );
 
+    const previousButton = screen.getByRole('button', { name: 'Previous slide' });
+    previousButton.focus();
+    expect(previousButton).toHaveFocus();
+    await user.keyboard(' ');
+    expect(screen.getByText('1 / 2')).toBeInTheDocument();
+
     await user.click(screen.getByRole('button', { name: 'Show keyboard shortcuts' }));
     expect(screen.getByRole('dialog', { name: 'Keyboard Shortcuts' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Advance to next build/ })).toBeInTheDocument();

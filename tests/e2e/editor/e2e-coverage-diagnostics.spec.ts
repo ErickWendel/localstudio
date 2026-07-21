@@ -83,7 +83,11 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
     await noRecordingViewer.getByRole('button', { name: /Jump to slide 2: Public Slide 2/ }).click();
     await expect(noRecordingViewer.getByText('2 / 3')).toBeVisible();
     await noRecordingViewer.getByRole('button', { name: 'Previous slide' }).click();
-    await noRecordingViewer.getByRole('button', { name: 'Open transcript chat' }).click();
+    await noRecordingViewer.getByRole('button', { name: 'Open slide list' }).click();
+    const slideList = page.getByRole('complementary', { name: 'Slide list' });
+    await expect(slideList).toBeVisible();
+    await slideList.getByRole('button', { name: /Open slide 2: Public Slide 2/ }).click();
+    await expect(noRecordingViewer.getByText('2 / 3')).toBeVisible();
     await expect(page.getByText('Deck not found')).toBeVisible();
     await expect(page.getByText('Deck could not be loaded')).toBeVisible();
     await expect(page.getByLabel('Sequential view model diagnostics')).toContainText('"pages"', {
