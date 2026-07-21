@@ -138,6 +138,49 @@ test.describe('public deck view journey', () => {
     await expect(shortcuts.getByRole('button', { name: /Go to first slide/ })).toBeVisible();
     await expect(shortcuts.getByRole('button', { name: /Pause\/Play movie/ })).toBeVisible();
     await expect(shortcuts.getByRole('button', { name: /Jump to end of movie/ })).toBeVisible();
+    await expect(shortcuts.getByRole('button', { name: /Quit presentation mode/ })).toHaveCount(0);
+    await expect(shortcuts.getByRole('button', { name: /Close the slide navigator/ })).toHaveCount(0);
+    await page.evaluate(() => {
+      function addInstrumentedVideo(parent: Element, testId: string) {
+        const video = document.createElement('video');
+        let paused = true;
+        video.dataset.testid = testId;
+        video.dataset.shortcutState = 'idle';
+        Object.defineProperty(video, 'paused', {
+          configurable: true,
+          get: () => paused,
+        });
+        video.play = () => {
+          paused = false;
+          video.dataset.shortcutState = 'playing';
+          return Promise.resolve();
+        };
+        video.pause = () => {
+          paused = true;
+          video.dataset.shortcutState = 'paused';
+        };
+        parent.append(video);
+      }
+
+      const viewer = document.querySelector('[aria-label="Public presentation"]');
+      const stage = viewer?.querySelector('.public-deck-stage-shell');
+      if (!viewer || !stage) throw new Error('Public deck stage was not rendered.');
+      const preloader = document.createElement('div');
+      preloader.className = 'project-video-preloader';
+      viewer.prepend(preloader);
+      addInstrumentedVideo(preloader, 'preloaded-shortcut-video');
+      addInstrumentedVideo(stage, 'presented-shortcut-video');
+    });
+    const presentedVideo = page.getByTestId('presented-shortcut-video');
+    const preloadedVideo = page.getByTestId('preloaded-shortcut-video');
+    await page.keyboard.press('k');
+    await expect(presentedVideo).toHaveAttribute('data-shortcut-state', 'playing');
+    await expect(preloadedVideo).toHaveAttribute('data-shortcut-state', 'idle');
+    await page.keyboard.press('k');
+    await expect(presentedVideo).toHaveAttribute('data-shortcut-state', 'paused');
+    await shortcuts.getByRole('button', { name: /Pause\/Play movie/ }).click();
+    await expect(presentedVideo).toHaveAttribute('data-shortcut-state', 'playing');
+    await expect(preloadedVideo).toHaveAttribute('data-shortcut-state', 'idle');
     await shortcuts.getByRole('button', { name: /Go to last slide/ }).click();
     await expect(page.getByText('3 / 3')).toBeVisible();
     await page.keyboard.press('Home');

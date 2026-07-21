@@ -63,7 +63,6 @@ type PublicPlaybackSource = 'overlay' | 'podcast';
 
 const publicDeckShortcutActions = [
   'black-screen',
-  'close-slide-navigator',
   'cursor-toggle',
   'decrease-notes',
   'fast-forward-movie',
@@ -81,7 +80,6 @@ const publicDeckShortcutActions = [
   'play-pause-movie',
   'previous-build',
   'previous-navigator-slide',
-  'quit-presentation',
   'reset-timer',
   'rewind-movie',
   'select-navigator-slide',
@@ -108,7 +106,6 @@ const publicDeckShortcutGroups = [
   {
     title: 'Other',
     items: [
-      { action: 'quit-presentation', keys: ['Esc'], label: 'Quit presentation mode' },
       { action: 'shortcut-toggle', keys: ['?'], label: 'Show or hide Keyboard Shortcuts window' },
       { action: 'pause-presentation', keys: ['F'], label: 'Pause presentation; press any key to resume' },
       { action: 'black-screen', keys: ['B'], label: 'Pause presentation and show black screen' },
@@ -124,7 +121,6 @@ const publicDeckShortcutGroups = [
       { action: 'next-navigator-slide', keys: ['+'], label: 'Go to the next slide in the slide navigator' },
       { action: 'previous-navigator-slide', keys: ['-'], label: 'Go to the previous slide in the slide navigator' },
       { action: 'select-navigator-slide', keys: ['Return'], label: 'Go to the current slide in the slide navigator' },
-      { action: 'close-slide-navigator', keys: ['Esc'], label: 'Close the slide navigator' },
     ],
   },
   {
@@ -1412,7 +1408,9 @@ export function PublicDeckViewer({
   const getPublicDeckVideos = useCallback(() => {
     const viewerElement = publicViewerRef.current;
     if (!viewerElement) return [];
-    return Array.from(viewerElement.querySelectorAll<HTMLVideoElement>('video'));
+    return Array.from(
+      viewerElement.querySelectorAll<HTMLVideoElement>('.public-deck-stage-shell video'),
+    );
   }, []);
 
   const controlPublicDeckMovies = useCallback((action: 'end' | 'play-toggle' | 'start') => {
@@ -1938,7 +1936,6 @@ export function PublicDeckViewer({
     if (action === 'fast-forward-movie') pulsePublicDeckMovieHold('fast-forward');
     if (action === 'jump-movie-start') controlPublicDeckMovies('start');
     if (action === 'jump-movie-end') controlPublicDeckMovies('end');
-    if (action === 'quit-presentation') window.close();
   }
 
   return (

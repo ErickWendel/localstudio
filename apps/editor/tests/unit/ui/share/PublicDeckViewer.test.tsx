@@ -714,6 +714,50 @@ describe('PublicDeckViewer', () => {
     });
 
     expect(await screen.findByText('2 / 2')).toBeInTheDocument();
+
+    const presentedVideo = screen.getByLabelText<HTMLVideoElement>('Slide video');
+    const preloadedVideo = document.querySelector<HTMLVideoElement>(
+      '.project-video-preloader video',
+    );
+    expect(preloadedVideo).not.toBeNull();
+    let presentedVideoPaused = true;
+    const playPresentedVideo = vi.fn(() => {
+      presentedVideoPaused = false;
+      return Promise.resolve();
+    });
+    const pausePresentedVideo = vi.fn(() => {
+      presentedVideoPaused = true;
+    });
+    const playPreloadedVideo = vi.fn(() => Promise.resolve());
+    Object.defineProperty(presentedVideo, 'paused', {
+      configurable: true,
+      get: () => presentedVideoPaused,
+    });
+    Object.defineProperty(presentedVideo, 'play', {
+      configurable: true,
+      value: playPresentedVideo,
+    });
+    Object.defineProperty(presentedVideo, 'pause', {
+      configurable: true,
+      value: pausePresentedVideo,
+    });
+    Object.defineProperty(preloadedVideo, 'play', {
+      configurable: true,
+      value: playPreloadedVideo,
+    });
+
+    fireEvent.keyDown(window, { key: 'k' });
+    expect(playPresentedVideo).toHaveBeenCalledOnce();
+    expect(playPreloadedVideo).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: 'k' });
+    expect(pausePresentedVideo).toHaveBeenCalledOnce();
+
+    await user.click(screen.getByRole('button', { name: 'Show keyboard shortcuts' }));
+    expect(screen.queryByRole('button', { name: /Quit presentation mode/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Close the slide navigator/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Pause\/Play movie/ }));
+    expect(playPresentedVideo).toHaveBeenCalledTimes(2);
+    expect(playPreloadedVideo).not.toHaveBeenCalled();
   });
 
   it('rewinds shared deck slides with the left arrow key after advancing', async () => {
