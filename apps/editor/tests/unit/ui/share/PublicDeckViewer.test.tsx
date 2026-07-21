@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
@@ -554,6 +554,37 @@ describe('PublicDeckViewer', () => {
       'aria-current',
       'page',
     );
+
+    await user.click(screen.getByRole('button', { name: 'Show keyboard shortcuts' }));
+    expect(screen.getByRole('dialog', { name: 'Keyboard Shortcuts' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Advance to next build/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Go to first slide/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Pause\/Play movie/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Jump to end of movie/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Go to first slide/ }));
+    expect(screen.getByText('1 / 2')).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'End' });
+    expect(screen.getByText('2 / 2')).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'Home' });
+    expect(screen.getByText('1 / 2')).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: '?' });
+    expect(screen.queryByRole('dialog', { name: 'Keyboard Shortcuts' })).not.toBeInTheDocument();
+    fireEvent.keyDown(window, { key: '?' });
+    expect(screen.getByRole('dialog', { name: 'Keyboard Shortcuts' })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Keyboard Shortcuts' })).not.toBeInTheDocument();
+
+    expect(screen.queryByRole('button', { name: 'Open transcript chat' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Open slide list' }));
+    const slideList = screen.getByRole('complementary', { name: 'Slide list' });
+    expect(slideList).toBeInTheDocument();
+    expect(slideList).toContainElement(
+      screen.getByRole('button', { name: 'Open slide 2: Slide 2' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Open slide 2: Slide 2' }));
+    expect(screen.getByText('2 / 2')).toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: 'Slide list' })).not.toBeInTheDocument();
   });
 
   it('waits for target slide videos and GIFs before changing public deck slides', async () => {

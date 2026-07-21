@@ -1,0 +1,37 @@
+.public-slide-list-popover {
+  position: fixed;
+  right: 18px;
+  bottom: 76px;
+  z-index: 8;
+  width: min(390px, calc(100vw - 36px));
+  max-height: min(620px, calc(100vh - 112px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--ew-text);
+  background: rgba(5, 8, 10, 0.94);
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(12px);
+}
+
+.public-slide-list-popover header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.public-slide-list-popover h2 {
+  margin: 0;
+  font-family: var(--ls-font-display);
+  font-size: 16px;
+  letter-spacing: 0;
+}
+
+.public-slide-list-popover .public-podcast-chapters {
+  min-height: 0;
+  max-height: none;
+}

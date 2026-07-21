@@ -1,6 +1,7 @@
 interface KeyboardShortcutsDialogProps {
   onShortcutAction?: (action: KeyboardShortcutAction) => void;
   onClose: () => void;
+  shortcutGroups?: readonly KeyboardShortcutGroup[];
   supportedActions?: readonly KeyboardShortcutAction[];
   title?: string;
   variant?: 'dialog' | 'popover';
@@ -36,7 +37,12 @@ export type KeyboardShortcutAction =
   | 'scroll-notes-up'
   | 'scroll-notes-down';
 
-const shortcutGroups = [
+export interface KeyboardShortcutGroup {
+  title: string;
+  items: { action: KeyboardShortcutAction; keys: string[]; label: string }[];
+}
+
+const defaultShortcutGroups = [
   {
     title: 'Navigation',
     items: [
@@ -91,14 +97,12 @@ const shortcutGroups = [
       { action: 'jump-movie-end', keys: ['O'], label: 'Jump to end of movie' },
     ],
   },
-] satisfies {
-  title: string;
-  items: { action: KeyboardShortcutAction; keys: string[]; label: string }[];
-}[];
+] satisfies KeyboardShortcutGroup[];
 
 export function KeyboardShortcutsDialog({
   onShortcutAction,
   onClose,
+  shortcutGroups = defaultShortcutGroups,
   supportedActions,
   title = 'Keyboard Shortcuts',
   variant = 'dialog',
