@@ -38,9 +38,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint:
-    name: Lint
-    needs: build
+  dependencies:
+    name: Dependencies
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -55,21 +54,66 @@ jobs:
           node-version: 26
           cache: npm
 
+      - name: Restore dependency cache
+        id: dependency-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: npm-dependencies-${{ runner.os }}-node26-${{ hashFiles('package-lock.json') }}
+
       - name: Install dependencies
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
         run: npm ci
 
-      - name: Download build artifact
-        uses: actions/download-artifact@v5
+      - name: Save dependency cache
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
         with:
-          name: localstudio-dist
-          path: dist
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: ${{ steps.dependency-cache.outputs.cache-primary-key }}
+
+  lint:
+    name: Lint
+    needs: dependencies
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 26
+
+      - name: Restore dependency cache
+        id: dependency-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: npm-dependencies-${{ runner.os }}-node26-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies on cache miss
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        run: npm ci
 
       - name: Lint
         run: npm run lint
 
   typecheck:
     name: Typecheck
-    needs: build
+    needs: dependencies
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -82,22 +126,27 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 26
-          cache: npm
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Download build artifact
-        uses: actions/download-artifact@v5
+      - name: Restore dependency cache
+        id: dependency-cache
+        uses: actions/cache/restore@v5
         with:
-          name: localstudio-dist
-          path: dist
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: npm-dependencies-${{ runner.os }}-node26-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies on cache miss
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        run: npm ci
 
       - name: Typecheck
         run: npm run typecheck
 
   test:
     name: Unit tests (${{ matrix.label }})
+    needs: dependencies
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -126,9 +175,19 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 26
-          cache: npm
 
-      - name: Install dependencies
+      - name: Restore dependency cache
+        id: dependency-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: npm-dependencies-${{ runner.os }}-node26-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies on cache miss
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Test
@@ -202,9 +261,19 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 26
-          cache: npm
 
-      - name: Install dependencies
+      - name: Restore dependency cache
+        id: dependency-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: npm-dependencies-${{ runner.os }}-node26-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies on cache miss
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Download build artifact
@@ -276,9 +345,19 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 26
-          cache: npm
 
-      - name: Install dependencies
+      - name: Restore dependency cache
+        id: dependency-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: npm-dependencies-${{ runner.os }}-node26-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies on cache miss
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Download build artifact
@@ -322,6 +401,7 @@ jobs:
 
   build:
     name: Build
+    needs: dependencies
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -336,9 +416,19 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 26
-          cache: npm
 
-      - name: Install dependencies
+      - name: Restore dependency cache
+        id: dependency-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: npm-dependencies-${{ runner.os }}-node26-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies on cache miss
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Build
@@ -364,14 +454,6 @@ jobs:
       id-token: write
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Setup Node
-        uses: actions/setup-node@v5
-        with:
-          node-version: 26
-
       - name: Download build artifact
         uses: actions/download-artifact@v5
         with:
