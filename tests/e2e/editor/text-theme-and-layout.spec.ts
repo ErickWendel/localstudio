@@ -12,14 +12,29 @@ test.describe('editor text theme and layout journey', () => {
 
     await editor.openTool('Text');
     await page.getByRole('button', { name: 'Add a text box' }).click();
-    await editor.openTool('Layout');
-    await page.getByRole('button', { name: 'Add a little bit of body text', exact: true }).click();
+    const inlineTextEditor = page.getByRole('textbox', { name: 'Edit text' });
+    await expect(inlineTextEditor).toBeFocused();
+    await expect(inlineTextEditor).toHaveValue('Add a little bit of body text');
+    await page.keyboard.type('Overwritten body copy');
+    await expect(inlineTextEditor).toHaveValue('Overwritten body copy');
+    await inlineTextEditor.evaluate((element) => {
+      const input = element as HTMLTextAreaElement;
+      input.setSelectionRange(12, 16);
+      input.dispatchEvent(new Event('select', { bubbles: true }));
+    });
+    const textColorInput = page.getByRole('toolbar', { name: 'Text editing controls' }).getByLabel('Text color');
+    await textColorInput.fill('#ff0055');
+    await expect(textColorInput).toHaveValue('#ff0055');
+    await page.keyboard.press('Enter');
 
     const toolbar = page.getByRole('toolbar', { name: 'Text editing controls' });
     await expect(toolbar).toBeVisible();
     await toolbar.getByRole('spinbutton', { name: 'Text font size' }).fill('48');
     await toolbar.getByRole('button', { name: 'Bold text' }).click();
+    await toolbar.getByRole('button', { name: 'Text alignment menu' }).click();
     await toolbar.getByRole('button', { name: 'Align text right' }).click();
+    await toolbar.getByRole('button', { name: 'Text alignment menu' }).click();
+    await toolbar.getByRole('button', { name: 'Align text bottom' }).click();
     await toolbar.getByRole('button', { name: 'Edit text hyperlink' }).click();
     await toolbar.getByRole('textbox', { name: 'Text hyperlink URL' }).fill('localstudio.dev');
     await toolbar.getByRole('button', { name: 'Apply' }).click();
@@ -32,7 +47,12 @@ test.describe('editor text theme and layout journey', () => {
       'aria-pressed',
       'true',
     );
+    await toolbar.getByRole('button', { name: 'Text alignment menu' }).click();
     await expect(toolbar.getByRole('button', { name: 'Align text right' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(toolbar.getByRole('button', { name: 'Align text bottom' })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
@@ -51,6 +71,72 @@ test.describe('editor text theme and layout journey', () => {
     await expect(page.getByRole('button', { name: 'Group', exact: true })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Ungroup' })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Distribute' })).toBeDisabled();
+  });
+
+  test('applies sticky toolbar formatting across multiple selected text elements', async ({
+    page,
+  }) => {
+    const editor = new EditorAppPage(page, getServer().baseURL);
+    await editor.gotoNewProject();
+
+    await editor.openTool('Text');
+    await page.getByRole('button', { name: 'Add a text box' }).click();
+    const inlineTextEditor = page.getByRole('textbox', { name: 'Edit text' });
+    await expect(inlineTextEditor).toBeFocused();
+    await page.keyboard.type('First multi text');
+    await page.keyboard.press('Enter');
+
+    await page.getByRole('button', { name: 'Add a text box' }).click();
+    await expect(inlineTextEditor).toBeFocused();
+    await page.keyboard.type('Second multi text');
+    await page.keyboard.press('Enter');
+
+    await editor.openTool('Layout');
+    const firstLayer = page.locator('.layer-list article[role="button"][aria-label="First multi text"]');
+    const secondLayer = page.locator('.layer-list article[role="button"][aria-label="Second multi text"]');
+    await secondLayer.click();
+    await firstLayer.click({ modifiers: ['Shift'] });
+    await expect(firstLayer).toHaveAttribute('aria-pressed', 'true');
+    await expect(secondLayer).toHaveAttribute('aria-pressed', 'true');
+
+    const toolbar = page.getByRole('toolbar', { name: 'Text editing controls' });
+    await expect(toolbar).toBeVisible();
+    await toolbar.getByRole('spinbutton', { name: 'Text font size' }).fill('64');
+    await toolbar.getByRole('button', { name: 'Bold text' }).click();
+    await toolbar.getByRole('button', { name: 'Text alignment menu' }).click();
+    await toolbar.getByRole('button', { name: 'Align text center' }).click();
+    await toolbar.getByRole('button', { name: 'Text alignment menu' }).click();
+    await toolbar.getByRole('button', { name: 'Align text middle' }).click();
+    await toolbar.getByRole('button', { name: 'Text alignment menu' }).click();
+    await expect(toolbar.getByRole('button', { name: 'Align text middle' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    await firstLayer.click();
+    await editor.openTool('Design');
+    await expect(page.getByLabel('Selected text font size')).toHaveValue('64');
+    await expect(page.getByRole('button', { name: 'Align selected text center' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(page.getByRole('button', { name: 'Align selected text middle' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    await editor.openTool('Layout');
+    await secondLayer.click();
+    await editor.openTool('Design');
+    await expect(page.getByLabel('Selected text font size')).toHaveValue('64');
+    await expect(page.getByRole('button', { name: 'Align selected text center' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(page.getByRole('button', { name: 'Align selected text middle' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 
   test('changes presentation and slide design surfaces without selecting an element', async ({

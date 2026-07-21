@@ -31,6 +31,7 @@ import type {
   ImageElement,
   ProjectDocument,
   SelectionState,
+  TextElement,
   VideoElement,
 } from '../../../domain/documents/model';
 import { getNormalizedElementPoint } from '../background-selection/backgroundSelection';
@@ -53,6 +54,9 @@ import { shapeLineDraw } from './shape-line-draw';
 import { textTranslationLayout } from '../state/text-translation-layout';
 
 const TEXT_FRAME_PADDING = 6;
+const textMeasureCanvas =
+  typeof document === 'undefined' ? undefined : document.createElement('canvas');
+const textMeasureContext = textMeasureCanvas?.getContext('2d');
 
 interface CanvasWorkspaceProps {
   project: ProjectDocument;
@@ -91,6 +95,8 @@ interface CanvasWorkspaceProps {
   canTranslateSelection?: boolean;
   isTranslating?: boolean;
   translationNotice?: string | undefined;
+  autoEditTextElementId?: string | undefined;
+  activeTextSelection?: { elementId: string; start: number; end: number } | undefined;
   onAlignSelectedElement?: (() => void) | undefined;
   onAnimationPreviewAdvance?: (() => void) | undefined;
   onBringSelectedElementForward?: (() => void) | undefined;
@@ -117,6 +123,9 @@ interface CanvasWorkspaceProps {
   onSelectElement?: ((elementId: string, options?: { additive?: boolean }) => void) | undefined;
   onSendSelectedElementBackward?: (() => void) | undefined;
   onTranslateSelectedText?: (() => void) | undefined;
+  onTextEditSelectionChange?:
+    | ((elementId: string, range: { start: number; end: number }) => void)
+    | undefined;
   onUpdateImageCrop?: ((elementId: string, patch: ImageCropPatch) => void) | undefined;
   onUpdateElementFrame?: ((elementId: string, patch: ElementFramePatch) => void) | undefined;
   onUpdateElementFrames?: ((patches: Record<string, ElementFramePatch>) => void) | undefined;
@@ -148,6 +157,111 @@ function getAnimationOpacity(baseOpacity: number, state: ElementAnimationRenderS
 function getTypedText(text: string, state: ElementAnimationRenderState) {
   if (state.activeBuild?.effect !== 'keyboard-typing') return text;
   return text.slice(0, Math.ceil(text.length * state.progress));
+}
+
+function measureTextSegmentWidth(input: {
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: number;
+  text: string;
+}) {
+  if (!textMeasureContext) return input.text.length * input.fontSize * 0.55;
+  textMeasureContext.font = `${input.fontWeight} ${input.fontSize}px ${input.fontFamily}`;
+  return textMeasureContext.measureText(input.text).width;
+}
+
+function getFillForTextIndex(element: TextElement, index: number) {
+  return (
+    element.colorRanges?.find((range) => range.start <= index && index < range.end)?.fill ??
+    element.fill
+  );
+}
+
+function createTextRenderSegments(input: {
+  element: TextElement;
+  fontSize: number;
+  text: string;
+  width: number;
+}) {
+  const segments: Array<{ fill: string; text: string; x: number; y: number }> = [];
+  const lineHeight = input.element.lineHeight ?? 1.05;
+  const visualLines: Array<{
+    characters: Array<{ text: string; textIndex: number }>;
+    width: number;
+  }> = [];
+  let currentLine: Array<{ text: string; textIndex: number }> = [];
+  let currentLineWidth = 0;
+
+  for (let textIndex = 0; textIndex < input.text.length; textIndex += 1) {
+    const character = input.text[textIndex] ?? '';
+    if (character === '\n') {
+      visualLines.push({ characters: currentLine, width: currentLineWidth });
+      currentLine = [];
+      currentLineWidth = 0;
+      continue;
+    }
+
+    const characterWidth = measureTextSegmentWidth({
+      fontFamily: input.element.fontFamily,
+      fontSize: input.fontSize,
+      fontWeight: input.element.fontWeight,
+      text: character,
+    });
+    if (currentLine.length > 0 && currentLineWidth + characterWidth > input.width) {
+      visualLines.push({ characters: currentLine, width: currentLineWidth });
+      currentLine = [];
+      currentLineWidth = 0;
+    }
+    currentLine.push({ text: character, textIndex });
+    currentLineWidth += characterWidth;
+  }
+  visualLines.push({ characters: currentLine, width: currentLineWidth });
+
+  for (const [lineIndex, line] of visualLines.entries()) {
+    const lineX =
+      input.element.align === 'center'
+        ? Math.max(0, (input.width - line.width) / 2)
+        : input.element.align === 'right'
+          ? Math.max(0, input.width - line.width)
+          : 0;
+    let offsetX = lineX;
+    let segmentText = '';
+    let segmentFill = line.characters[0]
+      ? getFillForTextIndex(input.element, line.characters[0].textIndex)
+      : input.element.fill;
+
+    for (const character of line.characters) {
+      const fill = getFillForTextIndex(input.element, character.textIndex);
+      if (fill !== segmentFill && segmentText) {
+        segments.push({
+          fill: segmentFill,
+          text: segmentText,
+          x: offsetX,
+          y: lineIndex * input.fontSize * lineHeight,
+        });
+        offsetX += measureTextSegmentWidth({
+          fontFamily: input.element.fontFamily,
+          fontSize: input.fontSize,
+          fontWeight: input.element.fontWeight,
+          text: segmentText,
+        });
+        segmentText = '';
+      }
+      segmentFill = fill;
+      segmentText += character.text;
+    }
+
+    if (segmentText) {
+      segments.push({
+        fill: segmentFill,
+        text: segmentText,
+        x: offsetX,
+        y: lineIndex * input.fontSize * lineHeight,
+      });
+    }
+  }
+
+  return segments;
 }
 
 function getNormalizedStageRect(start: { x: number; y: number }, end: { x: number; y: number }) {
@@ -188,6 +302,7 @@ export function CanvasWorkspace({
   canTranslateSelection = false,
   isTranslating = false,
   translationNotice,
+  autoEditTextElementId,
   onAlignSelectedElement,
   onAnimationPreviewAdvance,
   onBackgroundPreviewPoint,
@@ -207,6 +322,7 @@ export function CanvasWorkspace({
   onSelectElement,
   onSendSelectedElementBackward,
   onTranslateSelectedText,
+  onTextEditSelectionChange,
   onUpdateImageCrop,
   onUpdateElementFrame,
   onUpdateElementFrames,
@@ -216,6 +332,7 @@ export function CanvasWorkspace({
   const nodeRefs = useRef<Record<string, Konva.Node | null>>({});
   const artboardRef = useRef<HTMLDivElement>(null);
   const textInputRef = useRef<HTMLTextAreaElement>(null);
+  const consumedAutoEditTextElementIdRef = useRef<string | undefined>(undefined);
   const [stageSize, setStageSize] = useState({ width: 768, height: 432 });
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [editingTextValue, setEditingTextValue] = useState('');
@@ -384,6 +501,31 @@ export function CanvasWorkspace({
     textInputRef.current?.focus();
     textInputRef.current?.select();
   }, [editingTextId]);
+
+  useEffect(() => {
+    if (!autoEditTextElementId) return;
+    if (consumedAutoEditTextElementIdRef.current === autoEditTextElementId) return;
+    const element = project.elements[autoEditTextElementId];
+    if (!element || element.type !== 'text') return;
+    if (readOnly) return;
+    consumedAutoEditTextElementIdRef.current = autoEditTextElementId;
+    const timeoutId = window.setTimeout(() => {
+      onSelectElement?.(element.id);
+      setEditingTextId(element.id);
+      setEditingTextValue(element.text);
+      setEditingTextHeight(element.height);
+      onTextEditSelectionChange?.(element.id, { start: 0, end: element.text.length });
+    }, 0);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [
+    autoEditTextElementId,
+    onSelectElement,
+    onTextEditSelectionChange,
+    project.elements,
+    readOnly,
+  ]);
 
   useEffect(() => {
     const fontSet = document.fonts;
@@ -642,6 +784,7 @@ export function CanvasWorkspace({
     setEditingTextId(element.id);
     setEditingTextValue(element.text);
     setEditingTextHeight(element.height);
+    onTextEditSelectionChange?.(element.id, { start: 0, end: element.text.length });
   }
 
   function commitTextEditing() {
@@ -652,6 +795,7 @@ export function CanvasWorkspace({
   }
 
   function cancelTextEditing() {
+    if (editingTextId) onTextEditSelectionChange?.(editingTextId, { start: 0, end: 0 });
     setEditingTextId(null);
     setEditingTextValue('');
     setEditingTextHeight(undefined);
@@ -670,6 +814,13 @@ export function CanvasWorkspace({
     if (nextHeight !== element.height) {
       onUpdateElementFrame?.(element.id, { height: nextHeight });
     }
+  }
+
+  function updateTextSelection(element: Extract<DesignElement, { type: 'text' }>, input: HTMLTextAreaElement) {
+    onTextEditSelectionChange?.(element.id, {
+      start: input.selectionStart,
+      end: input.selectionEnd,
+    });
   }
 
   function pickBackgroundSubject(
@@ -1130,11 +1281,70 @@ export function CanvasWorkspace({
                   );
                 }
 
+                const typedText = getTypedText(element.text, animationState);
+                if (element.colorRanges?.length) {
+                  const fontSize = element.fontSize * scaleY;
+                  const padding = TEXT_FRAME_PADDING * scaleY;
+                  const renderSegments = createTextRenderSegments({
+                    element,
+                    fontSize,
+                    text: typedText,
+                    width: element.width * scaleX - padding * 2,
+                  });
+                  const renderedLineCount =
+                    renderSegments.length > 0
+                      ? Math.max(
+                          ...renderSegments.map(
+                            (segment) => segment.y / (fontSize * (element.lineHeight ?? 1.05)),
+                          ),
+                        ) + 1
+                      : 1;
+                  const contentHeight =
+                    renderedLineCount * fontSize * (element.lineHeight ?? 1.05);
+                  const contentY =
+                    (element.verticalAlign ?? 'top') === 'middle'
+                      ? Math.max(0, (element.height * scaleY - contentHeight) / 2)
+                      : (element.verticalAlign ?? 'top') === 'bottom'
+                        ? Math.max(0, element.height * scaleY - contentHeight - padding)
+                        : 0;
+
+                  return (
+                    <Group
+                      {...commonProps}
+                      key={`${element.id}-font-${fontRenderVersion}`}
+                      ref={nodeRef}
+                      visible={editingTextId !== element.id}
+                    >
+                      <Rect
+                        height={element.height * scaleY}
+                        listening={false}
+                        width={element.width * scaleX}
+                        x={0}
+                        y={0}
+                      />
+                      {renderSegments.map((segment, index) => (
+                        <Text
+                          key={`${segment.x}-${segment.y}-${index}`}
+                          text={segment.text}
+                          fontFamily={element.fontFamily}
+                          fontSize={fontSize}
+                          fontStyle={element.fontWeight >= 700 ? 'bold' : 'normal'}
+                          fill={segment.fill}
+                          lineHeight={element.lineHeight ?? 1.05}
+                          x={padding + segment.x}
+                          y={padding + contentY + segment.y}
+                          {...(element.hyperlink ? { textDecoration: 'underline' } : {})}
+                        />
+                      ))}
+                    </Group>
+                  );
+                }
+
                 return (
                   <Text
                     {...commonProps}
                     key={`${element.id}-font-${fontRenderVersion}`}
-                    text={getTypedText(element.text, animationState)}
+                    text={typedText}
                     fontFamily={element.fontFamily}
                     fontSize={element.fontSize * scaleY}
                     fontStyle={element.fontWeight >= 700 ? 'bold' : 'normal'}
@@ -1285,17 +1495,25 @@ export function CanvasWorkspace({
                       transform: `rotate(${element.rotation}deg)`,
                       width: `${element.width * scaleX}px`,
                     }}
-                    onBlur={commitTextEditing}
+                    onBlur={(event) => {
+                      updateTextSelection(element, event.currentTarget);
+                      commitTextEditing();
+                    }}
                     onChange={(event) => {
                       updateTextEditing(element, event.currentTarget);
+                    }}
+                    onSelect={(event) => {
+                      updateTextSelection(element, event.currentTarget);
                     }}
                     onKeyDown={(event) => {
                       if (event.key === 'Escape') {
                         event.preventDefault();
+                        onTextEditSelectionChange?.(element.id, { start: 0, end: 0 });
                         cancelTextEditing();
                       }
                       if (event.key === 'Enter' && !event.shiftKey) {
                         event.preventDefault();
+                        onTextEditSelectionChange?.(element.id, { start: 0, end: 0 });
                         commitTextEditing();
                       }
                     }}

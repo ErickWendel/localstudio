@@ -172,8 +172,38 @@ function getShapeName(element: ShapeElement): PptxGenJS.SHAPE_NAME {
   return shapeMap[element.shape] ?? 'rect';
 }
 
+function getPptxTextRuns(element: Extract<DesignElement, { type: 'text' }>) {
+  if (!element.colorRanges?.length) return element.text;
+  const runs: Array<{ text: string; options: { color: string } }> = [];
+  let index = 0;
+  for (const range of element.colorRanges) {
+    const start = Math.max(0, Math.min(element.text.length, range.start));
+    const end = Math.max(start, Math.min(element.text.length, range.end));
+    if (index < start) {
+      runs.push({
+        text: element.text.slice(index, start),
+        options: { color: normalizeHexColor(element.fill, '111111') },
+      });
+    }
+    if (start < end) {
+      runs.push({
+        text: element.text.slice(start, end),
+        options: { color: normalizeHexColor(range.fill, '111111') },
+      });
+    }
+    index = end;
+  }
+  if (index < element.text.length) {
+    runs.push({
+      text: element.text.slice(index),
+      options: { color: normalizeHexColor(element.fill, '111111') },
+    });
+  }
+  return runs.length > 0 ? runs : element.text;
+}
+
 function addTextElement(slide: PptxGenJS.Slide, element: Extract<DesignElement, { type: 'text' }>) {
-  slide.addText(element.text, {
+  slide.addText(getPptxTextRuns(element), {
     ...toPosition(element),
     align: element.align,
     bold: element.fontWeight >= 600,

@@ -130,6 +130,30 @@ describe('editor commands', () => {
     expect(project.elements['image-hero']?.x).toBe(55);
   });
 
+  it('aligns an element to page edges immutably', () => {
+    const project = sampleProject.createSampleProject();
+    const top = new basicCommands.AlignElementCommand(
+      'page-1',
+      'image-hero',
+      'vertical-top',
+    ).execute(project);
+    const right = new basicCommands.AlignElementCommand(
+      'page-1',
+      'image-hero',
+      'horizontal-right',
+    ).execute(project);
+    const bottom = new basicCommands.AlignElementCommand(
+      'page-1',
+      'image-hero',
+      'vertical-bottom',
+    ).execute(project);
+
+    expect(top.elements['image-hero']?.y).toBe(0);
+    expect(right.elements['image-hero']?.x).toBe(1920 - 980);
+    expect(bottom.elements['image-hero']?.y).toBe(1080 - 735);
+    expect(project.elements['image-hero']).toMatchObject({ x: 55, y: 200 });
+  });
+
   it('brings an element to front by moving its id to the end', () => {
     const project = sampleProject.createSampleProject();
     const command = new basicCommands.SetZOrderCommand('page-1', 'image-hero', 'front');
@@ -355,6 +379,37 @@ describe('editor commands', () => {
       fontSize: 96,
       opacity: 1,
     });
+  });
+
+  it('applies text color to selected character ranges without changing the whole text fill', () => {
+    const project = sampleProject.createSampleProject();
+    const first = new basicCommands.UpdateElementStyleCommand('text-title', {
+      fill: '#FF0000',
+      textColorRange: { start: 0, end: 2 },
+    }).execute(project);
+    const next = new basicCommands.UpdateElementStyleCommand('text-title', {
+      fill: '#0000FF',
+      textColorRange: { start: 1, end: 4 },
+    }).execute(first);
+
+    expect(next.elements['text-title']).toMatchObject({
+      fill: '#37FD76',
+      colorRanges: [
+        { start: 0, end: 1, fill: '#FF0000' },
+        { start: 1, end: 4, fill: '#0000FF' },
+      ],
+    });
+    expect(project.elements['text-title']).not.toHaveProperty('colorRanges');
+  });
+
+  it('updates text vertical alignment immutably', () => {
+    const project = sampleProject.createSampleProject();
+    const next = new basicCommands.UpdateElementStyleCommand('text-title', {
+      verticalAlign: 'bottom',
+    }).execute(project);
+
+    expect(next.elements['text-title']).toMatchObject({ verticalAlign: 'bottom' });
+    expect(project.elements['text-title']).not.toHaveProperty('verticalAlign');
   });
 
   it('clears shape fill and border style immutably', () => {

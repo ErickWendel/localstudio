@@ -1383,6 +1383,8 @@ function EditorDesktopShell({ services }: EditorShellProps) {
             canTranslateSelection={vm.canTranslateSelection}
             isTranslating={vm.isTranslating}
             translationNotice={vm.translationNotice}
+            autoEditTextElementId={vm.autoEditTextElementId}
+            activeTextSelection={vm.activeTextSelection}
             onAlignSelectedElement={
               isHistoryReadOnly
                 ? undefined
@@ -1467,6 +1469,9 @@ function EditorDesktopShell({ services }: EditorShellProps) {
                 : () => {
                     void vm.translateSelectedText();
                   }
+            }
+            onTextEditSelectionChange={
+              isHistoryReadOnly ? undefined : vm.updateTextEditSelection
             }
             onUpdateImageCrop={isHistoryReadOnly ? undefined : vm.updateImageCrop}
             onUpdateElementFrame={isHistoryReadOnly ? undefined : vm.updateElementFrame}

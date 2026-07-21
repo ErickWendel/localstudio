@@ -62,6 +62,16 @@ test.describe('editor multi-select and advanced shape styling journeys', () => {
     await page.getByLabel('Selected element height').fill('160');
     await page.getByRole('spinbutton', { name: 'Selected element rotation' }).fill('30');
     await page.getByLabel('Align selected element').selectOption('page-center');
+    await page.getByLabel('Align selected element').selectOption('horizontal-left');
+    await expect(page.getByLabel('Selected element x position')).toHaveValue('0');
+    await page.getByLabel('Align selected element').selectOption('vertical-top');
+    await expect(page.getByLabel('Selected element y position')).toHaveValue('0');
+    await page.getByLabel('Align selected element').selectOption('horizontal-right');
+    await expect.poll(async () => Number(await page.getByLabel('Selected element x position').inputValue()))
+      .toBeGreaterThan(1100);
+    await page.getByLabel('Align selected element').selectOption('vertical-bottom');
+    await expect.poll(async () => Number(await page.getByLabel('Selected element y position').inputValue()))
+      .toBeGreaterThan(800);
     await expect(page.getByLabel('Selected element width')).toHaveValue('720');
     await expect(page.getByLabel('Selected element height')).toHaveValue('160');
     await expect(page.getByRole('spinbutton', { name: 'Selected element rotation' })).toHaveValue('30');

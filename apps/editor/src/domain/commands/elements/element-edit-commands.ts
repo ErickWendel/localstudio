@@ -1,4 +1,5 @@
 import type { Asset, DesignElement, ProjectDocument } from '../../documents/model';
+import { textColorRanges } from '../../documents/textColorRanges';
 import { projectMutationUtils } from '../shared/projectMutationUtils';
 import type { EditorCommand } from '../shared/types';
 import type { ElementFramePatch, ElementStylePatch } from './basicCommands';
@@ -108,15 +109,19 @@ class UpdateTextContentCommand implements EditorCommand {
   execute(project: ProjectDocument): ProjectDocument {
     const element = project.elements[this.elementId];
     if (!element || element.type !== 'text' || element.locked) return project;
+    const colorRanges = textColorRanges.trimTextColorRanges(element.colorRanges, this.text.length);
+    const nextElement = {
+      ...element,
+      text: this.text,
+      ...(colorRanges ? { colorRanges } : {}),
+    };
+    if (!colorRanges) delete nextElement.colorRanges;
 
     return {
       ...project,
       elements: {
         ...project.elements,
-        [this.elementId]: {
-          ...element,
-          text: this.text,
-        },
+        [this.elementId]: nextElement,
       },
       updatedAt: projectMutationUtils.getProjectUpdatedAt(),
     };
@@ -142,17 +147,31 @@ class UpdateElementStyleCommand implements EditorCommand {
     let nextElement: DesignElement = { ...element, opacity };
 
     if (element.type === 'text') {
+      const nextColorRanges =
+        typeof this.patch.fill === 'string' && this.patch.textColorRange
+          ? textColorRanges.applyTextColorRange({
+              fill: this.patch.fill,
+              range: { ...this.patch.textColorRange, fill: this.patch.fill },
+              ranges: element.colorRanges,
+              textLength: element.text.length,
+            })
+          : textColorRanges.trimTextColorRanges(element.colorRanges, element.text.length);
       const nextTextElement = {
         ...element,
         opacity,
         ...(this.patch.align ? { align: this.patch.align } : {}),
-        ...(typeof this.patch.fill === 'string' ? { fill: this.patch.fill } : {}),
+        ...(typeof this.patch.fill === 'string' && !this.patch.textColorRange
+          ? { fill: this.patch.fill }
+          : {}),
         ...(this.patch.fontFamily ? { fontFamily: this.patch.fontFamily } : {}),
         ...(this.patch.fontSize !== undefined
           ? { fontSize: Math.max(1, this.patch.fontSize) }
           : {}),
         ...(this.patch.fontWeight !== undefined ? { fontWeight: this.patch.fontWeight } : {}),
+        ...(this.patch.verticalAlign ? { verticalAlign: this.patch.verticalAlign } : {}),
+        ...(nextColorRanges ? { colorRanges: nextColorRanges } : {}),
       };
+      if (!nextColorRanges) delete nextTextElement.colorRanges;
       if (typeof this.patch.hyperlink === 'string') {
         nextTextElement.hyperlink = this.patch.hyperlink;
       }

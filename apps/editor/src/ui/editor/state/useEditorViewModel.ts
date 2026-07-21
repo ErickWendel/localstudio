@@ -241,6 +241,13 @@ export function useEditorViewModel(services: AppServices) {
   const activePageIdRef = useRef(activePageId);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   const selectedElementIdsRef = useRef(selectedElementIds);
+  const [autoEditTextElementId, setAutoEditTextElementId] = useState<string | undefined>();
+  const activeTextSelectionRef = useRef<
+    { elementId: string; start: number; end: number } | undefined
+  >(undefined);
+  const [activeTextSelection, setActiveTextSelection] = useState<
+    { elementId: string; start: number; end: number } | undefined
+  >(undefined);
   const [selectionTarget, setSelectionTarget] = useState<NonNullable<SelectionState['target']>>(
     'presentation',
   );
@@ -691,9 +698,11 @@ export function useEditorViewModel(services: AppServices) {
     projectRef.current = nextProject;
     activePageIdRef.current = nextActivePageId;
     selectedElementIdsRef.current = [];
+    activeTextSelectionRef.current = undefined;
     setProject(nextProject);
     setActivePageId(nextActivePageId);
     setSelectedElementIds([]);
+    setActiveTextSelection(undefined);
     setHistory({ past: [], future: [] });
     setPageLanguageCodes({});
     cancelBackgroundSelectionMode();
@@ -1294,7 +1303,9 @@ export function useEditorViewModel(services: AppServices) {
       }
       if (options?.selectedElementIds !== undefined) {
         selectedElementIdsRef.current = options.selectedElementIds;
+        activeTextSelectionRef.current = undefined;
         setSelectedElementIds(options.selectedElementIds);
+        setActiveTextSelection(undefined);
         setSelectionTarget(
           editorViewModelSelection.getSelectionTargetForElements(options.selectedElementIds),
         );
@@ -1306,6 +1317,8 @@ export function useEditorViewModel(services: AppServices) {
   function selectElement(elementId: string, options?: { additive?: boolean }) {
     if (processingElementIds.includes(elementId)) return;
     cancelBackgroundSelectionMode();
+    activeTextSelectionRef.current = undefined;
+    setActiveTextSelection(undefined);
     setSelectionTarget('elements');
     setSelectedElementIds((currentSelection) => {
       return editorViewModelSelection.getNextElementSelection({
@@ -1323,24 +1336,32 @@ export function useEditorViewModel(services: AppServices) {
       project,
     });
     cancelBackgroundSelectionMode();
+    activeTextSelectionRef.current = undefined;
+    setActiveTextSelection(undefined);
     setSelectionTarget('elements');
     setSelectedElementIds(selectableElementIds);
   }
 
   function clearSelection() {
     cancelBackgroundSelectionMode();
+    activeTextSelectionRef.current = undefined;
+    setActiveTextSelection(undefined);
     setSelectionTarget('presentation');
     setSelectedElementIds([]);
   }
 
   function selectSlideBackground() {
     cancelBackgroundSelectionMode();
+    activeTextSelectionRef.current = undefined;
+    setActiveTextSelection(undefined);
     setSelectionTarget('slide');
     setSelectedElementIds([]);
   }
 
   function selectPresentation() {
     cancelBackgroundSelectionMode();
+    activeTextSelectionRef.current = undefined;
+    setActiveTextSelection(undefined);
     setSelectionTarget('presentation');
     setSelectedElementIds([]);
   }
@@ -2269,9 +2290,44 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function updateElementStyle(elementId: string, patch: ElementStylePatch) {
-    commitProject((currentProject) =>
-      editorViewModelText.updateElementStyle(currentProject, elementId, patch),
-    );
+    const selectedIds = selectedElementIdsRef.current;
+    const targetIds =
+      selectedIds.length > 1 && selectedIds.includes(elementId) ? selectedIds : [elementId];
+    const capturedTextSelection =
+      targetIds.length === 1 && activeTextSelectionRef.current?.elementId === elementId
+        ? activeTextSelectionRef.current
+        : undefined;
+    if (capturedTextSelection && typeof patch.fill !== 'string') {
+      activeTextSelectionRef.current = undefined;
+      setActiveTextSelection(undefined);
+    }
+    commitProject((currentProject) => {
+      return targetIds.reduce((nextProject, targetId) => {
+        const element = nextProject.elements[targetId];
+        const textSelection =
+          capturedTextSelection?.elementId === targetId ? capturedTextSelection : undefined;
+        const targetPatch = editorViewModelText.getSupportedStylePatch({
+          element,
+          patch,
+          textSelection,
+        });
+        if (!targetPatch) return nextProject;
+        return editorViewModelText.updateElementStyle(nextProject, targetId, targetPatch);
+      }, currentProject);
+    });
+  }
+
+  function updateTextEditSelection(elementId: string, range: { start: number; end: number }) {
+    const nextSelection =
+      range.start === range.end
+        ? undefined
+        : {
+            elementId,
+            start: Math.min(range.start, range.end),
+            end: Math.max(range.start, range.end),
+          };
+    activeTextSelectionRef.current = nextSelection;
+    setActiveTextSelection(nextSelection);
   }
 
   async function downloadFontForSelection(family: string) {
@@ -2976,6 +3032,7 @@ export function useEditorViewModel(services: AppServices) {
         new basicCommands.AddElementsCommand(activePageId, [nextElement]).execute(currentProject),
       { selectedElementIds: [elementId] },
     );
+    setAutoEditTextElementId(elementId);
   }
 
   function insertShapeElement(shape: ShapeKind) {
@@ -2999,10 +3056,14 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function alignSelectedElement(mode: AlignMode) {
-    const elementId = selectedElementIds[0];
-    if (!elementId) return;
+    const elementIds = selectedElementIdsRef.current;
+    if (elementIds.length === 0) return;
     commitProject((currentProject) =>
-      new basicCommands.AlignElementCommand(activePageId, elementId, mode).execute(currentProject),
+      elementIds.reduce(
+        (nextProject, elementId) =>
+          new basicCommands.AlignElementCommand(activePageId, elementId, mode).execute(nextProject),
+        currentProject,
+      ),
     );
   }
 
@@ -3237,6 +3298,7 @@ export function useEditorViewModel(services: AppServices) {
     automation,
     activePageId,
     activePageFocusKey,
+    activeTextSelection,
     zoomPercent,
     pagesPanelOpen,
     isFullscreen,
@@ -3376,6 +3438,7 @@ export function useEditorViewModel(services: AppServices) {
     canTranslateCurrentSlide: !isTranslating && getTranslatableTextElementIds('slide').length > 0,
     canTranslateDeck: !isTranslating && getTranslatableTextElementIds('deck').length > 0,
     canPasteElements: elementClipboard.elements.length > 0,
+    autoEditTextElementId,
     translateSelectedText: () => requestTranslation('selection'),
     translateCurrentSlide: () => requestTranslation('slide'),
     translatePage: (pageId: string) => requestTranslation('slide', { pageId }),
@@ -3425,6 +3488,7 @@ export function useEditorViewModel(services: AppServices) {
     updateElementFrame,
     updateElementFrames,
     updateElementStyle,
+    updateTextEditSelection,
     downloadFontForSelection,
     importLocalFontForSelection,
     updateMediaPlayback,

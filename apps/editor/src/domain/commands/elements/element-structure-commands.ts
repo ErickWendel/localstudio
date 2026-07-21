@@ -20,11 +20,19 @@ class AlignElementCommand implements EditorCommand {
 
     const patch = {
       x:
-        this.mode === 'horizontal-center' || this.mode === 'page-center'
+        this.mode === 'horizontal-left'
+          ? 0
+          : this.mode === 'horizontal-right'
+            ? page.width - element.width
+            : this.mode === 'horizontal-center' || this.mode === 'page-center'
           ? (page.width - element.width) / 2
           : element.x,
       y:
-        this.mode === 'vertical-center' || this.mode === 'page-center'
+        this.mode === 'vertical-top'
+          ? 0
+          : this.mode === 'vertical-bottom'
+            ? page.height - element.height
+            : this.mode === 'vertical-center' || this.mode === 'page-center'
           ? (page.height - element.height) / 2
           : element.y,
     };
