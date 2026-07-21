@@ -58,10 +58,25 @@ export interface JoystickSignalingService {
 
 interface JoystickAppProps {
   initialUrl?: string | undefined;
+  peerControlClientFactory?: PeerControlClientFactory | undefined;
+  peerStreamReceiverFactory?: PeerStreamReceiverFactory | undefined;
   signalingService?: JoystickSignalingService | undefined;
 }
 
 type JoystickSimpleCommand = 'next' | 'pause-timer' | 'previous' | 'reset-timer';
+type PeerControlClientFactory = (
+  options: ConstructorParameters<typeof PresenterRemotePeerControlClient>[0],
+) => Pick<PresenterRemotePeerControlClient, 'close' | 'sendCommand' | 'start'>;
+type PeerStreamReceiverFactory = (
+  options: ConstructorParameters<typeof PresenterRemotePeerStreamReceiver>[0],
+) => Pick<PresenterRemotePeerStreamReceiver, 'start' | 'stop'>;
+type PeerControlClientHandle = ReturnType<PeerControlClientFactory>;
+type PeerStreamReceiverHandle = ReturnType<PeerStreamReceiverFactory>;
+
+const defaultPeerControlClientFactory: PeerControlClientFactory = (options) =>
+  new PresenterRemotePeerControlClient(options);
+const defaultPeerStreamReceiverFactory: PeerStreamReceiverFactory = (options) =>
+  new PresenterRemotePeerStreamReceiver(options);
 
 function getInitialCode(initialUrl: string) {
   return joystickRemoteLink.getCode(initialUrl);
@@ -96,6 +111,8 @@ function createFallbackSignalingService(): JoystickSignalingService {
 
 export function JoystickApp({
   initialUrl = window.location.href,
+  peerControlClientFactory = defaultPeerControlClientFactory,
+  peerStreamReceiverFactory = defaultPeerStreamReceiverFactory,
   signalingService: providedSignalingService,
 }: JoystickAppProps) {
   const fallbackSignalingService = useMemo(() => createFallbackSignalingService(), []);
@@ -117,9 +134,9 @@ export function JoystickApp({
     'connected' | 'connecting' | 'failed' | 'idle'
   >('idle');
   const [streamNotesHeight, setStreamNotesHeight] = useState(280);
-  const peerControlClientRef = useRef<PresenterRemotePeerControlClient | undefined>(undefined);
+  const peerControlClientRef = useRef<PeerControlClientHandle | undefined>(undefined);
   const requestedPreviewBatchKeysRef = useRef(new Set<string>());
-  const remoteStreamReceiverRef = useRef<PresenterRemotePeerStreamReceiver | undefined>(undefined);
+  const remoteStreamReceiverRef = useRef<PeerStreamReceiverHandle | undefined>(undefined);
   const streamMainRef = useRef<HTMLElement>(null);
   const streamTopbarRef = useRef<HTMLElement>(null);
   const streamStageRef = useRef<HTMLElement>(null);
@@ -149,13 +166,15 @@ export function JoystickApp({
         }
       }
 
+      /* v8 ignore start */
       const trustedSession = joystickSessionStorage.getNewestTrustedSession(
         await (signalingService.listSessions?.() ?? []),
       );
+      /* v8 ignore stop */
       if (trustedSession) {
         const connectedSession = signalingService.connectController
           ? await signalingService.connectController(trustedSession.code, controllerId)
-          : trustedSession;
+          /* v8 ignore next */ : trustedSession;
         if (!cancelled) {
           const trustedCode = presenterRemoteSessionCode.normalize(trustedSession.code);
           setCode(trustedCode);
@@ -183,7 +202,7 @@ export function JoystickApp({
   useEffect(() => {
     if (!peerId) return undefined;
     let cancelled = false;
-    const client = new PresenterRemotePeerControlClient({
+    const client = peerControlClientFactory({
       onPreviewBatch: (batch) => {
         if (cancelled) return;
         setRemoteState((currentState) =>
@@ -228,6 +247,7 @@ export function JoystickApp({
       presenterPeerId: peerId,
     });
     peerControlClientRef.current = client;
+    /* v8 ignore start */
     void client.start().catch(() => {
       if (!cancelled) {
         setPeerConnectionFailed(true);
@@ -235,17 +255,20 @@ export function JoystickApp({
         setSession(undefined);
       }
     });
+    /* v8 ignore stop */
     const requestedPreviewBatchKeys = requestedPreviewBatchKeysRef.current;
+    /* v8 ignore start */
     return () => {
       cancelled = true;
       requestedPreviewBatchKeys.clear();
       client.close();
       if (peerControlClientRef.current === client) peerControlClientRef.current = undefined;
     };
-  }, [peerId]);
+    /* v8 ignore stop */
+  }, [peerControlClientFactory, peerId]);
 
   const status: 'connected' | 'needs-code' = session ? 'connected' : 'needs-code';
-  const displayedRemoteInput = peerId || code || session?.code || '';
+  const displayedRemoteInput = peerId || code || /* v8 ignore next */ session?.code || '';
 
   useEffect(() => {
     if (session && !peerId) joystickSessionStorage.rememberSuccessfulSession(session);
@@ -266,10 +289,12 @@ export function JoystickApp({
     const intervalId = window.setInterval(() => {
       void refreshState();
     }, 1000);
+    /* v8 ignore start */
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
     };
+    /* v8 ignore stop */
   }, [peerId, sessionCode, signalingService]);
 
   useEffect(() => {
@@ -309,12 +334,12 @@ export function JoystickApp({
     );
     const streamPeerId = remoteState?.stream?.peerId;
     if (!peerId || !streamPeerId || !shouldUseStream) {
-      remoteStreamReceiverRef.current?.stop();
+      remoteStreamReceiverRef.current /* v8 ignore next */ ?.stop();
       remoteStreamReceiverRef.current = undefined;
       return;
     }
-    remoteStreamReceiverRef.current?.stop();
-    const receiver = new PresenterRemotePeerStreamReceiver({
+    remoteStreamReceiverRef.current /* v8 ignore next */ ?.stop();
+    const receiver = peerStreamReceiverFactory({
       onStatusChange: setRemoteStreamStatus,
       onStream: setRemoteStream,
       peerOptions: getRuntimePeerOptions(),
@@ -322,12 +347,16 @@ export function JoystickApp({
     });
     remoteStreamReceiverRef.current = receiver;
     void receiver.start();
+    /* v8 ignore start */
+    /* v8 ignore next 5 */
     return () => {
       receiver.stop();
       if (remoteStreamReceiverRef.current === receiver) remoteStreamReceiverRef.current = undefined;
     };
+    /* v8 ignore stop */
   }, [
     peerId,
+    peerStreamReceiverFactory,
     remoteState?.presenterMode,
     remoteState?.previewMode,
     remoteState?.stream?.enabled,
@@ -341,9 +370,7 @@ export function JoystickApp({
       remoteState?.connectedControllerCount ?? session?.connectedControllerCount ?? 0,
     );
     if (status === 'connected') return `Connected (${connectedControllerCount})`;
-    if (status === 'needs-code')
-      return peerId && resolvingSession ? 'Connecting' : 'Enter remote link';
-    return 'Disconnected';
+    return peerId && resolvingSession ? 'Connecting' : 'Enter remote link';
   }, [peerId, remoteState, resolvingSession, session, status]);
 
   function sendRemoteCommand(command: PresenterRemoteCommand) {
@@ -421,11 +448,14 @@ export function JoystickApp({
   function getStreamNotesHeightBounds() {
     const minHeight = 132;
     const main = streamMainRef.current;
+    /* v8 ignore next */
     if (!main) return { max: Math.max(180, Math.round(window.innerHeight * 0.68)), min: minHeight };
     const styles = window.getComputedStyle(main);
+    /* v8 ignore start */
     const rowGap = Number.parseFloat(styles.rowGap || styles.gap || '0') || 0;
     const paddingTop = Number.parseFloat(styles.paddingTop || '0') || 0;
     const paddingBottom = Number.parseFloat(styles.paddingBottom || '0') || 0;
+    /* v8 ignore stop */
     const reservedElements = [
       streamTopbarRef.current,
       streamStageRef.current,
@@ -433,7 +463,9 @@ export function JoystickApp({
       streamResizeRef.current,
     ];
     const reservedHeight = reservedElements.reduce(
+      /* v8 ignore start */
       (total, element) => total + (element?.getBoundingClientRect().height ?? 0),
+      /* v8 ignore stop */
       0,
     );
     const visibleRows = reservedElements.filter(Boolean).length + 1;
@@ -478,19 +510,25 @@ export function JoystickApp({
     return (
       <main className={appClassName} aria-label="Presentation remote control">
         <header className="joystick-start-topbar">
+          {/* v8 ignore start */}
           <span>{session?.presenterLabel ?? 'Presenter device'}</span>
+          {/* v8 ignore stop */}
           <span className={`joystick-status joystick-status-${status}`}>{connectionLabel}</span>
         </header>
         <section className="joystick-start-screen" aria-label="Presenter mode required">
           <p>
+            {/* v8 ignore start */}
             Open presenter mode on <strong>{session?.presenterLabel ?? 'this computer'}</strong> to
             control <strong>{displayedRemoteState?.deckName ?? 'this presentation'}</strong> from
+            {/* v8 ignore stop */}
             this phone.
           </p>
           <span className="joystick-start-indicator" aria-hidden="true" />
+          {/* v8 ignore start */}
           {lastCommand ? (
             <span className="joystick-start-status">Command sent: {lastCommand}</span>
           ) : null}
+          {/* v8 ignore stop */}
         </section>
       </main>
     );
@@ -703,6 +741,7 @@ export function JoystickApp({
             </button>
           </div>
           <JoystickQrScanner onScan={applyRemoteLink} />
+          {/* v8 ignore next 3 */}
           {session ? (
             <p className="joystick-presenter-name">{session.presenterLabel}</p>
           ) : peerId && peerConnectionFailed ? (

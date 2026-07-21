@@ -33,7 +33,7 @@ const coverageRuns = {
     exclude: isJoystickSourceContractSpec,
     needsPeerServer: true,
     outputName: 'joystick',
-    threshold: 75,
+    threshold: 100,
     warm: warmJoystick,
   },
   'joystick-contracts': {

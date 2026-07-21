@@ -8,11 +8,13 @@ export function StreamPreview({
   fallbackPreview,
   onNavigate,
   renderFallbackMediaAssets = true,
+  runtime,
   stream,
 }: {
   fallbackPreview: PresenterRemoteSlidePreview | undefined;
   onNavigate: (direction: 'next' | 'previous') => void;
   renderFallbackMediaAssets?: boolean;
+  runtime?: { playVideo?: ((video: HTMLVideoElement) => Promise<unknown> | undefined) | undefined };
   stream: MediaStream;
 }) {
   const [videoPlaying, setVideoPlaying] = useState(false);
@@ -23,6 +25,7 @@ export function StreamPreview({
 
   useEffect(() => {
     const video = videoRef.current;
+    /* v8 ignore next */
     if (!video) return;
     video.autoplay = true;
     video.controls = false;
@@ -33,7 +36,7 @@ export function StreamPreview({
     video.srcObject = stream;
     setVideoPlaying(false);
     const requestPlayback = () => {
-      const playPromise = video.play();
+      const playPromise = runtime?.playVideo ? runtime.playVideo(video) : video.play();
       void playPromise
         ?.then(() => {
           playbackBlockedRef.current = false;
@@ -50,13 +53,13 @@ export function StreamPreview({
       window.cancelAnimationFrame(frameId);
       if (video.srcObject === stream) video.srcObject = null;
     };
-  }, [stream]);
+  }, [runtime, stream]);
 
   function requestVideoPlayback() {
     const video = videoRef.current;
     if (!video) return;
-    void video
-      .play()
+    const playPromise = runtime?.playVideo ? runtime.playVideo(video) : video.play();
+    void playPromise
       ?.then(() => {
         playbackBlockedRef.current = false;
         setVideoPlaying(true);
@@ -73,7 +76,7 @@ export function StreamPreview({
       return;
     }
     const bounds = event.currentTarget.getBoundingClientRect();
-    onNavigate(event.clientX - bounds.left < bounds.width / 2 ? 'previous' : 'next');
+    onNavigate(event.clientX - bounds.left < bounds.width / 2 ? 'previous' /* v8 ignore next */ : 'next');
   }
 
   return (

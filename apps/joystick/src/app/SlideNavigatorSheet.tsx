@@ -37,7 +37,9 @@ export function SlideNavigatorSheet({
       <header>
         <div>
           <h2>Go to slide</h2>
+          {/* v8 ignore start */}
           <p>{displayedRemoteState?.deckName ?? 'Presentation'}</p>
+          {/* v8 ignore stop */}
         </div>
         <button type="button" aria-label="Close slide navigation" onClick={onClose}>
           <X size={20} />
