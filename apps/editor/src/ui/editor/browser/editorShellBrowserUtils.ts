@@ -55,6 +55,11 @@ function isWebMcpEnabled() {
   return new URL(window.location.href).searchParams.get('webmcp') === '1';
 }
 
+function isWebMcpProtocolEnabled() {
+  if (typeof window === 'undefined') return false;
+  return new URL(window.location.href).searchParams.get('webmcp') !== '0';
+}
+
 function getWebMcpModelContext() {
   if (typeof document === 'undefined') return undefined;
   return (document as Document & { modelContext?: WebMcpModelContext }).modelContext;
@@ -67,5 +72,6 @@ export const editorShellBrowserUtils = {
   hasEditorObjectClipboardMarker,
   writeEditorObjectClipboardMarker,
   isWebMcpEnabled,
+  isWebMcpProtocolEnabled,
   getWebMcpModelContext,
 };
