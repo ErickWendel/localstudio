@@ -105,8 +105,14 @@ test.describe('public deck view journey', () => {
         ],
       },
     };
+    const noTranscriptPayload = structuredClone(payload);
+    noTranscriptPayload.shareId = 'e2e-no-transcript';
+    noTranscriptPayload.project.recordings = {};
     await page.route('**/e2e-share.json', async (route) => {
       await route.fulfill({ contentType: 'application/json', json: payload });
+    });
+    await page.route('**/e2e-no-transcript-share.json', async (route) => {
+      await route.fulfill({ contentType: 'application/json', json: noTranscriptPayload });
     });
     await page.route('**/missing-share.json', async (route) => {
       await route.fulfill({ contentType: 'application/json', json: { shareId: 'other' } });
@@ -114,6 +120,9 @@ test.describe('public deck view journey', () => {
 
     const publicDeck = new PublicDeckPage(page, server.baseURL);
     const shareSrc = encodeURIComponent('http://localhost/e2e-share.json');
+    const noTranscriptShareSrc = encodeURIComponent(
+      'http://localhost/e2e-no-transcript-share.json',
+    );
     const missingShareSrc = encodeURIComponent('http://localhost/missing-share.json');
     await publicDeck.goto(`/editor/?share=e2e-share&src=${shareSrc}`);
     await publicDeck.expectReady(false);
@@ -121,6 +130,70 @@ test.describe('public deck view journey', () => {
     await page.getByRole('button', { name: 'Next slide' }).click();
     await expect(page.getByText('2 / 3')).toBeVisible();
     await page.keyboard.press('ArrowLeft');
+    await expect(page.getByText('1 / 3')).toBeVisible();
+    await page.getByRole('button', { name: 'Show keyboard shortcuts' }).click();
+    const shortcuts = page.getByRole('dialog', { name: 'Keyboard Shortcuts' });
+    await expect(shortcuts).toBeVisible();
+    await expect(shortcuts.getByRole('button', { name: /Advance to next build/ })).toBeVisible();
+    await expect(shortcuts.getByRole('button', { name: /Go to first slide/ })).toBeVisible();
+    await expect(shortcuts.getByRole('button', { name: /Pause\/Play movie/ })).toBeVisible();
+    await expect(shortcuts.getByRole('button', { name: /Jump to end of movie/ })).toBeVisible();
+    await expect(shortcuts.getByRole('button', { name: /Quit presentation mode/ })).toHaveCount(0);
+    await expect(shortcuts.getByRole('button', { name: /Close the slide navigator/ })).toHaveCount(0);
+    await page.evaluate(() => {
+      function addInstrumentedVideo(parent: Element, testId: string) {
+        const video = document.createElement('video');
+        let paused = true;
+        video.dataset.testid = testId;
+        video.dataset.shortcutState = 'idle';
+        Object.defineProperty(video, 'paused', {
+          configurable: true,
+          get: () => paused,
+        });
+        video.play = () => {
+          paused = false;
+          video.dataset.shortcutState = 'playing';
+          return Promise.resolve();
+        };
+        video.pause = () => {
+          paused = true;
+          video.dataset.shortcutState = 'paused';
+        };
+        parent.append(video);
+      }
+
+      const viewer = document.querySelector('[aria-label="Public presentation"]');
+      const stage = viewer?.querySelector('.public-deck-stage-shell');
+      if (!viewer || !stage) throw new Error('Public deck stage was not rendered.');
+      const preloader = document.createElement('div');
+      preloader.className = 'project-video-preloader';
+      viewer.prepend(preloader);
+      addInstrumentedVideo(preloader, 'preloaded-shortcut-video');
+      addInstrumentedVideo(stage, 'presented-shortcut-video');
+    });
+    const presentedVideo = page.getByTestId('presented-shortcut-video');
+    const preloadedVideo = page.getByTestId('preloaded-shortcut-video');
+    await page.keyboard.press('k');
+    await expect(presentedVideo).toHaveAttribute('data-shortcut-state', 'playing');
+    await expect(preloadedVideo).toHaveAttribute('data-shortcut-state', 'idle');
+    await page.keyboard.press('k');
+    await expect(presentedVideo).toHaveAttribute('data-shortcut-state', 'paused');
+    await shortcuts.getByRole('button', { name: /Pause\/Play movie/ }).click();
+    await expect(presentedVideo).toHaveAttribute('data-shortcut-state', 'playing');
+    await expect(preloadedVideo).toHaveAttribute('data-shortcut-state', 'idle');
+    await shortcuts.getByRole('button', { name: /Go to last slide/ }).click();
+    await expect(page.getByText('3 / 3')).toBeVisible();
+    await page.keyboard.press('Home');
+    await expect(page.getByText('1 / 3')).toBeVisible();
+    await page.keyboard.press('End');
+    await expect(page.getByText('3 / 3')).toBeVisible();
+    await page.keyboard.press('?');
+    await expect(shortcuts).toBeHidden();
+    await page.keyboard.press('?');
+    await expect(shortcuts).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(shortcuts).toBeHidden();
+    await page.keyboard.press('Home');
     await expect(page.getByText('1 / 3')).toBeVisible();
     await expect(page.getByRole('region', { name: 'Presentation playback' })).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Jump to slide' })).toBeHidden();
@@ -189,6 +262,18 @@ test.describe('public deck view journey', () => {
 
     await publicDeck.goto(`/editor/?embed=e2e-share&src=${shareSrc}`);
     await publicDeck.expectReady(true);
+
+    await publicDeck.goto(
+      `/editor/?share=e2e-no-transcript&src=${noTranscriptShareSrc}`,
+    );
+    await publicDeck.expectReady(false);
+    await expect(page.getByRole('button', { name: 'Open transcript chat' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Open slide list' }).click();
+    const slideList = page.getByRole('complementary', { name: 'Slide list' });
+    await expect(slideList).toBeVisible();
+    await slideList.getByRole('button', { name: 'Open slide 3: Appendix' }).click();
+    await expect(page.getByText('3 / 3')).toBeVisible();
+    await expect(slideList).toBeHidden();
 
     await publicDeck.goto(`/editor/?share=e2e-share&src=${missingShareSrc}`);
     await expect(page.getByRole('heading', { name: 'Deck not found' })).toBeVisible();

@@ -43,20 +43,16 @@ test.describe('editor public transcript chat journey', () => {
     await publicDeck.goto(`/editor/?share=e2e-share&src=${shareSrc}`);
     await publicDeck.expectReady(false);
 
-    const transcriptButton = page.getByRole('button', { name: 'Open transcript chat' });
-    const presentationAiButton = page.getByRole('button', { name: 'Open presentation AI' });
-    await expect(transcriptButton).toBeEnabled();
-    await expect(presentationAiButton).toBeEnabled();
-    await presentationAiButton.click();
-    await expect(page.getByRole('complementary', { name: 'Transcript chat' })).toBeVisible();
-    await expect(
-      page.getByText('No presenter recording has been published with this deck.'),
-    ).toBeVisible();
-    await page
-      .getByRole('textbox', { name: 'Question for transcript chat' })
-      .fill('Is there a recording?');
-    await page.getByRole('button', { name: 'Ask transcript' }).click();
-    await expect(page.getByText('No transcript text is available for this presentation.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open transcript chat' })).not.toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open presentation AI' })).not.toBeVisible();
+
+    const slideListButton = page.getByRole('button', { name: 'Open slide list' });
+    await expect(slideListButton).toBeEnabled();
+    await slideListButton.click();
+    const slideList = page.getByRole('complementary', { name: 'Slide list' });
+    await expect(slideList).toBeVisible();
+    await slideList.getByRole('button', { name: 'Open slide 2: Closing' }).click();
+    await expect(page.getByText('2 / 2')).toBeVisible();
   });
 
   test('surfaces transcript chat model failures in the public viewer', async ({ page }) => {

@@ -32,8 +32,18 @@ import type {
   TranscriptAnswer,
   TranscriptQuestionContext,
 } from '../../services/transcription/transcriptQuestionAnsweringService';
+import {
+  KeyboardShortcutsDialog,
+  type KeyboardShortcutAction,
+  type KeyboardShortcutGroup,
+} from '../components/KeyboardShortcutsDialog';
+import { isKeyboardShortcutEditableTarget } from '../components/isKeyboardShortcutEditableTarget';
 import { CanvasWorkspace } from '../editor/canvas/CanvasWorkspace';
 import { ProjectVideoPreloader } from '../editor/media/ProjectVideoPreloader';
+import {
+  presentationMovieControls,
+  type MovieHoldState,
+} from '../editor/media/presentationMovieControls';
 import { MiniPagePreview } from '../editor/panels/PageMiniPreview';
 import {
   PromptModelControl,
@@ -74,6 +84,107 @@ interface PublicPodcastChapter {
 }
 
 type PublicPlaybackSource = 'overlay' | 'podcast';
+
+const nativeControlActivationKeys = new Set([' ', 'Enter', 'Spacebar']);
+
+function isKeyboardShortcutControlActivation(event: KeyboardEvent) {
+  if (!nativeControlActivationKeys.has(event.key)) return false;
+  return (
+    isKeyboardShortcutInteractiveTarget(event.target) ||
+    isKeyboardShortcutInteractiveTarget(document.activeElement)
+  );
+}
+
+function isKeyboardShortcutInteractiveTarget(target: EventTarget | null) {
+  return (
+    target instanceof Element &&
+    Boolean(target.closest('button, a[href], [role="button"], [role="link"]'))
+  );
+}
+
+const publicDeckShortcutActions = [
+  'black-screen',
+  'cursor-toggle',
+  'decrease-notes',
+  'fast-forward-movie',
+  'previous-slide',
+  'first-slide',
+  'increase-notes',
+  'jump-movie-end',
+  'jump-movie-start',
+  'last-slide',
+  'next-build',
+  'next-navigator-slide',
+  'next-slide',
+  'open-slide-navigator',
+  'pause-presentation',
+  'play-pause-movie',
+  'previous-build',
+  'previous-navigator-slide',
+  'reset-timer',
+  'rewind-movie',
+  'select-navigator-slide',
+  'shortcut-toggle',
+  'show-slide-number',
+  'white-screen',
+  'scroll-notes-up',
+  'scroll-notes-down',
+] satisfies KeyboardShortcutAction[];
+
+const publicDeckShortcutGroups = [
+  {
+    title: 'Navigation',
+    items: [
+      { action: 'next-build', keys: ['→', '↓'], label: 'Advance to next build' },
+      { action: 'previous-build', keys: ['['], label: 'Go back to previous build' },
+      { action: 'next-build', keys: [']'], label: 'Advance and skip build' },
+      { action: 'next-slide', keys: ['Shift', '↓'], label: 'Advance to next slide' },
+      { action: 'previous-slide', keys: ['←', '↑'], label: 'Go back to previous slide' },
+      { action: 'first-slide', keys: ['Home'], label: 'Go to first slide' },
+      { action: 'last-slide', keys: ['End'], label: 'Go to last slide' },
+    ],
+  },
+  {
+    title: 'Other',
+    items: [
+      { action: 'shortcut-toggle', keys: ['?'], label: 'Show or hide Keyboard Shortcuts window' },
+      { action: 'pause-presentation', keys: ['F'], label: 'Pause presentation; press any key to resume' },
+      { action: 'black-screen', keys: ['B'], label: 'Pause presentation and show black screen' },
+      { action: 'white-screen', keys: ['W'], label: 'Pause presentation and show white screen' },
+      { action: 'cursor-toggle', keys: ['C'], label: 'Show or hide the pointer cursor' },
+      { action: 'show-slide-number', keys: ['S'], label: 'Display the current slide number' },
+    ],
+  },
+  {
+    title: 'Slide Navigator',
+    items: [
+      { action: 'open-slide-navigator', keys: ['#'], label: 'Open the slide navigator' },
+      { action: 'next-navigator-slide', keys: ['+'], label: 'Go to the next slide in the slide navigator' },
+      { action: 'previous-navigator-slide', keys: ['-'], label: 'Go to the previous slide in the slide navigator' },
+      { action: 'select-navigator-slide', keys: ['Return'], label: 'Go to the current slide in the slide navigator' },
+    ],
+  },
+  {
+    title: 'Presenter Display',
+    items: [
+      { action: 'reset-timer', keys: ['R'], label: 'Reset timer' },
+      { action: 'scroll-notes-up', keys: ['U'], label: 'Scroll notes up' },
+      { action: 'scroll-notes-down', keys: ['D'], label: 'Scroll notes down' },
+      { action: 'increase-notes', keys: ['⌘', '+'], label: 'Increase note font size' },
+      { action: 'decrease-notes', keys: ['⌘', '-'], label: 'Decrease note font size' },
+    ],
+  },
+  {
+    title: 'Movies',
+    items: [
+      { action: 'play-pause-movie', keys: ['K'], label: 'Pause/Play movie' },
+      { action: 'rewind-movie', keys: ['J'], label: 'Hold to rewind movie' },
+      { action: 'fast-forward-movie', keys: ['L'], label: 'Hold to fast forward movie' },
+      { action: 'jump-movie-start', keys: ['I'], label: 'Jump to beginning of movie' },
+      { action: 'jump-movie-end', keys: ['O'], label: 'Jump to end of movie' },
+    ],
+  },
+] satisfies KeyboardShortcutGroup[];
 
 interface PublicPlaybackSync {
   currentTimeMs: number;
@@ -487,6 +598,90 @@ function PublicTranscriptPromptComposer({
   );
 }
 
+function PublicDeckSlideList({
+  activeChapter,
+  activePageIndex,
+  chaptersByPageIndex,
+  onSelectPage,
+  onToggleChapterPlayback,
+  pages,
+  playing = false,
+  project,
+}: {
+  activeChapter?: PublicPodcastChapter | undefined;
+  activePageIndex: number;
+  chaptersByPageIndex?: ReadonlyMap<number, PublicPodcastChapter>;
+  onSelectPage: (pageIndex: number) => void;
+  onToggleChapterPlayback?: (chapter: PublicPodcastChapter) => void;
+  pages: Page[];
+  playing?: boolean;
+  project: ProjectDocument;
+}) {
+  return (
+    <div className="public-podcast-chapters" aria-label="Presentation slides">
+      <div className="public-podcast-chapters-heading">
+        <span>Slides</span>
+        <strong>{pages.length}</strong>
+      </div>
+      {pages.map((page, pageIndex) => {
+        const chapter = chaptersByPageIndex?.get(pageIndex);
+        const isActiveSlide = pageIndex === activePageIndex;
+        return (
+          <article
+            className={
+              isActiveSlide
+                ? 'public-podcast-slide public-podcast-chapter-active page-card page-card-active'
+                : 'public-podcast-slide page-card'
+            }
+            key={page.id}
+            aria-label={`Slide ${pageIndex + 1}: ${page.name}`}
+          >
+            <span className="page-card-number">{pageIndex + 1}</span>
+            <button
+              className="page-card-preview"
+              style={{ aspectRatio: `${page.width} / ${page.height}` }}
+              type="button"
+              aria-label={`Open slide ${pageIndex + 1}: ${page.name}`}
+              onClick={() => onSelectPage(pageIndex)}
+            >
+              <MiniPagePreview page={page} project={project} visible={page.visible ?? true} />
+            </button>
+            <span className="public-podcast-slide-body page-card-body">
+              {chaptersByPageIndex ? (
+                chapter ? (
+                  <span className="public-podcast-chapter-time">
+                    {formatTranscriptTimestamp(chapter.startMs)}
+                  </span>
+                ) : (
+                  <span className="public-podcast-chapter-time public-podcast-chapter-time-empty">
+                    No audio
+                  </span>
+                )
+              ) : null}
+              <strong>Slide {pageIndex + 1}</strong>
+              <em>{page.name}</em>
+            </span>
+            {chapter && onToggleChapterPlayback ? (
+              <button
+                className="public-podcast-chapter-icon"
+                type="button"
+                aria-label={`${chapter.id === activeChapter?.id && playing ? 'Pause' : 'Play'} slide ${pageIndex + 1}`}
+                onClick={() => onToggleChapterPlayback(chapter)}
+              >
+                {chapter.id === activeChapter?.id && playing ? (
+                  <Pause size={14} aria-hidden="true" />
+                ) : (
+                  <Play size={14} aria-hidden="true" />
+                )}
+              </button>
+            ) : null}
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
 function PublicTranscriptPodcastPlayer({
   activePageIndex,
   onSelectPage,
@@ -822,65 +1017,16 @@ function PublicTranscriptPodcastPlayer({
           }}
         />
       </div>
-      <div className="public-podcast-chapters" aria-label="Presentation slides">
-        <div className="public-podcast-chapters-heading">
-          <span>Slides</span>
-          <strong>{pages.length}</strong>
-        </div>
-        {pages.map((page, pageIndex) => {
-          const chapter = chaptersByPageIndex.get(pageIndex);
-          const isActiveSlide = pageIndex === activePageIndex;
-          return (
-            <article
-              className={
-                isActiveSlide
-                  ? 'public-podcast-slide public-podcast-chapter-active page-card page-card-active'
-                  : 'public-podcast-slide page-card'
-              }
-              key={page.id}
-              aria-label={`Slide ${pageIndex + 1}: ${page.name}`}
-            >
-              <span className="page-card-number">{pageIndex + 1}</span>
-              <button
-                className="page-card-preview"
-                style={{ aspectRatio: `${page.width} / ${page.height}` }}
-                type="button"
-                aria-label={`Open slide ${pageIndex + 1}: ${page.name}`}
-                onClick={() => selectSlide(pageIndex)}
-              >
-                <MiniPagePreview page={page} project={project} visible={page.visible ?? true} />
-              </button>
-              <span className="public-podcast-slide-body page-card-body">
-                {chapter ? (
-                  <span className="public-podcast-chapter-time">
-                    {formatTranscriptTimestamp(chapter.startMs)}
-                  </span>
-                ) : (
-                  <span className="public-podcast-chapter-time public-podcast-chapter-time-empty">
-                    No audio
-                  </span>
-                )}
-                <strong>Slide {pageIndex + 1}</strong>
-                <em>{page.name}</em>
-              </span>
-              {chapter ? (
-                <button
-                  className="public-podcast-chapter-icon"
-                  type="button"
-                  aria-label={`${chapter.id === activeChapter?.id && playing ? 'Pause' : 'Play'} slide ${pageIndex + 1}`}
-                  onClick={() => toggleChapterPlayback(chapter)}
-                >
-                  {chapter.id === activeChapter?.id && playing ? (
-                    <Pause size={14} aria-hidden="true" />
-                  ) : (
-                    <Play size={14} aria-hidden="true" />
-                  )}
-                </button>
-              ) : null}
-            </article>
-          );
-        })}
-      </div>
+      <PublicDeckSlideList
+        activeChapter={activeChapter}
+        activePageIndex={activePageIndex}
+        chaptersByPageIndex={chaptersByPageIndex}
+        pages={pages}
+        playing={playing}
+        project={project}
+        onSelectPage={selectSlide}
+        onToggleChapterPlayback={toggleChapterPlayback}
+      />
       <section className="public-transcript-list public-podcast-transcript-list" aria-label="Transcript">
         <article>
           <h3>{selectedRecording.name}</h3>
@@ -928,10 +1074,12 @@ function PublicDeckPlaybackOverlay({
   activePageIndex,
   canGoNext,
   canGoPrevious,
+  keyboardShortcutsOpen,
   onEnterSlideFullscreen,
   onOpenTranscript,
   onPlaybackSync,
   onSelectPage,
+  onToggleKeyboardShortcuts,
   playbackSync,
   project,
   recordings,
@@ -939,10 +1087,12 @@ function PublicDeckPlaybackOverlay({
   activePageIndex: number;
   canGoNext: boolean;
   canGoPrevious: boolean;
+  keyboardShortcutsOpen: boolean;
   onEnterSlideFullscreen: () => void;
   onOpenTranscript: () => void;
   onPlaybackSync: (sync: PublicPlaybackSync) => void;
   onSelectPage: (pageIndex: number) => void;
+  onToggleKeyboardShortcuts: () => void;
   playbackSync: PublicPlaybackSync | undefined;
   project: ProjectDocument;
   recordings: TranscriptRecording[];
@@ -1290,6 +1440,17 @@ function PublicDeckPlaybackOverlay({
           <button
             className="public-deck-playback-button"
             type="button"
+            aria-label="Show keyboard shortcuts"
+            aria-expanded={keyboardShortcutsOpen}
+            onClick={onToggleKeyboardShortcuts}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              keyboard
+            </span>
+          </button>
+          <button
+            className="public-deck-playback-button"
+            type="button"
             aria-label="Present slide fullscreen"
             onClick={onEnterSlideFullscreen}
           >
@@ -1319,6 +1480,7 @@ export function PublicDeckViewer({
   const animationFrameRef = useRef<number | undefined>(undefined);
   const pagePreloadAbortRef = useRef<AbortController | undefined>(undefined);
   const runNextAnimationBuildRef = useRef<() => void>(() => undefined);
+  const movieHoldStateRef = useRef<MovieHoldState | undefined>(undefined);
   const transcriptTextGenerationRuntimeRef = useRef<
     | InstanceType<typeof webGpuTextGenerationRuntime.TransformersTextGenerationRuntime>
     | undefined
@@ -1334,8 +1496,10 @@ export function PublicDeckViewer({
   const transcriptModelPreparationRunIdRef = useRef(0);
   const emptySelection = useMemo<SelectionState>(() => ({ pageId: '', elementIds: [] }), []);
   const [transcriptPanelOpen, setTranscriptPanelOpen] = useState(false);
+  const [slideListOpen, setSlideListOpen] = useState(false);
   const [publicPlaybackSync, setPublicPlaybackSync] = useState<PublicPlaybackSync | undefined>();
   const [slideOnlyFullscreen, setSlideOnlyFullscreen] = useState(false);
+  const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const publicViewerRef = useRef<HTMLElement | null>(null);
   const [transcriptQuestion, setTranscriptQuestion] = useState('');
   const [transcriptAnswer, setTranscriptAnswer] = useState<TranscriptAnswer | undefined>();
@@ -1398,12 +1562,45 @@ export function PublicDeckViewer({
 
   const enterSlideOnlyFullscreen = useCallback(() => {
     setTranscriptPanelOpen(false);
+    setSlideListOpen(false);
     setSlideOnlyFullscreen(true);
     const viewerElement = publicViewerRef.current;
     if (!viewerElement?.requestFullscreen) return;
     void viewerElement.requestFullscreen().catch(() => {
       setSlideOnlyFullscreen(false);
     });
+  }, []);
+
+  const getPublicDeckVideos = useCallback(() => {
+    const viewerElement = publicViewerRef.current;
+    if (!viewerElement) return [];
+    return Array.from(
+      viewerElement.querySelectorAll<HTMLVideoElement>('.public-deck-stage-shell video'),
+    );
+  }, []);
+
+  const controlPublicDeckMovies = useCallback((action: 'end' | 'play-toggle' | 'start') => {
+    return presentationMovieControls.control(getPublicDeckVideos(), action);
+  }, [getPublicDeckVideos]);
+
+  const pulsePublicDeckMovieHold = useCallback((action: 'fast-forward' | 'rewind') => {
+    movieHoldStateRef.current = presentationMovieControls.pulse(
+      getPublicDeckVideos(),
+      action,
+      movieHoldStateRef.current,
+    );
+  }, [getPublicDeckVideos]);
+
+  const startPublicDeckMovieHold = useCallback((action: 'fast-forward' | 'rewind') => {
+    movieHoldStateRef.current = presentationMovieControls.startHold(
+      getPublicDeckVideos(),
+      action,
+      movieHoldStateRef.current,
+    );
+  }, [getPublicDeckVideos]);
+
+  const stopPublicDeckMovieHold = useCallback(() => {
+    movieHoldStateRef.current = presentationMovieControls.stopHold(movieHoldStateRef.current);
   }, []);
 
   const clearAnimationTimers = useCallback(() => {
@@ -1687,27 +1884,106 @@ export function PublicDeckViewer({
     return () => {
       pagePreloadAbortRef.current?.abort();
       clearAnimationTimers();
+      movieHoldStateRef.current = presentationMovieControls.stopHold(movieHoldStateRef.current);
     };
   }, [clearAnimationTimers]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (viewerState.status !== 'ready') return;
-      if (event.key === 'ArrowLeft') {
+      if (isKeyboardShortcutEditableTarget(event.target)) return;
+      if (isKeyboardShortcutControlActivation(event)) return;
+      if (keyboardShortcutsOpen && event.key === 'Escape') {
         event.preventDefault();
-        rewindPresentation();
+        setKeyboardShortcutsOpen(false);
+        return;
       }
-      if (event.key === 'ArrowRight') {
+      if (event.key === '?' || (event.key === '/' && event.shiftKey)) {
+        event.preventDefault();
+        setKeyboardShortcutsOpen((current) => !current);
+        return;
+      }
+      const lowerKey = event.key.toLowerCase();
+      if (event.key === 'Home') {
+        event.preventDefault();
+        playPresentationPage(viewerState.project, 0);
+        return;
+      }
+      if (event.key === 'End') {
+        event.preventDefault();
+        playPresentationPage(viewerState.project, viewerState.project.pages.length - 1);
+        return;
+      }
+      if (event.key === 'ArrowDown' && event.shiftKey) {
+        event.preventDefault();
+        playPresentationPage(viewerState.project, activePageIndex + 1);
+        return;
+      }
+      if (
+        event.key === 'ArrowRight' ||
+        event.key === 'ArrowDown' ||
+        event.key === 'PageDown' ||
+        event.key === ' ' ||
+        event.key === 'Enter' ||
+        event.key === ']'
+      ) {
         event.preventDefault();
         advancePresentation();
+        return;
+      }
+      if (event.key === '[' || event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'PageUp') {
+        event.preventDefault();
+        rewindPresentation();
+        return;
+      }
+      if (lowerKey === 'k') {
+        event.preventDefault();
+        controlPublicDeckMovies('play-toggle');
+        return;
+      }
+      if (lowerKey === 'j') {
+        event.preventDefault();
+        if (!event.repeat) startPublicDeckMovieHold('rewind');
+        return;
+      }
+      if (lowerKey === 'l') {
+        event.preventDefault();
+        if (!event.repeat) startPublicDeckMovieHold('fast-forward');
+        return;
+      }
+      if (lowerKey === 'i') {
+        event.preventDefault();
+        controlPublicDeckMovies('start');
+        return;
+      }
+      if (lowerKey === 'o') {
+        event.preventDefault();
+        controlPublicDeckMovies('end');
       }
     }
 
+    function handleKeyUp(event: KeyboardEvent) {
+      if (event.key.toLowerCase() !== 'j' && event.key.toLowerCase() !== 'l') return;
+      stopPublicDeckMovieHold();
+    }
+
     window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [advancePresentation, rewindPresentation, viewerState.status]);
+  }, [
+    activePageIndex,
+    advancePresentation,
+    controlPublicDeckMovies,
+    keyboardShortcutsOpen,
+    playPresentationPage,
+    rewindPresentation,
+    startPublicDeckMovieHold,
+    stopPublicDeckMovieHold,
+    viewerState,
+  ]);
 
   useEffect(() => {
     function handleFullscreenChange() {
@@ -1920,6 +2196,20 @@ export function PublicDeckViewer({
     setTranscriptAnswerError('Transcript answer stopped.');
   }
 
+  function executePublicDeckShortcut(action: KeyboardShortcutAction) {
+    if (action === 'shortcut-toggle') setKeyboardShortcutsOpen((current) => !current);
+    if (action === 'previous-slide' || action === 'previous-build') rewindPresentation();
+    if (action === 'next-slide') advancePresentation();
+    if (action === 'next-build') advancePresentation();
+    if (action === 'first-slide') playPresentationPage(project, 0);
+    if (action === 'last-slide') playPresentationPage(project, project.pages.length - 1);
+    if (action === 'play-pause-movie') controlPublicDeckMovies('play-toggle');
+    if (action === 'rewind-movie') pulsePublicDeckMovieHold('rewind');
+    if (action === 'fast-forward-movie') pulsePublicDeckMovieHold('fast-forward');
+    if (action === 'jump-movie-start') controlPublicDeckMovies('start');
+    if (action === 'jump-movie-end') controlPublicDeckMovies('end');
+  }
+
   return (
     <main
       ref={publicViewerRef}
@@ -1963,6 +2253,7 @@ export function PublicDeckViewer({
           activePageIndex={activePageIndex}
           canGoNext={canGoNext}
           canGoPrevious={canGoPrevious}
+          keyboardShortcutsOpen={keyboardShortcutsOpen}
           playbackSync={publicPlaybackSync}
           recordings={transcriptRecordings}
           project={project}
@@ -1970,6 +2261,7 @@ export function PublicDeckViewer({
           onOpenTranscript={() => setTranscriptPanelOpen(true)}
           onPlaybackSync={setPublicPlaybackSync}
           onSelectPage={(pageIndex) => playPresentationPage(project, pageIndex)}
+          onToggleKeyboardShortcuts={() => setKeyboardShortcutsOpen((current) => !current)}
         />
       ) : !slideOnlyFullscreen ? (
         <nav className="public-deck-controls" aria-label="Slide navigation">
@@ -2005,25 +2297,68 @@ export function PublicDeckViewer({
           <button
             className="stitch-icon-button"
             type="button"
-            aria-label="Open transcript chat"
-            aria-expanded={transcriptPanelOpen}
-            onClick={() => setTranscriptPanelOpen((current) => !current)}
+            aria-label={hasTranscriptRecordings ? 'Open transcript chat' : 'Open slide list'}
+            aria-expanded={hasTranscriptRecordings ? transcriptPanelOpen : slideListOpen}
+            onClick={() => {
+              if (hasTranscriptRecordings) {
+                setTranscriptPanelOpen((current) => !current);
+                return;
+              }
+              setSlideListOpen((current) => !current);
+            }}
           >
             <ListMusic size={18} aria-hidden="true" />
           </button>
+          {hasTranscriptRecordings ? (
+            <button
+              className="stitch-icon-button"
+              type="button"
+              aria-label="Open presentation AI"
+              aria-expanded={transcriptPanelOpen}
+              title="Open presentation AI"
+              onClick={() => setTranscriptPanelOpen(true)}
+            >
+              <Sparkles size={18} aria-hidden="true" />
+            </button>
+          ) : null}
           <button
             className="stitch-icon-button"
             type="button"
-            aria-label="Open presentation AI"
-            aria-expanded={transcriptPanelOpen}
-            title="Open presentation AI"
-            onClick={() => setTranscriptPanelOpen(true)}
+            aria-label="Show keyboard shortcuts"
+            aria-expanded={keyboardShortcutsOpen}
+            onClick={() => setKeyboardShortcutsOpen((current) => !current)}
           >
-            <Sparkles size={18} aria-hidden="true" />
+            <span className="material-symbols-outlined" aria-hidden="true">
+              keyboard
+            </span>
           </button>
         </nav>
       ) : null}
-      {transcriptPanelOpen && !slideOnlyFullscreen ? (
+      {slideListOpen && !hasTranscriptRecordings && !slideOnlyFullscreen ? (
+        <aside className="public-slide-list-popover" aria-label="Slide list">
+          <header>
+            <h2>Slides</h2>
+            <button
+              className="stitch-icon-button"
+              type="button"
+              aria-label="Close slide list"
+              onClick={() => setSlideListOpen(false)}
+            >
+              <X size={18} aria-hidden="true" />
+            </button>
+          </header>
+          <PublicDeckSlideList
+            activePageIndex={activePageIndex}
+            pages={project.pages}
+            project={project}
+            onSelectPage={(pageIndex) => {
+              playPresentationPage(project, pageIndex);
+              setSlideListOpen(false);
+            }}
+          />
+        </aside>
+      ) : null}
+      {transcriptPanelOpen && hasTranscriptRecordings && !slideOnlyFullscreen ? (
         <aside className="public-transcript-panel" aria-label="Transcript chat">
           <header>
             <div>
@@ -2039,19 +2374,15 @@ export function PublicDeckViewer({
               <X size={18} aria-hidden="true" />
             </button>
           </header>
-          {hasTranscriptRecordings ? (
-            <PublicTranscriptPodcastPlayer
-              activePageIndex={activePageIndex}
-              playbackSync={publicPlaybackSync}
-              recordings={transcriptRecordings}
-              project={project}
-              pages={project.pages}
-              onPlaybackSync={setPublicPlaybackSync}
-              onSelectPage={(pageIndex) => playPresentationPage(project, pageIndex)}
-            />
-          ) : (
-            <p className="public-deck-status">No presenter recording has been published with this deck.</p>
-          )}
+          <PublicTranscriptPodcastPlayer
+            activePageIndex={activePageIndex}
+            playbackSync={publicPlaybackSync}
+            recordings={transcriptRecordings}
+            project={project}
+            pages={project.pages}
+            onPlaybackSync={setPublicPlaybackSync}
+            onSelectPage={(pageIndex) => playPresentationPage(project, pageIndex)}
+          />
           <PublicTranscriptPromptComposer
             answer={transcriptAnswer}
             error={transcriptAnswerError}
@@ -2070,6 +2401,16 @@ export function PublicDeckViewer({
             onSubmit={(question) => void answerTranscriptQuestion(question)}
           />
         </aside>
+      ) : null}
+      {keyboardShortcutsOpen ? (
+        <KeyboardShortcutsDialog
+          title="Keyboard Shortcuts"
+          variant="popover"
+          onClose={() => setKeyboardShortcutsOpen(false)}
+          onShortcutAction={executePublicDeckShortcut}
+          shortcutGroups={publicDeckShortcutGroups}
+          supportedActions={publicDeckShortcutActions}
+        />
       ) : null}
     </main>
   );

@@ -110,6 +110,7 @@
 .public-deck-viewer-slide-fullscreen .public-deck-playback-overlay,
 .public-deck-viewer-slide-fullscreen .public-deck-controls,
 .public-deck-viewer-slide-fullscreen .public-deck-slide-dots,
+.public-deck-viewer-slide-fullscreen .public-slide-list-popover,
 .public-deck-viewer-slide-fullscreen .public-transcript-panel,
 .public-deck-viewer-slide-fullscreen .public-deck-caption-overlay {
   display: none;

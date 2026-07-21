@@ -19,6 +19,7 @@ import {
   KeyboardShortcutsDialog,
   type KeyboardShortcutAction,
 } from '../components/KeyboardShortcutsDialog';
+import { isKeyboardShortcutEditableTarget } from '../components/isKeyboardShortcutEditableTarget';
 import { CanvasWorkspace } from '../editor/canvas/CanvasWorkspace';
 import {
   presentationMovieControls,
@@ -128,15 +129,6 @@ function getPresenterOpener() {
   if (!candidate || typeof candidate !== 'object') return null;
   if (!('postMessage' in candidate)) return null;
   return candidate as Window;
-}
-
-function isEditablePresenterTarget(target: EventTarget | null) {
-  const isEditableElement = (value: Element | EventTarget | null) =>
-    value instanceof HTMLInputElement ||
-    value instanceof HTMLTextAreaElement ||
-    value instanceof HTMLSelectElement ||
-    (value instanceof HTMLElement && value.isContentEditable);
-  return isEditableElement(target) || isEditableElement(document.activeElement);
 }
 
 function getActivePage(project: ProjectDocument, activePageId: string) {
@@ -920,7 +912,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (isEditablePresenterTarget(event.target)) return;
+      if (isKeyboardShortcutEditableTarget(event.target)) return;
 
       if (keyboardShortcutsMode && event.key === 'Escape') {
         event.preventDefault();
