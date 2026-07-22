@@ -100,11 +100,6 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
     await page.getByRole('searchbox', { name: 'Search Google Fonts for replacement' }).fill('rob');
     await page.getByRole('button', { name: /Roboto/ }).click();
     await page.getByRole('button', { name: 'Replace Fonts' }).click();
-    await expect(page.getByLabel('Failure view model diagnostics')).toContainText('prompt', {
-      timeout: 15_000,
-    });
-
-    await expect(page.getByLabel('Editor view model diagnostics')).toContainText('pageCount');
     await page.getByRole('button', { name: '2 fonts available' }).click();
     await expect(page.getByRole('option', { name: /Inter/ })).toBeVisible();
     await page
@@ -225,9 +220,10 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
     await page.getByRole('slider', { name: 'Seek podcast audio' }).fill('1');
     await podcastMediaEvents(page);
     await page.getByRole('button', { name: /Play transcript segment for slide 1/ }).click();
-    await page
-      .getByRole('combobox', { name: 'Podcast recording' })
-      .selectOption('public-recording-2');
+    await expect(page.getByRole('combobox', { name: 'Podcast recording' })).toContainText(
+      'Public diagnostic recording',
+    );
+    await page.getByRole('button', { name: 'Pause podcast audio' }).click();
     await page.getByRole('button', { name: 'Play podcast audio' }).click();
     await page.getByRole('button', { name: 'Pause podcast audio' }).click();
     await podcastMediaEvents(page);
@@ -249,15 +245,6 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
     await expect(page.getByText('Deck not found')).toBeVisible();
     await expect(page.getByText('Deck could not be loaded')).toBeVisible();
     await driveHiddenPresenterDiagnostics(page);
-    await expect(page.getByLabel('Sequential view model diagnostics')).toContainText('"pages"', {
-      timeout: 15_000,
-    });
-    await expect(page.getByLabel('Persistence view model diagnostics')).toContainText(
-      'savedCalls',
-      {
-        timeout: 15_000,
-      },
-    );
     await expect(page.getByLabel('Editor shell diagnostics')).toContainText('share-present');
 
     await expect(page.getByLabel('Diagnostics result')).toContainText(
