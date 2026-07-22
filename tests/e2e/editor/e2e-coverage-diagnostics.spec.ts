@@ -110,9 +110,7 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
     await expect(diagnosticsResult).toContainText('"generated":"nested assistant text"', {
       timeout: 25_000,
     });
-    await expect(diagnosticsResult).toContainText(
-      '"selectedRecordings":["second"]',
-    );
+    await expect(diagnosticsResult).toContainText('"selectedRecordings":["second"]');
   });
 });
 

@@ -15,7 +15,12 @@ import type {
   GeneratedSlideTasksDocument,
 } from '../../domain/generated-slides/generatedSlide';
 import { generatedSlide } from '../../domain/generated-slides/generatedSlide';
-import type { ProjectDocument, ProjectFont, ShapeLineEndpoint, TextElement } from '../../domain/documents/model';
+import type {
+  ProjectDocument,
+  ProjectFont,
+  ShapeLineEndpoint,
+  TextElement,
+} from '../../domain/documents/model';
 import { editorAutomationController } from '../../services/automation/editorAutomationController';
 import { BrowserPresenterSessionService } from '../../services/presenter/presenterSessionService';
 import { BrowserFileSystemProjectRepository } from '../../services/storage/browserFileSystemProjectRepository';
@@ -115,7 +120,12 @@ function createSlideDocument(
 ): GeneratedSlideTasksDocument {
   return {
     language: 'en',
-    page: { background: { color: '#111827', type: 'color' as const }, height: 1080 as const, name, width: 1920 as const },
+    page: {
+      background: { color: '#111827', type: 'color' as const },
+      height: 1080 as const,
+      name,
+      width: 1920 as const,
+    },
     tasks: tasks as GeneratedSlideTask[],
   };
 }
@@ -327,11 +337,9 @@ function E2EDiagnosticsComponentGallery() {
       dispatchKey('Delete');
       clickShellButton('Presentation play options');
       await nextFrame();
-      shellRoot
-        ?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')
-        .forEach((button) => {
-          if (button.textContent?.includes('Present in fullscreen')) button.click();
-        });
+      shellRoot?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]').forEach((button) => {
+        if (button.textContent?.includes('Present in fullscreen')) button.click();
+      });
       await nextFrame();
       dispatchKey('?');
       await nextFrame();
@@ -384,7 +392,8 @@ function E2EDiagnosticsComponentGallery() {
       clickShellButton('Play presentation');
       await nextFrame();
       window.open = originalOpen;
-      presenterSessionId = new URL(fakePopup.location.href).searchParams.get('presenterSession') ?? '';
+      presenterSessionId =
+        new URL(fakePopup.location.href).searchParams.get('presenterSession') ?? '';
       const postPresenterCommand = (command: Record<string, unknown>) => {
         if (!presenterSessionId) return;
         window.postMessage(
@@ -401,11 +410,18 @@ function E2EDiagnosticsComponentGallery() {
       postPresenterCommand({ command: 'start-presenting' });
       postPresenterCommand({ command: 'prepare-prompt-api' });
       postPresenterCommand({ command: 'set-prompt-provider', providerId: 'diagnostic-prompt' });
-      postPresenterCommand({ command: 'cancel-prompt-model-download', modelId: 'diagnostic-model' });
+      postPresenterCommand({
+        command: 'cancel-prompt-model-download',
+        modelId: 'diagnostic-model',
+      });
       postPresenterCommand({ command: 'next' });
       postPresenterCommand({ command: 'previous' });
       postPresenterCommand({ command: 'go-to-page', pageId: 'page-1' });
-      postPresenterCommand({ command: 'update-notes', notes: 'Presenter diagnostics note', pageId: 'page-1' });
+      postPresenterCommand({
+        command: 'update-notes',
+        notes: 'Presenter diagnostics note',
+        pageId: 'page-1',
+      });
       postPresenterCommand({
         audioBlob: new Blob(['audio'], { type: 'audio/webm' }),
         command: 'save-recording',
@@ -460,13 +476,17 @@ function E2EDiagnosticsComponentGallery() {
         select.dispatchEvent(new Event('change', { bubbles: true }));
       });
       document
-        .querySelectorAll<HTMLInputElement>('.left-tool-panel input[type="number"], .left-tool-panel input[type="text"], .left-tool-panel input[type="search"]')
+        .querySelectorAll<HTMLInputElement>(
+          '.left-tool-panel input[type="number"], .left-tool-panel input[type="text"], .left-tool-panel input[type="search"]',
+        )
         .forEach((input) => {
           setInputValue(input, input.type === 'number' ? '1.25' : 'diagnostics');
         });
-      document.querySelectorAll<HTMLTextAreaElement>('.left-tool-panel textarea').forEach((input) => {
-        setInputValue(input, 'Diagnostics panel text');
-      });
+      document
+        .querySelectorAll<HTMLTextAreaElement>('.left-tool-panel textarea')
+        .forEach((input) => {
+          setInputValue(input, 'Diagnostics panel text');
+        });
       await nextFrame();
       if (!cancelled) setShellDiagnostics('done');
     }
@@ -500,270 +520,312 @@ function E2EDiagnosticsComponentGallery() {
         onTranslationTargetLanguageChange={setDeckTranslationTargetLanguage}
       />
       <EditorMobileUnavailable />
-      <button type="button" aria-label="Hide diagnostics panels" onClick={() => setPanelsVisible(false)}>
+      <button
+        type="button"
+        aria-label="Hide diagnostics panels"
+        onClick={() => setPanelsVisible(false)}
+      >
         Hide diagnostics panels
       </button>
       {panelsVisible ? (
         <>
-      {panelTabs.map((tab) => (
-        <LeftToolPanel
-          activePageId={panelActivePageId}
-          activeSlideLanguage={{ code: 'en', displayCode: 'EN', flag: '🇺🇸', label: 'English' }}
-          activeTab={tab}
-          animationPreview={{
-            activeBuildElementId: 'video-1',
-            mode: 'editor',
-            pageId: panelActivePageId,
-            phase: 'waiting',
-            playing: true,
-            waitingForClick: true,
-          }}
-          attentionModelId={tab === 'ai-tools' ? imageGenerationModel.IMAGE_GENERATION_MODEL_ID : undefined}
-          availableFonts={[
-            { family: 'Inter', source: 'google-fonts' },
-            { family: 'Roboto', source: 'google-fonts' },
-          ]}
-          createImageOptions={{ height: 512, seed: 9, steps: 4, width: 512 }}
-          focusFontControlKey={1}
-          key={tab}
-          languageDetectionPreparation={{ progress: 44, sourceLanguage: 'en', status: 'downloading' }}
-          languageDetectionProviderStates={[
-            {
-              capability: 'language-detection',
-              compatibility: 'compatible',
-              description: 'Gallery language detection.',
-              id: 'gallery-language',
-              label: 'Gallery language',
-              modelId: aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID,
-              readiness: 'needs-download',
-              runtime: 'webgpu-huggingface',
-              selected: true,
-            },
-          ]}
-          localFonts={[
-            { family: 'Inter', source: 'local-font-folder' },
-            { family: 'Orbitron', source: 'local-font-folder' },
-          ]}
-          modelStates={[
-            {
-              id: imageGenerationModel.IMAGE_GENERATION_MODEL_ID,
-              label: 'Image generation',
-              progress: 34,
-              provider: 'transformers',
-              required: true,
-              status: 'downloading',
-            },
-            {
-              id: aiModelCatalog.GEMMA_LLM_MODEL_ID,
-              label: 'Prompt model',
-              progress: 0,
-              provider: 'transformers',
-              required: true,
-              status: 'needs-download',
-            },
-          ]}
-          open
-          project={panelProject}
-          promptApiAttention={tab === 'ai-tools'}
-          promptApiNotice="Prompt API needs preparation."
-          promptPreparation={{ availability: 'downloadable', progress: 27, status: 'downloading' }}
-          promptProviderStates={[
-            {
-              capability: 'prompt',
-              compatibility: 'compatible',
-              description: 'Gallery prompt provider.',
-              id: 'gallery-prompt',
-              label: 'Gallery prompt',
-              modelId: aiModelCatalog.GEMMA_LLM_MODEL_ID,
-              readiness: 'needs-download',
-              runtime: 'webgpu-huggingface',
-              selected: true,
-            },
-          ]}
-          selection={{
-            elementIds: tab === 'animations' ? ['video-1'] : ['text-1'],
-            pageId: panelActivePageId,
-            target: 'elements',
-          }}
-          stockGifResults={stockItems.filter((item) => item.kind === 'gif')}
-          stockImageResults={stockItems.filter((item) => item.kind === 'image')}
-          stockMediaError={{ gifs: 'GIF search failed.', images: 'Image search failed.' }}
-          stockMediaProviderState={{
-            gifs: { configured: true, provider: 'giphy' },
-            images: { configured: true, provider: 'unsplash' },
-          }}
-          stockMediaRecentItems={stockItems}
-          stockMediaSearchingGifs={tab === 'elements'}
-          stockMediaSearchingImages={tab === 'elements'}
-          translationLanguageOptions={TRANSLATION_LANGUAGE_OPTIONS.slice(0, 4)}
-          translationPreparation={{ progress: 58, sourceLanguage: 'en', status: 'downloading' }}
-          translationProviderStates={[
-            {
-              capability: 'translation',
-              compatibility: 'compatible',
-              description: 'Gallery translation provider.',
-              id: 'gallery-translation',
-              label: 'Gallery translation',
-              modelId: aiModelCatalog.TRANSLATEGEMMA_MODEL_ID,
-              readiness: 'needs-download',
-              runtime: 'chrome-built-in',
-              selected: true,
-            },
-          ]}
-          translationTargetAttention={tab === 'ai-tools'}
-          translationTargetLanguage="pt"
-          onAlignSelectedElement={(mode) => setShellDiagnostics(`align:${mode}`)}
-          onApplySlideLayout={(pageId, layoutId) => setShellDiagnostics(`layout:${pageId}:${layoutId}`)}
-          onApplyTheme={(themeId) => setShellDiagnostics(`theme:${themeId}`)}
-          onChangeTheme={() => setShellDiagnostics('theme-change')}
-          onClearElementAnimationBuild={(elementId) => setShellDiagnostics(`clear-build:${elementId}`)}
-          onClearPageTransition={() => setShellDiagnostics('clear-transition')}
-          onConfigureStockMedia={() => setShellDiagnostics('configure-stock')}
-          onCreateImageOptionsChange={() => setShellDiagnostics('image-options')}
-          onDeleteElement={(elementId) => setShellDiagnostics(`delete-element:${elementId}`)}
-          onDownloadFont={async (family) => setShellDiagnostics(`download-font:${family}`)}
-          onDownloadModel={async (id) => setShellDiagnostics(`download-model:${id}`)}
-          onEditSlideLayout={(layoutId) => setShellDiagnostics(`edit-layout:${layoutId}`)}
-          onEditTheme={(themeId) => setShellDiagnostics(`edit-theme:${themeId}`)}
-          onImportLocalFont={async (family) => setShellDiagnostics(`local-font:${family}`)}
-          onImportMedia={(file) => setShellDiagnostics(`import-media:${file.name}`)}
-          onInsertShape={(shape) => setShellDiagnostics(`shape:${shape}`)}
-          onInsertStockMedia={(item) => setShellDiagnostics(`stock:${item.id}`)}
-          onInsertText={(preset) => setShellDiagnostics(`text:${preset}`)}
-          onLanguageDetectionProviderChange={(providerId) => setShellDiagnostics(`language-provider:${providerId}`)}
-          onOpenChange={(open) => setShellDiagnostics(`panel-open:${open}`)}
-          onPlayAnimationPreview={() => setShellDiagnostics('play-animation')}
-          onPrepareLanguageDetectionProvider={async () => setShellDiagnostics('prepare-language')}
-          onPreparePromptApi={async () => setShellDiagnostics('prepare-prompt')}
-          onPrepareTranslationProvider={async () => setShellDiagnostics('prepare-translation')}
-          onPromptProviderChange={(providerId) => setShellDiagnostics(`prompt-provider:${providerId}`)}
-          onRemoveAsset={(assetId) => setShellDiagnostics(`remove-asset:${assetId}`)}
-          onRemoveModel={async (id) => setShellDiagnostics(`remove-model:${id}`)}
-          onReorderElement={(elementId, targetElementId, position) =>
-            setShellDiagnostics(`reorder:${elementId}:${targetElementId}:${position ?? ''}`)
-          }
-          onReorderElementAnimationBuild={(elementId, targetIndex) =>
-            setShellDiagnostics(`reorder-build:${elementId}:${targetIndex}`)
-          }
-          onReplaceVideoAsset={(elementId, file) => setShellDiagnostics(`replace-video:${elementId}:${file.name}`)}
-          onSearchStockGifs={(query) => setShellDiagnostics(`search-gif:${query}`)}
-          onSearchStockImages={(query) => setShellDiagnostics(`search-image:${query}`)}
-          onSelectElement={(elementId) => setShellDiagnostics(`select:${elementId}`)}
-          onSetElementAnimationBuilds={(elementIds, patch) =>
-            setShellDiagnostics(`set-build:${elementIds.join(',')}:${patch.effect}`)
-          }
-          onSetElementLock={(elementId, locked) => setShellDiagnostics(`lock:${elementId}:${locked}`)}
-          onSetElementVisibility={(elementId, visible) => setShellDiagnostics(`visible:${elementId}:${visible}`)}
-          onSetPageTransition={(transition) => setShellDiagnostics(`transition:${transition.effect}`)}
-          onSetSelectedElementZOrder={(mode) => setShellDiagnostics(`z:${mode}`)}
-          onTabChange={(nextTab) => setShellDiagnostics(`tab:${nextTab}`)}
-          onToggleSlideLayoutPlaceholder={(layoutId, role, visible) =>
-            setShellDiagnostics(`placeholder:${layoutId}:${role}:${visible}`)
-          }
-          onTranslationProviderChange={(providerId) => setShellDiagnostics(`translation-provider:${providerId}`)}
-          onTranslationTargetLanguageChange={(languageCode) => setShellDiagnostics(`target:${languageCode}`)}
-          onUpdateElementFrame={(elementId) => setShellDiagnostics(`frame:${elementId}`)}
-          onUpdateElementStyle={(elementId) => setShellDiagnostics(`style:${elementId}`)}
-          onUpdateMediaPlayback={(elementId) => setShellDiagnostics(`media:${elementId}`)}
-          onUpdatePageBackground={(background) => setShellDiagnostics(`background:${background.type}`)}
-          onUpdateTextContent={(elementId, text) => setShellDiagnostics(`content:${elementId}:${text}`)}
-        />
-      ))}
-      <RemoteImportPanel
-        error="Remote failed"
-        projects={[]}
-        status="failed"
-        onClose={() => undefined}
-        onImportProject={() => undefined}
-      />
-      <RemoteImportPanel
-        projects={[]}
-        status="loading"
-        onClose={() => undefined}
-        onImportProject={() => undefined}
-      />
-      <RemoteImportPanel
-        projects={[]}
-        status="empty"
-        onClose={() => undefined}
-        onImportProject={() => undefined}
-      />
-      <RemoteImportPanel
-        projects={[
-          {
-            id: 'remote-a',
-            name: 'Remote A',
-            syncedAt: '2026-07-20T00:00:00.000Z',
-          },
-          {
-            id: 'remote-b',
-            name: 'Remote B',
-            syncedAt: 'not-a-date',
-          },
-        ]}
-        status="ready"
-        onClose={() => setShellDiagnostics('remote-close')}
-        onDeleteProject={(projectId) => setShellDiagnostics(`delete:${projectId}`)}
-        onImportProject={(projectId) => setShellDiagnostics(`import:${projectId}`)}
-      />
-      <SharePanel
-        projectName="Diagnostics Share"
-        publicLinkUnavailableReason={shareCopyMode === 'fail' ? 'Configure the mirror first.' : undefined}
-        recordingOptions={[
-          { id: 'recording-a', label: 'Recording A', segmentCount: 2 },
-          { id: 'recording-b', label: 'Recording B', segmentCount: 4 },
-        ]}
-        share={
-          shareCopyMode === 'ready'
-            ? createDiagnosticShareMetadata('diagnostic-visible-share')
-            : {
-                ...createDiagnosticShareMetadata('diagnostic-syncing-share'),
-                status: 'syncing',
+          {panelTabs.map((tab) => (
+            <LeftToolPanel
+              activePageId={panelActivePageId}
+              activeSlideLanguage={{ code: 'en', displayCode: 'EN', flag: '🇺🇸', label: 'English' }}
+              activeTab={tab}
+              animationPreview={{
+                activeBuildElementId: 'video-1',
+                mode: 'editor',
+                pageId: panelActivePageId,
+                phase: 'waiting',
+                playing: true,
+                waitingForClick: true,
+              }}
+              attentionModelId={
+                tab === 'ai-tools' ? imageGenerationModel.IMAGE_GENERATION_MODEL_ID : undefined
               }
-        }
-        shareProgress={
-          shareCopyMode === 'ready'
-            ? undefined
-            : { current: 1, total: 3, label: 'Preparing public link' }
-        }
-        onClose={() => setShellDiagnostics('share-close')}
-        onConfigurePublicLink={() => setShareCopyMode('ready')}
-        onCopyLink={async (recordingId) => ({
-          ...createDiagnosticShareMetadata(`diagnostic-${recordingId ?? 'none'}`),
-          status: 'copied',
-        })}
-        onDownload={() => setShellDiagnostics('share-download')}
-        onPresent={() => setShellDiagnostics('share-present')}
-      />
-      <SharePanel
-        projectName="Diagnostics Share Failed"
-        onClose={() => undefined}
-        onCopyLink={async () => {
-          throw new Error('Share failed');
-        }}
-        onDownload={() => undefined}
-        onPresent={() => undefined}
-      />
-      <SpeakerNotesEditor
-        open={notesOpen}
-        page={notesPage}
-        pageIndex={2}
-        onClose={() => setNotesOpen(false)}
-        onUpdateNotes={(pageId, notes) =>
-          setNotesPage((current) => ({
-            ...current,
-            id: pageId,
-            speakerNotes: notes,
-          }))
-        }
-      />
-      <SpeakerNotesEditor
-        open={false}
-        page={notesPage}
-        pageIndex={0}
-        onClose={() => undefined}
-        onUpdateNotes={() => undefined}
-      />
+              availableFonts={[
+                { family: 'Inter', source: 'google-fonts' },
+                { family: 'Roboto', source: 'google-fonts' },
+              ]}
+              createImageOptions={{ height: 512, seed: 9, steps: 4, width: 512 }}
+              focusFontControlKey={1}
+              key={tab}
+              languageDetectionPreparation={{
+                progress: 44,
+                sourceLanguage: 'en',
+                status: 'downloading',
+              }}
+              languageDetectionProviderStates={[
+                {
+                  capability: 'language-detection',
+                  compatibility: 'compatible',
+                  description: 'Gallery language detection.',
+                  id: 'gallery-language',
+                  label: 'Gallery language',
+                  modelId: aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID,
+                  readiness: 'needs-download',
+                  runtime: 'webgpu-huggingface',
+                  selected: true,
+                },
+              ]}
+              localFonts={[
+                { family: 'Inter', source: 'local-font-folder' },
+                { family: 'Orbitron', source: 'local-font-folder' },
+              ]}
+              modelStates={[
+                {
+                  id: imageGenerationModel.IMAGE_GENERATION_MODEL_ID,
+                  label: 'Image generation',
+                  progress: 34,
+                  provider: 'transformers',
+                  required: true,
+                  status: 'downloading',
+                },
+                {
+                  id: aiModelCatalog.GEMMA_LLM_MODEL_ID,
+                  label: 'Prompt model',
+                  progress: 0,
+                  provider: 'transformers',
+                  required: true,
+                  status: 'needs-download',
+                },
+              ]}
+              open
+              project={panelProject}
+              promptApiAttention={tab === 'ai-tools'}
+              promptApiNotice="Prompt API needs preparation."
+              promptPreparation={{
+                availability: 'downloadable',
+                progress: 27,
+                status: 'downloading',
+              }}
+              promptProviderStates={[
+                {
+                  capability: 'prompt',
+                  compatibility: 'compatible',
+                  description: 'Gallery prompt provider.',
+                  id: 'gallery-prompt',
+                  label: 'Gallery prompt',
+                  modelId: aiModelCatalog.GEMMA_LLM_MODEL_ID,
+                  readiness: 'needs-download',
+                  runtime: 'webgpu-huggingface',
+                  selected: true,
+                },
+              ]}
+              selection={{
+                elementIds: tab === 'animations' ? ['video-1'] : ['text-1'],
+                pageId: panelActivePageId,
+                target: 'elements',
+              }}
+              stockGifResults={stockItems.filter((item) => item.kind === 'gif')}
+              stockImageResults={stockItems.filter((item) => item.kind === 'image')}
+              stockMediaError={{ gifs: 'GIF search failed.', images: 'Image search failed.' }}
+              stockMediaProviderState={{
+                gifs: { configured: true, provider: 'giphy' },
+                images: { configured: true, provider: 'unsplash' },
+              }}
+              stockMediaRecentItems={stockItems}
+              stockMediaSearchingGifs={tab === 'elements'}
+              stockMediaSearchingImages={tab === 'elements'}
+              translationLanguageOptions={TRANSLATION_LANGUAGE_OPTIONS.slice(0, 4)}
+              translationPreparation={{ progress: 58, sourceLanguage: 'en', status: 'downloading' }}
+              translationProviderStates={[
+                {
+                  capability: 'translation',
+                  compatibility: 'compatible',
+                  description: 'Gallery translation provider.',
+                  id: 'gallery-translation',
+                  label: 'Gallery translation',
+                  modelId: aiModelCatalog.TRANSLATEGEMMA_MODEL_ID,
+                  readiness: 'needs-download',
+                  runtime: 'chrome-built-in',
+                  selected: true,
+                },
+              ]}
+              translationTargetAttention={tab === 'ai-tools'}
+              translationTargetLanguage="pt"
+              onAlignSelectedElement={(mode) => setShellDiagnostics(`align:${mode}`)}
+              onApplySlideLayout={(pageId, layoutId) =>
+                setShellDiagnostics(`layout:${pageId}:${layoutId}`)
+              }
+              onApplyTheme={(themeId) => setShellDiagnostics(`theme:${themeId}`)}
+              onChangeTheme={() => setShellDiagnostics('theme-change')}
+              onClearElementAnimationBuild={(elementId) =>
+                setShellDiagnostics(`clear-build:${elementId}`)
+              }
+              onClearPageTransition={() => setShellDiagnostics('clear-transition')}
+              onConfigureStockMedia={() => setShellDiagnostics('configure-stock')}
+              onCreateImageOptionsChange={() => setShellDiagnostics('image-options')}
+              onDeleteElement={(elementId) => setShellDiagnostics(`delete-element:${elementId}`)}
+              onDownloadFont={async (family) => setShellDiagnostics(`download-font:${family}`)}
+              onDownloadModel={async (id) => setShellDiagnostics(`download-model:${id}`)}
+              onEditSlideLayout={(layoutId) => setShellDiagnostics(`edit-layout:${layoutId}`)}
+              onEditTheme={(themeId) => setShellDiagnostics(`edit-theme:${themeId}`)}
+              onImportLocalFont={async (family) => setShellDiagnostics(`local-font:${family}`)}
+              onImportMedia={(file) => setShellDiagnostics(`import-media:${file.name}`)}
+              onInsertShape={(shape) => setShellDiagnostics(`shape:${shape}`)}
+              onInsertStockMedia={(item) => setShellDiagnostics(`stock:${item.id}`)}
+              onInsertText={(preset) => setShellDiagnostics(`text:${preset}`)}
+              onLanguageDetectionProviderChange={(providerId) =>
+                setShellDiagnostics(`language-provider:${providerId}`)
+              }
+              onOpenChange={(open) => setShellDiagnostics(`panel-open:${open}`)}
+              onPlayAnimationPreview={() => setShellDiagnostics('play-animation')}
+              onPrepareLanguageDetectionProvider={async () =>
+                setShellDiagnostics('prepare-language')
+              }
+              onPreparePromptApi={async () => setShellDiagnostics('prepare-prompt')}
+              onPrepareTranslationProvider={async () => setShellDiagnostics('prepare-translation')}
+              onPromptProviderChange={(providerId) =>
+                setShellDiagnostics(`prompt-provider:${providerId}`)
+              }
+              onRemoveAsset={(assetId) => setShellDiagnostics(`remove-asset:${assetId}`)}
+              onRemoveModel={async (id) => setShellDiagnostics(`remove-model:${id}`)}
+              onReorderElement={(elementId, targetElementId, position) =>
+                setShellDiagnostics(`reorder:${elementId}:${targetElementId}:${position ?? ''}`)
+              }
+              onReorderElementAnimationBuild={(elementId, targetIndex) =>
+                setShellDiagnostics(`reorder-build:${elementId}:${targetIndex}`)
+              }
+              onReplaceVideoAsset={(elementId, file) =>
+                setShellDiagnostics(`replace-video:${elementId}:${file.name}`)
+              }
+              onSearchStockGifs={(query) => setShellDiagnostics(`search-gif:${query}`)}
+              onSearchStockImages={(query) => setShellDiagnostics(`search-image:${query}`)}
+              onSelectElement={(elementId) => setShellDiagnostics(`select:${elementId}`)}
+              onSetElementAnimationBuilds={(elementIds, patch) =>
+                setShellDiagnostics(`set-build:${elementIds.join(',')}:${patch.effect}`)
+              }
+              onSetElementLock={(elementId, locked) =>
+                setShellDiagnostics(`lock:${elementId}:${locked}`)
+              }
+              onSetElementVisibility={(elementId, visible) =>
+                setShellDiagnostics(`visible:${elementId}:${visible}`)
+              }
+              onSetPageTransition={(transition) =>
+                setShellDiagnostics(`transition:${transition.effect}`)
+              }
+              onSetSelectedElementZOrder={(mode) => setShellDiagnostics(`z:${mode}`)}
+              onTabChange={(nextTab) => setShellDiagnostics(`tab:${nextTab}`)}
+              onToggleSlideLayoutPlaceholder={(layoutId, role, visible) =>
+                setShellDiagnostics(`placeholder:${layoutId}:${role}:${visible}`)
+              }
+              onTranslationProviderChange={(providerId) =>
+                setShellDiagnostics(`translation-provider:${providerId}`)
+              }
+              onTranslationTargetLanguageChange={(languageCode) =>
+                setShellDiagnostics(`target:${languageCode}`)
+              }
+              onUpdateElementFrame={(elementId) => setShellDiagnostics(`frame:${elementId}`)}
+              onUpdateElementStyle={(elementId) => setShellDiagnostics(`style:${elementId}`)}
+              onUpdateMediaPlayback={(elementId) => setShellDiagnostics(`media:${elementId}`)}
+              onUpdatePageBackground={(background) =>
+                setShellDiagnostics(`background:${background.type}`)
+              }
+              onUpdateTextContent={(elementId, text) =>
+                setShellDiagnostics(`content:${elementId}:${text}`)
+              }
+            />
+          ))}
+          <RemoteImportPanel
+            error="Remote failed"
+            projects={[]}
+            status="failed"
+            onClose={() => undefined}
+            onImportProject={() => undefined}
+          />
+          <RemoteImportPanel
+            projects={[]}
+            status="loading"
+            onClose={() => undefined}
+            onImportProject={() => undefined}
+          />
+          <RemoteImportPanel
+            projects={[]}
+            status="empty"
+            onClose={() => undefined}
+            onImportProject={() => undefined}
+          />
+          <RemoteImportPanel
+            projects={[
+              {
+                id: 'remote-a',
+                name: 'Remote A',
+                syncedAt: '2026-07-20T00:00:00.000Z',
+              },
+              {
+                id: 'remote-b',
+                name: 'Remote B',
+                syncedAt: 'not-a-date',
+              },
+            ]}
+            status="ready"
+            onClose={() => setShellDiagnostics('remote-close')}
+            onDeleteProject={(projectId) => setShellDiagnostics(`delete:${projectId}`)}
+            onImportProject={(projectId) => setShellDiagnostics(`import:${projectId}`)}
+          />
+          <SharePanel
+            projectName="Diagnostics Share"
+            publicLinkUnavailableReason={
+              shareCopyMode === 'fail' ? 'Configure the mirror first.' : undefined
+            }
+            recordingOptions={[
+              { id: 'recording-a', label: 'Recording A', segmentCount: 2 },
+              { id: 'recording-b', label: 'Recording B', segmentCount: 4 },
+            ]}
+            share={
+              shareCopyMode === 'ready'
+                ? createDiagnosticShareMetadata('diagnostic-visible-share')
+                : {
+                    ...createDiagnosticShareMetadata('diagnostic-syncing-share'),
+                    status: 'syncing',
+                  }
+            }
+            shareProgress={
+              shareCopyMode === 'ready'
+                ? undefined
+                : { current: 1, total: 3, label: 'Preparing public link' }
+            }
+            onClose={() => setShellDiagnostics('share-close')}
+            onConfigurePublicLink={() => setShareCopyMode('ready')}
+            onCopyLink={async (recordingId) => ({
+              ...createDiagnosticShareMetadata(`diagnostic-${recordingId ?? 'none'}`),
+              status: 'copied',
+            })}
+            onDownload={() => setShellDiagnostics('share-download')}
+            onPresent={() => setShellDiagnostics('share-present')}
+          />
+          <SharePanel
+            projectName="Diagnostics Share Failed"
+            onClose={() => undefined}
+            onCopyLink={async () => {
+              throw new Error('Share failed');
+            }}
+            onDownload={() => undefined}
+            onPresent={() => undefined}
+          />
+          <SpeakerNotesEditor
+            open={notesOpen}
+            page={notesPage}
+            pageIndex={2}
+            onClose={() => setNotesOpen(false)}
+            onUpdateNotes={(pageId, notes) =>
+              setNotesPage((current) => ({
+                ...current,
+                id: pageId,
+                speakerNotes: notes,
+              }))
+            }
+          />
+          <SpeakerNotesEditor
+            open={false}
+            page={notesPage}
+            pageIndex={0}
+            onClose={() => undefined}
+            onUpdateNotes={() => undefined}
+          />
         </>
       ) : null}
       {mirrorOpen ? (
@@ -907,7 +969,13 @@ function createDiagnosticAppServices(options: DiagnosticAppServicesOptions = {})
     id: aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID,
     label: 'Language diagnostics',
   };
-  const modelStates = [readyModel, imageReadyModel, promptReadyModel, translationReadyModel, languageReadyModel];
+  const modelStates = [
+    readyModel,
+    imageReadyModel,
+    promptReadyModel,
+    translationReadyModel,
+    languageReadyModel,
+  ];
   const promptProviders = [
     {
       capability: 'prompt' as const,
@@ -1039,7 +1107,12 @@ function createDiagnosticAppServices(options: DiagnosticAppServicesOptions = {})
       },
       downloadRequiredModels: async () => modelStates,
       getModelStates: async () => modelStates,
-      removeModel: async (id: string) => ({ ...readyModel, id, progress: 0, status: 'needs-download' as const }),
+      removeModel: async (id: string) => ({
+        ...readyModel,
+        id,
+        progress: 0,
+        status: 'needs-download' as const,
+      }),
     },
     promptService: {
       checkAvailability: async () => 'ready' as const,
@@ -1061,7 +1134,12 @@ function createDiagnosticAppServices(options: DiagnosticAppServicesOptions = {})
       },
       generateSlideTasksFromPrompt: async () =>
         createSlideDocument([
-          { id: 'generated-title', placementHint: '', text: 'Generated diagnostics', type: 'add-title' },
+          {
+            id: 'generated-title',
+            placementHint: '',
+            text: 'Generated diagnostics',
+            type: 'add-title',
+          },
           { id: 'generated-body', placementHint: '', text: 'Coverage path', type: 'add-body-text' },
         ]),
       getProviderStates: async () => promptProviders,
@@ -1079,7 +1157,11 @@ function createDiagnosticAppServices(options: DiagnosticAppServicesOptions = {})
       prepareLanguageDetection: async (options?: { onProgress?: (progress: number) => void }) => {
         options?.onProgress?.(100);
       },
-      prepareTranslation: async (_source: string, _target: string, options?: { onProgress?: (progress: number) => void }) => {
+      prepareTranslation: async (
+        _source: string,
+        _target: string,
+        options?: { onProgress?: (progress: number) => void },
+      ) => {
         options?.onProgress?.(100);
       },
       setLanguageDetectionProvider: async () => languageProviders,
@@ -1087,7 +1169,10 @@ function createDiagnosticAppServices(options: DiagnosticAppServicesOptions = {})
       translate: async (text: string, targetLanguage: string) => `[${targetLanguage}] ${text}`,
     },
     imageGenerationService: {
-      generateImage: async (_prompt: string, options?: { onProgress?: (state: { label: string; progress: number }) => void }) => {
+      generateImage: async (
+        _prompt: string,
+        options?: { onProgress?: (state: { label: string; progress: number }) => void },
+      ) => {
         options?.onProgress?.({ label: 'Diagnostics', progress: 100 });
         return {
           id: 'generated-image-asset',
@@ -1120,7 +1205,17 @@ function createDiagnosticAppServices(options: DiagnosticAppServicesOptions = {})
       }),
     },
     presentationExportService: {
-      exportPowerPoint: async (_project: ProjectDocument, options?: { onProgress?: (progress: { detail?: string; progress: number; stage: string; title: string }) => void }) => {
+      exportPowerPoint: async (
+        _project: ProjectDocument,
+        options?: {
+          onProgress?: (progress: {
+            detail?: string;
+            progress: number;
+            stage: string;
+            title: string;
+          }) => void;
+        },
+      ) => {
         options?.onProgress?.({
           detail: 'Diagnostics export',
           progress: 100,
@@ -1128,7 +1223,9 @@ function createDiagnosticAppServices(options: DiagnosticAppServicesOptions = {})
           title: 'Exporting',
         });
         return {
-          blob: new Blob(['pptx'], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }),
+          blob: new Blob(['pptx'], {
+            type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          }),
           warnings: [],
         };
       },
@@ -1189,67 +1286,63 @@ function createDiagnosticAppServices(options: DiagnosticAppServicesOptions = {})
       ],
       trackImageDownload: async () => undefined,
     },
-	    fontImportService: {
-	      listDownloadableFonts: () => [{ family: 'Inter', source: 'google-fonts' as const }],
-	      loadProjectFonts: async () => undefined,
-	      resolveAndDownloadFonts: async (requests: FontImportRequest[]) => {
-	        const fonts = Object.fromEntries(
-	          requests
-	            .filter((request) => request.family.toLowerCase() === 'inter')
-	            .map((request) => [
-	              `diagnostic-${request.family}-${request.fontWeight}-${request.fontStyle}`,
-	              {
-	                family: request.family,
-	                fileName: `${request.family}-${request.fontWeight}.woff2`,
-	                fontStyle: request.fontStyle,
-	                fontWeight: request.fontWeight,
-	                id: `diagnostic-${request.family}-${request.fontWeight}-${request.fontStyle}`,
-	                mimeType: 'font/woff2',
-	                name: `${request.family} ${request.fontWeight}`,
-	                objectUrl: `blob:font-${request.fontWeight}`,
-	                requestedFamily: request.family,
-	                source: 'google-fonts',
-	                storage: 'inline',
-	              },
-	            ]),
-	        ) as Record<string, ProjectFont>;
-	        return {
-	          fonts,
-	          resolutions: requests.map((request) =>
-	            request.family.toLowerCase() === 'inter'
-	              ? {
-	                  family: request.family,
-	                  fontStyle: request.fontStyle,
-	                  fontWeight: request.fontWeight,
-	                  requestedFamily: request.family,
-	                  status: 'downloaded-exact' as const,
-	                }
-	              : {
-	                  fontStyle: request.fontStyle,
-	                  fontWeight: request.fontWeight,
-	                  message: `${request.family} needs replacement.`,
-	                  requestedFamily: request.family,
-	                  status: 'missing-needs-user' as const,
-	                },
-	          ),
-	          warnings: requests
-	            .filter((request) => request.family.toLowerCase() !== 'inter')
-	            .map((request) => ({
-	              code: 'font-missing',
-	              message: `${request.family} needs replacement.`,
-	              severity: 'warning' as const,
-	            })),
-	        };
-	      },
-	    },
-	  };
-	}
+    fontImportService: {
+      listDownloadableFonts: () => [{ family: 'Inter', source: 'google-fonts' as const }],
+      loadProjectFonts: async () => undefined,
+      resolveAndDownloadFonts: async (requests: FontImportRequest[]) => {
+        const fonts = Object.fromEntries(
+          requests
+            .filter((request) => request.family.toLowerCase() === 'inter')
+            .map((request) => [
+              `diagnostic-${request.family}-${request.fontWeight}-${request.fontStyle}`,
+              {
+                family: request.family,
+                fileName: `${request.family}-${request.fontWeight}.woff2`,
+                fontStyle: request.fontStyle,
+                fontWeight: request.fontWeight,
+                id: `diagnostic-${request.family}-${request.fontWeight}-${request.fontStyle}`,
+                mimeType: 'font/woff2',
+                name: `${request.family} ${request.fontWeight}`,
+                objectUrl: `blob:font-${request.fontWeight}`,
+                requestedFamily: request.family,
+                source: 'google-fonts',
+                storage: 'inline',
+              },
+            ]),
+        ) as Record<string, ProjectFont>;
+        return {
+          fonts,
+          resolutions: requests.map((request) =>
+            request.family.toLowerCase() === 'inter'
+              ? {
+                  family: request.family,
+                  fontStyle: request.fontStyle,
+                  fontWeight: request.fontWeight,
+                  requestedFamily: request.family,
+                  status: 'downloaded-exact' as const,
+                }
+              : {
+                  fontStyle: request.fontStyle,
+                  fontWeight: request.fontWeight,
+                  message: `${request.family} needs replacement.`,
+                  requestedFamily: request.family,
+                  status: 'missing-needs-user' as const,
+                },
+          ),
+          warnings: requests
+            .filter((request) => request.family.toLowerCase() !== 'inter')
+            .map((request) => ({
+              code: 'font-missing',
+              message: `${request.family} needs replacement.`,
+              severity: 'warning' as const,
+            })),
+        };
+      },
+    },
+  };
+}
 
-function createDiagnosticStockMediaItem(
-  id: string,
-  kind: 'gif' | 'image',
-  title: string,
-) {
+function createDiagnosticStockMediaItem(id: string, kind: 'gif' | 'image', title: string) {
   return {
     height: 480,
     id,
@@ -1351,58 +1444,84 @@ function EditorViewModelSequentialDiagnostics() {
       current().editSlideLayout('diagnostic-layout');
       current().toggleSlideLayoutPlaceholder('diagnostic-layout', 'title', false);
       await nextFrame();
-      await current().generateImageFromPrompt('Replace the selected image with a diagnostics card', {
-        height: 768,
-        seed: 7,
-        steps: 6,
-        width: 1024,
-      }).catch(() => undefined);
+      await current()
+        .generateImageFromPrompt('Replace the selected image with a diagnostics card', {
+          height: 768,
+          seed: 7,
+          steps: 6,
+          width: 1024,
+        })
+        .catch(() => undefined);
       await nextFrame();
       current().clearSelection();
-      await current().generateImageFromPrompt('Create a standalone diagnostics image', {
-        height: 512,
-        seed: 11,
-        steps: 4,
-        width: 512,
-      }).catch(() => undefined);
+      await current()
+        .generateImageFromPrompt('Create a standalone diagnostics image', {
+          height: 512,
+          seed: 11,
+          steps: 4,
+          width: 512,
+        })
+        .catch(() => undefined);
       await nextFrame();
-      await current().generateSlideFromPrompt('Create a cinematic AI image background').catch(() => undefined);
-      await current().generateSlideFromPrompt('Create a browser AI architecture slide').catch(() => undefined);
+      await current()
+        .generateSlideFromPrompt('Create a cinematic AI image background')
+        .catch(() => undefined);
+      await current()
+        .generateSlideFromPrompt('Create a browser AI architecture slide')
+        .catch(() => undefined);
       await nextFrame();
       current().setActiveSlideLanguage('en');
-      await current().setTranslationTargetLanguage('pt').catch(() => undefined);
+      await current()
+        .setTranslationTargetLanguage('pt')
+        .catch(() => undefined);
       await nextFrame();
       current().selectAllElementsOnActivePage();
       await nextFrame();
-      await current().translateSelectedText().catch(() => undefined);
-      await current().translateDeck().catch(() => undefined);
+      await current()
+        .translateSelectedText()
+        .catch(() => undefined);
+      await current()
+        .translateDeck()
+        .catch(() => undefined);
       const firstPageId = current().project.pages[0]?.id;
       if (firstPageId) {
-        await current().translatePage(firstPageId).catch(() => undefined);
+        await current()
+          .translatePage(firstPageId)
+          .catch(() => undefined);
       }
       await nextFrame();
       current().toggleBackgroundSelectionMode();
       await nextFrame();
       current().previewBackgroundSubject('image-1', { x: 180, y: 120 });
       current().refineBackgroundSubject('image-1', { x: 220, y: 180 });
-      await current().pickBackgroundSubject('image-1', { x: 220, y: 180 }).catch(() => undefined);
+      await current()
+        .pickBackgroundSubject('image-1', { x: 220, y: 180 })
+        .catch(() => undefined);
       current().cancelBackgroundSelectionMode();
       await nextFrame();
-      await current().importPowerPoint({
-        file: new File(['pptx'], 'diagnostic-sequential.pptx', {
-          type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        }),
-      }).catch(() => undefined);
+      await current()
+        .importPowerPoint({
+          file: new File(['pptx'], 'diagnostic-sequential.pptx', {
+            type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          }),
+        })
+        .catch(() => undefined);
       await nextFrame();
-      await current().replacePowerPointFont('Aptos', 'Inter').catch(() => undefined);
+      await current()
+        .replacePowerPointFont('Aptos', 'Inter')
+        .catch(() => undefined);
       await nextFrame();
-      await current().importPowerPoint({
-        file: new File(['pptx'], 'diagnostic-sequential-missing.pptx', {
-          type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        }),
-      }).catch(() => undefined);
+      await current()
+        .importPowerPoint({
+          file: new File(['pptx'], 'diagnostic-sequential-missing.pptx', {
+            type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          }),
+        })
+        .catch(() => undefined);
       await nextFrame();
-      await current().replacePowerPointFont('Aptos', 'Missing Sans').catch(() => undefined);
+      await current()
+        .replacePowerPointFont('Aptos', 'Missing Sans')
+        .catch(() => undefined);
       await nextFrame();
       current().selectElement('video-1');
       current().setSelectedElementZOrder('front');
@@ -1439,12 +1558,18 @@ function EditorViewModelSequentialDiagnostics() {
       current().removeAsset('asset-missing');
       await nextFrame();
       await current().setPersistence(true);
-      await current().saveLocalNow().catch(() => undefined);
-      await current().saveLocalAs().catch(() => undefined);
+      await current()
+        .saveLocalNow()
+        .catch(() => undefined);
+      await current()
+        .saveLocalAs()
+        .catch(() => undefined);
       current().closeLocalProjectSetup();
       await nextFrame();
       current().setHighlightVersionChanges(false);
-      await current().openVersionHistory().catch(() => undefined);
+      await current()
+        .openVersionHistory()
+        .catch(() => undefined);
       await nextFrame();
       current().closeVersionHistory();
       current().undo();
@@ -1632,7 +1757,10 @@ function EditorViewModelFailureDiagnostics() {
       },
       modelSetupService: {
         ...baseServices.modelSetupService,
-        downloadModel: async (id: string, options?: { onProgress?: (progress: number) => void }) => {
+        downloadModel: async (
+          id: string,
+          options?: { onProgress?: (progress: number) => void },
+        ) => {
           options?.onProgress?.(35);
           throw new Error(`download ${id} failed`);
         },
@@ -1690,7 +1818,11 @@ function EditorViewModelFailureDiagnostics() {
           options?.onProgress?.(33);
           throw new Error('language model failed');
         },
-        prepareTranslation: async (_source: string, _target: string, options?: { onProgress?: (progress: number) => void }) => {
+        prepareTranslation: async (
+          _source: string,
+          _target: string,
+          options?: { onProgress?: (progress: number) => void },
+        ) => {
           options?.onProgress?.(52);
           throw new Error('translation preparation failed');
         },
@@ -1726,22 +1858,50 @@ function EditorViewModelFailureDiagnostics() {
 
     async function run() {
       await nextFrame();
-      await current().preparePromptApi().catch(() => undefined);
-      await current().cancelPromptModelDownload(aiModelCatalog.GEMMA_LLM_MODEL_ID).catch(() => undefined);
-      await current().setPromptProvider('failing-prompt').catch(() => undefined);
-      await current().setTranslationProvider('failing-translation').catch(() => undefined);
-      await current().setLanguageDetectionProvider('failing-language').catch(() => undefined);
-      await current().setTranslationTargetLanguage('pt').catch(() => undefined);
-      await current().setTranslationTargetLanguage('').catch(() => undefined);
-      await current().translateCurrentSlide().catch(() => undefined);
-      await current().downloadModel(aiModelCatalog.TRANSLATEGEMMA_MODEL_ID).catch(() => undefined);
+      await current()
+        .preparePromptApi()
+        .catch(() => undefined);
+      await current()
+        .cancelPromptModelDownload(aiModelCatalog.GEMMA_LLM_MODEL_ID)
+        .catch(() => undefined);
+      await current()
+        .setPromptProvider('failing-prompt')
+        .catch(() => undefined);
+      await current()
+        .setTranslationProvider('failing-translation')
+        .catch(() => undefined);
+      await current()
+        .setLanguageDetectionProvider('failing-language')
+        .catch(() => undefined);
+      await current()
+        .setTranslationTargetLanguage('pt')
+        .catch(() => undefined);
+      await current()
+        .setTranslationTargetLanguage('')
+        .catch(() => undefined);
+      await current()
+        .translateCurrentSlide()
+        .catch(() => undefined);
+      await current()
+        .downloadModel(aiModelCatalog.TRANSLATEGEMMA_MODEL_ID)
+        .catch(() => undefined);
       current().openMirrorSettings();
-      await current().testMirrorConnection(mirrorConfig).catch(() => undefined);
+      await current()
+        .testMirrorConnection(mirrorConfig)
+        .catch(() => undefined);
       current().setMirrorEnabledFromSettings(true, mirrorConfig);
-      await current().syncMirrorNow().catch(() => undefined);
-      await current().importRemoteMirror().catch(() => undefined);
-      await current().importRemoteMirrorProject('missing-project').catch(() => undefined);
-      await current().deleteRemoteMirrorProject('missing-project').catch(() => undefined);
+      await current()
+        .syncMirrorNow()
+        .catch(() => undefined);
+      await current()
+        .importRemoteMirror()
+        .catch(() => undefined);
+      await current()
+        .importRemoteMirrorProject('missing-project')
+        .catch(() => undefined);
+      await current()
+        .deleteRemoteMirrorProject('missing-project')
+        .catch(() => undefined);
       setSummary(
         JSON.stringify({
           mirror: current().mirrorState.status,
@@ -1853,7 +2013,11 @@ function EditorViewModelEdgeDiagnostics() {
     ranRef.current = true;
     const originalSetTimeout = window.setTimeout;
     window.setTimeout = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) =>
-      originalSetTimeout(handler, timeout === 1000 ? 0 : timeout, ...args)) as typeof window.setTimeout;
+      originalSetTimeout(
+        handler,
+        timeout === 1000 ? 0 : timeout,
+        ...args,
+      )) as typeof window.setTimeout;
     const nextFrame = () => new Promise((resolve) => originalSetTimeout(resolve, 0));
 
     async function run() {
@@ -1911,7 +2075,10 @@ function BackgroundSubjectSelectionDiagnostics() {
   const ranRef = useRef(false);
   const readyBackground = useBackgroundSubjectSelection({
     backgroundRemovalService: {
-      prepareBackgroundRemoval: async (_asset, options?: { onProgress?: (progress: number) => void }) => {
+      prepareBackgroundRemoval: async (
+        _asset,
+        options?: { onProgress?: (progress: number) => void },
+      ) => {
         options?.onProgress?.(48);
         options?.onProgress?.(100);
       },
@@ -2046,9 +2213,10 @@ function BackgroundSubjectSelectionDiagnostics() {
         JSON.stringify({
           blockedNotice: blockedBackgroundRef.current.backgroundSelectionNotice,
           failedPreparation: failingBackgroundRef.current.backgroundPreparation?.status,
-          pickedAssetId: readyProjectRef.current.elements['image-1']?.type === 'image'
-            ? readyProjectRef.current.elements['image-1'].assetId
-            : undefined,
+          pickedAssetId:
+            readyProjectRef.current.elements['image-1']?.type === 'image'
+              ? readyProjectRef.current.elements['image-1'].assetId
+              : undefined,
           previewMask: readyBackgroundRef.current.backgroundPreview?.maskUrl,
           tabs: tabsRef.current,
         }),
@@ -2063,9 +2231,7 @@ function BackgroundSubjectSelectionDiagnostics() {
   return <output aria-label="Background subject selection diagnostics">{summary}</output>;
 }
 
-async function runEditorViewModelDiagnostic(
-  viewModel: ReturnType<typeof useEditorViewModel>,
-) {
+async function runEditorViewModelDiagnostic(viewModel: ReturnType<typeof useEditorViewModel>) {
   viewModel.setProjectName('Diagnostics Deck');
   viewModel.setActiveTab('text');
   viewModel.selectElement('text-1');
@@ -2097,22 +2263,24 @@ async function runEditorViewModelDiagnostic(
   viewModel.insertTextElement('subtitle');
   viewModel.insertShapeElement('rect');
   viewModel.selectElement('image-1');
-  await viewModel.importMediaFile(
-    new File(
-      ['<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480"></svg>'],
-      'diagnostic.svg',
-      { type: 'image/svg+xml' },
-    ),
-  ).catch(() => undefined);
-  await viewModel.importMediaFile(
-    new File(['gif-bytes'], 'diagnostic.gif', { type: 'image/gif' }),
-  ).catch(() => undefined);
-  await viewModel.importMediaFile(
-    new File(['video-bytes'], 'diagnostic.webm', { type: 'video/webm' }),
-  ).catch(() => undefined);
-  await viewModel.importMediaFile(
-    new File(['video-bytes'], 'diagnostic.mov', { type: 'video/quicktime' }),
-  ).catch(() => undefined);
+  await viewModel
+    .importMediaFile(
+      new File(
+        ['<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480"></svg>'],
+        'diagnostic.svg',
+        { type: 'image/svg+xml' },
+      ),
+    )
+    .catch(() => undefined);
+  await viewModel
+    .importMediaFile(new File(['gif-bytes'], 'diagnostic.gif', { type: 'image/gif' }))
+    .catch(() => undefined);
+  await viewModel
+    .importMediaFile(new File(['video-bytes'], 'diagnostic.webm', { type: 'video/webm' }))
+    .catch(() => undefined);
+  await viewModel
+    .importMediaFile(new File(['video-bytes'], 'diagnostic.mov', { type: 'video/quicktime' }))
+    .catch(() => undefined);
   viewModel.selectElement('image-1');
   viewModel.flipSelectedImage();
   viewModel.updateImageCrop('image-1', {
@@ -2173,22 +2341,28 @@ async function runEditorViewModelDiagnostic(
     unsplashAccessKey: 'diagnostic-unsplash',
   });
   await Promise.resolve();
-  viewModel.insertStockMedia(createDiagnosticStockMediaItem('stock-image', 'image', 'Diagnostic image'));
+  viewModel.insertStockMedia(
+    createDiagnosticStockMediaItem('stock-image', 'image', 'Diagnostic image'),
+  );
   viewModel.insertStockMedia(createDiagnosticStockMediaItem('stock-gif', 'gif', 'Diagnostic GIF'));
   viewModel.insertStockMedia({
     ...createDiagnosticStockMediaItem('stock-video-gif', 'gif', 'Diagnostic video GIF'),
     videoUrl: 'https://cdn.localstudio.test/diagnostic.mp4',
   });
-  viewModel.insertStockMedia(createDiagnosticStockMediaItem('stock-fail', 'image', 'Failed diagnostic image'));
+  viewModel.insertStockMedia(
+    createDiagnosticStockMediaItem('stock-fail', 'image', 'Failed diagnostic image'),
+  );
   await new Promise((resolve) => window.setTimeout(resolve, 0));
   viewModel.clearStockMediaConfig();
   viewModel.openMirrorSettings();
   viewModel.closeMirrorSettings();
   viewModel.setLocalFontMirrorEnabled(true);
   await viewModel.chooseLocalFontMirrorFolder().catch(() => undefined);
-  await viewModel.prepareProjectFontsForPublicShare({
-    onProgress: () => undefined,
-  }).catch(() => viewModel.project);
+  await viewModel
+    .prepareProjectFontsForPublicShare({
+      onProgress: () => undefined,
+    })
+    .catch(() => viewModel.project);
   const mirrorConfig = {
     accessKey: 'writer',
     bucket: 'localstudio',
@@ -2199,7 +2373,9 @@ async function runEditorViewModelDiagnostic(
     region: 'us-east-1',
     secretKey: 'secret',
   };
-  await viewModel.testMirrorConnection(mirrorConfig, { onProgress: () => undefined }).catch(() => undefined);
+  await viewModel
+    .testMirrorConnection(mirrorConfig, { onProgress: () => undefined })
+    .catch(() => undefined);
   viewModel.saveMirrorConfig(mirrorConfig);
   viewModel.setMirrorEnabledFromSettings(true, mirrorConfig);
   await viewModel.syncMirrorNow().catch(() => undefined);
@@ -2213,17 +2389,19 @@ async function runEditorViewModelDiagnostic(
   await viewModel.saveLocalAs().catch(() => undefined);
   await viewModel.saveLocalNow().catch(() => undefined);
   await viewModel.openVersionHistory().catch(() => undefined);
-  await viewModel.selectVersion('version-1', {
-    authorName: 'Diagnostics',
-    changeCount: 1,
-    createdAt: '2026-07-20T00:00:00.000Z',
-    fileName: 'version-1.json',
-    firstChangedElementId: 'text-1',
-    firstChangedPageId: 'page-1',
-    id: 'version-1',
-    projectName: 'Version 1',
-    summary: 'Diagnostics version',
-  }).catch(() => undefined);
+  await viewModel
+    .selectVersion('version-1', {
+      authorName: 'Diagnostics',
+      changeCount: 1,
+      createdAt: '2026-07-20T00:00:00.000Z',
+      fileName: 'version-1.json',
+      firstChangedElementId: 'text-1',
+      firstChangedPageId: 'page-1',
+      id: 'version-1',
+      projectName: 'Version 1',
+      summary: 'Diagnostics version',
+    })
+    .catch(() => undefined);
   await viewModel.restoreVersion('version-1').catch(() => undefined);
   viewModel.closeVersionHistory();
   await viewModel.downloadRequiredModels().catch(() => undefined);
@@ -2234,44 +2412,60 @@ async function runEditorViewModelDiagnostic(
   await viewModel.setTranslationProvider('diagnostic-translation').catch(() => undefined);
   await viewModel.setLanguageDetectionProvider('diagnostic-language').catch(() => undefined);
   await viewModel.setTranslationTargetLanguage('pt').catch(() => undefined);
-  await viewModel.setTranslationTargetLanguageForSource('pt', { sourceLanguage: 'en' }).catch(() => undefined);
+  await viewModel
+    .setTranslationTargetLanguageForSource('pt', { sourceLanguage: 'en' })
+    .catch(() => undefined);
   viewModel.setActiveSlideLanguage('es');
   await viewModel.translateCurrentSlide().catch(() => undefined);
-  await viewModel.generateSlideFromPrompt('Create a diagnostics status slide').catch(() => undefined);
-  await viewModel.generateImageFromPrompt('Create a diagnostics green browser card', {
-    height: 512,
-    seed: 42,
-    steps: 8,
-    width: 512,
-  }).catch(() => undefined);
+  await viewModel
+    .generateSlideFromPrompt('Create a diagnostics status slide')
+    .catch(() => undefined);
+  await viewModel
+    .generateImageFromPrompt('Create a diagnostics green browser card', {
+      height: 512,
+      seed: 42,
+      steps: 8,
+      width: 512,
+    })
+    .catch(() => undefined);
   viewModel.stopPromptGeneration();
-  await viewModel.importPowerPoint({
-    file: new File(['pptx'], 'diagnostic.pptx', {
-      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    }),
-  }).catch(() => undefined);
+  await viewModel
+    .importPowerPoint({
+      file: new File(['pptx'], 'diagnostic.pptx', {
+        type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      }),
+    })
+    .catch(() => undefined);
   viewModel.dismissMissingPowerPointFonts();
   await viewModel.replacePowerPointFont('Aptos', 'Inter').catch(() => undefined);
   viewModel.toggleSlideLayoutPlaceholder('missing-layout', 'title', false);
   await viewModel.importProject().catch(() => undefined);
   await viewModel.exportPowerPoint().catch(() => undefined);
   const automationSnapshot = viewModel.automation.getState();
-  await viewModel.automation.generateImage({
-    height: 640,
-    prompt: 'Automation diagnostics image',
-    seed: 13,
-    steps: 5,
-    width: 640,
-  }).catch(() => undefined);
-  await viewModel.automation.translateText({
-    pageId: viewModel.activePageId,
-    scope: 'slide',
-    targetLanguage: 'pt',
-  }).catch(() => undefined);
-  await viewModel.automation.generateSlides({
-    prompt: 'Automation diagnostics generated slides',
-  }).catch(() => undefined);
-  await viewModel.automation.createProject({ name: 'Automation Diagnostics Deck' }).catch(() => undefined);
+  await viewModel.automation
+    .generateImage({
+      height: 640,
+      prompt: 'Automation diagnostics image',
+      seed: 13,
+      steps: 5,
+      width: 640,
+    })
+    .catch(() => undefined);
+  await viewModel.automation
+    .translateText({
+      pageId: viewModel.activePageId,
+      scope: 'slide',
+      targetLanguage: 'pt',
+    })
+    .catch(() => undefined);
+  await viewModel.automation
+    .generateSlides({
+      prompt: 'Automation diagnostics generated slides',
+    })
+    .catch(() => undefined);
+  await viewModel.automation
+    .createProject({ name: 'Automation Diagnostics Deck' })
+    .catch(() => undefined);
   viewModel.undo();
   viewModel.redo();
 
@@ -2286,7 +2480,9 @@ async function runEditorViewModelDiagnostic(
 }
 
 async function runDiagnostics() {
-  const pptxBytes = Uint8Array.from(atob(minimalPptxPackageBase64), (character) => character.charCodeAt(0));
+  const pptxBytes = Uint8Array.from(atob(minimalPptxPackageBase64), (character) =>
+    character.charCodeAt(0),
+  );
   const patched = pptxPackagePatcher.patchPackageBuffer(
     pptxBytes.buffer,
     [
@@ -2316,7 +2512,13 @@ async function runDiagnostics() {
         height: 1080,
         id: 'page-1',
         name: 'Patch me',
-        transition: { delayMs: 250, direction: 'left', durationMs: 700, effect: 'push', trigger: 'after-delay' },
+        transition: {
+          delayMs: 250,
+          direction: 'left',
+          durationMs: 700,
+          effect: 'push',
+          trigger: 'after-delay',
+        },
         visible: true,
         width: 1920,
       },
@@ -2332,7 +2534,12 @@ async function runDiagnostics() {
       },
     ] as never,
     [{ category: 'media', code: 'existing-warning', message: 'Existing warning.' }],
-    [{ elements: [{ crop: { height: 0.7, width: 0.6, x: 0.1, y: 0.2 }, id: 'image-1' }], pageId: 'page-1' }],
+    [
+      {
+        elements: [{ crop: { height: 0.7, width: 0.6, x: 0.1, y: 0.2 }, id: 'image-1' }],
+        pageId: 'page-1',
+      },
+    ],
   );
 
   const progressValues: number[] = [];
@@ -2355,9 +2562,13 @@ async function runDiagnostics() {
   const generated = transformersResultParsing.extractGeneratedText([
     { generated_text: [{ content: 'nested assistant text' }] },
   ]);
-  const language = transformersResultParsing.extractDetectedLanguage([[{ label: 'pt', score: 0.93 }]]);
+  const language = transformersResultParsing.extractDetectedLanguage([
+    [{ label: 'pt', score: 0.93 }],
+  ]);
   const titleOnly = slideLayoutPresets.normalizeSlideTasksForLayout(
-    createSlideDocument([{ id: 'title', placementHint: '', text: 'Only title', type: 'add-title' }]),
+    createSlideDocument([
+      { id: 'title', placementHint: '', text: 'Only title', type: 'add-title' },
+    ]),
     'make a title only slide',
   );
   const centered = slideLayoutPresets.normalizeSlideTasksForLayout(
@@ -2366,7 +2577,12 @@ async function runDiagnostics() {
   );
   const bullets = slideLayoutPresets.normalizeSlideTasksForLayout(
     createSlideDocument([
-      { description: 'Browser', id: 'hero-image', placementHint: 'left image', type: 'add-placeholder-image' },
+      {
+        description: 'Browser',
+        id: 'hero-image',
+        placementHint: 'left image',
+        type: 'add-placeholder-image',
+      },
       { id: 'title', placementHint: '', text: 'LocalStudio', type: 'add-title' },
       { id: 'one', placementHint: '', text: 'Overview privacy', type: 'add-body-text' },
     ]),
@@ -2374,8 +2590,18 @@ async function runDiagnostics() {
   );
   const grid = slideLayoutPresets.normalizeSlideTasksForLayout(
     createSlideDocument([
-      { description: 'One', id: 'grid-1', placementHint: 'grid image 1', type: 'add-placeholder-image' },
-      { description: 'Two', id: 'grid-2', placementHint: 'grid image 2', type: 'add-placeholder-image' },
+      {
+        description: 'One',
+        id: 'grid-1',
+        placementHint: 'grid image 1',
+        type: 'add-placeholder-image',
+      },
+      {
+        description: 'Two',
+        id: 'grid-2',
+        placementHint: 'grid image 2',
+        type: 'add-placeholder-image',
+      },
       { id: 'grid-title', placementHint: '', text: 'Grid', type: 'add-title' },
       { id: 'caption-1', placementHint: '', text: 'First', type: 'add-body-text' },
       { id: 'caption-2', placementHint: '', text: 'Second', type: 'add-body-text' },
@@ -2383,9 +2609,19 @@ async function runDiagnostics() {
     'two-image grid with matching captions',
   );
   const hero = createSlideDocument([
-    { description: 'Hero', id: 'hero-media', placementHint: 'left media block', type: 'add-placeholder-image' },
+    {
+      description: 'Hero',
+      id: 'hero-media',
+      placementHint: 'left media block',
+      type: 'add-placeholder-image',
+    },
     { id: 'hero-title', placementHint: 'right text block', text: 'Hero', type: 'add-title' },
-    { id: 'hero-subtitle', placementHint: 'right text block', text: 'Subtitle', type: 'add-subtitle' },
+    {
+      id: 'hero-subtitle',
+      placementHint: 'right text block',
+      text: 'Subtitle',
+      type: 'add-subtitle',
+    },
   ]);
   const layoutSamples = [
     slideLayoutPresets.applySlideElementLayoutPreset(createTextElement('title'), {
@@ -2408,36 +2644,42 @@ async function runDiagnostics() {
       page: grid.page,
       task: grid.tasks.find((task) => task.type === 'add-body-text') as never,
     }),
-    slideLayoutPresets.applySlideElementLayoutPreset({
-      assetRole: 'placeholder',
-      height: 180,
-      id: 'grid-1',
-      opacity: 1,
-      rotation: 0,
-      type: 'image',
-      width: 320,
-      x: 0,
-      y: 0,
-    } as never, {
-      allTasks: grid.tasks,
-      page: grid.page,
-      task: grid.tasks.find((task) => task.type === 'add-placeholder-image') as never,
-    }),
-    slideLayoutPresets.applySlideElementLayoutPreset({
-      assetRole: 'placeholder',
-      height: 180,
-      id: 'hero-media',
-      opacity: 1,
-      rotation: 0,
-      type: 'image',
-      width: 320,
-      x: 0,
-      y: 0,
-    } as never, {
-      allTasks: hero.tasks,
-      page: hero.page,
-      task: hero.tasks[0] as never,
-    }),
+    slideLayoutPresets.applySlideElementLayoutPreset(
+      {
+        assetRole: 'placeholder',
+        height: 180,
+        id: 'grid-1',
+        opacity: 1,
+        rotation: 0,
+        type: 'image',
+        width: 320,
+        x: 0,
+        y: 0,
+      } as never,
+      {
+        allTasks: grid.tasks,
+        page: grid.page,
+        task: grid.tasks.find((task) => task.type === 'add-placeholder-image') as never,
+      },
+    ),
+    slideLayoutPresets.applySlideElementLayoutPreset(
+      {
+        assetRole: 'placeholder',
+        height: 180,
+        id: 'hero-media',
+        opacity: 1,
+        rotation: 0,
+        type: 'image',
+        width: 320,
+        x: 0,
+        y: 0,
+      } as never,
+      {
+        allTasks: hero.tasks,
+        page: hero.page,
+        task: hero.tasks[0] as never,
+      },
+    ),
     slideLayoutPresets.applySlideElementLayoutPreset(createTextElement('hero-title'), {
       allTasks: hero.tasks,
       page: hero.page,
@@ -2479,30 +2721,52 @@ async function runDiagnostics() {
     restoreRemotePreviewMedia();
   }
 
-  const recording = await runRecorderDiagnostic();
-  const transcript = await runSpeechDiagnostic();
-  const automation = await runAutomationDiagnostic();
-  const presenterSession = await runPresenterSessionDiagnostic(remotePayload);
-  const peerControlHost = await runPresenterRemotePeerControlHostDiagnostic(remoteState, batches[0]);
-  const storage = await runStorageDiagnostic();
+  const recording = await runDiagnosticStep('recording', runRecorderDiagnostic);
+  const transcript = await runDiagnosticStep('transcript', runSpeechDiagnostic);
+  const automation = await runDiagnosticStep('automation', runAutomationDiagnostic);
+  const presenterSession = await runDiagnosticStep('presenterSession', () =>
+    runPresenterSessionDiagnostic(remotePayload),
+  );
+  const peerControlHost = await runDiagnosticStep('peerControlHost', () =>
+    runPresenterRemotePeerControlHostDiagnostic(remoteState, batches[0]),
+  );
+  const storage = await runDiagnosticStep('storage', runStorageDiagnostic);
   const animation = runAnimationDiagnostic();
-  const webmcp = await runWebMcpDiagnostic();
-  const modelSetup = await runModelSetupDiagnostic();
-  const transformersRuntime = await runTransformersRuntimeDiagnostic();
-  const backgroundRemoval = await runBackgroundRemovalDiagnostic();
-  const bonsaiRuntime = await runBonsaiRuntimeDiagnostic();
+  const webmcp = await runDiagnosticStep('webmcp', runWebMcpDiagnostic);
+  const modelSetup = await runDiagnosticStep('modelSetup', runModelSetupDiagnostic);
+  const transformersRuntime = await runDiagnosticStep(
+    'transformersRuntime',
+    runTransformersRuntimeDiagnostic,
+  );
+  const backgroundRemoval = await runDiagnosticStep(
+    'backgroundRemoval',
+    runBackgroundRemovalDiagnostic,
+  );
+  const bonsaiRuntime = await runDiagnosticStep('bonsaiRuntime', runBonsaiRuntimeDiagnostic);
   const generatedSlideParsing = runGeneratedSlideParsingDiagnostic();
   const slideLayoutPresetCoverage = runSlideLayoutPresetDiagnostic();
-  const progressUtilities = await runProgressUtilitiesDiagnostic();
-  const pptxParsing = await runPptxParserDiagnostic();
-  const pptxExport = await runPptxExportDiagnostic();
-  const imageExportUtilities = await runImageExportDiagnostic();
-  const publicPreload = await runPublicDeckAssetPreloadDiagnostic();
-  const sharing = await runSharingDiagnostic();
-  const localFonts = await runLocalFontMirrorDiagnostic();
+  const progressUtilities = await runDiagnosticStep(
+    'progressUtilities',
+    runProgressUtilitiesDiagnostic,
+  );
+  const pptxParsing = await runDiagnosticStep('pptxParsing', runPptxParserDiagnostic);
+  const pptxExport = await runDiagnosticStep('pptxExport', runPptxExportDiagnostic);
+  const imageExportUtilities = await runDiagnosticStep(
+    'imageExportUtilities',
+    runImageExportDiagnostic,
+  );
+  const publicPreload = await runDiagnosticStep(
+    'publicPreload',
+    runPublicDeckAssetPreloadDiagnostic,
+  );
+  const sharing = await runDiagnosticStep('sharing', runSharingDiagnostic);
+  const localFonts = await runDiagnosticStep('localFonts', runLocalFontMirrorDiagnostic);
   const commandUtilities = runCommandUtilitiesDiagnostic();
   const projectUtilities = runEditorViewModelProjectDiagnostic();
-  const selectedProject = createProjectForSelectedShareRecording(createShareProject() as never, 'second');
+  const selectedProject = createProjectForSelectedShareRecording(
+    createShareProject() as never,
+    'second',
+  );
 
   return JSON.stringify({
     generated,
@@ -2541,6 +2805,23 @@ async function runDiagnostics() {
     projectUtilities,
     transcript,
   });
+}
+
+async function runDiagnosticStep<T>(
+  name: string,
+  action: () => Promise<T>,
+): Promise<T | { timedOut: string }> {
+  let timeoutId: number | undefined;
+  try {
+    return await Promise.race([
+      action(),
+      new Promise<{ timedOut: string }>((resolve) => {
+        timeoutId = window.setTimeout(() => resolve({ timedOut: name }), 5_000);
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+  }
 }
 
 async function runPresenterRemotePeerControlHostDiagnostic(
@@ -2845,22 +3126,43 @@ function runCommandUtilitiesDiagnostic() {
     true,
   ).execute(project);
   project = new slideLayoutCommands.ApplySlideLayoutCommand('page-1', 'layout-a').execute(project);
-  project = new slideLayoutCommands.EditSlideLayoutCommand({ ...layout, name: 'Edited layout' } as never).execute(project);
+  project = new slideLayoutCommands.EditSlideLayoutCommand({
+    ...layout,
+    name: 'Edited layout',
+  } as never).execute(project);
 
   project = new elementStructureCommands.AlignElementCommand(
     'page-1',
     'text-1',
     'page-center',
   ).execute(project);
-  project = new elementStructureCommands.SetZOrderCommand('page-1', 'text-1', 'front').execute(project);
-  project = new elementStructureCommands.SetZOrderCommand('page-1', 'text-1', 'back').execute(project);
-  project = new elementStructureCommands.SetZOrderCommand('page-1', 'image-1', 'forward').execute(project);
-  project = new elementStructureCommands.SetZOrderCommand('page-1', 'video-1', 'backward').execute(project);
-  project = new elementStructureCommands.DuplicateElementCommand('page-1', 'text-1', 'text-copy').execute(project);
-  project = new elementStructureCommands.ReorderElementCommand('page-1', 'text-copy', 1).execute(project);
-  project = new elementStructureCommands.SetElementVisibilityCommand('text-copy', false).execute(project);
+  project = new elementStructureCommands.SetZOrderCommand('page-1', 'text-1', 'front').execute(
+    project,
+  );
+  project = new elementStructureCommands.SetZOrderCommand('page-1', 'text-1', 'back').execute(
+    project,
+  );
+  project = new elementStructureCommands.SetZOrderCommand('page-1', 'image-1', 'forward').execute(
+    project,
+  );
+  project = new elementStructureCommands.SetZOrderCommand('page-1', 'video-1', 'backward').execute(
+    project,
+  );
+  project = new elementStructureCommands.DuplicateElementCommand(
+    'page-1',
+    'text-1',
+    'text-copy',
+  ).execute(project);
+  project = new elementStructureCommands.ReorderElementCommand('page-1', 'text-copy', 1).execute(
+    project,
+  );
+  project = new elementStructureCommands.SetElementVisibilityCommand('text-copy', false).execute(
+    project,
+  );
   project = new elementStructureCommands.SetElementLockCommand('text-copy', true).execute(project);
-  project = new elementStructureCommands.DeleteElementCommand('page-1', 'text-copy').execute(project);
+  project = new elementStructureCommands.DeleteElementCommand('page-1', 'text-copy').execute(
+    project,
+  );
 
   const newImageAsset = {
     id: 'asset-new-image',
@@ -2886,7 +3188,13 @@ function runCommandUtilitiesDiagnostic() {
     },
   } as never).execute(project);
   project = new mediaElementCommands.AddMediaElementCommand('page-1', {
-    asset: { id: 'asset-gif', mimeType: 'image/gif', name: 'Gif', objectUrl: 'blob:gif', type: 'gif' },
+    asset: {
+      id: 'asset-gif',
+      mimeType: 'image/gif',
+      name: 'Gif',
+      objectUrl: 'blob:gif',
+      type: 'gif',
+    },
     element: {
       assetId: 'asset-gif',
       autoplayInPreview: false,
@@ -3031,9 +3339,10 @@ async function runLocalFontMirrorDiagnostic() {
     createObjectURL: () => 'blob:unsupported-font',
     showDirectoryPicker: undefined,
   });
-  const unsupportedMessage = await unsupportedService
-    .chooseFontFolder()
-    .then(() => '', (error: unknown) => (error instanceof Error ? error.message : String(error)));
+  const unsupportedMessage = await unsupportedService.chooseFontFolder().then(
+    () => '',
+    (error: unknown) => (error instanceof Error ? error.message : String(error)),
+  );
   const deniedService = new BrowserLocalFontMirrorService({
     createObjectURL: () => 'blob:denied-font',
     fontDirectoryHandle: new E2EDeniedDirectoryHandle('Denied Fonts') as never,
@@ -3105,20 +3414,20 @@ function createFontHandleIndexedDb() {
       } = {};
       const complete = () => window.setTimeout(() => transaction.oncomplete?.(), 0);
       transaction.objectStore = () => ({
-          get: () => {
-            const request: { onsuccess?: () => void; result?: unknown } = {};
-            window.setTimeout(() => {
-              request.result = savedHandle;
-              request.onsuccess?.();
-              complete();
-            }, 0);
-            return request;
-          },
-          put: (handle: unknown) => {
-            savedHandle = handle;
+        get: () => {
+          const request: { onsuccess?: () => void; result?: unknown } = {};
+          window.setTimeout(() => {
+            request.result = savedHandle;
+            request.onsuccess?.();
             complete();
-          },
-        });
+          }, 0);
+          return request;
+        },
+        put: (handle: unknown) => {
+          savedHandle = handle;
+          complete();
+        },
+      });
       return transaction;
     },
   };
@@ -3201,7 +3510,8 @@ async function runSharingDiagnostic() {
           }),
         );
       }
-      if (url.endsWith('project.json')) return new Response('{}', { headers: { 'content-type': 'application/json' } });
+      if (url.endsWith('project.json'))
+        return new Response('{}', { headers: { 'content-type': 'application/json' } });
       return new Response('', { status: 200 });
     },
     now: () => new Date('2026-07-20T00:00:00.000Z'),
@@ -3246,12 +3556,14 @@ async function runSharingDiagnostic() {
       setItem: () => undefined,
     },
   });
-  const listError = await errorMinio
-    .listProjects(config)
-    .then(() => '', (error: unknown) => (error instanceof Error ? error.message : String(error)));
-  const downloadError = await errorMinio
-    .downloadProject('missing-project', config)
-    .then(() => '', (error: unknown) => (error instanceof Error ? error.message : String(error)));
+  const listError = await errorMinio.listProjects(config).then(
+    () => '',
+    (error: unknown) => (error instanceof Error ? error.message : String(error)),
+  );
+  const downloadError = await errorMinio.downloadProject('missing-project', config).then(
+    () => '',
+    (error: unknown) => (error instanceof Error ? error.message : String(error)),
+  );
 
   return {
     downloadedFiles: downloadedFiles.map((file) => file.path),
@@ -3368,7 +3680,13 @@ async function runWebMcpDiagnostic() {
   await tools[0]!.execute({ name: 'WebMCP Deck' });
   await tools[0]!.execute({ name: 123 });
   await tools[1]!.execute({ prompt: 'Create a launch slide' });
-  await tools[2]!.execute({ height: 512, prompt: 'neon card', seed: Number.NaN, steps: 8, width: 512 });
+  await tools[2]!.execute({
+    height: 512,
+    prompt: 'neon card',
+    seed: Number.NaN,
+    steps: 8,
+    width: 512,
+  });
   await tools[3]!.execute({ pageId: 'page-1', scope: 'slide', targetLanguage: 'pt' });
   await tools[3]!.execute({ pageId: 5, scope: 'deck', targetLanguage: 'es' });
   await tools[4]!.execute({});
@@ -3416,7 +3734,12 @@ async function runModelSetupDiagnostic() {
   };
   const modelLoads: string[] = [];
   const fakeImageEditingLoader = {
-    loadImageEditingModel: async (options?: { onProgress?: (progress: number, details?: { loadedBytes: number; totalBytes: number }) => void }) => {
+    loadImageEditingModel: async (options?: {
+      onProgress?: (
+        progress: number,
+        details?: { loadedBytes: number; totalBytes: number },
+      ) => void;
+    }) => {
       modelLoads.push('image-editing');
       options?.onProgress?.(75, { loadedBytes: 3, totalBytes: 4 });
     },
@@ -3425,13 +3748,26 @@ async function runModelSetupDiagnostic() {
     },
   };
   const fakeImageGenerationLoader = {
-    loadImageGenerationModel: async (options?: { onProgress?: (progress: number, details?: { loadedBytes: number; totalBytes: number }) => void }) => {
+    loadImageGenerationModel: async (options?: {
+      onProgress?: (
+        progress: number,
+        details?: { loadedBytes: number; totalBytes: number },
+      ) => void;
+    }) => {
       modelLoads.push('image-generation');
       options?.onProgress?.(40, { loadedBytes: 2, totalBytes: 4 });
     },
   };
   const fakeTextGenerationLoader = {
-    loadTextGenerationModel: async (modelId: string, options?: { onProgress?: (progress: number, details?: { loadedBytes: number; totalBytes: number }) => void }) => {
+    loadTextGenerationModel: async (
+      modelId: string,
+      options?: {
+        onProgress?: (
+          progress: number,
+          details?: { loadedBytes: number; totalBytes: number },
+        ) => void;
+      },
+    ) => {
       modelLoads.push(`text:${modelId}`);
       options?.onProgress?.(55, { loadedBytes: 5, totalBytes: 10 });
     },
@@ -3448,7 +3784,15 @@ async function runModelSetupDiagnostic() {
     },
   };
   const fakeLanguageDetectionLoader = {
-    loadLanguageDetectionModel: async (modelId: string, options?: { onProgress?: (progress: number, details?: { loadedBytes: number; totalBytes: number }) => void }) => {
+    loadLanguageDetectionModel: async (
+      modelId: string,
+      options?: {
+        onProgress?: (
+          progress: number,
+          details?: { loadedBytes: number; totalBytes: number },
+        ) => void;
+      },
+    ) => {
       modelLoads.push(`language:${modelId}`);
       options?.onProgress?.(65, { loadedBytes: 6, totalBytes: 10 });
     },
@@ -3484,8 +3828,12 @@ async function runModelSetupDiagnostic() {
     downloadStorageAdapter,
   );
   const failedState = await failingSetup.downloadModel(modelSetupService.IMAGE_EDITING_MODEL_ID);
-  const unknownDownload = await downloadSetup.downloadModel('missing-model').catch((error: Error) => error.message);
-  const unknownRemoval = await downloadSetup.removeModel('missing-model').catch((error: Error) => error.message);
+  const unknownDownload = await downloadSetup
+    .downloadModel('missing-model')
+    .catch((error: Error) => error.message);
+  const unknownRemoval = await downloadSetup
+    .removeModel('missing-model')
+    .catch((error: Error) => error.message);
   return {
     downloaded: downloadedStates.filter((state) => state.status === 'ready').length,
     failedState,
@@ -3518,7 +3866,9 @@ class E2EFakeWorker {
   postMessage(request: Record<string, unknown>) {
     this.postCount += 1;
     for (const response of this.responder(request, this)) {
-      queueMicrotask(() => this.onmessage?.({ data: response } as MessageEvent<DiagnosticWorkerResponse>));
+      queueMicrotask(() =>
+        this.onmessage?.({ data: response } as MessageEvent<DiagnosticWorkerResponse>),
+      );
     }
   }
 
@@ -3531,12 +3881,7 @@ function createDiagnosticSegmentationResult(fillSubject = true) {
   return {
     imageInput: {
       channels: 3,
-      data: new Uint8ClampedArray([
-        255, 0, 0,
-        0, 255, 0,
-        0, 0, 255,
-        255, 255, 255,
-      ]),
+      data: new Uint8ClampedArray([255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255]),
       height: 2,
       width: 2,
     },
@@ -3567,15 +3912,24 @@ async function runTransformersRuntimeDiagnostic() {
     removeImageEditing: async () => {
       fallbackCalls.push('remove-image');
     },
-    preloadLanguageDetection: async (modelId: string, options?: { onProgress?: (progress: number) => void }) => {
+    preloadLanguageDetection: async (
+      modelId: string,
+      options?: { onProgress?: (progress: number) => void },
+    ) => {
       fallbackCalls.push(`preload-language:${modelId}`);
       options?.onProgress?.(30);
     },
-    preloadTextGeneration: async (modelId: string, options?: { onProgress?: (progress: number) => void }) => {
+    preloadTextGeneration: async (
+      modelId: string,
+      options?: { onProgress?: (progress: number) => void },
+    ) => {
       fallbackCalls.push(`preload-text:${modelId}`);
       options?.onProgress?.(40);
     },
-    prepareBackgroundRemoval: async (objectUrl: string, options?: { onProgress?: (progress: number) => void }) => {
+    prepareBackgroundRemoval: async (
+      objectUrl: string,
+      options?: { onProgress?: (progress: number) => void },
+    ) => {
       fallbackCalls.push(`prepare:${objectUrl}`);
       options?.onProgress?.(50);
     },
@@ -3597,7 +3951,9 @@ async function runTransformersRuntimeDiagnostic() {
     fallbackOperations,
   });
   const fallbackProgress: number[] = [];
-  await fallbackClient.preloadTextGeneration('fallback-text', { onProgress: (value) => fallbackProgress.push(value) });
+  await fallbackClient.preloadTextGeneration('fallback-text', {
+    onProgress: (value) => fallbackProgress.push(value),
+  });
   await fallbackClient.generateText('fallback-text', 'Prompt text');
   await fallbackClient.releaseTextGeneration('fallback-text');
   await fallbackClient.removeTextGeneration('fallback-text');
@@ -3619,15 +3975,25 @@ async function runTransformersRuntimeDiagnostic() {
       createdWorkers += 1;
       return new E2EFakeWorker((request) => {
         const id = String(request.id);
-        if (request.type === 'detect-language') return [{ id, result: { language: 'pt', score: 0.8 }, type: 'result' }];
+        if (request.type === 'detect-language')
+          return [{ id, result: { language: 'pt', score: 0.8 }, type: 'result' }];
         if (request.type === 'segment-background-removal')
           return [{ id, result: createDiagnosticSegmentationResult(), type: 'result' }];
-        if (request.type === 'generate-text') return [{ id, progress: 10, type: 'progress' }, { id, result: 'Worker text', type: 'result' }];
-        return [{ id, progress: 25, type: 'progress' }, { id, type: 'result' }];
+        if (request.type === 'generate-text')
+          return [
+            { id, progress: 10, type: 'progress' },
+            { id, result: 'Worker text', type: 'result' },
+          ];
+        return [
+          { id, progress: 25, type: 'progress' },
+          { id, type: 'result' },
+        ];
       }) as never;
     },
   });
-  await workerClient.preloadTextGeneration('worker-text', { onProgress: (value) => workerProgress.push(value) });
+  await workerClient.preloadTextGeneration('worker-text', {
+    onProgress: (value) => workerProgress.push(value),
+  });
   await workerClient.generateText('worker-text', 'Prompt text');
   await workerClient.preloadLanguageDetection('worker-language', {
     onProgress: (value) => workerProgress.push(value),
@@ -3664,13 +4030,19 @@ async function runTransformersRuntimeDiagnostic() {
         terminate: () => undefined,
       }) as never,
   });
-  const postError = await throwingClient.generateText('worker-text', 'Throw').catch((error: Error) => error.message);
+  const postError = await throwingClient
+    .generateText('worker-text', 'Throw')
+    .catch((error: Error) => error.message);
 
   const invalidClient = new TransformersRuntimeClient({
     createWorker: () =>
-      new E2EFakeWorker((request) => [{ id: String(request.id), result: {}, type: 'result' }]) as never,
+      new E2EFakeWorker((request) => [
+        { id: String(request.id), result: {}, type: 'result' },
+      ]) as never,
   });
-  const invalidLanguage = await invalidClient.detectLanguage('bad-language', 'x').catch((error: Error) => error.message);
+  const invalidLanguage = await invalidClient
+    .detectLanguage('bad-language', 'x')
+    .catch((error: Error) => error.message);
 
   return {
     createdWorkers,
@@ -3716,10 +4088,12 @@ async function runBackgroundRemovalDiagnostic() {
   const emptyRemoved = await service.removeBackground(emptyAsset as never, {
     subjectPoint: { x: 0, y: 0 },
   });
-  const missingSource = await service.prepareBackgroundRemoval({ ...asset, objectUrl: undefined } as never).catch(
-    (error: Error) => error.message,
-  );
-  const missingPoint = await service.previewBackgroundMask(asset as never).catch((error: Error) => error.message);
+  const missingSource = await service
+    .prepareBackgroundRemoval({ ...asset, objectUrl: undefined } as never)
+    .catch((error: Error) => error.message);
+  const missingPoint = await service
+    .previewBackgroundMask(asset as never)
+    .catch((error: Error) => error.message);
   return {
     bounds: removed.bounds,
     calls,
@@ -3745,12 +4119,17 @@ async function runBonsaiRuntimeDiagnostic() {
             { blob: new Blob(['image'], { type: 'image/png' }), id, type: 'result' },
           ];
         }
-        return [{ id, progress: 45, type: 'progress' }, { id, type: 'result' }];
+        return [
+          { id, progress: 45, type: 'progress' },
+          { id, type: 'result' },
+        ];
       }) as never,
   });
   const progressValues: number[] = [];
   const steps: string[] = [];
-  await workerRuntime.preload('bonsai-worker', { onProgress: (value) => progressValues.push(value) });
+  await workerRuntime.preload('bonsai-worker', {
+    onProgress: (value) => progressValues.push(value),
+  });
   const blob = await workerRuntime.generate({
     height: 512,
     modelId: 'bonsai-worker',
@@ -3794,15 +4173,19 @@ async function runBonsaiRuntimeDiagnostic() {
 
   const errorRuntime = new bonsaiImageRuntime.WorkerBackedBonsaiImageRuntime({
     createWorker: () =>
-      new E2EFakeWorker((request) => [{ id: String(request.id), message: 'Bonsai failed', type: 'error' }]) as never,
+      new E2EFakeWorker((request) => [
+        { id: String(request.id), message: 'Bonsai failed', type: 'error' },
+      ]) as never,
   });
-  const error = await errorRuntime.generate({
-    height: 128,
-    modelId: 'bonsai-error',
-    prompt: 'broken image',
-    steps: 1,
-    width: 128,
-  }).catch((caught: Error) => caught.message);
+  const error = await errorRuntime
+    .generate({
+      height: 128,
+      modelId: 'bonsai-error',
+      prompt: 'broken image',
+      steps: 1,
+      width: 128,
+    })
+    .catch((caught: Error) => caught.message);
 
   return {
     blobSize: blob.size,
@@ -3891,10 +4274,25 @@ function runGeneratedSlideParsingDiagnostic() {
   );
   const errors = [
     () => generatedSlide.parseGeneratedSlideTasksJson('[]'),
-    () => generatedSlide.parseGeneratedSlideTasksJson(JSON.stringify({ page: { background: {} }, tasks: [{ type: 'add-remote-image', url: 'http://bad.test' }] })),
-    () => generatedSlide.parseGeneratedSlideTasksJson(JSON.stringify({ page: { background: {} }, tasks: [{ type: 'unknown' }] })),
-    () => generatedSlide.parseGeneratedSlideElementJson(JSON.stringify({ type: 'image', assetRole: 'bad' })),
-    () => generatedSlide.parseGeneratedSlideElementJson(JSON.stringify({ type: 'image', assetRole: 'remote', src: 'http://bad.test' })),
+    () =>
+      generatedSlide.parseGeneratedSlideTasksJson(
+        JSON.stringify({
+          page: { background: {} },
+          tasks: [{ type: 'add-remote-image', url: 'http://bad.test' }],
+        }),
+      ),
+    () =>
+      generatedSlide.parseGeneratedSlideTasksJson(
+        JSON.stringify({ page: { background: {} }, tasks: [{ type: 'unknown' }] }),
+      ),
+    () =>
+      generatedSlide.parseGeneratedSlideElementJson(
+        JSON.stringify({ type: 'image', assetRole: 'bad' }),
+      ),
+    () =>
+      generatedSlide.parseGeneratedSlideElementJson(
+        JSON.stringify({ type: 'image', assetRole: 'remote', src: 'http://bad.test' }),
+      ),
     () => generatedSlide.parseGeneratedSlideElementJson(JSON.stringify({ type: 'unknown' })),
   ].map((run) => {
     try {
@@ -4007,9 +4405,24 @@ function runSlideLayoutPresetDiagnostic() {
           type: 'add-remote-image',
           url: 'https://localstudio.test/three.png',
         },
-        { id: 'caption-1', placementHint: 'caption below grid image 1 left', text: 'One', type: 'add-body-text' },
-        { id: 'caption-2', placementHint: 'caption below grid image 2 center', text: 'Two', type: 'add-body-text' },
-        { id: 'caption-3', placementHint: 'caption below grid image 3 right', text: 'Three', type: 'add-subtitle' },
+        {
+          id: 'caption-1',
+          placementHint: 'caption below grid image 1 left',
+          text: 'One',
+          type: 'add-body-text',
+        },
+        {
+          id: 'caption-2',
+          placementHint: 'caption below grid image 2 center',
+          text: 'Two',
+          type: 'add-body-text',
+        },
+        {
+          id: 'caption-3',
+          placementHint: 'caption below grid image 3 right',
+          text: 'Three',
+          type: 'add-subtitle',
+        },
       ],
     },
     'three-image grid with matching captions',
@@ -4021,8 +4434,18 @@ function runSlideLayoutPresetDiagnostic() {
       placementHint: 'left media block',
       type: 'add-placeholder-image',
     },
-    { id: 'right-title', placementHint: 'right text block', text: 'Right title', type: 'add-title' },
-    { id: 'right-body', placementHint: 'right text block', text: 'Right body', type: 'add-body-text' },
+    {
+      id: 'right-title',
+      placementHint: 'right text block',
+      text: 'Right title',
+      type: 'add-title',
+    },
+    {
+      id: 'right-body',
+      placementHint: 'right text block',
+      text: 'Right body',
+      type: 'add-body-text',
+    },
   ]);
   const imageElement: GeneratedSlideElement = {
     assetRole: 'placeholder',
@@ -4037,7 +4460,10 @@ function runSlideLayoutPresetDiagnostic() {
   };
 
   const layoutTasks = (tasks: GeneratedSlideTask[]) =>
-    tasks.filter((task): task is Exclude<GeneratedSlideTask, { type: 'set-background' }> => task.type !== 'set-background');
+    tasks.filter(
+      (task): task is Exclude<GeneratedSlideTask, { type: 'set-background' }> =>
+        task.type !== 'set-background',
+    );
 
   const applyResults = [
     ...layoutTasks(centeredDocument.tasks).map((task) =>
@@ -4078,7 +4504,9 @@ function runSlideLayoutPresetDiagnostic() {
     ),
     ...layoutTasks(remoteGridDocument.tasks).map((task) =>
       slideLayoutPresets.applySlideElementLayoutPreset(
-        task.type === 'add-remote-image' ? ({ ...imageElement, type: 'shape' } as never) : createTextElement(`remote-${task.id}`),
+        task.type === 'add-remote-image'
+          ? ({ ...imageElement, type: 'shape' } as never)
+          : createTextElement(`remote-${task.id}`),
         {
           allTasks: remoteGridDocument.tasks,
           page: remoteGridDocument.page,
@@ -4122,11 +4550,20 @@ async function runProgressUtilitiesDiagnostic() {
   report(1);
   report(55, { loadedBytes: 2, totalBytes: 10 });
   report(20);
-  const transformersProgress = progress.createTransformersProgressCallback((value, details) => {
-    values.push({ details, value });
-  }, { initial: 5, max: 90, min: 5 });
+  const transformersProgress = progress.createTransformersProgressCallback(
+    (value, details) => {
+      values.push({ details, value });
+    },
+    { initial: 5, max: 90, min: 5 },
+  );
   transformersProgress(undefined);
-  transformersProgress({ file: 'a.bin', loaded: -1, name: 'model-a', status: 'progress', total: 0 });
+  transformersProgress({
+    file: 'a.bin',
+    loaded: -1,
+    name: 'model-a',
+    status: 'progress',
+    total: 0,
+  });
   transformersProgress({ file: 'a.bin', loaded: 4, name: 'model-a', status: 'progress', total: 8 });
   transformersProgress({ file: 'b.bin', loaded: 8, name: 'model-a', status: 'progress', total: 8 });
   transformersProgress({ loaded: 4, progress: 50, status: 'progress_total', total: 8 });
@@ -4155,8 +4592,9 @@ async function runPptxParserDiagnostic() {
   const files = [
     {
       path: '[Content_Types].xml',
-      blob: new Blob([
-        `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+      blob: new Blob(
+        [
+          `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
           <Default Extension="xml" ContentType="application/xml"/>
           <Default Extension="png" ContentType="image/png"/>
           <Default Extension="bin" ContentType="application/octet-stream"/>
@@ -4166,41 +4604,53 @@ async function runPptxParserDiagnostic() {
           <Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>
           <Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>
         </Types>`,
-      ], { type: 'application/xml' }),
+        ],
+        { type: 'application/xml' },
+      ),
     },
     {
       path: '_rels/.rels',
-      blob: new Blob([
-        `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+      blob: new Blob(
+        [
+          `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
           <Relationship Id="rIdOffice" Type="${relType}/officeDocument" Target="ppt/presentation.xml"/>
         </Relationships>`,
-      ], { type: 'application/xml' }),
+        ],
+        { type: 'application/xml' },
+      ),
     },
     {
       path: 'ppt/presentation.xml',
-      blob: new Blob([
-        `<p:presentation xmlns:p="p" xmlns:r="${relType}">
+      blob: new Blob(
+        [
+          `<p:presentation xmlns:p="p" xmlns:r="${relType}">
           <p:sldSz cx="0" cy="0"/>
           <p:sldMasterIdLst><p:sldMasterId r:id="rIdMaster"/></p:sldMasterIdLst>
           <p:sldIdLst>
             <p:sldId r:id="rIdSlide1"/>
           </p:sldIdLst>
         </p:presentation>`,
-      ], { type: 'application/xml' }),
+        ],
+        { type: 'application/xml' },
+      ),
     },
     {
       path: 'ppt/_rels/presentation.xml.rels',
-      blob: new Blob([
-        `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+      blob: new Blob(
+        [
+          `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
           <Relationship Id="rIdSlide1" Type="${relType}/slide" Target="slides/slide1.xml"/>
           <Relationship Id="rIdMaster" Type="${relType}/slideMaster" Target="slideMasters/slideMaster1.xml"/>
         </Relationships>`,
-      ], { type: 'application/xml' }),
+        ],
+        { type: 'application/xml' },
+      ),
     },
     {
       path: 'ppt/theme/theme1.xml',
-      blob: new Blob([
-        `<a:theme xmlns:a="a">
+      blob: new Blob(
+        [
+          `<a:theme xmlns:a="a">
           <a:themeElements>
             <a:clrScheme name="diagnostic">
               <a:accent1><a:srgbClr val="37FD76"/></a:accent1>
@@ -4212,12 +4662,15 @@ async function runPptxParserDiagnostic() {
             </a:fontScheme>
           </a:themeElements>
         </a:theme>`,
-      ], { type: 'application/xml' }),
+        ],
+        { type: 'application/xml' },
+      ),
     },
     {
       path: 'ppt/slideMasters/slideMaster1.xml',
-      blob: new Blob([
-        `<p:sldMaster xmlns:p="p" xmlns:a="a">
+      blob: new Blob(
+        [
+          `<p:sldMaster xmlns:p="p" xmlns:a="a">
           <p:cSld><p:spTree>
             <p:sp>
               <p:nvSpPr><p:cNvPr id="11" name="Master title"/><p:nvPr><p:ph type="title" idx="1"/></p:nvPr></p:nvSpPr>
@@ -4230,21 +4683,27 @@ async function runPptxParserDiagnostic() {
             </p:pic>
           </p:spTree></p:cSld>
         </p:sldMaster>`,
-      ], { type: 'application/xml' }),
+        ],
+        { type: 'application/xml' },
+      ),
     },
     {
       path: 'ppt/slideMasters/_rels/slideMaster1.xml.rels',
-      blob: new Blob([
-        `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+      blob: new Blob(
+        [
+          `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
           <Relationship Id="rIdTheme" Type="${relType}/theme" Target="../theme/theme1.xml"/>
           <Relationship Id="rIdLayout" Type="${relType}/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>
         </Relationships>`,
-      ], { type: 'application/xml' }),
+        ],
+        { type: 'application/xml' },
+      ),
     },
     {
       path: 'ppt/slideLayouts/slideLayout1.xml',
-      blob: new Blob([
-        `<p:sldLayout xmlns:p="p" xmlns:a="a" xmlns:r="${relType}">
+      blob: new Blob(
+        [
+          `<p:sldLayout xmlns:p="p" xmlns:a="a" xmlns:r="${relType}">
           <p:cSld name="Diagnostic Layout"><p:bg><p:bgPr><a:solidFill><a:srgbClr val="010203"/></a:solidFill></p:bgPr></p:bg><p:spTree>
             <p:sp>
               <p:nvSpPr><p:cNvPr id="21" name="Layout picture placeholder"/><p:nvPr><p:ph type="pic" idx="2"/></p:nvPr></p:nvSpPr>
@@ -4257,20 +4716,26 @@ async function runPptxParserDiagnostic() {
             </p:sp>
           </p:spTree></p:cSld>
         </p:sldLayout>`,
-      ], { type: 'application/xml' }),
+        ],
+        { type: 'application/xml' },
+      ),
     },
     {
       path: 'ppt/slideLayouts/_rels/slideLayout1.xml.rels',
-      blob: new Blob([
-        `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+      blob: new Blob(
+        [
+          `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
           <Relationship Id="rIdMaster" Type="${relType}/slideMaster" Target="../slideMasters/slideMaster1.xml"/>
         </Relationships>`,
-      ], { type: 'application/xml' }),
+        ],
+        { type: 'application/xml' },
+      ),
     },
     {
       path: 'ppt/slides/slide1.xml',
-      blob: new Blob([
-        `<p:sld xmlns:p="p" xmlns:a="a" xmlns:r="${relType}">
+      blob: new Blob(
+        [
+          `<p:sld xmlns:p="p" xmlns:a="a" xmlns:r="${relType}">
           <p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val="050D10"/></a:solidFill></p:bgPr></p:bg><p:spTree>
             <p:sp>
               <p:nvSpPr><p:cNvPr id="1" name="Title"/><p:nvPr><p:ph type="title" idx="1"/></p:nvPr></p:nvSpPr>
@@ -4316,18 +4781,23 @@ async function runPptxParserDiagnostic() {
             <p:graphicFrame><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/diagram"/></a:graphic></p:graphicFrame>
           </p:spTree></p:cSld>
         </p:sld>`,
-      ], { type: 'application/xml' }),
+        ],
+        { type: 'application/xml' },
+      ),
     },
     {
       path: 'ppt/slides/_rels/slide1.xml.rels',
-      blob: new Blob([
-        `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+      blob: new Blob(
+        [
+          `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
           <Relationship Id="rIdLayout" Type="${relType}/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>
           <Relationship Id="rIdImage" Type="${relType}/image" Target="../media/image1.png"/>
           <Relationship Id="rIdUnsupported" Type="${relType}/image" Target="../media/blob.bin"/>
           <Relationship Id="rIdExternal" Type="${relType}/image" Target="https://example.test/image.png" TargetMode="External"/>
         </Relationships>`,
-      ], { type: 'application/xml' }),
+        ],
+        { type: 'application/xml' },
+      ),
     },
     {
       path: 'ppt/media/image1.png',
@@ -4623,7 +5093,9 @@ async function runPptxExportDiagnostic() {
               buffer: message.buffer,
               id: message.id,
               type: 'result',
-              warnings: [{ category: 'fidelity', code: 'worker-warning', message: 'Worker warning.' }],
+              warnings: [
+                { category: 'fidelity', code: 'worker-warning', message: 'Worker warning.' },
+              ],
             },
           } as MessageEvent);
         }, 0);
@@ -4967,7 +5439,11 @@ async function runAutomationDiagnostic() {
   const emptySlides = await controller.generateSlides({ prompt: ' ' });
   const slides = await controller.generateSlides({ prompt: 'Create a compact talk deck' });
   const invalidImage = await controller.generateImage({ height: 1, prompt: 'bad size', width: 1 });
-  const image = await controller.generateImage({ height: 1024, prompt: 'Neon browser UI', width: 1024 });
+  const image = await controller.generateImage({
+    height: 1024,
+    prompt: 'Neon browser UI',
+    width: 1024,
+  });
   const invalidTranslation = await controller.translateText({ scope: 'bad', targetLanguage: 'pt' });
   const translated = await controller.translateText({ scope: 'selection', targetLanguage: 'pt' });
   const snapshot = controller.getProjectSnapshot();
@@ -5286,7 +5762,9 @@ async function runStorageDiagnostic() {
       },
     },
   });
-  await fileRepository.saveProject(project as never, { projectDirectoryName: 'Storage Diagnostic' });
+  await fileRepository.saveProject(project as never, {
+    projectDirectoryName: 'Storage Diagnostic',
+  });
   const loadedFileProject = await fileRepository.loadProject();
   const importedFileProject = await fileRepository.importProject();
   const version = await fileRepository.saveVersion(
@@ -5346,7 +5824,10 @@ async function runStorageDiagnostic() {
       blob: new Blob([JSON.stringify(missingBackedProject)], { type: 'application/json' }),
       path: 'project.json',
     },
-    { blob: new Blob(['nested-config'], { type: 'application/json' }), path: 'config/localstudio.json' },
+    {
+      blob: new Blob(['nested-config'], { type: 'application/json' }),
+      path: 'config/localstudio.json',
+    },
   ]);
   const remoteRepository = new BrowserFileSystemProjectRepository({
     fetch: async () => new Response(new Blob(['remote-image'], { type: 'image/png' })),
@@ -5382,9 +5863,10 @@ async function runStorageDiagnostic() {
       save: async () => undefined,
     },
   });
-  const deniedMessage = await deniedRepository
-    .saveProject(project as never)
-    .then(() => '', (error: unknown) => (error instanceof Error ? error.message : String(error)));
+  const deniedMessage = await deniedRepository.saveProject(project as never).then(
+    () => '',
+    (error: unknown) => (error instanceof Error ? error.message : String(error)),
+  );
   const disabledRepository = new DisabledProjectRepository();
   await disabledRepository.saveProject(project as never);
 
@@ -5410,9 +5892,15 @@ async function runStorageDiagnostic() {
   );
   const loadedOpfsVersion = await opfsRepository.loadVersion(opfsVersion.id);
   const imported = await opfsRepository.importMirrorFiles([
-    { blob: new Blob([JSON.stringify(project)], { type: 'application/json' }), path: 'project.json' },
+    {
+      blob: new Blob([JSON.stringify(project)], { type: 'application/json' }),
+      path: 'project.json',
+    },
     { blob: new Blob(['image-bytes'], { type: 'image/png' }), path: 'assets/asset-kept.png' },
-    { blob: new Blob(['audio-bytes'], { type: 'audio/webm' }), path: 'recordings/recording-1.webm' },
+    {
+      blob: new Blob(['audio-bytes'], { type: 'audio/webm' }),
+      path: 'recordings/recording-1.webm',
+    },
   ]);
 
   return {
@@ -5558,12 +6046,40 @@ function createCommandDiagnosticProject() {
         locked: false,
         visible: true,
       },
-      'line-arrow': createDiagnosticLineShape('line-arrow', 'line', 120, 460, 'arrow', 'open-arrow'),
-      'line-circle': createDiagnosticLineShape('line-circle', 'line', 360, 460, 'circle', 'open-circle'),
-      'line-square': createDiagnosticLineShape('line-square', 'line', 600, 460, 'square', 'open-square'),
+      'line-arrow': createDiagnosticLineShape(
+        'line-arrow',
+        'line',
+        120,
+        460,
+        'arrow',
+        'open-arrow',
+      ),
+      'line-circle': createDiagnosticLineShape(
+        'line-circle',
+        'line',
+        360,
+        460,
+        'circle',
+        'open-circle',
+      ),
+      'line-square': createDiagnosticLineShape(
+        'line-square',
+        'line',
+        600,
+        460,
+        'square',
+        'open-square',
+      ),
       'line-diamond': createDiagnosticLineShape('line-diamond', 'line', 840, 460, 'diamond', 'bar'),
       'arc-line': createDiagnosticLineShape('arc-line', 'arc', 1080, 460, 'none', 'arrow'),
-      'arrow-default': createDiagnosticLineShape('arrow-default', 'arrow', 1320, 460, 'none', undefined),
+      'arrow-default': createDiagnosticLineShape(
+        'arrow-default',
+        'arrow',
+        1320,
+        460,
+        'none',
+        undefined,
+      ),
       'gif-1': {
         assetId: 'asset-gif',
         height: 160,
@@ -5657,7 +6173,10 @@ function createCommandDiagnosticProject() {
             y: 320,
           },
           'diagnostic-layout-title': {
-            ...createDiagnosticTextElement('diagnostic-layout-title', 'Diagnostic title placeholder'),
+            ...createDiagnosticTextElement(
+              'diagnostic-layout-title',
+              'Diagnostic title placeholder',
+            ),
             fontSize: 64,
             placeholderRole: 'title' as const,
             templateSource: { layoutId: 'diagnostic-layout', type: 'layout' as const },
@@ -6029,8 +6548,24 @@ function createRemoteProject() {
     pages: [
       {
         animationBuilds: [
-          { delayMs: 0, durationMs: 300, effect: 'fade', elementId: 'title', id: 'build-1', kind: 'build-in', trigger: 'on-click' },
-          { delayMs: 0, durationMs: 300, effect: 'wipe', elementId: 'shape', id: 'build-2', kind: 'build-out', trigger: 'after-previous' },
+          {
+            delayMs: 0,
+            durationMs: 300,
+            effect: 'fade',
+            elementId: 'title',
+            id: 'build-1',
+            kind: 'build-in',
+            trigger: 'on-click',
+          },
+          {
+            delayMs: 0,
+            durationMs: 300,
+            effect: 'wipe',
+            elementId: 'shape',
+            id: 'build-2',
+            kind: 'build-out',
+            trigger: 'after-previous',
+          },
         ],
         background: { color: '#020617', type: 'color' },
         elementIds: ['title', 'image', 'shape', 'video', 'hidden'],
@@ -6077,7 +6612,7 @@ function installRemotePreviewMediaDiagnostics() {
         videoWidth: { configurable: true, value: 1280 },
       });
       video.load = () => {
-          window.setTimeout(() => video.onloadedmetadata?.(new Event('loadedmetadata')), 0);
+        window.setTimeout(() => video.onloadedmetadata?.(new Event('loadedmetadata')), 0);
       };
       video.play = () => Promise.resolve();
       video.pause = () => undefined;
@@ -6148,9 +6683,10 @@ async function runRecorderDiagnostic() {
   const result = await recorder.stop();
   const objectUrl = recorder.getObjectUrl();
   recorder.revokeObjectUrl();
-  const stopBeforeStart = await new PresenterAudioRecorder()
-    .stop()
-    .then(() => '', (error: unknown) => (error instanceof Error ? error.message : String(error)));
+  const stopBeforeStart = await new PresenterAudioRecorder().stop().then(
+    () => '',
+    (error: unknown) => (error instanceof Error ? error.message : String(error)),
+  );
   URL.createObjectURL = originalCreateObjectUrl;
   URL.revokeObjectURL = originalRevokeObjectUrl;
   return {
@@ -6177,7 +6713,10 @@ async function runSpeechDiagnostic() {
     onend: (() => void) | null = null;
     onerror: ((event: { error?: string; message?: string }) => void) | null = null;
     onresult:
-      | ((event: { resultIndex: number; results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }> }) => void)
+      | ((event: {
+          resultIndex: number;
+          results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }>;
+        }) => void)
       | null = null;
     abort() {
       this.onend?.();
