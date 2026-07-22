@@ -2701,25 +2701,43 @@ async function runDiagnostics() {
     project: remoteProject,
     streamPeerId: 'stream-peer',
   };
-  const restoreRemotePreviewMedia = installRemotePreviewMediaDiagnostics();
-  let remoteState: Awaited<ReturnType<typeof presenterRemoteStateFactory.createRemoteState>>;
-  let batches: Awaited<ReturnType<typeof presenterRemoteStateFactory.createRemotePreviewBatches>>;
-  let remoteExtra: PresenterRemoteStateFactoryExtraDiagnostics;
-  try {
-    remoteState = await presenterRemoteStateFactory.createRemoteState(remotePayload as never, 2, {
-      elapsedMs: 2_500,
-      paused: false,
-      updatedAtEpochMs: 1_786_000_000_000,
-    });
-    batches = await presenterRemoteStateFactory.createRemotePreviewBatches(
-      remotePayload as never,
-      ['slide-1', 'slide-2', 'slide-3', 'missing'],
-      'request-1',
-    );
-    remoteExtra = await runPresenterRemoteStateFactoryExtraDiagnostics(remotePayload as never);
-  } finally {
-    restoreRemotePreviewMedia();
-  }
+  const remoteDiagnostics = await runDiagnosticStep('remoteStateFactory', async () => {
+    const restoreRemotePreviewMedia = installRemotePreviewMediaDiagnostics();
+    try {
+      const remoteState = await presenterRemoteStateFactory.createRemoteState(
+        remotePayload as never,
+        2,
+        {
+          elapsedMs: 2_500,
+          paused: false,
+          updatedAtEpochMs: 1_786_000_000_000,
+        },
+      );
+      const batches = await presenterRemoteStateFactory.createRemotePreviewBatches(
+        remotePayload as never,
+        ['slide-1', 'slide-2', 'slide-3', 'missing'],
+        'request-1',
+      );
+      const remoteExtra = await runPresenterRemoteStateFactoryExtraDiagnostics(
+        remotePayload as never,
+      );
+      return { batches, remoteExtra, remoteState };
+    } finally {
+      restoreRemotePreviewMedia();
+    }
+  });
+  const remoteState = isTimedOutDiagnostic(remoteDiagnostics)
+    ? undefined
+    : remoteDiagnostics.remoteState;
+  const batches = isTimedOutDiagnostic(remoteDiagnostics) ? [] : remoteDiagnostics.batches;
+  const remoteSummary = isTimedOutDiagnostic(remoteDiagnostics)
+    ? remoteDiagnostics
+    : {
+        batches: remoteDiagnostics.batches.length,
+        current: remoteDiagnostics.remoteState.activePageName,
+        extra: remoteDiagnostics.remoteExtra,
+        previews: remoteDiagnostics.remoteState.upcomingSlidePreviews?.length ?? 0,
+      };
 
   const recording = await runDiagnosticStep('recording', runRecorderDiagnostic);
   const transcript = await runDiagnosticStep('transcript', runSpeechDiagnostic);
@@ -2727,9 +2745,11 @@ async function runDiagnostics() {
   const presenterSession = await runDiagnosticStep('presenterSession', () =>
     runPresenterSessionDiagnostic(remotePayload),
   );
-  const peerControlHost = await runDiagnosticStep('peerControlHost', () =>
-    runPresenterRemotePeerControlHostDiagnostic(remoteState, batches[0]),
-  );
+  const peerControlHost = remoteState
+    ? await runDiagnosticStep('peerControlHost', () =>
+        runPresenterRemotePeerControlHostDiagnostic(remoteState, batches[0]),
+      )
+    : { skipped: 'remoteStateFactory' };
   const storage = await runDiagnosticStep('storage', runStorageDiagnostic);
   const animation = runAnimationDiagnostic();
   const webmcp = await runDiagnosticStep('webmcp', runWebMcpDiagnostic);
@@ -2777,12 +2797,7 @@ async function runDiagnostics() {
     patchedWarnings: patched.warnings.length,
     progressValues,
     recording,
-    remote: {
-      batches: batches.length,
-      current: remoteState.activePageName,
-      extra: remoteExtra,
-      previews: remoteState.upcomingSlidePreviews?.length ?? 0,
-    },
+    remote: remoteSummary,
     selectedRecordings: Object.keys(selectedProject.recordings ?? {}),
     presenterSession,
     peerControlHost,
@@ -2822,6 +2837,10 @@ async function runDiagnosticStep<T>(
   } finally {
     if (timeoutId !== undefined) window.clearTimeout(timeoutId);
   }
+}
+
+function isTimedOutDiagnostic(value: unknown): value is { timedOut: string } {
+  return typeof value === 'object' && value !== null && 'timedOut' in value;
 }
 
 async function runPresenterRemotePeerControlHostDiagnostic(
