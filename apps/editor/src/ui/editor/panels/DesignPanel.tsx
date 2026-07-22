@@ -281,6 +281,11 @@ export function DesignPanel({
             <CaseSensitive size={16} />
             <span>{selection.elementIds.length} elements selected</span>
           </div>
+          <div className="movie-inspector-tabs" role="tablist" aria-label="Movie inspector sections">
+            <button type="button" role="tab" aria-selected="true">
+              Arrange
+            </button>
+          </div>
           <section className="movie-panel-section" aria-label="Arrange selected elements">
             <h3>Arrange</h3>
             <div className="movie-arrange-grid">
@@ -290,6 +295,15 @@ export function DesignPanel({
                 onClick={onEditSelectionGrid}
               >
                 Edit as grid
+              </button>
+              <button type="button" disabled>
+                Group
+              </button>
+              <button type="button" disabled>
+                Ungroup
+              </button>
+              <button type="button" disabled>
+                Distribute
               </button>
             </div>
           </section>
