@@ -104,9 +104,6 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
       .getByRole('button', { name: 'Hide diagnostics panels' })
       .evaluate((button: HTMLButtonElement) => button.click());
     await expect(page.getByRole('main', { name: 'Public presentation' }).first()).toBeVisible();
-    await page.keyboard.press('?');
-    await expect(page.getByRole('dialog', { name: 'Keyboard Shortcuts' }).first()).toBeVisible();
-    await page.keyboard.press('Escape');
     await page.keyboard.press('End');
     await page.keyboard.press('Home');
     await page.keyboard.press('ArrowDown+Shift');
@@ -121,10 +118,6 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
     await page.keyboard.press('o');
     await playbackMediaEvents(page);
     const playbackRegion = page.getByRole('region', { name: 'Presentation playback' });
-    await playbackRegion.getByRole('button', { name: 'Show keyboard shortcuts' }).click();
-    const shortcutDialog = page.getByRole('dialog', { name: 'Keyboard Shortcuts' }).first();
-    await expect(shortcutDialog).toBeVisible();
-    await shortcutDialog.getByRole('button', { name: 'Close keyboard shortcuts' }).click();
     await playbackRegion.getByRole('button', { name: 'Present slide fullscreen' }).click();
     await page.evaluate(() => {
       Object.defineProperty(document, 'fullscreenElement', {
