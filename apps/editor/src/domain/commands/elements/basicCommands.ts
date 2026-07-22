@@ -26,7 +26,18 @@ const elementAnimationCommandConstructors = {
   SetElementAnimationBuildsCommand: elementAnimationCommands.SetElementAnimationBuildsCommand,
 };
 
-export type AlignMode = 'horizontal-center' | 'vertical-center' | 'page-center';
+export type AlignMode =
+  | 'horizontal-center'
+  | 'page-bottom'
+  | 'page-bottom-center'
+  | 'page-center'
+  | 'page-left'
+  | 'page-left-center'
+  | 'page-right'
+  | 'page-right-center'
+  | 'page-top'
+  | 'page-top-center'
+  | 'vertical-center';
 export type ZOrderMode = 'front' | 'back' | 'forward' | 'backward';
 export type ElementFramePatch = Partial<
   Pick<BaseElement, 'height' | 'rotation' | 'width' | 'x' | 'y'>

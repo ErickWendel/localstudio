@@ -52,6 +52,7 @@ interface DesignPanelProps {
     visible: boolean,
   ) => void;
   onAlignSelectedElement?: (mode: AlignMode) => void;
+  onEditSelectionGrid?: () => void;
   onSetElementLock?: (elementId: string, locked: boolean) => void;
   onSetSelectedElementZOrder?: (mode: ZOrderMode) => void;
   onReplaceVideoAsset?: (elementId: string, file: File) => void;
@@ -100,6 +101,7 @@ export function DesignPanel({
   onEditSlideLayout,
   onToggleSlideLayoutPlaceholder,
   onAlignSelectedElement,
+  onEditSelectionGrid,
   onSetElementLock,
   onSetSelectedElementZOrder,
   availableFonts = [],
@@ -132,9 +134,9 @@ export function DesignPanel({
   );
   const fontFamilyOptions = useMemo(
     () =>
-      Array.from(
-        new Set([...textStyleOptions.TEXT_FONT_FAMILIES, ...projectFontFamilies]),
-      ).sort((left, right) => left.localeCompare(right)),
+      Array.from(new Set([...textStyleOptions.TEXT_FONT_FAMILIES, ...projectFontFamilies])).sort(
+        (left, right) => left.localeCompare(right),
+      ),
     [projectFontFamilies],
   );
   const localFontFamilyOptions = useMemo(() => {
@@ -146,9 +148,7 @@ export function DesignPanel({
   }, [fontFamilyOptions, localFonts]);
   const filteredDownloadableFonts = useMemo(() => {
     const query = fontSearchQuery.trim();
-    return availableFonts
-      .filter((font) => fontMatchesQuery(font, query))
-      .slice(0, 12);
+    return availableFonts.filter((font) => fontMatchesQuery(font, query)).slice(0, 12);
   }, [availableFonts, fontSearchQuery]);
 
   useEffect(() => {
@@ -275,7 +275,26 @@ export function DesignPanel({
         </div>
       </PanelSection>
 
-      {selectedElement ? (
+      {selection.elementIds.length > 1 ? (
+        <PanelSection title="Selection">
+          <div className="compact-action design-selection-summary ew-surface ew-surface-hover ew-compact-row">
+            <CaseSensitive size={16} />
+            <span>{selection.elementIds.length} elements selected</span>
+          </div>
+          <section className="movie-panel-section" aria-label="Arrange selected elements">
+            <h3>Arrange</h3>
+            <div className="movie-arrange-grid">
+              <button
+                type="button"
+                disabled={!onEditSelectionGrid}
+                onClick={onEditSelectionGrid}
+              >
+                Edit as grid
+              </button>
+            </div>
+          </section>
+        </PanelSection>
+      ) : selectedElement ? (
         <ElementDesignInspector
           key={selectedElement.id}
           assetName={

@@ -5,20 +5,14 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react';
 import type Konva from 'konva';
-import {
-  Circle,
-  Group,
-  Layer,
-  Rect,
-  Stage,
-  Text,
-  Transformer,
-} from 'react-konva';
+import { Circle, Group, Layer, Rect, Stage, Text, Transformer } from 'react-konva';
 import type {
+  AlignMode,
   ElementFramePatch,
   ImageCropPatch,
 } from '../../../domain/commands/elements/basicCommands';
@@ -47,6 +41,11 @@ import { CanvasReadOnlyMediaElement } from './CanvasReadOnlyMediaElement';
 import { CanvasShapeElement } from './CanvasShapeElement';
 import { CanvasStatusHint } from './CanvasStatusHint';
 import { CanvasDragGuide } from './CanvasDragGuide';
+import {
+  canvasMagnetGuides,
+  type CanvasMagnetGuide,
+  type CanvasMagnetRect,
+} from './canvasMagnetGuides';
 import { CropFrameOverlay } from './CropFrameOverlay';
 import type { CommonElementProps, ElementAnimationRenderState } from './canvas-element-props';
 import { shapeLineDraw } from './shape-line-draw';
@@ -91,9 +90,10 @@ interface CanvasWorkspaceProps {
   canTranslateSelection?: boolean;
   isTranslating?: boolean;
   translationNotice?: string | undefined;
-  onAlignSelectedElement?: (() => void) | undefined;
+  onAlignSelectedElement?: ((mode: AlignMode) => void) | undefined;
   onAnimationPreviewAdvance?: (() => void) | undefined;
   onBringSelectedElementForward?: (() => void) | undefined;
+  onCanvasBackgroundDoubleClick?: (() => void) | undefined;
   onBackgroundPreviewPoint?:
     | ((elementId: string, point: { x: number; y: number }) => void)
     | undefined;
@@ -117,6 +117,7 @@ interface CanvasWorkspaceProps {
   onSelectElement?: ((elementId: string, options?: { additive?: boolean }) => void) | undefined;
   onSendSelectedElementBackward?: (() => void) | undefined;
   onTranslateSelectedText?: (() => void) | undefined;
+  onEditSelectionGrid?: (() => void) | undefined;
   onUpdateImageCrop?: ((elementId: string, patch: ImageCropPatch) => void) | undefined;
   onUpdateElementFrame?: ((elementId: string, patch: ElementFramePatch) => void) | undefined;
   onUpdateElementFrames?: ((patches: Record<string, ElementFramePatch>) => void) | undefined;
@@ -195,6 +196,7 @@ export function CanvasWorkspace({
   onBackgroundSelectionToggle,
   onBackgroundSubjectPick,
   onBringSelectedElementForward,
+  onCanvasBackgroundDoubleClick,
   onCancelBackgroundSelection,
   onDeleteSelectedElement,
   onDuplicateSelectedElement,
@@ -207,6 +209,7 @@ export function CanvasWorkspace({
   onSelectElement,
   onSendSelectedElementBackward,
   onTranslateSelectedText,
+  onEditSelectionGrid,
   onUpdateImageCrop,
   onUpdateElementFrame,
   onUpdateElementFrames,
@@ -215,6 +218,7 @@ export function CanvasWorkspace({
   const transformerRef = useRef<Konva.Transformer>(null);
   const nodeRefs = useRef<Record<string, Konva.Node | null>>({});
   const artboardRef = useRef<HTMLDivElement>(null);
+  const suppressNextBackgroundDoubleClickRef = useRef(false);
   const textInputRef = useRef<HTMLTextAreaElement>(null);
   const [stageSize, setStageSize] = useState({ width: 768, height: 432 });
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
@@ -226,7 +230,7 @@ export function CanvasWorkspace({
     x: number;
     y: number;
   } | null>(null);
-  const [dragGuide, setDragGuide] = useState<{ x: number; y: number } | null>(null);
+  const [magnetGuides, setMagnetGuides] = useState<CanvasMagnetGuide[]>([]);
   const [marqueeSelection, setMarqueeSelection] = useState<MarqueeSelection | null>(null);
   const [cropModeElementId, setCropModeElementId] = useState<string | null>(null);
   const [cropDraft, setCropDraft] = useState<
@@ -265,7 +269,9 @@ export function CanvasWorkspace({
   const projectFontSignature = useMemo(
     () =>
       Object.values(project.fonts ?? {})
-        .map((font) => `${font.family}:${font.fontStyle}:${font.fontWeight}:${font.objectUrl ?? ''}`)
+        .map(
+          (font) => `${font.family}:${font.fontStyle}:${font.fontWeight}:${font.objectUrl ?? ''}`,
+        )
         .sort()
         .join('|'),
     [project.fonts],
@@ -467,6 +473,69 @@ export function CanvasWorkspace({
     };
   }
 
+  function getElementFrameStageRect(element: DesignElement): CanvasMagnetRect {
+    return {
+      height: element.height * scaleY,
+      id: element.id,
+      width: element.width * scaleX,
+      x: element.x * scaleX,
+      y: element.y * scaleY,
+    };
+  }
+
+  function getMagnetTargetRects(movingElementIds: string[]) {
+    const movingElementIdSet = new Set(movingElementIds);
+    return visibleElements
+      .filter((element) => !movingElementIdSet.has(element.id))
+      .map((element) => ({ ...getElementStageRect(element), id: element.id }));
+  }
+
+  function getSelectedMovingElementIds(elementId: string) {
+    if (!selection.elementIds.includes(elementId)) return [elementId];
+    return selection.elementIds.filter((selectedElementId) => {
+      const selected = project.elements[selectedElementId];
+      return selected && !selected.locked;
+    });
+  }
+
+  function getMovingStageRect(elementId: string, currentRect: CanvasMagnetRect) {
+    const movingElementIds = getSelectedMovingElementIds(elementId);
+    if (movingElementIds.length <= 1) return currentRect;
+    const activeElement = project.elements[elementId];
+    if (!activeElement) return currentRect;
+    const activeOriginalRect = getElementFrameStageRect(activeElement);
+    const originalMovingRects = movingElementIds
+      .map((movingElementId) => project.elements[movingElementId])
+      .filter((element): element is DesignElement => Boolean(element))
+      .map((element) => getElementFrameStageRect(element));
+    const groupRect = canvasMagnetGuides.getRectBounds(originalMovingRects);
+    if (!groupRect) return currentRect;
+    return canvasMagnetGuides.translateRect(groupRect, {
+      x: currentRect.x - activeOriginalRect.x,
+      y: currentRect.y - activeOriginalRect.y,
+    });
+  }
+
+  function applyDragSnapToNode(elementId: string, node: Konva.Node) {
+    const currentRect = {
+      ...node.getClientRect({ skipShadow: true, skipStroke: true }),
+      id: elementId,
+    };
+    const movingElementIds = getSelectedMovingElementIds(elementId);
+    const snap = canvasMagnetGuides.getDragSnap({
+      movingRect: getMovingStageRect(elementId, currentRect),
+      stageHeight,
+      stageWidth,
+      targetRects: getMagnetTargetRects(movingElementIds),
+      threshold: canvasMagnetGuides.SNAP_THRESHOLD_STAGE,
+    });
+    if (snap.deltaX !== 0 || snap.deltaY !== 0) {
+      node.x(node.x() + snap.deltaX);
+      node.y(node.y() + snap.deltaY);
+    }
+    return snap;
+  }
+
   function selectElementsInMarquee(rect: StageRect) {
     const selectedElementIds = pageVisibleElements
       .filter((element) => stageRectsIntersect(rect, getElementStageRect(element)))
@@ -481,7 +550,8 @@ export function CanvasWorkspace({
   }
 
   function handleDragEnd(elementId: string, event: Konva.KonvaEventObject<DragEvent>) {
-    setDragGuide(null);
+    applyDragSnapToNode(elementId, event.target);
+    setMagnetGuides([]);
     const element = project.elements[elementId];
     if (!element) return;
     const nextX =
@@ -518,15 +588,18 @@ export function CanvasWorkspace({
   }
 
   function handleDragMove(event: Konva.KonvaEventObject<DragEvent>) {
-    const node = event.target;
-    const rect = node.getClientRect({ skipShadow: true, skipStroke: true });
-    setDragGuide({
-      x: rect.x + rect.width / 2,
-      y: rect.y + rect.height / 2,
-    });
+    const elementId = Object.entries(nodeRefs.current).find(
+      ([, node]) => node === event.target,
+    )?.[0];
+    if (!elementId) return;
+    const snap = applyDragSnapToNode(elementId, event.target);
+    setMagnetGuides(snap.guides);
   }
 
-  function getTransformFramePatch(elementId: string, node: Konva.Node): ElementFramePatch | undefined {
+  function getTransformFramePatch(
+    elementId: string,
+    node: Konva.Node,
+  ): ElementFramePatch | undefined {
     const element = project.elements[elementId];
     if (!element) return undefined;
     const scaleXValue = Math.abs(node.scaleX());
@@ -568,7 +641,7 @@ export function CanvasWorkspace({
 
   function handleTransform(elementId: string, event: Konva.KonvaEventObject<Event>) {
     const node = event.target;
-    const frame = getTransformFramePatch(elementId, node);
+    const frame = getSnappedTransformFramePatch(elementId, node);
     if (!frame) return;
 
     applyTransformPatchToNode(elementId, node, frame);
@@ -576,11 +649,36 @@ export function CanvasWorkspace({
 
   function handleTransformEnd(elementId: string, event: Konva.KonvaEventObject<Event>) {
     const node = event.target;
-    const draft = getTransformFramePatch(elementId, node);
+    const draft = getSnappedTransformFramePatch(elementId, node);
     if (!draft) return;
 
     applyTransformPatchToNode(elementId, node, draft);
+    setMagnetGuides([]);
     onUpdateElementFrame?.(elementId, draft);
+  }
+
+  function getSnappedTransformFramePatch(elementId: string, node: Konva.Node) {
+    const frame = getTransformFramePatch(elementId, node);
+    const element = project.elements[elementId];
+    if (!frame || !element) return frame;
+    const resizedRect = {
+      height: (frame.height ?? element.height) * scaleY,
+      id: elementId,
+      width: (frame.width ?? element.width) * scaleX,
+      x: (frame.x ?? element.x) * scaleX,
+      y: (frame.y ?? element.y) * scaleY,
+    };
+    const snap = canvasMagnetGuides.getResizeSnap({
+      resizedRect,
+      targetRects: getMagnetTargetRects([elementId]),
+      threshold: canvasMagnetGuides.SNAP_THRESHOLD_STAGE,
+    });
+    setMagnetGuides(snap.guides);
+    return {
+      ...frame,
+      height: toDocumentY(snap.height),
+      width: toDocumentX(snap.width),
+    };
   }
 
   function toggleCropMode() {
@@ -657,7 +755,10 @@ export function CanvasWorkspace({
     setEditingTextHeight(undefined);
   }
 
-  function updateTextEditing(element: Extract<DesignElement, { type: 'text' }>, input: HTMLTextAreaElement) {
+  function updateTextEditing(
+    element: Extract<DesignElement, { type: 'text' }>,
+    input: HTMLTextAreaElement,
+  ) {
     const nextValue = input.value;
     const nextHeight = textTranslationLayout.getMinimumTextFrameHeight({
       ...element,
@@ -728,7 +829,10 @@ export function CanvasWorkspace({
     return element.type === 'text' && Boolean(element.hyperlink) && (presentationMode || readOnly);
   }
 
-  function getCommonElementProps(element: DesignElement, options: { interactive?: boolean } = {}): CommonElementProps {
+  function getCommonElementProps(
+    element: DesignElement,
+    options: { interactive?: boolean } = {},
+  ): CommonElementProps {
     const isInteractive = options.interactive ?? true;
     const isBackgroundSelectionTarget = element.id === backgroundSelectionTargetId;
     const isProcessing = processingElementIds.includes(element.id);
@@ -736,7 +840,8 @@ export function CanvasWorkspace({
     const animationTransform = animationState.preset?.transform;
 
     return {
-      draggable: isInteractive && !readOnly && !element.locked && !backgroundSelectionMode && !isProcessing,
+      draggable:
+        isInteractive && !readOnly && !element.locked && !backgroundSelectionMode && !isProcessing,
       height: element.height * scaleY,
       ...(!isInteractive ? { listening: false } : {}),
       ...(animationState.activeBuild ? { name: `animated-element-${element.id}` } : {}),
@@ -790,11 +895,13 @@ export function CanvasWorkspace({
       onDblClick: () => {
         if (!isInteractive) return;
         if (readOnly) return;
+        suppressNextBackgroundDoubleClickRef.current = true;
         startTextEditing(element);
       },
       onDblTap: () => {
         if (!isInteractive) return;
         if (readOnly) return;
+        suppressNextBackgroundDoubleClickRef.current = true;
         startTextEditing(element);
       },
       onDragEnd: (event: Konva.KonvaEventObject<DragEvent>) => {
@@ -993,6 +1100,22 @@ export function CanvasWorkspace({
     window.addEventListener('mouseup', handleMouseUp);
   }
 
+  function handleStageDoubleClick(event: Konva.KonvaEventObject<MouseEvent>) {
+    if (readOnly || backgroundSelectionMode || editingTextId) return;
+    if (event.target !== event.target.getStage()) return;
+    onCanvasBackgroundDoubleClick?.();
+  }
+
+  function handleArtboardDoubleClick(event: ReactMouseEvent<HTMLDivElement>) {
+    if (suppressNextBackgroundDoubleClickRef.current) {
+      suppressNextBackgroundDoubleClickRef.current = false;
+      return;
+    }
+    if (readOnly || backgroundSelectionMode || editingTextId) return;
+    if (!(event.target instanceof HTMLCanvasElement)) return;
+    onCanvasBackgroundDoubleClick?.();
+  }
+
   const marqueeRect = marqueeSelection
     ? getNormalizedStageRect(marqueeSelection.anchor, marqueeSelection.current)
     : undefined;
@@ -1017,7 +1140,7 @@ export function CanvasWorkspace({
           ? { 'data-background-selection-target': backgroundSelectionTargetId }
           : {})}
         data-selected-elements={selection.elementIds.join(',')}
-        data-drag-guide={dragGuide ? 'active' : 'idle'}
+        data-drag-guide={magnetGuides.length > 0 ? 'active' : 'idle'}
         data-marquee-selection={marqueeSelection ? 'active' : 'idle'}
         data-animation-preview={
           animationPreview?.playing && animationPreview.pageId === activePageId ? 'playing' : 'idle'
@@ -1032,7 +1155,12 @@ export function CanvasWorkspace({
         data-testid="slide-canvas-frame"
         style={{ '--canvas-zoom': `${zoomPercent / 100}` } as CSSProperties}
       >
-        <div className="canvas-artboard" ref={artboardRef} style={{ background: pageBackground }}>
+        <div
+          className="canvas-artboard"
+          ref={artboardRef}
+          style={{ background: pageBackground }}
+          onDoubleClick={handleArtboardDoubleClick}
+        >
           {showEditorOverlays &&
           (backgroundSelectionMode ||
             backgroundSelectionNotice ||
@@ -1055,6 +1183,7 @@ export function CanvasWorkspace({
             height={stageHeight}
             width={stageWidth}
             onMouseDown={handleStagePointerDown}
+            onDblClick={handleStageDoubleClick}
             onTouchStart={handleStagePointerDown}
           >
             <Layer>
@@ -1112,7 +1241,10 @@ export function CanvasWorkspace({
                         element={element}
                         hidePlaceholder={hideReadOnlyMediaPlaceholder}
                         key={element.id}
-                        label={asset?.name ?? (element.type === 'video' ? 'Imported video' : 'Imported GIF')}
+                        label={
+                          asset?.name ??
+                          (element.type === 'video' ? 'Imported video' : 'Imported GIF')
+                        }
                         nodeRef={nodeRef}
                       />
                     );
@@ -1185,12 +1317,8 @@ export function CanvasWorkspace({
                 </>
               ) : null}
               {showEditorOverlays && !backgroundSelectionMode && !processingSelectedImageId ? (
-                dragGuide ? (
-                  <CanvasDragGuide
-                    guide={dragGuide}
-                    stageHeight={stageHeight}
-                    stageWidth={stageWidth}
-                  />
+                magnetGuides.length > 0 ? (
+                  <CanvasDragGuide guides={magnetGuides} />
                 ) : null
               ) : null}
               {showEditorOverlays &&
@@ -1369,7 +1497,7 @@ export function CanvasWorkspace({
         selectedElement.type !== 'text' ? (
           <FloatingSelectionToolbar
             elementType={selectedElement.type}
-            onAlignCenter={onAlignSelectedElement}
+            onAlign={onAlignSelectedElement}
             onBringForward={onBringSelectedElementForward}
             onDelete={onDeleteSelectedElement}
             onDuplicate={onDuplicateSelectedElement}
@@ -1378,8 +1506,10 @@ export function CanvasWorkspace({
             onBackgroundSelectionToggle={onBackgroundSelectionToggle}
             onOpenAnimations={onOpenAnimations}
             onSendBackward={onSendSelectedElementBackward}
+            onEditAsGrid={onEditSelectionGrid}
             onTranslateSelectedText={onTranslateSelectedText}
             backgroundSelectionActive={backgroundSelectionMode}
+            selectionCount={selection.elementIds.length}
             cropActive={isCropModeActive}
             canTranslateSelection={canTranslateSelection}
             disabled={Boolean(processingSelectedImageId) || isTranslating}

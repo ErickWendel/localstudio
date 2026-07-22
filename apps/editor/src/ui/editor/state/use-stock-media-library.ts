@@ -3,6 +3,7 @@ import { basicCommands } from '../../../domain/commands/elements/basicCommands';
 import { fitImageWithinPage } from '../../../domain/images/imageSizing';
 import type { ProjectDocument } from '../../../domain/documents/model';
 import { createPrefixedId } from '../../../services/ids/idUtils';
+import { mediaPlaceholderReplacement } from './mediaPlaceholderReplacement';
 import type {
   DownloadedStockMedia,
   StockMediaConfig,
@@ -28,6 +29,7 @@ interface UseStockMediaLibraryOptions {
     options?: { selectedElementIds?: string[] },
   ) => void;
   project: ProjectDocument;
+  selectedElementIds: string[];
   setMediaSettingsOpen: (open: boolean) => void;
   stockMediaService: StockMediaService;
 }
@@ -38,6 +40,7 @@ export function useStockMediaLibrary({
   activePageId,
   commitProject,
   project,
+  selectedElementIds,
   setMediaSettingsOpen,
   stockMediaService,
 }: UseStockMediaLibraryOptions) {
@@ -156,17 +159,41 @@ export function useStockMediaLibrary({
       pageWidth: page.width,
       pageHeight: page.height,
     });
+    const placeholder = mediaPlaceholderReplacement.getSelectedImagePlaceholder({
+      project,
+      selectedElementIds,
+    });
+    const asset = {
+      id: assetId,
+      type: 'image',
+      name: item.title,
+      mimeType: media.mimeType,
+      objectUrl: media.objectUrl,
+    } as const;
+
+    if (placeholder) {
+      commitProject(
+        (currentProject) =>
+          new basicCommands.ReplaceElementWithMediaCommand(placeholder.id, {
+            asset,
+            element: mediaPlaceholderReplacement.createImageElement({
+              assetId,
+              mediaHeight: item.height,
+              mediaWidth: item.width,
+              placeholder,
+            }),
+          }).execute(currentProject),
+        { selectedElementIds: [placeholder.id] },
+      );
+      addRecentStockMedia(item);
+      void stockMediaService.trackImageDownload(item).catch(() => undefined);
+      return;
+    }
 
     commitProject(
       (currentProject) =>
         new basicCommands.AddImageElementCommand(activePageId, {
-          asset: {
-            id: assetId,
-            type: 'image',
-            name: item.title,
-            mimeType: media.mimeType,
-            objectUrl: media.objectUrl,
-          },
+          asset,
           element: {
             id: elementId,
             type: 'image',
@@ -208,17 +235,40 @@ export function useStockMediaLibrary({
       pageWidth: page.width,
       pageHeight: page.height,
     });
+    const placeholder = mediaPlaceholderReplacement.getSelectedImagePlaceholder({
+      project,
+      selectedElementIds,
+    });
+    const asset = {
+      id: assetId,
+      type: 'gif',
+      name: item.title,
+      mimeType: media.mimeType,
+      objectUrl: media.objectUrl,
+    } as const;
+
+    if (placeholder) {
+      commitProject(
+        (currentProject) =>
+          new basicCommands.ReplaceElementWithMediaCommand(placeholder.id, {
+            asset,
+            element: mediaPlaceholderReplacement.createGifElement({
+              assetId,
+              mediaHeight: item.height,
+              mediaWidth: item.width,
+              placeholder,
+            }),
+          }).execute(currentProject),
+        { selectedElementIds: [placeholder.id] },
+      );
+      addRecentStockMedia(item);
+      return;
+    }
 
     commitProject(
       (currentProject) =>
         new basicCommands.AddMediaElementCommand(activePageId, {
-          asset: {
-            id: assetId,
-            type: 'gif',
-            name: item.title,
-            mimeType: media.mimeType,
-            objectUrl: media.objectUrl,
-          },
+          asset,
           element: {
             id: elementId,
             type: 'gif',
@@ -260,17 +310,40 @@ export function useStockMediaLibrary({
       pageWidth: page.width,
       pageHeight: page.height,
     });
+    const placeholder = mediaPlaceholderReplacement.getSelectedImagePlaceholder({
+      project,
+      selectedElementIds,
+    });
+    const asset = {
+      id: assetId,
+      type: 'video',
+      name: item.title,
+      mimeType: media.mimeType,
+      objectUrl: media.objectUrl,
+    } as const;
+
+    if (placeholder) {
+      commitProject(
+        (currentProject) =>
+          new basicCommands.ReplaceElementWithMediaCommand(placeholder.id, {
+            asset,
+            element: mediaPlaceholderReplacement.createVideoElement({
+              assetId,
+              mediaHeight: item.height,
+              mediaWidth: item.width,
+              placeholder,
+            }),
+          }).execute(currentProject),
+        { selectedElementIds: [placeholder.id] },
+      );
+      addRecentStockMedia(item);
+      return;
+    }
 
     commitProject(
       (currentProject) =>
         new basicCommands.AddMediaElementCommand(activePageId, {
-          asset: {
-            id: assetId,
-            type: 'video',
-            name: item.title,
-            mimeType: media.mimeType,
-            objectUrl: media.objectUrl,
-          },
+          asset,
           element: {
             id: elementId,
             type: 'video',

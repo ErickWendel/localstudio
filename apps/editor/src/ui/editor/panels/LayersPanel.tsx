@@ -1,6 +1,31 @@
-import { Eye, EyeOff, Film, GripVertical, Image, Lock, Search, Square, Trash2, Type, Unlock, Video } from 'lucide-react';
-import { useState, type DragEvent } from 'react';
-import type { DesignElement, ProjectDocument, SelectionState } from '../../../domain/documents/model';
+import {
+  Eye,
+  EyeOff,
+  Film,
+  GripVertical,
+  Image,
+  LayoutGrid,
+  Lock,
+  Search,
+  Square,
+  Trash2,
+  Type,
+  Unlock,
+  Video,
+} from 'lucide-react';
+import { useState, type CSSProperties, type DragEvent, type FormEvent } from 'react';
+import type {
+  DesignElement,
+  ProjectDocument,
+  SelectionState,
+} from '../../../domain/documents/model';
+import type {
+  ImageGridFit,
+  ImageGridMediaPosition,
+  ImageGridPreset,
+  ImageGridRequest,
+  SelectionGridRequest,
+} from '../state/editorViewModelElements';
 import { IconButton } from '../../components/IconButton';
 import { PanelSection } from '../../components/PanelSection';
 
@@ -14,8 +39,24 @@ interface LayersPanelProps {
   onSetElementVisibility?: (elementId: string, visible: boolean) => void;
   onSetElementLock?: (elementId: string, locked: boolean) => void;
   onDeleteElement?: (elementId: string) => void;
+  onApplyGridToSelection?: (request: SelectionGridRequest) => void;
+  onInsertImageGrid?: (request: ImageGridRequest) => void;
   onReorderElement?: (elementId: string, targetElementId: string, position?: DropPosition) => void;
 }
+
+const CUSTOM_IMAGE_GRID_LIMIT = 6;
+const CUSTOM_TEXT_PLACEHOLDER_LIMIT = 6;
+
+const imageGridPresets: Array<{
+  label: string;
+  preset: ImageGridPreset;
+  preview: number[];
+}> = [
+  { label: '1 image', preset: 'one', preview: [1] },
+  { label: '2 images', preset: 'two-columns', preview: [2] },
+  { label: '3 images', preset: 'three-two-one', preview: [2, 1] },
+  { label: '4 images', preset: 'four-square', preview: [2, 2] },
+];
 
 function isDesignElement(element: DesignElement | undefined): element is DesignElement {
   return Boolean(element);
@@ -51,6 +92,13 @@ function getDropPosition(event: DragEvent<HTMLElement>): DropPosition {
   return event.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
 }
 
+function parseBoundedInteger(value: string, max: number) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) return undefined;
+  if (parsed < 0 || parsed > max) return undefined;
+  return parsed;
+}
+
 export function LayersPanel({
   project,
   activePageId,
@@ -59,9 +107,19 @@ export function LayersPanel({
   onSetElementVisibility,
   onSetElementLock,
   onDeleteElement,
+  onApplyGridToSelection,
+  onInsertImageGrid,
   onReorderElement,
 }: LayersPanelProps) {
-  const [dropIndicator, setDropIndicator] = useState<{ layerId: string; position: DropPosition } | undefined>();
+  const [dropIndicator, setDropIndicator] = useState<
+    { layerId: string; position: DropPosition } | undefined
+  >();
+  const [customColumns, setCustomColumns] = useState('1');
+  const [customRows, setCustomRows] = useState('1');
+  const [customTextCount, setCustomTextCount] = useState('1');
+  const [customMediaPosition, setCustomMediaPosition] =
+    useState<ImageGridMediaPosition>('left');
+  const [customImageFit, setCustomImageFit] = useState<ImageGridFit>('cover');
   const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
   const selectedElementId = selection.elementIds[0];
   const layers =
@@ -79,6 +137,49 @@ export function LayersPanel({
         locked: element.locked,
       })) ?? [];
   const selectedLayer = layers.find((layer) => layer.selected);
+  const gridEditMode = selection.elementIds.length > 1;
+  const selectedTextCount = layers.filter(
+    (layer) => layer.selected && layer.type === 'text',
+  ).length;
+  const balancedSelectionColumns = Math.max(1, Math.ceil(Math.sqrt(selection.elementIds.length)));
+  const balancedSelectionRows = Math.max(
+    1,
+    Math.ceil(selection.elementIds.length / balancedSelectionColumns),
+  );
+  const customColumnsControlValue =
+    gridEditMode && customColumns === '1' && customRows === '1'
+      ? String(balancedSelectionColumns)
+      : customColumns;
+  const customRowsControlValue =
+    gridEditMode && customColumns === '1' && customRows === '1'
+      ? String(balancedSelectionRows)
+      : customRows;
+  const customColumnsValue = parseBoundedInteger(
+    customColumnsControlValue,
+    CUSTOM_IMAGE_GRID_LIMIT,
+  );
+  const customRowsValue = parseBoundedInteger(customRowsControlValue, CUSTOM_IMAGE_GRID_LIMIT);
+  const customTextCountValue = parseBoundedInteger(customTextCount, CUSTOM_TEXT_PLACEHOLDER_LIMIT);
+  const customGrid =
+    customColumnsValue && customRowsValue && customTextCountValue !== undefined
+      ? {
+          columns: customColumnsValue,
+          imageFit: customImageFit,
+          mediaPosition: customMediaPosition,
+          rows: customRowsValue,
+          textCount: gridEditMode ? selectedTextCount : customTextCountValue,
+        }
+      : undefined;
+  const customGridInvalid = !customGrid;
+  const submitCustomGrid = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!customGrid) return;
+    if (gridEditMode) {
+      onApplyGridToSelection?.(customGrid);
+      return;
+    }
+    onInsertImageGrid?.(customGrid);
+  };
 
   return (
     <div className="panel-stack">
@@ -86,12 +187,136 @@ export function LayersPanel({
         <Search size={15} />
         <input aria-label="Search layers" placeholder="Search layers" type="search" />
       </div>
+      <PanelSection title={gridEditMode ? 'Edit selected grid' : 'Image grids'}>
+        {gridEditMode ? (
+          <p className="panel-muted">{selection.elementIds.length} selected elements</p>
+        ) : (
+          <div className="layout-image-grid-options">
+            {imageGridPresets.map((preset) => (
+              <button
+                aria-label={`Insert ${preset.label} grid`}
+                className="layout-image-grid-option ew-surface ew-surface-hover"
+                disabled={!onInsertImageGrid}
+                key={preset.preset}
+                type="button"
+                onClick={() => onInsertImageGrid?.(preset.preset)}
+              >
+                <LayoutGrid size={15} />
+                <GridPresetPreview rows={preset.preview} />
+                <span>{preset.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        <form className="layout-custom-grid-form" onSubmit={submitCustomGrid}>
+          <span className="layout-custom-grid-label">Custom grid</span>
+          <div className="layout-custom-grid-fields">
+            <label className="layout-custom-grid-field">
+              <span>Columns</span>
+              <input
+                aria-label="Grid columns"
+                inputMode="numeric"
+                min={1}
+                max={CUSTOM_IMAGE_GRID_LIMIT}
+                type="number"
+                value={customColumnsControlValue}
+                onChange={(event) => {
+                  setCustomColumns(event.currentTarget.value);
+                }}
+              />
+            </label>
+            <label className="layout-custom-grid-field">
+              <span>Rows</span>
+              <input
+                aria-label="Grid rows"
+                inputMode="numeric"
+                min={1}
+                max={CUSTOM_IMAGE_GRID_LIMIT}
+                type="number"
+                value={customRowsControlValue}
+                onChange={(event) => {
+                  setCustomRows(event.currentTarget.value);
+                }}
+              />
+            </label>
+            <label className="layout-custom-grid-field">
+              <span>Text</span>
+              <input
+                aria-label="Text placeholders"
+                disabled={gridEditMode}
+                inputMode="numeric"
+                min={0}
+                max={CUSTOM_TEXT_PLACEHOLDER_LIMIT}
+                type="number"
+                value={gridEditMode ? String(selectedTextCount) : customTextCount}
+                onChange={(event) => {
+                  setCustomTextCount(event.currentTarget.value);
+                }}
+              />
+            </label>
+          </div>
+          <span className="layout-custom-grid-label">Arrangement</span>
+          <div className="layout-custom-grid-row">
+            <select
+              aria-label="Media position"
+              value={customMediaPosition}
+              onChange={(event) => {
+                setCustomMediaPosition(event.currentTarget.value as ImageGridMediaPosition);
+              }}
+            >
+              <option value="left">Images left, text right</option>
+              <option value="right">Text left, images right</option>
+              <option value="top">Images top, text bottom</option>
+              <option value="bottom">Text top, images bottom</option>
+            </select>
+          </div>
+          <span className="layout-custom-grid-label">Image behavior</span>
+          <div className="layout-custom-grid-row">
+            <select
+              aria-label="Image fit"
+              value={customImageFit}
+              onChange={(event) => {
+                setCustomImageFit(event.currentTarget.value as ImageGridFit);
+              }}
+            >
+              <option value="cover">object-fit: cover</option>
+              <option value="contain">object-fit: contain</option>
+              <option value="stretch">object-fit: fill</option>
+            </select>
+            <button
+              className="layout-custom-grid-submit ew-surface ew-surface-hover"
+              disabled={
+                gridEditMode
+                  ? !onApplyGridToSelection || !customGrid
+                  : !onInsertImageGrid || !customGrid
+              }
+              type="submit"
+            >
+              <LayoutGrid size={14} />
+              <span>{gridEditMode ? 'Update selection' : 'Insert'}</span>
+            </button>
+          </div>
+          <p className={customGridInvalid ? 'layout-custom-grid-error' : 'panel-muted'}>
+            Cover fills to the cell border. Fill may distort placeholders.
+          </p>
+          {customGrid ? (
+            <CustomGridPreview
+              columns={customGrid.columns}
+              imageFit={customGrid.imageFit}
+              mediaPosition={customGrid.mediaPosition}
+              rows={customGrid.rows}
+              textCount={customGrid.textCount}
+            />
+          ) : null}
+        </form>
+      </PanelSection>
       <PanelSection title="Stack">
         <p className="panel-muted">{layers.length + 1} layers on current page</p>
         <div className="layer-list ew-panel-card">
           {layers.map((layer) => {
             const Icon = layer.icon;
-            const dropPosition = dropIndicator?.layerId === layer.id ? dropIndicator.position : undefined;
+            const dropPosition =
+              dropIndicator?.layerId === layer.id ? dropIndicator.position : undefined;
             const rowClassName = [
               'layer-row',
               'ew-surface',
@@ -127,7 +352,9 @@ export function LayersPanel({
                 }}
                 onDragLeave={(event) => {
                   if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
-                  setDropIndicator((current) => (current?.layerId === layer.id ? undefined : current));
+                  setDropIndicator((current) =>
+                    current?.layerId === layer.id ? undefined : current,
+                  );
                 }}
                 onDrop={(event) => {
                   event.preventDefault();
@@ -153,9 +380,9 @@ export function LayersPanel({
                   }
                   onSelectElement?.(layer.id);
                 }}
-                >
-                  <GripVertical size={15} />
-                  <Icon size={16} />
+              >
+                <GripVertical size={15} />
+                <Icon size={16} />
                 <span className="layer-row-name ew-ellipsis">{layer.name}</span>
                 <span
                   className="layer-row-actions"
@@ -214,6 +441,85 @@ export function LayersPanel({
           </strong>
         </div>
       </PanelSection>
+    </div>
+  );
+}
+
+function GridPresetPreview({ rows }: { rows: number[] }) {
+  return (
+    <span className="layout-image-grid-preview" aria-hidden="true">
+      {rows.map((count, rowIndex) => (
+        <span className="layout-image-grid-preview-row" key={`${count}-${rowIndex}`}>
+          {Array.from({ length: count }, (_, index) => (
+            <span className="layout-image-grid-preview-cell" key={index} />
+          ))}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function CustomGridPreview({
+  columns,
+  imageFit,
+  mediaPosition,
+  rows,
+  textCount,
+}: {
+  columns: number;
+  imageFit: ImageGridFit;
+  mediaPosition: ImageGridMediaPosition;
+  rows: number;
+  textCount: number;
+}) {
+  const previewStyle = {
+    '--layout-custom-grid-columns': columns,
+    '--layout-custom-grid-rows': rows,
+  } as CSSProperties;
+  const imageGrid = (
+    <div
+      className={`layout-custom-grid-preview-stage layout-custom-grid-preview-stage-${imageFit}`}
+      style={previewStyle}
+    >
+      {Array.from({ length: columns * rows }, (_, index) => (
+        <span className="layout-custom-grid-preview-cell" key={index}>
+          <span className="layout-custom-grid-preview-media" />
+        </span>
+      ))}
+    </div>
+  );
+  const textStack =
+    textCount > 0 ? (
+      <div className="layout-custom-grid-preview-text-stack">
+        {Array.from({ length: textCount }, (_, index) => (
+          <span className="layout-custom-grid-preview-text" key={index}>
+            T
+          </span>
+        ))}
+      </div>
+    ) : null;
+  const horizontal = mediaPosition === 'left' || mediaPosition === 'right';
+  const className = [
+    'layout-custom-grid-preview-content',
+    textCount === 0 ? 'layout-custom-grid-preview-content-single' : '',
+    horizontal ? 'layout-custom-grid-preview-content-horizontal' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const children =
+    mediaPosition === 'right' || mediaPosition === 'bottom'
+      ? [textStack, imageGrid]
+      : [imageGrid, textStack];
+
+  return (
+    <div
+      aria-label={`Custom grid preview ${columns} columns by ${rows} rows, ${textCount} text placeholders, ${imageFit} image fit`}
+      className="layout-custom-grid-preview"
+      role="img"
+    >
+      <div className={className}>
+        {children.map((child, index) => (child ? <div key={index}>{child}</div> : null))}
+      </div>
     </div>
   );
 }

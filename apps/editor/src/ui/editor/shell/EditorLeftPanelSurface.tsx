@@ -45,6 +45,7 @@ export function EditorLeftPanelSurface({
       onDeleteElement={isHistoryReadOnly ? undefined : vm.deleteElement}
       onReorderElement={isHistoryReadOnly ? undefined : vm.reorderElement}
       onAlignSelectedElement={isHistoryReadOnly ? undefined : vm.alignSelectedElement}
+      onEditSelectionGrid={isHistoryReadOnly ? undefined : () => vm.setActiveTab('layout')}
       onSetSelectedElementZOrder={isHistoryReadOnly ? undefined : vm.setSelectedElementZOrder}
       onUpdateElementFrame={isHistoryReadOnly ? undefined : vm.updateElementFrame}
       onUpdateElementStyle={isHistoryReadOnly ? undefined : vm.updateElementStyle}
@@ -94,6 +95,8 @@ export function EditorLeftPanelSurface({
       onInsertStockMedia={isHistoryReadOnly ? undefined : vm.insertStockMedia}
       onInsertText={isHistoryReadOnly ? undefined : vm.insertTextElement}
       onInsertShape={isHistoryReadOnly ? undefined : vm.insertShapeElement}
+      onInsertImageGrid={isHistoryReadOnly ? undefined : vm.insertImageGridPlaceholders}
+      onApplyGridToSelection={isHistoryReadOnly ? undefined : vm.applyGridToSelectedElements}
       onSearchStockGifs={(query) => {
         void vm.searchStockGifs(query);
       }}

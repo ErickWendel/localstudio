@@ -244,6 +244,206 @@ describe('CanvasWorkspace', () => {
     );
   });
 
+  it('snaps a dragged element to the page vertical center and draws one guide', async () => {
+    const onUpdateElementFrame = vi.fn<(elementId: string, patch: ElementFramePatch) => void>();
+    const stageRef = createRef<Konva.Stage>();
+    const baseProject = sampleProject.createBlankProject();
+    const project: ProjectDocument = {
+      ...baseProject,
+      elements: {
+        ...baseProject.elements,
+        'shape-snap': {
+          id: 'shape-snap',
+          type: 'shape',
+          shape: 'rect',
+          x: 900,
+          y: 120,
+          width: 100,
+          height: 80,
+          rotation: 0,
+          locked: false,
+          visible: true,
+          opacity: 1,
+          fill: '#37FD76',
+        },
+      },
+      pages: baseProject.pages.map((page) =>
+        page.id === 'page-1' ? { ...page, elementIds: ['shape-snap'] } : page,
+      ),
+    };
+
+    render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['shape-snap'] }}
+        stageRef={stageRef}
+        onUpdateElementFrame={onUpdateElementFrame}
+      />,
+    );
+
+    const shapeNode = stageRef.current
+      ?.find('Rect')
+      .find((node) => (node as Konva.Rect).fill() === '#37FD76') as Konva.Rect | undefined;
+    expect(shapeNode).toBeDefined();
+
+    act(() => {
+      shapeNode!.fire('dragmove', { target: shapeNode });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute('data-drag-guide', 'active');
+    });
+    expect(stageRef.current?.find('.magnet-guide-line-vertical')).toHaveLength(1);
+    expect(stageRef.current?.find('.magnet-guide-line-horizontal')).toHaveLength(0);
+    expect(shapeNode!.x()).toBeCloseTo(364);
+
+    act(() => {
+      shapeNode!.fire('dragend', { target: shapeNode });
+    });
+
+    expect(onUpdateElementFrame).toHaveBeenCalledWith(
+      'shape-snap',
+      expect.objectContaining({ x: 910 }),
+    );
+  });
+
+  it('snaps a multi-selected drag and commits one batched frame update', () => {
+    const onUpdateElementFrames = vi.fn<(patches: Record<string, ElementFramePatch>) => void>();
+    const stageRef = createRef<Konva.Stage>();
+    const baseProject = sampleProject.createBlankProject();
+    const project: ProjectDocument = {
+      ...baseProject,
+      elements: {
+        ...baseProject.elements,
+        'shape-left': {
+          id: 'shape-left',
+          type: 'shape',
+          shape: 'rect',
+          x: 800,
+          y: 120,
+          width: 100,
+          height: 80,
+          rotation: 0,
+          locked: false,
+          visible: true,
+          opacity: 1,
+          fill: '#37FD76',
+        },
+        'shape-right': {
+          id: 'shape-right',
+          type: 'shape',
+          shape: 'rect',
+          x: 950,
+          y: 120,
+          width: 100,
+          height: 80,
+          rotation: 0,
+          locked: false,
+          visible: true,
+          opacity: 1,
+          fill: '#FFFFFF',
+        },
+      },
+      pages: baseProject.pages.map((page) =>
+        page.id === 'page-1' ? { ...page, elementIds: ['shape-left', 'shape-right'] } : page,
+      ),
+    };
+
+    render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['shape-left', 'shape-right'] }}
+        stageRef={stageRef}
+        onUpdateElementFrames={onUpdateElementFrames}
+      />,
+    );
+
+    const leftNode = stageRef.current
+      ?.find('Rect')
+      .find((node) => (node as Konva.Rect).fill() === '#37FD76') as Konva.Rect | undefined;
+    expect(leftNode).toBeDefined();
+
+    act(() => {
+      leftNode!.x(330);
+      leftNode!.fire('dragend', { target: leftNode });
+    });
+
+    expect(onUpdateElementFrames).toHaveBeenCalledWith({
+      'shape-left': { x: 835, y: 120 },
+      'shape-right': { x: 985, y: 120 },
+    });
+  });
+
+  it('snaps resized element width to a nearby object width', () => {
+    const onUpdateElementFrame = vi.fn<(elementId: string, patch: ElementFramePatch) => void>();
+    const stageRef = createRef<Konva.Stage>();
+    const baseProject = sampleProject.createBlankProject();
+    const project: ProjectDocument = {
+      ...baseProject,
+      elements: {
+        ...baseProject.elements,
+        'shape-resize': {
+          id: 'shape-resize',
+          type: 'shape',
+          shape: 'rect',
+          x: 120,
+          y: 120,
+          width: 100,
+          height: 80,
+          rotation: 0,
+          locked: false,
+          visible: true,
+          opacity: 1,
+          fill: '#37FD76',
+        },
+        'shape-reference': {
+          id: 'shape-reference',
+          type: 'shape',
+          shape: 'rect',
+          x: 360,
+          y: 120,
+          width: 120,
+          height: 300,
+          rotation: 0,
+          locked: false,
+          visible: true,
+          opacity: 1,
+          fill: '#FFFFFF',
+        },
+      },
+      pages: baseProject.pages.map((page) =>
+        page.id === 'page-1' ? { ...page, elementIds: ['shape-resize', 'shape-reference'] } : page,
+      ),
+    };
+
+    render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['shape-resize'] }}
+        stageRef={stageRef}
+        onUpdateElementFrame={onUpdateElementFrame}
+      />,
+    );
+
+    const resizeNode = stageRef.current
+      ?.find('Rect')
+      .find((node) => (node as Konva.Rect).fill() === '#37FD76') as Konva.Rect | undefined;
+    expect(resizeNode).toBeDefined();
+
+    act(() => {
+      resizeNode!.scaleX(1.15);
+      resizeNode!.fire('transformend', { target: resizeNode });
+    });
+
+    expect(onUpdateElementFrame).toHaveBeenCalledWith(
+      'shape-resize',
+      expect.objectContaining({ width: 120 }),
+    );
+  });
+
   it('shrinks the live text editor frame to the typed text height', () => {
     const onSelectElement = vi.fn();
     const onUpdateElementFrame = vi.fn<(elementId: string, patch: ElementFramePatch) => void>();

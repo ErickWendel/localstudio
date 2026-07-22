@@ -130,6 +130,25 @@ describe('editor commands', () => {
     expect(project.elements['image-hero']?.x).toBe(55);
   });
 
+  it('aligns an element to centered page edges', () => {
+    const project = sampleProject.createSampleProject();
+    const left = new basicCommands.AlignElementCommand(
+      'page-1',
+      'image-hero',
+      'page-left-center',
+    ).execute(project);
+    const bottom = new basicCommands.AlignElementCommand(
+      'page-1',
+      'image-hero',
+      'page-bottom-center',
+    ).execute(project);
+
+    expect(left.elements['image-hero']?.x).toBe(0);
+    expect(left.elements['image-hero']?.y).toBe((1080 - 735) / 2);
+    expect(bottom.elements['image-hero']?.x).toBe((1920 - 980) / 2);
+    expect(bottom.elements['image-hero']?.y).toBe(1080 - 735);
+  });
+
   it('brings an element to front by moving its id to the end', () => {
     const project = sampleProject.createSampleProject();
     const command = new basicCommands.SetZOrderCommand('page-1', 'image-hero', 'front');
@@ -210,6 +229,49 @@ describe('editor commands', () => {
     expect(next.pages[0]?.elementIds).toEqual(project.pages[0]?.elementIds);
     expect(next.assets['asset-generated-replacement']).toBeDefined();
     expect(next.assets['asset-hero']).toBeDefined();
+    expect(project.elements['image-hero']).toMatchObject({ type: 'image', assetId: 'asset-hero' });
+  });
+
+  it('replaces an element with media while preserving its id and z-order', () => {
+    const project = sampleProject.createSampleProject();
+    const command = new basicCommands.ReplaceElementWithMediaCommand('image-hero', {
+      asset: {
+        id: 'asset-gif-replacement',
+        type: 'gif',
+        name: 'replacement.gif',
+        mimeType: 'image/gif',
+        objectUrl: 'blob:replacement-gif',
+      },
+      element: {
+        id: 'image-hero',
+        type: 'gif',
+        assetId: 'asset-gif-replacement',
+        x: 120,
+        y: 220,
+        width: 640,
+        height: 360,
+        rotation: 0,
+        locked: false,
+        visible: true,
+        opacity: 1,
+        playing: true,
+      },
+    });
+    const next = command.execute(project);
+
+    expect(next).not.toBe(project);
+    expect(next.elements['image-hero']).toMatchObject({
+      id: 'image-hero',
+      type: 'gif',
+      assetId: 'asset-gif-replacement',
+      x: 120,
+      y: 220,
+      width: 640,
+      height: 360,
+      playing: true,
+    });
+    expect(next.pages[0]?.elementIds).toEqual(project.pages[0]?.elementIds);
+    expect(next.assets['asset-gif-replacement']).toBeDefined();
     expect(project.elements['image-hero']).toMatchObject({ type: 'image', assetId: 'asset-hero' });
   });
 

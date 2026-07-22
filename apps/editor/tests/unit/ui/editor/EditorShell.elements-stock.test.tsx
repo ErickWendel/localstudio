@@ -76,6 +76,38 @@ describe('EditorShell elements and stock media workflows', () => {
     });
   });
 
+  it('opens Elements when selecting an image placeholder and replaces it with a stock image', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const stockMediaService = new ReadyStockMediaService();
+    services.stockMediaService = stockMediaService;
+
+    render(<EditorShell services={services} />);
+
+    await openLeftTab(user, 'Layout');
+    fireEvent.click(screen.getByRole('button', { name: 'Insert 1 image grid' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Web AI placeholder image' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: 'Elements' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Insert image by Ada Photo' }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-selected-elements',
+        expect.stringMatching(/^image-grid-1-/),
+      );
+    });
+    expect(stockMediaService.downloadedItems).toEqual([
+      { item: stockImage, sourceUrl: stockImage.mediaUrl },
+    ]);
+  });
+
   it('inserts an Unsplash image before download tracking finishes', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
@@ -109,6 +141,28 @@ describe('EditorShell elements and stock media workflows', () => {
       expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
         'data-selected-elements',
         expect.stringMatching(/^video-/),
+      );
+    });
+    expect(screen.getByLabelText('Launch GIF').tagName.toLowerCase()).toBe('video');
+    expect(screen.getByLabelText('Launch GIF')).toHaveAttribute('src', 'blob:giphy-video');
+  });
+
+  it('replaces a selected image placeholder with a stock GIF movie in the same slot', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    services.stockMediaService = new ReadyStockMediaService();
+
+    render(<EditorShell services={services} />);
+
+    await openLeftTab(user, 'Layout');
+    fireEvent.click(screen.getByRole('button', { name: 'Insert 1 image grid' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Web AI placeholder image' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Insert GIF Launch GIF' }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-selected-elements',
+        expect.stringMatching(/^image-grid-1-/),
       );
     });
     expect(screen.getByLabelText('Launch GIF').tagName.toLowerCase()).toBe('video');

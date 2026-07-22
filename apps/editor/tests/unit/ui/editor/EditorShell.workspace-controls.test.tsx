@@ -1,14 +1,10 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { EditorShell } from '../../../../src/ui/editor/shell/EditorShell';
 import { editorShellTestHarness } from './EditorShell.test-harness';
 
-const {
-  createAppServices,
-  openLeftTab,
-  selectImageLayer,
-} = editorShellTestHarness;
+const { createAppServices, openLeftTab, selectImageLayer } = editorShellTestHarness;
 
 describe('EditorShell workspace controls', () => {
   afterEach(() => {
@@ -27,6 +23,21 @@ describe('EditorShell workspace controls', () => {
     expect(screen.getByRole('tab', { name: 'Layout' })).toHaveAttribute('aria-selected', 'true');
   });
 
+  it('opens the layout panel when the canvas background is double-clicked', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<EditorShell services={createAppServices()} />);
+
+    await openLeftTab(user, 'Elements');
+    expect(screen.getByRole('tab', { name: 'Elements' })).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.dblClick(container.querySelector('canvas')!);
+
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: 'Layout' })).toHaveAttribute('aria-selected', 'true');
+    });
+    expect(screen.getByText('Image grids')).toBeInTheDocument();
+  });
+
   it('keeps pages and tool panels mutually exclusive', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
@@ -43,6 +54,125 @@ describe('EditorShell workspace controls', () => {
 
     expect(screen.getByLabelText('Pages')).toBeInTheDocument();
     expect(screen.queryByText('4 layers on current page')).not.toBeInTheDocument();
+  });
+
+  it('inserts placeholder image grids from the layout panel', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    await openLeftTab(user, 'Layout');
+    fireEvent.click(screen.getByRole('button', { name: 'Insert 3 images grid' }));
+
+    expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+      'data-selected-elements',
+      expect.stringMatching(/image-grid-1.*image-grid-2.*image-grid-3/),
+    );
+    expect(screen.getAllByRole('button', { name: 'Web AI placeholder image' })).toHaveLength(3);
+  });
+
+  it('inserts custom placeholder image grids from the layout panel', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    await openLeftTab(user, 'Layout');
+    const columnsInput = screen.getByRole('spinbutton', { name: 'Grid columns' });
+    const rowsInput = screen.getByRole('spinbutton', { name: 'Grid rows' });
+    const insertButton = screen.getByRole('button', { name: 'Insert' });
+    await user.clear(columnsInput);
+    await user.type(columnsInput, '2');
+    await user.clear(rowsInput);
+    await user.type(rowsInput, '2');
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Text placeholders' }), {
+      target: { value: '0' },
+    });
+    expect(
+      screen.getByRole('img', {
+        name: 'Custom grid preview 2 columns by 2 rows, 0 text placeholders, cover image fit',
+      }),
+    ).toBeInTheDocument();
+    expect(insertButton).toBeEnabled();
+    await user.click(insertButton);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-selected-elements',
+        expect.stringMatching(/image-grid-1.*image-grid-2.*image-grid-3.*image-grid-4/),
+      );
+    });
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: 'Web AI placeholder image' })).toHaveLength(4);
+    });
+  });
+
+  it('inserts custom image and text placeholder layouts from the layout panel', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    await openLeftTab(user, 'Layout');
+    const columnsInput = screen.getByRole('spinbutton', { name: 'Grid columns' });
+    const rowsInput = screen.getByRole('spinbutton', { name: 'Grid rows' });
+    const textInput = screen.getByRole('spinbutton', { name: 'Text placeholders' });
+    const imageFitSelect = screen.getByRole('combobox', { name: 'Image fit' });
+    expect(screen.getByText('Arrangement')).toBeInTheDocument();
+    expect(screen.getByText('Image behavior')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'object-fit: fill' })).toBeInTheDocument();
+    expect(columnsInput).toHaveValue(1);
+    expect(rowsInput).toHaveValue(1);
+    expect(textInput).toHaveValue(1);
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Media position' }), 'left');
+    await user.selectOptions(imageFitSelect, 'contain');
+    await user.click(screen.getByRole('button', { name: 'Insert' }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-selected-elements',
+        expect.stringMatching(/image-grid-1.*layout-text-1/),
+      );
+    });
+    expect(screen.getAllByRole('button', { name: 'Web AI placeholder image' })).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Add a heading' })).toBeInTheDocument();
+  });
+
+  it('blocks invalid custom placeholder image grid sizes', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    await openLeftTab(user, 'Layout');
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Grid columns' }), {
+      target: { value: '9' },
+    });
+
+    expect(screen.getByRole('button', { name: 'Insert' })).toBeDisabled();
+    expect(screen.queryByRole('img', { name: /Custom grid preview/ })).not.toBeInTheDocument();
+  });
+
+  it('updates the custom image grid preview while typing', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    await openLeftTab(user, 'Layout');
+    const columnsInput = screen.getByRole('spinbutton', { name: 'Grid columns' });
+    const rowsInput = screen.getByRole('spinbutton', { name: 'Grid rows' });
+    const textInput = screen.getByRole('spinbutton', { name: 'Text placeholders' });
+    await user.clear(columnsInput);
+    await user.type(columnsInput, '4');
+    await user.clear(rowsInput);
+    await user.type(rowsInput, '3');
+    await user.clear(textInput);
+    await user.type(textInput, '1');
+
+    const preview = screen.getByRole('img', {
+      name: 'Custom grid preview 4 columns by 3 rows, 1 text placeholders, cover image fit',
+    });
+    expect(preview).toBeInTheDocument();
+    expect(preview.querySelectorAll('.layout-custom-grid-preview-cell')).toHaveLength(12);
+    expect(preview.querySelectorAll('.layout-custom-grid-preview-text')).toHaveLength(1);
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Image fit' }), 'contain');
+    expect(
+      screen.getByRole('img', {
+        name: 'Custom grid preview 4 columns by 3 rows, 1 text placeholders, contain image fit',
+      }),
+    ).toBeInTheDocument();
   });
 
   it('marks the workspace as zoomed out when the user scales below 100%', () => {
@@ -103,6 +233,28 @@ describe('EditorShell workspace controls', () => {
       'aria-pressed',
       'true',
     );
+  });
+
+  it('opens Layout to edit a multi-selection as a grid and makes the update undoable', async () => {
+    const user = userEvent.setup();
+    render(<EditorShell services={createAppServices()} />);
+
+    await user.keyboard('{Meta>}a{/Meta}');
+
+    expect(screen.getByRole('button', { name: 'Edit as grid' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit as grid' }));
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: 'Layout' })).toHaveAttribute('aria-selected', 'true');
+    });
+    expect(screen.getByText('Edit selected grid')).toBeInTheDocument();
+    expect(screen.getByText('3 selected elements')).toBeInTheDocument();
+    expect(screen.getByRole('spinbutton', { name: 'Grid columns' })).toHaveValue(2);
+    expect(screen.getByRole('spinbutton', { name: 'Grid rows' })).toHaveValue(2);
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Image fit' }), 'stretch');
+    fireEvent.click(screen.getByRole('button', { name: 'Update selection' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+
+    expect(screen.getByText('3 selected elements')).toBeInTheDocument();
   });
 
   it('renames the project from the toolbar', async () => {
@@ -171,7 +323,8 @@ describe('EditorShell workspace controls', () => {
       'true',
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Align Center' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Align' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Center left' }));
     fireEvent.click(screen.getByRole('button', { name: 'Send Backward' }));
     fireEvent.click(screen.getByRole('button', { name: 'Bring Forward' }));
 

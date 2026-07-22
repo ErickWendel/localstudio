@@ -19,14 +19,8 @@ class AlignElementCommand implements EditorCommand {
     if (!page || !element || element.locked) return project;
 
     const patch = {
-      x:
-        this.mode === 'horizontal-center' || this.mode === 'page-center'
-          ? (page.width - element.width) / 2
-          : element.x,
-      y:
-        this.mode === 'vertical-center' || this.mode === 'page-center'
-          ? (page.height - element.height) / 2
-          : element.y,
+      x: getAlignedX({ element, mode: this.mode, pageWidth: page.width }),
+      y: getAlignedY({ element, mode: this.mode, pageHeight: page.height }),
     };
 
     return {
@@ -37,6 +31,38 @@ class AlignElementCommand implements EditorCommand {
       },
     };
   }
+}
+
+function getAlignedX(input: { element: DesignElement; mode: AlignMode; pageWidth: number }) {
+  if (input.mode === 'page-left' || input.mode === 'page-left-center') return 0;
+  if (input.mode === 'page-right' || input.mode === 'page-right-center') {
+    return input.pageWidth - input.element.width;
+  }
+  if (
+    input.mode === 'horizontal-center' ||
+    input.mode === 'page-center' ||
+    input.mode === 'page-top-center' ||
+    input.mode === 'page-bottom-center'
+  ) {
+    return (input.pageWidth - input.element.width) / 2;
+  }
+  return input.element.x;
+}
+
+function getAlignedY(input: { element: DesignElement; mode: AlignMode; pageHeight: number }) {
+  if (input.mode === 'page-top' || input.mode === 'page-top-center') return 0;
+  if (input.mode === 'page-bottom' || input.mode === 'page-bottom-center') {
+    return input.pageHeight - input.element.height;
+  }
+  if (
+    input.mode === 'vertical-center' ||
+    input.mode === 'page-center' ||
+    input.mode === 'page-left-center' ||
+    input.mode === 'page-right-center'
+  ) {
+    return (input.pageHeight - input.element.height) / 2;
+  }
+  return input.element.y;
 }
 
 class SetZOrderCommand implements EditorCommand {

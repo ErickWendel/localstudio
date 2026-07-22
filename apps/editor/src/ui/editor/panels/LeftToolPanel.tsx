@@ -33,6 +33,7 @@ import { localMediaImportConfig } from '../media/localMediaImportConfig';
 import { LayersPanel } from './LayersPanel';
 import { TextPanel } from './TextPanel';
 import type { RightPanelTab, TextPreset } from '../state/useEditorViewModel';
+import type { ImageGridRequest, SelectionGridRequest } from '../state/editorViewModelElements';
 import type { StockMediaErrorState } from '../state/use-stock-media-library';
 
 interface LeftToolPanelProps {
@@ -101,6 +102,8 @@ interface LeftToolPanelProps {
   onInsertStockMedia?: ((item: StockMediaItem) => void) | undefined;
   onInsertText?: ((preset: TextPreset) => void) | undefined;
   onInsertShape?: ((shape: ShapeKind) => void) | undefined;
+  onInsertImageGrid?: ((request: ImageGridRequest) => void) | undefined;
+  onApplyGridToSelection?: ((request: SelectionGridRequest) => void) | undefined;
   onSearchStockGifs?: ((query: string) => void) | undefined;
   onSearchStockImages?: ((query: string) => void) | undefined;
   onPreparePromptApi?: (() => Promise<void>) | undefined;
@@ -121,6 +124,7 @@ interface LeftToolPanelProps {
     | ((elementId: string, targetElementId: string, position?: 'before' | 'after') => void)
     | undefined;
   onAlignSelectedElement?: ((mode: AlignMode) => void) | undefined;
+  onEditSelectionGrid?: (() => void) | undefined;
   onSetSelectedElementZOrder?: ((mode: ZOrderMode) => void) | undefined;
   onUpdateElementFrame?: ((elementId: string, patch: ElementFramePatch) => void) | undefined;
   onUpdateElementStyle?: ((elementId: string, patch: ElementStylePatch) => void) | undefined;
@@ -203,6 +207,8 @@ export function LeftToolPanel({
   onInsertStockMedia,
   onInsertText,
   onInsertShape,
+  onInsertImageGrid,
+  onApplyGridToSelection,
   onSearchStockGifs,
   onSearchStockImages,
   onPreparePromptApi,
@@ -221,6 +227,7 @@ export function LeftToolPanel({
   onDeleteElement,
   onReorderElement,
   onAlignSelectedElement,
+  onEditSelectionGrid,
   onSetSelectedElementZOrder,
   onUpdateElementFrame,
   onUpdateElementStyle,
@@ -341,6 +348,8 @@ export function LeftToolPanel({
             {...(onSetElementVisibility ? { onSetElementVisibility } : {})}
             {...(onSetElementLock ? { onSetElementLock } : {})}
             {...(onDeleteElement ? { onDeleteElement } : {})}
+            {...(onApplyGridToSelection ? { onApplyGridToSelection } : {})}
+            {...(onInsertImageGrid ? { onInsertImageGrid } : {})}
             {...(onReorderElement ? { onReorderElement } : {})}
           />
         ) : null}
@@ -355,6 +364,7 @@ export function LeftToolPanel({
             {...(onDownloadFont ? { onDownloadFont } : {})}
             {...(onImportLocalFont ? { onImportLocalFont } : {})}
             {...(onAlignSelectedElement ? { onAlignSelectedElement } : {})}
+            {...(onEditSelectionGrid ? { onEditSelectionGrid } : {})}
             {...(onSetElementLock ? { onSetElementLock } : {})}
             {...(onSetSelectedElementZOrder ? { onSetSelectedElementZOrder } : {})}
             {...(onUpdateElementFrame ? { onUpdateElementFrame } : {})}
