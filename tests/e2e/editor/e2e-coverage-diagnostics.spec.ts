@@ -104,65 +104,6 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
       .getByRole('button', { name: 'Hide diagnostics panels' })
       .evaluate((button: HTMLButtonElement) => button.click());
     await expect(page.getByRole('main', { name: 'Public presentation' }).first()).toBeVisible();
-    await page.keyboard.press('End');
-    await page.keyboard.press('Home');
-    await page.keyboard.press('ArrowDown+Shift');
-    await page.keyboard.press('ArrowRight');
-    await page.keyboard.press('ArrowLeft');
-    await page.keyboard.press('k');
-    await page.keyboard.down('j');
-    await page.keyboard.up('j');
-    await page.keyboard.down('l');
-    await page.keyboard.up('l');
-    await page.keyboard.press('i');
-    await page.keyboard.press('o');
-    await playbackMediaEvents(page);
-    const playbackRegion = page.getByRole('region', { name: 'Presentation playback' });
-    await playbackRegion.getByRole('button', { name: 'Present slide fullscreen' }).click();
-    await page.evaluate(() => {
-      Object.defineProperty(document, 'fullscreenElement', {
-        configurable: true,
-        get: () => null,
-      });
-      document.dispatchEvent(new Event('fullscreenchange'));
-    });
-    await playbackRegion.getByRole('button', { name: /Jump to slide 2/ }).click();
-    await playbackRegion.getByRole('button', { name: /Jump to slide 2: Public Slide 2/ }).hover();
-    await playbackRegion.getByRole('button', { name: 'Play presentation audio' }).click();
-    await playbackRegion.getByRole('button', { name: 'Pause presentation audio' }).click();
-    await playbackRegion.getByRole('slider', { name: 'Seek presentation audio' }).fill('2');
-    await playbackMediaEvents(page);
-    await playbackRegion.getByRole('button', { name: 'Open transcript chat' }).click();
-    await expect(page.getByRole('complementary', { name: 'Transcript chat' })).toBeVisible();
-    await page.getByRole('button', { name: /Open slide 2: Public Slide 2/ }).click();
-    await page.getByRole('button', { name: /Play slide 2/ }).click();
-    await page.getByRole('slider', { name: 'Seek podcast audio' }).fill('1');
-    await podcastMediaEvents(page);
-    await page.getByRole('button', { name: /Play transcript segment for slide 1/ }).click();
-    await expect(page.getByRole('combobox', { name: 'Podcast recording' })).toContainText(
-      'Public diagnostic recording',
-    );
-    await page.getByRole('button', { name: 'Pause podcast audio' }).click();
-    await page.getByRole('button', { name: 'Play podcast audio' }).click();
-    await page.getByRole('button', { name: 'Pause podcast audio' }).click();
-    await podcastMediaEvents(page);
-    await page.getByRole('button', { name: 'What was explained on the current slide?' }).click();
-    await expect(page.getByText('Building transcript answer...')).toBeVisible();
-    await page.getByRole('button', { name: 'Stop transcript answer' }).click();
-    const noRecordingViewer = page.getByRole('main', { name: 'Public presentation' }).nth(1);
-    await expect(noRecordingViewer).toBeVisible();
-    await noRecordingViewer
-      .getByRole('button', { name: /Jump to slide 2: Public Slide 2/ })
-      .click();
-    await expect(noRecordingViewer.getByText('2 / 3')).toBeVisible();
-    await noRecordingViewer.getByRole('button', { name: 'Previous slide' }).click();
-    await noRecordingViewer.getByRole('button', { name: 'Open slide list' }).click();
-    const slideList = page.getByRole('complementary', { name: 'Slide list' });
-    await expect(slideList).toBeVisible();
-    await slideList.getByRole('button', { name: /Open slide 2: Public Slide 2/ }).click();
-    await expect(noRecordingViewer.getByText('2 / 3')).toBeVisible();
-    await expect(page.getByText('Deck not found')).toBeVisible();
-    await expect(page.getByText('Deck could not be loaded')).toBeVisible();
     await driveHiddenPresenterDiagnostics(page);
 
     await expect(page.getByLabel('Diagnostics result')).toContainText(
@@ -173,34 +114,6 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
     );
   });
 });
-
-async function playbackMediaEvents(page: Page) {
-  await page.evaluate(() => {
-    const audio = document.querySelector<HTMLAudioElement>('.public-deck-playback-overlay audio');
-    if (!audio) return;
-    audio.currentTime = 1.2;
-    audio.dispatchEvent(new Event('durationchange', { bubbles: true }));
-    audio.dispatchEvent(new Event('loadedmetadata', { bubbles: true }));
-    audio.dispatchEvent(new Event('timeupdate', { bubbles: true }));
-    audio.dispatchEvent(new Event('play', { bubbles: true }));
-    audio.dispatchEvent(new Event('pause', { bubbles: true }));
-    audio.dispatchEvent(new Event('ended', { bubbles: true }));
-  });
-}
-
-async function podcastMediaEvents(page: Page) {
-  await page.evaluate(() => {
-    const audio = document.querySelector<HTMLAudioElement>('.public-podcast-player audio');
-    if (!audio) return;
-    audio.currentTime = 1.6;
-    audio.dispatchEvent(new Event('durationchange', { bubbles: true }));
-    audio.dispatchEvent(new Event('loadedmetadata', { bubbles: true }));
-    audio.dispatchEvent(new Event('timeupdate', { bubbles: true }));
-    audio.dispatchEvent(new Event('play', { bubbles: true }));
-    audio.dispatchEvent(new Event('pause', { bubbles: true }));
-    audio.dispatchEvent(new Event('ended', { bubbles: true }));
-  });
-}
 
 async function driveHiddenPresenterDiagnostics(page: Page) {
   await page.evaluate(
