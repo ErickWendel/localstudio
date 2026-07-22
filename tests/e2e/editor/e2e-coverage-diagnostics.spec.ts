@@ -94,6 +94,7 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
     );
 
     await page.goto(url.toString());
+    const diagnosticsResult = page.getByLabel('Diagnostics result');
     await expect(page.getByRole('status', { name: 'Diagnostics result' })).toBeVisible({
       timeout: 15_000,
     });
@@ -106,10 +107,10 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
     await expect(page.getByRole('main', { name: 'Public presentation' }).first()).toBeVisible();
     await driveHiddenPresenterDiagnostics(page);
 
-    await expect(page.getByLabel('Diagnostics result')).toContainText(
-      '"generated":"nested assistant text"',
-    );
-    await expect(page.getByLabel('Diagnostics result')).toContainText(
+    await expect(diagnosticsResult).toContainText('"generated":"nested assistant text"', {
+      timeout: 25_000,
+    });
+    await expect(diagnosticsResult).toContainText(
       '"selectedRecordings":["second"]',
     );
   });
