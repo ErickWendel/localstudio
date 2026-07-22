@@ -4,7 +4,9 @@ import type { Page } from '@playwright/test';
 const getServer = withIsolatedDevServer(test);
 
 test.describe('editor bundled runtime diagnostics coverage', () => {
-  test('exercises bundled editor services through an explicit diagnostics route', async ({ page }) => {
+  test('exercises bundled editor services through an explicit diagnostics route', async ({
+    page,
+  }) => {
     const url = new URL('/editor/', getServer().baseURL);
     url.searchParams.set('e2eCoverageDiagnostics', '1');
     url.searchParams.set('importPptxSample', '1');
@@ -95,154 +97,22 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
     await expect(page.getByRole('status', { name: 'Diagnostics result' })).toBeVisible({
       timeout: 15_000,
     });
-	    const remoteMediaPreview = await page.evaluate(async () => {
-	      const diagnosticsWindow = window as Window & {
-	        __LOCALSTUDIO_REMOTE_PREVIEW_THUMBNAIL_DIAGNOSTICS__?: boolean;
-	      };
-	      diagnosticsWindow.__LOCALSTUDIO_REMOTE_PREVIEW_THUMBNAIL_DIAGNOSTICS__ = true;
-	      const originalImage = window.Image;
-	      class DiagnosticImage {
-	        height = 800;
-	        naturalHeight = 800;
-	        naturalWidth = 1600;
-	        onerror: ((event: Event) => void) | null = null;
-	        onload: ((event: Event) => void) | null = null;
-	        width = 1600;
-	        set src(_value: string) {
-	          window.setTimeout(() => this.onload?.(new Event('load')), 0);
-	        }
-	      }
-	      window.Image = DiagnosticImage as unknown as typeof Image;
-	      const { presenterRemoteStateFactory } = (await import(
-	        '/editor/src/services/presenter/presenterRemoteStateFactory.ts'
-	      )) as typeof import('../../../apps/editor/src/services/presenter/presenterRemoteStateFactory');
-	      const longImageDataUrl = `data:image/png;base64,${'a'.repeat(10_050)}`;
-	      const project = {
-	        assets: {
-	          gif: {
-	            id: 'gif',
-	            mimeType: 'image/gif',
-	            name: 'Diagnostic.gif',
-	            objectUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=',
-	            type: 'gif',
-	          },
-	          image: {
-	            id: 'image',
-	            mimeType: 'image/png',
-	            name: 'Diagnostic.png',
-	            objectUrl: longImageDataUrl,
-	            type: 'image',
-	          },
-	          video: {
-	            id: 'video',
-	            mimeType: 'video/mp4',
-	            name: 'Diagnostic.mp4',
-	            objectUrl: 'data:video/mp4;base64,dmlkZW8=',
-	            type: 'video',
-	          },
-	        },
-	        createdAt: '2026-07-22T00:00:00.000Z',
-	        elements: {
-	          gif: {
-	            assetId: 'gif',
-	            height: 90,
-	            id: 'gif',
-	            locked: false,
-	            opacity: 1,
-	            playing: true,
-	            rotation: 0,
-	            type: 'gif',
-	            visible: true,
-	            width: 120,
-	            x: 0,
-	            y: 0,
-	          },
-	          image: {
-	            assetId: 'image',
-	            height: 90,
-	            id: 'image',
-	            locked: false,
-	            opacity: 1,
-	            rotation: 0,
-	            type: 'image',
-	            visible: true,
-	            width: 120,
-	            x: 130,
-	            y: 0,
-	          },
-	          video: {
-	            assetId: 'video',
-	            autoplayInPreview: true,
-	            controls: true,
-	            durationSeconds: 3,
-	            height: 90,
-	            id: 'video',
-	            locked: false,
-	            loop: false,
-	            muted: true,
-	            opacity: 1,
-	            playbackPositionSeconds: 0,
-	            playing: true,
-	            posterFrameSeconds: 1,
-	            repeatMode: 'loop',
-	            rotation: 0,
-	            trimStartSeconds: 1,
-	            type: 'video',
-	            visible: true,
-	            width: 120,
-	            x: 260,
-	            y: 0,
-	          },
-	        },
-	        id: 'remote-media-project',
-	        name: 'Remote media project',
-	        pages: [
-	          {
-	            background: { assetId: 'image', colorFallback: '#000000', type: 'asset' },
-	            elementIds: ['gif', 'image', 'video'],
-	            height: 720,
-	            id: 'slide-1',
-	            name: 'Media',
-	            speakerNotes: '',
-	            width: 1280,
-	          },
-	        ],
-	        updatedAt: '2026-07-22T00:00:00.000Z',
-	      };
-	      try {
-	        const state = await presenterRemoteStateFactory.createRemoteState(
-	          { activePageId: 'slide-1', project } as never,
-	          1,
-	          { elapsedMs: 0, paused: false },
-	        );
-	        return {
-	          elements: state.slidePreview?.elements.map((element) => element.kind),
-	          previewMode: state.previewMode,
-	        };
-	      } finally {
-	        window.Image = originalImage;
-	        delete diagnosticsWindow.__LOCALSTUDIO_REMOTE_PREVIEW_THUMBNAIL_DIAGNOSTICS__;
-	      }
-	    });
-	    expect(remoteMediaPreview).toEqual({
-	      elements: ['media', 'image', 'media'],
-	      previewMode: 'stream',
-	    });
-
-	    await page.getByRole('searchbox', { name: 'Search Google Fonts for replacement' }).fill('rob');
-	    await page.getByRole('button', { name: /Roboto/ }).click();
-	    await page.getByRole('button', { name: 'Replace Fonts' }).click();
-	    await expect(page.getByLabel('Failure view model diagnostics')).toContainText('prompt', {
-	      timeout: 15_000,
-	    });
+    await page.getByRole('searchbox', { name: 'Search Google Fonts for replacement' }).fill('rob');
+    await page.getByRole('button', { name: /Roboto/ }).click();
+    await page.getByRole('button', { name: 'Replace Fonts' }).click();
+    await expect(page.getByLabel('Failure view model diagnostics')).toContainText('prompt', {
+      timeout: 15_000,
+    });
 
     await expect(page.getByLabel('Editor view model diagnostics')).toContainText('pageCount');
     await page.getByRole('button', { name: '2 fonts available' }).click();
     await expect(page.getByRole('option', { name: /Inter/ })).toBeVisible();
-    await page.getByRole('button', { name: 'Resize mirror settings panel' }).dispatchEvent('pointerdown', {
-      clientX: 440,
-      pointerId: 1,
-    });
+    await page
+      .getByRole('button', { name: 'Resize mirror settings panel' })
+      .dispatchEvent('pointerdown', {
+        clientX: 440,
+        pointerId: 1,
+      });
     await page.evaluate(() => {
       window.dispatchEvent(new PointerEvent('pointermove', { clientX: 560, pointerId: 1 }));
       window.dispatchEvent(new PointerEvent('pointerup', { clientX: 560, pointerId: 1 }));
@@ -252,7 +122,9 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
     await expect(page.locator('.mirror-settings-status-error')).toContainText(
       'Use the S3 API endpoint, not the MinIO Console URL.',
     );
-    await page.getByRole('textbox', { name: 'S3 API endpoint' }).fill('https://s3.localstudio.test/');
+    await page
+      .getByRole('textbox', { name: 'S3 API endpoint' })
+      .fill('https://s3.localstudio.test/');
     await page.getByRole('button', { name: 'Test connection' }).click();
     await expect(page.getByText('S3-compatible connection is ready.')).toBeVisible();
     await page.getByRole('button', { name: 'Close mirror settings' }).click();
@@ -353,7 +225,9 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
     await page.getByRole('slider', { name: 'Seek podcast audio' }).fill('1');
     await podcastMediaEvents(page);
     await page.getByRole('button', { name: /Play transcript segment for slide 1/ }).click();
-    await page.getByRole('combobox', { name: 'Podcast recording' }).selectOption('public-recording-2');
+    await page
+      .getByRole('combobox', { name: 'Podcast recording' })
+      .selectOption('public-recording-2');
     await page.getByRole('button', { name: 'Play podcast audio' }).click();
     await page.getByRole('button', { name: 'Pause podcast audio' }).click();
     await podcastMediaEvents(page);
@@ -362,7 +236,9 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
     await page.getByRole('button', { name: 'Stop transcript answer' }).click();
     const noRecordingViewer = page.getByRole('main', { name: 'Public presentation' }).nth(1);
     await expect(noRecordingViewer).toBeVisible();
-    await noRecordingViewer.getByRole('button', { name: /Jump to slide 2: Public Slide 2/ }).click();
+    await noRecordingViewer
+      .getByRole('button', { name: /Jump to slide 2: Public Slide 2/ })
+      .click();
     await expect(noRecordingViewer.getByText('2 / 3')).toBeVisible();
     await noRecordingViewer.getByRole('button', { name: 'Previous slide' }).click();
     await noRecordingViewer.getByRole('button', { name: 'Open slide list' }).click();
@@ -376,13 +252,20 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
     await expect(page.getByLabel('Sequential view model diagnostics')).toContainText('"pages"', {
       timeout: 15_000,
     });
-    await expect(page.getByLabel('Persistence view model diagnostics')).toContainText('savedCalls', {
-      timeout: 15_000,
-    });
+    await expect(page.getByLabel('Persistence view model diagnostics')).toContainText(
+      'savedCalls',
+      {
+        timeout: 15_000,
+      },
+    );
     await expect(page.getByLabel('Editor shell diagnostics')).toContainText('share-present');
 
-    await expect(page.getByLabel('Diagnostics result')).toContainText('"generated":"nested assistant text"');
-    await expect(page.getByLabel('Diagnostics result')).toContainText('"selectedRecordings":["second"]');
+    await expect(page.getByLabel('Diagnostics result')).toContainText(
+      '"generated":"nested assistant text"',
+    );
+    await expect(page.getByLabel('Diagnostics result')).toContainText(
+      '"selectedRecordings":["second"]',
+    );
   });
 });
 
@@ -415,213 +298,229 @@ async function podcastMediaEvents(page: Page) {
 }
 
 async function driveHiddenPresenterDiagnostics(page: Page) {
-  await page.evaluate(async () => {
-    const nextFrame = () => new Promise((resolve) => window.setTimeout(resolve, 0));
-    const project = {
-      assets: {
-        'presenter-video-asset': {
-          id: 'presenter-video-asset',
-          mimeType: 'video/mp4',
-          name: 'Presenter video',
-          objectUrl: 'blob:presenter-video',
-          type: 'video',
-        },
-      },
-      createdAt: '2026-07-20T00:00:00.000Z',
-      elements: {
-        'presenter-text': {
-          align: 'left',
-          fill: '#FFFFFF',
-          fontFamily: 'Inter',
-          fontSize: 42,
-          fontWeight: 700,
-          height: 120,
-          id: 'presenter-text',
-          opacity: 1,
-          rotation: 0,
-          text: 'Presenter diagnostics',
-          type: 'text',
-          visible: true,
-          width: 620,
-          x: 120,
-          y: 140,
-        },
-        'presenter-video': {
-          assetId: 'presenter-video-asset',
-          autoplayInPreview: true,
-          controls: true,
-          durationSeconds: 20,
-          height: 240,
-          id: 'presenter-video',
-          locked: false,
-          loop: false,
-          muted: true,
-          opacity: 1,
-          playAcrossSlides: false,
-          playbackPositionSeconds: 0,
-          playing: true,
-          repeatMode: 'none',
-          rotation: 0,
-          startOnClick: true,
-          trimEndSeconds: 18,
-          trimStartSeconds: 1,
-          type: 'video',
-          visible: true,
-          volume: 0.5,
-          width: 420,
-          x: 760,
-          y: 260,
-        },
-      },
-      fonts: {},
-      id: 'presenter-diagnostics-project',
-      name: 'Presenter Diagnostics',
-      pages: [
-        {
-          animationBuilds: [
-            {
-              delayMs: 0,
-              durationMs: 0,
-              effect: 'reveal',
-              elementId: 'presenter-video',
-              id: 'presenter-video-build',
-              mediaAction: 'play',
-              trigger: 'on-click',
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        void (async () => {
+          const nextFrame = () => new Promise((resolve) => window.setTimeout(resolve, 0));
+          const project = {
+            assets: {
+              'presenter-video-asset': {
+                id: 'presenter-video-asset',
+                mimeType: 'video/mp4',
+                name: 'Presenter video',
+                objectUrl: 'blob:presenter-video',
+                type: 'video',
+              },
             },
-          ],
-          background: { color: '#111827', type: 'color' },
-          elementIds: ['presenter-text', 'presenter-video'],
-          height: 1080,
-          id: 'presenter-page-1',
-          name: 'Presenter Slide 1',
-          speakerNotes: 'Presenter diagnostics notes',
-          visible: true,
-          width: 1920,
-        },
-        {
-          background: { color: '#0f172a', type: 'color' },
-          elementIds: ['presenter-text'],
-          height: 1080,
-          id: 'presenter-page-2',
-          name: 'Presenter Slide 2',
-          speakerNotes: 'Second presenter diagnostics notes',
-          visible: true,
-          width: 1920,
-        },
-      ],
-      updatedAt: '2026-07-20T00:00:00.000Z',
-    };
-    window.postMessage(
-      {
-        payload: {
-          activePageId: 'presenter-page-1',
-          animationPreview: {
-            activeBuildIndex: 0,
-            activePageId: 'presenter-page-1',
-            mode: 'presenter',
-            playing: true,
-            revealedBuildIds: [],
-          },
-          project,
-          promptModel: {
-            options: [
+            createdAt: '2026-07-20T00:00:00.000Z',
+            elements: {
+              'presenter-text': {
+                align: 'left',
+                fill: '#FFFFFF',
+                fontFamily: 'Inter',
+                fontSize: 42,
+                fontWeight: 700,
+                height: 120,
+                id: 'presenter-text',
+                opacity: 1,
+                rotation: 0,
+                text: 'Presenter diagnostics',
+                type: 'text',
+                visible: true,
+                width: 620,
+                x: 120,
+                y: 140,
+              },
+              'presenter-video': {
+                assetId: 'presenter-video-asset',
+                autoplayInPreview: true,
+                controls: true,
+                durationSeconds: 20,
+                height: 240,
+                id: 'presenter-video',
+                locked: false,
+                loop: false,
+                muted: true,
+                opacity: 1,
+                playAcrossSlides: false,
+                playbackPositionSeconds: 0,
+                playing: true,
+                repeatMode: 'none',
+                rotation: 0,
+                startOnClick: true,
+                trimEndSeconds: 18,
+                trimStartSeconds: 1,
+                type: 'video',
+                visible: true,
+                volume: 0.5,
+                width: 420,
+                x: 760,
+                y: 260,
+              },
+            },
+            fonts: {},
+            id: 'presenter-diagnostics-project',
+            name: 'Presenter Diagnostics',
+            pages: [
               {
-                compatibility: 'compatible',
-                id: 'diagnostic-prompt',
-                label: 'Diagnostic prompt',
-                modelId: 'diagnostic-model',
-                readiness: 'ready',
-                selected: true,
+                animationBuilds: [
+                  {
+                    delayMs: 0,
+                    durationMs: 0,
+                    effect: 'reveal',
+                    elementId: 'presenter-video',
+                    id: 'presenter-video-build',
+                    mediaAction: 'play',
+                    trigger: 'on-click',
+                  },
+                ],
+                background: { color: '#111827', type: 'color' },
+                elementIds: ['presenter-text', 'presenter-video'],
+                height: 1080,
+                id: 'presenter-page-1',
+                name: 'Presenter Slide 1',
+                speakerNotes: 'Presenter diagnostics notes',
+                visible: true,
+                width: 1920,
+              },
+              {
+                background: { color: '#0f172a', type: 'color' },
+                elementIds: ['presenter-text'],
+                height: 1080,
+                id: 'presenter-page-2',
+                name: 'Presenter Slide 2',
+                speakerNotes: 'Second presenter diagnostics notes',
+                visible: true,
+                width: 1920,
               },
             ],
-            preparation: {
-              availability: 'ready',
-              progress: 100,
-              status: 'ready',
+            updatedAt: '2026-07-20T00:00:00.000Z',
+          };
+          window.postMessage(
+            {
+              payload: {
+                activePageId: 'presenter-page-1',
+                animationPreview: {
+                  activeBuildIndex: 0,
+                  activePageId: 'presenter-page-1',
+                  mode: 'presenter',
+                  playing: true,
+                  revealedBuildIds: [],
+                },
+                project,
+                promptModel: {
+                  options: [
+                    {
+                      compatibility: 'compatible',
+                      id: 'diagnostic-prompt',
+                      label: 'Diagnostic prompt',
+                      modelId: 'diagnostic-model',
+                      readiness: 'ready',
+                      selected: true,
+                    },
+                  ],
+                  preparation: {
+                    availability: 'ready',
+                    progress: 100,
+                    status: 'ready',
+                  },
+                },
+                presenterMode: 'presenting',
+                remoteSession: {
+                  code: 'DIAG-1234',
+                  connectedControllerCount: 1,
+                  controlPeerId: 'diagnostic-peer',
+                  expiresAt: '2026-07-20T01:00:00.000Z',
+                  presenterDeviceId: 'diagnostic-device',
+                  presenterLabel: 'Diagnostics',
+                  qrUrl: 'https://remote.localstudio.test/?code=DIAG-1234',
+                  sessionId: 'diagnostic-presenter',
+                  transport: 'peerjs',
+                },
+                streamPeerId: 'stream-peer-1',
+                transcriptionLanguage: { code: 'en-US', label: 'English' },
+              },
+              sessionId: 'diagnostic-presenter',
+              source: 'localstudio-presenter-main',
+              type: 'state',
             },
-          },
-          presenterMode: 'presenting',
-          remoteSession: {
-            code: 'DIAG-1234',
-            connectedControllerCount: 1,
-            controlPeerId: 'diagnostic-peer',
-            expiresAt: '2026-07-20T01:00:00.000Z',
-            presenterDeviceId: 'diagnostic-device',
-            presenterLabel: 'Diagnostics',
-            qrUrl: 'https://remote.localstudio.test/?code=DIAG-1234',
-            sessionId: 'diagnostic-presenter',
-            transport: 'peerjs',
-          },
-          streamPeerId: 'stream-peer-1',
-          transcriptionLanguage: { code: 'en-US', label: 'English' },
-        },
-        sessionId: 'diagnostic-presenter',
-        source: 'localstudio-presenter-main',
-        type: 'state',
-      },
-      window.location.origin,
-    );
-    await nextFrame();
-    const root = document.querySelector('.e2e-hidden-presenter-view');
-    const click = (label: string) =>
-      root?.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)?.click();
-    const keyDown = (key: string, init: KeyboardEventInit = {}) => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key, ...init }));
-    };
-    const keyUp = (key: string) => {
-      window.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, cancelable: true, key }));
-    };
-    click('Show keyboard shortcuts');
-    await nextFrame();
-    keyDown('Escape');
-    click('Show remote control QR code');
-    click('Previous slide');
-    click('Pause timer');
-    click('Reset timer');
-    click('Next slide');
-    click('Increase notes size');
-    click('Decrease notes size');
-    const resizeHandle = root?.querySelector<HTMLElement>('[aria-label="Resize presenter notes"]');
-    for (const key of ['ArrowLeft', 'ArrowRight', 'Home', 'End']) {
-      resizeHandle?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key }));
-    }
-    keyDown('?');
-    await nextFrame();
-    keyDown('Escape');
-    keyDown('#');
-    await nextFrame();
-    keyDown('+');
-    keyDown('-');
-    keyDown('Enter');
-    keyDown('Home');
-    keyDown('End');
-    keyDown('ArrowDown', { shiftKey: true });
-    keyDown('ArrowRight');
-    keyDown('[');
-    keyDown('ArrowLeft');
-    keyDown('r');
-    keyDown('u');
-    keyDown('d');
-    keyDown('=', { metaKey: true });
-    keyDown('-', { metaKey: true });
-    keyDown('k');
-    keyDown('j');
-    keyUp('j');
-    keyDown('l');
-    keyUp('l');
-    keyDown('i');
-    keyDown('o');
-    for (const command of ['pause-timer', 'resume-timer', 'reset-timer']) {
-      window.postMessage(
-        {
-          command,
-          sessionId: 'diagnostic-presenter',
-          source: 'localstudio-presenter-main',
-          type: 'command',
-        },
-        window.location.origin,
-      );
-    }
-    await nextFrame();
-  });
+            window.location.origin,
+          );
+          await nextFrame();
+          const root = document.querySelector('.e2e-hidden-presenter-view');
+          const click = (label: string) =>
+            root?.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)?.click();
+          const keyDown = (key: string, init: KeyboardEventInit = {}) => {
+            window.dispatchEvent(
+              new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key, ...init }),
+            );
+          };
+          const keyUp = (key: string) => {
+            window.dispatchEvent(
+              new KeyboardEvent('keyup', { bubbles: true, cancelable: true, key }),
+            );
+          };
+          click('Show keyboard shortcuts');
+          await nextFrame();
+          keyDown('Escape');
+          click('Show remote control QR code');
+          click('Previous slide');
+          click('Pause timer');
+          click('Reset timer');
+          click('Next slide');
+          click('Increase notes size');
+          click('Decrease notes size');
+          const resizeHandle = root?.querySelector<HTMLElement>(
+            '[aria-label="Resize presenter notes"]',
+          );
+          for (const key of ['ArrowLeft', 'ArrowRight', 'Home', 'End']) {
+            resizeHandle?.dispatchEvent(
+              new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key }),
+            );
+          }
+          keyDown('?');
+          await nextFrame();
+          keyDown('Escape');
+          keyDown('#');
+          await nextFrame();
+          keyDown('+');
+          keyDown('-');
+          keyDown('Enter');
+          keyDown('Home');
+          keyDown('End');
+          keyDown('ArrowDown', { shiftKey: true });
+          keyDown('ArrowRight');
+          keyDown('[');
+          keyDown('ArrowLeft');
+          keyDown('r');
+          keyDown('u');
+          keyDown('d');
+          keyDown('=', { metaKey: true });
+          keyDown('-', { metaKey: true });
+          keyDown('k');
+          keyDown('j');
+          keyUp('j');
+          keyDown('l');
+          keyUp('l');
+          keyDown('i');
+          keyDown('o');
+          for (const command of ['pause-timer', 'resume-timer', 'reset-timer']) {
+            window.postMessage(
+              {
+                command,
+                sessionId: 'diagnostic-presenter',
+                source: 'localstudio-presenter-main',
+                type: 'command',
+              },
+              window.location.origin,
+            );
+          }
+          await nextFrame();
+          resolve();
+        })().catch((error: unknown) =>
+          reject(error instanceof Error ? error : new Error(String(error))),
+        );
+      }),
+  );
 }
