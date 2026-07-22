@@ -337,7 +337,11 @@ function createSlidePreviewElement(
 
 async function createPreviewAssetUrl(assetUrl: string | undefined) {
   if (!assetUrl) return undefined;
-  if (isTestRuntime() && (assetUrl.startsWith('blob:') || assetUrl.startsWith('data:'))) {
+  if (
+    isTestRuntime() &&
+    !isRemotePreviewThumbnailDiagnosticsEnabled() &&
+    (assetUrl.startsWith('blob:') || assetUrl.startsWith('data:'))
+  ) {
     return undefined;
   }
   if (assetUrl.startsWith('data:image/')) {
@@ -358,7 +362,11 @@ async function createPreviewMediaAssetUrl(
 ) {
   if (!assetUrl) return undefined;
   if (mediaType === 'gif') return createPreviewAssetUrl(assetUrl);
-  if (isTestRuntime() && /^https?:\/\//.test(assetUrl)) {
+  if (
+    isTestRuntime() &&
+    !isRemotePreviewThumbnailDiagnosticsEnabled() &&
+    /^https?:\/\//.test(assetUrl)
+  ) {
     return undefined;
   }
   if (assetUrl.startsWith('data:image/')) return createPreviewAssetUrl(assetUrl);
@@ -515,6 +523,14 @@ function getJsonByteLength(value: unknown) {
 
 function isTestRuntime() {
   return import.meta.env.MODE === 'test';
+}
+
+function isRemotePreviewThumbnailDiagnosticsEnabled() {
+  return (
+    typeof window !== 'undefined' &&
+    (window as Window & { __LOCALSTUDIO_REMOTE_PREVIEW_THUMBNAIL_DIAGNOSTICS__?: boolean })
+      .__LOCALSTUDIO_REMOTE_PREVIEW_THUMBNAIL_DIAGNOSTICS__ === true
+  );
 }
 
 export const presenterRemoteStateFactory = {

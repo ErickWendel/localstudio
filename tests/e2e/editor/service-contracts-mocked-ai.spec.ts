@@ -12,6 +12,9 @@ test('executes mocked AI service contracts in the browser runtime', async ({ pag
   expect(result).toMatchObject({
     detectedSpanish: 'es',
     eraserMaskId: 'asset-1-mask',
+    gemmaGeneratedText: 'gemma text response',
+    gemmaRepairCalls: 3,
+    gemmaTaskCount: 2,
     maskScore: 0.9,
     paletteName: 'Brand',
     removedAssetId: 'asset-generated-neon-launch-card-transparent',

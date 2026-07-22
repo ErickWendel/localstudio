@@ -158,6 +158,87 @@ test.describe('editor public transcript chat journey', () => {
     });
   });
 
+  test('opens presentation AI from an embedded deck', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(window, 'LanguageModel', {
+        configurable: true,
+        value: {
+          availability: () => Promise.resolve('available'),
+          create: () =>
+            Promise.resolve({
+              destroy() {},
+              prompt: () => Promise.resolve('No transcript text is available.'),
+            }),
+        },
+      });
+      class EmptyWorker {
+        onmessage: ((event: MessageEvent) => void) | null = null;
+
+        postMessage(message: { id?: string }) {
+          window.setTimeout(() => {
+            this.onmessage?.(
+              new MessageEvent('message', {
+                data: { embeddings: [], id: message.id ?? 'missing-id', type: 'result' },
+              }),
+            );
+          }, 5);
+        }
+
+        terminate() {
+          this.onmessage = null;
+        }
+      }
+
+      Object.defineProperty(window, 'Worker', {
+        configurable: true,
+        value: EmptyWorker,
+      });
+    });
+
+    const payload = createSharePayload();
+    payload.project.recordings = {
+      'empty-text-recording': {
+        id: 'empty-text-recording',
+        name: 'Empty transcript recording',
+        createdAt: payload.createdAt,
+        updatedAt: payload.updatedAt,
+        durationMs: 1_000,
+        language: 'en',
+        modelPresetId: 'web-speech-api',
+        audio: {
+          mimeType: 'audio/webm;codecs=opus',
+          objectUrl: 'https://cdn.localstudio.test/recordings/empty-text-recording.webm',
+          storage: 'remote',
+        },
+        segments: [
+          {
+            id: 'embed-segment',
+            text: 'Embedded viewers can ask presentation AI about the transcript.',
+            startMs: 0,
+            endMs: 1_000,
+            final: true,
+          },
+        ],
+      },
+    };
+
+    await page.route('**/share-empty-text.json', async (route) => {
+      await route.fulfill({ contentType: 'application/json', json: payload });
+    });
+
+    const publicDeck = new PublicDeckPage(page, getServer().baseURL);
+    const shareSrc = encodeURIComponent('http://localhost/share-empty-text.json');
+    await publicDeck.goto(`/editor/?embed=e2e-share&src=${shareSrc}`);
+    await publicDeck.expectReady(true);
+
+    await page.getByRole('button', { name: 'Open presentation AI' }).click();
+    await expect(page.getByRole('complementary', { name: 'Transcript chat' })).toBeVisible();
+    await page.getByRole('button', { name: 'Close transcript chat' }).click();
+    await expect(page.getByRole('complementary', { name: 'Transcript chat' })).toBeHidden();
+  });
+
   test('answers public transcript questions with browser embeddings and cited timestamps', async ({
     page,
   }) => {
@@ -305,6 +386,10 @@ test.describe('editor public transcript chat journey', () => {
       'Chrome Built-in Prompt API',
       'Gemma 4 E2B',
     ]);
+    await transcriptModelSelect.selectOption('gemma-4-webgpu');
+    await expect(transcriptModelSelect).toHaveValue('gemma-4-webgpu');
+    await transcriptModelSelect.selectOption('chrome-prompt-api');
+    await expect(transcriptModelSelect).toHaveValue('chrome-prompt-api');
     const podcastPlayer = page.getByRole('region', { name: 'Podcast playback' });
     await expect(podcastPlayer).toBeVisible();
     await expect(

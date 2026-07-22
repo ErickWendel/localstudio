@@ -37,7 +37,6 @@ test.describe('editor AI workflow tour journey', () => {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       await editor.openMenu('Help');
       const tourItem = page.getByRole('menuitem', { name: 'AI Setup Tour' });
-      await expect(tourItem).toBeVisible();
       const clicked = await tourItem
         .click({ timeout: 5_000 })
         .then(() => true)

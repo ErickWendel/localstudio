@@ -27,6 +27,19 @@ const coverageRuns = {
     warm: warmEditor,
     threshold: 80,
   },
+  'editor-full': {
+    coverageScope: 'editor',
+    dirs: ['tests/e2e/editor'],
+    needsPeerServer: false,
+    outputName: 'editor-full',
+    split: {
+      grep: 'exports readable final slide states from the local PPTX sample when animation images are disabled',
+      outputName: 'sample-pptx-export',
+      spec: 'tests/e2e/editor/export-current-page-image.spec.ts',
+    },
+    warm: warmEditor,
+    threshold: 100,
+  },
   joystick: {
     coverageScope: 'joystick',
     dirs: ['tests/e2e/joystick'],

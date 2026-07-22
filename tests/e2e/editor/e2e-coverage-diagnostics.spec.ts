@@ -1,4 +1,5 @@
 import { expect, test, withIsolatedDevServer } from '../support/journey-test';
+import type { Page } from '@playwright/test';
 
 const getServer = withIsolatedDevServer(test);
 
@@ -6,17 +7,252 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
   test('exercises bundled editor services through an explicit diagnostics route', async ({ page }) => {
     const url = new URL('/editor/', getServer().baseURL);
     url.searchParams.set('e2eCoverageDiagnostics', '1');
+    url.searchParams.set('importPptxSample', '1');
+
+    await page.addInitScript(() => {
+      class DiagnosticImage extends EventTarget {
+        height = 480;
+        naturalHeight = 480;
+        naturalWidth = 640;
+        width = 640;
+        onload: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+
+        set src(_value: string) {
+          window.setTimeout(() => {
+            this.dispatchEvent(new Event('load'));
+            this.onload?.();
+          }, 0);
+        }
+      }
+
+      Object.defineProperty(window, 'Image', {
+        configurable: true,
+        value: DiagnosticImage,
+      });
+      Object.defineProperty(HTMLMediaElement.prototype, 'duration', {
+        configurable: true,
+        get() {
+          return 3;
+        },
+      });
+      Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', {
+        configurable: true,
+        get() {
+          return 720;
+        },
+      });
+      Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', {
+        configurable: true,
+        get() {
+          return 1280;
+        },
+      });
+      const sourceDescriptor = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'src');
+      if (sourceDescriptor?.set && sourceDescriptor.get) {
+        Object.defineProperty(HTMLMediaElement.prototype, 'src', {
+          configurable: true,
+          get() {
+            return sourceDescriptor.get?.call(this) as string;
+          },
+          set(value: string) {
+            const mediaElement = this as HTMLMediaElement;
+            sourceDescriptor.set?.call(mediaElement, value);
+            window.setTimeout(() => {
+              mediaElement.dispatchEvent(new Event('loadedmetadata', { bubbles: true }));
+            }, 0);
+          },
+        });
+      }
+      HTMLMediaElement.prototype.load = function load() {
+        this.dispatchEvent(new Event('loadedmetadata', { bubbles: true }));
+      };
+      HTMLMediaElement.prototype.play = function play() {
+        this.dispatchEvent(new Event('play', { bubbles: true }));
+        return Promise.resolve();
+      };
+      HTMLMediaElement.prototype.pause = function pause() {
+        this.dispatchEvent(new Event('pause', { bubbles: true }));
+      };
+      HTMLElement.prototype.requestFullscreen = function requestFullscreen() {
+        Object.defineProperty(document, 'fullscreenElement', {
+          configurable: true,
+          get: () => this,
+        });
+        document.dispatchEvent(new Event('fullscreenchange'));
+        return Promise.resolve();
+      };
+    });
+
+    await page.route('**/__localstudio/pptx-sample/file', (route) =>
+      route.fulfill({
+        body: 'sample unavailable',
+        status: 500,
+      }),
+    );
 
     await page.goto(url.toString());
-    await expect(page.getByRole('main', { name: 'E2E coverage diagnostics' })).toBeVisible();
+    await expect(page.getByRole('status', { name: 'Diagnostics result' })).toBeVisible({
+      timeout: 15_000,
+    });
+	    const remoteMediaPreview = await page.evaluate(async () => {
+	      const diagnosticsWindow = window as Window & {
+	        __LOCALSTUDIO_REMOTE_PREVIEW_THUMBNAIL_DIAGNOSTICS__?: boolean;
+	      };
+	      diagnosticsWindow.__LOCALSTUDIO_REMOTE_PREVIEW_THUMBNAIL_DIAGNOSTICS__ = true;
+	      const originalImage = window.Image;
+	      class DiagnosticImage {
+	        height = 800;
+	        naturalHeight = 800;
+	        naturalWidth = 1600;
+	        onerror: ((event: Event) => void) | null = null;
+	        onload: ((event: Event) => void) | null = null;
+	        width = 1600;
+	        set src(_value: string) {
+	          window.setTimeout(() => this.onload?.(new Event('load')), 0);
+	        }
+	      }
+	      window.Image = DiagnosticImage as unknown as typeof Image;
+	      const { presenterRemoteStateFactory } = (await import(
+	        '/editor/src/services/presenter/presenterRemoteStateFactory.ts'
+	      )) as typeof import('../../../apps/editor/src/services/presenter/presenterRemoteStateFactory');
+	      const longImageDataUrl = `data:image/png;base64,${'a'.repeat(10_050)}`;
+	      const project = {
+	        assets: {
+	          gif: {
+	            id: 'gif',
+	            mimeType: 'image/gif',
+	            name: 'Diagnostic.gif',
+	            objectUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=',
+	            type: 'gif',
+	          },
+	          image: {
+	            id: 'image',
+	            mimeType: 'image/png',
+	            name: 'Diagnostic.png',
+	            objectUrl: longImageDataUrl,
+	            type: 'image',
+	          },
+	          video: {
+	            id: 'video',
+	            mimeType: 'video/mp4',
+	            name: 'Diagnostic.mp4',
+	            objectUrl: 'data:video/mp4;base64,dmlkZW8=',
+	            type: 'video',
+	          },
+	        },
+	        createdAt: '2026-07-22T00:00:00.000Z',
+	        elements: {
+	          gif: {
+	            assetId: 'gif',
+	            height: 90,
+	            id: 'gif',
+	            locked: false,
+	            opacity: 1,
+	            playing: true,
+	            rotation: 0,
+	            type: 'gif',
+	            visible: true,
+	            width: 120,
+	            x: 0,
+	            y: 0,
+	          },
+	          image: {
+	            assetId: 'image',
+	            height: 90,
+	            id: 'image',
+	            locked: false,
+	            opacity: 1,
+	            rotation: 0,
+	            type: 'image',
+	            visible: true,
+	            width: 120,
+	            x: 130,
+	            y: 0,
+	          },
+	          video: {
+	            assetId: 'video',
+	            autoplayInPreview: true,
+	            controls: true,
+	            durationSeconds: 3,
+	            height: 90,
+	            id: 'video',
+	            locked: false,
+	            loop: false,
+	            muted: true,
+	            opacity: 1,
+	            playbackPositionSeconds: 0,
+	            playing: true,
+	            posterFrameSeconds: 1,
+	            repeatMode: 'loop',
+	            rotation: 0,
+	            trimStartSeconds: 1,
+	            type: 'video',
+	            visible: true,
+	            width: 120,
+	            x: 260,
+	            y: 0,
+	          },
+	        },
+	        id: 'remote-media-project',
+	        name: 'Remote media project',
+	        pages: [
+	          {
+	            background: { assetId: 'image', colorFallback: '#000000', type: 'asset' },
+	            elementIds: ['gif', 'image', 'video'],
+	            height: 720,
+	            id: 'slide-1',
+	            name: 'Media',
+	            speakerNotes: '',
+	            width: 1280,
+	          },
+	        ],
+	        updatedAt: '2026-07-22T00:00:00.000Z',
+	      };
+	      try {
+	        const state = await presenterRemoteStateFactory.createRemoteState(
+	          { activePageId: 'slide-1', project } as never,
+	          1,
+	          { elapsedMs: 0, paused: false },
+	        );
+	        return {
+	          elements: state.slidePreview?.elements.map((element) => element.kind),
+	          previewMode: state.previewMode,
+	        };
+	      } finally {
+	        window.Image = originalImage;
+	        delete diagnosticsWindow.__LOCALSTUDIO_REMOTE_PREVIEW_THUMBNAIL_DIAGNOSTICS__;
+	      }
+	    });
+	    expect(remoteMediaPreview).toEqual({
+	      elements: ['media', 'image', 'media'],
+	      previewMode: 'stream',
+	    });
 
-    await page.getByRole('searchbox', { name: 'Search Google Fonts for replacement' }).fill('rob');
-    await page.getByRole('button', { name: /Roboto/ }).click();
-    await page.getByRole('button', { name: 'Replace Fonts' }).click();
+	    await page.getByRole('searchbox', { name: 'Search Google Fonts for replacement' }).fill('rob');
+	    await page.getByRole('button', { name: /Roboto/ }).click();
+	    await page.getByRole('button', { name: 'Replace Fonts' }).click();
+	    await expect(page.getByLabel('Failure view model diagnostics')).toContainText('prompt', {
+	      timeout: 15_000,
+	    });
 
     await expect(page.getByLabel('Editor view model diagnostics')).toContainText('pageCount');
     await page.getByRole('button', { name: '2 fonts available' }).click();
     await expect(page.getByRole('option', { name: /Inter/ })).toBeVisible();
+    await page.getByRole('button', { name: 'Resize mirror settings panel' }).dispatchEvent('pointerdown', {
+      clientX: 440,
+      pointerId: 1,
+    });
+    await page.evaluate(() => {
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 560, pointerId: 1 }));
+      window.dispatchEvent(new PointerEvent('pointerup', { clientX: 560, pointerId: 1 }));
+    });
+    await page.getByRole('textbox', { name: 'S3 API endpoint' }).fill('http://localhost:9001/');
+    await page.getByRole('button', { name: 'Test connection' }).click();
+    await expect(page.locator('.mirror-settings-status-error')).toContainText(
+      'Use the S3 API endpoint, not the MinIO Console URL.',
+    );
+    await page.getByRole('textbox', { name: 'S3 API endpoint' }).fill('https://s3.localstudio.test/');
     await page.getByRole('button', { name: 'Test connection' }).click();
     await expect(page.getByText('S3-compatible connection is ready.')).toBeVisible();
     await page.getByRole('button', { name: 'Close mirror settings' }).click();
@@ -65,16 +301,62 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
       .getByRole('button', { name: 'Hide diagnostics panels' })
       .evaluate((button: HTMLButtonElement) => button.click());
     await expect(page.getByRole('main', { name: 'Public presentation' }).first()).toBeVisible();
+    await page.keyboard.press('?');
+    await expect(page.getByRole('dialog', { name: 'Keyboard Shortcuts' }).first()).toBeVisible();
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('End');
+    await page.keyboard.press('Home');
+    await page.keyboard.press('ArrowDown+Shift');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('k');
+    await page.keyboard.down('j');
+    await page.keyboard.up('j');
+    await page.keyboard.down('l');
+    await page.keyboard.up('l');
+    await page.keyboard.press('i');
+    await page.keyboard.press('o');
+    await playbackMediaEvents(page);
     await page.getByRole('button', { name: 'Show captions' }).click();
     const playbackRegion = page.getByRole('region', { name: 'Presentation playback' });
+    await playbackRegion.getByRole('button', { name: 'Show keyboard shortcuts' }).click();
+    const shortcutDialog = page.getByRole('dialog', { name: 'Keyboard Shortcuts' }).first();
+    await expect(shortcutDialog).toBeVisible();
+    await shortcutDialog.getByRole('button', { name: /Go back to previous slide/ }).click();
+    await shortcutDialog.getByRole('button', { name: /Advance to next slide/ }).click();
+    await shortcutDialog.getByRole('button', { name: /Go to first slide/ }).click();
+    await shortcutDialog.getByRole('button', { name: /Go to last slide/ }).click();
+    await shortcutDialog.getByRole('button', { name: /Pause\/Play movie/ }).click();
+    await shortcutDialog.getByRole('button', { name: /Hold to rewind movie/ }).click();
+    await shortcutDialog.getByRole('button', { name: /Hold to fast forward movie/ }).click();
+    await shortcutDialog.getByRole('button', { name: /Jump to beginning of movie/ }).click();
+    await shortcutDialog.getByRole('button', { name: /Jump to end of movie/ }).click();
+    await shortcutDialog.getByRole('button', { name: 'Close keyboard shortcuts' }).click();
+    await playbackRegion.getByRole('button', { name: 'Present slide fullscreen' }).click();
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'fullscreenElement', {
+        configurable: true,
+        get: () => null,
+      });
+      document.dispatchEvent(new Event('fullscreenchange'));
+    });
     await playbackRegion.getByRole('button', { name: /Jump to slide 2/ }).click();
     await playbackRegion.getByRole('button', { name: /Jump to slide 2: Public Slide 2/ }).hover();
+    await playbackRegion.getByRole('button', { name: 'Play presentation audio' }).click();
+    await playbackRegion.getByRole('button', { name: 'Pause presentation audio' }).click();
+    await playbackRegion.getByRole('slider', { name: 'Seek presentation audio' }).fill('2');
+    await playbackMediaEvents(page);
     await playbackRegion.getByRole('button', { name: 'Open transcript chat' }).click();
     await expect(page.getByRole('complementary', { name: 'Transcript chat' })).toBeVisible();
     await page.getByRole('button', { name: /Open slide 2: Public Slide 2/ }).click();
     await page.getByRole('button', { name: /Play slide 2/ }).click();
     await page.getByRole('slider', { name: 'Seek podcast audio' }).fill('1');
+    await podcastMediaEvents(page);
     await page.getByRole('button', { name: /Play transcript segment for slide 1/ }).click();
+    await page.getByRole('combobox', { name: 'Podcast recording' }).selectOption('public-recording-2');
+    await page.getByRole('button', { name: 'Play podcast audio' }).click();
+    await page.getByRole('button', { name: 'Pause podcast audio' }).click();
+    await podcastMediaEvents(page);
     await page.getByRole('button', { name: 'What was explained on the current slide?' }).click();
     await expect(page.getByText('Building transcript answer...')).toBeVisible();
     await page.getByRole('button', { name: 'Stop transcript answer' }).click();
@@ -90,6 +372,7 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
     await expect(noRecordingViewer.getByText('2 / 3')).toBeVisible();
     await expect(page.getByText('Deck not found')).toBeVisible();
     await expect(page.getByText('Deck could not be loaded')).toBeVisible();
+    await driveHiddenPresenterDiagnostics(page);
     await expect(page.getByLabel('Sequential view model diagnostics')).toContainText('"pages"', {
       timeout: 15_000,
     });
@@ -102,3 +385,243 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
     await expect(page.getByLabel('Diagnostics result')).toContainText('"selectedRecordings":["second"]');
   });
 });
+
+async function playbackMediaEvents(page: Page) {
+  await page.evaluate(() => {
+    const audio = document.querySelector<HTMLAudioElement>('.public-deck-playback-overlay audio');
+    if (!audio) return;
+    audio.currentTime = 1.2;
+    audio.dispatchEvent(new Event('durationchange', { bubbles: true }));
+    audio.dispatchEvent(new Event('loadedmetadata', { bubbles: true }));
+    audio.dispatchEvent(new Event('timeupdate', { bubbles: true }));
+    audio.dispatchEvent(new Event('play', { bubbles: true }));
+    audio.dispatchEvent(new Event('pause', { bubbles: true }));
+    audio.dispatchEvent(new Event('ended', { bubbles: true }));
+  });
+}
+
+async function podcastMediaEvents(page: Page) {
+  await page.evaluate(() => {
+    const audio = document.querySelector<HTMLAudioElement>('.public-podcast-player audio');
+    if (!audio) return;
+    audio.currentTime = 1.6;
+    audio.dispatchEvent(new Event('durationchange', { bubbles: true }));
+    audio.dispatchEvent(new Event('loadedmetadata', { bubbles: true }));
+    audio.dispatchEvent(new Event('timeupdate', { bubbles: true }));
+    audio.dispatchEvent(new Event('play', { bubbles: true }));
+    audio.dispatchEvent(new Event('pause', { bubbles: true }));
+    audio.dispatchEvent(new Event('ended', { bubbles: true }));
+  });
+}
+
+async function driveHiddenPresenterDiagnostics(page: Page) {
+  await page.evaluate(async () => {
+    const nextFrame = () => new Promise((resolve) => window.setTimeout(resolve, 0));
+    const project = {
+      assets: {
+        'presenter-video-asset': {
+          id: 'presenter-video-asset',
+          mimeType: 'video/mp4',
+          name: 'Presenter video',
+          objectUrl: 'blob:presenter-video',
+          type: 'video',
+        },
+      },
+      createdAt: '2026-07-20T00:00:00.000Z',
+      elements: {
+        'presenter-text': {
+          align: 'left',
+          fill: '#FFFFFF',
+          fontFamily: 'Inter',
+          fontSize: 42,
+          fontWeight: 700,
+          height: 120,
+          id: 'presenter-text',
+          opacity: 1,
+          rotation: 0,
+          text: 'Presenter diagnostics',
+          type: 'text',
+          visible: true,
+          width: 620,
+          x: 120,
+          y: 140,
+        },
+        'presenter-video': {
+          assetId: 'presenter-video-asset',
+          autoplayInPreview: true,
+          controls: true,
+          durationSeconds: 20,
+          height: 240,
+          id: 'presenter-video',
+          locked: false,
+          loop: false,
+          muted: true,
+          opacity: 1,
+          playAcrossSlides: false,
+          playbackPositionSeconds: 0,
+          playing: true,
+          repeatMode: 'none',
+          rotation: 0,
+          startOnClick: true,
+          trimEndSeconds: 18,
+          trimStartSeconds: 1,
+          type: 'video',
+          visible: true,
+          volume: 0.5,
+          width: 420,
+          x: 760,
+          y: 260,
+        },
+      },
+      fonts: {},
+      id: 'presenter-diagnostics-project',
+      name: 'Presenter Diagnostics',
+      pages: [
+        {
+          animationBuilds: [
+            {
+              delayMs: 0,
+              durationMs: 0,
+              effect: 'reveal',
+              elementId: 'presenter-video',
+              id: 'presenter-video-build',
+              mediaAction: 'play',
+              trigger: 'on-click',
+            },
+          ],
+          background: { color: '#111827', type: 'color' },
+          elementIds: ['presenter-text', 'presenter-video'],
+          height: 1080,
+          id: 'presenter-page-1',
+          name: 'Presenter Slide 1',
+          speakerNotes: 'Presenter diagnostics notes',
+          visible: true,
+          width: 1920,
+        },
+        {
+          background: { color: '#0f172a', type: 'color' },
+          elementIds: ['presenter-text'],
+          height: 1080,
+          id: 'presenter-page-2',
+          name: 'Presenter Slide 2',
+          speakerNotes: 'Second presenter diagnostics notes',
+          visible: true,
+          width: 1920,
+        },
+      ],
+      updatedAt: '2026-07-20T00:00:00.000Z',
+    };
+    window.postMessage(
+      {
+        payload: {
+          activePageId: 'presenter-page-1',
+          animationPreview: {
+            activeBuildIndex: 0,
+            activePageId: 'presenter-page-1',
+            mode: 'presenter',
+            playing: true,
+            revealedBuildIds: [],
+          },
+          project,
+          promptModel: {
+            options: [
+              {
+                compatibility: 'compatible',
+                id: 'diagnostic-prompt',
+                label: 'Diagnostic prompt',
+                modelId: 'diagnostic-model',
+                readiness: 'ready',
+                selected: true,
+              },
+            ],
+            preparation: {
+              availability: 'ready',
+              progress: 100,
+              status: 'ready',
+            },
+          },
+          presenterMode: 'presenting',
+          remoteSession: {
+            code: 'DIAG-1234',
+            connectedControllerCount: 1,
+            controlPeerId: 'diagnostic-peer',
+            expiresAt: '2026-07-20T01:00:00.000Z',
+            presenterDeviceId: 'diagnostic-device',
+            presenterLabel: 'Diagnostics',
+            qrUrl: 'https://remote.localstudio.test/?code=DIAG-1234',
+            sessionId: 'diagnostic-presenter',
+            transport: 'peerjs',
+          },
+          streamPeerId: 'stream-peer-1',
+          transcriptionLanguage: { code: 'en-US', label: 'English' },
+        },
+        sessionId: 'diagnostic-presenter',
+        source: 'localstudio-presenter-main',
+        type: 'state',
+      },
+      window.location.origin,
+    );
+    await nextFrame();
+    const root = document.querySelector('.e2e-hidden-presenter-view');
+    const click = (label: string) =>
+      root?.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)?.click();
+    const keyDown = (key: string, init: KeyboardEventInit = {}) => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key, ...init }));
+    };
+    const keyUp = (key: string) => {
+      window.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, cancelable: true, key }));
+    };
+    click('Show keyboard shortcuts');
+    await nextFrame();
+    keyDown('Escape');
+    click('Show remote control QR code');
+    click('Previous slide');
+    click('Pause timer');
+    click('Reset timer');
+    click('Next slide');
+    click('Increase notes size');
+    click('Decrease notes size');
+    const resizeHandle = root?.querySelector<HTMLElement>('[aria-label="Resize presenter notes"]');
+    for (const key of ['ArrowLeft', 'ArrowRight', 'Home', 'End']) {
+      resizeHandle?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key }));
+    }
+    keyDown('?');
+    await nextFrame();
+    keyDown('Escape');
+    keyDown('#');
+    await nextFrame();
+    keyDown('+');
+    keyDown('-');
+    keyDown('Enter');
+    keyDown('Home');
+    keyDown('End');
+    keyDown('ArrowDown', { shiftKey: true });
+    keyDown('ArrowRight');
+    keyDown('[');
+    keyDown('ArrowLeft');
+    keyDown('r');
+    keyDown('u');
+    keyDown('d');
+    keyDown('=', { metaKey: true });
+    keyDown('-', { metaKey: true });
+    keyDown('k');
+    keyDown('j');
+    keyUp('j');
+    keyDown('l');
+    keyUp('l');
+    keyDown('i');
+    keyDown('o');
+    for (const command of ['pause-timer', 'resume-timer', 'reset-timer']) {
+      window.postMessage(
+        {
+          command,
+          sessionId: 'diagnostic-presenter',
+          source: 'localstudio-presenter-main',
+          type: 'command',
+        },
+        window.location.origin,
+      );
+    }
+    await nextFrame();
+  });
+}

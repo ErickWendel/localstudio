@@ -19,6 +19,8 @@ test('executes presenter session service contracts in the browser runtime', asyn
     duplicateSessionReused: true,
     hostCloseCount: 1,
     hostOpenCount: 1,
+    legacyCloseCount: 1,
+    legacyPublishCount: 2,
     openedPopupHrefIncludesPresenter: true,
     openedStatus: 'opened',
     popupClosed: true,
@@ -36,7 +38,13 @@ test('executes presenter session service contracts in the browser runtime', asyn
     'update-stream-peer',
     'go-to-page',
     'next',
+    'save-recording',
+    'close',
+    'previous',
+    'request-state',
+    'start-presenting',
   ]);
+  expect(result.legacyCommandNames).toEqual(['resume-timer', 'reset-timer']);
   expect(result.hostPreviewBatchCount).toBeGreaterThan(0);
   expect(result.hostStateCount).toBeGreaterThanOrEqual(4);
   expect(result.popupCommandCount).toBe(1);
