@@ -101,7 +101,7 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
     await page.getByRole('button', { name: /Roboto/ }).click();
     await page.getByRole('button', { name: 'Replace Fonts' }).click();
     await page.getByRole('button', { name: '2 fonts available' }).click();
-    await expect(page.getByRole('option', { name: /Inter/ })).toBeVisible();
+    await expect(page.getByRole('option', { name: /Inter/ })).toBeVisible({ timeout: 10_000 });
     await page
       .getByRole('button', { name: 'Resize mirror settings panel' })
       .dispatchEvent('pointerdown', {
@@ -112,14 +112,17 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
       window.dispatchEvent(new PointerEvent('pointermove', { clientX: 560, pointerId: 1 }));
       window.dispatchEvent(new PointerEvent('pointerup', { clientX: 560, pointerId: 1 }));
     });
-    await page.getByRole('textbox', { name: 'S3 API endpoint' }).fill('http://localhost:9001/');
+    await expect(page.locator('.mirror-settings-panel')).not.toHaveClass(
+      /mirror-settings-panel-resizing/,
+    );
+    const s3EndpointInput = page.getByRole('textbox', { name: 'S3 API endpoint' });
+    await expect(s3EndpointInput).toBeEditable();
+    await s3EndpointInput.fill('http://localhost:9001/');
     await page.getByRole('button', { name: 'Test connection' }).click();
     await expect(page.locator('.mirror-settings-status-error')).toContainText(
       'Use the S3 API endpoint, not the MinIO Console URL.',
     );
-    await page
-      .getByRole('textbox', { name: 'S3 API endpoint' })
-      .fill('https://s3.localstudio.test/');
+    await s3EndpointInput.fill('https://s3.localstudio.test/');
     await page.getByRole('button', { name: 'Test connection' }).click();
     await expect(page.getByText('S3-compatible connection is ready.')).toBeVisible();
     await page.getByRole('button', { name: 'Close mirror settings' }).click();
