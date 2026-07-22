@@ -30,7 +30,7 @@ async function startFullscreenPresentation(user: ReturnType<typeof userEvent.set
 
 async function openLeftTab(
   user: ReturnType<typeof userEvent.setup>,
-  name: 'AI Tools' | 'Animate' | 'Elements' | 'Layout',
+  name: 'AI Tools' | 'Animate' | 'Design' | 'Elements' | 'Layout',
 ) {
   void user;
   const tab = screen.getByRole('tab', { name });

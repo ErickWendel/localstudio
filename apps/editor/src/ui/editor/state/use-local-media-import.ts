@@ -4,6 +4,7 @@ import { fitImageWithinPage } from '../../../domain/images/imageSizing';
 import type { ProjectDocument } from '../../../domain/documents/model';
 import { createPrefixedId } from '../../../services/ids/idUtils';
 import { localMediaFiles } from './local-media-files';
+import { mediaPlaceholderReplacement } from './mediaPlaceholderReplacement';
 
 export interface MediaImportProgressState {
   detail: string;
@@ -18,6 +19,7 @@ interface UseLocalMediaImportOptions {
     options?: { selectedElementIds?: string[] },
   ) => void;
   project: ProjectDocument;
+  selectedElementIds: string[];
 }
 
 function waitForNextPaint() {
@@ -35,6 +37,7 @@ export function useLocalMediaImport({
   activePageId,
   commitProject,
   project,
+  selectedElementIds,
 }: UseLocalMediaImportOptions) {
   const [mediaImportProgress, setMediaImportProgress] = useState<
     MediaImportProgressState | undefined
@@ -103,18 +106,41 @@ export function useLocalMediaImport({
         pageWidth: page.width,
         pageHeight: page.height,
       });
+      const placeholder = mediaPlaceholderReplacement.getSelectedImagePlaceholder({
+        project,
+        selectedElementIds,
+      });
 
       if (assetType === 'gif') {
+        const asset = {
+          id: assetId,
+          type: 'gif',
+          name: mediaName,
+          mimeType: file.type || 'image/gif',
+          objectUrl: mediaUrl,
+        } as const;
+        if (placeholder) {
+          commitProject(
+            (currentProject) =>
+              new basicCommands.ReplaceElementWithMediaCommand(placeholder.id, {
+                asset,
+                element: mediaPlaceholderReplacement.createGifElement({
+                  assetId,
+                  mediaHeight: mediaSize.height,
+                  mediaWidth: mediaSize.width,
+                  placeholder,
+                }),
+              }).execute(currentProject),
+            { selectedElementIds: [placeholder.id] },
+          );
+          imported = true;
+          return;
+        }
+
         commitProject(
           (currentProject) =>
             new basicCommands.AddMediaElementCommand(activePageId, {
-              asset: {
-                id: assetId,
-                type: 'gif',
-                name: mediaName,
-                mimeType: file.type || 'image/gif',
-                objectUrl: mediaUrl,
-              },
+              asset,
               element: {
                 id: elementId,
                 type: 'gif',
@@ -137,16 +163,36 @@ export function useLocalMediaImport({
       }
 
       if (assetType === 'video') {
+        const asset = {
+          id: assetId,
+          type: 'video',
+          name: mediaName,
+          mimeType: file.type || 'video/mp4',
+          objectUrl: mediaUrl,
+        } as const;
+        if (placeholder) {
+          commitProject(
+            (currentProject) =>
+              new basicCommands.ReplaceElementWithMediaCommand(placeholder.id, {
+                asset,
+                element: mediaPlaceholderReplacement.createVideoElement({
+                  assetId,
+                  durationSeconds: videoDurationSeconds,
+                  mediaHeight: mediaSize.height,
+                  mediaWidth: mediaSize.width,
+                  placeholder,
+                }),
+              }).execute(currentProject),
+            { selectedElementIds: [placeholder.id] },
+          );
+          imported = true;
+          return;
+        }
+
         commitProject(
           (currentProject) =>
             new basicCommands.AddMediaElementCommand(activePageId, {
-              asset: {
-                id: assetId,
-                type: 'video',
-                name: mediaName,
-                mimeType: file.type || 'video/mp4',
-                objectUrl: mediaUrl,
-              },
+              asset,
               element: {
                 id: elementId,
                 type: 'video',
@@ -179,16 +225,35 @@ export function useLocalMediaImport({
         return;
       }
 
+      const asset = {
+        id: assetId,
+        type: 'image',
+        name: mediaName,
+        mimeType: file.type || 'image/*',
+        objectUrl: mediaUrl,
+      } as const;
+      if (placeholder) {
+        commitProject(
+          (currentProject) =>
+            new basicCommands.ReplaceElementWithMediaCommand(placeholder.id, {
+              asset,
+              element: mediaPlaceholderReplacement.createImageElement({
+                assetId,
+                mediaHeight: mediaSize.height,
+                mediaWidth: mediaSize.width,
+                placeholder,
+              }),
+            }).execute(currentProject),
+          { selectedElementIds: [placeholder.id] },
+        );
+        imported = true;
+        return;
+      }
+
       commitProject(
         (currentProject) =>
           new basicCommands.AddImageElementCommand(activePageId, {
-            asset: {
-              id: assetId,
-              type: 'image',
-              name: mediaName,
-              mimeType: file.type || 'image/*',
-              objectUrl: mediaUrl,
-            },
+            asset,
             element: {
               id: elementId,
               type: 'image',

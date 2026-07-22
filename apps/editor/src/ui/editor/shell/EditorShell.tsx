@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type Konva from 'konva';
 import type { AppServices } from '../../../app/composition';
+import { placeholderImage } from '../../../domain/assets/placeholderImage';
 import type { ProjectDocument } from '../../../domain/documents/model';
 import { pageVisibility } from '../../../domain/documents/pageVisibility';
-import type {
-  ShareMetadata,
-  SharePublishProgress,
-} from '../../../services/contracts/interfaces';
+import type { ShareMetadata, SharePublishProgress } from '../../../services/contracts/interfaces';
 import { editorAutomationController } from '../../../services/automation/editorAutomationController';
 import type { EditorAutomationDelegate } from '../../../services/automation/editorAutomationController';
 import { imageGenerationModel } from '../../../services/image-generation/imageGenerationModel';
@@ -37,7 +35,10 @@ import { presentationMovieControls, type MovieHoldState } from '../media/present
 import { useEditorViewModel, type OperationNoticeState } from '../state/useEditorViewModel';
 import { SharePanel } from '../../share/SharePanel';
 import { copyShareText } from '../../share/shareClipboard';
-import { KeyboardShortcutsDialog, type KeyboardShortcutAction } from '../../components/KeyboardShortcutsDialog';
+import {
+  KeyboardShortcutsDialog,
+  type KeyboardShortcutAction,
+} from '../../components/KeyboardShortcutsDialog';
 import { editorShellBrowserUtils } from '../browser/editorShellBrowserUtils';
 import { BrowserPresenterSessionService } from '../../../services/presenter/presenterSessionService';
 import type {
@@ -115,8 +116,9 @@ export function EditorShell({ services }: EditorShellProps) {
 function EditorDesktopShell({ services }: EditorShellProps) {
   const vm = useEditorViewModel(services);
   const presenterTranscriptionLanguage =
-    vm.translationLanguageOptions.find((language) => language.code === vm.translationTargetLanguage) ??
-    vm.activeSlideLanguage;
+    vm.translationLanguageOptions.find(
+      (language) => language.code === vm.translationTargetLanguage,
+    ) ?? vm.activeSlideLanguage;
   const automationDelegateRef = useRef(vm.automation);
   const prepareProjectFontsForPublicShareRef = useRef(vm.prepareProjectFontsForPublicShare);
   const movieHoldStateRef = useRef<MovieHoldState | undefined>(undefined);
@@ -151,7 +153,9 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const [isExportingImages, setIsExportingImages] = useState(false);
   const [sharePanelOpen, setSharePanelOpen] = useState(false);
   const [shareMetadata, setShareMetadata] = useState<ShareMetadata | undefined>();
-  const [sharePublishProgress, setSharePublishProgress] = useState<SharePublishProgress | undefined>();
+  const [sharePublishProgress, setSharePublishProgress] = useState<
+    SharePublishProgress | undefined
+  >();
   const stageRef = useRef<Konva.Stage>(null);
   const imageExportStageRef = useRef<Konva.Stage>(null);
   const workspaceRef = useRef<HTMLElement>(null);
@@ -162,15 +166,21 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const imageExportNoticeTimeoutRef = useRef<number | undefined>(undefined);
   const presenterFullscreenEnteredRef = useRef(false);
   const pendingShareAfterLocalSaveRef = useRef(false);
-  const lastPublishedShareSelectionRef = useRef<{
-    projectSignature: string;
-    selectedRecordingId?: string | undefined;
-    shareId: string;
-  } | undefined>(undefined);
-  const sharePublishPromiseRef = useRef<{
-    promise: Promise<ShareMetadata>;
-    selectedRecordingId?: string | undefined;
-  } | undefined>(undefined);
+  const lastPublishedShareSelectionRef = useRef<
+    | {
+        projectSignature: string;
+        selectedRecordingId?: string | undefined;
+        shareId: string;
+      }
+    | undefined
+  >(undefined);
+  const sharePublishPromiseRef = useRef<
+    | {
+        promise: Promise<ShareMetadata>;
+        selectedRecordingId?: string | undefined;
+      }
+    | undefined
+  >(undefined);
   const toolbarImageInputRef = useRef<HTMLInputElement>(null);
   const hasSelection = vm.selection.elementIds.length > 0;
   const isHistoryReadOnly = vm.versionHistoryOpen;
@@ -212,7 +222,8 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     },
     options: [
       {
-        compatibility: imageGenerationState?.status === 'unavailable' ? 'incompatible' : 'compatible',
+        compatibility:
+          imageGenerationState?.status === 'unavailable' ? 'incompatible' : 'compatible',
         id: imageGenerationModel.IMAGE_GENERATION_MODEL_ID,
         label: imageGenerationModel.IMAGE_GENERATION_DISPLAY_NAME,
         modelId: imageGenerationModel.IMAGE_GENERATION_MODEL_ID,
@@ -254,52 +265,58 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     ],
   );
 
-  const publishCurrentProjectShare = useCallback(async (selectedRecordingId?: string) => {
-    const inFlightSharePublish = sharePublishPromiseRef.current;
-    if (inFlightSharePublish && inFlightSharePublish.selectedRecordingId === selectedRecordingId) {
-      return inFlightSharePublish.promise;
-    }
-    if (inFlightSharePublish) {
-      await inFlightSharePublish.promise.catch(() => undefined);
-    }
-    const preparedShare = services.shareService.getProjectShareMetadata(vm.project);
-    const shareId = shareMetadata?.shareId ?? preparedShare.shareId;
-    setShareMetadata((current) => ({
-      ...(current ?? preparedShare),
-      shareId,
-      status: 'syncing',
-    }));
-
-    const publishPromise = (async () => {
-      const fontResult = await prepareProjectFontsForPublicShareRef.current();
-      return services.shareService.updateShare(
-        shareId,
-        createProjectForSelectedShareRecording(fontResult.project, selectedRecordingId),
-        {
-          onProgress: setSharePublishProgress,
-        },
-      );
-    })();
-    sharePublishPromiseRef.current = { promise: publishPromise, selectedRecordingId };
-    try {
-      const nextShare = await publishPromise;
-      lastPublishedShareSelectionRef.current = {
-        projectSignature: getProjectPublishSignature(vm.project),
-        selectedRecordingId,
-        shareId: nextShare.shareId,
-      };
-      setShareMetadata(nextShare);
-      return nextShare;
-    } catch (error) {
-      setShareMetadata((current) => (current ? { ...current, status: 'sync-failed' } : current));
-      throw error;
-    } finally {
-      if (sharePublishPromiseRef.current?.promise === publishPromise) {
-        sharePublishPromiseRef.current = undefined;
+  const publishCurrentProjectShare = useCallback(
+    async (selectedRecordingId?: string) => {
+      const inFlightSharePublish = sharePublishPromiseRef.current;
+      if (
+        inFlightSharePublish &&
+        inFlightSharePublish.selectedRecordingId === selectedRecordingId
+      ) {
+        return inFlightSharePublish.promise;
       }
-      setSharePublishProgress(undefined);
-    }
-  }, [services.shareService, shareMetadata?.shareId, vm.project]);
+      if (inFlightSharePublish) {
+        await inFlightSharePublish.promise.catch(() => undefined);
+      }
+      const preparedShare = services.shareService.getProjectShareMetadata(vm.project);
+      const shareId = shareMetadata?.shareId ?? preparedShare.shareId;
+      setShareMetadata((current) => ({
+        ...(current ?? preparedShare),
+        shareId,
+        status: 'syncing',
+      }));
+
+      const publishPromise = (async () => {
+        const fontResult = await prepareProjectFontsForPublicShareRef.current();
+        return services.shareService.updateShare(
+          shareId,
+          createProjectForSelectedShareRecording(fontResult.project, selectedRecordingId),
+          {
+            onProgress: setSharePublishProgress,
+          },
+        );
+      })();
+      sharePublishPromiseRef.current = { promise: publishPromise, selectedRecordingId };
+      try {
+        const nextShare = await publishPromise;
+        lastPublishedShareSelectionRef.current = {
+          projectSignature: getProjectPublishSignature(vm.project),
+          selectedRecordingId,
+          shareId: nextShare.shareId,
+        };
+        setShareMetadata(nextShare);
+        return nextShare;
+      } catch (error) {
+        setShareMetadata((current) => (current ? { ...current, status: 'sync-failed' } : current));
+        throw error;
+      } finally {
+        if (sharePublishPromiseRef.current?.promise === publishPromise) {
+          sharePublishPromiseRef.current = undefined;
+        }
+        setSharePublishProgress(undefined);
+      }
+    },
+    [services.shareService, shareMetadata?.shareId, vm.project],
+  );
 
   function getReusablePublishedShare(
     share: ShareMetadata | undefined,
@@ -316,19 +333,22 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     return undefined;
   }
 
-  const hasPublishedCurrentProjectShare = useCallback((
-    share: ShareMetadata | undefined,
-    selectedRecordingId: string | undefined,
-    project: ProjectDocument,
-  ) => {
-    if (!share || (share.status !== 'published' && share.status !== 'copied')) return false;
-    const lastPublishedShareSelection = lastPublishedShareSelectionRef.current;
-    return (
-      lastPublishedShareSelection?.shareId === share.shareId &&
-      lastPublishedShareSelection.selectedRecordingId === selectedRecordingId &&
-      lastPublishedShareSelection.projectSignature === getProjectPublishSignature(project)
-    );
-  }, []);
+  const hasPublishedCurrentProjectShare = useCallback(
+    (
+      share: ShareMetadata | undefined,
+      selectedRecordingId: string | undefined,
+      project: ProjectDocument,
+    ) => {
+      if (!share || (share.status !== 'published' && share.status !== 'copied')) return false;
+      const lastPublishedShareSelection = lastPublishedShareSelectionRef.current;
+      return (
+        lastPublishedShareSelection?.shareId === share.shareId &&
+        lastPublishedShareSelection.selectedRecordingId === selectedRecordingId &&
+        lastPublishedShareSelection.projectSignature === getProjectPublishSignature(project)
+      );
+    },
+    [],
+  );
 
   function exportCurrentPageAsPng() {
     const dataUrl = stageRef.current?.toDataURL({ mimeType: 'image/png', pixelRatio: 2 });
@@ -357,13 +377,18 @@ function EditorDesktopShell({ services }: EditorShellProps) {
 
   function getImageExportFrames(options: ImageExportOptions): ImageExportFrame[] {
     return editorImageExport.getFrames({
-      getPageImageFileName: services.exportService.getPageImageFileName.bind(services.exportService),
+      getPageImageFileName: services.exportService.getPageImageFileName.bind(
+        services.exportService,
+      ),
       options,
       project: vm.project,
     });
   }
 
-  async function renderImageExportFrame(frame: ImageExportFrame, format: ImageExportOptions['format']) {
+  async function renderImageExportFrame(
+    frame: ImageExportFrame,
+    format: ImageExportOptions['format'],
+  ) {
     await editorImageExport.preloadFrameImages(vm.project, frame.pageId);
     setImageExportFrame(frame);
     await editorImageExport.waitForNextPaint();
@@ -750,6 +775,19 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     openLeftPanel();
   }
 
+  function revealElementsForImagePlaceholder(elementId: string) {
+    const selectedElement = vm.project.elements[elementId];
+    if (
+      selectedElement?.type !== 'image' ||
+      selectedElement.assetId !== placeholderImage.PLACEHOLDER_IMAGE_ASSET_ID
+    ) {
+      return false;
+    }
+    vm.setActiveTab('elements');
+    openLeftPanel();
+    return true;
+  }
+
   function openDesignFontList() {
     vm.setActiveTab('design');
     openLeftPanel();
@@ -758,7 +796,9 @@ function EditorDesktopShell({ services }: EditorShellProps) {
 
   function selectElement(elementId: string, options?: { additive?: boolean }) {
     vm.selectElement(elementId, options);
-    if (!options?.additive) revealMediaSettingsForElement(elementId);
+    if (options?.additive) return;
+    if (revealElementsForImagePlaceholder(elementId)) return;
+    revealMediaSettingsForElement(elementId);
   }
 
   function importMediaFile(file: File) {
@@ -1091,12 +1131,14 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           updatedAt: new Date().toISOString(),
         };
         vm.addTranscriptRecording(editorOwnedRecording);
-        getPresenterSessionService().publishState(createPresenterStatePayload({
-          activePageId: vm.activePageId,
-          animationPreview: vm.animationPreview,
-          presenterMode: presenterSessionId || remotePresenterActive ? 'presenting' : 'ready',
-          project: projectWithRecording,
-        }));
+        getPresenterSessionService().publishState(
+          createPresenterStatePayload({
+            activePageId: vm.activePageId,
+            animationPreview: vm.animationPreview,
+            presenterMode: presenterSessionId || remotePresenterActive ? 'presenting' : 'ready',
+            project: projectWithRecording,
+          }),
+        );
         return;
       }
       if (message.command === 'update-stream-peer') {
@@ -1383,11 +1425,13 @@ function EditorDesktopShell({ services }: EditorShellProps) {
             canTranslateSelection={vm.canTranslateSelection}
             isTranslating={vm.isTranslating}
             translationNotice={vm.translationNotice}
-            onAlignSelectedElement={
+            onAlignSelectedElement={isHistoryReadOnly ? undefined : vm.alignSelectedElement}
+            onEditSelectionGrid={
               isHistoryReadOnly
                 ? undefined
                 : () => {
-                    vm.alignSelectedElement('page-center');
+                    vm.setActiveTab('layout');
+                    openLeftPanel();
                   }
             }
             onAnimationPreviewAdvance={
@@ -1416,6 +1460,14 @@ function EditorDesktopShell({ services }: EditorShellProps) {
             }
             onCancelBackgroundSelection={
               isHistoryReadOnly ? undefined : vm.cancelBackgroundSelectionMode
+            }
+            onCanvasBackgroundDoubleClick={
+              isHistoryReadOnly
+                ? undefined
+                : () => {
+                    vm.setActiveTab('layout');
+                    openLeftPanel();
+                  }
             }
             onClearSelection={isHistoryReadOnly ? undefined : vm.clearSelection}
             onDeleteSelectedElement={isHistoryReadOnly ? undefined : vm.deleteSelectedElement}

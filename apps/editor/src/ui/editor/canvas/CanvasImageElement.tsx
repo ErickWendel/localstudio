@@ -1,5 +1,6 @@
 import type Konva from 'konva';
 import { Image as KonvaImage, Rect } from 'react-konva';
+import { placeholderImage } from '../../../domain/assets/placeholderImage';
 import type { DesignElement } from '../../../domain/documents/model';
 import { canvasWorkspaceUtils } from './canvasWorkspaceUtils';
 import type { CommonElementProps } from './canvas-element-props';
@@ -46,6 +47,29 @@ export function CanvasImageElement({
     );
   }
 
+  if (element.assetId === placeholderImage.PLACEHOLDER_IMAGE_ASSET_ID) {
+    const placeholderFrame = fitPlaceholderVisualFrame({
+      height: commonProps.height,
+      imageHeight: image.naturalHeight,
+      imageWidth: image.naturalWidth,
+      width: commonProps.width,
+    });
+    return (
+      <>
+        <Rect {...imageProps} fill="#F4F4F5" cornerRadius={6} ref={nodeRef} />
+        <KonvaImage
+          image={image}
+          x={commonProps.x + placeholderFrame.x}
+          y={commonProps.y + placeholderFrame.y}
+          width={placeholderFrame.width}
+          height={placeholderFrame.height}
+          opacity={0.36}
+          listening={false}
+        />
+      </>
+    );
+  }
+
   return (
     <KonvaImage
       {...imageProps}
@@ -55,4 +79,24 @@ export function CanvasImageElement({
       ref={nodeRef}
     />
   );
+}
+
+function fitPlaceholderVisualFrame(input: {
+  height: number;
+  imageHeight: number;
+  imageWidth: number;
+  width: number;
+}) {
+  const imageAspectRatio =
+    input.imageWidth > 0 && input.imageHeight > 0 ? input.imageWidth / input.imageHeight : 1;
+  const maxWidth = Math.max(1, input.width * 0.46);
+  const maxHeight = Math.max(1, input.height * 0.46);
+  const width = Math.min(maxWidth, maxHeight * imageAspectRatio);
+  const height = width / imageAspectRatio;
+  return {
+    height,
+    width,
+    x: (input.width - width) / 2,
+    y: (input.height - height) / 2,
+  };
 }

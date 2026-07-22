@@ -62,7 +62,12 @@ import { editorViewModelProgress } from './editorViewModelProgress';
 import { editorViewModelProject } from './editorViewModelProject';
 import { editorViewModelRuntime } from './editorViewModelRuntime';
 import { editorViewModelElements } from './editorViewModelElements';
-import type { ElementClipboardState } from './editorViewModelElements';
+import type {
+  ElementClipboardState,
+  GridSplitLayout,
+  ImageGridRequest,
+  SelectionGridRequest,
+} from './editorViewModelElements';
 import { editorViewModelHistory } from './editorViewModelHistory';
 import type { EditorHistory } from './editorViewModelHistory';
 import { editorViewModelPages } from './editorViewModelPages';
@@ -231,9 +236,7 @@ export function useEditorViewModel(services: AppServices) {
   const [presentationImportProgress, setPresentationImportProgress] = useState<
     PresentationImportProgressState | undefined
   >();
-  const [missingPowerPointFonts, setMissingPowerPointFonts] = useState<MissingPowerPointFont[]>(
-    [],
-  );
+  const [missingPowerPointFonts, setMissingPowerPointFonts] = useState<MissingPowerPointFont[]>([]);
   const [hasPersistedLocalProject, setHasPersistedLocalProject] = useState(false);
   const hasPersistedLocalProjectRef = useRef(hasPersistedLocalProject);
   const [activePageId, setActivePageId] = useState(initialProject.pages[0]?.id ?? '');
@@ -241,9 +244,8 @@ export function useEditorViewModel(services: AppServices) {
   const activePageIdRef = useRef(activePageId);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   const selectedElementIdsRef = useRef(selectedElementIds);
-  const [selectionTarget, setSelectionTarget] = useState<NonNullable<SelectionState['target']>>(
-    'presentation',
-  );
+  const [selectionTarget, setSelectionTarget] =
+    useState<NonNullable<SelectionState['target']>>('presentation');
   const [history, setHistory] = useState<EditorHistory>({ past: [], future: [] });
   const [zoomPercent, setZoomPercent] = useState(100);
   const [pagesPanelOpen, setPagesPanelOpen] = useState(false);
@@ -295,8 +297,9 @@ export function useEditorViewModel(services: AppServices) {
     elements: [],
   });
   const [isTranslating, setIsTranslating] = useState(false);
-  const [deckTranslationProgress, setDeckTranslationProgress] =
-    useState<DeckTranslationProgressState | undefined>();
+  const [deckTranslationProgress, setDeckTranslationProgress] = useState<
+    DeckTranslationProgressState | undefined
+  >();
   const [translationNotice, setTranslationNotice] = useState<string | undefined>();
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [versionHistoryEntries, setVersionHistoryEntries] = useState<VersionHistoryEntry[]>([]);
@@ -327,8 +330,9 @@ export function useEditorViewModel(services: AppServices) {
   const [remoteImportStatus, setRemoteImportStatus] = useState<RemoteImportStatus>('loading');
   const [remoteImportProjects, setRemoteImportProjects] = useState<MirrorProjectSummary[]>([]);
   const [remoteImportError, setRemoteImportError] = useState<string | undefined>();
-  const [remoteImportProgress, setRemoteImportProgress] =
-    useState<RemoteImportProgressState | undefined>();
+  const [remoteImportProgress, setRemoteImportProgress] = useState<
+    RemoteImportProgressState | undefined
+  >();
   const [mirrorConfig, setMirrorConfig] = useState<MinioMirrorConfig>(
     () => storedMirrorConfig ?? minioMirrorService.DEFAULT_MINIO_MIRROR_CONFIG,
   );
@@ -350,19 +354,17 @@ export function useEditorViewModel(services: AppServices) {
     activePageId,
     commitProject,
     project,
+    selectedElementIds,
     setMediaSettingsOpen,
     stockMediaService: services.stockMediaService,
   });
-  const {
-    clearMediaImportProgress,
-    importImageFile,
-    mediaImportProgress,
-    replaceVideoAsset,
-  } = useLocalMediaImport({
-    activePageId,
-    commitProject,
-    project,
-  });
+  const { clearMediaImportProgress, importImageFile, mediaImportProgress, replaceVideoAsset } =
+    useLocalMediaImport({
+      activePageId,
+      commitProject,
+      project,
+      selectedElementIds,
+    });
   const {
     backgroundPreparation,
     backgroundPreview,
@@ -495,7 +497,9 @@ export function useEditorViewModel(services: AppServices) {
       setIsFullscreen(isFullscreenActive);
       if (wasFullscreenRef.current && !isFullscreenActive) {
         const previewPageId =
-          presenterPageIdRef.current ?? animationPreviewRef.current?.pageId ?? activePageIdRef.current;
+          presenterPageIdRef.current ??
+          animationPreviewRef.current?.pageId ??
+          activePageIdRef.current;
         if (previewPageId && projectRef.current.pages.some((page) => page.id === previewPageId)) {
           setActivePageId(previewPageId);
           setActivePageFocusKey((current) => current + 1);
@@ -543,7 +547,10 @@ export function useEditorViewModel(services: AppServices) {
         if (!isMounted) return;
         if (savedProject) {
           const normalizedProject = editorViewModelProject.normalizeProjectDocument(savedProject);
-          await editorViewModelRuntime.loadProjectFonts(normalizedProject, services.fontImportService);
+          await editorViewModelRuntime.loadProjectFonts(
+            normalizedProject,
+            services.fontImportService,
+          );
           if (!isMounted) return;
           setProject(normalizedProject);
           setActivePageId(normalizedProject.pages[0]?.id ?? '');
@@ -754,7 +761,11 @@ export function useEditorViewModel(services: AppServices) {
         setModelStates((currentStates) =>
           currentStates.map((state) =>
             state.id === id
-              ? { ...state, status: 'downloading', ...editorViewModelProgress.getDownloadProgressPatch(progress, details) }
+              ? {
+                  ...state,
+                  status: 'downloading',
+                  ...editorViewModelProgress.getDownloadProgressPatch(progress, details),
+                }
               : state,
           ),
         );
@@ -821,7 +832,8 @@ export function useEditorViewModel(services: AppServices) {
     }
     if (services.translatorService.getLanguageDetectionProviderStates) {
       const nextLanguageDetectionProviders =
-        selectedLanguageDetectionProviderId && services.translatorService.setLanguageDetectionProvider
+        selectedLanguageDetectionProviderId &&
+        services.translatorService.setLanguageDetectionProvider
           ? await services.translatorService.setLanguageDetectionProvider(
               selectedLanguageDetectionProviderId,
             )
@@ -1512,7 +1524,9 @@ export function useEditorViewModel(services: AppServices) {
           projectDirectoryName: nextName,
         });
       } else {
-        await services.projectRepository.saveProject(nextProject, { projectDirectoryName: nextName });
+        await services.projectRepository.saveProject(nextProject, {
+          projectDirectoryName: nextName,
+        });
       }
       setProject(nextProject);
       lastVersionProjectRef.current = nextProject;
@@ -1667,7 +1681,8 @@ export function useEditorViewModel(services: AppServices) {
         title: 'Mapping animations',
       });
       await editorViewModelRuntime.waitForNextPaint();
-      const normalizedProject = editorViewModelProject.normalizeProjectDocument(importedProjectWithFonts);
+      const normalizedProject =
+        editorViewModelProject.normalizeProjectDocument(importedProjectWithFonts);
       await editorViewModelRuntime.loadProjectFonts(normalizedProject, services.fontImportService);
       setPresentationImportProgress({
         detail: 'Opening the imported project in the editor.',
@@ -1753,7 +1768,9 @@ export function useEditorViewModel(services: AppServices) {
       })),
     );
     if (result.warnings.some((warning) => warning.code === 'font-missing')) {
-      throw new Error(result.warnings[0]?.message ?? `${trimmedReplacement} could not be downloaded.`);
+      throw new Error(
+        result.warnings[0]?.message ?? `${trimmedReplacement} could not be downloaded.`,
+      );
     }
 
     commitProject((currentProject) => ({
@@ -1825,7 +1842,8 @@ export function useEditorViewModel(services: AppServices) {
 
   useEffect(() => {
     if (!powerPointIo.consumeLocalSampleImportRequest()) return;
-    void powerPointIo.loadLocalSampleInput()
+    void powerPointIo
+      .loadLocalSampleInput()
       .then((input) => importPowerPointRef.current(input))
       .catch((error: unknown) => {
         pptxImportLogger.error('Local PowerPoint sample import failed.', error);
@@ -1938,16 +1956,18 @@ export function useEditorViewModel(services: AppServices) {
     }
   }
 
-  async function prepareProjectFontsForPublicShare(
-    options?: { onProgress?: (progress: LocalFontMirrorProgress) => void },
-  ) {
+  async function prepareProjectFontsForPublicShare(options?: {
+    onProgress?: (progress: LocalFontMirrorProgress) => void;
+  }) {
     const result = await services.localFontMirrorService.importProjectFonts(projectRef.current, {
       ...(options?.onProgress ? { onProgress: options.onProgress } : {}),
     });
     if (result.project !== projectRef.current) {
       setProject(result.project);
       projectRef.current = result.project;
-      await editorViewModelRuntime.loadProjectFonts(result.project, services.fontImportService).catch(() => undefined);
+      await editorViewModelRuntime
+        .loadProjectFonts(result.project, services.fontImportService)
+        .catch(() => undefined);
     }
     return result;
   }
@@ -2138,7 +2158,9 @@ export function useEditorViewModel(services: AppServices) {
     } catch (error: unknown) {
       setRemoteImportStatus('failed');
       setRemoteImportProgress(undefined);
-      setRemoteImportError(error instanceof Error ? error.message : 'Remote storage import failed.');
+      setRemoteImportError(
+        error instanceof Error ? error.message : 'Remote storage import failed.',
+      );
       setMirrorState({
         enabled: Boolean(config),
         status: 'failed',
@@ -2196,8 +2218,12 @@ export function useEditorViewModel(services: AppServices) {
     const entry = entryOverride ?? versionHistoryEntries.find((item) => item.id === versionId);
     const versionProject = await services.projectRepository.loadVersion(versionId);
     if (!versionProject) return;
-    const normalizedVersionProject = editorViewModelProject.normalizeProjectDocument(versionProject);
-    await editorViewModelRuntime.loadProjectFonts(normalizedVersionProject, services.fontImportService);
+    const normalizedVersionProject =
+      editorViewModelProject.normalizeProjectDocument(versionProject);
+    await editorViewModelRuntime.loadProjectFonts(
+      normalizedVersionProject,
+      services.fontImportService,
+    );
     setSelectedVersionId(versionId);
     setPreviewProject(normalizedVersionProject);
     const nextPageId = entry?.firstChangedPageId ?? normalizedVersionProject.pages[0]?.id ?? '';
@@ -2350,7 +2376,9 @@ export function useEditorViewModel(services: AppServices) {
   function editTheme(themeId: string) {
     const theme = projectRef.current.themes?.[themeId];
     if (!theme) return;
-    commitProject((currentProject) => new basicCommands.EditThemeCommand(theme).execute(currentProject));
+    commitProject((currentProject) =>
+      new basicCommands.EditThemeCommand(theme).execute(currentProject),
+    );
   }
 
   function changeTheme() {
@@ -2469,7 +2497,9 @@ export function useEditorViewModel(services: AppServices) {
     if (elementIds.length === 0) return [];
 
     const pageIdsByElementId = new Map(
-      project.pages.flatMap((page) => page.elementIds.map((elementId) => [elementId, page.id] as const)),
+      project.pages.flatMap((page) =>
+        page.elementIds.map((elementId) => [elementId, page.id] as const),
+      ),
     );
     const pageById = new Map(project.pages.map((page) => [page.id, page]));
     const concurrency = scope === 'deck' ? DECK_TRANSLATION_CONCURRENCY : elementIds.length;
@@ -2513,10 +2543,7 @@ export function useEditorViewModel(services: AppServices) {
         if (!element || element.type !== 'text') return undefined;
         const pageId = pageIdsByElementId.get(elementId);
         if (shouldTrackDeckProgress && pageId) {
-          activeElementCountByPageId.set(
-            pageId,
-            (activeElementCountByPageId.get(pageId) ?? 0) + 1,
-          );
+          activeElementCountByPageId.set(pageId, (activeElementCountByPageId.get(pageId) ?? 0) + 1);
           updateDeckTranslationProgress(pageId);
         }
         const translatedText = await services.translatorService.translate(
@@ -2998,11 +3025,61 @@ export function useEditorViewModel(services: AppServices) {
     setActiveTab('design');
   }
 
+  function insertImageGridPlaceholders(request: ImageGridRequest) {
+    const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
+    if (!page) return;
+    const grid = editorViewModelElements.createImageGridPlaceholderElements({
+      createElementId: (index, type) =>
+        createPrefixedId(type === 'text' ? `layout-text-${index + 1}` : `image-grid-${index + 1}`),
+      page,
+      request,
+    });
+    commitProject(
+      (currentProject) =>
+        new basicCommands.AddElementsCommand(activePageId, grid.elements, grid.assets).execute(
+          currentProject,
+        ),
+      { selectedElementIds: grid.elements.map((element) => element.id) },
+    );
+  }
+
   function alignSelectedElement(mode: AlignMode) {
     const elementId = selectedElementIds[0];
     if (!elementId) return;
     commitProject((currentProject) =>
       new basicCommands.AlignElementCommand(activePageId, elementId, mode).execute(currentProject),
+    );
+  }
+
+  function splitSelectedElementsIntoGrid(layout: GridSplitLayout = 'auto') {
+    if (selectedElementIds.length < 2) return;
+    const page = project.pages.find((item) => item.id === activePageId);
+    if (!page) return;
+    const patches = editorViewModelElements.createGridSplitFramePatches({
+      layout,
+      page,
+      project,
+      selectedElementIds,
+    });
+    if (Object.keys(patches).length === 0) return;
+    commitProject((currentProject) =>
+      new basicCommands.UpdateElementFramesCommand(patches).execute(currentProject),
+    );
+  }
+
+  function applyGridToSelectedElements(request: SelectionGridRequest) {
+    if (selectedElementIds.length < 2) return;
+    const page = project.pages.find((item) => item.id === activePageId);
+    if (!page) return;
+    const patches = editorViewModelElements.createSelectionGridFramePatches({
+      page,
+      project,
+      request,
+      selectedElementIds,
+    });
+    if (Object.keys(patches).length === 0) return;
+    commitProject((currentProject) =>
+      new basicCommands.UpdateElementFramesCommand(patches).execute(currentProject),
     );
   }
 
@@ -3066,7 +3143,8 @@ export function useEditorViewModel(services: AppServices) {
     if (!nextPage) return;
 
     commitProject(
-      (currentProject) => editorViewModelPages.insertPageAfter(currentProject, afterPageId, nextPage),
+      (currentProject) =>
+        editorViewModelPages.insertPageAfter(currentProject, afterPageId, nextPage),
       { activePageId: pageId, selectedElementIds: [] },
     );
   }
@@ -3418,7 +3496,10 @@ export function useEditorViewModel(services: AppServices) {
     pasteCopiedElements,
     insertTextElement,
     insertShapeElement,
+    insertImageGridPlaceholders,
+    applyGridToSelectedElements,
     alignSelectedElement,
+    splitSelectedElementsIntoGrid,
     setSelectedElementZOrder,
     flipSelectedImage,
     updateImageCrop,

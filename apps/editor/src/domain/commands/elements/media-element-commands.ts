@@ -183,6 +183,33 @@ class ReplaceVideoAssetCommand implements EditorCommand {
   }
 }
 
+class ReplaceElementWithMediaCommand implements EditorCommand {
+  readonly description = 'Replace element with media';
+
+  constructor(
+    private readonly elementId: string,
+    private readonly payload: { asset: Asset; element: ImageElement | GifElement | VideoElement },
+  ) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    const element = project.elements[this.elementId];
+    if (!element || element.locked || this.payload.element.id !== this.elementId) return project;
+
+    return {
+      ...project,
+      assets: {
+        ...project.assets,
+        [this.payload.asset.id]: this.payload.asset,
+      },
+      elements: {
+        ...project.elements,
+        [this.elementId]: this.payload.element,
+      },
+      updatedAt: projectMutationUtils.getProjectUpdatedAt(),
+    };
+  }
+}
+
 class ToggleImageFlipCommand implements EditorCommand {
   readonly description = 'Flip image';
 
@@ -237,6 +264,7 @@ class UpdateImageCropCommand implements EditorCommand {
 export const mediaElementCommands = {
   AddImageElementCommand,
   AddMediaElementCommand,
+  ReplaceElementWithMediaCommand,
   ReplaceImageAssetCommand,
   ReplaceVideoAssetCommand,
   ToggleImageFlipCommand,
