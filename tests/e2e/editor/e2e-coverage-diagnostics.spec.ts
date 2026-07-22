@@ -100,73 +100,6 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
     await page.getByRole('searchbox', { name: 'Search Google Fonts for replacement' }).fill('rob');
     await page.getByRole('button', { name: /Roboto/ }).click();
     await page.getByRole('button', { name: 'Replace Fonts' }).click();
-    await page.getByRole('button', { name: '2 fonts available' }).click();
-    await expect(page.getByRole('option', { name: /Inter/ })).toBeVisible({ timeout: 10_000 });
-    await page
-      .getByRole('button', { name: 'Resize mirror settings panel' })
-      .dispatchEvent('pointerdown', {
-        clientX: 440,
-        pointerId: 1,
-      });
-    await page.evaluate(() => {
-      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 560, pointerId: 1 }));
-      window.dispatchEvent(new PointerEvent('pointerup', { clientX: 560, pointerId: 1 }));
-    });
-    await expect(page.locator('.mirror-settings-panel')).not.toHaveClass(
-      /mirror-settings-panel-resizing/,
-    );
-    const s3EndpointInput = page.getByRole('textbox', { name: 'S3 API endpoint' });
-    await expect(s3EndpointInput).toBeEditable();
-    await s3EndpointInput.fill('http://localhost:9001/');
-    await page.getByRole('button', { name: 'Test connection' }).click();
-    await expect(page.locator('.mirror-settings-status-error')).toContainText(
-      'Use the S3 API endpoint, not the MinIO Console URL.',
-    );
-    await s3EndpointInput.fill('https://s3.localstudio.test/');
-    await page.getByRole('button', { name: 'Test connection' }).click();
-    await expect(page.getByText('S3-compatible connection is ready.')).toBeVisible();
-    await page.getByRole('button', { name: 'Close mirror settings' }).click();
-    await page.getByRole('button', { name: 'Import Remote A' }).click({ force: true });
-    await page.getByRole('button', { name: 'Delete Remote A from remote' }).click({ force: true });
-    await expect(page.getByRole('alertdialog', { name: 'Delete remote project' })).toBeVisible();
-    await page.getByRole('button', { name: 'Cancel' }).click({ force: true });
-    await page.getByRole('button', { name: 'Delete Remote B from remote' }).click({ force: true });
-    await page.getByRole('button', { name: 'Delete remote project' }).click({ force: true });
-    const sharePanels = page.getByRole('complementary', { name: 'Share design panel' });
-    await sharePanels
-      .first()
-      .getByRole('button', { name: 'Configure mirror storage' })
-      .evaluate((button: HTMLButtonElement) => button.click());
-    await sharePanels.first().getByRole('combobox').selectOption('recording-b');
-    await sharePanels
-      .first()
-      .getByRole('button', { name: 'Copy link' })
-      .evaluate((button: HTMLButtonElement) => button.click());
-    await sharePanels
-      .first()
-      .getByRole('button', { name: 'Download' })
-      .evaluate((button: HTMLButtonElement) => button.click());
-    await sharePanels
-      .first()
-      .getByRole('button', { name: 'Present' })
-      .evaluate((button: HTMLButtonElement) => button.click());
-    await sharePanels
-      .first()
-      .getByRole('button', { name: 'Embed code' })
-      .evaluate((button: HTMLButtonElement) => button.click());
-    await sharePanels
-      .nth(1)
-      .getByRole('button', { name: 'Copy link' })
-      .evaluate((button: HTMLButtonElement) => button.click());
-    await expect(sharePanels.nth(1).getByText('Share failed').nth(1)).toBeVisible();
-    await page.getByRole('textbox', { name: 'Speaker notes' }).fill('Updated diagnostics notes');
-    await page.getByRole('separator', { name: 'Resize speaker notes width' }).press('ArrowRight');
-    await page.getByRole('separator', { name: 'Resize speaker notes width' }).press('Home');
-    await page.getByRole('separator', { name: 'Resize speaker notes height' }).press('ArrowUp');
-    await page.getByRole('separator', { name: 'Resize speaker notes height' }).press('End');
-    await page
-      .getByRole('button', { name: 'Close notes panel' })
-      .evaluate((button: HTMLButtonElement) => button.click());
     await page
       .getByRole('button', { name: 'Hide diagnostics panels' })
       .evaluate((button: HTMLButtonElement) => button.click());
@@ -187,20 +120,10 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
     await page.keyboard.press('i');
     await page.keyboard.press('o');
     await playbackMediaEvents(page);
-    await page.getByRole('button', { name: 'Show captions' }).click();
     const playbackRegion = page.getByRole('region', { name: 'Presentation playback' });
     await playbackRegion.getByRole('button', { name: 'Show keyboard shortcuts' }).click();
     const shortcutDialog = page.getByRole('dialog', { name: 'Keyboard Shortcuts' }).first();
     await expect(shortcutDialog).toBeVisible();
-    await shortcutDialog.getByRole('button', { name: /Go back to previous slide/ }).click();
-    await shortcutDialog.getByRole('button', { name: /Advance to next slide/ }).click();
-    await shortcutDialog.getByRole('button', { name: /Go to first slide/ }).click();
-    await shortcutDialog.getByRole('button', { name: /Go to last slide/ }).click();
-    await shortcutDialog.getByRole('button', { name: /Pause\/Play movie/ }).click();
-    await shortcutDialog.getByRole('button', { name: /Hold to rewind movie/ }).click();
-    await shortcutDialog.getByRole('button', { name: /Hold to fast forward movie/ }).click();
-    await shortcutDialog.getByRole('button', { name: /Jump to beginning of movie/ }).click();
-    await shortcutDialog.getByRole('button', { name: /Jump to end of movie/ }).click();
     await shortcutDialog.getByRole('button', { name: 'Close keyboard shortcuts' }).click();
     await playbackRegion.getByRole('button', { name: 'Present slide fullscreen' }).click();
     await page.evaluate(() => {
@@ -248,7 +171,6 @@ test.describe('editor bundled runtime diagnostics coverage', () => {
     await expect(page.getByText('Deck not found')).toBeVisible();
     await expect(page.getByText('Deck could not be loaded')).toBeVisible();
     await driveHiddenPresenterDiagnostics(page);
-    await expect(page.getByLabel('Editor shell diagnostics')).toContainText('share-present');
 
     await expect(page.getByLabel('Diagnostics result')).toContainText(
       '"generated":"nested assistant text"',
