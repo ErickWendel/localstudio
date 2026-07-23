@@ -117,12 +117,12 @@ test.describe('generated and public accessibility regression journeys', () => {
     const nextButton = page.getByRole('button', { name: 'Next slide' });
     await nextButton.focus();
     await expect(nextButton).toBeFocused();
-    await page.keyboard.press('Enter');
+    await nextButton.press('Enter');
     await expect(page.getByText('2 / 2')).toBeVisible();
 
     const previousButton = page.getByRole('button', { name: 'Previous slide' });
     await previousButton.focus();
-    await page.keyboard.press('Space');
+    await previousButton.press('Space');
     await expect(page.getByText('1 / 2')).toBeVisible();
   });
 });

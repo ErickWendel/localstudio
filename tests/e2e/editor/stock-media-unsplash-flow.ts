@@ -13,4 +13,20 @@ export const stockMediaUnsplashFlow = {
     await editor.openTool('Layout');
     await expect(page.getByRole('button', { name: 'E2E stock dashboard', exact: true })).toBeVisible();
   },
+
+  async replacePlaceholderWithDashboardImage(editor: EditorAppPage, page: Page): Promise<void> {
+    await editor.openTool('Layout');
+    await page.getByRole('button', { name: 'Insert 1 image grid' }).click();
+    await page.getByRole('button', { name: 'Web AI placeholder image', exact: true }).first().click();
+
+    await editor.openTool('Elements');
+    await page
+      .getByRole('region', { name: 'Images results' })
+      .getByRole('button', { name: 'Insert image by E2E Photographer' })
+      .click();
+    await editor.openTool('Layout');
+    await expect(
+      page.getByRole('button', { name: 'E2E stock dashboard', exact: true }).first(),
+    ).toBeVisible();
+  },
 };

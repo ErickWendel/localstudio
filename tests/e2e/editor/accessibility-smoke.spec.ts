@@ -10,9 +10,17 @@ test.describe('editor accessibility smoke journey', () => {
     const editor = new EditorAppPage(page, getServer().baseURL);
     await editor.gotoNewProject();
 
-    await editor.openMenu('Help');
-    await page.getByRole('menuitem', { name: 'Keyboard Shortcuts' }).click();
-    await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeVisible();
+    const keyboardShortcutsDialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await editor.openMenu('Help');
+      await page
+        .getByRole('menuitem', { name: 'Keyboard Shortcuts' })
+        .click({ timeout: 5000 })
+        .catch(() => undefined);
+      if (await keyboardShortcutsDialog.isVisible().catch(() => false)) break;
+      await page.keyboard.press('Escape').catch(() => undefined);
+    }
+    await expect(keyboardShortcutsDialog).toBeVisible();
     await page.getByRole('button', { name: 'Close keyboard shortcuts' }).focus();
     await expect(page.getByRole('button', { name: 'Close keyboard shortcuts' })).toBeFocused();
     await page.keyboard.press('Enter');

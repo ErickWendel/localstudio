@@ -34,6 +34,9 @@ test.describe('editor element command contracts', () => {
 
     expect(result).toEqual({
       imageY: 320,
+      missingAssetRetained: true,
+      referencedAssetRetained: true,
+      removedAssetGone: true,
       shape1X: 100,
       shape2Deleted: true,
     });
