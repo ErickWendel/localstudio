@@ -62,6 +62,7 @@ export async function evaluateEditorHighCoverageContract({
     { transformersResultParsing },
     { slideLayoutPresets },
     { presenterRemoteStateFactory },
+    { editorViewModelProject },
     { PresenterAudioRecorder },
     { PresenterSpeechTranscriber },
     { BrowserPresenterSessionService },
@@ -71,6 +72,7 @@ export async function evaluateEditorHighCoverageContract({
     import(`${editorSourceRoot}/services/model-setup/transformersResultParsing.ts`),
     import(`${editorSourceRoot}/services/prompting/slideLayoutPresets.ts`),
     import(`${editorSourceRoot}/services/presenter/presenterRemoteStateFactory.ts`),
+    import(`${editorSourceRoot}/ui/editor/state/editorViewModelProject.ts`),
     import(`${editorSourceRoot}/services/transcription/presenterAudioRecorder.ts`),
     import(`${editorSourceRoot}/services/transcription/presenterSpeechTranscriber.ts`),
     import(`${editorSourceRoot}/services/presenter/presenterSessionService.ts`),
@@ -80,6 +82,7 @@ export async function evaluateEditorHighCoverageContract({
     typeof import('../../../apps/editor/src/services/model-setup/transformersResultParsing'),
     typeof import('../../../apps/editor/src/services/prompting/slideLayoutPresets'),
     typeof import('../../../apps/editor/src/services/presenter/presenterRemoteStateFactory'),
+    typeof import('../../../apps/editor/src/ui/editor/state/editorViewModelProject'),
     typeof import('../../../apps/editor/src/services/transcription/presenterAudioRecorder'),
     typeof import('../../../apps/editor/src/services/transcription/presenterSpeechTranscriber'),
     typeof import('../../../apps/editor/src/services/presenter/presenterSessionService'),
@@ -342,6 +345,87 @@ export async function evaluateEditorHighCoverageContract({
     0,
     { elapsedMs: 0, paused: true },
   );
+  const completeRemoteState = await presenterRemoteStateFactory.createRemoteState(
+    {
+      ...presenterPayload,
+      animationPreview: {
+        hiddenElementIds: [],
+        mode: 'presenter',
+        pageId: 'slide-1',
+        phase: 'complete',
+        playing: false,
+      },
+    } as never,
+    1,
+    { elapsedMs: 5_000, paused: false },
+  );
+  const idleRemoteSkeleton = presenterRemoteStateFactory.createRemoteStateSkeleton(
+    {
+      ...presenterPayload,
+      animationPreview: undefined,
+    } as never,
+    0,
+    { elapsedMs: 0, paused: true },
+  );
+  const largePreviewProject = {
+    ...project,
+    elements: {
+      ...project.elements,
+      huge: {
+        ...createTextElement('huge', 'Preview '.repeat(5_000)),
+        visible: true,
+      },
+    },
+    pages: [
+      {
+        background: { color: '#020617', type: 'color' },
+        elementIds: ['huge'],
+        height: 1080,
+        id: 'huge-slide',
+        name: 'Huge',
+        speakerNotes: '',
+        width: 1920,
+      },
+      ...project.pages,
+    ],
+  };
+  const splitPreviewBatches = await presenterRemoteStateFactory.createRemotePreviewBatches(
+    {
+      activePageId: 'huge-slide',
+      project: largePreviewProject,
+    } as never,
+    ['huge-slide', 'slide-1', 'slide-2'],
+    'split-request',
+  );
+  const restoredHeroProject = editorViewModelProject.normalizeProjectDocument({
+    ...project,
+    assets: {
+      ...project.assets,
+      'asset-hero': {
+        id: 'asset-hero',
+        mimeType: 'image/png',
+        name: 'Legacy hero',
+        objectUrl: undefined,
+        type: 'image',
+      },
+    },
+    elements: {
+      ...project.elements,
+      'legacy-hidden': {
+        ...createTextElement('legacy-hidden', 'Legacy hidden'),
+        visible: undefined,
+      },
+    },
+    pages: [
+      {
+        ...project.pages[0],
+        animationBuilds: undefined,
+        elementIds: ['legacy-hidden'],
+        visible: undefined,
+      },
+      ...project.pages.slice(1),
+    ],
+  } as never);
 
   const speechUpdates: Array<{ final: boolean; text: string }> = [];
   const speechErrors: string[] = [];
@@ -586,9 +670,14 @@ export async function evaluateEditorHighCoverageContract({
     remote: {
       activePageName: remoteState.activePageName,
       batchCount: previewBatches.length,
+      completeRemaining: completeRemoteState.buildsRemaining,
       emptyPageCount: emptyRemoteState.pageCount,
+      idleRemaining: idleRemoteSkeleton.buildsRemaining,
+      restoredHeroFirstElement: restoredHeroProject.pages[0]?.elementIds[0],
+      restoredHeroVisible: restoredHeroProject.elements['image-hero']?.visible,
       skeletonRemaining: remoteSkeleton.buildsRemaining,
       slidePreviewElements: remoteState.slidePreview?.elements.length ?? 0,
+      splitBatchCount: splitPreviewBatches.length,
       timerValid: presenterRemoteStateFactory.isPresenterRemoteTimerState(remoteState.timer),
       timerInvalid: presenterRemoteStateFactory.isPresenterRemoteTimerState({ elapsedMs: 'bad', paused: false }),
       upcomingCount: remoteState.upcomingSlidePreviews.length,

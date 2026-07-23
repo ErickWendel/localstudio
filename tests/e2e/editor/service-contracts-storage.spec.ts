@@ -8,12 +8,26 @@ test('executes local file repository persistence and version contracts in the br
   const result = await storageContractRuntimePage.run(page, serviceContractsSupport.getServer().baseURL);
 
   expect(result).toMatchObject({
+    browserMissingMirrorProjectMessage: 'The mirrored project did not include project.json.',
+    browserRemoteAssetObjectUrl: expect.stringContaining('blob:'),
+    fileBackedAssetObjectUrl: expect.stringContaining('blob:'),
+    fileBackedFontObjectUrl: expect.stringContaining('blob:'),
+    fileBackedRecordingObjectUrl: expect.stringContaining('blob:'),
     historyCount: 1,
+    inlineRecordingStorage: 'file',
     loadedAssetStorage: 'file',
     loadedFontStorage: 'file',
     loadedName: 'File Contract',
     loadedVersionName: 'File Contract v2',
     missingVersion: null,
+    opfsMissingMirrorProjectMessage: 'The mirrored project did not include project.json.',
+    opfsRemoteAssetObjectUrl: expect.stringContaining('blob:'),
+    opfsImportedName: '',
+    opfsLoadedName: 'File Contract',
+    opfsMissingProject: null,
+    pickerImportedName: 'Prepared Picker Import',
+    permissionDeniedMessage:
+      'LocalStudio.dev needs permission to read and write the selected project folder.',
   });
   expect(result.persistedKeys).toEqual(
     expect.arrayContaining([

@@ -6,6 +6,9 @@ export type PresenterSessionServiceContractResult = {
   hostOpenCount: number;
   hostPreviewBatchCount: number;
   hostStateCount: number;
+  legacyCommandNames: string[];
+  legacyCloseCount: number;
+  legacyPublishCount: number;
   openedPopupHrefIncludesPresenter: boolean;
   openedStatus: string;
   popupClosed: boolean;
@@ -41,6 +44,9 @@ type PresenterSessionServiceContractResultInput = {
     previewBatches: unknown[];
     states: unknown[];
   };
+  legacyCommands?: unknown[];
+  legacyCloseCount?: number;
+  legacyPublishCount?: number;
   opened: PresenterSessionContractStatus;
   popup: {
     closed: boolean;
@@ -57,6 +63,9 @@ export function createPresenterSessionServiceContractResult({
   duplicateSession,
   getPresenterCommandNames,
   host,
+  legacyCloseCount,
+  legacyCommands,
+  legacyPublishCount,
   opened,
   popup,
   remoteSession,
@@ -69,6 +78,9 @@ export function createPresenterSessionServiceContractResult({
     hostOpenCount: host.openCount,
     hostPreviewBatchCount: host.previewBatches.length,
     hostStateCount: host.states.length,
+    legacyCommandNames: getPresenterCommandNames(legacyCommands ?? []),
+    legacyCloseCount: legacyCloseCount ?? 0,
+    legacyPublishCount: legacyPublishCount ?? 0,
     openedPopupHrefIncludesPresenter: popup.location.href.includes('presenter=1'),
     openedStatus: opened.status,
     popupClosed: popup.closed,

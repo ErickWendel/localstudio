@@ -21,13 +21,25 @@ export class EditorAppPage extends BasePage {
       await this.page.keyboard.press('Escape');
     }
     const menu = this.page.getByRole('menu', { name: `${name} menu` });
-    const button = this.page.getByRole('button', { name, exact: true });
-    await button.click({ timeout: 30_000 });
-    if (!(await menu.isVisible().catch(() => false))) {
+    const button = this.page
+      .getByRole('navigation', { name: 'Application menu' })
+      .getByRole('button', { name, exact: true });
+    await expect(button).toBeVisible({ timeout: 30_000 });
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (attempt === 2) {
+        await button.evaluate((element: HTMLButtonElement) => element.click());
+      } else {
+        await button.click({ timeout: 30_000 });
+      }
+      if (
+        (await button.getAttribute('aria-expanded')) === 'true' &&
+        (await menu.isVisible().catch(() => false))
+      ) {
+        return;
+      }
       await this.page.keyboard.press('Escape').catch(() => undefined);
-      await button.click({ timeout: 30_000 });
     }
-    await expect(menu).toBeVisible();
+    await expect(menu).toBeVisible({ timeout: 10_000 });
   }
 
   async openTool(tab: 'AI Tools' | 'Animate' | 'Assets' | 'Design' | 'Elements' | 'Layout' | 'Text') {

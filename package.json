@@ -22,6 +22,7 @@
     "test:e2e": "playwright test --project=chromium",
     "test:e2e:coverage": "npm run test:e2e:coverage:editor && npm run test:e2e:coverage:landing && npm run test:e2e:coverage:public-deck && npm run test:e2e:coverage:webmcp && npm run test:e2e:coverage:joystick",
     "test:e2e:coverage:editor": "node scripts/run-e2e-coverage.mjs editor",
+    "test:e2e:coverage:editor-full": "E2E_SERVER=dev node scripts/run-e2e-coverage.mjs editor-full",
     "test:e2e:coverage:joystick": "node scripts/run-e2e-coverage.mjs joystick",
     "test:e2e:coverage:landing": "node scripts/run-e2e-coverage.mjs landing",
     "test:e2e:coverage:public-deck": "node scripts/run-e2e-coverage.mjs public",

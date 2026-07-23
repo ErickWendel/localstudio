@@ -4,6 +4,7 @@ const scaffoldSourceFiles = new Set([
   'apps/editor/src/domain/projects/sampleProject.ts',
   'apps/editor/src/services/fonts/googleFontsCatalog.ts',
   'apps/editor/src/services/model-setup/aiModelCatalog.ts',
+  'apps/editor/src/ui/e2e/E2ECoverageDiagnosticsPage.tsx',
   'apps/editor/src/ui/editor/animation/animationEffectCatalog.ts',
   'apps/editor/src/ui/editor/media/imagePromptOptions.ts',
   'apps/editor/src/ui/editor/media/localMediaImportConfig.ts',

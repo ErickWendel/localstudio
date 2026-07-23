@@ -12,6 +12,34 @@ function createProject() {
     id: 'project-mirror-contract',
     name: 'Mirror Contract',
     pages: mirrorFileContractPages.create(),
+    recordings: {
+      'recording-readable': {
+        audio: {
+          mimeType: 'audio/webm',
+          objectUrl: 'data:audio/webm;base64,bWlycm9yLWF1ZGlv',
+          storage: 'inline',
+        },
+        createdAt: '2026-07-09T11:00:00.000Z',
+        durationMs: 1500,
+        id: 'recording-readable',
+        name: 'Readable recording',
+        segments: [],
+        updatedAt: '2026-07-09T11:00:00.000Z',
+      },
+      'recording-unreadable': {
+        audio: {
+          fileName: 'kept-recording.webm',
+          mimeType: 'audio/webm',
+          storage: 'file',
+        },
+        createdAt: '2026-07-09T11:10:00.000Z',
+        durationMs: 2500,
+        id: 'recording-unreadable',
+        name: 'Unreadable recording',
+        segments: [],
+        updatedAt: '2026-07-09T11:10:00.000Z',
+      },
+    },
     updatedAt: '2026-07-09T12:00:00.000Z',
   };
 }

@@ -9,8 +9,12 @@ test('executes mirror file generation contracts in the browser runtime', async (
   );
 
   expect(result).toMatchObject({
+    defaultPublicBaseUrl: 'https://bucket.s3.example.test',
     mirroredAssetIds: ['asset-unreadable', 'asset-used'],
+    mirroredFontStorage: 'file',
     mirroredProjectAssetStorage: 'file',
+    mirroredRecordingObjectUrl: undefined,
+    mirroredRecordingStorage: 'file',
     mirroredProjectUnreadableObjectUrl: 'https://example.test/unreadable.png',
   });
   expect(result.manifest).toMatchObject({
@@ -29,6 +33,7 @@ test('executes mirror file generation contracts in the browser runtime', async (
       'history/versions/version-1.json',
       'localstudio-mirror.json',
       'project.json',
+      'recordings/recording-readable.webm',
     ]),
   );
 });

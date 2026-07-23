@@ -172,13 +172,18 @@ test.describe('editor service contracts coverage batch', () => {
       });
       expect(result.remote).toMatchObject({
         activePageName: 'Opening',
+        completeRemaining: 0,
         emptyPageCount: 0,
+        idleRemaining: 2,
+        restoredHeroFirstElement: 'image-hero',
+        restoredHeroVisible: true,
         skeletonRemaining: 1,
         timerInvalid: false,
         timerValid: true,
       });
       expect(result.remote.batchCount).toBeGreaterThan(0);
       expect(result.remote.slidePreviewElements).toBeGreaterThan(0);
+      expect(result.remote.splitBatchCount).toBeGreaterThan(1);
       expect(result.recorder).toMatchObject({
         objectUrl: 'blob:contract-audio',
         recordingBeforePause: true,
@@ -645,6 +650,11 @@ test.describe('editor service contracts coverage batch', () => {
         'update-stream-peer',
         'go-to-page',
         'next',
+        'save-recording',
+        'close',
+        'previous',
+        'request-state',
+        'start-presenting',
       ]);
       expect(session.hostPreviewBatchCount).toBeGreaterThan(0);
       expect(session.hostStateCount).toBeGreaterThanOrEqual(4);

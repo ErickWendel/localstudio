@@ -7,6 +7,15 @@ const minimalPptxPackageBase64 =
 
 export type PptxPatcherContractInput = {
   base64: string;
+  packageMutations?: {
+    addUndeclaredAviMedia?: boolean;
+    addExistingCropRect?: boolean;
+    addAbsoluteMissingMediaRelationship?: boolean;
+    removePresentationFile?: boolean;
+    removeContentTypesFile?: boolean;
+    removeImageMedia?: boolean;
+    removeSlideShapeIds?: boolean;
+  };
   pages: Page[];
   patchPages: PptxPackagePatchPage[];
   warnings: PresentationExportWarning[];
@@ -32,9 +41,16 @@ export const pptxPatcherContractFixtures = {
             {
               delayMs: 0,
               effect: 'reveal',
+              elementId: 'image-1',
+              id: 'build-media',
+              mediaAction: 'play',
+              trigger: 'after-previous',
+            },
+            {
+              delayMs: 0,
+              effect: 'reveal',
               elementId: 'missing-element',
               id: 'build-missing',
-              mediaAction: 'play',
               trigger: 'after-previous',
             },
           ],
@@ -61,6 +77,139 @@ export const pptxPatcherContractFixtures = {
         },
       ],
       warnings: [{ category: 'media', code: 'existing-warning', message: 'Existing warning.' }],
+    };
+  },
+  createValidationInput(): PptxPatcherContractInput {
+    return {
+      base64: minimalPptxPackageBase64,
+      packageMutations: {
+        addUndeclaredAviMedia: true,
+        removePresentationFile: true,
+        removeSlideShapeIds: true,
+      },
+      pages: [
+        {
+          animationBuilds: [
+            {
+              delayMs: 120,
+              direction: 'down',
+              durationMs: 600,
+              effect: 'wipe',
+              elementId: 'orphan-shape',
+              id: 'build-orphan',
+              kind: 'build-out',
+              trigger: 'with-previous',
+            },
+          ],
+          background: { color: '#ffffff', type: 'color' },
+          elementIds: ['orphan-shape'],
+          height: 1080,
+          id: 'page-1',
+          name: 'Validation',
+          transition: {
+            delayMs: 0,
+            direction: 'down',
+            durationMs: -40,
+            effect: 'line-draw',
+            trigger: 'on-click',
+          },
+          visible: true,
+          width: 1920,
+        },
+        {
+          animationBuilds: [
+            {
+              delayMs: 0,
+              effect: 'push',
+              elementId: 'missing-slide-shape',
+              id: 'build-missing-slide',
+              kind: 'emphasis',
+              trigger: 'after-previous',
+            },
+          ],
+          background: { color: '#ffffff', type: 'color' },
+          elementIds: ['missing-slide-shape'],
+          height: 1080,
+          id: 'page-2',
+          name: 'Missing slide',
+          transition: {
+            delayMs: 0,
+            durationMs: 120,
+            effect: 'line-draw',
+            trigger: 'on-click',
+          },
+          visible: true,
+          width: 1920,
+        },
+      ],
+      patchPages: [{ elements: [{ id: 'image-1' }], pageId: 'page-1' }],
+      warnings: [],
+    };
+  },
+  createBranchInput(): PptxPatcherContractInput {
+    return {
+      base64: minimalPptxPackageBase64,
+      packageMutations: {
+        addAbsoluteMissingMediaRelationship: true,
+        addExistingCropRect: true,
+        removeContentTypesFile: true,
+        removeImageMedia: true,
+      },
+      pages: [
+        {
+          animationBuilds: [
+            {
+              delayMs: 10,
+              direction: 'right',
+              durationMs: 300,
+              effect: 'push',
+              elementId: 'text-1',
+              id: 'build-push',
+              kind: 'emphasis',
+              trigger: 'with-previous',
+            },
+            {
+              delayMs: 0,
+              direction: 'up',
+              durationMs: 250,
+              effect: 'wipe',
+              elementId: 'image-1',
+              id: 'build-wipe',
+              kind: 'build-out',
+              trigger: 'after-previous',
+            },
+            {
+              delayMs: 0,
+              durationMs: 125,
+              effect: 'dissolve',
+              elementId: 'text-1',
+              id: 'build-dissolve',
+              trigger: 'on-click',
+            },
+          ],
+          background: { color: '#ffffff', type: 'color' },
+          elementIds: ['image-1', 'text-1'],
+          height: 1080,
+          id: 'page-1',
+          name: 'Branches',
+          transition: {
+            delayMs: 0,
+            direction: 'right',
+            durationMs: 500,
+            effect: 'wipe',
+            trigger: 'on-click',
+          },
+          visible: true,
+          width: 1920,
+        },
+      ],
+      patchPages: [
+        {
+          elements: [{ crop: { height: 0.4, width: 0.5, x: 0.25, y: 0.1 }, id: 'image-1' }],
+          pageId: 'page-1',
+        },
+      ],
+      warnings: [],
     };
   },
 };
