@@ -66,6 +66,8 @@ export async function evaluateEditorHighCoverageContract({
     { PresenterAudioRecorder },
     { PresenterSpeechTranscriber },
     { BrowserPresenterSessionService },
+    { browserPromptService },
+    { chromeTranslatorService },
   ] = (await Promise.all([
     import(`${editorSourceRoot}/services/exporting/pptxPackagePatcher.ts`),
     import(`${editorSourceRoot}/services/model-setup/progress.ts`),
@@ -76,6 +78,8 @@ export async function evaluateEditorHighCoverageContract({
     import(`${editorSourceRoot}/services/transcription/presenterAudioRecorder.ts`),
     import(`${editorSourceRoot}/services/transcription/presenterSpeechTranscriber.ts`),
     import(`${editorSourceRoot}/services/presenter/presenterSessionService.ts`),
+    import(`${editorSourceRoot}/services/prompting/browserPromptService.ts`),
+    import(`${editorSourceRoot}/services/translation/chromeTranslatorService.ts`),
   ])) as [
     typeof import('../../../apps/editor/src/services/exporting/pptxPackagePatcher'),
     typeof import('../../../apps/editor/src/services/model-setup/progress'),
@@ -86,6 +90,8 @@ export async function evaluateEditorHighCoverageContract({
     typeof import('../../../apps/editor/src/services/transcription/presenterAudioRecorder'),
     typeof import('../../../apps/editor/src/services/transcription/presenterSpeechTranscriber'),
     typeof import('../../../apps/editor/src/services/presenter/presenterSessionService'),
+    typeof import('../../../apps/editor/src/services/prompting/browserPromptService'),
+    typeof import('../../../apps/editor/src/services/translation/chromeTranslatorService'),
   ];
 
   const pptxBytes = Uint8Array.from(atob(pptx.base64), (character) => character.charCodeAt(0));
@@ -153,6 +159,12 @@ export async function evaluateEditorHighCoverageContract({
   } catch (error) {
     parsingErrors.push(error instanceof Error ? error.message : 'unknown');
   }
+  transformersResultParsing.extractGeneratedText([{ generated_text: 'first generated text' }]);
+  transformersResultParsing.extractGeneratedText([
+    { generated_text: [{ generated_text: 'deep generated text' }] },
+    { content: 'last chat text' },
+  ]);
+  transformersResultParsing.extractDetectedLanguage([[{ label: 'es' }]]);
 
   const titleOnly = slideLayoutPresets.normalizeSlideTasksForLayout(
     createSlideDocument([{ id: 'title', placementHint: '', text: 'Only title', type: 'add-title' }]),
@@ -218,6 +230,206 @@ export async function evaluateEditorHighCoverageContract({
       task: hero.tasks[1] as never,
     }),
   ];
+
+  const originalGpu = Object.getOwnPropertyDescriptor(Navigator.prototype, 'gpu');
+  Object.defineProperty(Navigator.prototype, 'gpu', {
+    configurable: true,
+    get: () => ({ requestAdapter: async () => ({}) }),
+  });
+  const chromeWindow = window as Window &
+    typeof globalThis & {
+      LanguageDetector?: unknown;
+      LanguageModel?: unknown;
+      Translator?: unknown;
+    };
+  const originalLanguageDetector = chromeWindow.LanguageDetector;
+  const originalLanguageModel = chromeWindow.LanguageModel;
+  const originalTranslator = chromeWindow.Translator;
+  const promptStorage = new Map<string, string>();
+  const promptRuntimeCalls: string[] = [];
+  let structuredPromptCallCount = 0;
+  const promptRuntime = {
+    generate: async (_modelId: string, prompt: unknown) => {
+      promptRuntimeCalls.push(Array.isArray(prompt) ? 'messages' : 'text');
+      if (Array.isArray(prompt)) {
+        structuredPromptCallCount += 1;
+        if (structuredPromptCallCount > 1) {
+          return JSON.stringify(createTextElement('gemma-element', 'Gemma element'));
+        }
+        return JSON.stringify(
+          createSlideDocument([
+            { id: 'gemma-title', placementHint: '', text: 'Gemma', type: 'add-title' },
+            { id: 'gemma-body', placementHint: '', text: 'Repaired JSON', type: 'add-body-text' },
+          ]),
+        );
+      }
+      return `gemma:${String(prompt).slice(0, 20)}`;
+    },
+  };
+  const promptModelSetup = {
+    downloadModel: async (
+      id: string,
+      options?: { onProgress?: (progress: number) => void },
+    ) => {
+      options?.onProgress?.(55);
+      return {
+        id,
+        label: 'Prompt model',
+        progress: 100,
+        provider: 'transformers' as const,
+        required: true,
+        status: 'ready' as const,
+      };
+    },
+    downloadRequiredModels: async () => [],
+    getModelStates: async () => [
+      {
+        id: 'diagnostic-model',
+        label: 'Diagnostic',
+        provider: 'transformers' as const,
+        required: true,
+        status: 'needs-download' as const,
+      },
+      {
+        id: 'gemma-4-webgpu-llm',
+        label: 'Gemma',
+        progress: 100,
+        provider: 'transformers' as const,
+        required: true,
+        status: 'ready' as const,
+      },
+    ],
+    removeModel: async (id: string) => ({
+      id,
+      label: 'Prompt model',
+      progress: 0,
+      provider: 'transformers' as const,
+      required: true,
+      status: 'needs-download' as const,
+    }),
+  };
+  chromeWindow.LanguageModel = {
+    availability: async () => 'downloadable',
+    create: async (options?: { monitor?: (target: EventTarget) => void }) => {
+      const monitorTarget = new EventTarget();
+      options?.monitor?.(monitorTarget);
+      monitorTarget.dispatchEvent(
+        new CustomEvent('downloadprogress', { detail: { loaded: 1, total: 4 } }),
+      );
+      return {
+        destroy: () => undefined,
+        prompt: async (prompt: string, options?: { responseConstraint?: unknown }) => {
+          if (options?.responseConstraint) {
+            return JSON.stringify(
+              createSlideDocument([
+                { id: 'chrome-title', placementHint: '', text: 'Chrome', type: 'add-title' },
+              ]),
+            );
+          }
+          return `chrome:${prompt.slice(0, 20)}`;
+        },
+      };
+    },
+  };
+  chromeWindow.LanguageDetector = {
+    create: async () => ({
+      detect: async () => [{ detectedLanguage: 'zh-Hant' }],
+    }),
+  };
+  let chromeTranslatorAvailability = 'downloadable';
+  const chromeTranslatorPairs: string[] = [];
+  chromeWindow.Translator = {
+    availability: async ({
+      sourceLanguage,
+      targetLanguage,
+    }: {
+      sourceLanguage: string;
+      targetLanguage: string;
+    }) => {
+      chromeTranslatorPairs.push(`availability:${sourceLanguage}:${targetLanguage}`);
+      return chromeTranslatorAvailability;
+    },
+    create: async (options: {
+      monitor?: (target: EventTarget) => void;
+      sourceLanguage: string;
+      targetLanguage: string;
+    }) => {
+      chromeTranslatorPairs.push(`create:${options.sourceLanguage}:${options.targetLanguage}`);
+      const monitorTarget = new EventTarget();
+      options.monitor?.(monitorTarget);
+      monitorTarget.dispatchEvent(new ProgressEvent('downloadprogress', { loaded: 0.4 }));
+      return {
+        ready: Promise.resolve(),
+        translate: async (text: string) => `[${options.targetLanguage}] ${text}`,
+      };
+    },
+  };
+  const promptService = new browserPromptService.BrowserPromptService(
+    promptModelSetup as never,
+    undefined,
+    {
+      getItem: (key) => promptStorage.get(key) ?? null,
+      removeItem: (key) => {
+        promptStorage.delete(key);
+      },
+      setItem: (key, value) => {
+        promptStorage.set(key, value);
+      },
+    },
+    promptRuntime as never,
+  );
+  const promptProviderStates = await promptService.getProviderStates();
+  const unknownPromptProvider = await promptService
+    .setSelectedProvider('missing-provider')
+    .catch((error: Error) => error.message);
+  await promptService.setSelectedProvider(browserPromptService.CHROME_PROMPT_PROVIDER_ID);
+  await promptService.preparePromptApi();
+  const chromePromptText = await promptService.generateText([
+    { content: { text: 'object content' }, role: 'user' },
+    { content: 'plain content', role: 'assistant' },
+  ]);
+  await promptService.generateSlideTasksFromPrompt('Chrome diagnostic deck');
+  await promptService.setSelectedProvider(browserPromptService.GEMMA_PROMPT_PROVIDER_ID);
+  await promptService.preparePromptApi();
+  const gemmaTasks = await promptService.generateSlideTasksFromPrompt('Gemma diagnostic deck');
+  const gemmaElement = await promptService.generateSlideElementFromTask(gemmaTasks.tasks[1] as never, {
+    allTasks: gemmaTasks.tasks,
+    existingElements: [],
+    page: gemmaTasks.page,
+    userPrompt: 'Gemma diagnostic deck',
+  });
+  const gemmaPromptText = await promptService.generateText('plain prompt');
+  const chromeTranslator = new chromeTranslatorService.ChromeTranslatorService();
+  const chromeTranslationProgress: number[] = [];
+  const detectedChromeLanguage = await chromeTranslator.detectLanguage('Chrome text');
+  await chromeTranslator.prepareTranslation('en', 'en', {
+    onProgress: (value) => chromeTranslationProgress.push(value),
+  });
+  await chromeTranslator.prepareTranslation('en', 'pt-BR', {
+    onProgress: (value) => chromeTranslationProgress.push(value),
+  });
+  const translatedChromeText = await chromeTranslator.translate('cached text', 'pt', {
+    sourceLanguage: 'en',
+  });
+  const sameLanguageTranslation = await chromeTranslator.translate('same language', 'iw', {
+    sourceLanguage: 'he',
+  });
+  chromeTranslatorAvailability = 'unavailable';
+  const unavailableTranslation = await chromeTranslator
+    .prepareTranslation('fr', 'de')
+    .catch((error: Error) => error.message);
+  chromeWindow.Translator = {};
+  const missingChromeTranslator = await chromeTranslator
+    .translate('missing translator', 'it', { sourceLanguage: 'en' })
+    .catch((error: Error) => error.message);
+  if (originalGpu) {
+    Object.defineProperty(Navigator.prototype, 'gpu', originalGpu);
+  } else {
+    delete (Navigator.prototype as Navigator & { gpu?: unknown }).gpu;
+  }
+  chromeWindow.LanguageDetector = originalLanguageDetector;
+  chromeWindow.LanguageModel = originalLanguageModel;
+  chromeWindow.Translator = originalTranslator;
 
   const project = {
     assets: {
@@ -656,6 +868,28 @@ export async function evaluateEditorHighCoverageContract({
   return {
     detectedLanguages,
     generatedTexts,
+    prompt: {
+      chromePromptText,
+      gemmaElement: gemmaElement.id,
+      gemmaPromptText,
+      promptProviderCount: promptProviderStates.length,
+      promptRuntimeCalls,
+      unknownPromptProvider,
+    },
+    chromeTranslation: {
+      chromeTranslationProgress,
+      detectedChromeLanguage,
+      missingChromeTranslator,
+      normalized: [
+        chromeTranslatorService.normalizeDetectedLanguageCode('he-IL'),
+        chromeTranslatorService.normalizeDetectedLanguageCode('zh-tw'),
+        chromeTranslatorService.normalizeDetectedLanguageCode('pt-BR'),
+      ],
+      pairs: chromeTranslatorPairs,
+      sameLanguageTranslation,
+      translatedChromeText,
+      unavailableTranslation,
+    },
     layoutFills: layoutSamples.map((sample) => ('fill' in sample ? sample.fill : undefined)),
     parsingErrors,
     patchedWarningCodes: patchedPptx.warnings.map((warning) => warning.code).sort(),

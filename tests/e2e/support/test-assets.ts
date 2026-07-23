@@ -17,6 +17,12 @@ export async function createTinyPngFixture(testInfo: TestInfo) {
   return filePath;
 }
 
+export async function createTinyGifFixture(testInfo: TestInfo) {
+  const filePath = testInfo.outputPath('localstudio-e2e-pixel.gif');
+  await writeFile(filePath, Buffer.from(tinyPngBase64, 'base64'));
+  return filePath;
+}
+
 export function getBigBuckBunnyMp4Fixture() {
   if (!existsSync(bigBuckBunnyMp4FixturePath)) {
     throw new Error(`Missing Big Buck Bunny E2E video fixture: ${bigBuckBunnyMp4FixturePath}`);

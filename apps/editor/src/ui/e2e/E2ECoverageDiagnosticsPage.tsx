@@ -1,9 +1,13 @@
 /* eslint-disable react-hooks/refs, @typescript-eslint/require-await, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-unsafe-return, @typescript-eslint/unbound-method, @typescript-eslint/no-this-alias, @typescript-eslint/no-floating-promises, @typescript-eslint/no-base-to-string, @typescript-eslint/restrict-template-expressions */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { strToU8, zipSync } from 'fflate';
 import { pptxPackagePatcher } from '../../services/exporting/pptxPackagePatcher';
 import { progress } from '../../services/model-setup/progress';
 import { transformersResultParsing } from '../../services/model-setup/transformersResultParsing';
+import { webGpuTextGenerationRuntime } from '../../services/prompting/webGpuTextGenerationRuntime';
+import { browserPromptService } from '../../services/prompting/browserPromptService';
 import { slideLayoutPresets } from '../../services/prompting/slideLayoutPresets';
+import { placeholderImage } from '../../domain/assets/placeholderImage';
 import { createProjectForSelectedShareRecording } from '../editor/shell/createProjectForSelectedShareRecording';
 import { PowerPointFontReplacementDialog } from '../editor/shell/PowerPointFontReplacementDialog';
 import { presenterRemoteStateFactory } from '../../services/presenter/presenterRemoteStateFactory';
@@ -16,6 +20,8 @@ import type {
 } from '../../domain/generated-slides/generatedSlide';
 import { generatedSlide } from '../../domain/generated-slides/generatedSlide';
 import type {
+  DesignElement,
+  ImageElement,
   ProjectDocument,
   ProjectFont,
   ShapeLineEndpoint,
@@ -23,34 +29,59 @@ import type {
 } from '../../domain/documents/model';
 import { editorAutomationController } from '../../services/automation/editorAutomationController';
 import { BrowserPresenterSessionService } from '../../services/presenter/presenterSessionService';
+import type {
+  PresenterStatePayload,
+  PresenterWindowCommand,
+} from '../../services/presenter/presenterSessionTypes';
 import { BrowserFileSystemProjectRepository } from '../../services/storage/browserFileSystemProjectRepository';
 import { DisabledProjectRepository } from '../../services/storage/disabledProjectRepository';
 import { OpfsProjectRepository } from '../../services/storage/opfsProjectRepository';
 import { animationPresetEngine } from '../editor/animation/animationPresetEngine';
 import { WebMcpToolAdapter } from '../../services/webmcp/webMcpToolAdapter';
 import { aiModelCatalog } from '../../services/model-setup/aiModelCatalog';
+import { providerSelection } from '../../services/model-setup/providerSelection';
 import { imageGenerationModel } from '../../services/image-generation/imageGenerationModel';
 import { bonsaiImageRuntime } from '../../services/image-generation/bonsaiImageRuntime';
+import { createPrefixedId } from '../../services/ids/idUtils';
 import { modelSetupService } from '../../services/model-setup/modelSetupService';
 import { TransformersRuntimeClient } from '../../services/model-setup/transformersRuntimeClient';
 import { BrowserBackgroundRemovalService } from '../../services/background-removal/browserBackgroundRemovalService';
 import { BrowserShareService } from '../../services/sharing/shareService';
 import type { FontImportRequest } from '../../services/contracts/interfaces';
+import { minioMirrorFiles } from '../../services/mirror/minioMirrorFiles';
 import { minioMirrorService } from '../../services/mirror/minioMirrorService';
 import { BrowserLocalFontMirrorService } from '../../services/fonts/localFontMirrorService';
 import { localFontFolderHandleStore } from '../../services/fonts/localFontFolderHandleStore';
+import { BrowserGoogleFontsImportService } from '../../services/fonts/googleFontsImportService';
 import { BrowserPptxExportService } from '../../services/exporting/pptxExportService';
+import { browserTranslatorService } from '../../services/translation/browserTranslatorService';
 import { pptxPackage } from '../../services/importing/pptx/pptxPackage';
 import { pptxParser } from '../../services/importing/pptx/pptxParser';
+import { pptxVisualStyle } from '../../services/importing/pptx/pptx-visual-style';
+import { pptxXml } from '../../services/importing/pptx/pptxXml';
 import { slideLayoutCommands } from '../../domain/commands/elements/slide-layout-commands';
 import { elementStructureCommands } from '../../domain/commands/elements/element-structure-commands';
 import { mediaElementCommands } from '../../domain/commands/elements/media-element-commands';
+import { textThemeCommands } from '../../domain/commands/elements/text-theme-commands';
+import { basicCommands } from '../../domain/commands/elements/basicCommands';
+import { CanvasDragGuide } from '../editor/canvas/CanvasDragGuide';
+import { CanvasWorkspace } from '../editor/canvas/CanvasWorkspace';
+import { canvasMagnetGuides } from '../editor/canvas/canvasMagnetGuides';
+import { canvasWorkspaceUtils } from '../editor/canvas/canvasWorkspaceUtils';
 import { shapeLineDraw } from '../editor/canvas/shape-line-draw';
 import { movieStartPlayback } from '../editor/media/movieStartPlayback';
 import { createAppServices } from '../../app/composition';
 import { useEditorViewModel } from '../editor/state/useEditorViewModel';
 import { useBackgroundSubjectSelection } from '../editor/state/use-background-subject-selection';
+import { editorViewModelElements } from '../editor/state/editorViewModelElements';
+import { editorViewModelHistory } from '../editor/state/editorViewModelHistory';
+import { editorViewModelPages } from '../editor/state/editorViewModelPages';
 import { editorViewModelProject } from '../editor/state/editorViewModelProject';
+import { editorViewModelRuntime } from '../editor/state/editorViewModelRuntime';
+import { editorViewModelSelection } from '../editor/state/editorViewModelSelection';
+import { editorViewModelText } from '../editor/state/editorViewModelText';
+import { mediaPlaceholderReplacement } from '../editor/state/mediaPlaceholderReplacement';
+import { AiToolsPanel } from '../editor/panels/AiToolsPanel';
 import { MirrorSettingsPanel } from '../editor/panels/MirrorSettingsPanel';
 import { LeftToolPanel } from '../editor/panels/LeftToolPanel';
 import { RemoteImportPanel } from '../editor/panels/RemoteImportPanel';
@@ -65,10 +96,15 @@ import { preloadPublicDeckAssets } from '../share/publicDeckAssetPreloader';
 import { DeckTranslationControl } from '../editor/toolbars/DeckTranslationControl';
 import { TRANSLATION_LANGUAGE_OPTIONS } from '../editor/translation/translationLanguages';
 import { PresenterRemotePeerControlHost } from '@localstudio/presenter-remote/peer-control-host';
-import type {
-  PresenterRemotePreviewBatch,
-  PresenterRemoteState,
+import { presenterRemoteDataChannelState } from '../../../../../packages/presenter-remote/src/data-channel-state';
+import {
+  presenterRemoteProtocol,
+  type PresenterRemoteCommand,
+  type PresenterRemotePreviewBatch,
+  type PresenterRemoteState,
 } from '@localstudio/presenter-remote/protocol';
+import { presenterRemoteSessionCode } from '@localstudio/presenter-remote/session-code';
+import { PresenterRemotePeerStreamPublisher } from '@localstudio/presenter-remote/peer-stream-publisher';
 
 const minimalPptxPackageBase64 =
   'UEsDBBQAAAAIAHN/6Vwvs4W/qAAAADUBAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbH2QSw7CMAxErxJli9oUFixQPwvgBlwgCmkbkZ9iU5Xb47SsKmBpj59n7LqbnWWTTmCCb/i+rHjX1rdX1MBI8dDwETGehAA1aiehDFF7UvqQnEQq0yCiVA85aHGoqqNQwaP2WGDewdv6onv5tMiuM7VXF8I5O69z2arhMkZrlESSRVbFVy5pC3/Ayd836YpPspLIZQZGE2H32yH6YWNgXL4s94kQy2PaN1BLAwQUAAAACABzf+lcxai+J0sAAABWAAAAFAAAAHBwdC9wcmVzZW50YXRpb24ueG1ssymwKihKLU7NK0ksyczPU6jIzckrtiqwVcooKSmw0tcvTs5IzU0s1ssvSM0DyqXlF+UmlgC5Ren6yPpyc/SNDAzM9HMTM/OU9O0AUEsDBBQAAAAIAHN/6VzkAO1e6QAAAN0BAAAVAAAAcHB0L3NsaWRlcy9zbGlkZTEueG1sjVDLTsMwEPyVyHdwQcAhSnJCSFxQpPIDrr1JVvJjtTaln48dNwKqHnraWXtmZ2c7aqM1zclZH1vqxZIStVJGvYBT8T4Q+Pw3BXYq5ZZnSQwRfFIJg3dWPu52L9Ip9OI8RN0yxLD6Rj9f0/Mt+jBNqOE16C+Xd6lDGOy6VFyQohhyMr23ptRInwxQEKEuxR9H1COvnI/jyA2aXjyJxisHvUCnZrh7EHLo5D/uwSK9obVDp1bccAvuAFnL72bj/5Jyc/aLVF33dGn6vJkmOKU/npWZYZGupUbIcEuV0OUTFhSsqbrtqQgy6QdQSwMEFAAAAAgAc3/pXENyEzaeAAAAcgEAACAAAABwcHQvc2xpZGVzL19yZWxzL3NsaWRlMS54bWwucmVsc62QMQ7CMAxFr1LlAHFbIQZEO7F0RVwgStw0ok6sJCC4PQEWKnVg6Ohv6f2nfzzjrLILPk2OU/Wg2adOTDnzASDpCUklGRh9+YwhksrljBZY6auyCG1d7yH+MkS/YFaD6UQcTCOqy5PxH3YYR6fxFPSN0OeVCnBUugtQRYu5E1ICoXHqmzeSvRWwrtFuqXF3BsOKxidvJPHurQGLifsXUEsDBBQAAAAIAHN/6VwdgLxVBQAAAAMAAAAUAAAAcHB0L21lZGlhL2ltYWdlMS5wbmdjZGIGAFBLAwQUAAAACABzf+lcviBcbAUAAAADAAAAFAAAAHBwdC9tZWRpYS92aWRlbzEubXA0Y2FlAwBQSwECFAAUAAAACABzf+lcL7OFv6gAAAA1AQAAEwAAAAAAAAAAAAAAAAAAAAAAW0NvbnRlbnRfVHlwZXNdLnhtbFBLAQIUABQAAAAIAHN/6VzFqL4nSwAAAFYAAAAUAAAAAAAAAAAAAAAAANkAAABwcHQvcHJlc2VudGF0aW9uLnhtbFBLAQIUABQAAAAIAHN/6VzkAO1e6QAAAN0BAAAVAAAAAAAAAAAAAAAAAFYBAABwcHQvc2xpZGVzL3NsaWRlMS54bWxQSwECFAAUAAAACABzf+lcQ3ITNp4AAAByAQAAIAAAAAAAAAAAAAAAAAByAgAAcHB0L3NsaWRlcy9fcmVscy9zbGlkZTEueG1sLnJlbHNQSwECFAAUAAAACABzf+lcHYC8VQUAAAADAAAAFAAAAAAAAAAAAAAAAABOAwAAcHB0L21lZGlhL2ltYWdlMS5wbmdQSwECFAAUAAAACABzf+lcviBcbAUAAAADAAAAFAAAAAAAAAAAAAAAAACFAwAAcHB0L21lZGlhL3ZpZGVvMS5tcDRQSwUGAAAAAAYABgCYAQAAvAMAAAAA';
@@ -133,20 +169,30 @@ function createSlideDocument(
 export function E2ECoverageDiagnosticsPage() {
   const [result, setResult] = useState('running');
   const [dialogOpen, setDialogOpen] = useState(true);
+  const sourceDiagnosticsOnly = new URL(window.location.href).searchParams.get(
+    'e2eSourceDiagnostics',
+  ) === '1';
 
   useEffect(() => {
     let mounted = true;
-    void runDiagnostics().then((nextResult) => {
-      if (mounted) setResult(nextResult);
-    });
+    const diagnostics = sourceDiagnosticsOnly ? runBundledSourceDiagnostics : runDiagnostics;
+    void diagnostics()
+      .then((nextResult) => {
+        if (mounted) setResult(nextResult);
+      })
+      .catch((error) => {
+        if (mounted) {
+          setResult(error instanceof Error ? error.message : 'diagnostics failed');
+        }
+      });
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [sourceDiagnosticsOnly]);
 
   return (
     <main aria-label="E2E coverage diagnostics">
-      {dialogOpen ? (
+      {!sourceDiagnosticsOnly && dialogOpen ? (
         <PowerPointFontReplacementDialog
           downloadableFonts={[
             { family: 'Inter', source: 'google-fonts' },
@@ -164,7 +210,13 @@ export function E2ECoverageDiagnosticsPage() {
           onReplaceFont={async () => undefined}
         />
       ) : null}
-      {dialogOpen ? null : (
+      {sourceDiagnosticsOnly ? (
+        <>
+          <EditorViewModelSourceDiagnostics />
+          <SourceComponentDiagnostics />
+        </>
+      ) : null}
+      {sourceDiagnosticsOnly || dialogOpen ? null : (
         <>
           <EditorViewModelDiagnostics />
           <EditorViewModelSequentialDiagnostics />
@@ -188,6 +240,7 @@ function E2EDiagnosticsComponentGallery() {
   const [deckTranslationSourceLanguage, setDeckTranslationSourceLanguage] = useState('en');
   const [deckTranslationTargetLanguage, setDeckTranslationTargetLanguage] = useState('pt');
   const [shellDiagnostics, setShellDiagnostics] = useState('pending');
+  const [publicDeckDiagnostics, setPublicDeckDiagnostics] = useState('pending');
   const [shareCopyMode, setShareCopyMode] = useState<'fail' | 'ready'>('fail');
   const [panelsVisible, setPanelsVisible] = useState(true);
   const [notesOpen, setNotesOpen] = useState(true);
@@ -230,7 +283,13 @@ function E2EDiagnosticsComponentGallery() {
   const panelTabs = ['layout', 'design', 'elements', 'animations', 'ai-tools', 'assets'] as const;
   const stockItems = useMemo(
     () => [
-      createDiagnosticStockMediaItem('gallery-stock-image', 'image', 'Gallery image'),
+      ...Array.from({ length: 12 }, (_, index) =>
+        createDiagnosticStockMediaItem(
+          `gallery-stock-image-${index + 1}`,
+          'image',
+          `Gallery image ${index + 1}`,
+        ),
+      ),
       createDiagnosticStockMediaItem('gallery-stock-gif', 'gif', 'Gallery GIF'),
     ],
     [],
@@ -330,6 +389,21 @@ function E2EDiagnosticsComponentGallery() {
           bubbles: true,
           cancelable: true,
           clipboardData,
+        }),
+      );
+      const imageClipboardData = new DataTransfer();
+      imageClipboardData.items.add(
+        new File(
+          ['<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"></svg>'],
+          'clipboard-diagnostics.svg',
+          { type: 'image/svg+xml' },
+        ),
+      );
+      window.dispatchEvent(
+        new ClipboardEvent('paste', {
+          bubbles: true,
+          cancelable: true,
+          clipboardData: imageClipboardData,
         }),
       );
       dispatchKey('z', { metaKey: true });
@@ -502,9 +576,207 @@ function E2EDiagnosticsComponentGallery() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    const wait = (delayMs = 0) => new Promise((resolve) => window.setTimeout(resolve, delayMs));
+
+    async function drivePublicDeckAndMirrorPanels() {
+      const clickFirst = (selector: string) => {
+        const button = document.querySelector<HTMLButtonElement>(selector);
+        if (!button || button.disabled) return false;
+        button.click();
+        return true;
+      };
+      const setInputValue = (input: HTMLInputElement | HTMLTextAreaElement, value: string) => {
+        const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), 'value')?.set;
+        setter?.call(input, value);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      };
+      const dispatchKey = (key: string, init: KeyboardEventInit = {}) => {
+        window.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            bubbles: true,
+            cancelable: true,
+            key,
+            ...init,
+          }),
+        );
+      };
+      const dispatchKeyUp = (key: string) => {
+        window.dispatchEvent(
+          new KeyboardEvent('keyup', {
+            bubbles: true,
+            cancelable: true,
+            key,
+          }),
+        );
+      };
+
+      for (let attempt = 0; attempt < 30; attempt += 1) {
+        if (cancelled) return;
+        if (document.querySelector('[aria-label="Public presentation"]')) break;
+        await wait(20);
+      }
+
+      clickFirst('button[aria-label="Show secret key"]');
+      clickFirst('button[aria-label="Hide secret key"]');
+      clickFirst('button[aria-label="Show reader secret key"]');
+      clickFirst('button[aria-label="Hide reader secret key"]');
+      document
+        .querySelectorAll<HTMLInputElement>(
+          '.mirror-settings-panel input:not([type="checkbox"]):not([type="search"])',
+        )
+        .forEach((input, index) => setInputValue(input, index === 0 ? 'http://localhost:9001' : `diag-${index}`));
+      clickFirst('.mirror-settings-panel button.footer-toggle:nth-of-type(2)');
+      await wait();
+      const endpointInput = document.querySelector<HTMLInputElement>(
+        '.mirror-settings-panel input:not([type="checkbox"]):not([type="search"])',
+      );
+      if (endpointInput) setInputValue(endpointInput, 'https://s3.localstudio.test/');
+      clickFirst('.mirror-settings-panel button.footer-toggle:nth-of-type(2)');
+      await wait();
+      clickFirst('.mirror-settings-panel .mirror-settings-font-dropdown-trigger');
+      await wait();
+      document
+        .querySelectorAll<HTMLInputElement>('.mirror-settings-panel input[type="search"]')
+        .forEach((input) => setInputValue(input, 'orb'));
+      clickFirst('.mirror-settings-panel .font-download-result');
+      await wait();
+      document
+        .querySelectorAll<HTMLInputElement>('.mirror-settings-panel input[type="search"]')
+        .forEach((input) => setInputValue(input, 'missing font'));
+      await wait();
+      clickFirst('.mirror-settings-panel .mirror-settings-resize-handle');
+      const resizeHandle = document.querySelector<HTMLButtonElement>(
+        '.mirror-settings-panel .mirror-settings-resize-handle',
+      );
+      resizeHandle?.dispatchEvent(
+        new PointerEvent('pointerdown', {
+          bubbles: true,
+          clientX: 440,
+          pointerId: 1,
+        }),
+      );
+      window.dispatchEvent(
+        new PointerEvent('pointermove', {
+          bubbles: true,
+          clientX: 560,
+          pointerId: 1,
+        }),
+      );
+      window.dispatchEvent(
+        new PointerEvent('pointerup', {
+          bubbles: true,
+          clientX: 560,
+          pointerId: 1,
+        }),
+      );
+
+      clickFirst('button[aria-label="Next slide"]');
+      await wait();
+      clickFirst('button[aria-label="Previous slide"]');
+      await wait();
+      clickFirst('button[aria-label="Show keyboard shortcuts"]');
+      await wait();
+      const publicShortcutRows = Array.from(
+        document.querySelectorAll<HTMLButtonElement>(
+          '.public-deck-viewer .keyboard-shortcuts-row',
+        ),
+      );
+      for (const button of publicShortcutRows.slice(1)) {
+        button.click();
+        await wait();
+      }
+      publicShortcutRows[0]?.click();
+      await wait();
+      dispatchKey('Escape');
+      dispatchKey('?');
+      dispatchKey('Escape');
+      dispatchKey('End');
+      dispatchKey('Home');
+      dispatchKey('ArrowDown', { shiftKey: true });
+      dispatchKey('ArrowRight');
+      dispatchKey('ArrowLeft');
+      dispatchKey('PageDown');
+      dispatchKey('PageUp');
+      dispatchKey(']');
+      dispatchKey('[');
+      dispatchKey('k');
+      dispatchKey('j');
+      dispatchKeyUp('j');
+      dispatchKey('l');
+      dispatchKeyUp('l');
+      dispatchKey('i');
+      dispatchKey('o');
+      await wait();
+      clickFirst('button[aria-label="Open transcript chat"]');
+      await wait();
+      clickFirst('button[aria-label="Open presentation AI"]');
+      await wait();
+      clickFirst('button[aria-label="Play presentation audio"]');
+      await wait();
+      clickFirst('button[aria-label="Pause presentation audio"]');
+      await wait();
+      document
+        .querySelectorAll<HTMLInputElement>(
+          'input[aria-label="Seek presentation audio"], input[aria-label="Seek podcast audio"]',
+        )
+        .forEach((input) => setInputValue(input, '2'));
+      document
+        .querySelectorAll<HTMLSelectElement>('select[aria-label="Podcast recording"]')
+        .forEach((select) => {
+          const option = Array.from(select.options).at(1);
+          if (!option) return;
+          select.value = option.value;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+      await wait();
+      clickFirst('button[aria-label^="Jump to slide 2:"]');
+      clickFirst('button[aria-label^="Jump to slide 3:"]');
+      clickFirst('button[aria-label="Play podcast audio"]');
+      await wait();
+      clickFirst('button[aria-label="Pause podcast audio"]');
+      clickFirst('button[aria-label^="Play slide 1"]');
+      clickFirst('button[aria-label^="Play transcript segment"]');
+      document
+        .querySelectorAll<HTMLTextAreaElement>('textarea[aria-label="Question for transcript chat"]')
+        .forEach((input) => setInputValue(input, 'Summarize the diagnostics recording.'));
+      clickFirst('button[aria-label="Ask transcript"]');
+      await wait();
+      clickFirst('button[aria-label="Stop transcript answer"]');
+      clickFirst('button[aria-label="Close transcript chat"]');
+      clickFirst('button[aria-label="Present slide fullscreen"]');
+      await wait();
+      document.dispatchEvent(new Event('fullscreenchange'));
+
+      if (!cancelled) {
+        setPublicDeckDiagnostics(
+          JSON.stringify({
+            publicDecks: document.querySelectorAll('[aria-label="Public presentation"]').length,
+            transcriptPanels: document.querySelectorAll('[aria-label="Transcript chat"]').length,
+          }),
+        );
+      }
+    }
+
+    void drivePublicDeckAndMirrorPanels().catch((error) => {
+      if (!cancelled) {
+        setPublicDeckDiagnostics(
+          error instanceof Error ? error.message : 'public deck diagnostics failed',
+        );
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <section aria-label="Diagnostics component gallery">
       <output aria-label="Editor shell diagnostics">{shellDiagnostics}</output>
+      <output aria-label="Public deck diagnostics">{publicDeckDiagnostics}</output>
       <DeckTranslationControl
         canTranslateDeck
         deckTranslationStatus="Translating diagnostics · 1/3"
@@ -729,6 +1001,34 @@ function E2EDiagnosticsComponentGallery() {
               }
             />
           ))}
+          <AiToolsPanel
+            activeSlideLanguage={{ code: 'en', displayCode: 'EN', flag: '🇺🇸', label: 'English' }}
+            modelStates={[
+              {
+                estimatedRemainingMs: 42_000,
+                id: 'diagnostic-byte-progress-model',
+                label: 'Byte progress model',
+                loadedBytes: 1_250_000_000,
+                progress: 41,
+                provider: 'transformers',
+                required: true,
+                status: 'downloading',
+                totalBytes: 3_000_000_000,
+              },
+            ]}
+            promptPreparation={{ availability: 'downloadable', progress: 0, status: 'idle' }}
+            translationLanguageOptions={TRANSLATION_LANGUAGE_OPTIONS.slice(0, 2)}
+            translationTargetLanguage="pt"
+            onCreateImageOptionsChange={() => setShellDiagnostics('fallback-image-options')}
+            onDownloadModel={async (id) => setShellDiagnostics(`fallback-download:${id}`)}
+            onPrepareLanguageDetectionProvider={async () => setShellDiagnostics('fallback-language')}
+            onPreparePromptApi={async () => setShellDiagnostics('fallback-prompt')}
+            onPrepareTranslationProvider={async () => setShellDiagnostics('fallback-translation')}
+            onRemoveModel={async (id) => setShellDiagnostics(`fallback-remove:${id}`)}
+            onTranslationTargetLanguageChange={(languageCode) =>
+              setShellDiagnostics(`fallback-target:${languageCode}`)
+            }
+          />
           <RemoteImportPanel
             error="Remote failed"
             projects={[]}
@@ -894,6 +1194,7 @@ function E2EDiagnosticsComponentGallery() {
         shareId="diagnostic-share-empty"
         shareService={shareService}
       />
+      <CanvasWorkspaceDiagnosticsGallery />
       <div aria-hidden="true" className="e2e-hidden-editor-shell">
         <EditorShell services={shellServices} />
       </div>
@@ -901,6 +1202,121 @@ function E2EDiagnosticsComponentGallery() {
         <PresenterView sessionId="diagnostic-presenter" />
       </div>
     </section>
+  );
+}
+
+function CanvasWorkspaceDiagnosticsGallery() {
+  const project = useMemo(() => {
+    const baseProject = createCommandDiagnosticProject() as ProjectDocument;
+    return {
+      ...baseProject,
+      elements: {
+        ...baseProject.elements,
+        'image-1': {
+          ...(baseProject.elements['image-1'] as ImageElement),
+          crop: { height: 0.72, width: 0.66, x: 0.12, y: 0.08 },
+        },
+        'text-1': {
+          ...(baseProject.elements['text-1'] as TextElement),
+          hyperlink: 'https://localstudio.dev',
+          text: 'Diagnostics linked canvas text',
+        },
+      },
+    } as ProjectDocument;
+  }, []);
+  const activePageId = project.pages[0]?.id ?? '';
+  const confettiBuild = {
+    delayMs: 0,
+    durationMs: 400,
+    effect: 'confetti',
+    elementId: 'text-1',
+    id: 'diagnostic-confetti-build',
+    kind: 'build-in',
+    trigger: 'after-previous',
+  } as const;
+  const wipeBuild = {
+    delayMs: 0,
+    direction: 'right',
+    durationMs: 400,
+    effect: 'wipe',
+    elementId: 'image-1',
+    id: 'diagnostic-wipe-build',
+    kind: 'build-in',
+    trigger: 'after-previous',
+  } as const;
+
+  return (
+    <div aria-label="Canvas workspace diagnostics" style={{ height: 2, overflow: 'hidden' }}>
+      <CanvasWorkspace
+        activePageId={activePageId}
+        animationPreview={{
+          activeBuild: confettiBuild,
+          activeBuildElementId: confettiBuild.elementId,
+          animationProgress: 0.42,
+          hiddenElementIds: ['image-1'],
+          mode: 'presenter',
+          pageId: activePageId,
+          phase: 'animation',
+          playing: true,
+          waitingForClick: false,
+        }}
+        backgroundPreview={{
+          elementId: 'image-1',
+          maskUrl: 'data:image/png;base64,aW1hZ2U=',
+          pending: false,
+          score: 0.87,
+        }}
+        backgroundSelectionMode
+        backgroundSelectionNotice="Diagnostics subject selection"
+        canvasLabel="Diagnostics animated canvas"
+        processingElementIds={['video-1']}
+        project={project}
+        readOnly
+        selection={{ elementIds: ['text-1', 'image-1'], pageId: activePageId, target: 'elements' }}
+        zoomPercent={92}
+        onAnimationPreviewAdvance={() => undefined}
+        onBackgroundPreviewPoint={() => undefined}
+        onBackgroundRefinePoint={() => undefined}
+        onBackgroundSubjectPick={() => undefined}
+        onCancelBackgroundSelection={() => undefined}
+        onSelectElement={() => undefined}
+        onUpdateElementFrame={() => undefined}
+        onUpdateElementFrames={() => undefined}
+      />
+      <CanvasWorkspace
+        activePageId={activePageId}
+        animationPreview={{
+          activeBuild: wipeBuild,
+          activeBuildElementId: wipeBuild.elementId,
+          animationProgress: 0.58,
+          hiddenElementIds: [],
+          mode: 'editor',
+          pageId: activePageId,
+          phase: 'animation',
+          playing: true,
+          waitingForClick: false,
+        }}
+        canTranslateSelection
+        canvasLabel="Diagnostics wipe canvas"
+        isTranslating
+        project={project}
+        selection={{ elementIds: ['image-1'], pageId: activePageId, target: 'elements' }}
+        translationNotice="Diagnostics translation notice"
+        zoomPercent={108}
+        onAlignSelectedElement={() => undefined}
+        onDeleteSelectedElement={() => undefined}
+        onDuplicateSelectedElement={() => undefined}
+        onFlipSelectedImage={() => undefined}
+        onInsertMedia={() => undefined}
+        onInsertText={() => undefined}
+        onOpenAnimations={() => undefined}
+        onSelectElement={() => undefined}
+        onSelectPresentation={() => undefined}
+        onSelectSlide={() => undefined}
+        onTranslateSelectedText={() => undefined}
+        onUpdateImageCrop={() => undefined}
+      />
+    </div>
   );
 }
 
@@ -1377,6 +1793,126 @@ function EditorViewModelDiagnostics() {
   return <output aria-label="Editor view model diagnostics">{summary}</output>;
 }
 
+function EditorViewModelSourceDiagnostics() {
+  const services = useMemo(
+    () => createDiagnosticAppServices() as unknown as ReturnType<typeof createAppServices>,
+    [],
+  );
+  const viewModel = useEditorViewModel(services);
+  const viewModelRef = useRef(viewModel);
+  const ranRef = useRef(false);
+  const [summary, setSummary] = useState('pending');
+  viewModelRef.current = viewModel;
+
+  useEffect(() => {
+    if (ranRef.current) return;
+    ranRef.current = true;
+    const wait = () => new Promise((resolve) => window.setTimeout(resolve, 0));
+    void (async () => {
+      const current = () => viewModelRef.current;
+      current().selectElement('text-1');
+      current().updateElementStyle('text-1', {
+        fontFamily: 'Aptos',
+        fontSize: 56,
+        fontWeight: 700,
+      });
+      await current().replacePowerPointFont('Aptos', '   ');
+      await current().replacePowerPointFont('Missing Sans', 'Inter');
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        await wait();
+        const element = current().project.elements['text-1'];
+        if (element?.type === 'text' && element.fontFamily === 'Aptos') break;
+      }
+      await current().replacePowerPointFont('Aptos', 'Inter');
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        await wait();
+        const element = current().project.elements['text-1'];
+        if (element?.type === 'text' && element.fontFamily === 'Inter') break;
+      }
+      current().setActiveSlideLanguage('en');
+      await current()
+        .setTranslationTargetLanguageForSource('pt', { sourceLanguage: 'en' })
+        .catch(() => undefined);
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        await wait();
+        if (current().translationTargetLanguage === 'pt') break;
+      }
+      await current().translateDeck().catch(() => undefined);
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        await wait();
+        if (!current().isTranslating) break;
+      }
+      const element = current().project.elements['text-1'];
+      setSummary(
+        JSON.stringify({
+          fontFamily: element?.type === 'text' ? element.fontFamily : undefined,
+          fontCount: Object.keys(current().project.fonts ?? {}).length,
+          missingFonts: current().missingPowerPointFonts.length,
+        }),
+      );
+    })().catch((error) =>
+      setSummary(error instanceof Error ? error.message : 'source view model diagnostics failed'),
+    );
+  }, []);
+
+  return <output aria-label="Source view model diagnostics">{summary}</output>;
+}
+
+function SourceComponentDiagnostics() {
+  const [summary, setSummary] = useState('pending');
+  const eventsRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    const wait = (delayMs = 0) => new Promise((resolve) => window.setTimeout(resolve, delayMs));
+    void (async () => {
+      const findButton = (label: string) =>
+        Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
+          (button) => button.getAttribute('aria-label') === label || button.textContent?.trim() === label,
+        );
+      await wait();
+      findButton('Import Source Remote A')?.click();
+      await wait();
+      findButton('Delete Source Remote A from remote')?.click();
+      await wait();
+      findButton('Cancel')?.click();
+      await wait();
+      findButton('Delete Source Remote A from remote')?.click();
+      await wait();
+      findButton('Delete remote project')?.click();
+      await wait();
+      setSummary(
+        JSON.stringify({
+          events: eventsRef.current,
+          hasDialog: Boolean(
+            document.querySelector('[role="alertdialog"][aria-label="Delete remote project"]'),
+          ),
+        }),
+      );
+    })().catch((error) =>
+      setSummary(error instanceof Error ? error.message : 'source component diagnostics failed'),
+    );
+  }, []);
+
+  return (
+    <>
+      <RemoteImportPanel
+        projects={[
+          {
+            id: 'source-remote-a',
+            name: 'Source Remote A',
+            syncedAt: 'not-a-date',
+          },
+        ]}
+        status="ready"
+        onClose={() => eventsRef.current.push('close')}
+        onDeleteProject={(projectId) => eventsRef.current.push(`delete:${projectId}`)}
+        onImportProject={(projectId) => eventsRef.current.push(`import:${projectId}`)}
+      />
+      <output aria-label="Source component diagnostics">{summary}</output>
+    </>
+  );
+}
+
 function EditorViewModelSequentialDiagnostics() {
   const services = useMemo(
     () => createDiagnosticAppServices() as unknown as ReturnType<typeof createAppServices>,
@@ -1431,6 +1967,75 @@ function EditorViewModelSequentialDiagnostics() {
         await nextFrame();
         current().pasteCopiedElements();
       }
+      await nextFrame();
+      current().insertTextElement('body');
+      await nextFrame();
+      current().insertShapeElement('line');
+      await nextFrame();
+      current().insertShapeElement('arc');
+      await nextFrame();
+      current().insertShapeElement('triangle');
+      await nextFrame();
+      current().insertImageGridPlaceholders('one');
+      await nextFrame();
+      current().insertImageGridPlaceholders('two-columns');
+      await nextFrame();
+      current().insertImageGridPlaceholders('three-two-one');
+      await nextFrame();
+      current().insertImageGridPlaceholders('four-square');
+      await nextFrame();
+      current().insertImageGridPlaceholders({
+        columns: 2,
+        imageFit: 'contain',
+        mediaPosition: 'right',
+        rows: 2,
+        textCount: 2,
+      });
+      await nextFrame();
+      current().insertImageGridPlaceholders({
+        columns: 1,
+        imageFit: 'stretch',
+        mediaPosition: 'top',
+        rows: 1,
+        textCount: 1,
+      });
+      await nextFrame();
+      current().insertImageGridPlaceholders({
+        columns: 2,
+        imageFit: 'cover',
+        mediaPosition: 'bottom',
+        rows: 1,
+        textCount: 2,
+      });
+      await nextFrame();
+      current().splitSelectedElementsIntoGrid('one-two');
+      current().applyGridToSelectedElements({
+        columns: 2,
+        imageFit: 'cover',
+        mediaPosition: 'left',
+        rows: 2,
+      });
+      await nextFrame();
+      current().selectAllElementsOnActivePage();
+      await nextFrame();
+      current().splitSelectedElementsIntoGrid('two-one');
+      current().applyGridToSelectedElements({
+        columns: 3,
+        imageFit: 'contain',
+        mediaPosition: 'top',
+        rows: 2,
+      });
+      await nextFrame();
+      current().applyGridToSelectedElements({
+        columns: 2,
+        imageFit: 'stretch',
+        mediaPosition: 'bottom',
+        rows: 2,
+      });
+      await nextFrame();
+      current().clearSelection();
+      current().splitSelectedElementsIntoGrid('auto');
+      current().applyGridToSelectedElements({ columns: 1, rows: 1 });
       await nextFrame();
       current().selectElement('image-1');
       current().updateElementFrames({
@@ -1676,11 +2281,17 @@ function EditorViewModelPersistenceDiagnostics() {
       savedViewModel.setProjectName('Loaded Diagnostics Autosave');
       await nextFrame();
       await savedViewModel.saveLocalNow().catch(() => undefined);
+      await savedViewModel.saveLocalAs().catch(() => undefined);
       emptyViewModel.setProjectName('Empty Diagnostics Autosave');
+      await emptyViewModel.confirmLocalProjectSetup('   ');
       failingViewModel.setProjectName('Failing Diagnostics Autosave');
       await nextFrame();
       await Promise.resolve(failingViewModel.setPersistence(true)).catch(() => false);
       await failingViewModel.saveLocalNow().catch(() => undefined);
+      await failingViewModel.saveLocalAs().catch(() => undefined);
+      await failingViewModel.confirmLocalProjectSetup('Failing Confirm Diagnostics').catch(
+        () => false,
+      );
       setSummary(
         JSON.stringify({
           emptyPersistence: emptyViewModel.persistenceEnabled,
@@ -1795,6 +2406,15 @@ function EditorViewModelFailureDiagnostics() {
           status: 'needs-download' as const,
         }),
       },
+      imageGenerationService: {
+        generateImage: async (
+          _prompt: string,
+          options?: { onProgress?: (state: { label: string; progress: number }) => void },
+        ) => {
+          options?.onProgress?.({ label: 'Failing image diagnostics', progress: 28 });
+          throw new Error('image generation failed');
+        },
+      },
       promptService: {
         ...baseServices.promptService,
         checkAvailability: async () => 'downloadable' as const,
@@ -1860,6 +2480,9 @@ function EditorViewModelFailureDiagnostics() {
       await nextFrame();
       await current()
         .preparePromptApi()
+        .catch(() => undefined);
+      await current()
+        .generateImageFromPrompt('failing diagnostics image')
         .catch(() => undefined);
       await current()
         .cancelPromptModelDownload(aiModelCatalog.GEMMA_LLM_MODEL_ID)
@@ -2239,10 +2862,12 @@ async function runEditorViewModelDiagnostic(viewModel: ReturnType<typeof useEdit
   viewModel.updateElementFrame('text-1', { height: 140, width: 640, x: 44, y: 56 });
   viewModel.updateElementStyle('text-1', {
     fill: '#37FD76',
-    fontFamily: 'Inter',
+    fontFamily: 'Aptos',
     fontSize: 64,
     fontWeight: 700,
   });
+  await viewModel.replacePowerPointFont('Aptos', 'Inter').catch(() => undefined);
+  await viewModel.replacePowerPointFont('Inter', 'Roboto').catch(() => undefined);
   viewModel.selectAllElementsOnActivePage();
   viewModel.copySelectedElements();
   viewModel.pasteCopiedElements();
@@ -2260,8 +2885,33 @@ async function runEditorViewModelDiagnostic(viewModel: ReturnType<typeof useEdit
   viewModel.zoomIn();
   viewModel.zoomOut();
   viewModel.resetZoom();
+  await viewModel.generateSlideFromPrompt('Create an image of diagnostic studio lights');
+  await viewModel.generateImageFromPrompt('diagnostic gradient poster', {
+    height: 768,
+    seed: 42,
+    steps: 4,
+    width: 1024,
+  });
+  viewModel.stopPromptGeneration();
   viewModel.insertTextElement('subtitle');
+  viewModel.insertTextElement('body');
   viewModel.insertShapeElement('rect');
+  viewModel.insertShapeElement('line');
+  viewModel.insertImageGridPlaceholders({
+    columns: 2,
+    imageFit: 'contain',
+    mediaPosition: 'left',
+    rows: 2,
+    textCount: 2,
+  });
+  viewModel.insertImageGridPlaceholders('three-two-one');
+  viewModel.splitSelectedElementsIntoGrid('one-two');
+  viewModel.applyGridToSelectedElements({
+    columns: 2,
+    imageFit: 'cover',
+    mediaPosition: 'right',
+    rows: 2,
+  });
   viewModel.selectElement('image-1');
   await viewModel
     .importMediaFile(
@@ -2281,7 +2931,9 @@ async function runEditorViewModelDiagnostic(viewModel: ReturnType<typeof useEdit
   await viewModel
     .importMediaFile(new File(['video-bytes'], 'diagnostic.mov', { type: 'video/quicktime' }))
     .catch(() => undefined);
+  viewModel.clearMediaImportProgress();
   viewModel.selectElement('image-1');
+  await viewModel.generateImageFromPrompt('replace the selected image with diagnostics');
   viewModel.flipSelectedImage();
   viewModel.updateImageCrop('image-1', {
     crop: { height: 0.6, width: 0.6, x: 0.2, y: 0.2 },
@@ -2295,6 +2947,10 @@ async function runEditorViewModelDiagnostic(viewModel: ReturnType<typeof useEdit
     trimEndSeconds: 20,
     trimStartSeconds: 2,
   });
+  await viewModel.replaceVideoAsset(
+    'video-1',
+    new File(['not-video-bytes'], 'diagnostic.txt', { type: 'text/plain' }),
+  );
   viewModel.setElementAnimationBuilds(['video-1'], {
     delayMs: 0,
     effect: 'reveal',
@@ -2417,6 +3073,7 @@ async function runEditorViewModelDiagnostic(viewModel: ReturnType<typeof useEdit
     .catch(() => undefined);
   viewModel.setActiveSlideLanguage('es');
   await viewModel.translateCurrentSlide().catch(() => undefined);
+  await viewModel.translateDeck().catch(() => undefined);
   await viewModel
     .generateSlideFromPrompt('Create a diagnostics status slide')
     .catch(() => undefined);
@@ -2506,6 +3163,34 @@ async function runDiagnostics() {
             mediaAction: 'play',
             trigger: 'after-previous',
           },
+          {
+            delayMs: 0,
+            effect: 'reveal',
+            elementId: 'image-1',
+            id: 'build-media',
+            mediaAction: 'play',
+            trigger: 'with-previous',
+          },
+          {
+            delayMs: 120,
+            direction: 'right',
+            durationMs: 300,
+            effect: 'wipe',
+            elementId: 'text-1',
+            id: 'build-wipe',
+            kind: 'build-out',
+            trigger: 'after-previous',
+          },
+          {
+            delayMs: 80,
+            direction: 'up',
+            durationMs: 200,
+            effect: 'push',
+            elementId: 'text-1',
+            id: 'build-emphasis',
+            kind: 'emphasis',
+            trigger: 'with-previous',
+          },
         ],
         background: { color: '#ffffff', type: 'color' },
         elementIds: ['image-1', 'text-1', 'missing-element'],
@@ -2559,12 +3244,73 @@ async function runDiagnostics() {
     total: 100,
   });
 
-  const generated = transformersResultParsing.extractGeneratedText([
-    { generated_text: [{ content: 'nested assistant text' }] },
-  ]);
-  const language = transformersResultParsing.extractDetectedLanguage([
-    [{ label: 'pt', score: 0.93 }],
-  ]);
+  const generated = [
+    transformersResultParsing.extractGeneratedText('plain assistant text'),
+    transformersResultParsing.extractGeneratedText([{ content: 'chat assistant text' }]),
+    transformersResultParsing.extractGeneratedText([
+      { generated_text: [{ content: 'first nested text' }] },
+      'tail marker',
+    ]),
+    transformersResultParsing.extractGeneratedText([
+      { generated_text: [{ content: 'nested assistant text' }] },
+    ]),
+    transformersResultParsing.extractGeneratedText({ generated_text: 'object assistant text' }),
+  ];
+  const language = [
+    transformersResultParsing.extractDetectedLanguage([[{ label: 'pt', score: 0.93 }]]),
+    transformersResultParsing.extractDetectedLanguage({ label: 'en' }),
+  ];
+  const parsingErrors: string[] = [];
+  try {
+    transformersResultParsing.extractGeneratedText([{ output: 'missing' }]);
+  } catch (error) {
+    parsingErrors.push(error instanceof Error ? error.message : 'unknown generated text error');
+  }
+  try {
+    transformersResultParsing.extractDetectedLanguage([{ score: 0.2 }]);
+  } catch (error) {
+    parsingErrors.push(error instanceof Error ? error.message : 'unknown language error');
+  }
+  const visualStyleDocument = new DOMParser().parseFromString(
+    `
+      <root>
+        <shape id="shade"><a:solidFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:srgbClr val="6699CC"><a:shade val="50000"/></a:srgbClr></a:solidFill></shape>
+        <shape id="tint"><a:solidFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:srgbClr val="336699"><a:tint val="50000"/></a:srgbClr></a:solidFill></shape>
+        <shape id="lum"><a:solidFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:srgbClr val="102030"><a:lumMod val="200000"/><a:lumOff val="25000"/></a:srgbClr></a:solidFill></shape>
+        <shape id="theme"><a:solidFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:schemeClr val="bg1"/></a:solidFill></shape>
+        <shape id="opacity"><a:blipFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:blip><a:alphaMod amt="140000"/></a:blip></a:blipFill></shape>
+      </root>
+    `,
+    'application/xml',
+  );
+  const visualStyleTheme = {
+    colors: new Map([
+      ['lt1', 'ABCDEF'],
+      ['dk1', '111111'],
+    ]),
+  };
+  const visualStyle = {
+    lum: pptxVisualStyle.getHexColor(
+      visualStyleDocument.querySelector('[id="lum"]') ?? undefined,
+      '#000000',
+    ),
+    opacity: pptxVisualStyle.getOpacity(
+      visualStyleDocument.querySelector('[id="opacity"]') ?? undefined,
+    ),
+    shade: pptxVisualStyle.getHexColor(
+      visualStyleDocument.querySelector('[id="shade"]') ?? undefined,
+      '#000000',
+    ),
+    theme: pptxVisualStyle.getHexColor(
+      visualStyleDocument.querySelector('[id="theme"]') ?? undefined,
+      '#000000',
+      visualStyleTheme,
+    ),
+    tint: pptxVisualStyle.getHexColor(
+      visualStyleDocument.querySelector('[id="tint"]') ?? undefined,
+      '#000000',
+    ),
+  };
   const titleOnly = slideLayoutPresets.normalizeSlideTasksForLayout(
     createSlideDocument([
       { id: 'title', placementHint: '', text: 'Only title', type: 'add-title' },
@@ -2738,6 +3484,7 @@ async function runDiagnostics() {
         extra: remoteDiagnostics.remoteExtra,
         previews: remoteDiagnostics.remoteState.upcomingSlidePreviews?.length ?? 0,
       };
+  const protocol = runPresenterRemoteProtocolDiagnostic(remoteState, batches[0]);
 
   const recording = await runDiagnosticStep('recording', runRecorderDiagnostic);
   const transcript = await runDiagnosticStep('transcript', runSpeechDiagnostic);
@@ -2754,6 +3501,10 @@ async function runDiagnostics() {
   const animation = runAnimationDiagnostic();
   const webmcp = await runDiagnosticStep('webmcp', runWebMcpDiagnostic);
   const modelSetup = await runDiagnosticStep('modelSetup', runModelSetupDiagnostic);
+  const browserTranslation = await runDiagnosticStep(
+    'browserTranslation',
+    runBrowserTranslationDiagnostic,
+  );
   const transformersRuntime = await runDiagnosticStep(
     'transformersRuntime',
     runTransformersRuntimeDiagnostic,
@@ -2770,6 +3521,7 @@ async function runDiagnostics() {
     runProgressUtilitiesDiagnostic,
   );
   const pptxParsing = await runDiagnosticStep('pptxParsing', runPptxParserDiagnostic);
+  const pptxXmlUtilities = runPptxXmlDiagnostic();
   const pptxExport = await runDiagnosticStep('pptxExport', runPptxExportDiagnostic);
   const imageExportUtilities = await runDiagnosticStep(
     'imageExportUtilities',
@@ -2781,8 +3533,16 @@ async function runDiagnostics() {
   );
   const sharing = await runDiagnosticStep('sharing', runSharingDiagnostic);
   const localFonts = await runDiagnosticStep('localFonts', runLocalFontMirrorDiagnostic);
+  const webGpuTextRuntime = await runDiagnosticStep(
+    'webGpuTextRuntime',
+    runWebGpuTextGenerationRuntimeDiagnostic,
+  );
   const commandUtilities = runCommandUtilitiesDiagnostic();
+  const elementUtilities = runEditorViewModelElementsDiagnostic();
+  const canvasUtilities = runCanvasMagnetGuideDiagnostic();
+  const mediaPlaceholderUtilities = runMediaPlaceholderReplacementDiagnostic();
   const projectUtilities = runEditorViewModelProjectDiagnostic();
+  const stateUtilities = await runEditorStateUtilitiesDiagnostic();
   const selectedProject = createProjectForSelectedShareRecording(
     createShareProject() as never,
     'second',
@@ -2791,6 +3551,8 @@ async function runDiagnostics() {
   return JSON.stringify({
     generated,
     language,
+    parsingErrors,
+    visualStyle,
     automation,
     animation,
     layoutCount: layoutSamples.length,
@@ -2798,12 +3560,14 @@ async function runDiagnostics() {
     progressValues,
     recording,
     remote: remoteSummary,
+    protocol,
     selectedRecordings: Object.keys(selectedProject.recordings ?? {}),
     presenterSession,
     peerControlHost,
     storage,
     webmcp,
     modelSetup,
+    browserTranslation,
     transformersRuntime,
     backgroundRemoval,
     bonsaiRuntime,
@@ -2811,15 +3575,556 @@ async function runDiagnostics() {
     slideLayoutPresetCoverage,
     progressUtilities,
     pptxParsing,
+    pptxXmlUtilities,
     pptxExport,
     imageExportUtilities,
     publicPreload,
     sharing,
     localFonts,
+    webGpuTextRuntime,
     commandUtilities,
+    elementUtilities,
+    canvasUtilities,
+    mediaPlaceholderUtilities,
     projectUtilities,
+    stateUtilities,
     transcript,
   });
+}
+
+async function runBundledSourceDiagnostics() {
+  const [prompt, remotePreview, streamPublisher, googleFonts, presenterSession] = await Promise.all(
+    [
+      runBundledPromptRepairDiagnostic(),
+      runBundledRemotePreviewDiagnostic(),
+      runBundledStreamPublisherDiagnostic(),
+      runBundledGoogleFontsDiagnostic(),
+      runBundledPresenterSessionDiagnostic(),
+    ],
+  );
+  const canvas = runBundledCanvasUtilityDiagnostic();
+  const ids = runBundledIdUtilityDiagnostic();
+  const presenterRemote = runBundledPresenterRemoteUtilityDiagnostic();
+
+  return JSON.stringify({
+    canvas,
+    googleFonts,
+    ids,
+    presenterRemote,
+    presenterSession,
+    prompt,
+    remotePreview,
+    streamPublisher,
+  });
+}
+
+async function runBundledGoogleFontsDiagnostic() {
+  const cssFor = (url: string) => `
+    @font-face {
+      font-family: 'Diagnostics';
+      font-style: normal;
+      font-weight: ${url.includes('700') ? '400 800' : '400'};
+      src: url(https://fonts.gstatic.com/s/diagnostics/v1/font-${url.includes('700') ? '700' : '400'}.woff2) format('woff2');
+    }
+  `;
+  const requestedUrls: string[] = [];
+  const requestFetch: typeof fetch = async (input) => {
+    const url = String(input);
+    requestedUrls.push(url);
+    if (url.includes('Anton')) throw new Error('font request failed');
+    if (url.includes('Inter')) return new Response('', { status: 503 });
+    if (url.includes('Poppins')) return new Response('body { color: red; }');
+    if (url.includes('Roboto+Mono')) return new Response(cssFor(url));
+    if (url.includes('fonts.gstatic.com') && url.includes('700')) {
+      return new Response('', { status: 500 });
+    }
+    if (url.includes('Arimo')) return new Response(cssFor(url));
+    if (url.includes('fonts.gstatic.com')) {
+      return new Response(new Blob(['diagnostic-font'], { type: 'font/woff2' }));
+    }
+    return new Response('', { status: 404 });
+  };
+  const loadedFonts: Array<{ family: string; weight?: string }> = [];
+  class DiagnosticFontFace {
+    constructor(
+      readonly family: string,
+      readonly source: string,
+      readonly descriptors?: FontFaceDescriptors,
+    ) {}
+
+    async load() {
+      return this as unknown as FontFace;
+    }
+  }
+  const service = new BrowserGoogleFontsImportService({
+    fetch: requestFetch,
+    fontAvailability: {
+      isAvailable: (family) => family === 'Local Diagnostics',
+    },
+    fontFaceConstructor: DiagnosticFontFace as never,
+    fontSet: {
+      add: (fontFace: FontFace) => {
+        const diagnosticFontFace = fontFace as unknown as DiagnosticFontFace;
+        loadedFonts.push({
+          family: diagnosticFontFace.family,
+          ...(diagnosticFontFace.descriptors?.weight
+            ? { weight: diagnosticFontFace.descriptors.weight }
+            : {}),
+        });
+        return fontFace;
+      },
+    } as never,
+  });
+  const requests: FontImportRequest[] = [
+    { family: 'Local Diagnostics', fontStyle: 'normal', fontWeight: 400 },
+    { family: 'Unknown Diagnostics', fontStyle: 'normal', fontWeight: 400 },
+    { family: 'Anton', fontStyle: 'normal', fontWeight: 400 },
+    { family: 'Inter', fontStyle: 'normal', fontWeight: 400 },
+    { family: 'Poppins', fontStyle: 'normal', fontWeight: 400 },
+    { family: 'Roboto Mono', fontStyle: 'normal', fontWeight: 700 },
+    { family: 'Arial', fontStyle: 'normal', fontWeight: 400 },
+  ];
+  const result = await service.resolveAndDownloadFonts(requests);
+  return {
+    downloaded: Object.keys(result.fonts).length,
+    loaded: loadedFonts.length,
+    statuses: result.resolutions.map((resolution) => resolution.status),
+    warnings: result.warnings.map((warning) => warning.code),
+    requestedUrls: requestedUrls.length,
+  };
+}
+
+async function runBundledPromptRepairDiagnostic() {
+  const restoreGpu = installDiagnosticGpu();
+  let generateCallCount = 0;
+  const runtime = {
+    generate: async (_modelId: string, prompt: unknown) => {
+      generateCallCount += 1;
+      const promptText = JSON.stringify(prompt);
+      if (promptText.includes('Return only corrected JSON.')) {
+        return JSON.stringify(
+          createSlideDocument([
+            { color: '#101820', type: 'set-background' },
+            {
+              id: 'repair-title',
+              placementHint: 'center title',
+              text: 'Repair path',
+              type: 'add-title',
+            },
+          ]),
+        );
+      }
+      if (promptText.includes('JSON Schema:')) return '{"tasks":';
+      return 'diagnostic prompt text';
+    },
+  };
+  const modelSetup = {
+    downloadModel: async (
+      id: string,
+      options?: { onProgress?: (progress: number) => void },
+    ) => {
+      options?.onProgress?.(24);
+      options?.onProgress?.(100);
+      return {
+        id,
+        label: 'Prompt diagnostics',
+        progress: 100,
+        provider: 'transformers' as const,
+        required: true,
+        status: 'ready' as const,
+      };
+    },
+    downloadRequiredModels: async () => [],
+    getModelStates: async () => [
+      {
+        id: aiModelCatalog.GEMMA_LLM_MODEL_ID,
+        label: 'Prompt diagnostics',
+        progress: 100,
+        provider: 'transformers' as const,
+        required: true,
+        status: 'ready' as const,
+      },
+    ],
+    removeModel: async (id: string) => ({
+      id,
+      label: 'Prompt diagnostics',
+      progress: 0,
+      provider: 'transformers' as const,
+      required: true,
+      status: 'needs-download' as const,
+    }),
+  };
+  const storage = new Map<string, string>();
+  const promptService = new browserPromptService.BrowserPromptService(
+    modelSetup as never,
+    [new browserPromptService.GemmaPromptProvider(runtime as never)],
+    {
+      getItem: (key) => storage.get(key) ?? null,
+      removeItem: (key) => {
+        storage.delete(key);
+      },
+      setItem: (key, value) => {
+        storage.set(key, value);
+      },
+    },
+    runtime as never,
+  );
+
+  try {
+    await promptService.setSelectedProvider(browserPromptService.GEMMA_PROMPT_PROVIDER_ID);
+    await promptService.preparePromptApi();
+    const tasks = await promptService.generateSlideTasksFromPrompt('Repair invalid diagnostics JSON.');
+    const element = await promptService.generateSlideElementFromTask(tasks.tasks[1] as never, {
+      allTasks: tasks.tasks,
+      existingElements: [],
+      page: tasks.page,
+      userPrompt: 'Repair invalid diagnostics JSON.',
+    }).catch(() => undefined);
+    const text = await promptService.generateText('Summarize diagnostics');
+    return {
+      elementType: element?.type,
+      generateCallCount,
+      selectedProvider: promptService.getSelectedProviderId(),
+      taskCount: tasks.tasks.length,
+      text,
+    };
+  } finally {
+    restoreGpu();
+  }
+}
+
+async function runWebGpuTextGenerationRuntimeDiagnostic() {
+  const calls: string[] = [];
+  const runtime = new webGpuTextGenerationRuntime.TransformersTextGenerationRuntime({
+    generateText: async (modelId: string, prompt: unknown) => {
+      calls.push(`generate:${modelId}:${JSON.stringify(prompt).length}`);
+      return 'diagnostic generated text';
+    },
+    preloadTextGeneration: async (
+      modelId: string,
+      options?: { onProgress?: (progress: number) => void },
+    ) => {
+      calls.push(`preload:${modelId}`);
+      options?.onProgress?.(100);
+    },
+    releaseTextGeneration: async (modelId: string) => {
+      calls.push(`release:${modelId}`);
+    },
+    removeTextGeneration: async (modelId: string) => {
+      calls.push(`remove:${modelId}`);
+    },
+  } as never);
+  await runtime.loadTextGenerationModel('diagnostic-model', {
+    onProgress: (progressValue) => calls.push(`progress:${progressValue}`),
+  });
+  const generated = await runtime.generate('diagnostic-model', [
+    { content: 'Generate diagnostics text', role: 'user' },
+  ]);
+  await runtime.releaseTextGenerationModel('diagnostic-model');
+  await runtime.removeTextGenerationModel('diagnostic-model');
+  return {
+    calls,
+    extracted: webGpuTextGenerationRuntime.extractGeneratedText([
+      { generated_text: 'diagnostic extracted text' },
+    ]),
+    generated,
+  };
+}
+
+async function runBundledRemotePreviewDiagnostic() {
+  const restoreRemotePreviewMedia = installRemotePreviewMediaDiagnostics();
+  const project = createRemoteProject();
+  const payload = {
+    activePageId: 'slide-1',
+    presenterMode: 'presenting',
+    project: {
+      ...project,
+      assets: {
+        ...project.assets,
+        video: {
+          ...project.assets.video,
+          objectUrl: 'https://cdn.localstudio.test/video.mp4',
+        },
+      },
+    },
+    streamPeerId: 'stream-peer',
+  };
+  try {
+    const state = await presenterRemoteStateFactory.createRemoteState(payload as never, 1, {
+      elapsedMs: 1_000,
+      paused: false,
+      updatedAtEpochMs: 1_786_000_000_000,
+    });
+    const batches = await presenterRemoteStateFactory.createRemotePreviewBatches(
+      payload as never,
+      ['slide-1', 'slide-2'],
+      'source-diagnostics',
+    );
+    return {
+      batches: batches.length,
+      imagePreview: state.slidePreview?.elements.some(
+        (element) => element.kind === 'image' && element.assetUrl?.startsWith('data:image/jpeg'),
+      ),
+      mediaPreview: state.slidePreview?.elements.some(
+        (element) => element.kind === 'media' && element.assetUrl?.startsWith('data:image/jpeg'),
+      ),
+    };
+  } finally {
+    restoreRemotePreviewMedia();
+  }
+}
+
+function runBundledCanvasUtilityDiagnostic() {
+  const shapes = ['triangle', 'diamond', 'parallelogram', 'pentagon', 'rect'] as const;
+  return {
+    labels: [
+      canvasWorkspaceUtils.getElementLabel(undefined),
+      canvasWorkspaceUtils.getElementLabel(createDiagnosticTextElement('label', 'Label')),
+      canvasWorkspaceUtils.getElementLabel({
+        fill: '#FFFFFF',
+        height: 10,
+        id: 'arc',
+        locked: false,
+        opacity: 1,
+        rotation: 0,
+        shape: 'arc',
+        type: 'shape',
+        visible: true,
+        width: 10,
+        x: 0,
+        y: 0,
+      }),
+    ],
+    paint: canvasWorkspaceUtils.getShapePaint({
+      fill: '#37FD76',
+      height: 10,
+      id: 'shape',
+      locked: false,
+      opacity: 1,
+      rotation: 0,
+      shape: 'rect',
+      stroke: '#101820',
+      strokeWidth: 2,
+      type: 'shape',
+      visible: true,
+      width: 10,
+      x: 0,
+      y: 0,
+    }),
+    points: shapes.map((shape) => canvasWorkspaceUtils.getPolygonPoints(shape, 100, 80).length),
+  };
+}
+
+function runBundledIdUtilityDiagnostic() {
+  const originalCrypto = Object.getOwnPropertyDescriptor(window, 'crypto');
+  const originalDateNow = Date.now;
+  try {
+    Object.defineProperty(window, 'crypto', {
+      configurable: true,
+      value: {},
+    });
+    Date.now = () => 1_786_000_000_000;
+    return {
+      fallbackId: createPrefixedId('diagnostic'),
+    };
+  } finally {
+    Date.now = originalDateNow;
+    if (originalCrypto) {
+      Object.defineProperty(window, 'crypto', originalCrypto);
+    }
+  }
+}
+
+async function runBundledStreamPublisherDiagnostic() {
+  const peer = new E2EDiagnosticsFakePeer('stream-peer');
+  const stream = {
+    getTracks: () => [{ kind: 'video' }],
+  } as unknown as MediaStream;
+  const publisher = new PresenterRemotePeerStreamPublisher({
+    peerFactory: () => peer as never,
+    stream,
+  });
+  const peerIdPromise = publisher.start();
+  const peerId = await peerIdPromise;
+  const call = new E2EDiagnosticsFakeMediaConnection();
+  peer.emit('call', call);
+  call.emit('error', new Error('diagnostic call error'));
+  const closingCall = new E2EDiagnosticsFakeMediaConnection();
+  peer.emit('call', closingCall);
+  closingCall.emit('close');
+  publisher.stop();
+  return {
+    answered: call.answered,
+    closed: call.closed && closingCall.closed,
+    destroyed: peer.destroyed,
+    peerId,
+  };
+}
+
+async function runBundledPresenterSessionDiagnostic() {
+  const restoreRemotePreviewMedia = installRemotePreviewMediaDiagnostics();
+  const popupMessages: unknown[] = [];
+  const remoteStates: PresenterRemoteState[] = [];
+  const previewBatches: PresenterRemotePreviewBatch[] = [];
+  let remoteClosed = false;
+  let remoteCommand: ((command: PresenterRemoteCommand) => void) | undefined;
+  const popupWindow = {
+    closed: false,
+    close() {
+      this.closed = true;
+    },
+    location: { href: '' },
+    postMessage(message: unknown) {
+      popupMessages.push(message);
+    },
+  };
+  const service = new BrowserPresenterSessionService({
+    href: 'https://localstudio.test/editor/',
+    openWindow: () => popupWindow as unknown as Window,
+    presenterDeviceId: 'presenter-device',
+    randomId: () => 'presenter-session',
+    remotePeerControlHostFactory: (options) => {
+      remoteCommand = options.onCommand;
+      return {
+        close: () => {
+          remoteClosed = true;
+        },
+        open: async () => ({
+          code: 'PEER-1234',
+          connectedControllerCount: 2,
+          controlPeerId: 'PEER-1234',
+          expiresAt: new Date('2026-07-23T12:00:00.000Z').toISOString(),
+          presenterDeviceId: options.presenterDeviceId ?? 'presenter-device',
+          presenterLabel: options.presenterLabel,
+          sessionId: 'peer-session',
+          transport: 'peerjs',
+        }),
+        publishPreviewBatch: (batch) => {
+          previewBatches.push(batch);
+        },
+        publishState: (state) => {
+          remoteStates.push(state);
+        },
+      };
+    },
+    resolveRemoteControlOrigin: async () => 'https://remote.localstudio.test',
+    targetWindow: window,
+  });
+  try {
+    const openResult = service.openPresenterWindow();
+    const handledCommands: PresenterWindowCommand[] = [];
+    const unsubscribe = service.subscribeToCommands((command) => {
+      handledCommands.push(command);
+    });
+    const payload = {
+      activePageId: 'slide-1',
+      presenterMode: 'presenting',
+      project: createRemoteProject(),
+      streamPeerId: 'stream-peer',
+      timer: { elapsedMs: 250, paused: false, updatedAtEpochMs: 1_786_000_000_000 },
+    } as unknown as PresenterStatePayload;
+    service.publishState(payload);
+    const remoteSession = await service.openRemoteControlSession({
+      presenterLabel: 'Diagnostics Presenter',
+      ttlMs: 60_000,
+    });
+    remoteCommand?.({ command: 'pause-timer', type: 'command' });
+    remoteCommand?.({
+      command: 'update-notes',
+      notes: 'Remote notes',
+      pageId: 'slide-1',
+      type: 'command',
+    });
+    remoteCommand?.({ command: 'go-to-page', pageId: 'slide-2', type: 'command' });
+    remoteCommand?.({
+      command: 'request-previews',
+      pageIds: ['slide-1', 'slide-2'],
+      requestId: 'preview-request',
+      type: 'command',
+    });
+    await new Promise((resolve) => window.setTimeout(resolve, 50));
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: {
+          command: 'update-stream-peer',
+          peerId: 'presenter-stream',
+          sessionId: 'presenter-session',
+          source: 'localstudio-presenter-window',
+          type: 'command',
+        },
+        origin: 'https://localstudio.test',
+      }),
+    );
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: {
+          command: 'update-timer',
+          sessionId: 'presenter-session',
+          source: 'localstudio-presenter-window',
+          timer: { elapsedMs: 500, paused: true, updatedAtEpochMs: 1_786_000_001_000 },
+          type: 'command',
+        },
+        origin: 'https://localstudio.test',
+      }),
+    );
+    service.publishState(payload);
+    unsubscribe();
+    service.closePresenterWindow();
+    return {
+      commands: handledCommands.map((command) => command.command),
+      opened: openResult.status,
+      popupClosed: popupWindow.closed,
+      popupMessages: popupMessages.length,
+      previews: previewBatches.length,
+      qrUrl: remoteSession.qrUrl,
+      remoteClosed,
+      states: remoteStates.length,
+    };
+  } finally {
+    restoreRemotePreviewMedia();
+  }
+}
+
+function runBundledPresenterRemoteUtilityDiagnostic() {
+  const code = presenterRemoteSessionCode.create(() => 0);
+  const normalizedCode = presenterRemoteSessionCode.normalize(' abcd 1234 ');
+  const safeState = presenterRemoteDataChannelState.createSafeState({
+    connectedControllerCount: 1,
+    nextSlidePreview: { elements: [], pageId: 'next' },
+    pages: Array.from({ length: 24 }, (_, index) => ({
+      id: `page-${index}`,
+      name: `Page ${index}`,
+      notes: 'x'.repeat(1_000),
+    })),
+    slidePreview: {
+      elements: [{ id: 'large', kind: 'image', assetUrl: 'x'.repeat(20_000) }],
+      pageId: 'page-1',
+    },
+    timer: { elapsedMs: 1, paused: false, updatedAtEpochMs: 1_786_000_000_000 },
+    upcomingSlidePreviews: [{ elements: [], pageId: 'upcoming' }],
+  } as never);
+  return {
+    code,
+    normalizedCode,
+    safePages: safeState.pages?.length,
+    strippedPreview: safeState.slidePreview === undefined,
+    valid: presenterRemoteSessionCode.isValid(normalizedCode),
+  };
+}
+
+function installDiagnosticGpu() {
+  const originalGpu = Object.getOwnPropertyDescriptor(Navigator.prototype, 'gpu');
+  Object.defineProperty(Navigator.prototype, 'gpu', {
+    configurable: true,
+    get: () => ({ requestAdapter: async () => ({}) }),
+  });
+  return () => {
+    if (originalGpu) {
+      Object.defineProperty(Navigator.prototype, 'gpu', originalGpu);
+    } else {
+      Reflect.deleteProperty(Navigator.prototype, 'gpu');
+    }
+  };
 }
 
 async function runDiagnosticStep<T>(
@@ -2841,6 +4146,51 @@ async function runDiagnosticStep<T>(
 
 function isTimedOutDiagnostic(value: unknown): value is { timedOut: string } {
   return typeof value === 'object' && value !== null && 'timedOut' in value;
+}
+
+function runPresenterRemoteProtocolDiagnostic(
+  state: PresenterRemoteState | undefined,
+  previewBatch: PresenterRemotePreviewBatch | undefined,
+) {
+  const validCommand = presenterRemoteProtocol.isCommand({
+    command: 'go-to-page',
+    pageId: 'slide-1',
+    type: 'command',
+  });
+  const validPreviewRequest = presenterRemoteProtocol.isCommand({
+    command: 'request-previews',
+    pageIds: ['slide-1', 'slide-2'],
+    requestId: 'request-1',
+    type: 'command',
+  });
+  const validNotesCommand = presenterRemoteProtocol.isCommand({
+    command: 'update-notes',
+    notes: 'Protocol diagnostics notes',
+    pageId: 'slide-1',
+    type: 'command',
+  });
+  const invalidCommand = presenterRemoteProtocol.isCommand({
+    command: 'go-to-page',
+    pageId: 5,
+    type: 'command',
+  });
+  const validSession = presenterRemoteProtocol.isSession({
+    code: 'DIAG123',
+    connectedControllerCount: 1,
+    expiresAt: '2026-07-22T12:00:00.000Z',
+    presenterDeviceId: 'device-1',
+    presenterLabel: 'Diagnostics',
+    sessionId: 'session-1',
+  });
+  return {
+    invalidCommand,
+    validCommand,
+    validNotesCommand,
+    validPreviewBatch: previewBatch ? presenterRemoteProtocol.isPreviewBatch(previewBatch) : false,
+    validPreviewRequest,
+    validSession,
+    validState: state ? presenterRemoteProtocol.isState(state) : false,
+  };
 }
 
 async function runPresenterRemotePeerControlHostDiagnostic(
@@ -2934,6 +4284,21 @@ class E2EDiagnosticsFakeDataConnection extends E2EDiagnosticsFakeEventTarget {
   send(message: unknown): void {
     if (this.throwOnSend) throw new Error('send failed');
     this.sentMessages.push(message);
+  }
+}
+
+class E2EDiagnosticsFakeMediaConnection extends E2EDiagnosticsFakeEventTarget {
+  answered = false;
+  closed = false;
+
+  answer(stream: MediaStream): void {
+    void stream;
+    this.answered = true;
+  }
+
+  close(): void {
+    this.closed = true;
+    this.emit('close');
   }
 }
 
@@ -3099,6 +4464,457 @@ function runEditorViewModelProjectDiagnostic() {
     legacyHeroWidth: normalizedLegacy.elements['image-hero']?.width,
     restoredHeroFirstElement: normalizedRestored.pages[0]?.elementIds[0],
     restoredHeroObjectUrl: normalizedRestored.assets['asset-hero']?.objectUrl,
+  };
+}
+
+async function runEditorStateUtilitiesDiagnostic() {
+  const project = createCommandDiagnosticProject() as ProjectDocument;
+  const emptyProject = {
+    ...project,
+    elements: {},
+    pages: [],
+  } as ProjectDocument;
+  const insertedFromActivePage = editorViewModelPages.createInsertedPage({
+    activePageId: 'page-1',
+    afterPageId: 'missing-page',
+    pageId: 'inserted-page',
+    project,
+  });
+  const insertedFromEmptyProject = editorViewModelPages.createInsertedPage({
+    activePageId: 'missing-page',
+    afterPageId: 'missing-page',
+    pageId: 'missing-inserted-page',
+    project: emptyProject,
+  });
+  const insertedProject = insertedFromActivePage
+    ? editorViewModelPages.insertPageAfter(project, 'missing-page', insertedFromActivePage)
+    : project;
+  const selectedTextMinimum = editorViewModelText.getFramePatchWithTextMinimum(project, 'text-1', {
+    height: 1,
+  });
+  const fontAppliedProject = editorViewModelText.applyFontFamilyWithFonts({
+    elementId: 'text-1',
+    font: {
+      family: 'Inter',
+      fileName: 'inter.woff2',
+      fontStyle: 'normal',
+      fontWeight: 400,
+      id: 'font-inter',
+      mimeType: 'font/woff2',
+      objectUrl: 'blob:font-inter',
+      requestedFamily: 'Inter',
+      source: 'google-fonts',
+      storage: 'inline',
+    },
+    fonts: {},
+    project,
+  });
+  await editorViewModelRuntime.loadProjectFonts(project, {
+    listDownloadableFonts: () => [],
+    loadProjectFonts: async () => {
+      throw new Error('diagnostic font load failure');
+    },
+    resolveAndDownloadFonts: async () => ({ fonts: {}, resolutions: [], warnings: [] }),
+  });
+  await editorViewModelRuntime.waitForNextPaint();
+  const providers = [
+    {
+      availability: 'available',
+      compatibility: 'compatible',
+      id: 'webgpu',
+      label: 'WebGPU',
+      readiness: 'ready',
+      runtime: 'webgpu-huggingface',
+    },
+    {
+      availability: 'available',
+      compatibility: 'compatible',
+      id: 'chrome',
+      label: 'Chrome',
+      readiness: 'needs-download',
+      runtime: 'chrome-built-in',
+    },
+    {
+      availability: 'available',
+      compatibility: 'incompatible',
+      id: 'blocked',
+      label: 'Blocked',
+      readiness: 'ready',
+      runtime: 'webgpu-huggingface',
+    },
+  ] as never;
+  return {
+    activePageFallback: editorViewModelHistory.getActivePageIdForProject(project, 'missing-page'),
+    addedPageCount: insertedProject.pages.length,
+    compatibleProvider: providerSelection.selectDefaultProvider(providers, 'webgpu')?.id,
+    emptyInsert: insertedFromEmptyProject?.id,
+    forcedProvider: providerSelection.selectDefaultProvider(providers, 'webgpu', {
+      forcePreferred: true,
+    })?.id,
+    missingModelReadiness: providerSelection.getModelReadiness([], 'missing-model'),
+    nextAfterDelete: editorViewModelPages.getNextPageIdAfterDelete(project, 'page-1'),
+    selectionToggle: editorViewModelSelection.getNextElementSelection({
+      additive: true,
+      currentSelection: ['text-1'],
+      elementId: 'text-1',
+    }).length,
+    selectableCount: editorViewModelSelection.getSelectableElementIdsOnPage({
+      pageId: 'page-1',
+      processingElementIds: ['image-1'],
+      project,
+    }).length,
+    selectedFallback: editorViewModelHistory.getSelectionForProject({
+      currentSelection: ['missing-element'],
+      pageId: 'page-1',
+      project,
+    })[0],
+    selectionTarget: editorViewModelSelection.getSelectionTargetForElements([]),
+    textFontFamily:
+      fontAppliedProject.elements['text-1']?.type === 'text'
+        ? fontAppliedProject.elements['text-1'].fontFamily
+        : undefined,
+    textMinimumHeight: selectedTextMinimum.height,
+    webGpuCompatible: providerSelection.isWebGpuCompatible(),
+  };
+}
+
+function runEditorViewModelElementsDiagnostic() {
+  const project = createCommandDiagnosticProject() as ProjectDocument;
+  const page = project.pages[0];
+  if (!page) return { skipped: 'missing page' };
+  const selectedIds = ['text-1', 'image-1', 'video-1'];
+  const copied = editorViewModelElements.getSelectedElementsForClipboard({
+    activePageId: page.id,
+    project,
+    selectedElementIds: selectedIds,
+  });
+  const missingPageCopy = editorViewModelElements.getSelectedElementsForClipboard({
+    activePageId: 'missing-page',
+    project,
+    selectedElementIds: selectedIds,
+  });
+  const assets = editorViewModelElements.collectClipboardAssets(project, [
+    ...copied,
+    { ...project.elements['image-1'], assetId: 'missing-asset' } as DesignElement,
+  ]);
+  const pasted = editorViewModelElements.createPastedElements({
+    createElementId: (sourceElementId) => `pasted-${sourceElementId}`,
+    elements: copied,
+  });
+  const grids = [
+    editorViewModelElements.createImageGridPlaceholderElements({
+      createElementId: (index, type) => `grid-one-${type}-${index}`,
+      page,
+      request: 'one',
+    }),
+    editorViewModelElements.createImageGridPlaceholderElements({
+      createElementId: (index, type) => `grid-two-${type}-${index}`,
+      page,
+      request: 'two-columns',
+    }),
+    editorViewModelElements.createImageGridPlaceholderElements({
+      createElementId: (index, type) => `grid-three-${type}-${index}`,
+      page,
+      request: 'three-two-one',
+    }),
+    editorViewModelElements.createImageGridPlaceholderElements({
+      createElementId: (index, type) => `grid-four-${type}-${index}`,
+      page,
+      request: 'four-square',
+    }),
+    editorViewModelElements.createImageGridPlaceholderElements({
+      createElementId: (index, type) => `grid-right-${type}-${index}`,
+      page,
+      request: { columns: 2, imageFit: 'contain', mediaPosition: 'right', rows: 2, textCount: 2 },
+    }),
+    editorViewModelElements.createImageGridPlaceholderElements({
+      createElementId: (index, type) => `grid-top-${type}-${index}`,
+      page,
+      request: { columns: 1, imageFit: 'stretch', mediaPosition: 'top', rows: 1, textCount: 1 },
+    }),
+    editorViewModelElements.createImageGridPlaceholderElements({
+      createElementId: (index, type) => `grid-bottom-${type}-${index}`,
+      page,
+      request: { columns: 2, imageFit: 'cover', mediaPosition: 'bottom', rows: 1, textCount: 3 },
+    }),
+    editorViewModelElements.createImageGridPlaceholderElements({
+      createElementId: (index, type) => `grid-negative-${type}-${index}`,
+      page,
+      request: { columns: -1, imageFit: 'contain', mediaPosition: 'left', rows: 0, textCount: -1 },
+    }),
+  ];
+  const shapes = [
+    editorViewModelElements.createShapeElement({
+      elementId: 'diagnostic-line',
+      page,
+      selectedElement: project.elements['image-1'],
+      shape: 'line',
+    }),
+    editorViewModelElements.createShapeElement({
+      elementId: 'diagnostic-arc',
+      page,
+      selectedElement: undefined,
+      shape: 'arc',
+    }),
+    editorViewModelElements.createShapeElement({
+      elementId: 'diagnostic-diamond',
+      page,
+      selectedElement: project.elements['text-1'],
+      shape: 'diamond',
+    }),
+  ];
+  const textElements = [
+    editorViewModelElements.createTextElement({
+      elementId: 'diagnostic-title',
+      page,
+      preset: 'title',
+      project,
+      selectedElement: undefined,
+    }),
+    editorViewModelElements.createTextElement({
+      elementId: 'diagnostic-subtitle',
+      page,
+      preset: 'subtitle',
+      project: { ...project, elements: {} },
+      selectedElement: project.elements['image-1'],
+    }),
+    editorViewModelElements.createTextElement({
+      elementId: 'diagnostic-body',
+      page,
+      preset: 'body',
+      project,
+      selectedElement: project.elements['video-1'],
+    }),
+  ];
+  const gridSplits = ['auto', 'one-two', 'two-one', 'two-by-two'].map((layout) =>
+    editorViewModelElements.createGridSplitFramePatches({
+      layout: layout as never,
+      page,
+      project,
+      selectedElementIds: ['text-1', 'image-1', 'video-1'],
+    }),
+  );
+  const emptyGridSplit = editorViewModelElements.createGridSplitFramePatches({
+    page,
+    project,
+    selectedElementIds: ['missing'],
+  });
+  const selectionGrids = [
+    editorViewModelElements.createSelectionGridFramePatches({
+      page,
+      project,
+      request: { columns: 2, imageFit: 'contain', mediaPosition: 'left', rows: 2 },
+      selectedElementIds: ['text-1', 'image-1', 'video-1'],
+    }),
+    editorViewModelElements.createSelectionGridFramePatches({
+      page,
+      project,
+      request: { columns: 2, imageFit: 'cover', mediaPosition: 'right', rows: 1 },
+      selectedElementIds: ['image-1', 'video-1'],
+    }),
+    editorViewModelElements.createSelectionGridFramePatches({
+      page,
+      project,
+      request: { columns: 1, imageFit: 'stretch', mediaPosition: 'bottom', rows: 2 },
+      selectedElementIds: ['text-1', 'line-arrow'],
+    }),
+    editorViewModelElements.createSelectionGridFramePatches({
+      page,
+      project,
+      request: { columns: 2, rows: 0 },
+      selectedElementIds: ['image-1', 'gif-1'],
+    }),
+  ];
+  const emptySelectionGrid = editorViewModelElements.createSelectionGridFramePatches({
+    page,
+    project,
+    request: { columns: 1, rows: 1 },
+    selectedElementIds: ['text-1'],
+  });
+  return {
+    assets: Object.keys(assets),
+    copied: copied.length,
+    emptyGridSplit: Object.keys(emptyGridSplit).length,
+    emptySelectionGrid: Object.keys(emptySelectionGrid).length,
+    gridElements: grids.reduce((total, grid) => total + grid.elements.length, 0),
+    gridSplits: gridSplits.map((patch) => Object.keys(patch).length),
+    missingPageCopy: missingPageCopy.length,
+    pasted: pasted.map((element) => element.id),
+    selectionGrids: selectionGrids.map((patch) => Object.keys(patch).length),
+    shapes: shapes.map((shape) => shape.shape),
+    textElements: textElements.map((element) => element.text),
+  };
+}
+
+function runCanvasMagnetGuideDiagnostic() {
+  const movingRect = { height: 120, id: 'moving', width: 160, x: 876, y: 478 };
+  const targetRects = [
+    { height: 120, id: 'target-a', width: 160, x: 120, y: 478 },
+    { height: 240, id: 'target-b', width: 320, x: 880, y: 180 },
+  ];
+  const objectSnap = canvasMagnetGuides.getDragSnap({
+    movingRect: { height: 100, id: 'moving-object', width: 100, x: 218, y: 220 },
+    stageHeight: 1080,
+    stageWidth: 1920,
+    targetRects: [{ height: 180, id: 'object-target', width: 240, x: 320, y: 320 }],
+    threshold: canvasMagnetGuides.SNAP_THRESHOLD_STAGE,
+  });
+  const pageSnap = canvasMagnetGuides.getDragSnap({
+    movingRect,
+    stageHeight: 1080,
+    stageWidth: 1920,
+    targetRects,
+    threshold: canvasMagnetGuides.SNAP_THRESHOLD_STAGE,
+  });
+  const pageOnlySnap = canvasMagnetGuides.getDragSnap({
+    movingRect: { height: 120, id: 'page-only', width: 160, x: 880, y: 480 },
+    stageHeight: 1080,
+    stageWidth: 1920,
+    targetRects: [],
+    threshold: canvasMagnetGuides.SNAP_THRESHOLD_STAGE,
+  });
+  const anonymousTargetSnap = canvasMagnetGuides.getDragSnap({
+    movingRect: { height: 80, id: 'anonymous-moving', width: 120, x: 252, y: 208 },
+    stageHeight: 1080,
+    stageWidth: 1920,
+    targetRects: [{ height: 160, width: 180, x: 360, y: 280 }],
+    threshold: canvasMagnetGuides.SNAP_THRESHOLD_STAGE,
+  });
+  const noSnap = canvasMagnetGuides.getDragSnap({
+    movingRect: { ...movingRect, x: 40, y: 72 },
+    stageHeight: 1080,
+    stageWidth: 1920,
+    targetRects,
+    threshold: 1,
+  });
+  const resizeSnap = canvasMagnetGuides.getResizeSnap({
+    resizedRect: { height: 238, id: 'resized', width: 318, x: 400, y: 240 },
+    targetRects,
+    threshold: canvasMagnetGuides.SNAP_THRESHOLD_STAGE,
+  });
+  const resizeBestSnap = canvasMagnetGuides.getResizeSnap({
+    resizedRect: { height: 217, id: 'resize-best', width: 297, x: 400, y: 240 },
+    targetRects: [
+      { height: 220, id: 'near-size-a', width: 300, x: 80, y: 80 },
+      { height: 218, width: 298, x: 520, y: 120 },
+    ],
+    threshold: canvasMagnetGuides.SNAP_THRESHOLD_STAGE,
+  });
+  const resizeNoSnap = canvasMagnetGuides.getResizeSnap({
+    resizedRect: { height: 50, id: 'small', width: 50, x: 400, y: 240 },
+    targetRects,
+    threshold: 1,
+  });
+  const bounds = canvasMagnetGuides.getRectBounds([movingRect, ...targetRects]);
+  const emptyBounds = canvasMagnetGuides.getRectBounds([]);
+  const translated = canvasMagnetGuides.translateRect(movingRect, { x: 12, y: -8 });
+  return {
+    bounds,
+    emptyBounds,
+    anonymousTargetGuides: anonymousTargetSnap.guides.map((guide) => guide.id),
+    noSnapGuides: noSnap.guides.length,
+    objectSnapGuides: objectSnap.guides.map((guide) => guide.id),
+    pageOnlyGuides: pageOnlySnap.guides.map((guide) => guide.id),
+    pageSnapGuides: pageSnap.guides.map((guide) => guide.id),
+    resizeBestGuides: resizeBestSnap.guides.map((guide) => guide.id),
+    resizeGuides: resizeSnap.guides.map((guide) => guide.id),
+    resizeNoSnap,
+    translated,
+  };
+}
+
+function runMediaPlaceholderReplacementDiagnostic() {
+  const placeholder = {
+    assetId: placeholderImage.PLACEHOLDER_IMAGE_ASSET_ID,
+    height: 360,
+    id: 'media-placeholder',
+    locked: false,
+    opacity: 0.92,
+    rotation: 0,
+    type: 'image',
+    visible: true,
+    width: 640,
+    x: 120,
+    y: 160,
+  } satisfies ImageElement;
+  const project = {
+    ...(createCommandDiagnosticProject() as ProjectDocument),
+    assets: {
+      ...(createCommandDiagnosticProject() as ProjectDocument).assets,
+      [placeholderImage.PLACEHOLDER_IMAGE_ASSET_ID]: {
+        id: placeholderImage.PLACEHOLDER_IMAGE_ASSET_ID,
+        mimeType: placeholderImage.PLACEHOLDER_IMAGE_MIME_TYPE,
+        name: placeholderImage.PLACEHOLDER_IMAGE_NAME,
+        objectUrl: placeholderImage.PLACEHOLDER_IMAGE_URL,
+        type: 'image' as const,
+      },
+    },
+    elements: {
+      ...(createCommandDiagnosticProject() as ProjectDocument).elements,
+      [placeholder.id]: placeholder,
+    },
+  } satisfies ProjectDocument;
+  const selectedPlaceholder = mediaPlaceholderReplacement.getSelectedImagePlaceholder({
+    project,
+    selectedElementIds: [placeholder.id],
+  });
+  const missingSelection = mediaPlaceholderReplacement.getSelectedImagePlaceholder({
+    project,
+    selectedElementIds: ['image-1', placeholder.id],
+  });
+  const regularImageSelection = mediaPlaceholderReplacement.getSelectedImagePlaceholder({
+    project,
+    selectedElementIds: ['image-1'],
+  });
+  const imageElement = mediaPlaceholderReplacement.createImageElement({
+    assetId: 'asset-replacement-image',
+    mediaHeight: 900,
+    mediaWidth: 1600,
+    placeholder,
+  });
+  const invalidImageElement = mediaPlaceholderReplacement.createImageElement({
+    assetId: 'asset-invalid-image',
+    mediaHeight: 0,
+    mediaWidth: 0,
+    placeholder,
+  });
+  const gifElement = mediaPlaceholderReplacement.createGifElement({
+    assetId: 'asset-replacement-gif',
+    mediaHeight: 640,
+    mediaWidth: 320,
+    placeholder,
+  });
+  const videoElement = mediaPlaceholderReplacement.createVideoElement({
+    assetId: 'asset-replacement-video',
+    durationSeconds: 12,
+    mediaHeight: 1080,
+    mediaWidth: 1920,
+    placeholder,
+  });
+  const videoWithoutDuration = mediaPlaceholderReplacement.createVideoElement({
+    assetId: 'asset-video-no-duration',
+    mediaHeight: 360,
+    mediaWidth: 360,
+    placeholder,
+  });
+  return {
+    gifPlaying: gifElement.playing,
+    imageFrame: {
+      height: imageElement.height,
+      width: imageElement.width,
+      x: imageElement.x,
+      y: imageElement.y,
+    },
+    invalidImageFrame: {
+      height: invalidImageElement.height,
+      width: invalidImageElement.width,
+    },
+    missingSelection: Boolean(missingSelection),
+    regularImageSelection: Boolean(regularImageSelection),
+    selectedPlaceholder: selectedPlaceholder?.id,
+    videoLoop: videoElement.repeatMode,
+    videoTrimEnd: videoElement.trimEndSeconds,
+    videoWithoutDurationTrimEnd: videoWithoutDuration.trimEndSeconds,
   };
 }
 
@@ -3268,13 +5084,142 @@ function runCommandUtilitiesDiagnostic() {
     height: 360,
     width: 480,
   } as never).execute(project);
+  const noOpCommandProject = {
+    ...project,
+    elements: {
+      ...project.elements,
+      'locked-image': {
+        ...(project.elements['image-1'] as ImageElement),
+        id: 'locked-image',
+        locked: true,
+      },
+      'locked-text': {
+        ...(project.elements['text-1'] as TextElement),
+        id: 'locked-text',
+        locked: true,
+      },
+      'locked-video': {
+        ...project.elements['video-1'],
+        id: 'locked-video',
+        locked: true,
+      } as DesignElement,
+    },
+  } as ProjectDocument;
+  const noOpResults = [
+    new mediaElementCommands.UpdateMediaPlaybackCommand('missing-media', {
+      playing: true,
+    } as never).execute(noOpCommandProject) === noOpCommandProject,
+    new mediaElementCommands.UpdateMediaPlaybackCommand('text-1', {
+      playing: true,
+    } as never).execute(noOpCommandProject) === noOpCommandProject,
+    new mediaElementCommands.UpdateMediaPlaybackCommand('locked-video', {
+      playing: true,
+    } as never).execute(noOpCommandProject) === noOpCommandProject,
+    new mediaElementCommands.ReplaceImageAssetCommand('locked-image', {
+      id: 'asset-locked-replacement',
+      mimeType: 'image/png',
+      name: 'Locked replacement',
+      objectUrl: 'blob:locked',
+      type: 'image',
+    } as never).execute(noOpCommandProject) === noOpCommandProject,
+    new mediaElementCommands.ReplaceVideoAssetCommand('locked-video', {
+      id: 'asset-locked-video',
+      mimeType: 'video/mp4',
+      name: 'Locked video',
+      objectUrl: 'blob:locked-video',
+      type: 'video',
+    } as never).execute(noOpCommandProject) === noOpCommandProject,
+    new mediaElementCommands.ReplaceElementWithMediaCommand('locked-image', {
+      asset: {
+        id: 'asset-locked-media',
+        mimeType: 'image/png',
+        name: 'Locked media',
+        objectUrl: 'blob:locked-media',
+        type: 'image',
+      },
+      element: project.elements['image-1'] as ImageElement,
+    } as never).execute(noOpCommandProject) === noOpCommandProject,
+    new mediaElementCommands.ToggleImageFlipCommand('locked-image').execute(noOpCommandProject) ===
+      noOpCommandProject,
+    new mediaElementCommands.UpdateImageCropCommand('locked-image', {
+      height: 1,
+      width: 1,
+    } as never).execute(noOpCommandProject) === noOpCommandProject,
+  ];
+  project = new textThemeCommands.TranslateTextElementsCommand({
+    'missing-text': 'Missing',
+    'locked-text': 'Locked',
+    'text-1': {
+      fontSize: 30,
+      height: 120,
+      text: 'Translated diagnostics',
+      width: 480,
+      x: 32,
+    },
+  }).execute(noOpCommandProject);
+  const unchangedTranslationProject = new textThemeCommands.TranslateTextElementsCommand({
+    'text-1': (project.elements['text-1'] as TextElement).text,
+  }).execute(project);
+  const missingThemeProject = new textThemeCommands.ApplyThemeCommand('missing-theme').execute(
+    project,
+  );
+  const commandTheme = {
+    id: 'command-theme',
+    name: 'Command Theme',
+    palette: {
+      accent: '#37FD76',
+      background: '#0B0F0C',
+      mutedText: '#8EA39A',
+      surface: '#101A14',
+      text: '#F8FFF9',
+    },
+    preview: {
+      background: '#0B0F0C',
+      foreground: '#37FD76',
+    },
+    typography: {
+      bodyFontFamily: 'Inter',
+      headingFontFamily: 'Inter',
+    },
+  };
+  project = new textThemeCommands.SaveThemeCommand(commandTheme).execute(project);
+  project = new textThemeCommands.ApplyThemeCommand('command-theme').execute(project);
+  project = new textThemeCommands.EditThemeCommand({
+    ...commandTheme,
+    name: 'Edited Command Theme',
+  }).execute(project);
+  project = new basicCommands.RemoveAssetCommand('missing-asset').execute(project);
+  project = new basicCommands.RemoveAssetCommand('asset-replacement').execute(project);
+  project = {
+    ...project,
+    assets: {
+      ...project.assets,
+      'asset-unused': {
+        id: 'asset-unused',
+        mimeType: 'image/png',
+        name: 'Unused diagnostics asset',
+        objectUrl: 'blob:unused',
+        type: 'image',
+      },
+    },
+  };
+  project = new basicCommands.RemoveAssetCommand('asset-unused').execute(project);
 
   const linePoints = [
+    shapeLineDraw.getPoints([10, 20], 0.25, 'start-to-end'),
     shapeLineDraw.getPoints([0, 0, 100, 100], 0.25, 'start-to-end'),
     shapeLineDraw.getPoints([0, 0, 100, 100], 0.5, 'end-to-start'),
     shapeLineDraw.getPoints([0, 0, 100, 100], 0.75, 'middle-to-ends'),
   ];
-  const lineDash = shapeLineDraw.getDash(120, 0.5, 'middle-to-ends');
+  const lineDash = [
+    shapeLineDraw.getDash(0, 0.5, 'start-to-end'),
+    shapeLineDraw.getDash(120, 0.5, 'end-to-start'),
+    shapeLineDraw.getDash(120, 0.5, 'middle-to-ends'),
+  ];
+  const inactiveLineState = shapeLineDraw.getState({
+    activeBuild: undefined,
+    progress: 0.5,
+  } as never);
   const lineState = shapeLineDraw.getState({
     activeBuild: {
       effect: 'line-draw',
@@ -3285,6 +5230,33 @@ function runCommandUtilitiesDiagnostic() {
     },
     progress: 0.5,
   } as never);
+  const dragGuideElement = CanvasDragGuide({
+    guides: [
+      {
+        id: 'diagnostic-line',
+        kind: 'line',
+        orientation: 'vertical',
+        source: 'page',
+        x1: 10,
+        x2: 10,
+        y1: 0,
+        y2: 100,
+      },
+      {
+        capX1: 120,
+        capX2: 120,
+        capY1: 80,
+        capY2: 120,
+        id: 'diagnostic-size',
+        kind: 'size',
+        orientation: 'horizontal',
+        x1: 10,
+        x2: 120,
+        y1: 100,
+        y2: 100,
+      },
+    ],
+  });
 
   const video = document.createElement('video');
   video.dataset.elementId = 'video-1';
@@ -3306,13 +5278,18 @@ function runCommandUtilitiesDiagnostic() {
   return {
     elementCount: Object.keys(project.elements).length,
     layoutName: project.slideLayouts?.['layout-a']?.name,
-    lineDash: lineDash.dash.length,
+    dragGuideRendered: Boolean(dragGuideElement),
+    inactiveLineProgress: inactiveLineState.progress,
+    lineDash: lineDash.length,
     linePoints: linePoints.length,
     lineProgress: lineState.progress > 0,
+    missingThemeUnchanged: missingThemeProject === project,
     movieConsumed,
     movieConsumedAfterSet,
     movieStarted,
+    noOpResults,
     pageElementCount: project.pages[0]?.elementIds.length ?? 0,
+    unchangedTranslation: unchangedTranslationProject === project,
   };
 }
 
@@ -3550,6 +5527,34 @@ async function runSharingDiagnostic() {
   const listedProjects = await minio.listProjects(config).catch(() => []);
   const downloadedFiles = await minio.downloadProject('Storage Diagnostic', config).catch(() => []);
   await minio.deleteProject('Storage Diagnostic', config).catch(() => undefined);
+  const mirrorFiles = await minioMirrorFiles.createMirrorFiles(
+    createMirrorFilesDiagnosticProject() as never,
+    {
+      getVersionHistory: async () => [
+        {
+          authorName: 'Local user',
+          changeCount: 1,
+          createdAt: '2026-07-20T00:00:00.000Z',
+          fileName: 'diagnostic-version.json',
+          id: 'diagnostic-version',
+          projectName: 'Mirror Files Diagnostic',
+          summary: '1 edit',
+        },
+      ],
+      loadProject: async () => null,
+      loadVersion: async () => createMirrorFilesDiagnosticProject() as never,
+      saveProject: async () => undefined,
+      saveProjectAs: async () => undefined,
+      saveVersion: async () => {
+        throw new Error('unused');
+      },
+    },
+    { ...config, publicBaseUrl: '   ' },
+    {
+      fetch: async () => new Response('', { status: 404 }),
+      now: () => new Date('2026-07-20T00:00:00.000Z'),
+    },
+  );
   const publicObjectUrl = minio.getPublicObjectUrl('diag/share.json', config);
   minio.clearConfig();
   minio.saveConfig({
@@ -3590,6 +5595,7 @@ async function runSharingDiagnostic() {
     listError,
     listedProjects: listedProjects.map((item) => item.id),
     loadedConfig: loadedConfig?.bucket,
+    mirrorFiles: mirrorFiles.length,
     publicObjectUrl,
     downloadError,
     minioCalls: minioCalls.length,
@@ -3910,6 +5916,132 @@ function createDiagnosticSegmentationResult(fillSubject = true) {
       score: fillSubject ? 0.91 : 0,
       width: 2,
     },
+  };
+}
+
+async function runBrowserTranslationDiagnostic() {
+  const originalGpu = Object.getOwnPropertyDescriptor(Navigator.prototype, 'gpu');
+  Object.defineProperty(Navigator.prototype, 'gpu', {
+    configurable: true,
+    get: () => ({ requestAdapter: async () => ({}) }),
+  });
+  const storage = new Map<string, string>();
+  const modelSetup = {
+    downloadModel: async (
+      _modelId: string,
+      options?: { onProgress?: (progress: number) => void },
+    ) => {
+      options?.onProgress?.(34);
+      options?.onProgress?.(100);
+      return {
+        id: 'diagnostic-model',
+        label: 'Diagnostic model',
+        progress: 100,
+        provider: 'transformers' as const,
+        required: true,
+        status: 'ready' as const,
+      };
+    },
+    downloadRequiredModels: async () => [],
+    getModelStates: async () => [
+      {
+        id: aiModelCatalog.TRANSLATEGEMMA_MODEL_ID,
+        label: 'TranslateGemma',
+        progress: 100,
+        provider: 'transformers' as const,
+        required: true,
+        status: 'ready' as const,
+      },
+      {
+        id: aiModelCatalog.LANGUAGE_DETECTION_MODEL_ID,
+        label: 'Language detection',
+        progress: 100,
+        provider: 'transformers' as const,
+        required: true,
+        status: 'ready' as const,
+      },
+    ],
+    removeModel: async () => ({
+      id: 'diagnostic-model',
+      label: 'Diagnostic model',
+      progress: 0,
+      provider: 'transformers' as const,
+      required: true,
+      status: 'needs-download' as const,
+    }),
+  };
+  const service = new browserTranslatorService.BrowserTranslatorService(
+    modelSetup,
+    undefined,
+    {
+      getItem: (key) => storage.get(key) ?? null,
+      removeItem: (key) => {
+        storage.delete(key);
+      },
+      setItem: (key, value) => {
+        storage.set(key, value);
+      },
+    },
+    {
+      generate: async (_modelId, messages) => JSON.stringify({ translated: messages.length }),
+      preload: async () => undefined,
+    },
+    {
+      detectLanguage: async () => ({ language: 'pt-BR', score: 0.98 }),
+      preload: async () => undefined,
+    },
+  );
+
+  const unsupportedLanguage = (() => {
+    try {
+      browserTranslatorService.toTranslateGemmaLanguageCode('xx-YY');
+      return '';
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
+  })();
+  const initialProviders = await service.getProviderStates();
+  const initialLanguageProviders = await service.getLanguageDetectionProviderStates();
+  const unknownProvider = await service.setSelectedProvider('missing-provider').then(
+    () => '',
+    (error: unknown) => (error instanceof Error ? error.message : String(error)),
+  );
+  const unknownLanguageProvider = await service.setLanguageDetectionProvider('missing-language').then(
+    () => '',
+    (error: unknown) => (error instanceof Error ? error.message : String(error)),
+  );
+  await service.setSelectedProvider(browserTranslatorService.TRANSLATEGEMMA_PROVIDER_ID);
+  await service.setLanguageDetectionProvider(
+    browserTranslatorService.WEBGPU_LANGUAGE_DETECTION_PROVIDER_ID,
+  );
+  await service.prepareTranslation('en', 'pt', { onProgress: () => undefined });
+  await service.prepareLanguageDetection({ onProgress: () => undefined });
+  const translated = await service.translate('Diagnostics translation', 'pt', {
+    sourceLanguage: 'en',
+  });
+  const detected = await service.detectLanguage('olá diagnostics', {
+    allowModelPreparation: false,
+  });
+  const preparedDetected = await service.detectLanguage('olá diagnostics', {
+    allowModelPreparation: true,
+    onProgress: () => undefined,
+  });
+
+  if (originalGpu) {
+    Object.defineProperty(Navigator.prototype, 'gpu', originalGpu);
+  } else {
+    Reflect.deleteProperty(Navigator.prototype, 'gpu');
+  }
+
+  return {
+    detected,
+    initialLanguageProviders: initialLanguageProviders.length,
+    initialProviders: initialProviders.length,
+    preparedDetected,
+    translated,
+    unknownLanguageProvider,
+    unknownProvider,
+    unsupportedLanguage,
   };
 }
 
@@ -4606,6 +6738,35 @@ async function runProgressUtilitiesDiagnostic() {
   return { estimates, mapped, tickerValues, values };
 }
 
+function runPptxXmlDiagnostic() {
+  const document = pptxXml.parseXml(`
+    <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+      xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+      <p:cSld>
+        <p:spTree>
+          <p:pic r:id="rId1"><p:nvPicPr><p:cNvPr name="Picture 1" /></p:nvPicPr></p:pic>
+          <p:sp><p:txBody><a:p xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:r><a:t>Hello</a:t></a:r></a:p></p:txBody></p:sp>
+        </p:spTree>
+      </p:cSld>
+    </p:sld>
+  `);
+  const picture = pptxXml.firstDescendant(document, 'pic');
+  let parseError = '';
+  try {
+    pptxXml.parseXml('<broken>');
+  } catch (error) {
+    parseError = error instanceof Error ? error.message : 'parse failed';
+  }
+  return {
+    childCount: pptxXml.childElements(document.documentElement).length,
+    namedChildren: pptxXml.childElements(document.documentElement, 'cSld').length,
+    parseError: parseError.includes('PowerPoint XML could not be parsed'),
+    pictureId: pptxXml.getRelationshipAttr(picture, 'id'),
+    pictureName: pptxXml.getAttr(pptxXml.firstDescendant(document, 'cNvPr'), 'name'),
+    text: pptxXml.textContent(document, 't'),
+  };
+}
+
 async function runPptxParserDiagnostic() {
   const relType = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
   const files = [
@@ -5200,10 +7361,60 @@ async function runPptxExportDiagnostic() {
       });
     }
   })();
+  const malformedPackage = zipSync({
+    'ppt/slides/_rels/slide1.xml.rels': strToU8(
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/video" Target="../media/missing.webm"/>' +
+        '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://localstudio.dev"/>' +
+        '</Relationships>',
+    ),
+    'ppt/slides/slide1.xml': strToU8(
+      '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">' +
+        '<p:cSld><p:spTree/></p:cSld><p:transition/><p:timing><p:tnLst/></p:timing></p:sld>',
+    ),
+  });
+  const malformedPatch = pptxPackagePatcher.patchPackageBuffer(
+    malformedPackage.buffer.slice(
+      malformedPackage.byteOffset,
+      malformedPackage.byteOffset + malformedPackage.byteLength,
+    ),
+    [
+      {
+        animationBuilds: [
+          {
+            delayMs: 0,
+            durationMs: 250,
+            effect: 'push',
+            elementId: 'shape-without-id',
+            id: 'missing-shape-build',
+            trigger: 'on-click',
+          },
+        ],
+        background: { color: '#111111', type: 'color' },
+        elementIds: ['shape-without-id'],
+        height: 720,
+        id: 'malformed-page-1',
+        name: 'Malformed Page 1',
+        visible: true,
+        width: 1280,
+      },
+      {
+        background: { color: '#222222', type: 'color' },
+        elementIds: [],
+        height: 720,
+        id: 'malformed-page-2',
+        name: 'Malformed Page 2',
+        visible: true,
+        width: 1280,
+      },
+    ],
+    [],
+  );
 
   return {
     defaultWorkerFallbackWarnings,
     fallbackWarnings: fallback.warnings.length,
+    malformedWarnings: malformedPatch.warnings.map((warning) => warning.code),
     progressEvents,
     stats: success.stats,
     successSize: success.blob.size,
@@ -5768,6 +7979,116 @@ function createAutomationProject() {
   };
 }
 
+function createMirrorFilesDiagnosticProject() {
+  return {
+    assets: {
+      readable: {
+        id: 'readable',
+        mimeType: 'image/png',
+        name: 'Readable image',
+        objectUrl: 'data:image/png;base64,cmVhZGFibGU=',
+        type: 'image',
+      },
+      unreadable: {
+        id: 'unreadable',
+        mimeType: 'image/png',
+        name: 'Unreadable image',
+        objectUrl: 'https://cdn.localstudio.test/missing.png',
+        type: 'image',
+      },
+    },
+    createdAt: '2026-07-20T00:00:00.000Z',
+    elements: {
+      readable: {
+        assetId: 'readable',
+        height: 120,
+        id: 'readable',
+        locked: false,
+        opacity: 1,
+        rotation: 0,
+        type: 'image',
+        visible: true,
+        width: 120,
+        x: 0,
+        y: 0,
+      },
+      unreadable: {
+        assetId: 'unreadable',
+        height: 120,
+        id: 'unreadable',
+        locked: false,
+        opacity: 1,
+        rotation: 0,
+        type: 'image',
+        visible: true,
+        width: 120,
+        x: 140,
+        y: 0,
+      },
+    },
+    fonts: {
+      readable: {
+        family: 'Readable',
+        fileName: 'readable.woff2',
+        id: 'readable',
+        objectUrl: 'data:font/woff2;base64,Zm9udA==',
+        storage: 'browser',
+      },
+      unreadable: {
+        family: 'Unreadable',
+        fileName: 'unreadable.woff2',
+        id: 'unreadable',
+        objectUrl: 'https://cdn.localstudio.test/missing.woff2',
+        storage: 'browser',
+      },
+    },
+    id: 'mirror-files-diagnostic',
+    name: 'Mirror Files Diagnostic',
+    pages: [
+      {
+        background: { color: '#ffffff', type: 'color' },
+        elementIds: ['readable', 'unreadable'],
+        height: 1080,
+        id: 'page-1',
+        name: 'Slide 1',
+        visible: true,
+        width: 1920,
+      },
+    ],
+    recordings: {
+      readable: {
+        audio: {
+          mimeType: 'audio/webm;codecs=opus',
+          objectUrl: 'data:audio/webm;base64,YXVkaW8=',
+          storage: 'inline',
+        },
+        createdAt: '2026-07-20T00:00:00.000Z',
+        durationMs: 1_000,
+        id: 'readable',
+        modelPresetId: 'web-speech-api',
+        name: 'Readable recording',
+        segments: [],
+        updatedAt: '2026-07-20T00:00:00.000Z',
+      },
+      unreadable: {
+        audio: {
+          mimeType: 'audio/webm;codecs=opus',
+          objectUrl: 'https://cdn.localstudio.test/missing.webm',
+          storage: 'inline',
+        },
+        createdAt: '2026-07-20T00:00:00.000Z',
+        durationMs: 1_000,
+        id: 'unreadable',
+        modelPresetId: 'web-speech-api',
+        name: 'Unreadable recording',
+        segments: [],
+        updatedAt: '2026-07-20T00:00:00.000Z',
+      },
+    },
+    updatedAt: '2026-07-20T00:00:00.000Z',
+  };
+}
+
 async function runStorageDiagnostic() {
   const project = createStorageDiagnosticProject();
   const fileRoot = new E2EFakeDirectoryHandle('file-root');
@@ -5784,6 +8105,10 @@ async function runStorageDiagnostic() {
   await fileRepository.saveProject(project as never, {
     projectDirectoryName: 'Storage Diagnostic',
   });
+  const staleAssetsDirectory = await fileRoot
+    .getDirectoryHandle('Storage Diagnostic')
+    .then((directory) => directory.getDirectoryHandle('assets'));
+  staleAssetsDirectory.addFile('stale-image.png', new Blob(['stale'], { type: 'image/png' }));
   const loadedFileProject = await fileRepository.loadProject();
   const importedFileProject = await fileRepository.importProject();
   const version = await fileRepository.saveVersion(
@@ -5792,6 +8117,10 @@ async function runStorageDiagnostic() {
   );
   const loadedVersion = await fileRepository.loadVersion(version.id);
   const history = await fileRepository.getVersionHistory();
+  const missingVersion = await fileRepository.loadVersion('missing-version');
+  await fileRepository.saveProject(createFileBackedStorageDiagnosticProject() as never, {
+    projectDirectoryName: 'Storage Diagnostic Renamed',
+  });
   const mirrorParentRoot = new E2EFakeDirectoryHandle('mirror-parent');
   const mirrorRepository = new BrowserFileSystemProjectRepository({
     pickDirectory: async () => mirrorParentRoot as never,
@@ -5848,6 +8177,27 @@ async function runStorageDiagnostic() {
       path: 'config/localstudio.json',
     },
   ]);
+  await mirrorRepository.prepareImportMirrorFiles();
+  const singleMirrorProject = await mirrorRepository.importMirrorFiles({
+    blob: new Blob([JSON.stringify({ ...project, name: '' })], { type: 'application/json' }),
+    path: 'project.json',
+  });
+  const emptyRecentRepository = new BrowserFileSystemProjectRepository({
+    pickDirectory: async () => new E2EFakeDirectoryHandle('empty-picked-root') as never,
+    recentProjectStore: {
+      load: async () => null,
+      save: async () => undefined,
+    },
+  });
+  const missingRecentProject = await emptyRecentRepository.loadProject();
+  const emptyPickedRepository = new BrowserFileSystemProjectRepository({
+    pickDirectory: async () => new E2EFakeDirectoryHandle('empty-picked-root') as never,
+    recentProjectStore: {
+      load: async () => null,
+      save: async () => undefined,
+    },
+  });
+  const missingPickedProject = await emptyPickedRepository.importProject();
   const remoteRepository = new BrowserFileSystemProjectRepository({
     fetch: async () => new Response(new Blob(['remote-image'], { type: 'image/png' })),
     pickDirectory: async () => fileRoot as never,
@@ -5905,11 +8255,16 @@ async function runStorageDiagnostic() {
   });
   await opfsRepository.saveProject(project as never);
   const loadedOpfsProject = await opfsRepository.loadProject();
+  const missingNamedOpfsProject = await opfsRepository.loadProject({ projectName: 'Missing OPFS' });
   const opfsVersion = await opfsRepository.saveVersion(
     { ...project, name: 'Storage Diagnostic OPFS v2' } as never,
     { previousProject: project as never },
   );
   const loadedOpfsVersion = await opfsRepository.loadVersion(opfsVersion.id);
+  const missingOpfsVersion = await opfsRepository.loadVersion('missing-version');
+  await opfsRepository.saveProject(createFileBackedStorageDiagnosticProject() as never, {
+    projectDirectoryName: 'Storage Diagnostic OPFS Renamed',
+  });
   const imported = await opfsRepository.importMirrorFiles([
     {
       blob: new Blob([JSON.stringify(project)], { type: 'application/json' }),
@@ -5931,10 +8286,50 @@ async function runStorageDiagnostic() {
     fileVersion: loadedVersion?.name,
     imported: imported.name,
     importedMirror: importedMirrorProject.name,
+    missingPicked: missingPickedProject,
+    missingRecent: missingRecentProject,
+    missingVersion,
+    opfsMissingNamed: missingNamedOpfsProject,
+    opfsMissingVersion: missingOpfsVersion,
     opfsLoaded: loadedOpfsProject?.name,
     opfsVersion: loadedOpfsVersion?.name,
     remoteLoaded: remoteLoaded?.assets.remote?.objectUrl?.startsWith('blob:') ?? false,
     savedHandles,
+    singleMirror: singleMirrorProject.name,
+  };
+}
+
+function createFileBackedStorageDiagnosticProject() {
+  const project = createStorageDiagnosticProject();
+  return {
+    ...project,
+    assets: {
+      'asset-kept': {
+        ...project.assets['asset-kept'],
+        fileName: 'asset-kept.png',
+        objectUrl: 'blob:file-backed-asset',
+        storage: 'file',
+      },
+    },
+    fonts: {
+      inter: {
+        ...project.fonts.inter,
+        objectUrl: 'blob:file-backed-font',
+        storage: 'file',
+      },
+    },
+    name: `${project.name} File Backed`,
+    recordings: {
+      'recording-1': {
+        ...project.recordings['recording-1'],
+        audio: {
+          ...project.recordings['recording-1'].audio,
+          fileName: 'recording-1.webm',
+          objectUrl: 'blob:file-backed-recording',
+          storage: 'file',
+        },
+      },
+    },
   };
 }
 
@@ -6611,8 +9006,40 @@ function createRemoteProject() {
 function installRemotePreviewMediaDiagnostics() {
   const originalImage = window.Image;
   const originalCreateElement = document.createElement.bind(document);
+  const diagnosticWindow = window as Window & {
+    __LOCALSTUDIO_REMOTE_PREVIEW_THUMBNAIL_DIAGNOSTICS__?: boolean;
+  };
+  const previousThumbnailDiagnostics = diagnosticWindow.__LOCALSTUDIO_REMOTE_PREVIEW_THUMBNAIL_DIAGNOSTICS__;
+  diagnosticWindow.__LOCALSTUDIO_REMOTE_PREVIEW_THUMBNAIL_DIAGNOSTICS__ = true;
+  class DiagnosticRemotePreviewImage extends EventTarget {
+    height = 480;
+    naturalHeight = 480;
+    naturalWidth = 640;
+    onerror: (() => void) | null = null;
+    onload: (() => void) | null = null;
+    width = 640;
+
+    set src(_value: string) {
+      window.setTimeout(() => {
+        this.dispatchEvent(new Event('load'));
+        this.onload?.();
+      }, 0);
+    }
+  }
+  window.Image = DiagnosticRemotePreviewImage as unknown as typeof Image;
   document.createElement = ((tagName: string, options?: ElementCreationOptions) => {
     const normalizedTagName = tagName.toLowerCase();
+    if (normalizedTagName === 'canvas') {
+      const canvas = originalCreateElement(tagName, options) as HTMLCanvasElement;
+      canvas.getContext = ((contextId: string) => {
+        if (contextId !== '2d') return null;
+        return {
+          drawImage: () => undefined,
+        } as unknown as CanvasRenderingContext2D;
+      }) as HTMLCanvasElement['getContext'];
+      canvas.toDataURL = () => 'data:image/jpeg;base64,cmVtb3RlLXByZXZpZXctdGh1bWI=';
+      return canvas;
+    }
     if (normalizedTagName === 'video') {
       let currentTime = 0;
       const video = originalCreateElement(tagName, options) as HTMLVideoElement;
@@ -6642,6 +9069,12 @@ function installRemotePreviewMediaDiagnostics() {
   return () => {
     window.Image = originalImage;
     document.createElement = originalCreateElement as typeof document.createElement;
+    if (previousThumbnailDiagnostics === undefined) {
+      delete diagnosticWindow.__LOCALSTUDIO_REMOTE_PREVIEW_THUMBNAIL_DIAGNOSTICS__;
+    } else {
+      diagnosticWindow.__LOCALSTUDIO_REMOTE_PREVIEW_THUMBNAIL_DIAGNOSTICS__ =
+        previousThumbnailDiagnostics;
+    }
   };
 }
 
