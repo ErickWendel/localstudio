@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { localStudioAnalyticsConfig } from '@localstudio/analytics-config/config';
 import { basicCommands } from '../../../domain/commands/elements/basicCommands';
 import { fitImageWithinPage } from '../../../domain/images/imageSizing';
 import type { ProjectDocument } from '../../../domain/documents/model';
@@ -37,6 +38,7 @@ interface UseStockMediaLibraryOptions {
 }
 
 const STOCK_MEDIA_RECENT_LIMIT = 12;
+const postHogEvents = localStudioAnalyticsConfig.postHog.events;
 
 export function useStockMediaLibrary({
   activePageId,
@@ -189,7 +191,7 @@ export function useStockMediaLibrary({
         { selectedElementIds: [placeholder.id] },
       );
       addRecentStockMedia(item);
-      analyticsService.capture('stock_media_inserted', {
+      analyticsService.capture(postHogEvents.stockMediaInserted, {
         kind: item.kind,
         provider: item.provider,
         replacedPlaceholder: true,
@@ -219,7 +221,7 @@ export function useStockMediaLibrary({
       { selectedElementIds: [elementId] },
     );
     addRecentStockMedia(item);
-    analyticsService.capture('stock_media_inserted', {
+    analyticsService.capture(postHogEvents.stockMediaInserted, {
       kind: item.kind,
       provider: item.provider,
       replacedPlaceholder: false,
@@ -275,7 +277,7 @@ export function useStockMediaLibrary({
         { selectedElementIds: [placeholder.id] },
       );
       addRecentStockMedia(item);
-      analyticsService.capture('stock_media_inserted', {
+      analyticsService.capture(postHogEvents.stockMediaInserted, {
         kind: item.kind,
         provider: item.provider,
         replacedPlaceholder: true,
@@ -305,7 +307,7 @@ export function useStockMediaLibrary({
       { selectedElementIds: [elementId] },
     );
     addRecentStockMedia(item);
-    analyticsService.capture('stock_media_inserted', {
+    analyticsService.capture(postHogEvents.stockMediaInserted, {
       kind: item.kind,
       provider: item.provider,
       replacedPlaceholder: false,
@@ -360,7 +362,7 @@ export function useStockMediaLibrary({
         { selectedElementIds: [placeholder.id] },
       );
       addRecentStockMedia(item);
-      analyticsService.capture('stock_media_inserted', {
+      analyticsService.capture(postHogEvents.stockMediaInserted, {
         kind: 'video',
         provider: item.provider,
         replacedPlaceholder: true,
@@ -395,7 +397,7 @@ export function useStockMediaLibrary({
       { selectedElementIds: [elementId] },
     );
     addRecentStockMedia(item);
-    analyticsService.capture('stock_media_inserted', {
+    analyticsService.capture(postHogEvents.stockMediaInserted, {
       kind: 'video',
       provider: item.provider,
       replacedPlaceholder: false,

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { localStudioAnalyticsConfig } from '@localstudio/analytics-config/config';
 import type { AppServices } from '../../../app/composition';
 import { basicCommands } from '../../../domain/commands/elements/basicCommands';
 import type {
@@ -22,6 +23,7 @@ import type {
   TranscriptRecording,
 } from '../../../domain/documents/model';
 import { sampleProject } from '../../../domain/projects/sampleProject';
+import { analyticsModelProperties } from '../../../services/analytics/analyticsModelProperties';
 import type { EditorAutomationDelegate } from '../../../services/automation/editorAutomationController';
 import type {
   AiProviderState,
@@ -73,6 +75,8 @@ import type { EditorHistory } from './editorViewModelHistory';
 import { editorViewModelPages } from './editorViewModelPages';
 import { editorViewModelSelection } from './editorViewModelSelection';
 import { editorViewModelText } from './editorViewModelText';
+
+const postHogEvents = localStudioAnalyticsConfig.postHog.events;
 
 export type RightPanelTab =
   | 'layout'
@@ -745,7 +749,7 @@ export function useEditorViewModel(services: AppServices) {
       setCreateImageNotice(undefined);
       setAiToolsAttentionModelId(undefined);
     }
-    services.analyticsService.capture('model_downloaded', {
+    services.analyticsService.capture(postHogEvents.modelDownloaded, {
       modelCount: next.filter((state) => state.required && state.status === 'ready').length,
       modelId: 'required',
     });
@@ -798,7 +802,7 @@ export function useEditorViewModel(services: AppServices) {
       setAiToolsAttentionModelId(undefined);
     }
     if (next.status === 'ready') {
-      services.analyticsService.capture('model_downloaded', {
+      services.analyticsService.capture(postHogEvents.modelDownloaded, {
         modelId: id,
         provider: next.provider,
       });
@@ -933,7 +937,7 @@ export function useEditorViewModel(services: AppServices) {
         setPromptProviderStates(await services.promptService.getProviderStates());
       }
       setPromptApiNotice('Prompt API ready');
-      services.analyticsService.capture('model_downloaded', {
+      services.analyticsService.capture(postHogEvents.modelDownloaded, {
         modelId: 'prompt-api',
         provider: 'chrome-built-in',
       });
@@ -1182,8 +1186,9 @@ export function useEditorViewModel(services: AppServices) {
         ...current,
         [pageId]: translationLanguageUtils.normalizeLanguageCode(generatedTasks.language),
       }));
-      services.analyticsService.capture('prompt_generated_slide', {
+      services.analyticsService.capture(postHogEvents.promptGeneratedSlide, {
         elementCount: generatedElements.length,
+        ...analyticsModelProperties.getSelectedPromptModelProperties(promptProviderStates),
         pageCount: 1,
         taskCount: generatedTasks.tasks.length,
       });
@@ -1248,8 +1253,9 @@ export function useEditorViewModel(services: AppServices) {
             ),
           { selectedElementIds: [imageToReplace.id] },
         );
-        services.analyticsService.capture('prompt_generated_image', {
+        services.analyticsService.capture(postHogEvents.promptGeneratedImage, {
           height: generationOptions.height,
+          ...analyticsModelProperties.getImageGenerationModelProperties(),
           replacedExistingImage: true,
           steps: generationOptions.steps,
           width: generationOptions.width,
@@ -1285,8 +1291,9 @@ export function useEditorViewModel(services: AppServices) {
           }).execute(currentProject),
         { selectedElementIds: [elementId] },
       );
-      services.analyticsService.capture('prompt_generated_image', {
+      services.analyticsService.capture(postHogEvents.promptGeneratedImage, {
         height: generationOptions.height,
+        ...analyticsModelProperties.getImageGenerationModelProperties(),
         replacedExistingImage: false,
         steps: generationOptions.steps,
         width: generationOptions.width,
@@ -1620,7 +1627,7 @@ export function useEditorViewModel(services: AppServices) {
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(true);
       }
-      services.analyticsService.capture('project_imported_local', {
+      services.analyticsService.capture(postHogEvents.projectImportedLocal, {
         pageCount: normalizedProject.pages.length,
       });
     } catch {
@@ -2060,7 +2067,7 @@ export function useEditorViewModel(services: AppServices) {
       lastMirroredProjectNameRef.current = projectToSync.name;
       setMirrorState(nextState);
       if (nextState.status === 'synced') {
-        services.analyticsService.capture('project_synced_remote_mirror', {
+        services.analyticsService.capture(postHogEvents.projectSyncedRemoteMirror, {
           pageCount: projectToSync.pages.length,
         });
       }
@@ -2197,7 +2204,7 @@ export function useEditorViewModel(services: AppServices) {
       setMirrorState({ enabled: true, status: 'synced', lastSyncedAt: new Date().toISOString() });
       setRemoteImportProgress(undefined);
       setRemoteImportOpen(false);
-      services.analyticsService.capture('remote_mirror_imported', {
+      services.analyticsService.capture(postHogEvents.remoteMirrorImported, {
         pageCount: normalizedProject.pages.length,
       });
     } catch (error: unknown) {
@@ -2308,7 +2315,7 @@ export function useEditorViewModel(services: AppServices) {
     setVersionHistoryOpen(false);
     setActivePageId(normalizedProject.pages[0]?.id ?? '');
     setSelectedElementIds([]);
-    services.analyticsService.capture('project_restored_version', {
+    services.analyticsService.capture(postHogEvents.projectRestoredVersion, {
       pageCount: normalizedProject.pages.length,
     });
   }
@@ -2376,7 +2383,7 @@ export function useEditorViewModel(services: AppServices) {
         project: currentProject,
       });
     });
-    services.analyticsService.capture('font_downloaded', {
+    services.analyticsService.capture(postHogEvents.fontDownloaded, {
       family,
       warningCount: result.warnings.length,
     });
@@ -2409,7 +2416,7 @@ export function useEditorViewModel(services: AppServices) {
         project: currentProject,
       });
     });
-    services.analyticsService.capture('local_font_imported', {
+    services.analyticsService.capture(postHogEvents.localFontImported, {
       family,
       warningCount: result.warnings.length,
     });

@@ -1,10 +1,11 @@
+import { localStudioAnalyticsConfig } from '@localstudio/analytics-config/config';
 import type { AppServices } from '../../../app/composition';
 import { LocalProjectSetupPanel } from '../panels/LocalProjectSetupPanel';
 import type { OperationNoticeState, useEditorViewModel } from '../state/useEditorViewModel';
 import { TopToolbar } from '../toolbars/TopToolbar';
-import { posthog } from '../../../services/analytics/posthog';
 
 type EditorViewModel = ReturnType<typeof useEditorViewModel>;
+const postHogEvents = localStudioAnalyticsConfig.postHog.events;
 
 interface EditorToolbarSurfaceProps {
   deckTranslationStatus: string | undefined;
@@ -102,13 +103,13 @@ export function EditorToolbarSurface({
           : undefined
       }
       onImportPowerPoint={() => {
-        posthog.capture('presentation_imported_pptx', {
+        services.analyticsService.capture(postHogEvents.presentationImportedPptx, {
           project_name: vm.project.name,
         });
         void vm.importPowerPoint();
       }}
       onExportPowerPoint={() => {
-        posthog.capture('presentation_exported_pptx', {
+        services.analyticsService.capture(postHogEvents.presentationExportedPptx, {
           project_name: vm.project.name,
           page_count: vm.project.pages.length,
         });
@@ -136,7 +137,7 @@ export function EditorToolbarSurface({
       onOpenPresenterView={onOpenPresenterView}
       onStartPresenterMode={onStartPresenterMode}
       onSaveLocal={() => {
-        posthog.capture('project_saved_local', {
+        services.analyticsService.capture(postHogEvents.projectSavedLocal, {
           project_name: vm.project.name,
           page_count: vm.project.pages.length,
           persistence_mode: services.persistenceMode,
@@ -160,7 +161,7 @@ export function EditorToolbarSurface({
         isHistoryReadOnly
           ? undefined
           : () => {
-              posthog.capture('deck_translated', {
+              services.analyticsService.capture(postHogEvents.deckTranslated, {
                 project_name: vm.project.name,
                 page_count: vm.project.pages.length,
                 target_language: vm.translationTargetLanguage,
