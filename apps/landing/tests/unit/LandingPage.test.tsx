@@ -384,13 +384,16 @@ describe('LandingPage', () => {
       /Bring your existing presentations to LocalStudio/i,
     );
     expect(showcaseHeadings[1]).toHaveTextContent(/Present with confidence from LocalStudio/i);
-    expect(showcaseHeadings[5]).toHaveTextContent(
-      /Project files, assets, and history stay in a folder/i,
+    expect(showcaseHeadings[2]).toHaveTextContent(
+      /Turn spoken presentations into accessible public playback/i,
     );
     expect(showcaseHeadings[6]).toHaveTextContent(
-      /S3-compatible projects can still publish public links/i,
+      /Project files, assets, and history stay in a folder/i,
     );
     expect(showcaseHeadings[7]).toHaveTextContent(
+      /S3-compatible projects can still publish public links/i,
+    );
+    expect(showcaseHeadings[8]).toHaveTextContent(
       /Use segmentation tools like normal editor actions/i,
     );
     expect(within(featuresSection).getByText(/Google Slides\? Keynote\?/i)).toBeInTheDocument();
@@ -424,6 +427,20 @@ describe('LandingPage', () => {
         name: /presenter mode with speaker notes and phone remote controls/i,
       }),
     ).toHaveAttribute('src', '/present-with-confidence-showcase.png');
+    expect(
+      within(featuresSection).getByText(/native Speech-to-Text API/i),
+    ).toBeInTheDocument();
+    expect(
+      within(featuresSection).getByText('RAG answers from transcript and speaker notes'),
+    ).toBeInTheDocument();
+    expect(
+      within(featuresSection).getByText('Podcast-style playback per slide'),
+    ).toBeInTheDocument();
+    expect(
+      within(featuresSection).getByRole('img', {
+        name: /public presentation view with transcript question answering/i,
+      }),
+    ).toHaveAttribute('src', '/live-transcript-showcase.png');
     expect(
       showcaseHeadings.some((heading) => /S3-compatible projects/i.test(heading.textContent ?? '')),
     ).toBe(true);

@@ -1,5 +1,10 @@
 export type WebMcpToolAdapterRegistrationContractResult = {
+  batchCleanupCount: number;
+  duplicateBatchIgnored: boolean;
+  duplicateIndividualIgnored: boolean;
+  individualCleanupCount: number;
   individuallyRegisteredNames: string[];
+  nonDuplicateErrorName: string;
   registeredNames: string[];
 };
 
@@ -16,21 +21,65 @@ export async function evaluateWebMcpToolAdapterRegistrationContract(): Promise<W
     translateText: () => ({ data: {}, ok: true }),
   });
   const registeredNames: string[] = [];
+  let batchCleanupCount = 0;
   const unregisterBatch = adapter.register({
     registerTools: (registeredTools) => {
       registeredNames.push(...registeredTools.map((tool) => tool.name));
+      return () => {
+        batchCleanupCount += registeredTools.length;
+      };
     },
   });
   unregisterBatch();
+
+  const duplicateBatchIgnored = (() => {
+    adapter.register({
+      registerTools: () => {
+        throw new DOMException('Duplicate tool name: create_project', 'InvalidStateError');
+      },
+    });
+    return true;
+  })();
+
   const individuallyRegisteredNames: string[] = [];
-  adapter.register({
+  let individualCleanupCount = 0;
+  const unregisterIndividual = adapter.register({
     registerTool: (tool) => {
       individuallyRegisteredNames.push(tool.name);
+      return () => {
+        individualCleanupCount += 1;
+      };
     },
   });
+  unregisterIndividual();
+
+  const duplicateIndividualIgnored = (() => {
+    adapter.register({
+      registerTool: () => {
+        throw new DOMException('Duplicate tool name: create_project', 'InvalidStateError');
+      },
+    });
+    return true;
+  })();
+
+  let nonDuplicateErrorName = '';
+  try {
+    adapter.register({
+      registerTool: () => {
+        throw new Error('registration failed');
+      },
+    });
+  } catch (error) {
+    nonDuplicateErrorName = error instanceof Error ? error.message : String(error);
+  }
 
   return {
+    batchCleanupCount,
+    duplicateBatchIgnored,
+    duplicateIndividualIgnored,
+    individualCleanupCount,
     individuallyRegisteredNames,
+    nonDuplicateErrorName,
     registeredNames,
   };
 }

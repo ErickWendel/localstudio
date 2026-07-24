@@ -29,6 +29,7 @@ interface BackgroundSelectionPoint {
 }
 
 interface UseBackgroundSubjectSelectionOptions {
+  analyticsService: AppServices['analyticsService'];
   backgroundRemovalService: AppServices['backgroundRemovalService'];
   commitProject: (
     updater: (currentProject: ProjectDocument) => ProjectDocument,
@@ -60,6 +61,7 @@ function getPreviewLoadingState(
 }
 
 export function useBackgroundSubjectSelection({
+  analyticsService,
   backgroundRemovalService,
   commitProject,
   modelStates,
@@ -334,6 +336,10 @@ export function useBackgroundSubjectSelection({
         }),
         { selectedElementIds: [elementId] },
       );
+      analyticsService.capture('background_removed', {
+        hadBounds: Boolean(result.bounds),
+        pointCount: points.length,
+      });
     } finally {
       setProcessingElementIds((currentIds) => currentIds.filter((id) => id !== elementId));
     }

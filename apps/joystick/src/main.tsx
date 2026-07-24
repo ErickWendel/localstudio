@@ -5,6 +5,7 @@ import type { JoystickSignalingService } from './app/JoystickApp';
 import { JoystickCoverageDiagnosticsPage } from './app/e2e/JoystickCoverageDiagnosticsPage';
 import { registerJoystickServiceWorker } from './app/register-joystick-service-worker';
 import './styles/joystick.css';
+import './services/analytics/posthog';
 
 type JoystickWindow = Window & {
   __LOCALSTUDIO_JOYSTICK_SIGNALING_SERVICE__?: JoystickSignalingService | undefined;

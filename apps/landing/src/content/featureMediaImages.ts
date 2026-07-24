@@ -44,6 +44,15 @@ export const featureMediaImages = {
     width: 4112,
     height: 2312,
   },
+  transcript: {
+    src: '/live-transcript-showcase.png',
+    srcSet: '/live-transcript-showcase-645.webp 645w',
+    largeSrcSet: '/live-transcript-showcase-1290.webp 1290w',
+    alt: 'LocalStudio public presentation view with transcript question answering and per-slide podcast playback',
+    aspectRatio: '1024 / 768',
+    width: 1024,
+    height: 768,
+  },
   edit: {
     src: '/edit-images-showcase.png',
     srcSet: '/edit-images-showcase-645.webp 645w',

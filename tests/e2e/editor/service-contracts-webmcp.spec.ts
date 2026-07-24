@@ -70,4 +70,9 @@ test('executes WebMCP tool adapter registration contracts in the browser runtime
     'get_project_snapshot',
   ]);
   expect(result.individuallyRegisteredNames).toEqual(result.registeredNames);
+  expect(result.batchCleanupCount).toBe(5);
+  expect(result.individualCleanupCount).toBe(5);
+  expect(result.duplicateBatchIgnored).toBe(true);
+  expect(result.duplicateIndividualIgnored).toBe(true);
+  expect(result.nonDuplicateErrorName).toBe('registration failed');
 });

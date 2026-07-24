@@ -12,6 +12,7 @@
   "dependencies": {
     "@giphy/js-fetch-api": "^5.8.0",
     "@huggingface/transformers": "^4.2.0",
+    "@localstudio/analytics-config": "*",
     "@localstudio/app-routes": "*",
     "@localstudio/brand": "*",
     "@localstudio/presenter-remote": "*",
@@ -21,6 +22,7 @@
     "jspdf": "^4.2.1",
     "konva": "^10.3.0",
     "lucide-react": "^1.21.0",
+    "posthog-js": "^1.407.2",
     "pptxgenjs": "^4.0.1",
     "qrcode": "^1.5.4",
     "react": "^19.2.7",

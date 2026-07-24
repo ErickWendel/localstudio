@@ -1,5 +1,6 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Connect, type Plugin } from 'vite';
+import { analyticsHtmlPlugin } from '../../scripts/vite/analyticsHtmlPlugin';
 import { localNetworkOriginRoute } from '../../scripts/vite/localNetworkOriginRoute';
 import { localPowerPointSampleRoute } from '../../scripts/vite/localPowerPointSampleRoute';
 
@@ -107,6 +108,7 @@ function editorManualChunks(id: string) {
 export default defineConfig({
   base: editorBase,
   plugins: [
+    analyticsHtmlPlugin(),
     localNetworkOriginRoute(),
     localPowerPointSampleRoute(),
     webMcpRouteAlias(),

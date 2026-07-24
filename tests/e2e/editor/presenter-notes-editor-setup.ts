@@ -22,6 +22,13 @@ export const presenterNotesEditorSetup = {
     );
     await page.mouse.up();
     await expect(widthResizer).not.toHaveAttribute('aria-valuenow', notesWidthBefore ?? '');
+    await widthResizer.press('ArrowLeft');
+    await widthResizer.press('ArrowRight');
+    await widthResizer.press('Home');
+    await expect(widthResizer).toHaveAttribute('aria-valuenow', '280');
+    await widthResizer.press('End');
+    await expect(widthResizer).toHaveAttribute('aria-valuenow', '720');
+    await widthResizer.press('Escape');
 
     const heightResizer = page.getByRole('separator', { name: 'Resize speaker notes height' });
     const notesHeightBefore = await heightResizer.getAttribute('aria-valuenow');
@@ -38,6 +45,15 @@ export const presenterNotesEditorSetup = {
     );
     await page.mouse.up();
     await expect(heightResizer).not.toHaveAttribute('aria-valuenow', notesHeightBefore ?? '');
+    await heightResizer.press('ArrowUp');
+    await heightResizer.press('ArrowDown');
+    await heightResizer.press('Home');
+    await expect(heightResizer).toHaveAttribute('aria-valuenow', '260');
+    await heightResizer.press('End');
+    await expect
+      .poll(async () => Number(await heightResizer.getAttribute('aria-valuenow')))
+      .toBeGreaterThan(260);
+    await heightResizer.press('Escape');
     await page
       .getByRole('textbox', { name: 'Speaker notes' })
       .fill('Remember to pause after the opening slide.');

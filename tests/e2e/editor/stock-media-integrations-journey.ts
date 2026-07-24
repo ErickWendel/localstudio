@@ -17,6 +17,8 @@ export const stockMediaIntegrationsJourney = {
     await stockMediaSettings.configure(page);
     await stockMediaUnsplashFlow.insertDashboardImage(editor, page);
     await stockMediaGiphyFlow.searchCelebrationGif(editor, page);
+    await stockMediaUnsplashFlow.replacePlaceholderWithDashboardImage(editor, page);
+    await stockMediaGiphyFlow.replacePlaceholderWithCelebrationGif(editor, page);
     await stockMediaSettings.clear(page);
     await editor.openTool('Elements');
     await expect(page.getByText('Unsplash is not configured.')).toBeVisible();

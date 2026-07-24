@@ -58,6 +58,7 @@ import { editorShortcutActions } from './editor-shortcut-actions';
 import { PresentationSlideNavigator } from './PresentationSlideNavigator';
 import { SpeakerNotesEditor } from './SpeakerNotesEditor';
 import { createProjectForSelectedShareRecording } from './createProjectForSelectedShareRecording';
+import { posthog } from '../../../services/analytics/posthog';
 
 interface EditorShellProps {
   services: AppServices;
@@ -304,6 +305,12 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           shareId: nextShare.shareId,
         };
         setShareMetadata(nextShare);
+        posthog.capture('presentation_shared', {
+          project_name: vm.project.name,
+          share_id: nextShare.shareId,
+          has_recording: Boolean(selectedRecordingId),
+          page_count: vm.project.pages.length,
+        });
         return nextShare;
       } catch (error) {
         setShareMetadata((current) => (current ? { ...current, status: 'sync-failed' } : current));
@@ -440,6 +447,12 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         message: `Images exported: ${frames.length} file${frames.length === 1 ? '' : 's'}.`,
         tone: 'success',
       });
+      posthog.capture('presentation_exported_images', {
+        slide_count: frames.length,
+        format: options.format,
+        project_name: vm.project.name,
+        page_count: vm.project.pages.length,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown export error.';
       showImageExportNotice({ message: `Image export failed: ${message}`, tone: 'error' });
@@ -463,6 +476,11 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     const copiedShare: ShareMetadata = { ...preparedShare, status: 'copied' };
     setShareMetadata(copiedShare);
     copyShareText(copiedShare.publicUrl);
+    posthog.capture('share_link_copied', {
+      project_name: vm.project.name,
+      has_recording: Boolean(selectedRecordingId),
+      page_count: vm.project.pages.length,
+    });
     return copiedShare;
   }
 
@@ -495,6 +513,10 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   function presentFromSharePanel() {
     setSharePanelOpen(false);
     void vm.toggleFullscreen(workspaceRef.current);
+    services.analyticsService.capture('presentation_started_fullscreen', {
+      fromSharePanel: true,
+      pageCount: vm.project.pages.length,
+    });
   }
 
   function startPresenterMode(options?: { fromBeginning?: boolean }) {
@@ -502,6 +524,10 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     if (!pageId) return;
     vm.playPresentationPreview(pageId);
     void vm.toggleFullscreen(workspaceRef.current);
+    services.analyticsService.capture('presentation_started_fullscreen', {
+      fromBeginning: Boolean(options?.fromBeginning),
+      pageCount: vm.project.pages.length,
+    });
   }
 
   function getPresenterSessionService() {
@@ -536,6 +562,10 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     setPresenterRemoteUnavailable(false);
     setRemotePresenterActive(true);
     setPresenterSessionId(result.sessionId);
+    posthog.capture('presenter_view_opened', {
+      project_name: vm.project.name,
+      page_count: vm.project.pages.length,
+    });
     void service
       .openRemoteControlSession({
         presenterLabel: navigator.platform || 'Presenter device',
@@ -543,6 +573,9 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       })
       .then((remoteSession) => {
         setPresenterRemoteSession(remoteSession);
+        services.analyticsService.capture('presenter_remote_opened', {
+          pageCount: vm.project.pages.length,
+        });
         service.publishState(
           createPresenterStatePayload({ activePageId: pageId, presenterMode: 'presenting' }),
         );
@@ -562,7 +595,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         createPresenterStatePayload({ activePageId: pageId, presenterMode: 'presenting' }),
       );
     }, 0);
-  }, [createPresenterStatePayload, presenterSessionId, vm]);
+  }, [createPresenterStatePayload, presenterSessionId, services.analyticsService, vm]);
 
   function enterAudienceFullscreen() {
     setAudienceFullscreenPromptOpen(false);
@@ -1584,7 +1617,17 @@ function EditorDesktopShell({ services }: EditorShellProps) {
               isGeneratingSlide={vm.isGeneratingSlide}
               selectedImageElementId={vm.selectedImagePromptElementId}
               onCreateImagePromptIntent={() => vm.ensureImageGenerationReadyForPrompt()}
-              onCreateImageSubmit={(prompt, options) => vm.generateImageFromPrompt(prompt, options)}
+              onCreateImageSubmit={async (prompt, options) => {
+                posthog.capture('ai_image_generated', {
+                  project_name: vm.project.name,
+                  page_count: vm.project.pages.length,
+                  prompt_length: prompt.length,
+                  image_width: options.width,
+                  image_height: options.height,
+                  image_steps: options.steps,
+                });
+                return vm.generateImageFromPrompt(prompt, options);
+              }}
               onCancelCreateImageModelDownload={vm.cancelModelDownload}
               onCancelPromptModelDownload={vm.cancelPromptModelDownload}
               onPrepareCreateImageModel={() =>
@@ -1594,7 +1637,14 @@ function EditorDesktopShell({ services }: EditorShellProps) {
               onPromptProviderChange={(providerId) => {
                 void vm.setPromptProvider(providerId);
               }}
-              onSlidePromptSubmit={(prompt) => vm.generateSlideFromPrompt(prompt)}
+              onSlidePromptSubmit={async (prompt) => {
+                posthog.capture('ai_slide_generated', {
+                  project_name: vm.project.name,
+                  page_count: vm.project.pages.length,
+                  prompt_length: prompt.length,
+                });
+                return vm.generateSlideFromPrompt(prompt);
+              }}
               onStopGeneration={vm.stopPromptGeneration}
             />
           ) : null}

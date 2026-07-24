@@ -2,6 +2,9 @@
 import { type ProjectDocument } from '../../../apps/editor/src/domain/documents/model';
 
 export type CommandContractFrameResult = {
+  missingAssetRetained: boolean;
+  referencedAssetRetained: boolean;
+  removedAssetGone: boolean;
   imageY: number | undefined;
   shape1X: number | undefined;
   shape2Deleted: boolean;
@@ -40,10 +43,30 @@ export async function evaluateCommandContractFrame(
   run(new basicCommands.UpdateElementFrameCommand('shape-2', { height: 96, width: 120, x: 44 }));
   run(new basicCommands.UpdateElementFramesCommand({ 'shape-1': { x: 100 }, 'image-1': { y: 320 } }));
   run(new basicCommands.DeleteElementCommand('page-1', 'shape-2'));
+  run(new basicCommands.RemoveAssetCommand('missing-asset'));
+  run(new basicCommands.RemoveAssetCommand('asset-image'));
+  project = {
+    ...project,
+    assets: {
+      ...project.assets,
+      'asset-unused': {
+        id: 'asset-unused',
+        mimeType: 'image/png',
+        name: 'Unused asset',
+        objectUrl: 'blob:unused',
+        storage: 'inline',
+        type: 'image',
+      },
+    },
+  };
+  run(new basicCommands.RemoveAssetCommand('asset-unused'));
 
   if (project.elements['shape-2']) throw new Error('added shape should be deleted');
 
   return {
+    missingAssetRetained: !project.assets['missing-asset'],
+    referencedAssetRetained: Boolean(project.assets['asset-image']),
+    removedAssetGone: !project.assets['asset-unused'],
     imageY: project.elements['image-1']?.y,
     shape1X: project.elements['shape-1']?.x,
     shape2Deleted: !project.elements['shape-2'],
