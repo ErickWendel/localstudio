@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { basicCommands } from '../../../domain/commands/elements/basicCommands';
 import { fitImageWithinPage } from '../../../domain/images/imageSizing';
 import type { ProjectDocument } from '../../../domain/documents/model';
+import type { AppServices } from '../../../app/composition';
 import { createPrefixedId } from '../../../services/ids/idUtils';
 import { localMediaFiles } from './local-media-files';
 import { mediaPlaceholderReplacement } from './mediaPlaceholderReplacement';
@@ -14,6 +15,7 @@ export interface MediaImportProgressState {
 
 interface UseLocalMediaImportOptions {
   activePageId: string;
+  analyticsService: AppServices['analyticsService'];
   commitProject: (
     updater: (currentProject: ProjectDocument) => ProjectDocument,
     options?: { selectedElementIds?: string[] },
@@ -35,6 +37,7 @@ function waitForNextPaint() {
 
 export function useLocalMediaImport({
   activePageId,
+  analyticsService,
   commitProject,
   project,
   selectedElementIds,
@@ -274,9 +277,7 @@ export function useLocalMediaImport({
     } catch (error) {
       setMediaImportProgress({
         detail:
-          error instanceof Error
-            ? error.message
-            : 'The selected media file could not be loaded.',
+          error instanceof Error ? error.message : 'The selected media file could not be loaded.',
         title: 'Media import failed',
         tone: 'error',
       });
@@ -285,7 +286,18 @@ export function useLocalMediaImport({
       if (!imported && objectUrl && typeof URL.revokeObjectURL === 'function') {
         URL.revokeObjectURL(objectUrl);
       }
-      if (imported) setMediaImportProgress(undefined);
+      if (imported) {
+        analyticsService.capture('local_media_imported', {
+          assetType,
+          replacedPlaceholder: Boolean(
+            mediaPlaceholderReplacement.getSelectedImagePlaceholder({
+              project,
+              selectedElementIds,
+            }),
+          ),
+        });
+        setMediaImportProgress(undefined);
+      }
     }
   }
 
@@ -312,6 +324,10 @@ export function useLocalMediaImport({
         ).execute(currentProject),
       { selectedElementIds: [elementId] },
     );
+    analyticsService.capture('local_media_imported', {
+      assetType: 'video',
+      replacedExistingMedia: true,
+    });
   }
 
   function clearMediaImportProgress() {

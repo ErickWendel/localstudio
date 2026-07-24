@@ -352,6 +352,7 @@ export function useEditorViewModel(services: AppServices) {
     stockMediaSearching,
   } = useStockMediaLibrary({
     activePageId,
+    analyticsService: services.analyticsService,
     commitProject,
     project,
     selectedElementIds,
@@ -361,6 +362,7 @@ export function useEditorViewModel(services: AppServices) {
   const { clearMediaImportProgress, importImageFile, mediaImportProgress, replaceVideoAsset } =
     useLocalMediaImport({
       activePageId,
+      analyticsService: services.analyticsService,
       commitProject,
       project,
       selectedElementIds,
@@ -376,6 +378,7 @@ export function useEditorViewModel(services: AppServices) {
     refineBackgroundSubject,
     toggleBackgroundSelectionMode,
   } = useBackgroundSubjectSelection({
+    analyticsService: services.analyticsService,
     backgroundRemovalService: services.backgroundRemovalService,
     commitProject,
     modelStates,
@@ -742,6 +745,10 @@ export function useEditorViewModel(services: AppServices) {
       setCreateImageNotice(undefined);
       setAiToolsAttentionModelId(undefined);
     }
+    services.analyticsService.capture('model_downloaded', {
+      modelCount: next.filter((state) => state.required && state.status === 'ready').length,
+      modelId: 'required',
+    });
   }
 
   async function downloadModel(id: string) {
@@ -789,6 +796,12 @@ export function useEditorViewModel(services: AppServices) {
     if (id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID && next.status === 'ready') {
       setCreateImageNotice(undefined);
       setAiToolsAttentionModelId(undefined);
+    }
+    if (next.status === 'ready') {
+      services.analyticsService.capture('model_downloaded', {
+        modelId: id,
+        provider: next.provider,
+      });
     }
   }
 
@@ -920,6 +933,10 @@ export function useEditorViewModel(services: AppServices) {
         setPromptProviderStates(await services.promptService.getProviderStates());
       }
       setPromptApiNotice('Prompt API ready');
+      services.analyticsService.capture('model_downloaded', {
+        modelId: 'prompt-api',
+        provider: 'chrome-built-in',
+      });
     } catch (error: unknown) {
       if (!isCurrentRun()) return;
       const selectedProvider = promptProviderStates.find((provider) => provider.selected);
@@ -1165,6 +1182,11 @@ export function useEditorViewModel(services: AppServices) {
         ...current,
         [pageId]: translationLanguageUtils.normalizeLanguageCode(generatedTasks.language),
       }));
+      services.analyticsService.capture('prompt_generated_slide', {
+        elementCount: generatedElements.length,
+        pageCount: 1,
+        taskCount: generatedTasks.tasks.length,
+      });
     } catch (error: unknown) {
       if (!isCurrentRun()) return;
       setPromptGenerationNotice(
@@ -1226,6 +1248,12 @@ export function useEditorViewModel(services: AppServices) {
             ),
           { selectedElementIds: [imageToReplace.id] },
         );
+        services.analyticsService.capture('prompt_generated_image', {
+          height: generationOptions.height,
+          replacedExistingImage: true,
+          steps: generationOptions.steps,
+          width: generationOptions.width,
+        });
         return;
       }
 
@@ -1257,6 +1285,12 @@ export function useEditorViewModel(services: AppServices) {
           }).execute(currentProject),
         { selectedElementIds: [elementId] },
       );
+      services.analyticsService.capture('prompt_generated_image', {
+        height: generationOptions.height,
+        replacedExistingImage: false,
+        steps: generationOptions.steps,
+        width: generationOptions.width,
+      });
     } catch (error: unknown) {
       if (!isCurrentRun()) return;
       setCreateImageNotice(error instanceof Error ? error.message : 'Image generation failed.');
@@ -1461,6 +1495,10 @@ export function useEditorViewModel(services: AppServices) {
       await persistCurrentProject();
       setPersistenceError(false);
       editorViewModelProject.writeProjectNameToUrl(projectRef.current.name);
+      services.analyticsService.capture('project_saved_local', {
+        pageCount: projectRef.current.pages.length,
+        persistenceMode: services.persistenceMode,
+      });
     } catch {
       setPersistenceEnabled(false);
       setPersistenceError(true);
@@ -1497,6 +1535,10 @@ export function useEditorViewModel(services: AppServices) {
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(true);
       }
+      services.analyticsService.capture('project_saved_local', {
+        pageCount: projectToSave.pages.length,
+        persistenceMode: services.persistenceMode,
+      });
     } catch {
       setPersistenceEnabled(false);
       setPersistenceError(true);
@@ -1544,6 +1586,10 @@ export function useEditorViewModel(services: AppServices) {
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(true);
       }
+      services.analyticsService.capture('project_saved_local', {
+        pageCount: nextProject.pages.length,
+        persistenceMode: services.persistenceMode,
+      });
       return true;
     } catch {
       setPersistenceEnabled(false);
@@ -1586,6 +1632,9 @@ export function useEditorViewModel(services: AppServices) {
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(true);
       }
+      services.analyticsService.capture('project_imported_local', {
+        pageCount: normalizedProject.pages.length,
+      });
     } catch {
       setPersistenceEnabled(false);
       setPersistenceError(true);
@@ -1731,6 +1780,11 @@ export function useEditorViewModel(services: AppServices) {
           tone: 'warning',
         });
       }
+      services.analyticsService.capture('presentation_imported_pptx', {
+        missingFontCount,
+        pageCount: normalizedProject.pages.length,
+        substitutedFontCount,
+      });
     } catch (error) {
       setPresentationImportProgress(undefined);
       pptxImportLogger.error('PowerPoint import failed.', error);
@@ -1827,6 +1881,12 @@ export function useEditorViewModel(services: AppServices) {
       showOperationNotice({
         message: powerPointIo.summarizeExport(result),
         tone: result.warnings.length > 0 ? 'warning' : 'success',
+      });
+      services.analyticsService.capture('presentation_exported_pptx', {
+        animationBuildCount: result.stats.animationBuildCount,
+        mediaElementCount: result.stats.mediaElementCount,
+        pageCount: result.stats.slideCount,
+        warningCount: result.warnings.length,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown export error.';
@@ -2022,6 +2082,11 @@ export function useEditorViewModel(services: AppServices) {
       }
       lastMirroredProjectNameRef.current = projectToSync.name;
       setMirrorState(nextState);
+      if (nextState.status === 'synced') {
+        services.analyticsService.capture('project_synced_remote_mirror', {
+          pageCount: projectToSync.pages.length,
+        });
+      }
     } catch (error: unknown) {
       setMirrorState({
         enabled: true,
@@ -2155,6 +2220,9 @@ export function useEditorViewModel(services: AppServices) {
       setMirrorState({ enabled: true, status: 'synced', lastSyncedAt: new Date().toISOString() });
       setRemoteImportProgress(undefined);
       setRemoteImportOpen(false);
+      services.analyticsService.capture('remote_mirror_imported', {
+        pageCount: normalizedProject.pages.length,
+      });
     } catch (error: unknown) {
       setRemoteImportStatus('failed');
       setRemoteImportProgress(undefined);
@@ -2263,6 +2331,9 @@ export function useEditorViewModel(services: AppServices) {
     setVersionHistoryOpen(false);
     setActivePageId(normalizedProject.pages[0]?.id ?? '');
     setSelectedElementIds([]);
+    services.analyticsService.capture('project_restored_version', {
+      pageCount: normalizedProject.pages.length,
+    });
   }
 
   function selectPage(pageId: string) {
@@ -2328,6 +2399,10 @@ export function useEditorViewModel(services: AppServices) {
         project: currentProject,
       });
     });
+    services.analyticsService.capture('font_downloaded', {
+      family,
+      warningCount: result.warnings.length,
+    });
   }
 
   async function importLocalFontForSelection(family: string) {
@@ -2356,6 +2431,10 @@ export function useEditorViewModel(services: AppServices) {
         fonts: result.project.fonts ?? {},
         project: currentProject,
       });
+    });
+    services.analyticsService.capture('local_font_imported', {
+      family,
+      warningCount: result.warnings.length,
     });
   }
 
@@ -2775,6 +2854,11 @@ export function useEditorViewModel(services: AppServices) {
             translatedPageIds.map((pageId) => [pageId, normalizedTargetLanguage]),
           ),
         }));
+        services.analyticsService.capture('deck_translated', {
+          pageCount: translatedPageIds.length,
+          scope,
+          targetLanguage: normalizedTargetLanguage,
+        });
       }
     } catch (error) {
       setTranslationNotice(

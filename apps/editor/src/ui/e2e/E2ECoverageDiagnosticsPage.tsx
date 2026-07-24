@@ -35,7 +35,7 @@ import { modelSetupService } from '../../services/model-setup/modelSetupService'
 import { TransformersRuntimeClient } from '../../services/model-setup/transformersRuntimeClient';
 import { BrowserBackgroundRemovalService } from '../../services/background-removal/browserBackgroundRemovalService';
 import { BrowserShareService } from '../../services/sharing/shareService';
-import type { FontImportRequest } from '../../services/contracts/interfaces';
+import type { AnalyticsService, FontImportRequest } from '../../services/contracts/interfaces';
 import { minioMirrorService } from '../../services/mirror/minioMirrorService';
 import { BrowserLocalFontMirrorService } from '../../services/fonts/localFontMirrorService';
 import { localFontFolderHandleStore } from '../../services/fonts/localFontFolderHandleStore';
@@ -2058,6 +2058,7 @@ function EditorViewModelEdgeDiagnostics() {
 }
 
 function BackgroundSubjectSelectionDiagnostics() {
+  const analyticsService: AnalyticsService = { capture: () => undefined };
   const [readyProject, setReadyProject] = useState(
     () => createCommandDiagnosticProject() as ProjectDocument,
   );
@@ -2074,6 +2075,7 @@ function BackgroundSubjectSelectionDiagnostics() {
   const [summary, setSummary] = useState('pending');
   const ranRef = useRef(false);
   const readyBackground = useBackgroundSubjectSelection({
+    analyticsService,
     backgroundRemovalService: {
       prepareBackgroundRemoval: async (
         _asset,
@@ -2115,6 +2117,7 @@ function BackgroundSubjectSelectionDiagnostics() {
     setProcessingElementIds: setReadyProcessingIds,
   });
   const failingBackground = useBackgroundSubjectSelection({
+    analyticsService,
     backgroundRemovalService: {
       prepareBackgroundRemoval: async () => {
         throw new Error('prepare failed');
@@ -2144,6 +2147,7 @@ function BackgroundSubjectSelectionDiagnostics() {
     setProcessingElementIds: setFailingProcessingIds,
   });
   const blockedBackground = useBackgroundSubjectSelection({
+    analyticsService,
     backgroundRemovalService: {
       prepareBackgroundRemoval: async () => undefined,
       previewBackgroundMask: async () => ({ maskUrl: 'blob:blocked-preview', score: 0.1 }),

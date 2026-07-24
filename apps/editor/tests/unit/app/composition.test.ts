@@ -6,6 +6,7 @@ import { DisabledProjectRepository } from '../../../src/services/storage/disable
 import { OpfsProjectRepository } from '../../../src/services/storage/opfsProjectRepository';
 import { BrowserStockMediaService } from '../../../src/services/stock-media/stockMediaService';
 import { BrowserLocalFontMirrorService } from '../../../src/services/fonts/localFontMirrorService';
+import { BrowserPostHogAnalyticsService } from '../../../src/services/analytics/posthogAnalyticsService';
 
 describe('createAppServices', () => {
   const testWindow = window as Window & { showDirectoryPicker?: unknown };
@@ -68,7 +69,9 @@ describe('createAppServices', () => {
   });
 
   it('wires the browser image generation service', () => {
-    expect(createAppServices().imageGenerationService).toBeInstanceOf(BrowserImageGenerationService);
+    expect(createAppServices().imageGenerationService).toBeInstanceOf(
+      BrowserImageGenerationService,
+    );
   });
 
   it('wires the browser stock media service', () => {
@@ -76,7 +79,13 @@ describe('createAppServices', () => {
   });
 
   it('wires the browser local font mirror service', () => {
-    expect(createAppServices().localFontMirrorService).toBeInstanceOf(BrowserLocalFontMirrorService);
+    expect(createAppServices().localFontMirrorService).toBeInstanceOf(
+      BrowserLocalFontMirrorService,
+    );
+  });
+
+  it('wires the browser analytics service', () => {
+    expect(createAppServices().analyticsService).toBeInstanceOf(BrowserPostHogAnalyticsService);
   });
 
   it('starts new app services with a blank project by default', () => {

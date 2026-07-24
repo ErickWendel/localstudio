@@ -1,6 +1,7 @@
 import { sampleProject } from '../domain/projects/sampleProject';
 import type { ProjectDocument } from '../domain/documents/model';
 import type {
+  AnalyticsService,
   BackgroundRemovalService,
   ExportService,
   FontImportService,
@@ -20,6 +21,7 @@ import type {
   StockMediaService,
   TranslatorService,
 } from '../services/contracts/interfaces';
+import { BrowserPostHogAnalyticsService } from '../services/analytics/posthogAnalyticsService';
 import { inMemoryAiServices } from '../services/testing/inMemoryAiServices';
 import { browserTranslatorService } from '../services/translation/browserTranslatorService';
 import { browserPromptService } from '../services/prompting/browserPromptService';
@@ -64,6 +66,7 @@ export interface AppServices {
   smartGrabService: SmartGrabService;
   magicEraserService: MagicEraserService;
   mirrorService: MirrorService<MinioMirrorConfig>;
+  analyticsService: AnalyticsService;
 }
 
 interface CreateAppServicesOptions {
@@ -74,7 +77,8 @@ interface CreateAppServicesOptions {
 
 export function createAppServices(options: CreateAppServicesOptions = {}): AppServices {
   const textGenerationRuntime = new webGpuTextGenerationRuntime.TransformersTextGenerationRuntime();
-  const languageDetectionRuntime = new webGpuLanguageDetectionRuntime.TransformersLanguageDetectionRuntime();
+  const languageDetectionRuntime =
+    new webGpuLanguageDetectionRuntime.TransformersLanguageDetectionRuntime();
   const persistenceMode = getPersistenceStorageMode();
   const persistenceAvailable = persistenceMode !== 'none';
   const mirrorService = new minioMirrorService.MinioMirrorService();
@@ -120,6 +124,7 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     smartGrabService: new inMemoryAiServices.MockSmartGrabService(),
     magicEraserService: new inMemoryAiServices.MockMagicEraserService(),
     mirrorService,
+    analyticsService: new BrowserPostHogAnalyticsService(),
   };
 }
 

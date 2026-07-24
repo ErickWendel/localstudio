@@ -304,6 +304,10 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           shareId: nextShare.shareId,
         };
         setShareMetadata(nextShare);
+        services.analyticsService.capture('public_share_published', {
+          hasRecording: Boolean(selectedRecordingId),
+          pageCount: vm.project.pages.length,
+        });
         return nextShare;
       } catch (error) {
         setShareMetadata((current) => (current ? { ...current, status: 'sync-failed' } : current));
@@ -315,7 +319,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         setSharePublishProgress(undefined);
       }
     },
-    [services.shareService, shareMetadata?.shareId, vm.project],
+    [services.analyticsService, services.shareService, shareMetadata?.shareId, vm.project],
   );
 
   function getReusablePublishedShare(
@@ -435,6 +439,10 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         editorImageExport.createZipBlob(archiveFiles),
         services.exportService.getImagesArchiveFileName(vm.project),
       );
+      services.analyticsService.capture('presentation_exported_images', {
+        format: options.format,
+        frameCount: frames.length,
+      });
       setImageExportPanelOpen(false);
       showImageExportNotice({
         message: `Images exported: ${frames.length} file${frames.length === 1 ? '' : 's'}.`,
@@ -463,6 +471,9 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     const copiedShare: ShareMetadata = { ...preparedShare, status: 'copied' };
     setShareMetadata(copiedShare);
     copyShareText(copiedShare.publicUrl);
+    services.analyticsService.capture('public_share_link_copied', {
+      hasRecording: Boolean(selectedRecordingId),
+    });
     return copiedShare;
   }
 
@@ -495,6 +506,10 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   function presentFromSharePanel() {
     setSharePanelOpen(false);
     void vm.toggleFullscreen(workspaceRef.current);
+    services.analyticsService.capture('presentation_started_fullscreen', {
+      fromSharePanel: true,
+      pageCount: vm.project.pages.length,
+    });
   }
 
   function startPresenterMode(options?: { fromBeginning?: boolean }) {
@@ -502,6 +517,10 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     if (!pageId) return;
     vm.playPresentationPreview(pageId);
     void vm.toggleFullscreen(workspaceRef.current);
+    services.analyticsService.capture('presentation_started_fullscreen', {
+      fromBeginning: Boolean(options?.fromBeginning),
+      pageCount: vm.project.pages.length,
+    });
   }
 
   function getPresenterSessionService() {
@@ -536,6 +555,9 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     setPresenterRemoteUnavailable(false);
     setRemotePresenterActive(true);
     setPresenterSessionId(result.sessionId);
+    services.analyticsService.capture('presenter_view_opened', {
+      pageCount: vm.project.pages.length,
+    });
     void service
       .openRemoteControlSession({
         presenterLabel: navigator.platform || 'Presenter device',
@@ -543,6 +565,9 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       })
       .then((remoteSession) => {
         setPresenterRemoteSession(remoteSession);
+        services.analyticsService.capture('presenter_remote_opened', {
+          pageCount: vm.project.pages.length,
+        });
         service.publishState(
           createPresenterStatePayload({ activePageId: pageId, presenterMode: 'presenting' }),
         );
@@ -562,7 +587,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         createPresenterStatePayload({ activePageId: pageId, presenterMode: 'presenting' }),
       );
     }, 0);
-  }, [createPresenterStatePayload, presenterSessionId, vm]);
+  }, [createPresenterStatePayload, presenterSessionId, services.analyticsService, vm]);
 
   function enterAudienceFullscreen() {
     setAudienceFullscreenPromptOpen(false);
