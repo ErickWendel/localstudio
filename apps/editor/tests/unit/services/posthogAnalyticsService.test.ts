@@ -16,14 +16,14 @@ describe('BrowserPostHogAnalyticsService', () => {
   it('delegates capture calls to the shared PostHog singleton', () => {
     const service = new BrowserPostHogAnalyticsService();
 
-    service.capture('project_saved_local', { pageCount: 3 });
-    service.capture('deck_translated', { targetLanguage: 'pt' });
+    service.capture('model_downloaded', { modelId: 'gemma' });
+    service.capture('stock_media_inserted', { provider: 'unsplash' });
 
     const captureCalls = (posthog.capture as unknown as { mock: { calls: unknown[][] } }).mock
       .calls;
     expect(captureCalls).toEqual([
-      ['project_saved_local', { pageCount: 3 }],
-      ['deck_translated', { targetLanguage: 'pt' }],
+      ['model_downloaded', { modelId: 'gemma' }],
+      ['stock_media_inserted', { provider: 'unsplash' }],
     ]);
   });
 });

@@ -129,25 +129,17 @@ export interface MirrorService<TConfig = unknown> {
 
 export type AnalyticsEventName =
   | 'background_removed'
-  | 'deck_translated'
   | 'font_downloaded'
   | 'local_media_imported'
   | 'local_font_imported'
   | 'model_downloaded'
-  | 'presentation_exported_images'
-  | 'presentation_exported_pptx'
-  | 'presentation_imported_pptx'
   | 'presentation_started_fullscreen'
   | 'presenter_remote_opened'
-  | 'presenter_view_opened'
   | 'project_imported_local'
   | 'project_restored_version'
-  | 'project_saved_local'
   | 'project_synced_remote_mirror'
   | 'prompt_generated_image'
   | 'prompt_generated_slide'
-  | 'public_share_link_copied'
-  | 'public_share_published'
   | 'remote_mirror_imported'
   | 'stock_media_inserted';
 

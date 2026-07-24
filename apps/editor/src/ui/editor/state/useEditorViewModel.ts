@@ -1495,10 +1495,6 @@ export function useEditorViewModel(services: AppServices) {
       await persistCurrentProject();
       setPersistenceError(false);
       editorViewModelProject.writeProjectNameToUrl(projectRef.current.name);
-      services.analyticsService.capture('project_saved_local', {
-        pageCount: projectRef.current.pages.length,
-        persistenceMode: services.persistenceMode,
-      });
     } catch {
       setPersistenceEnabled(false);
       setPersistenceError(true);
@@ -1535,10 +1531,6 @@ export function useEditorViewModel(services: AppServices) {
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(true);
       }
-      services.analyticsService.capture('project_saved_local', {
-        pageCount: projectToSave.pages.length,
-        persistenceMode: services.persistenceMode,
-      });
     } catch {
       setPersistenceEnabled(false);
       setPersistenceError(true);
@@ -1586,10 +1578,6 @@ export function useEditorViewModel(services: AppServices) {
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(true);
       }
-      services.analyticsService.capture('project_saved_local', {
-        pageCount: nextProject.pages.length,
-        persistenceMode: services.persistenceMode,
-      });
       return true;
     } catch {
       setPersistenceEnabled(false);
@@ -1780,11 +1768,6 @@ export function useEditorViewModel(services: AppServices) {
           tone: 'warning',
         });
       }
-      services.analyticsService.capture('presentation_imported_pptx', {
-        missingFontCount,
-        pageCount: normalizedProject.pages.length,
-        substitutedFontCount,
-      });
     } catch (error) {
       setPresentationImportProgress(undefined);
       pptxImportLogger.error('PowerPoint import failed.', error);
@@ -1881,12 +1864,6 @@ export function useEditorViewModel(services: AppServices) {
       showOperationNotice({
         message: powerPointIo.summarizeExport(result),
         tone: result.warnings.length > 0 ? 'warning' : 'success',
-      });
-      services.analyticsService.capture('presentation_exported_pptx', {
-        animationBuildCount: result.stats.animationBuildCount,
-        mediaElementCount: result.stats.mediaElementCount,
-        pageCount: result.stats.slideCount,
-        warningCount: result.warnings.length,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown export error.';
@@ -2854,11 +2831,6 @@ export function useEditorViewModel(services: AppServices) {
             translatedPageIds.map((pageId) => [pageId, normalizedTargetLanguage]),
           ),
         }));
-        services.analyticsService.capture('deck_translated', {
-          pageCount: translatedPageIds.length,
-          scope,
-          targetLanguage: normalizedTargetLanguage,
-        });
       }
     } catch (error) {
       setTranslationNotice(
