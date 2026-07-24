@@ -17,14 +17,8 @@ export function ShowcaseSection() {
         {featureShowcases.map((feature, index) => (
           <article className={index % 2 === 1 ? 'showcase-row reverse' : 'showcase-row'} key={feature.id}>
             <Reveal as="div" className="showcase-copy" delay={index * 50} reveal="showcase-copy">
-              <p className="eyebrow">{feature.eyebrow}</p>
               <h3>{feature.title}</h3>
               <p>{feature.copy}</p>
-              <ul>
-                {feature.bullets.map((bullet) => (
-                  <li key={bullet}>{bullet}</li>
-                ))}
-              </ul>
             </Reveal>
             <FeatureMedia feature={feature.id} />
           </article>

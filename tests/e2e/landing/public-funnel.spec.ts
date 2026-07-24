@@ -3,6 +3,7 @@ import { expect, test, withIsolatedDevServer } from '../support/journey-test';
 import { evaluatePublicFunnelLlmsContract } from './public-funnel-llms-contract-browser';
 
 const getServer = withIsolatedDevServer(test);
+const isLandingCoverageRun = process.env.E2E_COVERAGE_SCOPE === 'landing';
 
 test.describe('landing public funnel journey', () => {
   test('serves llms.txt as Markdown with a top-level heading', async ({ page }) => {
@@ -87,13 +88,27 @@ test.describe('landing public funnel journey', () => {
       page.getByRole('link', { name: /Star LocalStudio.dev on GitHub/i }),
     ).toHaveAttribute('href', /github\.com\/ErickWendel\/localstudio/);
 
-    await page.getByRole('link', { name: 'Open editor' }).first().click();
-    await expect(page).toHaveURL(/\/editor\/$/);
-    await expect(page.getByRole('heading', { name: 'LocalStudio.dev' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Open editor' }).first()).toHaveAttribute(
+      'href',
+      '/editor/',
+    );
+
+    if (!isLandingCoverageRun) {
+      await page.getByRole('link', { name: 'Open editor' }).first().click();
+      await expect(page).toHaveURL(/\/editor\/$/);
+      await expect(page.getByRole('heading', { name: 'LocalStudio.dev' })).toBeVisible();
+    }
 
     await page.goto(new URL('/', getServer().baseURL).toString());
-    await page.getByRole('link', { name: 'Open WebMCP demo' }).click();
-    await expect(page).toHaveURL(/\/editor\/webmcp$/);
-    await expect(page.getByRole('heading', { name: /WebMCP showcase/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Open WebMCP demo' })).toHaveAttribute(
+      'href',
+      '/editor/webmcp',
+    );
+
+    if (!isLandingCoverageRun) {
+      await page.getByRole('link', { name: 'Open WebMCP demo' }).click();
+      await expect(page).toHaveURL(/\/editor\/webmcp$/);
+      await expect(page.getByRole('heading', { name: /WebMCP showcase/i })).toBeVisible();
+    }
   });
 });

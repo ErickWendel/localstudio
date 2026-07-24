@@ -29,7 +29,7 @@
 }
 
 .showcase-copy h3 {
-  margin-bottom: 14px;
+  margin-bottom: 16px;
   font-size: clamp(28px, 3.4vw, 48px);
   line-height: 1.04;
 }
@@ -38,21 +38,6 @@
   color: var(--ls-muted);
   font-size: clamp(16px, 1.5vw, 19px);
   line-height: 1.58;
-}
-
-.showcase-copy ul {
-  display: grid;
-  gap: 9px;
-  margin: 22px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.showcase-copy li {
-  border-left: 3px solid var(--ls-green);
-  padding: 9px 0 9px 13px;
-  color: var(--ls-text);
-  font-weight: 900;
 }
 
 .feature-media {
