@@ -23,6 +23,17 @@ export const featureShowcases = [
     ],
   },
   {
+    id: 'transcript',
+    eyebrow: 'Live transcript',
+    title: 'Turn spoken presentations into accessible public playback.',
+    copy: 'While presenting, speakers can record their voice with the native Speech-to-Text API. LocalStudio opens the transcript in a separate window for accessibility, then reuses the recording, transcript, and speaker notes in the public view.',
+    bullets: [
+      'Separate transcript window for audiences',
+      'RAG answers from transcript and speaker notes',
+      'Podcast-style playback per slide',
+    ],
+  },
+  {
     id: 'prompt',
     eyebrow: 'Prompt-to-slide',
     title: 'Generate a real slide structure, then keep editing every layer.',

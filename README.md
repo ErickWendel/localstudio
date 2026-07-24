@@ -14,8 +14,8 @@ LocalStudio.dev is a browser-native slide editor for people who want editable de
 Cloud presentation tools are convenient until sync becomes the product risk. LocalStudio exists for a practical reason: iCloud sync issues can lose or corrupt entire presentations, and translating a deck manually is still slow. LocalStudio keeps the deck as editable local layers and can translate the whole deck with one action when the browser AI setup is ready.
 
 It turns PowerPoint (`.pptx`) import, prompt generation, image
-creation, translation, background removal, presenter-mode PWA remote control, local project history, and S3-compatible
-projects into one editable slide workflow.
+creation, translation, background removal, presenter-mode PWA remote control, live speech transcripts, public
+audience Q&A, local project history, and S3-compatible projects into one editable slide workflow.
 
 [Live demo](https://localstudio.dev/) · [Docs](https://localstudio.dev/docs/) · [WebMCP showcase](https://localstudio.dev/webmcp/) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md)
 
@@ -25,12 +25,12 @@ For usage walkthroughs, start with the hosted docs at [localstudio.dev/docs](htt
 
 LocalStudio.dev runs in the browser without a product backend. Your deck remains a layered document: PowerPoint
 (`.pptx`) files can become editable LocalStudio projects, prompts become editable slide objects, generated images stay
-as normal assets, translated text updates in place, presenter controls can run from the companion PWA, and project files
-can be saved to a local folder you control.
+as normal assets, translated text updates in place, presenter controls can run from the companion PWA, spoken sessions
+can become accessible transcripts, and project files can be saved to a local folder you control.
 
 | Landing section | What it proves |
 | --- | --- |
-| Watch the workflow | Import, prompt, generate images, translate, save locally, present, and share. |
+| Watch the workflow | Import, prompt, generate images, translate, save locally, present, record, and share. |
 | Feature showcase | Every AI action returns to editable slide layers inside the same deck. |
 | WebMCP Showcase | Host pages and agents can discover editor tools and drive the same local-first surface. |
 | Requirements | Chrome-first browser APIs, WebGPU model caches, and local storage expectations. |
@@ -60,12 +60,24 @@ The feature showcase on the landing page focuses on the editor outcomes behind t
 
 - PowerPoint (`.pptx`) import turns existing decks into editable LocalStudio projects.
 - Presenter mode adds speaker notes, slide controls, fullscreen playback, and PWA remote control over peer-to-peer browser connections.
+- Live speech transcription can record the presenter's voice with the native Speech-to-Text API, open the transcript in a separate accessibility window, and carry that transcript into the public view.
 - Prompt-to-slide creates structured text, image, and shape layers instead of a flat bitmap.
 - Prompt-to-image saves generated assets locally and drops them back onto the canvas as normal image layers.
 - Translation supports selected text, the current page, or the whole deck with language detection and target-language control.
 - Local project history keeps project JSON, assets, cache, and version snapshots in a folder you control.
 - S3-compatible mirroring publishes project JSON, assets, version history, config, public share payloads, and mirrored fonts.
 - Image editing supports click-guided segmentation, mask preview, flip, and crop after extraction.
+
+### Live transcript and public Q&A
+
+When presenting, speakers can record their voice and use the native Speech-to-Text API to transcribe the talk. LocalStudio
+opens the live transcript in a separate window, which makes the session easier to follow and more accessible while the
+presentation is running.
+
+Public deck viewers can reuse that transcript alongside speaker notes. The public view includes a small RAG app for
+audience questions, plus podcast-style playback so each slide can be replayed with its matching recorded narration.
+
+![LocalStudio public view with transcript Q&A and podcast playback](apps/landing/public/live-transcript-showcase.png)
 
 ### S3-compatible projects
 
