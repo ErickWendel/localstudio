@@ -431,11 +431,11 @@ describe('LandingPage', () => {
       within(featuresSection).getByText(/native Speech-to-Text API/i),
     ).toBeInTheDocument();
     expect(
-      within(featuresSection).getByText('RAG answers from transcript and speaker notes'),
-    ).toBeInTheDocument();
+      within(featuresSection).queryByText('RAG answers from transcript and speaker notes'),
+    ).not.toBeInTheDocument();
     expect(
-      within(featuresSection).getByText('Podcast-style playback per slide'),
-    ).toBeInTheDocument();
+      within(featuresSection).queryByText('Podcast-style playback per slide'),
+    ).not.toBeInTheDocument();
     expect(
       within(featuresSection).getByRole('img', {
         name: /public presentation view with transcript question answering/i,
