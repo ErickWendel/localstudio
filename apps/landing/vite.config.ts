@@ -1,5 +1,6 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Connect, type Plugin } from 'vite';
+import { analyticsHtmlPlugin } from '../../scripts/vite/analyticsHtmlPlugin';
 import { rewriteEditorPreviewRoute } from './src/routing/rewriteEditorPreviewRoute';
 import { localNetworkOriginRoute } from '../../scripts/vite/localNetworkOriginRoute';
 import { localPowerPointSampleRoute } from '../../scripts/vite/localPowerPointSampleRoute';
@@ -73,6 +74,7 @@ function inlineStylesheetLinks(): Plugin {
 export default defineConfig({
   base: siteBase,
   plugins: [
+    analyticsHtmlPlugin(),
     localNetworkOriginRoute(),
     localPowerPointSampleRoute(),
     presenterRemoteSignalingRoute(),

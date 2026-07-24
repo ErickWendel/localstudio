@@ -17,5 +17,3 @@ if (!postHogConfig.apiKey) {
     enable_recording_console_log: false,
   });
 }
-
-export { posthog };

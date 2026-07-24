@@ -10,10 +10,12 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@localstudio/analytics-config": "*",
     "@localstudio/brand": "*",
     "@localstudio/presenter-remote": "*",
     "jsqr": "^1.4.0",
     "lucide-react": "^1.21.0",
+    "posthog-js": "^1.407.2",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   }
