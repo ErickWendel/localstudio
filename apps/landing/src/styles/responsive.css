@@ -118,10 +118,19 @@
 @media (max-width: 760px) {
   .landing-header {
     grid-template-columns: 1fr auto;
+    align-items: start;
   }
 
   .landing-nav {
     display: none;
+  }
+
+  .mobile-menu-toggle {
+    display: inline-flex;
+  }
+
+  .mobile-landing-nav.open {
+    display: grid;
   }
 
   .hero-section {
@@ -241,6 +250,7 @@
 
 @media (max-width: 420px) {
   .landing-header {
+    grid-template-columns: 1fr auto;
     gap: 10px;
     padding-inline: 12px;
   }
@@ -255,18 +265,17 @@
     font-size: 9px;
   }
 
-  .header-cta {
-    width: 40px;
-    min-width: 40px;
-    padding: 0;
-    gap: 0;
-    overflow: hidden;
-    color: transparent;
-    font-size: 0;
+  .hero-cta {
+    min-width: 0;
+    width: 100%;
+    max-width: 240px;
+    min-height: 62px;
+    padding: 0 20px;
+    font-size: 13px;
   }
 
-  .header-cta svg {
-    color: var(--ls-on-primary);
+  .header-actions {
+    gap: 8px;
   }
 
   .workflow-tabs,

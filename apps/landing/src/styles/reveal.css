@@ -39,6 +39,19 @@
   transform: translate3d(0, 0, 0) scale(1);
 }
 
+[data-reveal='showcase-media'] {
+  transform: translate3d(42px, 22px, 0) scale(0.98);
+}
+
+.showcase-row.reverse [data-reveal='showcase-media'] {
+  transform: translate3d(-42px, 22px, 0) scale(0.98);
+}
+
+[data-reveal='showcase-media'].is-visible,
+.showcase-row.reverse [data-reveal='showcase-media'].is-visible {
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
 [data-reveal='demo-card'],
 [data-reveal='requirement-card'],
 [data-reveal='proof-item'] {

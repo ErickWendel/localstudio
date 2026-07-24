@@ -5,7 +5,8 @@ import { WorkflowPreview } from './WorkflowPreview';
 type WorkflowStepId = (typeof workflowSteps)[number]['id'];
 
 export function WorkflowCarousel({ prefersReducedMotion }: { prefersReducedMotion: boolean }) {
-  const [activeWorkflowStep, setActiveWorkflowStep] = useState<WorkflowStepId>('prompt');
+  const firstWorkflowStep = workflowSteps[0];
+  const [activeWorkflowStep, setActiveWorkflowStep] = useState<WorkflowStepId>(firstWorkflowStep.id);
   const activeWorkflow = workflowSteps.find((step) => step.id === activeWorkflowStep) ?? workflowSteps[0];
 
   const advanceWorkflowStep = () => {

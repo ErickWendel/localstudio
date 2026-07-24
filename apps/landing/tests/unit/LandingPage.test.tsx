@@ -81,8 +81,8 @@ describe('LandingPage', () => {
     expect(screen.queryByRole('link', { name: 'Web AI' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Thanks' })).not.toBeInTheDocument();
     const openEditorLinks = screen.getAllByRole('link', { name: /Open editor/i });
-    expect(openEditorLinks).toHaveLength(2);
-    const heroOpenEditorLink = openEditorLinks[1]!;
+    expect(openEditorLinks).toHaveLength(1);
+    const heroOpenEditorLink = openEditorLinks[0]!;
     expect(heroOpenEditorLink).toHaveClass('header-cta');
     expect(heroOpenEditorLink).toHaveClass('hero-cta');
     expect(heroOpenEditorLink.querySelector('.hero-cta-snake')).toBeInTheDocument();
@@ -96,6 +96,39 @@ describe('LandingPage', () => {
     expect(screen.getByRole('link', { name: 'About it' })).toHaveAttribute('href', '#top');
     expect(screen.getByRole('link', { name: 'Features' })).not.toHaveAttribute('aria-current');
     expect(screen.getByRole('link', { name: 'Pricing' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('opens a mobile section menu from the header', async () => {
+    const user = userEvent.setup();
+    render(<LandingPage />);
+
+    const menuButton = screen.getByRole('button', { name: 'Open section menu' });
+
+    expect(menuButton).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('navigation', { name: 'Mobile landing sections' })).not.toBeInTheDocument();
+
+    await user.click(menuButton);
+
+    const mobileNav = screen.getByRole('navigation', { name: 'Mobile landing sections' });
+    const mobileLinks = within(mobileNav).getAllByRole('link');
+
+    expect(menuButton).toHaveAttribute('aria-expanded', 'true');
+    expect(mobileLinks.map((link) => link.textContent)).toEqual([
+      'About it',
+      'Features',
+      'Requirements',
+      'Docs',
+      'Pricing',
+    ]);
+    expect(within(mobileNav).getByRole('link', { name: 'About it' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+
+    await user.click(within(mobileNav).getByRole('link', { name: 'Features' }));
+
+    expect(screen.queryByRole('navigation', { name: 'Mobile landing sections' })).not.toBeInTheDocument();
+    expect(menuButton).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('adds scroll reveal contracts to hero, media, cards, and calls to action', () => {
@@ -149,6 +182,7 @@ describe('LandingPage', () => {
     expect(workflowTabs.every((tab) => tab.classList.contains('workflow-tab'))).toBe(true);
     expect(workflowTabs).toHaveLength(7);
     expect(workflowTabs[0]).toHaveTextContent(/Bring your own PPT/i);
+    expect(workflowTabs[0]).toHaveAttribute('aria-selected', 'true');
     expect(workflowTabs[5]).toHaveTextContent(/Present with confidence/i);
     expect(workflowTabs[6]).toHaveTextContent(/Share your presentation/i);
     expect(screen.getByRole('tab', { name: /Bring your own PPT/i })).toBeInTheDocument();
@@ -160,6 +194,11 @@ describe('LandingPage', () => {
     expect(screen.getByRole('tab', { name: /Present with confidence/i })).toBeInTheDocument();
     expect(screen.queryByText('Chrome Prompt API')).not.toBeInTheDocument();
     expect(screen.queryByText('Bonsai Image WebGPU')).not.toBeInTheDocument();
+    expect(screen.getByText(/Import an existing \.pptx file/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Bring your own PPT workflow/i).querySelector('source')).toHaveAttribute(
+      'src',
+      '/demo-bring-your-ppt.mp4',
+    );
     expect(screen.getByRole('heading', { name: 'Share your slides' })).toBeInTheDocument();
     expect(screen.getByText(/use your own external storage/i)).toBeInTheDocument();
     expect(screen.getByText(/reimport it into different machines/i)).toBeInTheDocument();
@@ -314,11 +353,13 @@ describe('LandingPage', () => {
         /mirror local fonts so shared decks keep their typography for viewers/i,
       ),
     ).toBeInTheDocument();
-    expect(within(showcaseSection).getByText('Project JSON and assets')).toBeInTheDocument();
-    expect(within(showcaseSection).getByText('Version history and config')).toBeInTheDocument();
+    expect(within(showcaseSection).queryByText('Project JSON and assets')).not.toBeInTheDocument();
     expect(
-      within(showcaseSection).getByText('Public share payloads with mirrored fonts'),
-    ).toBeInTheDocument();
+      within(showcaseSection).queryByText('Version history and config'),
+    ).not.toBeInTheDocument();
+    expect(
+      within(showcaseSection).queryByText('Public share payloads with mirrored fonts'),
+    ).not.toBeInTheDocument();
     expect(
       within(showcaseSection).getByRole('img', {
         name: /S3-compatible mirror settings beside a MinIO object browser/i,
@@ -368,11 +409,15 @@ describe('LandingPage', () => {
     expect(
       within(featuresSection).getByText(/companion PWA can remotely control the presentation/i),
     ).toBeInTheDocument();
-    expect(within(featuresSection).getByText('Speaker timer and notes')).toBeInTheDocument();
     expect(
-      within(featuresSection).getByText('Next and previous slide controls'),
-    ).toBeInTheDocument();
-    expect(within(featuresSection).getByText('PWA remote control over P2P')).toBeInTheDocument();
+      within(featuresSection).queryByText('Speaker timer and notes'),
+    ).not.toBeInTheDocument();
+    expect(
+      within(featuresSection).queryByText('Next and previous slide controls'),
+    ).not.toBeInTheDocument();
+    expect(
+      within(featuresSection).queryByText('PWA remote control over P2P'),
+    ).not.toBeInTheDocument();
     expect(
       within(featuresSection).getByRole('img', {
         name: /presenter mode with speaker notes and phone remote controls/i,
@@ -437,6 +482,7 @@ describe('LandingPage', () => {
       'decoding',
       'async',
     );
+    expect(document.querySelector('.feature-media-text-mask')).not.toBeInTheDocument();
     expect(screen.getByRole('img', { name: /generated AI chip image/i })).toHaveAttribute(
       'src',
       '/prompt-to-image-showcase.png',
