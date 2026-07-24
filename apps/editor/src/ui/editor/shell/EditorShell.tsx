@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { localStudioAnalyticsConfig } from '@localstudio/analytics-config/config';
 import type Konva from 'konva';
 import type { AppServices } from '../../../app/composition';
 import { placeholderImage } from '../../../domain/assets/placeholderImage';
 import type { ProjectDocument } from '../../../domain/documents/model';
 import { pageVisibility } from '../../../domain/documents/pageVisibility';
 import type { ShareMetadata, SharePublishProgress } from '../../../services/contracts/interfaces';
+import { analyticsModelProperties } from '../../../services/analytics/analyticsModelProperties';
 import { editorAutomationController } from '../../../services/automation/editorAutomationController';
 import type { EditorAutomationDelegate } from '../../../services/automation/editorAutomationController';
 import { imageGenerationModel } from '../../../services/image-generation/imageGenerationModel';
@@ -58,13 +60,13 @@ import { editorShortcutActions } from './editor-shortcut-actions';
 import { PresentationSlideNavigator } from './PresentationSlideNavigator';
 import { SpeakerNotesEditor } from './SpeakerNotesEditor';
 import { createProjectForSelectedShareRecording } from './createProjectForSelectedShareRecording';
-import { posthog } from '../../../services/analytics/posthog';
 
 interface EditorShellProps {
   services: AppServices;
 }
 
 const editorMobileViewportQuery = '(max-width: 760px)';
+const postHogEvents = localStudioAnalyticsConfig.postHog.events;
 
 function getModelControlPreparation(status: string | undefined, progress: number | undefined) {
   if (status === 'downloading') {
@@ -305,7 +307,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           shareId: nextShare.shareId,
         };
         setShareMetadata(nextShare);
-        posthog.capture('presentation_shared', {
+        services.analyticsService.capture(postHogEvents.presentationShared, {
           project_name: vm.project.name,
           share_id: nextShare.shareId,
           has_recording: Boolean(selectedRecordingId),
@@ -322,7 +324,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         setSharePublishProgress(undefined);
       }
     },
-    [services.shareService, shareMetadata?.shareId, vm.project],
+    [services.analyticsService, services.shareService, shareMetadata?.shareId, vm.project],
   );
 
   function getReusablePublishedShare(
@@ -447,7 +449,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         message: `Images exported: ${frames.length} file${frames.length === 1 ? '' : 's'}.`,
         tone: 'success',
       });
-      posthog.capture('presentation_exported_images', {
+      services.analyticsService.capture(postHogEvents.presentationExportedImages, {
         slide_count: frames.length,
         format: options.format,
         project_name: vm.project.name,
@@ -476,7 +478,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     const copiedShare: ShareMetadata = { ...preparedShare, status: 'copied' };
     setShareMetadata(copiedShare);
     copyShareText(copiedShare.publicUrl);
-    posthog.capture('share_link_copied', {
+    services.analyticsService.capture(postHogEvents.shareLinkCopied, {
       project_name: vm.project.name,
       has_recording: Boolean(selectedRecordingId),
       page_count: vm.project.pages.length,
@@ -513,7 +515,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   function presentFromSharePanel() {
     setSharePanelOpen(false);
     void vm.toggleFullscreen(workspaceRef.current);
-    services.analyticsService.capture('presentation_started_fullscreen', {
+    services.analyticsService.capture(postHogEvents.presentationStartedFullscreen, {
       fromSharePanel: true,
       pageCount: vm.project.pages.length,
     });
@@ -524,7 +526,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     if (!pageId) return;
     vm.playPresentationPreview(pageId);
     void vm.toggleFullscreen(workspaceRef.current);
-    services.analyticsService.capture('presentation_started_fullscreen', {
+    services.analyticsService.capture(postHogEvents.presentationStartedFullscreen, {
       fromBeginning: Boolean(options?.fromBeginning),
       pageCount: vm.project.pages.length,
     });
@@ -562,7 +564,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     setPresenterRemoteUnavailable(false);
     setRemotePresenterActive(true);
     setPresenterSessionId(result.sessionId);
-    posthog.capture('presenter_view_opened', {
+    services.analyticsService.capture(postHogEvents.presenterViewOpened, {
       project_name: vm.project.name,
       page_count: vm.project.pages.length,
     });
@@ -573,7 +575,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       })
       .then((remoteSession) => {
         setPresenterRemoteSession(remoteSession);
-        services.analyticsService.capture('presenter_remote_opened', {
+        services.analyticsService.capture(postHogEvents.presenterRemoteOpened, {
           pageCount: vm.project.pages.length,
         });
         service.publishState(
@@ -1618,13 +1620,14 @@ function EditorDesktopShell({ services }: EditorShellProps) {
               selectedImageElementId={vm.selectedImagePromptElementId}
               onCreateImagePromptIntent={() => vm.ensureImageGenerationReadyForPrompt()}
               onCreateImageSubmit={async (prompt, options) => {
-                posthog.capture('ai_image_generated', {
+                services.analyticsService.capture(postHogEvents.aiImageGenerated, {
                   project_name: vm.project.name,
                   page_count: vm.project.pages.length,
                   prompt_length: prompt.length,
                   image_width: options.width,
                   image_height: options.height,
                   image_steps: options.steps,
+                  ...analyticsModelProperties.getImageGenerationModelProperties(),
                 });
                 return vm.generateImageFromPrompt(prompt, options);
               }}
@@ -1638,10 +1641,13 @@ function EditorDesktopShell({ services }: EditorShellProps) {
                 void vm.setPromptProvider(providerId);
               }}
               onSlidePromptSubmit={async (prompt) => {
-                posthog.capture('ai_slide_generated', {
+                services.analyticsService.capture(postHogEvents.aiSlideGenerated, {
                   project_name: vm.project.name,
                   page_count: vm.project.pages.length,
                   prompt_length: prompt.length,
+                  ...analyticsModelProperties.getSelectedPromptModelProperties(
+                    vm.promptProviderStates,
+                  ),
                 });
                 return vm.generateSlideFromPrompt(prompt);
               }}

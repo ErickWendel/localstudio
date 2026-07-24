@@ -1,14 +1,14 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { localStudioAnalyticsConfig } from '@localstudio/analytics-config/config';
+import type { AiProviderState } from '../../../../src/services/contracts/interfaces';
 import { EditorShell } from '../../../../src/ui/editor/shell/EditorShell';
 import { aiFlowTestFixtures } from './aiFlows.fixtures';
 
-const {
-  TestPromptService,
-  createAppServices,
-  createImageExample,
-  promptExampleLabels,
-} = aiFlowTestFixtures;
+const postHogEvents = localStudioAnalyticsConfig.postHog.events;
+
+const { TestPromptService, createAppServices, createImageExample, promptExampleLabels } =
+  aiFlowTestFixtures;
 
 describe('mocked AI prompt flows', () => {
   it('exposes selected-object AI shortcuts', async () => {
@@ -60,9 +60,15 @@ describe('mocked AI prompt flows', () => {
       promptExampleLabels.leftHeroSlide,
     );
     expect(screen.getByRole('button', { name: promptExampleLabels.gridSlide })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: promptExampleLabels.bulletsSlide })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: promptExampleLabels.urlImageSlide })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: promptExampleLabels.colorsSlide })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: promptExampleLabels.bulletsSlide }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: promptExampleLabels.urlImageSlide }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: promptExampleLabels.colorsSlide }),
+    ).toBeInTheDocument();
   });
 
   it('clears create image mode when the prompt text is deleted', async () => {
@@ -91,7 +97,9 @@ describe('mocked AI prompt flows', () => {
 
     await user.click(screen.getByRole('button', { name: 'Remove Create image mode' }));
 
-    expect(screen.queryByRole('button', { name: 'Remove Create image mode' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Remove Create image mode' }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Slide structure prompt' })).toHaveValue('');
   });
 
@@ -99,7 +107,22 @@ describe('mocked AI prompt flows', () => {
     const user = userEvent.setup();
     const services = createAppServices();
     const promptService = new TestPromptService('ready');
+    const capture = vi.fn();
+    const selectedPromptProvider: AiProviderState = {
+      id: 'chrome-prompt-api',
+      label: 'Chrome Built-in Prompt API',
+      description: 'Prompt to slides using Chrome Built-in AI.',
+      capability: 'prompt',
+      runtime: 'chrome-built-in',
+      compatibility: 'compatible',
+      readiness: 'ready',
+      selected: true,
+    };
+    Object.assign(promptService, {
+      getProviderStates: vi.fn(() => Promise.resolve([selectedPromptProvider])),
+    });
     services.promptService = promptService;
+    services.analyticsService = { capture };
     render(<EditorShell services={services} />);
 
     await user.type(screen.getByLabelText('Create image prompt'), 'switch mode');
@@ -120,6 +143,18 @@ describe('mocked AI prompt flows', () => {
     });
     expect(screen.getByRole('textbox', { name: 'Slide structure prompt' })).toHaveValue('');
     expect(screen.getByRole('button', { name: 'Undo' })).not.toBeDisabled();
+    expect(capture).toHaveBeenCalledWith(
+      postHogEvents.aiSlideGenerated,
+      expect.objectContaining({
+        model_name: 'Chrome Built-in Prompt API',
+      }),
+    );
+    expect(capture).toHaveBeenCalledWith(
+      postHogEvents.promptGeneratedSlide,
+      expect.objectContaining({
+        model_name: 'Chrome Built-in Prompt API',
+      }),
+    );
   });
 
   it('shows a tooltip when image generation is requested outside Create image mode', async () => {
@@ -131,10 +166,15 @@ describe('mocked AI prompt flows', () => {
 
     await user.type(screen.getByLabelText('Create image prompt'), 'switch mode');
     await user.clear(screen.getByLabelText('Create image prompt'));
-    await user.type(screen.getByRole('textbox', { name: 'Slide structure prompt' }), 'generate an image of a frozen tree');
+    await user.type(
+      screen.getByRole('textbox', { name: 'Slide structure prompt' }),
+      'generate an image of a frozen tree',
+    );
     await user.click(screen.getByRole('button', { name: 'Submit prompt' }));
 
     expect(promptService.generateSlideTasksFromPrompt).not.toHaveBeenCalled();
-    expect(screen.getByText('Use Create image from the + menu to generate images.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Use Create image from the + menu to generate images.'),
+    ).toBeInTheDocument();
   });
 });

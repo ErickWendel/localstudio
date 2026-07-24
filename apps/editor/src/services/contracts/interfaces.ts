@@ -1,3 +1,4 @@
+import type { localStudioAnalyticsConfig } from '@localstudio/analytics-config/config';
 import type {
   Asset,
   ImportWarning,
@@ -127,21 +128,9 @@ export interface MirrorService<TConfig = unknown> {
   uploadPublicObject?(key: string, blob: Blob, config: TConfig): Promise<void>;
 }
 
-export type AnalyticsEventName =
-  | 'background_removed'
-  | 'font_downloaded'
-  | 'local_media_imported'
-  | 'local_font_imported'
-  | 'model_downloaded'
-  | 'presentation_started_fullscreen'
-  | 'presenter_remote_opened'
-  | 'project_imported_local'
-  | 'project_restored_version'
-  | 'project_synced_remote_mirror'
-  | 'prompt_generated_image'
-  | 'prompt_generated_slide'
-  | 'remote_mirror_imported'
-  | 'stock_media_inserted';
+type PostHogEvents = typeof localStudioAnalyticsConfig.postHog.events;
+
+export type AnalyticsEventName = PostHogEvents[keyof PostHogEvents];
 
 export interface AnalyticsService {
   capture(

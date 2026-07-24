@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { localStudioAnalyticsConfig } from '@localstudio/analytics-config/config';
 import { basicCommands } from '../../../domain/commands/elements/basicCommands';
 import { fitImageWithinPage } from '../../../domain/images/imageSizing';
 import type { ProjectDocument } from '../../../domain/documents/model';
@@ -6,6 +7,8 @@ import type { AppServices } from '../../../app/composition';
 import { createPrefixedId } from '../../../services/ids/idUtils';
 import { localMediaFiles } from './local-media-files';
 import { mediaPlaceholderReplacement } from './mediaPlaceholderReplacement';
+
+const postHogEvents = localStudioAnalyticsConfig.postHog.events;
 
 export interface MediaImportProgressState {
   detail: string;
@@ -287,7 +290,7 @@ export function useLocalMediaImport({
         URL.revokeObjectURL(objectUrl);
       }
       if (imported) {
-        analyticsService.capture('local_media_imported', {
+        analyticsService.capture(postHogEvents.localMediaImported, {
           assetType,
           replacedPlaceholder: Boolean(
             mediaPlaceholderReplacement.getSelectedImagePlaceholder({
@@ -324,7 +327,7 @@ export function useLocalMediaImport({
         ).execute(currentProject),
       { selectedElementIds: [elementId] },
     );
-    analyticsService.capture('local_media_imported', {
+    analyticsService.capture(postHogEvents.localMediaImported, {
       assetType: 'video',
       replacedExistingMedia: true,
     });

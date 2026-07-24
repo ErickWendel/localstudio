@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { localStudioAnalyticsConfig } from '@localstudio/analytics-config/config';
 import type { Dispatch, SetStateAction } from 'react';
 import type { AppServices } from '../../../app/composition';
 import type { ModelState } from '../../../services/contracts/interfaces';
@@ -8,6 +9,7 @@ import { editorViewModelRuntime } from './editorViewModelRuntime';
 
 const IMAGE_EDITING_MODEL_REQUIRED_MESSAGE = 'You must download the image editing tools first.';
 const BACKGROUND_PREVIEW_DEBOUNCE_MS = 120;
+const postHogEvents = localStudioAnalyticsConfig.postHog.events;
 
 interface BackgroundPreviewState {
   elementId: string;
@@ -336,7 +338,7 @@ export function useBackgroundSubjectSelection({
         }),
         { selectedElementIds: [elementId] },
       );
-      analyticsService.capture('background_removed', {
+      analyticsService.capture(postHogEvents.backgroundRemoved, {
         hadBounds: Boolean(result.bounds),
         pointCount: points.length,
       });
