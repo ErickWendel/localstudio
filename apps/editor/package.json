@@ -21,6 +21,7 @@
     "jspdf": "^4.2.1",
     "konva": "^10.3.0",
     "lucide-react": "^1.21.0",
+    "posthog-js": "^1.407.2",
     "pptxgenjs": "^4.0.1",
     "qrcode": "^1.5.4",
     "react": "^19.2.7",

@@ -8,14 +8,15 @@ export type PptxPatcherContractResult = {
 
 export async function evaluatePptxPatcherContract({
   base64,
+  fflateModuleUrl,
   packageMutations,
   pages,
   patchPages,
   warnings,
 }: PptxPatcherContractInput): Promise<PptxPatcherContractResult> {
-  const { strFromU8, strToU8, unzipSync, zipSync } = (await import(
-    '/@fs/Users/erickwendel/.codex/worktrees/77ff/canva-webai-clone/node_modules/fflate/esm/browser.js'
-  )) as typeof import('fflate');
+  const { strFromU8, strToU8, unzipSync, zipSync } = (await import(fflateModuleUrl)) as typeof import(
+    'fflate'
+  );
   const { pptxPackagePatcher } = (await import(
     '/editor/src/services/exporting/pptxPackagePatcher.ts'
   )) as typeof import('../../../apps/editor/src/services/exporting/pptxPackagePatcher');

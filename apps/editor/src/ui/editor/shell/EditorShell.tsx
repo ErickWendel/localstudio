@@ -58,6 +58,7 @@ import { editorShortcutActions } from './editor-shortcut-actions';
 import { PresentationSlideNavigator } from './PresentationSlideNavigator';
 import { SpeakerNotesEditor } from './SpeakerNotesEditor';
 import { createProjectForSelectedShareRecording } from './createProjectForSelectedShareRecording';
+import { posthog } from '../../../services/analytics/posthog';
 
 interface EditorShellProps {
   services: AppServices;
@@ -304,9 +305,11 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           shareId: nextShare.shareId,
         };
         setShareMetadata(nextShare);
-        services.analyticsService.capture('public_share_published', {
-          hasRecording: Boolean(selectedRecordingId),
-          pageCount: vm.project.pages.length,
+        posthog.capture('presentation_shared', {
+          project_name: vm.project.name,
+          share_id: nextShare.shareId,
+          has_recording: Boolean(selectedRecordingId),
+          page_count: vm.project.pages.length,
         });
         return nextShare;
       } catch (error) {
@@ -319,7 +322,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         setSharePublishProgress(undefined);
       }
     },
-    [services.analyticsService, services.shareService, shareMetadata?.shareId, vm.project],
+    [services.shareService, shareMetadata?.shareId, vm.project],
   );
 
   function getReusablePublishedShare(
@@ -439,14 +442,16 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         editorImageExport.createZipBlob(archiveFiles),
         services.exportService.getImagesArchiveFileName(vm.project),
       );
-      services.analyticsService.capture('presentation_exported_images', {
-        format: options.format,
-        frameCount: frames.length,
-      });
       setImageExportPanelOpen(false);
       showImageExportNotice({
         message: `Images exported: ${frames.length} file${frames.length === 1 ? '' : 's'}.`,
         tone: 'success',
+      });
+      posthog.capture('presentation_exported_images', {
+        slide_count: frames.length,
+        format: options.format,
+        project_name: vm.project.name,
+        page_count: vm.project.pages.length,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown export error.';
@@ -471,8 +476,10 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     const copiedShare: ShareMetadata = { ...preparedShare, status: 'copied' };
     setShareMetadata(copiedShare);
     copyShareText(copiedShare.publicUrl);
-    services.analyticsService.capture('public_share_link_copied', {
-      hasRecording: Boolean(selectedRecordingId),
+    posthog.capture('share_link_copied', {
+      project_name: vm.project.name,
+      has_recording: Boolean(selectedRecordingId),
+      page_count: vm.project.pages.length,
     });
     return copiedShare;
   }
@@ -555,8 +562,9 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     setPresenterRemoteUnavailable(false);
     setRemotePresenterActive(true);
     setPresenterSessionId(result.sessionId);
-    services.analyticsService.capture('presenter_view_opened', {
-      pageCount: vm.project.pages.length,
+    posthog.capture('presenter_view_opened', {
+      project_name: vm.project.name,
+      page_count: vm.project.pages.length,
     });
     void service
       .openRemoteControlSession({
@@ -1609,7 +1617,17 @@ function EditorDesktopShell({ services }: EditorShellProps) {
               isGeneratingSlide={vm.isGeneratingSlide}
               selectedImageElementId={vm.selectedImagePromptElementId}
               onCreateImagePromptIntent={() => vm.ensureImageGenerationReadyForPrompt()}
-              onCreateImageSubmit={(prompt, options) => vm.generateImageFromPrompt(prompt, options)}
+              onCreateImageSubmit={async (prompt, options) => {
+                posthog.capture('ai_image_generated', {
+                  project_name: vm.project.name,
+                  page_count: vm.project.pages.length,
+                  prompt_length: prompt.length,
+                  image_width: options.width,
+                  image_height: options.height,
+                  image_steps: options.steps,
+                });
+                return vm.generateImageFromPrompt(prompt, options);
+              }}
               onCancelCreateImageModelDownload={vm.cancelModelDownload}
               onCancelPromptModelDownload={vm.cancelPromptModelDownload}
               onPrepareCreateImageModel={() =>
@@ -1619,7 +1637,14 @@ function EditorDesktopShell({ services }: EditorShellProps) {
               onPromptProviderChange={(providerId) => {
                 void vm.setPromptProvider(providerId);
               }}
-              onSlidePromptSubmit={(prompt) => vm.generateSlideFromPrompt(prompt)}
+              onSlidePromptSubmit={async (prompt) => {
+                posthog.capture('ai_slide_generated', {
+                  project_name: vm.project.name,
+                  page_count: vm.project.pages.length,
+                  prompt_length: prompt.length,
+                });
+                return vm.generateSlideFromPrompt(prompt);
+              }}
               onStopGeneration={vm.stopPromptGeneration}
             />
           ) : null}

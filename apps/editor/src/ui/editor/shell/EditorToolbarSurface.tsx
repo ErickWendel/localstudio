@@ -2,6 +2,7 @@ import type { AppServices } from '../../../app/composition';
 import { LocalProjectSetupPanel } from '../panels/LocalProjectSetupPanel';
 import type { OperationNoticeState, useEditorViewModel } from '../state/useEditorViewModel';
 import { TopToolbar } from '../toolbars/TopToolbar';
+import { posthog } from '../../../services/analytics/posthog';
 
 type EditorViewModel = ReturnType<typeof useEditorViewModel>;
 
@@ -101,9 +102,16 @@ export function EditorToolbarSurface({
           : undefined
       }
       onImportPowerPoint={() => {
+        posthog.capture('presentation_imported_pptx', {
+          project_name: vm.project.name,
+        });
         void vm.importPowerPoint();
       }}
       onExportPowerPoint={() => {
+        posthog.capture('presentation_exported_pptx', {
+          project_name: vm.project.name,
+          page_count: vm.project.pages.length,
+        });
         void vm.exportPowerPoint();
       }}
       onExportImages={onExportImages}
@@ -128,6 +136,11 @@ export function EditorToolbarSurface({
       onOpenPresenterView={onOpenPresenterView}
       onStartPresenterMode={onStartPresenterMode}
       onSaveLocal={() => {
+        posthog.capture('project_saved_local', {
+          project_name: vm.project.name,
+          page_count: vm.project.pages.length,
+          persistence_mode: services.persistenceMode,
+        });
         void vm.saveLocalNow();
       }}
       onSaveLocalAs={
@@ -147,6 +160,12 @@ export function EditorToolbarSurface({
         isHistoryReadOnly
           ? undefined
           : () => {
+              posthog.capture('deck_translated', {
+                project_name: vm.project.name,
+                page_count: vm.project.pages.length,
+                target_language: vm.translationTargetLanguage,
+                source_language: vm.activeSlideLanguage.code,
+              });
               void vm.translateDeck();
             }
       }
