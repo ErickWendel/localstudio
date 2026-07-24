@@ -1,11 +1,12 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
+import { analyticsHtmlPlugin } from '../../scripts/vite/analyticsHtmlPlugin';
 
 const siteBase = process.env.LOCALSTUDIO_JOYSTICK_BASE_PATH ?? '/joystick/';
 
 export default defineConfig({
   base: siteBase,
-  plugins: [react()],
+  plugins: [analyticsHtmlPlugin(), react()],
   build: {
     emptyOutDir: false,
     outDir: '../../dist/joystick',
