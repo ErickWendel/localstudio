@@ -4,6 +4,7 @@ import { LandingPage } from './LandingPage';
 import { configureLandingScrollRestoration } from './routing/configureLandingScrollRestoration';
 import { getStandaloneAppRedirectUrl } from './routing/standaloneAppRedirect';
 import './landing.css';
+import './services/analytics/posthog';
 
 const standaloneRedirectUrl = getStandaloneAppRedirectUrl(window.location);
 if (standaloneRedirectUrl) {
