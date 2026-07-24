@@ -513,6 +513,10 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   function presentFromSharePanel() {
     setSharePanelOpen(false);
     void vm.toggleFullscreen(workspaceRef.current);
+    services.analyticsService.capture('presentation_started_fullscreen', {
+      fromSharePanel: true,
+      pageCount: vm.project.pages.length,
+    });
   }
 
   function startPresenterMode(options?: { fromBeginning?: boolean }) {
@@ -520,6 +524,10 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     if (!pageId) return;
     vm.playPresentationPreview(pageId);
     void vm.toggleFullscreen(workspaceRef.current);
+    services.analyticsService.capture('presentation_started_fullscreen', {
+      fromBeginning: Boolean(options?.fromBeginning),
+      pageCount: vm.project.pages.length,
+    });
   }
 
   function getPresenterSessionService() {
@@ -565,6 +573,9 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       })
       .then((remoteSession) => {
         setPresenterRemoteSession(remoteSession);
+        services.analyticsService.capture('presenter_remote_opened', {
+          pageCount: vm.project.pages.length,
+        });
         service.publishState(
           createPresenterStatePayload({ activePageId: pageId, presenterMode: 'presenting' }),
         );
@@ -584,7 +595,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         createPresenterStatePayload({ activePageId: pageId, presenterMode: 'presenting' }),
       );
     }, 0);
-  }, [createPresenterStatePayload, presenterSessionId, vm]);
+  }, [createPresenterStatePayload, presenterSessionId, services.analyticsService, vm]);
 
   function enterAudienceFullscreen() {
     setAudienceFullscreenPromptOpen(false);

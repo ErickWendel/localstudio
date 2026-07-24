@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { basicCommands } from '../../../domain/commands/elements/basicCommands';
 import { fitImageWithinPage } from '../../../domain/images/imageSizing';
 import type { ProjectDocument } from '../../../domain/documents/model';
+import type { AppServices } from '../../../app/composition';
 import { createPrefixedId } from '../../../services/ids/idUtils';
 import { mediaPlaceholderReplacement } from './mediaPlaceholderReplacement';
 import type {
@@ -24,6 +25,7 @@ export interface StockMediaErrorState {
 
 interface UseStockMediaLibraryOptions {
   activePageId: string;
+  analyticsService: AppServices['analyticsService'];
   commitProject: (
     updater: (currentProject: ProjectDocument) => ProjectDocument,
     options?: { selectedElementIds?: string[] },
@@ -38,6 +40,7 @@ const STOCK_MEDIA_RECENT_LIMIT = 12;
 
 export function useStockMediaLibrary({
   activePageId,
+  analyticsService,
   commitProject,
   project,
   selectedElementIds,
@@ -186,6 +189,11 @@ export function useStockMediaLibrary({
         { selectedElementIds: [placeholder.id] },
       );
       addRecentStockMedia(item);
+      analyticsService.capture('stock_media_inserted', {
+        kind: item.kind,
+        provider: item.provider,
+        replacedPlaceholder: true,
+      });
       void stockMediaService.trackImageDownload(item).catch(() => undefined);
       return;
     }
@@ -211,6 +219,11 @@ export function useStockMediaLibrary({
       { selectedElementIds: [elementId] },
     );
     addRecentStockMedia(item);
+    analyticsService.capture('stock_media_inserted', {
+      kind: item.kind,
+      provider: item.provider,
+      replacedPlaceholder: false,
+    });
     void stockMediaService.trackImageDownload(item).catch(() => undefined);
   }
 
@@ -262,6 +275,11 @@ export function useStockMediaLibrary({
         { selectedElementIds: [placeholder.id] },
       );
       addRecentStockMedia(item);
+      analyticsService.capture('stock_media_inserted', {
+        kind: item.kind,
+        provider: item.provider,
+        replacedPlaceholder: true,
+      });
       return;
     }
 
@@ -287,6 +305,11 @@ export function useStockMediaLibrary({
       { selectedElementIds: [elementId] },
     );
     addRecentStockMedia(item);
+    analyticsService.capture('stock_media_inserted', {
+      kind: item.kind,
+      provider: item.provider,
+      replacedPlaceholder: false,
+    });
   }
 
   async function insertRemoteVideoElement(item: StockMediaItem, videoUrl: string) {
@@ -337,6 +360,11 @@ export function useStockMediaLibrary({
         { selectedElementIds: [placeholder.id] },
       );
       addRecentStockMedia(item);
+      analyticsService.capture('stock_media_inserted', {
+        kind: 'video',
+        provider: item.provider,
+        replacedPlaceholder: true,
+      });
       return;
     }
 
@@ -367,6 +395,11 @@ export function useStockMediaLibrary({
       { selectedElementIds: [elementId] },
     );
     addRecentStockMedia(item);
+    analyticsService.capture('stock_media_inserted', {
+      kind: 'video',
+      provider: item.provider,
+      replacedPlaceholder: false,
+    });
   }
 
   async function insertRemoteGif(item: StockMediaItem) {

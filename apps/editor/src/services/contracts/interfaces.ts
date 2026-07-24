@@ -1,4 +1,9 @@
-import type { Asset, ImportWarning, ProjectDocument, ProjectFont } from '../../domain/documents/model';
+import type {
+  Asset,
+  ImportWarning,
+  ProjectDocument,
+  ProjectFont,
+} from '../../domain/documents/model';
 import type { PptxImportInput } from '../importing/pptx/pptxImportService';
 import type {
   GeneratedSlideElement,
@@ -120,6 +125,29 @@ export interface MirrorService<TConfig = unknown> {
   deleteProject?(projectId: string, config: TConfig): Promise<void>;
   getPublicObjectUrl?(key: string, config: TConfig): string;
   uploadPublicObject?(key: string, blob: Blob, config: TConfig): Promise<void>;
+}
+
+export type AnalyticsEventName =
+  | 'background_removed'
+  | 'font_downloaded'
+  | 'local_media_imported'
+  | 'local_font_imported'
+  | 'model_downloaded'
+  | 'presentation_started_fullscreen'
+  | 'presenter_remote_opened'
+  | 'project_imported_local'
+  | 'project_restored_version'
+  | 'project_synced_remote_mirror'
+  | 'prompt_generated_image'
+  | 'prompt_generated_slide'
+  | 'remote_mirror_imported'
+  | 'stock_media_inserted';
+
+export interface AnalyticsService {
+  capture(
+    eventName: AnalyticsEventName,
+    properties?: Record<string, boolean | number | string | undefined>,
+  ): void;
 }
 
 export interface VersionHistoryEntry {
@@ -290,9 +318,9 @@ export interface LocalFontMirrorService {
     project: ProjectDocument,
     options?: { onProgress?: (progress: LocalFontMirrorProgress) => void },
   ): Promise<LocalFontMirrorResult>;
-  getTestFontFiles(
-    options?: { onProgress?: (progress: LocalFontMirrorProgress) => void },
-  ): Promise<File[]>;
+  getTestFontFiles(options?: {
+    onProgress?: (progress: LocalFontMirrorProgress) => void;
+  }): Promise<File[]>;
   validateTestFontFiles(
     files: File[],
     options?: { onProgress?: (progress: LocalFontMirrorProgress) => void },
@@ -330,7 +358,11 @@ export interface ShareRecord {
 
 export interface ShareService {
   createShare(project: ProjectDocument, options?: SharePublishOptions): Promise<ShareMetadata>;
-  updateShare(shareId: string, project: ProjectDocument, options?: SharePublishOptions): Promise<ShareMetadata>;
+  updateShare(
+    shareId: string,
+    project: ProjectDocument,
+    options?: SharePublishOptions,
+  ): Promise<ShareMetadata>;
   getShare(shareId: string): Promise<ShareRecord | null>;
   getProjectShareMetadata(project: ProjectDocument): ShareMetadata;
   getPublicUrl(shareId: string): string;

@@ -47,7 +47,7 @@ import { modelSetupService } from '../../services/model-setup/modelSetupService'
 import { TransformersRuntimeClient } from '../../services/model-setup/transformersRuntimeClient';
 import { BrowserBackgroundRemovalService } from '../../services/background-removal/browserBackgroundRemovalService';
 import { BrowserShareService } from '../../services/sharing/shareService';
-import type { FontImportRequest } from '../../services/contracts/interfaces';
+import type { AnalyticsService, FontImportRequest } from '../../services/contracts/interfaces';
 import { minioMirrorFiles } from '../../services/mirror/minioMirrorFiles';
 import { minioMirrorService } from '../../services/mirror/minioMirrorService';
 import { BrowserLocalFontMirrorService } from '../../services/fonts/localFontMirrorService';
@@ -169,9 +169,8 @@ function createSlideDocument(
 export function E2ECoverageDiagnosticsPage() {
   const [result, setResult] = useState('running');
   const [dialogOpen, setDialogOpen] = useState(true);
-  const sourceDiagnosticsOnly = new URL(window.location.href).searchParams.get(
-    'e2eSourceDiagnostics',
-  ) === '1';
+  const sourceDiagnosticsOnly =
+    new URL(window.location.href).searchParams.get('e2eSourceDiagnostics') === '1';
 
   useEffect(() => {
     let mounted = true;
@@ -627,7 +626,9 @@ function E2EDiagnosticsComponentGallery() {
         .querySelectorAll<HTMLInputElement>(
           '.mirror-settings-panel input:not([type="checkbox"]):not([type="search"])',
         )
-        .forEach((input, index) => setInputValue(input, index === 0 ? 'http://localhost:9001' : `diag-${index}`));
+        .forEach((input, index) =>
+          setInputValue(input, index === 0 ? 'http://localhost:9001' : `diag-${index}`),
+        );
       clickFirst('.mirror-settings-panel button.footer-toggle:nth-of-type(2)');
       await wait();
       const endpointInput = document.querySelector<HTMLInputElement>(
@@ -680,9 +681,7 @@ function E2EDiagnosticsComponentGallery() {
       clickFirst('button[aria-label="Show keyboard shortcuts"]');
       await wait();
       const publicShortcutRows = Array.from(
-        document.querySelectorAll<HTMLButtonElement>(
-          '.public-deck-viewer .keyboard-shortcuts-row',
-        ),
+        document.querySelectorAll<HTMLButtonElement>('.public-deck-viewer .keyboard-shortcuts-row'),
       );
       for (const button of publicShortcutRows.slice(1)) {
         button.click();
@@ -740,7 +739,9 @@ function E2EDiagnosticsComponentGallery() {
       clickFirst('button[aria-label^="Play slide 1"]');
       clickFirst('button[aria-label^="Play transcript segment"]');
       document
-        .querySelectorAll<HTMLTextAreaElement>('textarea[aria-label="Question for transcript chat"]')
+        .querySelectorAll<HTMLTextAreaElement>(
+          'textarea[aria-label="Question for transcript chat"]',
+        )
         .forEach((input) => setInputValue(input, 'Summarize the diagnostics recording.'));
       clickFirst('button[aria-label="Ask transcript"]');
       await wait();
@@ -1021,7 +1022,9 @@ function E2EDiagnosticsComponentGallery() {
             translationTargetLanguage="pt"
             onCreateImageOptionsChange={() => setShellDiagnostics('fallback-image-options')}
             onDownloadModel={async (id) => setShellDiagnostics(`fallback-download:${id}`)}
-            onPrepareLanguageDetectionProvider={async () => setShellDiagnostics('fallback-language')}
+            onPrepareLanguageDetectionProvider={async () =>
+              setShellDiagnostics('fallback-language')
+            }
             onPreparePromptApi={async () => setShellDiagnostics('fallback-prompt')}
             onPrepareTranslationProvider={async () => setShellDiagnostics('fallback-translation')}
             onRemoveModel={async (id) => setShellDiagnostics(`fallback-remove:${id}`)}
@@ -1837,7 +1840,9 @@ function EditorViewModelSourceDiagnostics() {
         await wait();
         if (current().translationTargetLanguage === 'pt') break;
       }
-      await current().translateDeck().catch(() => undefined);
+      await current()
+        .translateDeck()
+        .catch(() => undefined);
       for (let attempt = 0; attempt < 10; attempt += 1) {
         await wait();
         if (!current().isTranslating) break;
@@ -1867,7 +1872,8 @@ function SourceComponentDiagnostics() {
     void (async () => {
       const findButton = (label: string) =>
         Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
-          (button) => button.getAttribute('aria-label') === label || button.textContent?.trim() === label,
+          (button) =>
+            button.getAttribute('aria-label') === label || button.textContent?.trim() === label,
         );
       await wait();
       findButton('Import Source Remote A')?.click();
@@ -2289,9 +2295,9 @@ function EditorViewModelPersistenceDiagnostics() {
       await Promise.resolve(failingViewModel.setPersistence(true)).catch(() => false);
       await failingViewModel.saveLocalNow().catch(() => undefined);
       await failingViewModel.saveLocalAs().catch(() => undefined);
-      await failingViewModel.confirmLocalProjectSetup('Failing Confirm Diagnostics').catch(
-        () => false,
-      );
+      await failingViewModel
+        .confirmLocalProjectSetup('Failing Confirm Diagnostics')
+        .catch(() => false);
       setSummary(
         JSON.stringify({
           emptyPersistence: emptyViewModel.persistenceEnabled,
@@ -2681,6 +2687,7 @@ function EditorViewModelEdgeDiagnostics() {
 }
 
 function BackgroundSubjectSelectionDiagnostics() {
+  const analyticsService: AnalyticsService = { capture: () => undefined };
   const [readyProject, setReadyProject] = useState(
     () => createCommandDiagnosticProject() as ProjectDocument,
   );
@@ -2697,6 +2704,7 @@ function BackgroundSubjectSelectionDiagnostics() {
   const [summary, setSummary] = useState('pending');
   const ranRef = useRef(false);
   const readyBackground = useBackgroundSubjectSelection({
+    analyticsService,
     backgroundRemovalService: {
       prepareBackgroundRemoval: async (
         _asset,
@@ -2738,6 +2746,7 @@ function BackgroundSubjectSelectionDiagnostics() {
     setProcessingElementIds: setReadyProcessingIds,
   });
   const failingBackground = useBackgroundSubjectSelection({
+    analyticsService,
     backgroundRemovalService: {
       prepareBackgroundRemoval: async () => {
         throw new Error('prepare failed');
@@ -2767,6 +2776,7 @@ function BackgroundSubjectSelectionDiagnostics() {
     setProcessingElementIds: setFailingProcessingIds,
   });
   const blockedBackground = useBackgroundSubjectSelection({
+    analyticsService,
     backgroundRemovalService: {
       prepareBackgroundRemoval: async () => undefined,
       previewBackgroundMask: async () => ({ maskUrl: 'blob:blocked-preview', score: 0.1 }),
@@ -3719,10 +3729,7 @@ async function runBundledPromptRepairDiagnostic() {
     },
   };
   const modelSetup = {
-    downloadModel: async (
-      id: string,
-      options?: { onProgress?: (progress: number) => void },
-    ) => {
+    downloadModel: async (id: string, options?: { onProgress?: (progress: number) => void }) => {
       options?.onProgress?.(24);
       options?.onProgress?.(100);
       return {
@@ -3773,13 +3780,17 @@ async function runBundledPromptRepairDiagnostic() {
   try {
     await promptService.setSelectedProvider(browserPromptService.GEMMA_PROMPT_PROVIDER_ID);
     await promptService.preparePromptApi();
-    const tasks = await promptService.generateSlideTasksFromPrompt('Repair invalid diagnostics JSON.');
-    const element = await promptService.generateSlideElementFromTask(tasks.tasks[1] as never, {
-      allTasks: tasks.tasks,
-      existingElements: [],
-      page: tasks.page,
-      userPrompt: 'Repair invalid diagnostics JSON.',
-    }).catch(() => undefined);
+    const tasks = await promptService.generateSlideTasksFromPrompt(
+      'Repair invalid diagnostics JSON.',
+    );
+    const element = await promptService
+      .generateSlideElementFromTask(tasks.tasks[1] as never, {
+        allTasks: tasks.tasks,
+        existingElements: [],
+        page: tasks.page,
+        userPrompt: 'Repair invalid diagnostics JSON.',
+      })
+      .catch(() => undefined);
     const text = await promptService.generateText('Summarize diagnostics');
     return {
       elementType: element?.type,
@@ -6006,10 +6017,12 @@ async function runBrowserTranslationDiagnostic() {
     () => '',
     (error: unknown) => (error instanceof Error ? error.message : String(error)),
   );
-  const unknownLanguageProvider = await service.setLanguageDetectionProvider('missing-language').then(
-    () => '',
-    (error: unknown) => (error instanceof Error ? error.message : String(error)),
-  );
+  const unknownLanguageProvider = await service
+    .setLanguageDetectionProvider('missing-language')
+    .then(
+      () => '',
+      (error: unknown) => (error instanceof Error ? error.message : String(error)),
+    );
   await service.setSelectedProvider(browserTranslatorService.TRANSLATEGEMMA_PROVIDER_ID);
   await service.setLanguageDetectionProvider(
     browserTranslatorService.WEBGPU_LANGUAGE_DETECTION_PROVIDER_ID,
@@ -9009,7 +9022,8 @@ function installRemotePreviewMediaDiagnostics() {
   const diagnosticWindow = window as Window & {
     __LOCALSTUDIO_REMOTE_PREVIEW_THUMBNAIL_DIAGNOSTICS__?: boolean;
   };
-  const previousThumbnailDiagnostics = diagnosticWindow.__LOCALSTUDIO_REMOTE_PREVIEW_THUMBNAIL_DIAGNOSTICS__;
+  const previousThumbnailDiagnostics =
+    diagnosticWindow.__LOCALSTUDIO_REMOTE_PREVIEW_THUMBNAIL_DIAGNOSTICS__;
   diagnosticWindow.__LOCALSTUDIO_REMOTE_PREVIEW_THUMBNAIL_DIAGNOSTICS__ = true;
   class DiagnosticRemotePreviewImage extends EventTarget {
     height = 480;
