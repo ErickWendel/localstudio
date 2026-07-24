@@ -81,8 +81,9 @@ describe('LandingPage', () => {
     expect(screen.queryByRole('link', { name: 'Web AI' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Thanks' })).not.toBeInTheDocument();
     const openEditorLinks = screen.getAllByRole('link', { name: /Open editor/i });
-    expect(openEditorLinks).toHaveLength(1);
-    const heroOpenEditorLink = openEditorLinks[0]!;
+    expect(openEditorLinks).toHaveLength(2);
+    expect(openEditorLinks[0]).toHaveClass('desktop-header-cta');
+    const heroOpenEditorLink = openEditorLinks[1]!;
     expect(heroOpenEditorLink).toHaveClass('header-cta');
     expect(heroOpenEditorLink).toHaveClass('hero-cta');
     expect(heroOpenEditorLink.querySelector('.hero-cta-snake')).toBeInTheDocument();

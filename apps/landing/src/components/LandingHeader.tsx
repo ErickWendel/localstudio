@@ -1,5 +1,5 @@
 import { localStudioAppRoutes } from '@localstudio/app-routes';
-import { Menu, X } from 'lucide-react';
+import { ArrowRight, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import { BrandLockup } from './BrandLockup';
 import { GitHubStarButton } from './GitHubStarButton';
@@ -44,6 +44,10 @@ export function LandingHeader({
       </nav>
       <div className="header-actions">
         <GitHubStarButton prefersReducedMotion={prefersReducedMotion} />
+        <a className="header-cta desktop-header-cta" href="/editor/">
+          Open editor
+          <ArrowRight size={16} aria-hidden="true" />
+        </a>
         <button
           type="button"
           className="mobile-menu-toggle"
