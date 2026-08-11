@@ -1271,6 +1271,9 @@ export function CanvasWorkspace({
                     fontSize={element.fontSize * scaleY}
                     fontStyle={element.fontWeight >= 700 ? 'bold' : 'normal'}
                     fill={element.fill}
+                    {...(element.stroke && (element.strokeWidth ?? 0) > 0
+                      ? { stroke: element.stroke, strokeWidth: element.strokeWidth }
+                      : {})}
                     align={element.align}
                     lineHeight={element.lineHeight ?? 1.05}
                     padding={TEXT_FRAME_PADDING * scaleY}

@@ -401,6 +401,8 @@ describe('editor commands', () => {
       fontSize: 72,
       fontWeight: 900,
       opacity: 0.7,
+      stroke: '#000000',
+      strokeWidth: 6,
     }).execute(project);
 
     expect(next).not.toBe(project);
@@ -410,6 +412,8 @@ describe('editor commands', () => {
       fontSize: 72,
       fontWeight: 900,
       opacity: 0.7,
+      stroke: '#000000',
+      strokeWidth: 6,
     });
     expect(project.elements['text-title']).toMatchObject({
       align: 'center',

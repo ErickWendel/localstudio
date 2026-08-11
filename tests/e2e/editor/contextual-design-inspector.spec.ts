@@ -19,6 +19,9 @@ test.describe('editor contextual design inspector journey', () => {
     await page.getByLabel('Selected text font size').fill('42');
     await page.getByRole('button', { name: 'Bold selected text' }).click();
     await page.getByRole('button', { name: 'Align selected text center' }).click();
+    await page.getByLabel('Selected text border mode').selectOption('color');
+    await page.getByLabel('Selected text border color').fill('#000000');
+    await page.getByLabel('Selected text border width').fill('6');
     await page
       .getByRole('tablist', { name: 'Movie inspector sections' })
       .getByRole('tab', { name: 'Text' })

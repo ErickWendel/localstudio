@@ -252,6 +252,8 @@ export interface TextElement extends BaseElement {
   fontSize: number;
   fontWeight: number;
   fill: string;
+  stroke?: string;
+  strokeWidth?: number;
   align: 'left' | 'center' | 'right';
   hyperlink?: string;
   lineHeight?: number;
