@@ -2547,6 +2547,23 @@ export function useEditorViewModel(services: AppServices) {
     );
   }
 
+  function getTranslatableSpeakerNotePageIds(
+    scope: TranslationScope,
+    sourceProject = project,
+    options?: { pageId?: string },
+  ) {
+    if (scope === 'selection') return [];
+
+    const pages =
+      scope === 'slide'
+        ? sourceProject.pages.filter((page) => page.id === (options?.pageId ?? activePageId))
+        : sourceProject.pages;
+
+    return pages
+      .filter((page) => Boolean(page.speakerNotes?.trim()))
+      .map((page) => page.id);
+  }
+
   async function translateTextScope(
     scope: TranslationScope,
     targetLanguage = 'pt',
@@ -2557,7 +2574,12 @@ export function useEditorViewModel(services: AppServices) {
       project,
       options?.pageId ? { pageId: options.pageId } : undefined,
     );
-    if (elementIds.length === 0) return [];
+    const speakerNotePageIds = getTranslatableSpeakerNotePageIds(
+      scope,
+      project,
+      options?.pageId ? { pageId: options.pageId } : undefined,
+    );
+    if (elementIds.length === 0 && speakerNotePageIds.length === 0) return [];
 
     const pageIdsByElementId = new Map(
       project.pages.flatMap((page) =>
@@ -2577,6 +2599,12 @@ export function useEditorViewModel(services: AppServices) {
         const pageId = pageIdsByElementId.get(elementId);
         if (!pageId) continue;
         pendingElementCountByPageId.set(pageId, (pendingElementCountByPageId.get(pageId) ?? 0) + 1);
+      }
+      for (const pageId of speakerNotePageIds) {
+        pendingElementCountByPageId.set(
+          pageId,
+          (pendingElementCountByPageId.get(pageId) ?? 0) + 1,
+        );
       }
       totalPageCount = pendingElementCountByPageId.size;
       setDeckTranslationProgress({
@@ -2643,14 +2671,56 @@ export function useEditorViewModel(services: AppServices) {
       ),
     );
 
+    const translatedNotes = Object.fromEntries(
+      (
+        await textTranslationLayout.mapWithConcurrency(
+          speakerNotePageIds,
+          concurrency,
+          async (pageId) => {
+            const page = pageById.get(pageId);
+            if (!page?.speakerNotes?.trim()) return undefined;
+            if (shouldTrackDeckProgress) {
+              activeElementCountByPageId.set(
+                pageId,
+                (activeElementCountByPageId.get(pageId) ?? 0) + 1,
+              );
+              updateDeckTranslationProgress(pageId);
+            }
+            const translatedNotes = await services.translatorService.translate(
+              page.speakerNotes,
+              targetLanguage,
+              options?.sourceLanguage ? { sourceLanguage: options.sourceLanguage } : undefined,
+            );
+            if (shouldTrackDeckProgress) {
+              activeElementCountByPageId.delete(pageId);
+              const pendingElementCount = (pendingElementCountByPageId.get(pageId) ?? 1) - 1;
+              if (pendingElementCount > 0) {
+                pendingElementCountByPageId.set(pageId, pendingElementCount);
+              } else {
+                pendingElementCountByPageId.delete(pageId);
+                completedPageCount += 1;
+              }
+              updateDeckTranslationProgress(pageId);
+            }
+            return [pageId, translatedNotes] as const;
+          },
+        )
+      ).filter((entry): entry is readonly [string, string] => Boolean(entry)),
+    );
+
     commitProject((currentProject) =>
-      new basicCommands.TranslateTextElementsCommand(translations).execute(currentProject),
+      new basicCommands.TranslateSpeakerNotesCommand(translatedNotes).execute(
+        new basicCommands.TranslateTextElementsCommand(translations).execute(currentProject),
+      ),
     );
     return Array.from(
       new Set(
-        elementIds
-          .map((elementId) => pageIdsByElementId.get(elementId))
-          .filter((pageId): pageId is string => Boolean(pageId)),
+        [
+          ...elementIds
+            .map((elementId) => pageIdsByElementId.get(elementId))
+            .filter((pageId): pageId is string => Boolean(pageId)),
+          ...speakerNotePageIds,
+        ],
       ),
     );
   }

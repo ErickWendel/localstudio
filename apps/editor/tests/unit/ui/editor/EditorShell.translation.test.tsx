@@ -67,6 +67,26 @@ describe('EditorShell translation workflows', () => {
     expect(screen.getByText('Pair: pt → pt')).toBeInTheDocument();
   });
 
+  it('translates speaker notes with the current slide', async () => {
+    const user = userEvent.setup();
+    const project = createThreeColumnCaptionProject();
+    project.pages[0]!.speakerNotes = 'Explain the future of AI.';
+    const services = createAppServices({ initialProject: project });
+    const translator = new RecordingTranslatorService();
+    services.translatorService = translator;
+    render(<EditorShell services={services} />);
+
+    await openLeftTab(user, 'AI Tools');
+    await user.selectOptions(screen.getByLabelText('Translate to'), 'pt');
+    fireEvent.click(screen.getByRole('button', { name: 'Translate Hero split' }));
+
+    await waitFor(() => {
+      expect(translator.translate).toHaveBeenCalledWith('Explain the future of AI.', 'pt', {
+        sourceLanguage: 'en',
+      });
+    });
+  });
+
   it('restores the toolbar source language after undoing a slide translation with Ctrl+Z', async () => {
     const user = userEvent.setup();
     const services = createAppServices();
