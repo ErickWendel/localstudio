@@ -43,6 +43,12 @@ export interface ElementClipboardState {
   elements: DesignElement[];
 }
 
+export interface SlideClipboardState {
+  assets: ProjectDocument['assets'];
+  elements: DesignElement[];
+  page: Page;
+}
+
 const placeholderImageAsset: Asset = {
   id: placeholderImage.PLACEHOLDER_IMAGE_ASSET_ID,
   type: 'image',
@@ -86,6 +92,40 @@ function createPastedElements(input: {
     y: element.y + PASTED_ELEMENT_OFFSET,
     locked: false,
   }));
+}
+
+function isElementClipboardState(value: unknown): value is ElementClipboardState {
+  if (!value || typeof value !== 'object') return false;
+  const clipboard = value as Partial<ElementClipboardState>;
+  if (!clipboard.assets || typeof clipboard.assets !== 'object' || !Array.isArray(clipboard.elements)) {
+    return false;
+  }
+  return clipboard.elements.every((element) => {
+    if (!element || typeof element !== 'object') return false;
+    const candidate = element as Partial<DesignElement>;
+    return (
+      typeof candidate.id === 'string' &&
+      typeof candidate.type === 'string' &&
+      ['text', 'image', 'gif', 'video', 'shape'].includes(candidate.type) &&
+      typeof candidate.x === 'number' &&
+      typeof candidate.y === 'number'
+    );
+  });
+}
+
+function isSlideClipboardState(value: unknown): value is SlideClipboardState {
+  if (!value || typeof value !== 'object') return false;
+  const slide = value as Partial<SlideClipboardState>;
+  if (!slide.page || typeof slide.page !== 'object') return false;
+  const page = slide.page as Partial<Page>;
+  return Boolean(
+    typeof page.id === 'string' &&
+      typeof page.name === 'string' &&
+      typeof page.width === 'number' &&
+      typeof page.height === 'number' &&
+      Array.isArray(page.elementIds) &&
+      isElementClipboardState({ assets: slide.assets, elements: slide.elements }),
+  );
 }
 
 function getImageGridFrameBounds(page: Page) {
@@ -690,6 +730,8 @@ export const editorViewModelElements = {
   createGridSplitFramePatches,
   createImageGridPlaceholderElements,
   createPastedElements,
+  isElementClipboardState,
+  isSlideClipboardState,
   createSelectionGridFramePatches,
   createShapeElement,
   createTextElement,

@@ -1247,8 +1247,12 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       )
         return;
       event.preventDefault();
-      vm.copySelectedElements();
-      editorShellBrowserUtils.writeEditorObjectClipboardMarker(event.clipboardData);
+      const clipboard = vm.copySelectedElements();
+      if (!clipboard) return;
+      editorShellBrowserUtils.writeEditorObjectClipboardPayload(
+        event.clipboardData,
+        JSON.stringify(clipboard),
+      );
     }
 
     function handleCut(event: ClipboardEvent) {
@@ -1260,14 +1264,35 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       )
         return;
       event.preventDefault();
+      const clipboard = vm.copySelectedElements();
+      if (!clipboard) return;
       vm.cutSelectedElements();
-      editorShellBrowserUtils.writeEditorObjectClipboardMarker(event.clipboardData);
+      editorShellBrowserUtils.writeEditorObjectClipboardPayload(
+        event.clipboardData,
+        JSON.stringify(clipboard),
+      );
     }
 
     function handlePaste(event: ClipboardEvent) {
       if (isHistoryReadOnly) return;
       if (editorShellBrowserUtils.isEditableInteractionTarget(event.target)) return;
       event.preventDefault();
+      const slidePayload = editorShellBrowserUtils.readSlideClipboardPayload(event.clipboardData);
+      if (slidePayload) {
+        try {
+          if (vm.pasteSlideClipboardPayload(JSON.parse(slidePayload) as unknown)) return;
+        } catch {
+          // Continue to the object and image clipboard paths.
+        }
+      }
+      const payload = editorShellBrowserUtils.readEditorObjectClipboardPayload(event.clipboardData);
+      if (payload) {
+        try {
+          if (vm.pasteClipboardElements(JSON.parse(payload) as unknown)) return;
+        } catch {
+          // Fall through to the existing in-tab clipboard and image paths.
+        }
+      }
       if (
         editorShellBrowserUtils.hasEditorObjectClipboardMarker(event.clipboardData) &&
         vm.pasteCopiedElements()
@@ -1290,6 +1315,12 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       window.removeEventListener('paste', handlePaste);
     };
   }, [hasSelection, isHistoryReadOnly, vm]);
+
+  async function copyPageToClipboard(pageId: string) {
+    const payload = vm.getSlideClipboardPayload(pageId);
+    if (!payload) return;
+    await editorShellBrowserUtils.writeSlideClipboardPayload(JSON.stringify(payload));
+  }
 
   useEffect(() => {
     if (!editorShellBrowserUtils.isWebMcpProtocolEnabled()) return undefined;
@@ -1564,6 +1595,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
             onAddPage={isHistoryReadOnly ? undefined : vm.addPage}
             onDeletePage={isHistoryReadOnly ? undefined : vm.deletePage}
             onDuplicatePage={isHistoryReadOnly ? undefined : vm.duplicatePage}
+            onCopyPage={isHistoryReadOnly ? undefined : (pageId) => void copyPageToClipboard(pageId)}
             onRenamePage={isHistoryReadOnly ? undefined : vm.renamePage}
             onReorderPage={isHistoryReadOnly ? undefined : vm.reorderPage}
             onSetPageVisibility={isHistoryReadOnly ? undefined : vm.setPageVisibility}
@@ -1664,6 +1696,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
             onClose={togglePagesPanel}
             onDeletePage={isHistoryReadOnly ? undefined : vm.deletePage}
             onDuplicatePage={isHistoryReadOnly ? undefined : vm.duplicatePage}
+            onCopyPage={isHistoryReadOnly ? undefined : (pageId) => void copyPageToClipboard(pageId)}
             onRenamePage={isHistoryReadOnly ? undefined : vm.renamePage}
             onReorderPage={isHistoryReadOnly ? undefined : vm.reorderPage}
             onSelectPage={vm.selectPage}

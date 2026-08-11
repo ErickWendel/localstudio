@@ -13,6 +13,7 @@ interface PagesPanelProps {
   onClose?: (() => void) | undefined;
   onDeletePage?: ((pageId: string) => void) | undefined;
   onDuplicatePage?: ((pageId: string) => void) | undefined;
+  onCopyPage?: ((pageId: string) => void) | undefined;
   onRenamePage?: ((pageId: string, name: string) => void) | undefined;
   onReorderPage?: ((pageId: string, targetIndex: number) => void) | undefined;
   onSelectPage?: ((pageId: string) => void) | undefined;
@@ -36,6 +37,7 @@ export function PagesPanel({
   onClose,
   onDeletePage,
   onDuplicatePage,
+  onCopyPage,
   onRenamePage,
   onReorderPage,
   onSelectPage,
@@ -270,6 +272,16 @@ export function PagesPanel({
                   >
                     <span className="material-symbols-outlined" aria-hidden="true">
                       content_copy
+                    </span>
+                  </button>
+                  <button
+                    className="icon-button"
+                    type="button"
+                    aria-label={`Copy ${page.name}`}
+                    onClick={() => onCopyPage?.(page.id)}
+                  >
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      file_copy
                     </span>
                   </button>
                   <button
