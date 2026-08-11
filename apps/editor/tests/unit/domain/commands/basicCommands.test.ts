@@ -623,6 +623,25 @@ describe('editor commands', () => {
     });
   });
 
+  it('translates speaker notes immutably', () => {
+    const project = {
+      ...sampleProject.createSampleProject(),
+      pages: [
+        {
+          ...sampleProject.createSampleProject().pages[0]!,
+          speakerNotes: 'Original speaker notes',
+        },
+      ],
+    };
+    const next = new basicCommands.TranslateSpeakerNotesCommand({
+      'page-1': 'Translated speaker notes',
+    }).execute(project);
+
+    expect(next).not.toBe(project);
+    expect(next.pages[0]?.speakerNotes).toBe('Translated speaker notes');
+    expect(project.pages[0]?.speakerNotes).toBe('Original speaker notes');
+  });
+
   it('skips locked text translations', () => {
     const project = {
       ...sampleProject.createSampleProject(),

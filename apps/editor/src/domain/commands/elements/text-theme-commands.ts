@@ -44,6 +44,30 @@ class TranslateTextElementsCommand implements EditorCommand {
   }
 }
 
+class TranslateSpeakerNotesCommand implements EditorCommand {
+  readonly description = 'Translate speaker notes';
+
+  constructor(private readonly translations: Record<string, string>) {}
+
+  execute(project: ProjectDocument): ProjectDocument {
+    let didChange = false;
+    const pages = project.pages.map((page) => {
+      const translation = this.translations[page.id];
+      if (translation === undefined || translation === page.speakerNotes) return page;
+      didChange = true;
+      return { ...page, speakerNotes: translation };
+    });
+
+    if (!didChange) return project;
+
+    return {
+      ...project,
+      pages,
+      updatedAt: projectMutationUtils.getProjectUpdatedAt(),
+    };
+  }
+}
+
 class ApplyThemeCommand implements EditorCommand {
   readonly description = 'Apply theme';
 
@@ -87,4 +111,5 @@ export const textThemeCommands = {
   EditThemeCommand,
   SaveThemeCommand,
   TranslateTextElementsCommand,
+  TranslateSpeakerNotesCommand,
 };
