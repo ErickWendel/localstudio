@@ -40,7 +40,8 @@ class MockDirectoryHandle {
   readonly files = new Map<string, string | Blob>();
   readonly directories = new Map<string, MockDirectoryHandle>();
   getFileHandle(name: string, options?: { create?: boolean }): Promise<MockFileHandle> {
-    if (!options?.create && !this.files.has(name)) throw new DOMException('Not found', 'NotFoundError');
+    if (!options?.create && !this.files.has(name))
+      throw new DOMException('Not found', 'NotFoundError');
     return Promise.resolve(new MockFileHandle(name, this.files));
   }
   getDirectoryHandle(name: string, options?: { create?: boolean }): Promise<MockDirectoryHandle> {
@@ -104,7 +105,9 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
     expect(savedAssetFile).toBeInstanceOf(Blob);
     expect((savedAssetFile as Blob).type).toBe('image/png');
     expect(await (savedAssetFile as Blob).text()).toBe('hello');
-    const savedProject = JSON.parse(directory.files.get('project.json') as string) as ProjectDocument;
+    const savedProject = JSON.parse(
+      directory.files.get('project.json') as string,
+    ) as ProjectDocument;
     const savedAsset = savedProject.assets['asset-hero'];
     if (!savedAsset) throw new Error('Expected asset-hero to be saved in project.json');
     expect(savedAsset).toMatchObject({
@@ -149,9 +152,7 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
   it('downloads remote image assets on import and saves them as local files', async () => {
     const directory = new MockDirectoryHandle();
     const fetchRemoteAsset = vi.fn(() =>
-      Promise.resolve(
-        new Response('remote image', { headers: { 'content-type': 'image/png' } }),
-      ),
+      Promise.resolve(new Response('remote image', { headers: { 'content-type': 'image/png' } })),
     );
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response('remote image', { headers: { 'content-type': 'image/png' } }),
@@ -190,8 +191,12 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
     });
     expect(loaded.assets['asset-remote']?.storage).toBeUndefined();
     const assetsDirectory = directory.directories.get('assets')!;
-    expect(await (assetsDirectory.files.get('asset-remote.png') as Blob).text()).toBe('remote image');
-    const savedProject = JSON.parse(directory.files.get('project.json') as string) as ProjectDocument;
+    expect(await (assetsDirectory.files.get('asset-remote.png') as Blob).text()).toBe(
+      'remote image',
+    );
+    const savedProject = JSON.parse(
+      directory.files.get('project.json') as string,
+    ) as ProjectDocument;
     expect(savedProject.assets['asset-remote']).toMatchObject({
       fileName: 'asset-remote.png',
       storage: 'file',
@@ -231,7 +236,9 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
     await repository.saveProject(loaded);
 
     expect(assetsDirectory.files.get('asset-hero.png')).toBe(assetFile);
-    const savedProject = JSON.parse(directory.files.get('project.json') as string) as ProjectDocument;
+    const savedProject = JSON.parse(
+      directory.files.get('project.json') as string,
+    ) as ProjectDocument;
     const savedAsset = savedProject.assets['asset-hero'];
     if (!savedAsset) throw new Error('Expected asset-hero to be saved in project.json');
     expect(savedAsset).toMatchObject({
@@ -282,7 +289,9 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
     const recordingsDirectory = directory.directories.get('recordings')!;
     expect(recordingsDirectory.files.has('recording1.webm')).toBe(true);
     expect(await (recordingsDirectory.files.get('recording1.webm') as Blob).text()).toBe('audio');
-    const savedProject = JSON.parse(directory.files.get('project.json') as string) as ProjectDocument;
+    const savedProject = JSON.parse(
+      directory.files.get('project.json') as string,
+    ) as ProjectDocument;
     expect(savedProject.recordings?.recording1?.audio).toMatchObject({
       fileName: 'recording1.webm',
       storage: 'file',
@@ -295,7 +304,7 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
     expect(createObjectUrl).toHaveBeenCalled();
   });
 
-  it('rejects when project.json references a missing file-backed asset', async () => {
+  it('imports a project with missing file-backed assets and records warnings', async () => {
     const directory = new MockDirectoryHandle();
     directory.files.set(
       'project.json',
@@ -318,7 +327,20 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
       recentProjectStore: new MemoryRecentProjectHandleStore(),
     });
 
-    await expect(repository.importProject()).rejects.toMatchObject({ name: 'NotFoundError' });
+    const importedProject = await repository.importProject();
+
+    expect(importedProject?.assets['asset-hero']).toMatchObject({
+      fileName: 'missing.png',
+      storage: 'file',
+    });
+    expect(importedProject?.importWarnings).toEqual([
+      {
+        code: 'missing-local-file',
+        message:
+          'The imported project references a missing asset file: missing.png. That content will remain unavailable until the file is restored.',
+        severity: 'warning',
+      },
+    ]);
   });
 
   it('moves blob URL image assets into assets/ and saves metadata in project.json', async () => {
@@ -361,7 +383,9 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
     const savedAssetFile = assetsDirectory.files.get('asset-generated.png');
     expect(savedAssetFile).toBeInstanceOf(Blob);
     expect(await (savedAssetFile as Blob).text()).toBe('generated');
-    const savedProject = JSON.parse(directory.files.get('project.json') as string) as ProjectDocument;
+    const savedProject = JSON.parse(
+      directory.files.get('project.json') as string,
+    ) as ProjectDocument;
     const savedAsset = savedProject.assets['asset-generated'];
     if (!savedAsset) throw new Error('Expected asset-generated to be saved in project.json');
     expect(savedAsset).toMatchObject({
@@ -433,7 +457,9 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
     const assetsDirectory = directory.directories.get('assets')!;
     expect(assetsDirectory.files.has('asset-gif.gif')).toBe(true);
     expect(assetsDirectory.files.has('asset-video.mp4')).toBe(true);
-    const savedProject = JSON.parse(directory.files.get('project.json') as string) as ProjectDocument;
+    const savedProject = JSON.parse(
+      directory.files.get('project.json') as string,
+    ) as ProjectDocument;
     expect(savedProject.assets['asset-gif']).toMatchObject({
       type: 'gif',
       fileName: 'asset-gif.gif',
@@ -469,7 +495,9 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
 
     await repository.saveProject(project);
 
-    const savedProject = JSON.parse(directory.files.get('project.json') as string) as ProjectDocument;
+    const savedProject = JSON.parse(
+      directory.files.get('project.json') as string,
+    ) as ProjectDocument;
     expect(savedProject.assets['asset-stale']).toMatchObject({
       id: 'asset-stale',
       fileName: 'asset-stale.png',

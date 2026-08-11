@@ -1,4 +1,4 @@
-import type { ProjectDocument } from '../../domain/documents/model';
+import type { ImportWarning, ProjectDocument } from '../../domain/documents/model';
 import type {
   MirrorFile,
   ProjectRepository,
@@ -19,6 +19,14 @@ interface FileSystemProjectRepositoryOptions {
 
 interface HydrateProjectAssetsOptions {
   allowMissingAssetFiles?: boolean;
+}
+
+function createMissingFileWarning(kind: string, fileName: string): ImportWarning {
+  return {
+    code: 'missing-local-file',
+    message: `The imported project references a missing ${kind} file: ${fileName}. That content will remain unavailable until the file is restored.`,
+    severity: 'warning',
+  };
 }
 
 export interface RecentProjectHandleStore {
@@ -73,7 +81,8 @@ async function createFileBackedProjectSnapshot(
     }
 
     if (!assetFileUtils.isReadableObjectUrl(asset.objectUrl)) continue;
-    const fileName = asset.fileName ?? `${assetId}.${assetFileUtils.getAssetFileExtension(asset.mimeType)}`;
+    const fileName =
+      asset.fileName ?? `${assetId}.${assetFileUtils.getAssetFileExtension(asset.mimeType)}`;
     await writeBlobFileToDirectory(
       assetsDirectory,
       fileName,
@@ -124,8 +133,7 @@ async function createFileBackedProjectSnapshot(
 
     if (!assetFileUtils.isReadableObjectUrl(audio.objectUrl)) continue;
     const fileName =
-      audio.fileName ??
-      `${recordingId}.${assetFileUtils.getAssetFileExtension(audio.mimeType)}`;
+      audio.fileName ?? `${recordingId}.${assetFileUtils.getAssetFileExtension(audio.mimeType)}`;
     await writeBlobFileToDirectory(
       recordingsDirectory,
       fileName,
@@ -206,7 +214,7 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     const pickDirectory = this.options.pickDirectory ?? getBrowserDirectoryPicker();
     this.directoryHandle = await pickDirectory();
     await this.recentProjectStore.save(this.directoryHandle);
-    const project = await this.loadProject();
+    const project = await this.loadProject({ allowMissingAssetFiles: true });
     if (project) await this.recentProjectStore.save(this.directoryHandle, project.name);
     return project;
   }
@@ -220,7 +228,8 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
   async importMirrorFiles(files: MirrorFile[]): Promise<ProjectDocument>;
   async importMirrorFiles(files: MirrorFile | MirrorFile[]): Promise<ProjectDocument> {
     const pickDirectory = this.options.pickDirectory ?? getBrowserDirectoryPicker();
-    const selectedDirectoryHandle = this.pendingMirrorImportDirectoryHandle ?? (await pickDirectory());
+    const selectedDirectoryHandle =
+      this.pendingMirrorImportDirectoryHandle ?? (await pickDirectory());
     this.pendingMirrorImportDirectoryHandle = null;
     const mirrorFiles = Array.isArray(files) ? files : [files];
     const projectDirectoryName = await readProjectNameFromMirrorFiles(mirrorFiles);
@@ -240,14 +249,19 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     return project;
   }
 
-  async loadProject(options?: { projectName?: string }): Promise<ProjectDocument | null> {
+  async loadProject(options?: {
+    projectName?: string;
+    allowMissingAssetFiles?: boolean;
+  }): Promise<ProjectDocument | null> {
     if (!this.directoryHandle) {
       this.directoryHandle = await this.recentProjectStore.load(options?.projectName);
     }
     if (!this.directoryHandle) return null;
     await this.ensureReadWritePermission(this.directoryHandle);
 
-    return this.readProjectFromDirectory(this.directoryHandle);
+    return this.readProjectFromDirectory(this.directoryHandle, {
+      ...(options?.allowMissingAssetFiles ? { allowMissingAssetFiles: true } : {}),
+    });
   }
 
   private async readProjectFromDirectory(
@@ -361,7 +375,10 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     const createdAt = new Date().toISOString();
     const id = projectVersionHistoryUtils.createVersionId(new Date(createdAt));
     const fileName = `${id}.json`;
-    const changeSummary = projectVersionHistoryUtils.createChangeSummary(project, metadata.previousProject);
+    const changeSummary = projectVersionHistoryUtils.createChangeSummary(
+      project,
+      metadata.previousProject,
+    );
     const entry: VersionHistoryEntry = {
       id,
       createdAt,
@@ -440,7 +457,8 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
         hasParentDirectoryPermission = true;
       }
       this.parentDirectoryHandle = requestedProjectDirectoryName ? selectedDirectoryHandle : null;
-      this.projectDirectoryName = requestedProjectDirectoryName ?? selectedDirectoryHandle.name ?? null;
+      this.projectDirectoryName =
+        requestedProjectDirectoryName ?? selectedDirectoryHandle.name ?? null;
       this.directoryHandle = requestedProjectDirectoryName
         ? await selectedDirectoryHandle.getDirectoryHandle(requestedProjectDirectoryName, {
             create: true,
@@ -512,9 +530,11 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     retainedAssetFileNames: Set<string>,
   ) {
     if (!directoryHandle.removeEntry) return;
-    const entries = (directoryHandle as unknown as {
-      entries?: () => AsyncIterable<[string, { kind?: string }]>;
-    }).entries;
+    const entries = (
+      directoryHandle as unknown as {
+        entries?: () => AsyncIterable<[string, { kind?: string }]>;
+      }
+    ).entries;
     if (!entries) return;
 
     const removals: Array<Promise<void>> = [];
@@ -632,6 +652,7 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     const assets: ProjectDocument['assets'] = {};
     const fonts: ProjectDocument['fonts'] = {};
     const recordings: ProjectDocument['recordings'] = {};
+    const missingFileWarnings: ImportWarning[] = [];
     let assetsDirectory: FileSystemDirectoryHandle | undefined;
     let fontsDirectory: FileSystemDirectoryHandle | undefined;
     let recordingsDirectory: FileSystemDirectoryHandle | undefined;
@@ -665,6 +686,7 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
         };
       } catch (error) {
         if (!isNotFoundError(error) || !options.allowMissingAssetFiles) throw error;
+        missingFileWarnings.push(createMissingFileWarning('asset', asset.fileName));
         assets[assetId] = asset;
       }
     }
@@ -684,6 +706,7 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
         };
       } catch (error) {
         if (!isNotFoundError(error) || !options.allowMissingAssetFiles) throw error;
+        missingFileWarnings.push(createMissingFileWarning('font', font.fileName));
         fonts[fontId] = font;
       }
     }
@@ -707,6 +730,7 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
         };
       } catch (error) {
         if (!isNotFoundError(error) || !options.allowMissingAssetFiles) throw error;
+        missingFileWarnings.push(createMissingFileWarning('recording', audio.fileName));
         recordings[recordingId] = recording;
       }
     }
@@ -716,6 +740,9 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
       assets,
       ...(project.fonts ? { fonts } : {}),
       ...(project.recordings ? { recordings } : {}),
+      ...(missingFileWarnings.length > 0
+        ? { importWarnings: [...(project.importWarnings ?? []), ...missingFileWarnings] }
+        : {}),
     };
   }
 }
@@ -726,7 +753,11 @@ class BrowserRecentProjectHandleStore implements RecentProjectHandleStore {
   private readonly handleKey = 'last-project-directory';
   private readonly localStorageKey = 'localstudio.ai.last-project.available';
 
-  constructor(private readonly storage: BrowserKeyValueStorage | undefined = browserStorage.getBrowserLocalStorage()) {}
+  constructor(
+    private readonly storage:
+      | BrowserKeyValueStorage
+      | undefined = browserStorage.getBrowserLocalStorage(),
+  ) {}
 
   async load(projectName?: string): Promise<FileSystemDirectoryHandle | null> {
     if (typeof window === 'undefined') return null;

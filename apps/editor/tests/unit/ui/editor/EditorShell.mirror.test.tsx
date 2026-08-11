@@ -155,7 +155,7 @@ describe('EditorShell mirror workflows', () => {
     fireEvent.click(disabledMirrorButton);
 
     await waitFor(() => {
-      expect(mirrorService.syncProject).toHaveBeenCalledTimes(2);
+      expect(mirrorService.syncProject).toHaveBeenCalledTimes(1);
     });
     expect(await screen.findByRole('button', { name: 'Mirror up to date' })).toBeInTheDocument();
   });
@@ -168,17 +168,15 @@ describe('EditorShell mirror workflows', () => {
     let resolveSync: (() => void) | undefined;
     services.projectRepository = repository;
     services.mirrorService = mirrorService;
-    mirrorService.syncProject.mockImplementation(
-      (project, projectRepository, config, options) => {
-        void project;
-        void projectRepository;
-        void config;
-        void options;
-        return new Promise((resolve) => {
-          resolveSync = () => resolve({ enabled: true, status: 'synced' });
-        });
-      },
-    );
+    mirrorService.syncProject.mockImplementation((project, projectRepository, config, options) => {
+      void project;
+      void projectRepository;
+      void config;
+      void options;
+      return new Promise((resolve) => {
+        resolveSync = () => resolve({ enabled: true, status: 'synced' });
+      });
+    });
 
     render(<EditorShell services={services} />);
 
@@ -189,9 +187,7 @@ describe('EditorShell mirror workflows', () => {
       });
     });
 
-    await waitFor(() => {
-      expect(mirrorService.syncProject).toHaveBeenCalledTimes(1);
-    });
+    expect(mirrorService.syncProject).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'File' }));
     await user.click(screen.getByRole('menuitem', { name: 'Mirror Now' }));
     expect(mirrorService.syncProject).toHaveBeenCalledTimes(1);
@@ -214,20 +210,18 @@ describe('EditorShell mirror workflows', () => {
     let resolveSync: (() => void) | undefined;
     services.projectRepository = repository;
     services.mirrorService = mirrorService;
-    mirrorService.syncProject.mockImplementation(
-      (project, projectRepository, config, options) => {
-        void project;
-        void projectRepository;
-        void config;
-        reportProgress = (current) => {
-          options?.onProgress?.({ current, label: `Mirrored file ${current}`, total: 5 });
-        };
-        reportProgress(3);
-        return new Promise((resolve) => {
-          resolveSync = () => resolve({ enabled: true, status: 'synced' });
-        });
-      },
-    );
+    mirrorService.syncProject.mockImplementation((project, projectRepository, config, options) => {
+      void project;
+      void projectRepository;
+      void config;
+      reportProgress = (current) => {
+        options?.onProgress?.({ current, label: `Mirrored file ${current}`, total: 5 });
+      };
+      reportProgress(3);
+      return new Promise((resolve) => {
+        resolveSync = () => resolve({ enabled: true, status: 'synced' });
+      });
+    });
 
     render(<EditorShell services={services} />);
 
@@ -238,6 +232,9 @@ describe('EditorShell mirror workflows', () => {
       });
     });
 
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Mirror Now' }));
     expect(await screen.findByRole('status', { name: 'Mirror syncing 60%' })).toBeInTheDocument();
 
     act(() => {
@@ -292,7 +289,9 @@ describe('EditorShell mirror workflows', () => {
       });
     });
 
-    expect(await screen.findByRole('button', { name: 'Save deck before mirroring' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Save deck before mirroring' }),
+    ).toBeInTheDocument();
     expect(secondMirrorService.syncProject).not.toHaveBeenCalled();
   });
 
@@ -336,9 +335,7 @@ describe('EditorShell mirror workflows', () => {
     const mirrorService = new RecordingMirrorService();
     const getTestFontFiles = vi
       .spyOn(services.localFontMirrorService, 'getTestFontFiles')
-      .mockResolvedValue([
-        new File(['font'], 'local-font.woff2', { type: 'font/woff2' }),
-      ]);
+      .mockResolvedValue([new File(['font'], 'local-font.woff2', { type: 'font/woff2' })]);
     const validateTestFontFiles = vi
       .spyOn(services.localFontMirrorService, 'validateTestFontFiles')
       .mockResolvedValue({});
@@ -416,7 +413,7 @@ describe('EditorShell mirror workflows', () => {
     expect(window.location.search).toBe('?project=Remote+Mirror+Deck');
   });
 
-  it('restores mirroring from saved config and syncs the loaded local project', async () => {
+  it('restores mirroring from saved config without uploading during local restore', async () => {
     const repository = new DeferredLoadingProjectRepository();
     const mirrorService = new RecordingMirrorService();
     const services = createAppServices();
@@ -438,21 +435,6 @@ describe('EditorShell mirror workflows', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
 
-    await waitFor(() => {
-      expect(
-        mirrorService.syncProject.mock.calls.some(
-          ([syncedProject]) =>
-            syncedProject.id === 'mirrored-project' && syncedProject.name === 'Mirrored Folder',
-        ),
-      ).toBe(true);
-    });
-    const restoredSyncCall = mirrorService.syncProject.mock.calls.find(
-      ([syncedProject]) =>
-        syncedProject.id === 'mirrored-project' && syncedProject.name === 'Mirrored Folder',
-    );
-    if (!restoredSyncCall) throw new Error('Expected mirror sync for Mirrored Folder.');
-    expect(restoredSyncCall[1]).toBe(repository);
-    expect(restoredSyncCall[2]).toEqual(mirrorConfig);
-    expect(typeof restoredSyncCall[3]?.onProgress).toBe('function');
+    expect(mirrorService.syncProject).not.toHaveBeenCalled();
   });
 });
