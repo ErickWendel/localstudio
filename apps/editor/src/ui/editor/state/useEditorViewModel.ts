@@ -66,6 +66,7 @@ import { editorViewModelRuntime } from './editorViewModelRuntime';
 import { editorViewModelElements } from './editorViewModelElements';
 import type {
   ElementClipboardState,
+  SlideClipboardState,
   GridSplitLayout,
   ImageGridRequest,
   SelectionGridRequest,
@@ -3028,18 +3029,22 @@ export function useEditorViewModel(services: AppServices) {
 
   function copySelectedElements() {
     const selectedElements = getSelectedElementsForClipboard();
-    if (selectedElements.length === 0) return;
-    setElementClipboard({
+    if (selectedElements.length === 0) return undefined;
+    const nextClipboard = {
       assets: editorViewModelElements.collectClipboardAssets(project, selectedElements),
       elements: selectedElements.map((element) => ({ ...element })),
-    });
+    };
+    setElementClipboard(nextClipboard);
+    return nextClipboard;
   }
 
-  function pasteCopiedElements() {
-    if (elementClipboard.elements.length === 0) return false;
+  function pasteClipboardElements(clipboard: unknown) {
+    if (!editorViewModelElements.isElementClipboardState(clipboard) || clipboard.elements.length === 0) {
+      return false;
+    }
     const pastedElements = editorViewModelElements.createPastedElements({
       createElementId: (sourceElementId) => createPrefixedId(`${sourceElementId}-copy`),
-      elements: elementClipboard.elements,
+      elements: clipboard.elements,
     });
 
     commitProject(
@@ -3047,15 +3052,19 @@ export function useEditorViewModel(services: AppServices) {
         new basicCommands.AddElementsCommand(
           activePageId,
           pastedElements,
-          elementClipboard.assets,
+          clipboard.assets,
         ).execute(currentProject),
       { selectedElementIds: pastedElements.map((element) => element.id) },
     );
     setElementClipboard({
-      assets: elementClipboard.assets,
+      assets: clipboard.assets,
       elements: pastedElements.map((element) => ({ ...element })),
     });
     return true;
+  }
+
+  function pasteCopiedElements() {
+    return pasteClipboardElements(elementClipboard);
   }
 
   function deleteElement(elementId: string) {
@@ -3293,6 +3302,52 @@ export function useEditorViewModel(services: AppServices) {
         ).execute(currentProject),
       { activePageId: nextPageId, selectedElementIds: [] },
     );
+  }
+
+  function getSlideClipboardPayload(pageId: string): SlideClipboardState | undefined {
+    const page = project.pages.find((item) => item.id === pageId);
+    if (!page) return undefined;
+    const elements = page.elementIds
+      .map((elementId) => project.elements[elementId])
+      .filter((element): element is NonNullable<typeof element> => Boolean(element));
+    return {
+      page: { ...page, elementIds: [...page.elementIds] },
+      elements: elements.map((element) => ({ ...element })),
+      assets: editorViewModelElements.collectClipboardAssets(project, elements),
+    };
+  }
+
+  function pasteSlideClipboardPayload(clipboard: unknown) {
+    if (!editorViewModelElements.isSlideClipboardState(clipboard)) return false;
+    const pageId = createPrefixedId('page');
+    const assetIds = new Map<string, string>();
+    const assets = Object.fromEntries(
+      Object.entries(clipboard.assets).map(([assetId, asset]) => {
+        const nextAssetId = createPrefixedId(`${assetId}-slide`);
+        assetIds.set(assetId, nextAssetId);
+        return [nextAssetId, { ...asset, id: nextAssetId }];
+      }),
+    );
+    const elementIds = new Map<string, string>();
+    const elements = clipboard.elements.map((element) => {
+      const nextElementId = createPrefixedId(`${element.id}-slide`);
+      elementIds.set(element.id, nextElementId);
+      const nextElement = { ...element, id: nextElementId };
+      if ('assetId' in nextElement) {
+        nextElement.assetId = assetIds.get(nextElement.assetId) ?? nextElement.assetId;
+      }
+      return nextElement;
+    });
+    const page = { ...clipboard.page, id: pageId, elementIds: elements.map((element) => element.id) };
+    commitProject(
+      (currentProject) => ({
+        ...editorViewModelPages.insertPageAfter(currentProject, activePageId, page),
+        elements: { ...currentProject.elements, ...Object.fromEntries(elements.map((element) => [element.id, element])) },
+        assets: { ...currentProject.assets, ...assets },
+      }),
+      { activePageId: pageId, selectedElementIds: [] },
+    );
+    return true;
   }
 
   function deletePage(pageId: string) {
@@ -3604,6 +3659,8 @@ export function useEditorViewModel(services: AppServices) {
     activateScrolledPage,
     addPage,
     duplicatePage,
+    getSlideClipboardPayload,
+    pasteSlideClipboardPayload,
     deletePage,
     reorderPage,
     renamePage,
@@ -3626,6 +3683,7 @@ export function useEditorViewModel(services: AppServices) {
     duplicateSelectedElement,
     copySelectedElements,
     cutSelectedElements,
+    pasteClipboardElements,
     pasteCopiedElements,
     insertTextElement,
     insertShapeElement,

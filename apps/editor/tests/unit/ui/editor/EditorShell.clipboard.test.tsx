@@ -92,6 +92,21 @@ describe('EditorShell clipboard workflows', () => {
     });
   });
 
+  it('pastes an object copied from another editor tab', async () => {
+    const user = userEvent.setup();
+    const clipboardData = createClipboardData();
+
+    render(<EditorShell services={createAppServices()} />);
+    await selectImageLayer(user);
+    fireEvent.copy(window, { clipboardData });
+    fireEvent.paste(window, { clipboardData });
+
+    expect(await screen.findByRole('button', { name: 'Selected Image copy' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
   it('does not overwrite copied text when an editable field is active with a selected object', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);

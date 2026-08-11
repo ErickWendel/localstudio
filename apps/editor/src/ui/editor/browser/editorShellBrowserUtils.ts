@@ -2,6 +2,8 @@ import type { WebMcpModelContext } from '../../../services/webmcp/webMcpToolAdap
 
 const EDITOR_OBJECT_CLIPBOARD_TYPE = 'application/x-localstudio-editor-elements';
 const EDITOR_OBJECT_CLIPBOARD_MARKER = '1';
+const MAX_EDITOR_OBJECT_CLIPBOARD_BYTES = 1024 * 1024;
+const SLIDE_CLIPBOARD_PREFIX = 'LocalStudio.dev slide: ';
 
 function isEditableElement(target: EventTarget | null) {
   return (
@@ -50,6 +52,37 @@ function writeEditorObjectClipboardMarker(clipboardData: DataTransfer | null) {
   clipboardData.setData('text/plain', 'LocalStudio.dev editor elements');
 }
 
+function writeEditorObjectClipboardPayload(clipboardData: DataTransfer | null, payload: string) {
+  if (!clipboardData || payload.length > MAX_EDITOR_OBJECT_CLIPBOARD_BYTES) return;
+  clipboardData.setData(EDITOR_OBJECT_CLIPBOARD_TYPE, payload);
+  clipboardData.setData('text/plain', 'LocalStudio.dev editor elements');
+}
+
+function readEditorObjectClipboardPayload(clipboardData: DataTransfer | null) {
+  if (!clipboardData) return undefined;
+  const payload = clipboardData.getData?.(EDITOR_OBJECT_CLIPBOARD_TYPE);
+  if (!payload || payload === EDITOR_OBJECT_CLIPBOARD_MARKER) return undefined;
+  if (payload.length > MAX_EDITOR_OBJECT_CLIPBOARD_BYTES) return undefined;
+  return payload;
+}
+
+async function writeSlideClipboardPayload(payload: string) {
+  if (payload.length > MAX_EDITOR_OBJECT_CLIPBOARD_BYTES || !navigator.clipboard?.writeText) return false;
+  try {
+    await navigator.clipboard.writeText(`${SLIDE_CLIPBOARD_PREFIX}${payload}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readSlideClipboardPayload(clipboardData: DataTransfer | null) {
+  const text = clipboardData?.getData?.('text/plain') ?? '';
+  if (!text.startsWith(SLIDE_CLIPBOARD_PREFIX)) return undefined;
+  const payload = text.slice(SLIDE_CLIPBOARD_PREFIX.length);
+  return payload.length <= MAX_EDITOR_OBJECT_CLIPBOARD_BYTES ? payload : undefined;
+}
+
 function isWebMcpEnabled() {
   if (typeof window === 'undefined') return false;
   return new URL(window.location.href).searchParams.get('webmcp') === '1';
@@ -71,6 +104,10 @@ export const editorShellBrowserUtils = {
   getClipboardImageFile,
   hasEditorObjectClipboardMarker,
   writeEditorObjectClipboardMarker,
+  writeEditorObjectClipboardPayload,
+  readEditorObjectClipboardPayload,
+  writeSlideClipboardPayload,
+  readSlideClipboardPayload,
   isWebMcpEnabled,
   isWebMcpProtocolEnabled,
   getWebMcpModelContext,

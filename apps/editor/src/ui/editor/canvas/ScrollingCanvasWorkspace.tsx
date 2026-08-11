@@ -21,6 +21,7 @@ interface ScrollingCanvasWorkspaceProps extends CanvasWorkspaceProps {
   onActivePageFromScroll?: ((pageId: string) => void) | undefined;
   onDeletePage?: ((pageId: string) => void) | undefined;
   onDuplicatePage?: ((pageId: string) => void) | undefined;
+  onCopyPage?: ((pageId: string) => void) | undefined;
   onRenamePage?: ((pageId: string, name: string) => void) | undefined;
   onReorderPage?: ((pageId: string, targetIndex: number) => void) | undefined;
   onSetPageVisibility?: ((pageId: string, visible: boolean) => void) | undefined;
@@ -45,6 +46,7 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
       onAddPage,
       onDeletePage,
       onDuplicatePage,
+      onCopyPage,
       onRenamePage,
       onReorderPage,
       onSetPageVisibility,
@@ -191,6 +193,7 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
                 {...(onAddPage ? { onAddPage } : {})}
                 {...(onDeletePage ? { onDeletePage } : {})}
                 {...(onDuplicatePage ? { onDuplicatePage } : {})}
+                {...(onCopyPage ? { onCopyPage } : {})}
                 {...(onRenamePage ? { onRenamePage } : {})}
                 {...(onReorderPage ? { onReorderPage } : {})}
                 {...(onSetPageVisibility ? { onSetPageVisibility } : {})}
@@ -262,6 +265,7 @@ interface PageHeaderProps {
   onAddPage?: (afterPageId?: string) => void;
   onDeletePage?: (pageId: string) => void;
   onDuplicatePage?: (pageId: string) => void;
+  onCopyPage?: (pageId: string) => void;
   onRenamePage?: (pageId: string, name: string) => void;
   onReorderPage?: (pageId: string, targetIndex: number) => void;
   onSetPageVisibility?: (pageId: string, visible: boolean) => void;
@@ -281,6 +285,7 @@ function PageHeader({
   onAddPage,
   onDeletePage,
   onDuplicatePage,
+  onCopyPage,
   onRenamePage,
   onReorderPage,
   onSetPageVisibility,
@@ -322,8 +327,13 @@ function PageHeader({
         />
         <IconAction
           label={`Duplicate ${name}`}
-          icon="content_copy"
+          icon="library_add"
           onClick={() => onDuplicatePage?.(pageId)}
+        />
+        <IconAction
+          label={`Copy ${name} to clipboard`}
+          icon="file_copy"
+          onClick={() => onCopyPage?.(pageId)}
         />
         <IconAction
           disabled={!canTranslate}
