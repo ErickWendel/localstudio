@@ -2,6 +2,7 @@ import { vi } from 'vitest';
 import type { ProjectDocument } from '../../../src/domain/documents/model';
 import { sampleProject } from '../../../src/domain/projects/sampleProject';
 import { minioMirrorService } from '../../../src/services/mirror/minioMirrorService';
+import type { MirrorManifest } from '../../../src/services/mirror/minioMirrorFiles';
 import type { MinioMirrorConfig } from '../../../src/services/mirror/minioMirrorService';
 import type {
   ProjectRepository,
@@ -129,6 +130,43 @@ function createProjectWithLargeMirrorAsset(): ProjectDocument {
 }
 
 describe('minioMirrorService.createMirrorFiles', () => {
+  it('reuses cached local object files and immutable history versions', async () => {
+    const project = createProjectWithLargeMirrorAsset();
+    const cache = { objectFiles: new Map(), versionFiles: new Map() };
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (getRequestUrl(input) === 'blob:https://localstudio.test/large-asset') {
+        return Promise.resolve(new Response(new Uint8Array([1, 2, 3]), { status: 200 }));
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${getRequestUrl(input)}`));
+    });
+    const repository = new VersionedRepository(
+      [
+        {
+          id: 'version-1',
+          authorName: 'Local user',
+          changeCount: 1,
+          createdAt: '2026-06-29T10:00:00.000Z',
+          fileName: 'version-1.json',
+          projectName: project.name,
+          summary: '1 edit',
+        },
+      ],
+      project,
+    );
+
+    await minioMirrorService.createMirrorFiles(project, repository, config, {
+      fetch: fetchMock,
+      cache,
+    });
+    await minioMirrorService.createMirrorFiles(project, repository, config, {
+      fetch: fetchMock,
+      cache,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(cache.versionFiles.size).toBe(1);
+  });
+
   it('creates a complete portable project mirror payload', async () => {
     const project = sampleProject.createSampleProject();
     const versionProject = {
@@ -459,12 +497,46 @@ describe('minioMirrorService.MinioMirrorService', () => {
     expect(putUrls.some((url) => url.endsWith('/localstudio-mirror.json'))).toBe(true);
     expect(progressUpdates[0]).toMatchObject({
       current: 0,
-      label: 'Checking mirror files',
+      label: 'Mirroring 3 changed files',
     });
     const finalProgress = progressUpdates.at(-1);
     if (!finalProgress) throw new Error('Expected mirror progress updates.');
     expect(finalProgress.current).toBe(finalProgress.total);
     expect(finalProgress.label).toContain('Mirrored ');
+  });
+
+  it('does not upload a timestamp-only manifest when the mirror is already current', async () => {
+    const project = sampleProject.createSampleProject();
+    const now = () => new Date('2026-06-30T10:00:00.000Z');
+    const files = await minioMirrorService.createMirrorFiles(
+      project,
+      new VersionedRepository([], project),
+      config,
+      { now },
+    );
+    const manifestFile = files.find((file) => file.path === 'localstudio-mirror.json');
+    if (!manifestFile) throw new Error('Expected a mirror manifest file.');
+    const remoteManifest = JSON.parse(await manifestFile.blob.text()) as MirrorManifest;
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'GET' && getRequestUrl(input).endsWith('localstudio-mirror.json')) {
+        return Promise.resolve(new Response(JSON.stringify(remoteManifest), { status: 200 }));
+      }
+      return Promise.resolve(new Response('', { status: 200 }));
+    });
+    const progressUpdates: Array<{ current: number; label: string; total: number }> = [];
+
+    await new minioMirrorService.MinioMirrorService({ fetch: fetchMock, now }).syncProject(
+      project,
+      new VersionedRepository([], project),
+      config,
+      { onProgress: (progress) => progressUpdates.push(progress) },
+    );
+
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'PUT')).toHaveLength(0);
+    expect(progressUpdates[0]).toMatchObject({
+      current: 0,
+      label: 'Mirror is up to date',
+    });
   });
 
   it('uploads changed mirror content files in bounded parallel and commits the manifest last', async () => {

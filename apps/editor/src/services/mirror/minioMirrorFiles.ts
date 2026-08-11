@@ -21,6 +21,11 @@ export interface MirrorManifest {
   publicBaseUrl?: string;
 }
 
+export interface MirrorFileCache {
+  objectFiles: Map<string, MirrorFile & MirrorManifestFile>;
+  versionFiles: Map<string, MirrorFile & MirrorManifestFile>;
+}
+
 const MIRROR_MANIFEST_FILE_NAME = 'localstudio-mirror.json';
 const PROJECT_FILE_NAME = 'project.json';
 
@@ -84,7 +89,7 @@ async function createMirrorFiles(
   project: ProjectDocument,
   repository: ProjectRepository,
   config: MinioMirrorConfig,
-  options: { fetch?: typeof fetch; now?: () => Date } = {},
+  options: { fetch?: typeof fetch; now?: () => Date; cache?: MirrorFileCache } = {},
 ): Promise<MirrorFile[]> {
   const requestFetch = options.fetch ?? getDefaultFetch();
   const now = options.now ?? (() => new Date());
@@ -96,11 +101,26 @@ async function createMirrorFiles(
   };
   const files: Array<MirrorFile & MirrorManifestFile> = [];
 
+  async function createObjectFileEntry(path: string, objectUrl: string | undefined) {
+    if (!objectUrl) return undefined;
+    const cacheKey = `${path}\n${objectUrl}`;
+    const cachedEntry = options.cache?.objectFiles.get(cacheKey);
+    if (cachedEntry) return cachedEntry;
+    const blob = await objectUrlToBlob({ objectUrl }, requestFetch);
+    if (!blob) return undefined;
+    const entry = await createFileEntry(path, blob);
+    options.cache?.objectFiles.set(cacheKey, entry);
+    return entry;
+  }
+
   for (const [assetId, asset] of Object.entries(project.assets)) {
     if (!referencedAssetIds.has(assetId)) continue;
     const fileName = asset.fileName ?? `${asset.id}.${assetFileUtils.getAssetFileExtension(asset.mimeType)}`;
-    const blob = await objectUrlToBlob(asset, requestFetch);
-    if (blob) {
+    const entry = await createObjectFileEntry(
+      `assets/${fileName}`,
+      asset.objectUrl,
+    );
+    if (entry) {
       const assetForMirror: Asset = {
         ...asset,
         fileName,
@@ -108,22 +128,22 @@ async function createMirrorFiles(
       };
       delete assetForMirror.objectUrl;
       projectForMirror.assets[assetId] = assetForMirror;
-      files.push(await createFileEntry(`assets/${fileName}`, blob));
+      files.push(entry);
     } else {
       projectForMirror.assets[assetId] = { ...asset };
     }
   }
 
   for (const [fontId, font] of Object.entries(project.fonts ?? {})) {
-    const blob = await objectUrlToBlob(font, requestFetch);
-    if (blob) {
+    const entry = await createObjectFileEntry(`fonts/${font.fileName}`, font.objectUrl);
+    if (entry) {
       const fontForMirror = {
         ...font,
         storage: 'file' as const,
       };
       delete fontForMirror.objectUrl;
       projectForMirror.fonts![fontId] = fontForMirror;
-      files.push(await createFileEntry(`fonts/${font.fileName}`, blob));
+      files.push(entry);
     } else {
       projectForMirror.fonts![fontId] = { ...font };
     }
@@ -133,8 +153,11 @@ async function createMirrorFiles(
     const fileName =
       recording.audio.fileName ??
       `${recording.id}.${assetFileUtils.getAssetFileExtension(recording.audio.mimeType)}`;
-    const blob = await objectUrlToBlob(recording.audio, requestFetch);
-    if (blob) {
+    const entry = await createObjectFileEntry(
+      `recordings/${fileName}`,
+      recording.audio.objectUrl,
+    );
+    if (entry) {
       const audioForMirror: TranscriptRecordingAudio = {
         ...recording.audio,
         fileName,
@@ -145,7 +168,7 @@ async function createMirrorFiles(
         ...recording,
         audio: audioForMirror,
       };
-      files.push(await createFileEntry(`recordings/${fileName}`, blob));
+      files.push(entry);
     } else {
       projectForMirror.recordings![recordingId] = { ...recording };
     }
@@ -167,14 +190,20 @@ async function createMirrorFiles(
   );
 
   for (const version of versions) {
+    const versionCacheKey = `${version.id}\n${version.fileName}`;
+    const cachedVersionFile = options.cache?.versionFiles.get(versionCacheKey);
+    if (cachedVersionFile) {
+      files.push(cachedVersionFile);
+      continue;
+    }
     const versionProject = repository.loadVersion ? await repository.loadVersion(version.id) : null;
     if (!versionProject) continue;
-    files.push(
-      await createFileEntry(
-        `history/versions/${version.fileName}`,
-        storageObjectUtils.jsonBlob(cloneProjectWithoutObjectUrls(versionProject)),
-      ),
+    const versionFile = await createFileEntry(
+      `history/versions/${version.fileName}`,
+      storageObjectUtils.jsonBlob(cloneProjectWithoutObjectUrls(versionProject)),
     );
+    options.cache?.versionFiles.set(versionCacheKey, versionFile);
+    files.push(versionFile);
   }
 
   files.push(

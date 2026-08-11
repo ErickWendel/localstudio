@@ -76,6 +76,7 @@ export interface ProjectRepository {
 export interface MirrorFile {
   path: string;
   blob: Blob;
+  checksum?: string;
 }
 
 export type MirrorStatus = 'disabled' | 'idle' | 'syncing' | 'synced' | 'failed';

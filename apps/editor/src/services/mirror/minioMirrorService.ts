@@ -12,7 +12,7 @@ import type { BrowserKeyValueStorage } from '../browser/browserStorage';
 import { browserStorage } from '../browser/browserStorage';
 import { storageObjectUtils } from '../storage/storageObjectUtils';
 import { minioObjectUtils } from './minioObjectUtils';
-import type { MirrorManifest } from './minioMirrorFiles';
+import type { MirrorFileCache, MirrorManifest } from './minioMirrorFiles';
 import { minioMirrorFiles } from './minioMirrorFiles';
 import { minioObjectUploader } from './minioObjectUploader';
 
@@ -226,6 +226,10 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
   private readonly now: () => Date;
   private readonly sleep: (delayMs: number) => Promise<void>;
   private readonly storage: BrowserKeyValueStorage | undefined;
+  private readonly fileCache: MirrorFileCache = {
+    objectFiles: new Map(),
+    versionFiles: new Map(),
+  };
 
   constructor(options: MinioMirrorServiceOptions = {}) {
     this.requestFetch = options.fetch ?? getDefaultFetch();
@@ -256,13 +260,20 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
     const files = await minioMirrorFiles.createMirrorFiles(project, repository, config, {
       fetch: this.requestFetch,
       now: this.now,
+      cache: this.fileCache,
     });
     const projectKey = getProjectMirrorKey(project.name);
     const remoteManifest = await this.loadRemoteManifest(projectKey, config);
-    const totalBytes = Math.max(
-      files.reduce((total, file) => total + file.blob.size, 0),
-      1,
+    const manifestFile = files.find((file) => file.path === minioMirrorFiles.MIRROR_MANIFEST_FILE_NAME);
+    const contentFiles = files.filter((file) => file.path !== minioMirrorFiles.MIRROR_MANIFEST_FILE_NAME);
+    const changedContentFiles = contentFiles.filter(
+      (file) => remoteManifest?.files[file.path]?.checksum !== file.checksum,
     );
+    const filesToUpload = [
+      ...changedContentFiles,
+      ...(manifestFile && (changedContentFiles.length > 0 || !remoteManifest) ? [manifestFile] : []),
+    ];
+    const totalBytes = Math.max(filesToUpload.reduce((total, file) => total + file.blob.size, 0), 1);
     let completedBytes = 0;
     const uploadedBytesByPath = new Map<string, number>();
 
@@ -276,12 +287,9 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
 
     options?.onProgress?.({
       current: completedBytes,
-      label: 'Checking mirror files',
+      label: filesToUpload.length > 0 ? `Mirroring ${filesToUpload.length} changed files` : 'Mirror is up to date',
       total: totalBytes,
     });
-
-    const manifestFile = files.find((file) => file.path === minioMirrorFiles.MIRROR_MANIFEST_FILE_NAME);
-    const contentFiles = files.filter((file) => file.path !== minioMirrorFiles.MIRROR_MANIFEST_FILE_NAME);
 
     const syncFile = async (file: MirrorFile) => {
       options?.onProgress?.({
@@ -289,22 +297,18 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
         label: `Mirroring ${file.path}`,
         total: totalBytes,
       });
-      const nextChecksum = await minioObjectUtils.sha256Hex(file.blob);
-      if (remoteManifest?.files[file.path]?.checksum !== nextChecksum) {
-        await this.putObject(
-          getProjectFileKey(config, projectKey, file.path),
-          file.blob,
-          config,
-          (uploadedBytes) =>
-            reportFileProgress(file, uploadedBytes, `Mirroring ${file.path}`),
-        );
-      }
+      await this.putObject(
+        getProjectFileKey(config, projectKey, file.path),
+        file.blob,
+        config,
+        (uploadedBytes) => reportFileProgress(file, uploadedBytes, `Mirroring ${file.path}`),
+      );
       reportFileProgress(file, file.blob.size, `Mirrored ${file.path}`);
     };
 
-    await runWithConcurrency(contentFiles, MIRROR_UPLOAD_CONCURRENCY, syncFile);
+    await runWithConcurrency(changedContentFiles, MIRROR_UPLOAD_CONCURRENCY, syncFile);
 
-    if (manifestFile) {
+    if (manifestFile && filesToUpload.includes(manifestFile)) {
       await syncFile(manifestFile);
     }
 
