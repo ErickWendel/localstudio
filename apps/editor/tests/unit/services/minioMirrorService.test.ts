@@ -923,6 +923,58 @@ describe('minioMirrorService.MinioMirrorService', () => {
     ]);
   });
 
+  it('lists remote mirrors across paginated object listings', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(getRequestUrl(input));
+      if (init?.method === 'GET' && url.searchParams.get('list-type') === '2') {
+        const continuationToken = url.searchParams.get('continuation-token');
+        return Promise.resolve(
+          new Response(
+            continuationToken === 'page-2'
+              ? `<ListBucketResult>
+                  <IsTruncated>false</IsTruncated>
+                  <Contents><Key>mirrors/Newest/localstudio-mirror.json</Key></Contents>
+                </ListBucketResult>`
+              : `<ListBucketResult>
+                  <IsTruncated>true</IsTruncated>
+                  <NextContinuationToken>page-2</NextContinuationToken>
+                  <Contents><Key>mirrors/Older/localstudio-mirror.json</Key></Contents>
+                  <Contents><Key>mirrors/Older/project.json</Key></Contents>
+                </ListBucketResult>`,
+            { status: 200 },
+          ),
+        );
+      }
+      if (init?.method === 'GET' && url.pathname.endsWith('/localstudio-mirror.json')) {
+        const projectName = url.pathname.includes('/Newest/') ? 'Newest' : 'Older';
+        return Promise.resolve(
+          Response.json({
+            files: {},
+            projectId: `project-${projectName.toLowerCase()}`,
+            projectName,
+            publicBaseUrl: splitCredentialConfig.publicBaseUrl,
+            schemaVersion: 1,
+            syncedAt:
+              projectName === 'Newest' ? '2026-08-11T18:00:00.000Z' : '2026-08-10T18:00:00.000Z',
+          }),
+        );
+      }
+      return Promise.resolve(new Response('', { status: 404 }));
+    });
+    const service = new minioMirrorService.MinioMirrorService({ fetch: fetchMock });
+
+    await expect(service.listProjects(splitCredentialConfig)).resolves.toEqual([
+      { id: 'Newest', name: 'Newest', syncedAt: '2026-08-11T18:00:00.000Z' },
+      { id: 'Older', name: 'Older', syncedAt: '2026-08-10T18:00:00.000Z' },
+    ]);
+    const listingUrls = fetchMock.mock.calls
+      .filter(([, init]) => init?.method === 'GET')
+      .map(([input]) => new URL(getRequestUrl(input)))
+      .filter((url) => url.searchParams.get('list-type') === '2');
+    expect(listingUrls).toHaveLength(2);
+    expect(listingUrls[1]?.searchParams.get('continuation-token')).toBe('page-2');
+  });
+
   it('reports mirrored file download progress', async () => {
     const progressEvents: Array<{
       downloadedBytes: number;
