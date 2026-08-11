@@ -152,12 +152,19 @@ class UpdateElementStyleCommand implements EditorCommand {
           ? { fontSize: Math.max(1, this.patch.fontSize) }
           : {}),
         ...(this.patch.fontWeight !== undefined ? { fontWeight: this.patch.fontWeight } : {}),
+        ...(typeof this.patch.stroke === 'string' ? { stroke: this.patch.stroke } : {}),
+        ...(this.patch.strokeWidth !== undefined
+          ? { strokeWidth: Math.max(0, this.patch.strokeWidth) }
+          : {}),
       };
       if (typeof this.patch.hyperlink === 'string') {
         nextTextElement.hyperlink = this.patch.hyperlink;
       }
       if (this.patch.hyperlink === null) {
         delete nextTextElement.hyperlink;
+      }
+      if (this.patch.stroke === null) {
+        delete nextTextElement.stroke;
       }
       nextElement = nextTextElement;
     }

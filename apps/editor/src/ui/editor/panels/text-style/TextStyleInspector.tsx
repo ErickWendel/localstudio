@@ -12,6 +12,8 @@ import type { ElementStylePatch } from '../../../../domain/commands/elements/bas
 import type { TextElement } from '../../../../domain/documents/model';
 import type { FontCatalogItem } from '../../../../services/contracts/interfaces';
 import { textStyleOptions } from '../../text/textStyleOptions';
+import { DesignColorField } from '../design-controls/DesignColorField';
+import { DesignSelectField } from '../design-controls/DesignSelectField';
 
 export interface TextStyleControls {
   downloadingFontFamily?: string | undefined;
@@ -33,6 +35,10 @@ export interface TextStyleControls {
 
 const regularTextWeight = 400;
 const boldTextWeight = 800;
+const textBorderOptions = [
+  { value: 'none', label: 'No border' },
+  { value: 'color', label: 'Color border' },
+] as const;
 
 function fontMatchesQuery(fontFamily: string, query: string) {
   const normalizedQuery = query.trim().toLowerCase();
@@ -258,6 +264,46 @@ export function TextStyleInspector({
             }}
           />
         </label>
+        <DesignSelectField
+          ariaLabel="Selected text border mode"
+          label="Border"
+          options={textBorderOptions}
+          value={element.stroke && (element.strokeWidth ?? 0) > 0 ? 'color' : 'none'}
+          onChange={(value) => {
+            onUpdateStyle(
+              value === 'color'
+                ? {
+                    stroke: element.stroke ?? '#000000',
+                    strokeWidth: element.strokeWidth && element.strokeWidth > 0 ? element.strokeWidth : 2,
+                  }
+                : { stroke: null, strokeWidth: 0 },
+            );
+          }}
+        />
+        {element.stroke && (element.strokeWidth ?? 0) > 0 ? (
+          <>
+            <DesignColorField
+              ariaLabel="Selected text border color"
+              label="Border color"
+              value={element.stroke}
+              onChange={(stroke) => {
+                onUpdateStyle({ stroke });
+              }}
+            />
+            <label className="design-control ew-field-scope">
+              <span>Border width</span>
+              <input
+                aria-label="Selected text border width"
+                min="1"
+                type="number"
+                value={element.strokeWidth ?? 2}
+                onChange={(event) => {
+                  onUpdateStyle({ strokeWidth: Number(event.target.value) });
+                }}
+              />
+            </label>
+          </>
+        ) : null}
         <div className="text-align-grid" aria-label="Selected text alignment">
           {([
             { align: 'left' as const, icon: AlignLeft, label: 'Align selected text left' },

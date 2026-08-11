@@ -80,6 +80,10 @@ function MiniElement({
           fontFamily: element.fontFamily,
           fontSize: `${Math.max(4, (element.fontSize / page.width) * 100)}cqw`,
           fontWeight: element.fontWeight,
+          WebkitTextStroke:
+            element.stroke && (element.strokeWidth ?? 0) > 0
+              ? `${element.strokeWidth}px ${element.stroke}`
+              : undefined,
           lineHeight: 0.9,
           overflow: 'visible',
           textAlign: element.align,
