@@ -572,6 +572,13 @@ export function useEditorViewModel(services: AppServices) {
           editorViewModelProject.writeProjectNameToUrl(normalizedProject.name);
           setHasPersistedLocalProject(true);
           setPersistenceError(false);
+          if (storedMirrorConfig && shouldEnableStoredMirror) {
+            setMirrorState({
+              enabled: true,
+              status: 'synced',
+              lastSyncedAt: normalizedProject.updatedAt,
+            });
+          }
           // Restoring a local project must not upload it automatically. The local
           // folder is authoritative, and another tab may still be finishing a
           // write when this tab opens. Upload only after a local save or an

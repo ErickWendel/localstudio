@@ -144,7 +144,7 @@ describe('EditorShell mirror workflows', () => {
       });
     });
 
-    const mirrorButton = await screen.findByRole('button', { name: 'Mirror ready' });
+    const mirrorButton = await screen.findByRole('button', { name: 'Mirror up to date' });
     fireEvent.click(mirrorButton);
 
     expect(mirrorService.clearConfig).not.toHaveBeenCalled();
@@ -263,7 +263,7 @@ describe('EditorShell mirror workflows', () => {
       });
     });
 
-    expect(await screen.findByRole('button', { name: 'Mirror ready' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Mirror up to date' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Mirror settings' }));
     fireEvent.click(
       within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('button', {
