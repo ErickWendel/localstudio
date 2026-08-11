@@ -12,6 +12,8 @@ export type MinioMirrorServiceContractResult = {
   }>;
   listError: string;
   listOrder: string[];
+  multipartCompletedParts: number;
+  multipartPartSizes: number[];
   uploadError: string;
 };
 
@@ -211,6 +213,47 @@ export async function evaluateMinioMirrorServiceContract(): Promise<MinioMirrorS
       fetch: () => Promise.resolve(new Response('', { status: 500 })),
     }).uploadPublicObject('mirrors/share.json', new Blob(['{}']), config),
   );
+  const multipartRequests: Array<{ body: BodyInit | null | undefined; method: string; url: string }> =
+    [];
+  const multipartService = new minioMirrorService.MinioMirrorService({
+    fetch: (input, init) => {
+      const url = stringifyFetchInput(input);
+      const method = init?.method ?? 'GET';
+      multipartRequests.push({ body: init?.body, method, url });
+      const parsedUrl = new URL(url);
+      if (method === 'POST' && parsedUrl.searchParams.has('uploads')) {
+        return Promise.resolve(
+          new Response(
+            '<InitiateMultipartUploadResult><UploadId>browser-upload</UploadId></InitiateMultipartUploadResult>',
+          ),
+        );
+      }
+      if (method === 'PUT' && parsedUrl.searchParams.has('partNumber')) {
+        return Promise.resolve(
+          new Response('', {
+            headers: { ETag: `"browser-part-${parsedUrl.searchParams.get('partNumber')}"` },
+          }),
+        );
+      }
+      return Promise.resolve(new Response('', { status: 200 }));
+    },
+  });
+  await multipartService.uploadPublicObject(
+    'mirrors/browser-large.mp4',
+    new Blob([new Uint8Array(5 * 1024 * 1024 + 7)], { type: 'video/mp4' }),
+    config,
+  );
+  const multipartPartSizes = multipartRequests
+    .filter(({ method, url }) => method === 'PUT' && new URL(url).searchParams.has('partNumber'))
+    .map(({ body }) => (body as Blob).size);
+  const completeRequest = multipartRequests.find(
+    ({ method, url }) =>
+      method === 'POST' && new URL(url).searchParams.get('uploadId') === 'browser-upload',
+  );
+  const completeDocument = new DOMParser().parseFromString(
+    await (completeRequest?.body as Blob).text(),
+    'application/xml',
+  );
 
   return {
     deleteError,
@@ -220,6 +263,8 @@ export async function evaluateMinioMirrorServiceContract(): Promise<MinioMirrorS
     downloadProgress,
     listError,
     listOrder,
+    multipartCompletedParts: completeDocument.querySelectorAll('Part').length,
+    multipartPartSizes,
     uploadError,
   };
 }

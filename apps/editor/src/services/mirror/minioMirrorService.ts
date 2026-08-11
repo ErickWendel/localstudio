@@ -14,6 +14,7 @@ import { storageObjectUtils } from '../storage/storageObjectUtils';
 import { minioObjectUtils } from './minioObjectUtils';
 import type { MirrorManifest } from './minioMirrorFiles';
 import { minioMirrorFiles } from './minioMirrorFiles';
+import { minioObjectUploader } from './minioObjectUploader';
 
 export interface MinioMirrorConfig {
   endpoint: string;
@@ -38,6 +39,7 @@ export interface MinioMirrorCredentials {
 interface MinioMirrorServiceOptions {
   fetch?: typeof fetch;
   now?: () => Date;
+  sleep?: (delayMs: number) => Promise<void>;
   storage?: BrowserKeyValueStorage;
 }
 
@@ -83,6 +85,12 @@ function getProjectMirrorKey(projectName: string) {
 function getDefaultFetch() {
   if (typeof window !== 'undefined') return window.fetch.bind(window);
   return globalThis.fetch.bind(globalThis);
+}
+
+function defaultSleep(delayMs: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, delayMs);
+  });
 }
 
 function getProjectRoot(config: MinioMirrorConfig, projectKey: string) {
@@ -216,11 +224,13 @@ async function mapWithConcurrency<T, TResult>(
 class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
   private readonly requestFetch: typeof fetch;
   private readonly now: () => Date;
+  private readonly sleep: (delayMs: number) => Promise<void>;
   private readonly storage: BrowserKeyValueStorage | undefined;
 
   constructor(options: MinioMirrorServiceOptions = {}) {
     this.requestFetch = options.fetch ?? getDefaultFetch();
     this.now = options.now ?? (() => new Date());
+    this.sleep = options.sleep ?? defaultSleep;
     this.storage = options.storage ?? browserStorage.getBrowserLocalStorage();
   }
 
@@ -249,13 +259,25 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
     });
     const projectKey = getProjectMirrorKey(project.name);
     const remoteManifest = await this.loadRemoteManifest(projectKey, config);
-    const totalFiles = Math.max(files.length, 1);
-    let completedFiles = 0;
+    const totalBytes = Math.max(
+      files.reduce((total, file) => total + file.blob.size, 0),
+      1,
+    );
+    let completedBytes = 0;
+    const uploadedBytesByPath = new Map<string, number>();
+
+    const reportFileProgress = (file: MirrorFile, uploadedBytes: number, label: string) => {
+      const previousUploadedBytes = uploadedBytesByPath.get(file.path) ?? 0;
+      const nextUploadedBytes = Math.min(file.blob.size, Math.max(previousUploadedBytes, uploadedBytes));
+      completedBytes += nextUploadedBytes - previousUploadedBytes;
+      uploadedBytesByPath.set(file.path, nextUploadedBytes);
+      options?.onProgress?.({ current: completedBytes, label, total: totalBytes });
+    };
 
     options?.onProgress?.({
-      current: completedFiles,
+      current: completedBytes,
       label: 'Checking mirror files',
-      total: totalFiles,
+      total: totalBytes,
     });
 
     const manifestFile = files.find((file) => file.path === minioMirrorFiles.MIRROR_MANIFEST_FILE_NAME);
@@ -263,20 +285,21 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
 
     const syncFile = async (file: MirrorFile) => {
       options?.onProgress?.({
-        current: completedFiles,
+        current: completedBytes,
         label: `Mirroring ${file.path}`,
-        total: totalFiles,
+        total: totalBytes,
       });
       const nextChecksum = await minioObjectUtils.sha256Hex(file.blob);
       if (remoteManifest?.files[file.path]?.checksum !== nextChecksum) {
-        await this.putObject(getProjectFileKey(config, projectKey, file.path), file.blob, config);
+        await this.putObject(
+          getProjectFileKey(config, projectKey, file.path),
+          file.blob,
+          config,
+          (uploadedBytes) =>
+            reportFileProgress(file, uploadedBytes, `Mirroring ${file.path}`),
+        );
       }
-      completedFiles += 1;
-      options?.onProgress?.({
-        current: completedFiles,
-        label: `Mirrored ${file.path}`,
-        total: totalFiles,
-      });
+      reportFileProgress(file, file.blob.size, `Mirrored ${file.path}`);
     };
 
     await runWithConcurrency(contentFiles, MIRROR_UPLOAD_CONCURRENCY, syncFile);
@@ -456,16 +479,28 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
     return (await response.json()) as MirrorManifest;
   }
 
-  private async putObject(key: string, blob: Blob, config: MinioMirrorConfig) {
-    const response = await this.signedFetch(
-      minioObjectUtils.createObjectUrl(config, key),
-      'PUT',
-      config,
-      getWriterCredentials(config),
+  private async putObject(
+    key: string,
+    blob: Blob,
+    config: MinioMirrorConfig,
+    onUploadedBytes?: (uploadedBytes: number) => void,
+  ) {
+    await minioObjectUploader.upload({
       blob,
-      blob.type,
-    );
-    if (!response.ok) throw new Error(`Could not upload ${key} to MinIO (${response.status}).`);
+      createUrl: (query) => minioObjectUtils.createObjectUrl(config, key, query),
+      key,
+      ...(onUploadedBytes ? { onUploadedBytes } : {}),
+      request: (url, method, body, contentType) =>
+        this.signedFetch(
+          url,
+          method,
+          config,
+          getWriterCredentials(config),
+          body,
+          contentType,
+        ),
+      sleep: this.sleep,
+    });
   }
 
   private async signedFetch(

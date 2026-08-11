@@ -15,6 +15,8 @@ test('executes MinIO mirror service contracts in the browser runtime', async ({ 
     downloadFileError: 'Could not download mirrored file project.json (500).',
     listError: 'Could not list MinIO mirrors (500).',
     listOrder: ['Zulu Project', 'Beta Project', 'Alpha Project'],
+    multipartCompletedParts: 2,
+    multipartPartSizes: [5 * 1024 * 1024, 7],
     uploadError: 'Could not upload mirrors/share.json to MinIO (500).',
   });
   expect(result.downloadProgress).toEqual(

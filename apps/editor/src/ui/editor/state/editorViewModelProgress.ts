@@ -1,4 +1,7 @@
-import type { ModelDownloadProgressDetails } from '../../../services/contracts/interfaces';
+import type {
+  MirrorSyncProgress,
+  ModelDownloadProgressDetails,
+} from '../../../services/contracts/interfaces';
 
 const IMAGE_GENERATION_DIMENSION_MULTIPLE = 16;
 
@@ -21,7 +24,25 @@ function normalizeImageGenerationDimension(value: number) {
   );
 }
 
+function getMirrorProgressFraction(progress: MirrorSyncProgress): number {
+  if (progress.total <= 0) {
+    return 0;
+  }
+
+  return Math.min(1, Math.max(0, progress.current / progress.total));
+}
+
+function selectMonotonicMirrorProgress(
+  current: MirrorSyncProgress | undefined,
+  next: MirrorSyncProgress,
+): MirrorSyncProgress {
+  return !current || getMirrorProgressFraction(next) >= getMirrorProgressFraction(current)
+    ? next
+    : current;
+}
+
 export const editorViewModelProgress = {
   getDownloadProgressPatch,
   normalizeImageGenerationDimension,
+  selectMonotonicMirrorProgress,
 };
