@@ -327,7 +327,7 @@ function PageHeader({
         />
         <IconAction
           label={`Duplicate ${name}`}
-          icon="content_copy"
+          icon="library_add"
           onClick={() => onDuplicatePage?.(pageId)}
         />
         <IconAction

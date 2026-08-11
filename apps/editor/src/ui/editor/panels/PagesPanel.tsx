@@ -271,7 +271,7 @@ export function PagesPanel({
                     }}
                   >
                     <span className="material-symbols-outlined" aria-hidden="true">
-                      content_copy
+                      library_add
                     </span>
                   </button>
                   <button
