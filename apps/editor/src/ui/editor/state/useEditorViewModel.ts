@@ -399,16 +399,12 @@ export function useEditorViewModel(services: AppServices) {
   const lastMirroredProjectNameRef = useRef<string | undefined>(undefined);
   const mirrorDebounceRef = useRef<number | undefined>(undefined);
   const queueMirrorSyncRef = useRef<() => void>(() => undefined);
-  const syncMirrorNowRef = useRef<(project?: ProjectDocument) => void>(() => undefined);
   projectRef.current = project;
   activePageIdRef.current = activePageId;
   selectedElementIdsRef.current = selectedElementIds;
   hasPersistedLocalProjectRef.current = hasPersistedLocalProject;
   mirrorConfigRef.current = hasMirrorConfig ? mirrorConfig : null;
   queueMirrorSyncRef.current = queueMirrorSync;
-  syncMirrorNowRef.current = (projectToSync) => {
-    void syncMirrorNow(projectToSync);
-  };
   const wasFullscreenRef = useRef(false);
   const presenterPageIdRef = useRef<string | undefined>(undefined);
   const languageDetectionSequenceRef = useRef(0);
@@ -576,9 +572,10 @@ export function useEditorViewModel(services: AppServices) {
           editorViewModelProject.writeProjectNameToUrl(normalizedProject.name);
           setHasPersistedLocalProject(true);
           setPersistenceError(false);
-          if (storedMirrorConfig && shouldEnableStoredMirror) {
-            syncMirrorNowRef.current(normalizedProject);
-          }
+          // Restoring a local project must not upload it automatically. The local
+          // folder is authoritative, and another tab may still be finishing a
+          // write when this tab opens. Upload only after a local save or an
+          // explicit mirror action so a stale restore cannot overwrite MinIO.
         } else if (initialRestorePendingRef.current) {
           setHasPersistedLocalProject(false);
           setPersistenceEnabled(false);
@@ -1600,8 +1597,16 @@ export function useEditorViewModel(services: AppServices) {
   async function importProject() {
     if (!services.projectRepository.importProject) return;
     try {
+      showOperationNotice(undefined);
       const importedProject = await services.projectRepository.importProject();
-      if (!importedProject) return;
+      if (!importedProject) {
+        showOperationNotice({
+          message: 'The selected folder does not contain a LocalStudio project.',
+          detail: 'Choose the project folder containing project.json.',
+          tone: 'warning',
+        });
+        return;
+      }
       const normalizedProject = editorViewModelProject.normalizeProjectDocument(importedProject);
       await editorViewModelRuntime.loadProjectFonts(normalizedProject, services.fontImportService);
       setProject(normalizedProject);
@@ -1631,12 +1636,29 @@ export function useEditorViewModel(services: AppServices) {
       services.analyticsService.capture(postHogEvents.projectImportedLocal, {
         pageCount: normalizedProject.pages.length,
       });
-    } catch {
+      const missingFileWarningCount =
+        normalizedProject.importWarnings?.filter((warning) => warning.code === 'missing-local-file')
+          .length ?? 0;
+      if (missingFileWarningCount > 0) {
+        showOperationNotice({
+          message: `Project imported with ${missingFileWarningCount} missing local file${missingFileWarningCount === 1 ? '' : 's'}.`,
+          detail:
+            'The project opened from disk as the source of truth. Restore the missing files to recover those assets.',
+          tone: 'warning',
+        });
+      }
+    } catch (error: unknown) {
       setPersistenceEnabled(false);
       setPersistenceError(true);
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(false);
       }
+      showOperationNotice({
+        message: 'Local project import failed.',
+        detail:
+          error instanceof Error ? error.message : 'Could not read the selected project folder.',
+        tone: 'error',
+      });
     }
   }
 
@@ -2564,9 +2586,7 @@ export function useEditorViewModel(services: AppServices) {
         ? sourceProject.pages.filter((page) => page.id === (options?.pageId ?? activePageId))
         : sourceProject.pages;
 
-    return pages
-      .filter((page) => Boolean(page.speakerNotes?.trim()))
-      .map((page) => page.id);
+    return pages.filter((page) => Boolean(page.speakerNotes?.trim())).map((page) => page.id);
   }
 
   async function translateTextScope(
@@ -2606,10 +2626,7 @@ export function useEditorViewModel(services: AppServices) {
         pendingElementCountByPageId.set(pageId, (pendingElementCountByPageId.get(pageId) ?? 0) + 1);
       }
       for (const pageId of speakerNotePageIds) {
-        pendingElementCountByPageId.set(
-          pageId,
-          (pendingElementCountByPageId.get(pageId) ?? 0) + 1,
-        );
+        pendingElementCountByPageId.set(pageId, (pendingElementCountByPageId.get(pageId) ?? 0) + 1);
       }
       totalPageCount = pendingElementCountByPageId.size;
       setDeckTranslationProgress({
@@ -2719,14 +2736,12 @@ export function useEditorViewModel(services: AppServices) {
       ),
     );
     return Array.from(
-      new Set(
-        [
-          ...elementIds
-            .map((elementId) => pageIdsByElementId.get(elementId))
-            .filter((pageId): pageId is string => Boolean(pageId)),
-          ...speakerNotePageIds,
-        ],
-      ),
+      new Set([
+        ...elementIds
+          .map((elementId) => pageIdsByElementId.get(elementId))
+          .filter((pageId): pageId is string => Boolean(pageId)),
+        ...speakerNotePageIds,
+      ]),
     );
   }
 
@@ -3043,7 +3058,10 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function pasteClipboardElements(clipboard: unknown) {
-    if (!editorViewModelElements.isElementClipboardState(clipboard) || clipboard.elements.length === 0) {
+    if (
+      !editorViewModelElements.isElementClipboardState(clipboard) ||
+      clipboard.elements.length === 0
+    ) {
       return false;
     }
     const pastedElements = editorViewModelElements.createPastedElements({
@@ -3342,11 +3360,18 @@ export function useEditorViewModel(services: AppServices) {
       }
       return nextElement;
     });
-    const page = { ...clipboard.page, id: pageId, elementIds: elements.map((element) => element.id) };
+    const page = {
+      ...clipboard.page,
+      id: pageId,
+      elementIds: elements.map((element) => element.id),
+    };
     commitProject(
       (currentProject) => ({
         ...editorViewModelPages.insertPageAfter(currentProject, activePageId, page),
-        elements: { ...currentProject.elements, ...Object.fromEntries(elements.map((element) => [element.id, element])) },
+        elements: {
+          ...currentProject.elements,
+          ...Object.fromEntries(elements.map((element) => [element.id, element])),
+        },
         assets: { ...currentProject.assets, ...assets },
       }),
       { activePageId: pageId, selectedElementIds: [] },

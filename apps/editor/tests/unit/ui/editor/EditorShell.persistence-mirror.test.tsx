@@ -192,6 +192,35 @@ describe('EditorShell persistence and mirror workflows', () => {
     expect(window.location.search).toBe('?project=Imported+LocalStudio+Project');
   });
 
+  it('opens local projects with missing-file warnings instead of failing silently', async () => {
+    const services = createAppServices();
+    services.projectRepository = new ImportingProjectRepository({
+      ...services.initialProject,
+      id: 'imported-project-with-warning',
+      name: 'Imported Project With Warning',
+      importWarnings: [
+        {
+          code: 'missing-local-file',
+          message: 'The imported project references a missing asset file: missing.png.',
+          severity: 'warning',
+        },
+      ],
+    });
+    render(<EditorShell services={services} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Import' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Project' }));
+
+    expect(
+      await screen.findByText('Project imported with 1 missing local file.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Restore the missing files/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Edit project name Imported Project With Warning' }),
+    ).toBeInTheDocument();
+  });
+
   it('preserves hydrated sample hero object URLs during import normalization', async () => {
     const services = createAppServices();
     const repository = new ImportingProjectRepository({
@@ -295,7 +324,9 @@ describe('EditorShell persistence and mirror workflows', () => {
     try {
       render(<EditorShell services={services} />);
 
-      expect(await screen.findByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
+      expect(
+        await screen.findByRole('button', { name: 'Persistence enabled' }),
+      ).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: 'Version history' }));
       await screen.findByText('Version with title edit');
       scrollIntoView.mockClear();
