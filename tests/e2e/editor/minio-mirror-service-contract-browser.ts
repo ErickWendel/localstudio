@@ -39,8 +39,15 @@ export async function evaluateMinioMirrorServiceContract(): Promise<MinioMirrorS
 
   const manifestXml = [
     '<ListBucketResult>',
+    '<IsTruncated>true</IsTruncated>',
+    '<NextContinuationToken>mirror-list-page-2</NextContinuationToken>',
     '<Contents><Key>mirrors/beta/localstudio-mirror.json</Key></Contents>',
     '<Contents><Key>mirrors/alpha/localstudio-mirror.json</Key></Contents>',
+    '</ListBucketResult>',
+  ].join('');
+  const manifestSecondPageXml = [
+    '<ListBucketResult>',
+    '<IsTruncated>false</IsTruncated>',
     '<Contents><Key>mirrors/zulu/localstudio-mirror.json</Key></Contents>',
     '</ListBucketResult>',
   ].join('');
@@ -69,6 +76,9 @@ export async function evaluateMinioMirrorServiceContract(): Promise<MinioMirrorS
       const method = init?.method ?? 'GET';
       if (method === 'PUT') return Promise.resolve(new Response('', { status: 201 }));
       if (method === 'DELETE') return Promise.resolve(new Response(null, { status: 204 }));
+      if (url.includes('continuation-token=mirror-list-page-2')) {
+        return Promise.resolve(new Response(manifestSecondPageXml));
+      }
       if (url.includes('list-type=2') && url.includes('continuation-token=second-page')) {
         return Promise.resolve(new Response(objectListSecondPageXml));
       }

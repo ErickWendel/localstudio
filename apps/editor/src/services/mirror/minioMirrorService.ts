@@ -141,13 +141,6 @@ function getReaderCredentials(config: MinioMirrorConfig): MinioMirrorCredentials
   };
 }
 
-function parseMirrorProjects(xml: string) {
-  const document = new DOMParser().parseFromString(xml, 'application/xml');
-  return Array.from(document.querySelectorAll('Contents Key'))
-    .map((node) => node.textContent ?? '')
-    .filter((key) => key.endsWith(`/${minioMirrorFiles.MIRROR_MANIFEST_FILE_NAME}`));
-}
-
 function parseObjectList(xml: string) {
   const document = new DOMParser().parseFromString(xml, 'application/xml');
   return {
@@ -316,25 +309,39 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
   }
 
   async listProjects(config: MinioMirrorConfig): Promise<MirrorProjectSummary[]> {
-    const url = minioObjectUtils.createObjectUrl(config, '', {
-      'list-type': '2',
-      'max-keys': '1000',
-      prefix: storageObjectUtils.normalizeObjectKeyPart(config.prefix)
-        ? `${storageObjectUtils.normalizeObjectKeyPart(config.prefix)}/`
-        : '',
-    });
-    const response = await this.signedFetch(url, 'GET', config, getReaderCredentials(config));
-    if (!response.ok) {
-      if (response.status === 403) {
-        throw new Error(
-          'Reader credentials cannot list the bucket or prefix (403). Grant read-only ListBucket on the bucket for Test/Import Remote, and GetObject on mirrored objects for public deck loading. Also verify the reader secret and region.',
-        );
+    const manifestKeys: string[] = [];
+    const prefix = storageObjectUtils.normalizeObjectKeyPart(config.prefix);
+    let continuationToken: string | undefined;
+    do {
+      const url = minioObjectUtils.createObjectUrl(config, '', {
+        ...(continuationToken ? { 'continuation-token': continuationToken } : {}),
+        'list-type': '2',
+        'max-keys': '1000',
+        prefix: prefix ? `${prefix}/` : '',
+      });
+      const response = await this.signedFetch(url, 'GET', config, getReaderCredentials(config));
+      if (!response.ok) {
+        if (response.status === 403) {
+          throw new Error(
+            'Reader credentials cannot list the bucket or prefix (403). Grant read-only ListBucket on the bucket for Test/Import Remote, and GetObject on mirrored objects for public deck loading. Also verify the reader secret and region.',
+          );
+        }
+        throw new Error(`Could not list MinIO mirrors (${response.status}).`);
       }
-      throw new Error(`Could not list MinIO mirrors (${response.status}).`);
-    }
-    const manifestKeys = parseMirrorProjects(await response.text());
-    const manifests = await Promise.all(
-      manifestKeys.map(async (key) => {
+
+      const objectList = parseObjectList(await response.text());
+      manifestKeys.push(
+        ...objectList.keys.filter((key) =>
+          key.endsWith(`/${minioMirrorFiles.MIRROR_MANIFEST_FILE_NAME}`),
+        ),
+      );
+      continuationToken = objectList.truncated ? objectList.nextContinuationToken : undefined;
+    } while (continuationToken);
+
+    const manifests = await mapWithConcurrency(
+      manifestKeys,
+      MIRROR_DOWNLOAD_CONCURRENCY,
+      async (key) => {
         const response = await this.signedFetch(
           minioObjectUtils.createObjectUrl(config, key),
           'GET',
@@ -349,7 +356,7 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
           name: manifest.projectName,
           syncedAt: manifest.syncedAt,
         };
-      }),
+      },
     );
     return manifests
       .filter((item): item is MirrorProjectSummary => Boolean(item))
