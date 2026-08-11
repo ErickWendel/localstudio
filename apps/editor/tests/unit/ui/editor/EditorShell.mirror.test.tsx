@@ -206,6 +206,52 @@ describe('EditorShell mirror workflows', () => {
     expect(mirrorService.syncProject).toHaveBeenCalledTimes(1);
   });
 
+  it('does not move displayed mirror progress backwards during one sync', async () => {
+    const services = createAppServices();
+    const mirrorService = new RecordingMirrorService();
+    const repository = new DeferredLoadingProjectRepository();
+    let reportProgress: ((current: number) => void) | undefined;
+    let resolveSync: (() => void) | undefined;
+    services.projectRepository = repository;
+    services.mirrorService = mirrorService;
+    mirrorService.syncProject.mockImplementation(
+      (project, projectRepository, config, options) => {
+        void project;
+        void projectRepository;
+        void config;
+        reportProgress = (current) => {
+          options?.onProgress?.({ current, label: `Mirrored file ${current}`, total: 5 });
+        };
+        reportProgress(3);
+        return new Promise((resolve) => {
+          resolveSync = () => resolve({ enabled: true, status: 'synced' });
+        });
+      },
+    );
+
+    render(<EditorShell services={services} />);
+
+    act(() => {
+      repository.resolveLoadedProject({
+        ...services.initialProject,
+        name: 'Mirrored Folder',
+      });
+    });
+
+    expect(await screen.findByRole('status', { name: 'Mirror syncing 60%' })).toBeInTheDocument();
+
+    act(() => {
+      reportProgress?.(2);
+    });
+
+    expect(screen.getByRole('status', { name: 'Mirror syncing 60%' })).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Mirror syncing 40%' })).not.toBeInTheDocument();
+
+    act(() => {
+      resolveSync?.();
+    });
+  });
+
   it('keeps saved mirror config disabled after refreshing the page', async () => {
     const firstServices = createAppServices();
     const firstRepository = new DeferredLoadingProjectRepository();

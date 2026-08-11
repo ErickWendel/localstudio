@@ -2053,7 +2053,11 @@ export function useEditorViewModel(services: AppServices) {
         services.projectRepository,
         mirrorConfigRef.current!,
         {
-          onProgress: setMirrorSyncProgress,
+          onProgress: (progress) => {
+            setMirrorSyncProgress((current) =>
+              editorViewModelProgress.selectMonotonicMirrorProgress(current, progress),
+            );
+          },
         },
       );
       const previousMirroredProjectName = lastMirroredProjectNameRef.current;

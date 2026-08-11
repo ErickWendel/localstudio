@@ -99,6 +99,35 @@ function createProjectWithInlineMirrorAssets(assetCount: number): ProjectDocumen
   return project;
 }
 
+function createProjectWithLargeMirrorAsset(): ProjectDocument {
+  const project = sampleProject.createSampleProject();
+  const firstPage = project.pages[0];
+  if (!firstPage) throw new Error('Sample project must contain a page.');
+  project.assets['large-asset'] = {
+    id: 'large-asset',
+    type: 'image',
+    mimeType: 'image/png',
+    name: 'Large asset',
+    objectUrl: 'blob:https://localstudio.test/large-asset',
+    storage: 'inline',
+  };
+  project.elements['large-image'] = {
+    id: 'large-image',
+    type: 'image',
+    assetId: 'large-asset',
+    x: 40,
+    y: 60,
+    width: 120,
+    height: 80,
+    rotation: 0,
+    opacity: 1,
+    locked: false,
+    visible: true,
+  };
+  firstPage.elementIds.push('large-image');
+  return project;
+}
+
 describe('minioMirrorService.createMirrorFiles', () => {
   it('creates a complete portable project mirror payload', async () => {
     const project = sampleProject.createSampleProject();
@@ -403,7 +432,7 @@ describe('minioMirrorService.MinioMirrorService', () => {
         },
       },
     };
-    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = getRequestUrl(input);
       if (init?.method === 'GET' && url.endsWith('localstudio-mirror.json')) {
         return Promise.resolve(new Response(JSON.stringify(remoteManifest), { status: 200 }));
@@ -470,6 +499,282 @@ describe('minioMirrorService.MinioMirrorService', () => {
     expect(maxActivePuts).toBeGreaterThan(1);
     expect(maxActivePuts).toBeLessThanOrEqual(3);
     expect(putOrder.at(-1)).toContain('localstudio-mirror.json');
+  });
+
+  it('uploads large public objects with the S3 multipart protocol', async () => {
+    const requests: Array<{
+      body: BodyInit | null | undefined;
+      method: string;
+      url: string;
+    }> = [];
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = getRequestUrl(input);
+      const method = init?.method ?? 'GET';
+      requests.push({ body: init?.body, method, url });
+      const parsedUrl = new URL(url);
+      if (method === 'POST' && parsedUrl.searchParams.has('uploads')) {
+        return Promise.resolve(
+          new Response(
+            '<InitiateMultipartUploadResult><UploadId>upload-123</UploadId></InitiateMultipartUploadResult>',
+            { status: 200 },
+          ),
+        );
+      }
+      if (method === 'PUT' && parsedUrl.searchParams.has('partNumber')) {
+        const partNumber = parsedUrl.searchParams.get('partNumber');
+        return Promise.resolve(
+          new Response('', { headers: { ETag: `"etag-${partNumber}"` }, status: 200 }),
+        );
+      }
+      if (method === 'POST' && parsedUrl.searchParams.get('uploadId') === 'upload-123') {
+        return Promise.resolve(new Response('', { status: 200 }));
+      }
+      return Promise.resolve(new Response('', { status: 200 }));
+    });
+    const service = new minioMirrorService.MinioMirrorService({ fetch: fetchMock });
+    const largeBlob = new Blob([new Uint8Array(5 * 1024 * 1024 + 3)], {
+      type: 'video/mp4',
+    });
+
+    await service.uploadPublicObject('mirrors/media.mp4', largeBlob, config);
+
+    const initiateRequest = requests.find(({ method, url }) => {
+      const parsedUrl = new URL(url);
+      return method === 'POST' && parsedUrl.searchParams.has('uploads');
+    });
+    const partRequests = requests.filter(({ method, url }) => {
+      const parsedUrl = new URL(url);
+      return method === 'PUT' && parsedUrl.searchParams.has('partNumber');
+    });
+    const completeRequest = requests.find(({ method, url }) => {
+      const parsedUrl = new URL(url);
+      return method === 'POST' && parsedUrl.searchParams.get('uploadId') === 'upload-123';
+    });
+    expect(initiateRequest).toBeDefined();
+    expect(partRequests.map(({ body }) => (body as Blob).size)).toEqual([5 * 1024 * 1024, 3]);
+    const completeDocument = new DOMParser().parseFromString(
+      await (completeRequest?.body as Blob).text(),
+      'application/xml',
+    );
+    expect(
+      Array.from(completeDocument.querySelectorAll('Part')).map((part) => ({
+        etag: part.querySelector('ETag')?.textContent,
+        partNumber: part.querySelector('PartNumber')?.textContent,
+      })),
+    ).toEqual([
+      { etag: '"etag-1"', partNumber: '1' },
+      { etag: '"etag-2"', partNumber: '2' },
+    ]);
+    expect(requests.some(({ method, url }) => method === 'PUT' && !new URL(url).search)).toBe(false);
+  });
+
+  it('reports multipart sync progress in uploaded bytes after each completed part', async () => {
+    const project = createProjectWithLargeMirrorAsset();
+    const largeBytes = new Uint8Array(5 * 1024 * 1024 + 3);
+    const largeBlob = new Blob([largeBytes], {
+      type: 'image/png',
+    });
+    const progressUpdates: Array<{ current: number; label: string; total: number }> = [];
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = getRequestUrl(input);
+      if (url === 'blob:https://localstudio.test/large-asset') {
+        return Promise.resolve(
+          new Response(largeBytes, { headers: { 'content-type': 'image/png' } }),
+        );
+      }
+      const parsedUrl = new URL(url);
+      if (init?.method === 'GET' && url.endsWith('localstudio-mirror.json')) {
+        return Promise.resolve(new Response('', { status: 404 }));
+      }
+      if (init?.method === 'POST' && parsedUrl.searchParams.has('uploads')) {
+        return Promise.resolve(
+          new Response(
+            '<InitiateMultipartUploadResult><UploadId>progress-upload</UploadId></InitiateMultipartUploadResult>',
+          ),
+        );
+      }
+      if (init?.method === 'PUT' && parsedUrl.searchParams.has('partNumber')) {
+        return Promise.resolve(
+          new Response('', {
+            headers: { ETag: `"part-${parsedUrl.searchParams.get('partNumber')}"` },
+          }),
+        );
+      }
+      return Promise.resolve(new Response('', { status: 200 }));
+    });
+    const service = new minioMirrorService.MinioMirrorService({ fetch: fetchMock });
+
+    await service.syncProject(project, new VersionedRepository([], project), config, {
+      onProgress: (progress) => progressUpdates.push(progress),
+    });
+
+    expect(progressUpdates[0]?.total).toBeGreaterThan(largeBlob.size);
+    expect(
+      progressUpdates.some(
+        ({ current, label, total }) =>
+          label === 'Mirroring assets/large-asset.png' &&
+          current >= 5 * 1024 * 1024 &&
+          current < total,
+      ),
+    ).toBe(true);
+    expect(progressUpdates.at(-1)?.current).toBe(progressUpdates.at(-1)?.total);
+  });
+
+  it('retries only the failed multipart part', async () => {
+    const retryDelays: number[] = [];
+    const partAttempts = new Map<string, number>();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(getRequestUrl(input));
+      if (init?.method === 'POST' && url.searchParams.has('uploads')) {
+        return Promise.resolve(
+          new Response(
+            '<InitiateMultipartUploadResult><UploadId>retry-upload</UploadId></InitiateMultipartUploadResult>',
+          ),
+        );
+      }
+      if (init?.method === 'PUT' && url.searchParams.has('partNumber')) {
+        const partNumber = url.searchParams.get('partNumber') ?? '';
+        const attempts = (partAttempts.get(partNumber) ?? 0) + 1;
+        partAttempts.set(partNumber, attempts);
+        return Promise.resolve(
+          new Response('', {
+            headers: attempts > 1 || partNumber === '1' ? { ETag: `"part-${partNumber}"` } : {},
+            status: partNumber === '2' && attempts === 1 ? 503 : 200,
+          }),
+        );
+      }
+      return Promise.resolve(new Response('', { status: 200 }));
+    });
+    const service = new minioMirrorService.MinioMirrorService({
+      fetch: fetchMock,
+      sleep: (delayMs) => {
+        retryDelays.push(delayMs);
+        return Promise.resolve();
+      },
+    });
+
+    await service.uploadPublicObject(
+      'mirrors/retry.mp4',
+      new Blob([new Uint8Array(5 * 1024 * 1024 + 1)], { type: 'video/mp4' }),
+      config,
+    );
+
+    expect(Object.fromEntries(partAttempts)).toEqual({ '1': 1, '2': 2 });
+    expect(retryDelays).toEqual([250]);
+  });
+
+  it('aborts an incomplete multipart upload without hiding the original failure', async () => {
+    const methods: string[] = [];
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(getRequestUrl(input));
+      methods.push(`${init?.method ?? 'GET'}:${url.search}`);
+      if (init?.method === 'POST' && url.searchParams.has('uploads')) {
+        return Promise.resolve(
+          new Response(
+            '<InitiateMultipartUploadResult><UploadId>abort-upload</UploadId></InitiateMultipartUploadResult>',
+          ),
+        );
+      }
+      if (init?.method === 'PUT') return Promise.resolve(new Response('', { status: 200 }));
+      return Promise.resolve(new Response('', { status: 204 }));
+    });
+    const service = new minioMirrorService.MinioMirrorService({ fetch: fetchMock });
+
+    await expect(
+      service.uploadPublicObject(
+        'mirrors/missing-etag.mp4',
+        new Blob([new Uint8Array(5 * 1024 * 1024 + 1)], { type: 'video/mp4' }),
+        config,
+      ),
+    ).rejects.toThrow('Could not upload mirrors/missing-etag.mp4 part 1: missing ETag.');
+    expect(methods).toContain('DELETE:?uploadId=abort-upload');
+  });
+
+  it('retries transient network upload failures with exponential backoff', async () => {
+    const project = sampleProject.createSampleProject();
+    const retryDelays: number[] = [];
+    let projectUploadAttempts = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = getRequestUrl(input);
+      if (init?.method === 'GET' && url.endsWith('localstudio-mirror.json')) {
+        return Promise.resolve(new Response('', { status: 404 }));
+      }
+      if (init?.method === 'PUT' && url.endsWith('/project.json')) {
+        projectUploadAttempts += 1;
+        if (projectUploadAttempts < 3) {
+          return Promise.reject(new TypeError('Failed to fetch'));
+        }
+      }
+      return Promise.resolve(new Response('', { status: 200 }));
+    });
+    const service = new minioMirrorService.MinioMirrorService({
+      fetch: fetchMock,
+      sleep: (delayMs) => {
+        retryDelays.push(delayMs);
+        return Promise.resolve();
+      },
+    });
+
+    await service.syncProject(project, new VersionedRepository([], project), config);
+
+    expect(projectUploadAttempts).toBe(3);
+    expect(retryDelays).toEqual([250, 500]);
+  });
+
+  it('retries retryable upload responses before committing the manifest', async () => {
+    const project = sampleProject.createSampleProject();
+    const retryDelays: number[] = [];
+    let manifestUploadAttempts = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = getRequestUrl(input);
+      if (init?.method === 'GET' && url.endsWith('localstudio-mirror.json')) {
+        return Promise.resolve(new Response('', { status: 404 }));
+      }
+      if (init?.method === 'PUT' && url.endsWith('/localstudio-mirror.json')) {
+        manifestUploadAttempts += 1;
+        return Promise.resolve(
+          new Response('', { status: manifestUploadAttempts === 1 ? 503 : 200 }),
+        );
+      }
+      return Promise.resolve(new Response('', { status: 200 }));
+    });
+    const service = new minioMirrorService.MinioMirrorService({
+      fetch: fetchMock,
+      sleep: (delayMs) => {
+        retryDelays.push(delayMs);
+        return Promise.resolve();
+      },
+    });
+
+    await service.syncProject(project, new VersionedRepository([], project), config);
+
+    expect(manifestUploadAttempts).toBe(2);
+    expect(retryDelays).toEqual([250]);
+  });
+
+  it('reports the object key after network upload retries are exhausted', async () => {
+    const project = sampleProject.createSampleProject();
+    let projectUploadAttempts = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = getRequestUrl(input);
+      if (init?.method === 'GET' && url.endsWith('localstudio-mirror.json')) {
+        return Promise.resolve(new Response('', { status: 404 }));
+      }
+      if (init?.method === 'PUT' && url.endsWith('/project.json')) {
+        projectUploadAttempts += 1;
+        return Promise.reject(new TypeError('Failed to fetch'));
+      }
+      return Promise.resolve(new Response('', { status: 200 }));
+    });
+    const service = new minioMirrorService.MinioMirrorService({
+      fetch: fetchMock,
+      sleep: () => Promise.resolve(),
+    });
+
+    await expect(
+      service.syncProject(project, new VersionedRepository([], project), config),
+    ).rejects.toThrow(/Could not upload mirrors\/.+\/project\.json after 3 attempts: Failed to fetch/);
+    expect(projectUploadAttempts).toBe(3);
   });
 
   it('uses writer credentials when sync checks and uploads mirror files', async () => {
