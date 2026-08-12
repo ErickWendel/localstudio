@@ -15,6 +15,7 @@
     "./session-code": "./src/session-code.ts",
     "./signaling-client": "./src/signaling-client.ts",
     "./signaling-service": "./src/signaling-service.ts",
+    "./stream-size": "./src/stream-size.ts",
     "./timer-format": "./src/timer-format.ts",
     "./webrtc": "./src/webrtc.ts"
   },

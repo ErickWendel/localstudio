@@ -1,6 +1,7 @@
 import type { DesignElement, Page, ProjectDocument } from '../../domain/documents/model';
 import { pageVisibility } from '../../domain/documents/pageVisibility';
 import { presenterRemoteDebugLog } from '@localstudio/presenter-remote/debug-log';
+import { presenterRemoteStreamSize } from '@localstudio/presenter-remote/stream-size';
 import type {
   PresenterRemotePreviewBatch,
   PresenterRemoteSlidePreview,
@@ -70,10 +71,10 @@ function createRemoteStateSkeleton(
     stream: {
       enabled: true,
       fps: 8,
-      height: 340,
+      height: presenterRemoteStreamSize.height,
       peerId: payload.streamPeerId,
       transport: 'peerjs',
-      width: 390,
+      width: presenterRemoteStreamSize.width,
     },
     timer,
     type: 'state',
@@ -140,10 +141,10 @@ function createRemoteState(
     stream: {
       enabled: true,
       fps: 8,
-      height: 340,
+      height: presenterRemoteStreamSize.height,
       peerId: payload.streamPeerId,
       transport: 'peerjs',
-      width: 390,
+      width: presenterRemoteStreamSize.width,
     },
     timer,
     type: 'state',

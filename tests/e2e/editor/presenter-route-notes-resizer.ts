@@ -1,6 +1,7 @@
 import { type Page } from '@playwright/test';
 
 import { expect } from '../support/journey-test';
+import { presenterRouteLayout } from './presenter-route-layout';
 
 export const presenterRouteNotesResizer = {
   async verify(page: Page): Promise<void> {
@@ -12,6 +13,7 @@ export const presenterRouteNotesResizer = {
     await page.keyboard.press('Home');
     await expect(notesResizer).toHaveAttribute('aria-valuenow', '280');
     await page.keyboard.press('End');
+    await presenterRouteLayout.verifyContainedSlide(page);
 
     const resizerBox = await notesResizer.boundingBox();
     expect(resizerBox).not.toBeNull();

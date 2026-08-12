@@ -42,7 +42,7 @@ describe('BrowserPresenterSessionService remote previews', () => {
         notes: project.pages[0]!.speakerNotes ?? '',
         pageCount: project.pages.length,
         previewMode: 'stream',
-        stream: { enabled: true, fps: 8, height: 340, width: 390 },
+        stream: { enabled: true, fps: 8, height: 288, width: 512 },
         type: 'state',
       });
       expect(signalingService.getPublishedState('ABCD-1234')?.slidePreview).toBeDefined();
@@ -443,7 +443,7 @@ describe('BrowserPresenterSessionService remote previews', () => {
     expect(signalingService.getPublishedState('ABCD-1234')).toMatchObject({
       buildsRemaining: 1,
       previewMode: 'stream',
-      stream: { enabled: true, fps: 8, height: 340, width: 390 },
+      stream: { enabled: true, fps: 8, height: 288, width: 512 },
     });
     expect(signalingService.getPublishedState('ABCD-1234')?.slidePreview).toBeDefined();
     expect(JSON.stringify(signalingService.getPublishedState('ABCD-1234'))).not.toContain(
