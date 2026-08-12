@@ -429,6 +429,7 @@ describe('BrowserPresenterSessionService remote previews', () => {
         hiddenElementIds: [hiddenElementId],
         mode: 'presenter',
         pageId: page.id,
+        pendingMediaActionBuildIds: [],
         phase: 'waiting',
         playing: true,
         waitingForClick: true,

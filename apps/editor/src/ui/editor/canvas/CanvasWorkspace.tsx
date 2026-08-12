@@ -87,6 +87,7 @@ interface CanvasWorkspaceProps {
         hiddenElementIds: string[];
         mode?: 'editor' | 'presenter';
         pageId: string;
+        pendingMediaActionBuildIds?: string[];
         phase: 'transition' | 'animation' | 'waiting' | 'complete';
         playbackRunId?: number;
         playing: boolean;
@@ -1046,7 +1047,9 @@ export function CanvasWorkspace({
     return {
       activeBuild,
       hidden: animationPreviewHiddenElementIds.includes(element.id),
-      mediaActionPending: Boolean(mediaActionBuild),
+      mediaActionPending:
+        mediaActionBuild !== undefined &&
+        (animationPreview?.pendingMediaActionBuildIds?.includes(mediaActionBuild.id) ?? true),
       playbackRunId:
         animationPreview?.pageId === activePageId ? animationPreview.playbackRunId : undefined,
       preset: activeBuild

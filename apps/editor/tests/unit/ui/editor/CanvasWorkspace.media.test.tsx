@@ -171,25 +171,25 @@ describe('CanvasWorkspace media elements', () => {
     pauseSpy.mockRestore();
   });
 
-  it('plays movie-start builds during editor animation preview', async () => {
+  it('keeps an automatically started movie playing after its build completes', async () => {
     const playSpy = vi
       .spyOn(HTMLMediaElement.prototype, 'play')
       .mockImplementation(() => Promise.resolve());
     const pauseSpy = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
-    const project = updateVideoElement(createMediaProject(), { startOnClick: true });
+    const project = updateVideoElement(createMediaProject(), { startOnClick: false });
     project.pages[0]!.animationBuilds = [
       {
         id: 'video-build',
         elementId: 'video-demo',
         effect: 'reveal',
-        trigger: 'on-click',
+        trigger: 'after-transition',
         delayMs: 0,
         durationMs: 0,
         mediaAction: 'play',
       },
     ];
 
-    render(
+    const { rerender } = render(
       <CanvasWorkspace
         project={project}
         activePageId="page-1"
@@ -201,6 +201,7 @@ describe('CanvasWorkspace media elements', () => {
           hiddenElementIds: [],
           mode: 'editor',
           pageId: 'page-1',
+          pendingMediaActionBuildIds: ['video-build'],
           phase: 'animation',
           playing: true,
           waitingForClick: false,
@@ -209,6 +210,29 @@ describe('CanvasWorkspace media elements', () => {
     );
 
     await waitFor(() => expect(playSpy).toHaveBeenCalled());
+    pauseSpy.mockClear();
+
+    rerender(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        animationPreview={{
+          activeBuild: undefined,
+          activeBuildElementId: undefined,
+          animationProgress: 1,
+          hiddenElementIds: [],
+          mode: 'editor',
+          pageId: 'page-1',
+          pendingMediaActionBuildIds: [],
+          phase: 'complete',
+          playing: true,
+          waitingForClick: false,
+        }}
+      />,
+    );
+
+    expect(pauseSpy).not.toHaveBeenCalled();
     playSpy.mockRestore();
     pauseSpy.mockRestore();
   });
