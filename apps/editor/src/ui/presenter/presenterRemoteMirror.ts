@@ -1,4 +1,5 @@
 import type { DesignElement, Page, ProjectDocument } from '../../domain/documents/model';
+import { presenterRemoteStreamSize } from '@localstudio/presenter-remote/stream-size';
 import type { AnimationPreviewState } from '../editor/animation/useAnimationPreviewController';
 
 export interface PresenterRemoteMirrorFrame {
@@ -17,7 +18,7 @@ export interface PresenterRemoteMirrorSize {
   width: number;
 }
 
-const mirrorSize = { height: 340, width: 390 };
+const mirrorSize = presenterRemoteStreamSize;
 const mirrorBackground = '#020805';
 const mirrorPanel = '#07120d';
 const imageCache = new Map<string, HTMLImageElement>();
@@ -201,15 +202,15 @@ function renderFrame(canvas: HTMLCanvasElement, frame: PresenterRemoteMirrorFram
   context.scale(width / mirrorSize.width, height / mirrorSize.height);
   context.fillStyle = mirrorBackground;
   context.fillRect(0, 0, mirrorSize.width, mirrorSize.height);
-  const gradient = context.createLinearGradient(0, 0, 0, 180);
+  const gradient = context.createLinearGradient(0, 0, 0, 160);
   gradient.addColorStop(0, 'rgba(55,253,118,0.10)');
   gradient.addColorStop(1, 'rgba(55,253,118,0)');
   context.fillStyle = gradient;
-  context.fillRect(0, 0, mirrorSize.width, 120);
-  roundedRect(context, 8, 8, mirrorSize.width - 16, 330, 2);
+  context.fillRect(0, 0, mirrorSize.width, 128);
+  roundedRect(context, 4, 4, mirrorSize.width - 8, mirrorSize.height - 8, 4);
   context.fillStyle = mirrorPanel;
   context.fill();
-  drawSlide(context, frame, frame.activePage, { height: 306, width: mirrorSize.width - 24, x: 12, y: 20 });
+  drawSlide(context, frame, frame.activePage, { height: 270, width: 480, x: 16, y: 9 });
   context.restore();
 }
 

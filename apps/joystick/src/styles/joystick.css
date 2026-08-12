@@ -172,6 +172,7 @@ input {
 
 .joystick-stream-hit-target {
   width: 100%;
+  height: 100%;
   min-height: 0;
   position: relative;
   display: grid;
@@ -187,6 +188,8 @@ input {
 .joystick-stream-fallback,
 .joystick-stream-video {
   grid-area: 1 / 1;
+  min-width: 0;
+  min-height: 0;
   width: 100%;
   height: 100%;
 }
@@ -502,7 +505,7 @@ input {
 .joystick-slide-bg,
 .joystick-slide-image,
 .joystick-slide-video {
-  object-fit: cover;
+  object-fit: fill;
   pointer-events: none;
 }
 

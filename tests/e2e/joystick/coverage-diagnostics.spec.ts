@@ -104,6 +104,16 @@ test.describe('joystick bundled runtime diagnostics coverage', () => {
     await streamPreview.click({ position: { x: 8, y: 20 } });
     await streamPreview.click({ position: { x: 220, y: 20 } });
     const streamVideo = streamPreview.locator('.joystick-stream-video');
+    const streamPreviewBounds = await streamPreview.boundingBox();
+    const streamVideoBounds = await streamVideo.boundingBox();
+    expect(streamPreviewBounds).not.toBeNull();
+    expect(streamVideoBounds).not.toBeNull();
+    expect(streamVideoBounds!.x + streamVideoBounds!.width).toBeLessThanOrEqual(
+      streamPreviewBounds!.x + streamPreviewBounds!.width + 1,
+    );
+    expect(streamVideoBounds!.y + streamVideoBounds!.height).toBeLessThanOrEqual(
+      streamPreviewBounds!.y + streamPreviewBounds!.height + 1,
+    );
     await streamVideo.dispatchEvent('waiting');
     await streamVideo.dispatchEvent('loadedmetadata');
     await streamVideo.dispatchEvent('canplay');

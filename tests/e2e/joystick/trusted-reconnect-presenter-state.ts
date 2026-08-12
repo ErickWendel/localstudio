@@ -19,6 +19,11 @@ export const trustedReconnectPresenterState = {
     );
     await expect(currentSlidePreview).toBeVisible();
     await expect(currentSlidePreview.getByLabel('Slide video')).toBeVisible();
+    await expect(currentSlidePreview.locator('.joystick-slide-bg')).toHaveCSS('object-fit', 'fill');
+    await expect(currentSlidePreview.locator('.joystick-slide-image').first()).toHaveCSS(
+      'object-fit',
+      'fill',
+    );
     await expect(page.getByRole('button', { name: 'Go to slide 2: Roadmap' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Go to slide 3: Risks' })).toBeVisible();
   },
