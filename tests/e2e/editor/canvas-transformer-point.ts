@@ -9,6 +9,7 @@ async function get(page: Page, point: TransformerPoint) {
 
     const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
     const greenPixels: Array<{ x: number; y: number }> = [];
+    const greenRowBounds = new Map<number, { minimumX: number; maximumX: number }>();
     let minimumX = canvas.width;
     let minimumY = canvas.height;
     let maximumX = -1;
@@ -22,6 +23,11 @@ async function get(page: Page, point: TransformerPoint) {
         const alpha = pixels[offset + 3];
         if (red >= 100 || green <= 200 || blue >= 180 || alpha <= 180) continue;
         greenPixels.push({ x, y });
+        const rowBounds = greenRowBounds.get(y);
+        greenRowBounds.set(y, {
+          minimumX: Math.min(rowBounds?.minimumX ?? x, x),
+          maximumX: Math.max(rowBounds?.maximumX ?? x, x),
+        });
         minimumX = Math.min(minimumX, x);
         minimumY = Math.min(minimumY, y);
         maximumX = Math.max(maximumX, x);
@@ -32,9 +38,17 @@ async function get(page: Page, point: TransformerPoint) {
       throw new Error('Could not find the selected element transformer on the editor canvas');
     }
 
+    const transformerWidth = maximumX - minimumX;
+    const frameBorderRows = Array.from(greenRowBounds.entries())
+      .filter(([, bounds]) => bounds.maximumX - bounds.minimumX >= transformerWidth * 0.8)
+      .map(([y]) => y);
+    if (frameBorderRows.length < 2) {
+      throw new Error('Could not identify the selected element transformer frame borders');
+    }
+
     let canvasPoint = {
       x: (minimumX + maximumX) / 2,
-      y: (minimumY + maximumY) / 2,
+      y: (Math.min(...frameBorderRows) + Math.max(...frameBorderRows)) / 2,
     };
     if (target === 'bottom-right') {
       const handlePixels = greenPixels.filter(
