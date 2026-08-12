@@ -243,25 +243,44 @@ export function CanvasWorkspace({
   >();
   const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
   const activeLayout = page?.layoutId ? project.slideLayouts?.[page.layoutId] : undefined;
-  const layoutVisibleElements =
-    activeLayout?.elementIds
-      .map((id) => activeLayout.elements[id])
-      .filter(canvasWorkspaceUtils.isDesignElement)
-      .filter((element) => element.visible !== false && !element.placeholderRole) ?? [];
-  const layoutVisibleElementIds = new Set(layoutVisibleElements.map((element) => element.id));
-  const sourceVisibleElements =
-    page?.elementIds
-      .map((id) => project.elements[id])
-      .filter(canvasWorkspaceUtils.isDesignElement)
-      .filter((element) => element.visible !== false) ?? [];
-  const getDraftedElement = (element: DesignElement | undefined): DesignElement | undefined => {
-    if (!element || element.type !== 'image' || cropDraft?.elementId !== element.id) return element;
-    return { ...element, ...cropDraft.frame, crop: cropDraft.crop };
-  };
-  const pageVisibleElements = sourceVisibleElements
-    .map((element) => getDraftedElement(element))
-    .filter(canvasWorkspaceUtils.isDesignElement);
-  const visibleElements = [...layoutVisibleElements, ...pageVisibleElements];
+  const layoutVisibleElements = useMemo(
+    () =>
+      activeLayout?.elementIds
+        .map((id) => activeLayout.elements[id])
+        .filter(canvasWorkspaceUtils.isDesignElement)
+        .filter((element) => element.visible !== false && !element.placeholderRole) ?? [],
+    [activeLayout],
+  );
+  const layoutVisibleElementIds = useMemo(
+    () => new Set(layoutVisibleElements.map((element) => element.id)),
+    [layoutVisibleElements],
+  );
+  const sourceVisibleElements = useMemo(
+    () =>
+      page?.elementIds
+        .map((id) => project.elements[id])
+        .filter(canvasWorkspaceUtils.isDesignElement)
+        .filter((element) => element.visible !== false) ?? [],
+    [page, project.elements],
+  );
+  const getDraftedElement = useCallback(
+    (element: DesignElement | undefined): DesignElement | undefined => {
+      if (!element || element.type !== 'image' || cropDraft?.elementId !== element.id) return element;
+      return { ...element, ...cropDraft.frame, crop: cropDraft.crop };
+    },
+    [cropDraft],
+  );
+  const pageVisibleElements = useMemo(
+    () =>
+      sourceVisibleElements
+        .map((element) => getDraftedElement(element))
+        .filter(canvasWorkspaceUtils.isDesignElement),
+    [getDraftedElement, sourceVisibleElements],
+  );
+  const visibleElements = useMemo(
+    () => [...layoutVisibleElements, ...pageVisibleElements],
+    [layoutVisibleElements, pageVisibleElements],
+  );
   const visibleMediaElements = visibleElements.filter(
     (element): element is GifElement | VideoElement =>
       element.type === 'gif' || element.type === 'video',
@@ -415,6 +434,32 @@ export function CanvasWorkspace({
       isMounted = false;
     };
   }, [project.fonts, projectFontSignature, stageRef]);
+
+  useEffect(() => {
+    if (readOnly || fontRenderVersion === 0) return;
+
+    let didResizeSelection = false;
+    selection.elementIds.forEach((elementId) => {
+      const element = project.elements[elementId];
+      const node = nodeRefs.current[elementId];
+      if (element?.type !== 'text' || !node || !('textArr' in node) || !('fontSize' in node)) {
+        return;
+      }
+
+      const textNode = node as Konva.Text;
+      const renderedHeight =
+        textNode.textArr.length * textNode.fontSize() * textNode.lineHeight() +
+        textNode.padding() * 2;
+      if (renderedHeight < 1 || renderedHeight === textNode.height()) return;
+      textNode.height(renderedHeight);
+      didResizeSelection = true;
+    });
+
+    if (didResizeSelection) {
+      transformerRef.current?.forceUpdate();
+      transformerRef.current?.getLayer()?.batchDraw();
+    }
+  }, [fontRenderVersion, project, readOnly, selection.elementIds]);
 
   useEffect(() => {
     if (backgroundSelectionMode || hasProcessingElements) return;

@@ -37,6 +37,7 @@ interface DesignPanelProps {
   onDownloadFont?: (family: string) => Promise<void>;
   onImportLocalFont?: (family: string) => Promise<void>;
   onUpdateElementStyle?: (elementId: string, patch: ElementStylePatch) => void;
+  onUpdateElementStyles?: (elementIds: string[], patch: ElementStylePatch) => void;
   onUpdateElementFrame?: (elementId: string, patch: ElementFramePatch) => void;
   onUpdateTextContent?: (elementId: string, text: string) => void;
   onUpdateMediaPlayback?: (elementId: string, patch: MediaPlaybackPatch) => void;
@@ -90,6 +91,7 @@ export function DesignPanel({
   activePageId,
   selection,
   onUpdateElementStyle,
+  onUpdateElementStyles,
   onUpdateElementFrame,
   onUpdateTextContent,
   onUpdateMediaPlayback,
@@ -120,6 +122,11 @@ export function DesignPanel({
   const [fontDownloadStatus, setFontDownloadStatus] = useState<string | undefined>();
   const page = project.pages.find((item) => item.id === activePageId);
   const selectedElement = getSelectedElement(project, selection);
+  const selectedTextElements = selection.elementIds
+    .map((elementId) => project.elements[elementId])
+    .filter((element): element is Extract<DesignElement, { type: 'text' }> => element?.type === 'text');
+  const allSelectedElementsAreText =
+    selection.elementIds.length > 1 && selectedTextElements.length === selection.elementIds.length;
   const selectionTarget = selection.target ?? (selectedElement ? 'elements' : 'presentation');
   const backgroundColor = page ? getBackgroundColor(page.background) : '#050D10';
   const projectFontFamilies = useMemo(
@@ -157,6 +164,18 @@ export function DesignPanel({
   }, [focusFontControlKey, selectedElement?.type]);
 
   function updateSelectedStyle(patch: Parameters<NonNullable<typeof onUpdateElementStyle>>[1]) {
+    if (allSelectedElementsAreText) {
+      const unlockedTextIds = selectedTextElements
+        .filter((element) => !element.locked)
+        .map((element) => element.id);
+      if (unlockedTextIds.length === 0) return;
+      if (onUpdateElementStyles) {
+        onUpdateElementStyles(unlockedTextIds, patch);
+      } else {
+        unlockedTextIds.forEach((elementId) => onUpdateElementStyle?.(elementId, patch));
+      }
+      return;
+    }
     if (!selectedElement || selectedElement.locked) return;
     onUpdateElementStyle?.(selectedElement.id, patch);
   }
@@ -275,7 +294,35 @@ export function DesignPanel({
         </div>
       </PanelSection>
 
-      {selection.elementIds.length > 1 ? (
+      {allSelectedElementsAreText ? (
+        <ElementDesignInspector
+          key={selectedTextElements[0]?.id}
+          element={selectedTextElements[0]!}
+          onUpdateStyle={updateSelectedStyle}
+          onUpdateMedia={() => undefined}
+          page={page}
+          textStyleControls={{
+            downloadingFontFamily,
+            filteredDownloadableFonts,
+            fontDownloadOpen,
+            fontDownloadStatus,
+            fontFamilyOptions,
+            localFontFamilyOptions,
+            fontSearchInput,
+            fontSearchQuery,
+            fontSelectRef,
+            hasFontDownload: Boolean(onDownloadFont),
+            onApplyFontFamily: applyFontFamily,
+            onDownloadFontFamily: downloadFont,
+            onFontSearchInputChange: (value) => {
+              setFontSearchInput(value);
+              setFontSearchQuery(value.trim());
+            },
+            onFontSearchSubmit: submitFontSearch,
+            onToggleFontDownload: () => setFontDownloadOpen((current) => !current),
+          }}
+        />
+      ) : selection.elementIds.length > 1 ? (
         <PanelSection title="Selection">
           <div className="compact-action design-selection-summary ew-surface ew-surface-hover ew-compact-row">
             <CaseSensitive size={16} />

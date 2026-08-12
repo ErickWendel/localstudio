@@ -28,6 +28,8 @@ interface ScrollingCanvasWorkspaceProps extends CanvasWorkspaceProps {
   onOpenFontPanel?: (() => void) | undefined;
   onTranslatePage?: ((pageId: string) => void) | undefined;
   onUpdateElementStyle?: ((elementId: string, patch: ElementStylePatch) => void) | undefined;
+  onUpdateElementStyles?: ((elementIds: string[], patch: ElementStylePatch) => void) | undefined;
+  onApplyFormat?: ((elementIds: string[], patch: ElementStylePatch) => void) | undefined;
   translatingPageIds?: string[] | undefined;
 }
 
@@ -53,6 +55,8 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
       onOpenFontPanel,
       onTranslatePage,
       onUpdateElementStyle,
+      onUpdateElementStyles,
+      onApplyFormat,
       project,
       translatingPageIds = [],
       ...canvasProps
@@ -65,10 +69,13 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
     const programmaticScrollRef = useRef(false);
     const scrollerRef = useRef<HTMLDivElement>(null);
     const selectedElement = project.elements[canvasProps.selection.elementIds[0] ?? ''];
+    const selectedTextElements = canvasProps.selection.elementIds
+      .map((elementId) => project.elements[elementId])
+      .filter((candidate): candidate is Extract<typeof candidate, { type: 'text' }> => candidate?.type === 'text');
     const showTextToolbar =
       !canvasProps.presentationMode &&
       selectedElement?.type === 'text' &&
-      canvasProps.selection.elementIds.length === 1;
+      selectedTextElements.length === canvasProps.selection.elementIds.length;
     const textToolbarDisabled =
       Boolean(canvasProps.isTranslating) ||
       Boolean(
@@ -151,6 +158,9 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
                 ? { onTranslateSelectedText: canvasProps.onTranslateSelectedText }
                 : {})}
               {...(onUpdateElementStyle ? { onUpdateElementStyle } : {})}
+              {...(onUpdateElementStyles ? { onUpdateElementStyles } : {})}
+              {...(onApplyFormat ? { onApplyFormat } : {})}
+              selectedElementIds={canvasProps.selection.elementIds}
             />
           </div>
         ) : null}

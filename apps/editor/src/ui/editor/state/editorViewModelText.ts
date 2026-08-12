@@ -59,6 +59,25 @@ function updateElementStyle(
   return ensureTextElementMinimumHeight(nextProject, elementId);
 }
 
+function updateElementStyles(project: ProjectDocument, elementIds: string[], patch: ElementStylePatch) {
+  return elementIds.reduce(
+    (currentProject, elementId) => updateElementStyle(currentProject, elementId, patch),
+    project,
+  );
+}
+
+function applyFormatToElements(
+  project: ProjectDocument,
+  elementIds: string[],
+  patch: ElementStylePatch,
+) {
+  return elementIds.reduce(
+    (currentProject, elementId) =>
+      new basicCommands.UpdateElementStyleCommand(elementId, patch).execute(currentProject),
+    project,
+  );
+}
+
 function applyFontFamilyWithFonts(input: {
   elementId: string;
   font: ProjectFont;
@@ -80,8 +99,10 @@ function applyFontFamilyWithFonts(input: {
 
 export const editorViewModelText = {
   applyFontFamilyWithFonts,
+  applyFormatToElements,
   ensureTextElementMinimumHeight,
   getFramePatchWithTextMinimum,
   updateElementStyle,
+  updateElementStyles,
   updateTextContent,
 };

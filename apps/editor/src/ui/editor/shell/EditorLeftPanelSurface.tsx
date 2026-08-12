@@ -49,6 +49,7 @@ export function EditorLeftPanelSurface({
       onSetSelectedElementZOrder={isHistoryReadOnly ? undefined : vm.setSelectedElementZOrder}
       onUpdateElementFrame={isHistoryReadOnly ? undefined : vm.updateElementFrame}
       onUpdateElementStyle={isHistoryReadOnly ? undefined : vm.updateElementStyle}
+      onUpdateElementStyles={isHistoryReadOnly ? undefined : vm.updateElementStyles}
       onUpdateTextContent={isHistoryReadOnly ? undefined : vm.updateTextContent}
       onUpdateMediaPlayback={isHistoryReadOnly ? undefined : vm.updateMediaPlayback}
       onUpdatePageBackground={isHistoryReadOnly ? undefined : vm.updatePageBackground}

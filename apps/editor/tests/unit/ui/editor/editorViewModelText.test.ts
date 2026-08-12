@@ -133,6 +133,30 @@ describe('editor view model text helpers', () => {
     expect(nextProject.elements['text-title']?.height).toBeGreaterThan(96);
   });
 
+  it('preserves text frame geometry when applying paint format', () => {
+    const project = sampleProject.createSampleProject();
+    const originalHeight = project.elements['text-subtitle']!.height;
+
+    const nextProject = editorViewModelText.applyFormatToElements(
+      project,
+      ['text-subtitle'],
+      {
+        fontFamily: 'Orbitron',
+        fontSize: 96,
+        fontWeight: 800,
+        fill: '#37FD76',
+      },
+    );
+
+    expect(nextProject.elements['text-subtitle']).toMatchObject({
+      fontFamily: 'Orbitron',
+      fontSize: 96,
+      fontWeight: 800,
+      fill: '#37FD76',
+      height: originalHeight,
+    });
+  });
+
   it('merges downloaded fonts before applying the selected family', () => {
     const project = sampleProject.createSampleProject();
     const font: ProjectFont = {

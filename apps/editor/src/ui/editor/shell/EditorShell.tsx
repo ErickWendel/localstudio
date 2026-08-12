@@ -831,6 +831,18 @@ function EditorDesktopShell({ services }: EditorShellProps) {
 
   function selectElement(elementId: string, options?: { additive?: boolean }) {
     vm.selectElement(elementId, options);
+    const nextSelection = options?.additive
+      ? vm.selection.elementIds.includes(elementId)
+        ? vm.selection.elementIds.filter((selectedId) => selectedId !== elementId)
+        : [...vm.selection.elementIds, elementId]
+      : [elementId];
+    if (
+      nextSelection.length > 1 &&
+      nextSelection.every((selectedId) => vm.project.elements[selectedId]?.type === 'text')
+    ) {
+      vm.setActiveTab('design');
+      openLeftPanel();
+    }
     if (options?.additive) return;
     if (revealElementsForImagePlaceholder(elementId)) return;
     revealMediaSettingsForElement(elementId);
@@ -1590,6 +1602,8 @@ function EditorDesktopShell({ services }: EditorShellProps) {
             onUpdateElementFrame={isHistoryReadOnly ? undefined : vm.updateElementFrame}
             onUpdateElementFrames={isHistoryReadOnly ? undefined : vm.updateElementFrames}
             onUpdateElementStyle={isHistoryReadOnly ? undefined : vm.updateElementStyle}
+            onUpdateElementStyles={isHistoryReadOnly ? undefined : vm.updateElementStyles}
+            onApplyFormat={isHistoryReadOnly ? undefined : vm.applyFormatToSelection}
             onUpdateTextContent={isHistoryReadOnly ? undefined : vm.updateTextContent}
             onActivePageFromScroll={vm.activateScrolledPage}
             onAddPage={isHistoryReadOnly ? undefined : vm.addPage}

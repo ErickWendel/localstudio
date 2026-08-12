@@ -128,6 +128,7 @@ interface LeftToolPanelProps {
   onSetSelectedElementZOrder?: ((mode: ZOrderMode) => void) | undefined;
   onUpdateElementFrame?: ((elementId: string, patch: ElementFramePatch) => void) | undefined;
   onUpdateElementStyle?: ((elementId: string, patch: ElementStylePatch) => void) | undefined;
+  onUpdateElementStyles?: ((elementIds: string[], patch: ElementStylePatch) => void) | undefined;
   onUpdateTextContent?: ((elementId: string, text: string) => void) | undefined;
   onUpdateMediaPlayback?: ((elementId: string, patch: MediaPlaybackPatch) => void) | undefined;
   onUpdatePageBackground?: ((background: PageBackground) => void) | undefined;
@@ -231,6 +232,7 @@ export function LeftToolPanel({
   onSetSelectedElementZOrder,
   onUpdateElementFrame,
   onUpdateElementStyle,
+  onUpdateElementStyles,
   onUpdateTextContent,
   onUpdateMediaPlayback,
   onUpdatePageBackground,
@@ -369,6 +371,7 @@ export function LeftToolPanel({
             {...(onSetSelectedElementZOrder ? { onSetSelectedElementZOrder } : {})}
             {...(onUpdateElementFrame ? { onUpdateElementFrame } : {})}
             {...(onUpdateElementStyle ? { onUpdateElementStyle } : {})}
+            {...(onUpdateElementStyles ? { onUpdateElementStyles } : {})}
             {...(onUpdateTextContent ? { onUpdateTextContent } : {})}
             {...(onUpdateMediaPlayback ? { onUpdateMediaPlayback } : {})}
             {...(onUpdatePageBackground ? { onUpdatePageBackground } : {})}
