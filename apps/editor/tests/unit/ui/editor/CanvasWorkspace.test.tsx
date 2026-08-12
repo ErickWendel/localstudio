@@ -297,6 +297,12 @@ describe('CanvasWorkspace', () => {
         expect(textNode).not.toBe(initialTextNode);
         expect(textNode!.width()).toBeCloseTo(project.elements['text-title']!.width * 0.4);
         expect(textNode!.height()).toBeGreaterThan(project.elements['text-title']!.height * 0.4);
+        const transformer = stageRef.current?.find('Transformer')[0] as
+          | Konva.Transformer
+          | undefined;
+        expect(transformer).toBeDefined();
+        expect(transformer?.nodes()).toContain(textNode);
+        expect(transformer?.nodes()).not.toContain(initialTextNode);
       });
     } finally {
       if (originalFonts) Object.defineProperty(document, 'fonts', originalFonts);

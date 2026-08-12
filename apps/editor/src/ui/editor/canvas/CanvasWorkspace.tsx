@@ -386,7 +386,7 @@ export function CanvasWorkspace({
       .filter((node): node is Konva.Node => Boolean(node));
     transformerRef.current?.nodes(selectedNodes);
     transformerRef.current?.getLayer()?.batchDraw();
-  }, [selection.elementIds, project]);
+  }, [fontRenderVersion, selection.elementIds, project]);
 
   useEffect(() => {
     const artboard = artboardRef.current;
