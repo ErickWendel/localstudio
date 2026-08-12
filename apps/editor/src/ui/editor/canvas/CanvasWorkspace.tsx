@@ -53,6 +53,14 @@ import { textTranslationLayout } from '../state/text-translation-layout';
 
 const TEXT_FRAME_PADDING = 6;
 
+function getRenderedTextContentHeight(textNode: Konva.Text) {
+  const measurementNode = textNode.clone();
+  measurementNode.setAttr('height', undefined);
+  const height = measurementNode.height();
+  measurementNode.destroy();
+  return height;
+}
+
 interface CanvasWorkspaceProps {
   project: ProjectDocument;
   activePageId: string;
@@ -447,12 +455,11 @@ export function CanvasWorkspace({
       }
 
       const textNode = node as Konva.Text;
-      const renderedHeight =
-        textNode.textArr.length * textNode.fontSize() * textNode.lineHeight() +
-        textNode.padding() * 2;
-      if (renderedHeight < 1 || renderedHeight === textNode.height()) return;
-      textNode.height(renderedHeight);
-      didResizeSelection = true;
+      const renderedHeight = getRenderedTextContentHeight(textNode);
+      if (renderedHeight >= 1 && renderedHeight !== textNode.height()) {
+        textNode.height(renderedHeight);
+        didResizeSelection = true;
+      }
     });
 
     if (didResizeSelection) {

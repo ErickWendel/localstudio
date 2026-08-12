@@ -244,6 +244,66 @@ describe('CanvasWorkspace', () => {
     );
   });
 
+  it('keeps the selected text width constrained to its authored frame after fonts load', async () => {
+    const originalFonts = Object.getOwnPropertyDescriptor(document, 'fonts');
+    Object.defineProperty(document, 'fonts', {
+      configurable: true,
+      value: {
+        load: vi.fn().mockResolvedValue([]),
+        ready: Promise.resolve(),
+      },
+    });
+    const stageRef = createRef<Konva.Stage>();
+    const baseProject = sampleProject.createSampleProject();
+    const titleElement = baseProject.elements['text-title'];
+    if (!titleElement || titleElement.type !== 'text') {
+      throw new Error('Expected the sample project title to be a text element');
+    }
+    const project: ProjectDocument = {
+      ...baseProject,
+      elements: {
+        ...baseProject.elements,
+        'text-title': {
+          ...titleElement,
+          fontSize: 160,
+          height: 50,
+          text: 'Add a heading',
+        },
+      },
+    };
+
+    try {
+      render(
+        <CanvasWorkspace
+          project={project}
+          activePageId="page-1"
+          selection={{ pageId: 'page-1', elementIds: ['text-title'] }}
+          stageRef={stageRef}
+        />,
+      );
+
+      const initialTextNode = stageRef.current
+        ?.find('Text')
+        .find((node) => (node as Konva.Text).text() === 'Add a heading');
+      expect(initialTextNode).toBeDefined();
+
+      await waitFor(() => {
+        const textNode = stageRef.current
+          ?.find('Text')
+          .find((node) => (node as Konva.Text).text() === 'Add a heading') as
+          | Konva.Text
+          | undefined;
+        expect(textNode).toBeDefined();
+        expect(textNode).not.toBe(initialTextNode);
+        expect(textNode!.width()).toBeCloseTo(project.elements['text-title']!.width * 0.4);
+        expect(textNode!.height()).toBeGreaterThan(project.elements['text-title']!.height * 0.4);
+      });
+    } finally {
+      if (originalFonts) Object.defineProperty(document, 'fonts', originalFonts);
+      else Reflect.deleteProperty(document, 'fonts');
+    }
+  });
+
   it('snaps a dragged element to the page vertical center and draws one guide', async () => {
     const onUpdateElementFrame = vi.fn<(elementId: string, patch: ElementFramePatch) => void>();
     const stageRef = createRef<Konva.Stage>();
