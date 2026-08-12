@@ -198,4 +198,55 @@ describe('ScrollingCanvasWorkspace', () => {
       hyperlink: 'https://localstudio.dev',
     });
   });
+
+  it('copies text format and pastes it across a multi-text selection', async () => {
+    const user = userEvent.setup();
+    const onUpdateElementStyles = vi.fn();
+    const onApplyFormat = vi.fn();
+    const { rerender } = render(
+      <ScrollingCanvasWorkspace
+        activePageId="page-1"
+        project={sampleProject.createSampleProject()}
+        selection={{ pageId: 'page-1', elementIds: ['text-title'] }}
+        onUpdateElementStyles={onUpdateElementStyles}
+        onApplyFormat={onApplyFormat}
+      />,
+    );
+
+    const toolbar = screen.getByRole('toolbar', { name: 'Text editing controls' });
+    const formatButton = within(toolbar).getByRole('button', { name: 'Copy format' });
+    expect(formatButton).toHaveAttribute('title', 'Copy format');
+    await user.click(formatButton);
+
+    rerender(
+      <ScrollingCanvasWorkspace
+        activePageId="page-1"
+        project={sampleProject.createSampleProject()}
+        selection={{ pageId: 'page-1', elementIds: ['text-title', 'text-subtitle'] }}
+        onUpdateElementStyles={onUpdateElementStyles}
+        onApplyFormat={onApplyFormat}
+      />,
+    );
+
+    const pasteButton = within(screen.getByRole('toolbar', { name: 'Text editing controls' })).getByRole(
+      'button',
+      { name: 'Paste format' },
+    );
+    expect(pasteButton).toHaveAttribute('title', 'Paste format');
+    await user.click(pasteButton);
+
+    expect(onApplyFormat).toHaveBeenCalledWith(
+      ['text-title', 'text-subtitle'],
+      expect.objectContaining({
+        fontFamily: 'Orbitron',
+        fontSize: 96,
+        fontWeight: 800,
+      }),
+    );
+    expect(
+      within(screen.getByRole('toolbar', { name: 'Text editing controls' })).getByRole('button', {
+        name: 'Copy format',
+      }),
+    ).toBeInTheDocument();
+  });
 });

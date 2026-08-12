@@ -88,6 +88,25 @@ function createProjectWithSelectedText(): ProjectDocument {
   };
 }
 
+function createProjectWithSelectedTexts(): ProjectDocument {
+  const project = createProjectWithSelectedText();
+  const firstText = project.elements['text-test'];
+  if (firstText?.type !== 'text') return project;
+  const secondText: TextElement = {
+    ...firstText,
+    id: 'text-test-2',
+    text: 'Second text',
+    x: 520,
+  };
+  return {
+    ...project,
+    elements: { ...project.elements, [secondText.id]: secondText },
+    pages: project.pages.map((page) =>
+      page.id === 'page-1' ? { ...page, elementIds: [...page.elementIds, secondText.id] } : page,
+    ),
+  };
+}
+
 function createProjectWithImportedTextFont(): ProjectDocument {
   const project = createProjectWithSelectedText();
   const text = project.elements['text-test'];
@@ -470,6 +489,30 @@ describe('DesignPanel', () => {
     fireEvent.change(textContent, { target: { value: 'Updated copy' } });
 
     expect(onUpdateTextContent).toHaveBeenLastCalledWith('text-test', 'Updated copy');
+  });
+
+  it('shows typography controls and applies style changes to every selected text element', () => {
+    const onUpdateElementStyles = vi.fn();
+
+    render(
+      <DesignPanel
+        project={createProjectWithSelectedTexts()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['text-test', 'text-test-2'] }}
+        onUpdateElementStyles={onUpdateElementStyles}
+      />,
+    );
+
+    expect(screen.getByRole('region', { name: 'Selected text controls' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Selected text font size'), { target: { value: '48' } });
+    fireEvent.change(screen.getByLabelText('Selected text color'), { target: { value: '#ff0000' } });
+
+    expect(onUpdateElementStyles).toHaveBeenNthCalledWith(1, ['text-test', 'text-test-2'], {
+      fontSize: 48,
+    });
+    expect(onUpdateElementStyles).toHaveBeenNthCalledWith(2, ['text-test', 'text-test-2'], {
+      fill: '#ff0000',
+    });
   });
 
   it('includes the selected imported font in the font dropdown options', () => {

@@ -12,6 +12,9 @@ interface TextSelectionToolbarProps {
   onOpenFontPanel?: () => void;
   onTranslateSelectedText?: () => void;
   onUpdateElementStyle?: (elementId: string, patch: ElementStylePatch) => void;
+  onUpdateElementStyles?: (elementIds: string[], patch: ElementStylePatch) => void;
+  onApplyFormat?: (elementIds: string[], patch: ElementStylePatch) => void;
+  selectedElementIds?: string[];
 }
 
 const FONT_SIZE_STEP = 4;
@@ -30,6 +33,20 @@ const positioningOptions = [
   { icon: 'align_vertical_bottom', label: 'Center bottom', mode: 'page-bottom-center' as const },
 ];
 
+const formatPaintStyleKeys = [
+  'align',
+  'fill',
+  'fontFamily',
+  'fontSize',
+  'fontWeight',
+  'stroke',
+  'strokeWidth',
+] as const satisfies readonly (keyof ElementStylePatch)[];
+
+function getFormatPaintPatch(element: TextElement): ElementStylePatch {
+  return Object.fromEntries(formatPaintStyleKeys.map((key) => [key, element[key]]));
+}
+
 function normalizeHyperlink(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -46,9 +63,13 @@ export function TextSelectionToolbar({
   onOpenFontPanel,
   onTranslateSelectedText,
   onUpdateElementStyle,
+  onUpdateElementStyles,
+  onApplyFormat,
+  selectedElementIds = [element.id],
 }: TextSelectionToolbarProps) {
   const [showAlignmentMenu, setShowAlignmentMenu] = useState(false);
   const [showLinkEditor, setShowLinkEditor] = useState(false);
+  const [copiedFormat, setCopiedFormat] = useState<ElementStylePatch>();
   const [linkDraft, setLinkDraft] = useState({
     elementId: element.id,
     value: element.hyperlink ?? '',
@@ -127,6 +148,36 @@ export function TextSelectionToolbar({
           }}
         />
       </label>
+
+      <button
+        aria-label={copiedFormat ? 'Paste format' : 'Copy format'}
+        className={copiedFormat ? 'text-toolbar-button text-toolbar-button-active' : 'text-toolbar-button'}
+        disabled={disabled || element.locked}
+        title={copiedFormat ? 'Paste format' : 'Copy format'}
+        type="button"
+        onClick={() => {
+          if (disabled || element.locked) return;
+          if (!copiedFormat) {
+            setCopiedFormat(getFormatPaintPatch(element));
+            return;
+          }
+          if (onApplyFormat) {
+            onApplyFormat(selectedElementIds, copiedFormat);
+            setCopiedFormat(undefined);
+            return;
+          } else if (selectedElementIds.length > 1 && onUpdateElementStyles) {
+            onUpdateElementStyles(selectedElementIds, copiedFormat);
+            setCopiedFormat(undefined);
+            return;
+          }
+          updateStyle(copiedFormat);
+          setCopiedFormat(undefined);
+        }}
+      >
+        <span className="material-symbols-outlined" aria-hidden="true">
+          format_paint
+        </span>
+      </button>
 
       <button
         aria-pressed={isBold}

@@ -2,7 +2,7 @@ import { type Page } from '@playwright/test';
 
 import { EditorAppPage } from '../pages/editor-app.page';
 import { expect } from '../support/journey-test';
-import { canvasBox } from './canvas-box';
+import { canvasTransformerPoint } from './canvas-transformer-point';
 
 export const canvasElementDragFlow = {
   async run(page: Page, baseURL: string): Promise<void> {
@@ -21,17 +21,12 @@ export const canvasElementDragFlow = {
     const rotationInput = page.getByRole('spinbutton', { name: 'Selected element rotation' });
     const startX = Number(await xInput.inputValue());
     const startY = Number(await yInput.inputValue());
-    const startWidth = Number(await widthInput.inputValue());
-    const startHeight = Number(await heightInput.inputValue());
-
     const frame = page.getByTestId('slide-canvas-frame');
-    const box = await canvasBox.get(page);
-    const startClientX = box.x + (startX + startWidth / 2) * (box.width / 1920);
-    const startClientY = box.y + (startY + startHeight / 2) * (box.height / 1080);
+    const dragStart = await canvasTransformerPoint.get(page, 'center');
 
-    await page.mouse.move(startClientX, startClientY);
+    await page.mouse.move(dragStart.x, dragStart.y);
     await page.mouse.down();
-    await page.mouse.move(startClientX + 120, startClientY + 72, { steps: 8 });
+    await page.mouse.move(dragStart.x + 120, dragStart.y + 72, { steps: 8 });
     await page.mouse.up();
 
     await expect.poll(async () => Number(await xInput.inputValue())).toBeGreaterThan(startX + 50);

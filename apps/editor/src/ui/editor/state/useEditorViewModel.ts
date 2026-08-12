@@ -2389,8 +2389,23 @@ export function useEditorViewModel(services: AppServices) {
     );
   }
 
+  function updateElementStyles(elementIds: string[], patch: ElementStylePatch) {
+    commitProject((currentProject) =>
+      editorViewModelText.updateElementStyles(currentProject, elementIds, patch),
+    );
+  }
+
+  function applyFormatToSelection(elementIds: string[], patch: ElementStylePatch) {
+    commitProject((currentProject) =>
+      editorViewModelText.applyFormatToElements(currentProject, elementIds, patch),
+    );
+  }
+
   async function downloadFontForSelection(family: string) {
-    const selectedElementId = selectedElementIdsRef.current[0];
+    const selectedTextElementIds = selectedElementIdsRef.current.filter(
+      (elementId) => projectRef.current.elements[elementId]?.type === 'text',
+    );
+    const selectedElementId = selectedTextElementIds[0];
     if (!selectedElementId) throw new Error('Select a text element before downloading a font.');
     const selectedElement = projectRef.current.elements[selectedElementId];
     if (!selectedElement || selectedElement.type !== 'text') {
@@ -2410,12 +2425,16 @@ export function useEditorViewModel(services: AppServices) {
     }
 
     commitProject((currentProject) => {
-      return editorViewModelText.applyFontFamilyWithFonts({
-        elementId: selectedElementId,
-        font,
-        fonts: result.fonts,
-        project: currentProject,
-      });
+      return selectedTextElementIds.reduce(
+        (projectWithFont, elementId) =>
+          editorViewModelText.applyFontFamilyWithFonts({
+            elementId,
+            font,
+            fonts: result.fonts,
+            project: projectWithFont,
+          }),
+        currentProject,
+      );
     });
     services.analyticsService.capture(postHogEvents.fontDownloaded, {
       family,
@@ -2424,7 +2443,10 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   async function importLocalFontForSelection(family: string) {
-    const selectedElementId = selectedElementIdsRef.current[0];
+    const selectedTextElementIds = selectedElementIdsRef.current.filter(
+      (elementId) => projectRef.current.elements[elementId]?.type === 'text',
+    );
+    const selectedElementId = selectedTextElementIds[0];
     if (!selectedElementId) throw new Error('Select a text element before adding a local font.');
     const selectedElement = projectRef.current.elements[selectedElementId];
     if (!selectedElement || selectedElement.type !== 'text') {
@@ -2443,12 +2465,16 @@ export function useEditorViewModel(services: AppServices) {
 
     await editorViewModelRuntime.loadProjectFonts(result.project, services.fontImportService);
     commitProject((currentProject) => {
-      return editorViewModelText.applyFontFamilyWithFonts({
-        elementId: selectedElementId,
-        font,
-        fonts: result.project.fonts ?? {},
-        project: currentProject,
-      });
+      return selectedTextElementIds.reduce(
+        (projectWithFont, elementId) =>
+          editorViewModelText.applyFontFamilyWithFonts({
+            elementId,
+            font,
+            fonts: result.project.fonts ?? {},
+            project: projectWithFont,
+          }),
+        currentProject,
+      );
     });
     services.analyticsService.capture(postHogEvents.localFontImported, {
       family,
@@ -3766,6 +3792,8 @@ export function useEditorViewModel(services: AppServices) {
     updateElementFrame,
     updateElementFrames,
     updateElementStyle,
+    updateElementStyles,
+    applyFormatToSelection,
     downloadFontForSelection,
     importLocalFontForSelection,
     updateMediaPlayback,
