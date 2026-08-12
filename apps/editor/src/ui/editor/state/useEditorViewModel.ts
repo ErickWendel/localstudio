@@ -3339,10 +3339,15 @@ export function useEditorViewModel(services: AppServices) {
     const elements = page.elementIds
       .map((elementId) => project.elements[elementId])
       .filter((element): element is NonNullable<typeof element> => Boolean(element));
+    const assets = editorViewModelElements.collectClipboardAssets(project, elements);
+    if (page.background.type === 'asset') {
+      const backgroundAsset = project.assets[page.background.assetId];
+      if (backgroundAsset) assets[backgroundAsset.id] = { ...backgroundAsset };
+    }
     return {
       page: { ...page, elementIds: [...page.elementIds] },
       elements: elements.map((element) => ({ ...element })),
-      assets: editorViewModelElements.collectClipboardAssets(project, elements),
+      assets,
     };
   }
 
@@ -3367,10 +3372,30 @@ export function useEditorViewModel(services: AppServices) {
       }
       return nextElement;
     });
+    const animationBuilds = clipboard.page.animationBuilds?.flatMap((build) => {
+      const nextElementId = elementIds.get(build.elementId);
+      if (!nextElementId) return [];
+      return [
+        {
+          ...build,
+          id: createPrefixedId(`${build.id}-slide`),
+          elementId: nextElementId,
+        },
+      ];
+    });
     const page = {
       ...clipboard.page,
       id: pageId,
       elementIds: elements.map((element) => element.id),
+      background:
+        clipboard.page.background.type === 'asset'
+          ? {
+              ...clipboard.page.background,
+              assetId:
+                assetIds.get(clipboard.page.background.assetId) ?? clipboard.page.background.assetId,
+            }
+          : clipboard.page.background,
+      ...(animationBuilds ? { animationBuilds } : {}),
     };
     commitProject(
       (currentProject) => ({
@@ -3380,6 +3405,7 @@ export function useEditorViewModel(services: AppServices) {
           ...Object.fromEntries(elements.map((element) => [element.id, element])),
         },
         assets: { ...currentProject.assets, ...assets },
+        updatedAt: new Date().toISOString(),
       }),
       { activePageId: pageId, selectedElementIds: [] },
     );
