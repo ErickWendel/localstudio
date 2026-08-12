@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ElementStylePatch } from '../../../domain/commands/elements/basicCommands';
 import type { TextElement } from '../../../domain/documents/model';
+import { colorInputValue } from '../panels/design-controls/colorInputValue';
 
 interface TextSelectionToolbarProps {
   disabled?: boolean;
@@ -101,7 +102,7 @@ export function TextSelectionToolbar({
           aria-label="Text color"
           disabled={disabled || element.locked}
           type="color"
-          value={element.fill}
+          value={colorInputValue(element.fill)}
           onChange={(event) => {
             updateStyle({ fill: event.target.value });
           }}
