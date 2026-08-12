@@ -119,7 +119,7 @@ describe('EditorShell clipboard workflows', () => {
       storage: 'file',
     };
     const backgroundAsset = {
-      ...initialProject.assets['asset-hero']!,
+      ...initialProject.assets['asset-hero'],
       fileName: 'background.png',
       id: 'asset-background',
       name: 'Slide background',
