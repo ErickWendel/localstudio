@@ -14,6 +14,7 @@ import type { FontCatalogItem } from '../../../../services/contracts/interfaces'
 import { textStyleOptions } from '../../text/textStyleOptions';
 import { DesignColorField } from '../design-controls/DesignColorField';
 import { DesignSelectField } from '../design-controls/DesignSelectField';
+import { colorInputValue } from '../design-controls/colorInputValue';
 
 export interface TextStyleControls {
   downloadingFontFamily?: string | undefined;
@@ -258,7 +259,7 @@ export function TextStyleInspector({
           <input
             aria-label="Selected text color"
             type="color"
-            value={element.fill}
+            value={colorInputValue(element.fill)}
             onChange={(event) => {
               onUpdateStyle({ fill: event.target.value });
             }}
