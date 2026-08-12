@@ -147,6 +147,9 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
                 ? { onOpenAnimations: canvasProps.onOpenAnimations }
                 : {})}
               {...(onOpenFontPanel ? { onOpenFontPanel } : {})}
+              {...(canvasProps.onAlignSelectedElement
+                ? { onAlignSelectedElement: canvasProps.onAlignSelectedElement }
+                : {})}
               {...(canvasProps.onTranslateSelectedText
                 ? { onTranslateSelectedText: canvasProps.onTranslateSelectedText }
                 : {})}
@@ -201,7 +204,11 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
               />
               {shouldRenderCanvas ? (
                 <div
-                  className={isActive ? 'scroll-page-canvas-shell' : 'scroll-page-canvas-shell scroll-page-canvas-shell-preloaded'}
+                  className={
+                    isActive
+                      ? 'scroll-page-canvas-shell'
+                      : 'scroll-page-canvas-shell scroll-page-canvas-shell-preloaded'
+                  }
                   {...(!isActive ? { 'aria-hidden': true, inert: true } : {})}
                 >
                   <CanvasWorkspace
@@ -304,10 +311,7 @@ function PageHeader({
       >
         Page {index + 1} - {name}
       </button>
-      <div
-        className="scroll-page-actions ew-inline-row-tight"
-        aria-label={`${name} page actions`}
-      >
+      <div className="scroll-page-actions ew-inline-row-tight" aria-label={`${name} page actions`}>
         <IconAction
           disabled={!canMoveUp}
           label={`Move ${name} up`}
