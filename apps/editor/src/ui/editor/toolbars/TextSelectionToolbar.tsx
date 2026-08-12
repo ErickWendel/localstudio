@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import type { ElementStylePatch } from '../../../domain/commands/elements/basicCommands';
+import type { AlignMode, ElementStylePatch } from '../../../domain/commands/elements/basicCommands';
 import type { TextElement } from '../../../domain/documents/model';
+import { colorInputValue } from '../panels/design-controls/colorInputValue';
 
 interface TextSelectionToolbarProps {
   disabled?: boolean;
   canTranslateSelection?: boolean;
   element: TextElement;
+  onAlignSelectedElement?: (mode: AlignMode) => void;
   onOpenAnimations?: () => void;
   onOpenFontPanel?: () => void;
   onTranslateSelectedText?: () => void;
@@ -18,6 +20,18 @@ interface TextSelectionToolbarProps {
 const FONT_SIZE_STEP = 4;
 const REGULAR_WEIGHT = 600;
 const BOLD_WEIGHT = 800;
+const textAlignmentOptions = [
+  { align: 'left' as const, icon: 'format_align_left', label: 'Align text left' },
+  { align: 'center' as const, icon: 'format_align_center', label: 'Align text center' },
+  { align: 'right' as const, icon: 'format_align_right', label: 'Align text right' },
+];
+const positioningOptions = [
+  { icon: 'align_horizontal_left', label: 'Center left', mode: 'page-left-center' as const },
+  { icon: 'align_horizontal_center', label: 'Center', mode: 'page-center' as const },
+  { icon: 'align_horizontal_right', label: 'Center right', mode: 'page-right-center' as const },
+  { icon: 'align_vertical_top', label: 'Center top', mode: 'page-top-center' as const },
+  { icon: 'align_vertical_bottom', label: 'Center bottom', mode: 'page-bottom-center' as const },
+];
 
 const formatPaintStyleKeys = [
   'align',
@@ -44,6 +58,7 @@ export function TextSelectionToolbar({
   disabled = false,
   canTranslateSelection = false,
   element,
+  onAlignSelectedElement,
   onOpenAnimations,
   onOpenFontPanel,
   onTranslateSelectedText,
@@ -52,10 +67,15 @@ export function TextSelectionToolbar({
   onApplyFormat,
   selectedElementIds = [element.id],
 }: TextSelectionToolbarProps) {
+  const [showAlignmentMenu, setShowAlignmentMenu] = useState(false);
   const [showLinkEditor, setShowLinkEditor] = useState(false);
   const [copiedFormat, setCopiedFormat] = useState<ElementStylePatch>();
-  const [linkDraft, setLinkDraft] = useState({ elementId: element.id, value: element.hyperlink ?? '' });
-  const linkValue = linkDraft.elementId === element.id ? linkDraft.value : (element.hyperlink ?? '');
+  const [linkDraft, setLinkDraft] = useState({
+    elementId: element.id,
+    value: element.hyperlink ?? '',
+  });
+  const linkValue =
+    linkDraft.elementId === element.id ? linkDraft.value : (element.hyperlink ?? '');
 
   function updateStyle(patch: ElementStylePatch) {
     if (disabled || element.locked) return;
@@ -122,7 +142,7 @@ export function TextSelectionToolbar({
           aria-label="Text color"
           disabled={disabled || element.locked}
           type="color"
-          value={element.fill}
+          value={colorInputValue(element.fill)}
           onChange={(event) => {
             updateStyle({ fill: event.target.value });
           }}
@@ -174,32 +194,86 @@ export function TextSelectionToolbar({
         B
       </button>
 
-      <div className="text-toolbar-segment" aria-label="Text alignment">
-        {(['left', 'center', 'right'] as const).map((align) => (
-          <button
-            key={align}
-            aria-label={`Align text ${align}`}
-            aria-pressed={element.align === align}
-            className={
-              element.align === align
-                ? 'text-toolbar-button text-toolbar-button-active'
-                : 'text-toolbar-button'
-            }
-            disabled={disabled || element.locked}
-            type="button"
-            onClick={() => {
-              updateStyle({ align });
-            }}
+      <div className="text-toolbar-alignment">
+        <button
+          aria-expanded={showAlignmentMenu}
+          aria-haspopup="menu"
+          aria-label="Text alignment menu"
+          className={
+            showAlignmentMenu || element.align !== 'left'
+              ? 'text-toolbar-button text-toolbar-button-active'
+              : 'text-toolbar-button'
+          }
+          disabled={disabled || element.locked}
+          title="Align text"
+          type="button"
+          onClick={() => {
+            if (disabled || element.locked) return;
+            setShowAlignmentMenu((current) => !current);
+          }}
+        >
+          <span className="material-symbols-outlined" aria-hidden="true">
+            {element.align === 'center'
+              ? 'format_align_center'
+              : element.align === 'right'
+                ? 'format_align_right'
+                : 'format_align_left'}
+          </span>
+          <span
+            className="material-symbols-outlined text-toolbar-alignment-caret"
+            aria-hidden="true"
           >
-            <span className="material-symbols-outlined" aria-hidden="true">
-              {align === 'left'
-                ? 'format_align_left'
-                : align === 'center'
-                  ? 'format_align_center'
-                  : 'format_align_right'}
-            </span>
-          </button>
-        ))}
+            expand_more
+          </span>
+        </button>
+        {showAlignmentMenu ? (
+          <div className="text-toolbar-alignment-menu" role="menu" aria-label="Text alignment">
+            {textAlignmentOptions.map((option) => (
+              <button
+                key={option.align}
+                aria-label={option.label}
+                aria-pressed={element.align === option.align}
+                className="text-toolbar-alignment-option"
+                disabled={disabled || element.locked}
+                title={option.label}
+                type="button"
+                onClick={() => {
+                  updateStyle({ align: option.align });
+                  setShowAlignmentMenu(false);
+                }}
+              >
+                <span className="material-symbols-outlined" aria-hidden="true">
+                  {option.icon}
+                </span>
+                <span>{option.label}</span>
+              </button>
+            ))}
+            {onAlignSelectedElement ? (
+              <>
+                <div className="text-toolbar-alignment-divider" role="separator" />
+                {positioningOptions.map((option) => (
+                  <button
+                    key={option.mode}
+                    aria-label={option.label}
+                    className="text-toolbar-alignment-option"
+                    disabled={disabled || element.locked}
+                    title={option.label}
+                    type="button"
+                    onClick={() => {
+                      onAlignSelectedElement(option.mode);
+                      setShowAlignmentMenu(false);
+                    }}
+                  >
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      {option.icon}
+                    </span>
+                    <span>{option.label}</span>
+                  </button>
+                ))}
+              </>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <button

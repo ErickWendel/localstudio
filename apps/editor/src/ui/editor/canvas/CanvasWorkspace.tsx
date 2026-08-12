@@ -53,8 +53,8 @@ import { textTranslationLayout } from '../state/text-translation-layout';
 
 const TEXT_FRAME_PADDING = 6;
 
-function getRenderedTextContentHeight(textNode: Konva.Text) {
-  const measurementNode = textNode.clone();
+function getRenderedTextContentHeight(textNode: Konva.Text): number {
+  const measurementNode = textNode.clone() as Konva.Text;
   measurementNode.setAttr('height', undefined);
   const height = measurementNode.height();
   measurementNode.destroy();

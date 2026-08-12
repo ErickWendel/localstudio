@@ -1,11 +1,13 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
+import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 import { EditorShell } from '../../../../src/ui/editor/shell/EditorShell';
 import { editorShellTestHarness } from './EditorShell.test-harness';
 
 const {
   SavingProjectRepository,
+  RecordingMirrorService,
   createAppServices,
   createClipboardData,
   openLeftTab,
@@ -107,6 +109,91 @@ describe('EditorShell clipboard workflows', () => {
     );
   });
 
+  it('persists and mirrors a whole slide pasted from the system clipboard', async () => {
+    const user = userEvent.setup();
+    const initialProject = sampleProject.createSampleProject();
+    initialProject.assets['asset-hero'] = {
+      ...initialProject.assets['asset-hero']!,
+      fileName: 'hero.png',
+      objectUrl: 'data:image/png;base64,aGVyby1ieXRlcw==',
+      storage: 'file',
+    };
+    const backgroundAsset = {
+      ...initialProject.assets['asset-hero'],
+      fileName: 'background.png',
+      id: 'asset-background',
+      name: 'Slide background',
+    };
+    initialProject.assets[backgroundAsset.id] = backgroundAsset;
+    initialProject.pages[0] = {
+      ...initialProject.pages[0]!,
+      animationBuilds: [
+        {
+          id: 'build-image-hero',
+          elementId: 'image-hero',
+          effect: 'reveal',
+          trigger: 'on-click',
+          delayMs: 0,
+        },
+      ],
+      background: {
+        type: 'asset',
+        assetId: backgroundAsset.id,
+        colorFallback: '#050D10',
+      },
+    };
+    const services = createAppServices({ initialProject, skipStoredProjectLoad: true });
+    const repository = new SavingProjectRepository();
+    const mirrorService = new RecordingMirrorService();
+    services.projectRepository = repository;
+    services.mirrorService = mirrorService;
+    const writeText = vi.fn<(text: string) => Promise<void>>(() => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<EditorShell services={services} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Mirror Now' }));
+    await waitFor(() => expect(mirrorService.syncProject).toHaveBeenCalledTimes(1));
+    mirrorService.syncProject.mockClear();
+
+    await user.click(screen.getByRole('button', { name: 'Copy Slide 1 to clipboard' }));
+    const copiedText = writeText.mock.calls[0]?.[0];
+    expect(copiedText).toContain('asset-background');
+
+    fireEvent.paste(window, {
+      clipboardData: {
+        getData: (type: string) => (type === 'text/plain' ? copiedText : ''),
+      },
+    });
+
+    await waitFor(() => {
+      const savedProject = repository.savedProjects.at(-1);
+      const pastedPage = savedProject?.pages[1];
+      expect(savedProject?.updatedAt).not.toBe(initialProject.updatedAt);
+      expect(pastedPage?.background).toMatchObject({ type: 'asset' });
+      if (pastedPage?.background.type !== 'asset') throw new Error('Expected an asset background.');
+      expect(pastedPage.background.assetId).not.toBe('asset-background');
+      expect(savedProject?.assets[pastedPage.background.assetId]).toMatchObject({
+        objectUrl: backgroundAsset.objectUrl,
+      });
+      expect(savedProject?.assets[pastedPage.background.assetId]).not.toHaveProperty('fileName');
+      expect(savedProject?.assets[pastedPage.background.assetId]).not.toHaveProperty('storage');
+      expect(pastedPage.animationBuilds?.[0]?.elementId).toBe(pastedPage.elementIds[0]);
+      expect(pastedPage.animationBuilds?.[0]?.id).not.toBe('build-image-hero');
+    });
+    await waitFor(() => {
+      expect(mirrorService.syncProject).toHaveBeenCalledTimes(1);
+    });
+    const syncedProject = mirrorService.syncProject.mock.calls[0]?.[0];
+    expect(syncedProject?.pages).toHaveLength(2);
+  });
+
   it('does not overwrite copied text when an editable field is active with a selected object', async () => {
     const user = userEvent.setup();
     render(<EditorShell services={createAppServices()} />);
@@ -199,6 +286,4 @@ describe('EditorShell clipboard workflows', () => {
       'true',
     );
   });
-
-
 });

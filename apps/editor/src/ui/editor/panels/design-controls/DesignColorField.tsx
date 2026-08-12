@@ -1,3 +1,5 @@
+import { colorInputValue } from './colorInputValue';
+
 interface DesignColorFieldProps {
   ariaLabel: string;
   className?: string | undefined;
@@ -19,7 +21,7 @@ export function DesignColorField({
       <input
         aria-label={ariaLabel}
         type="color"
-        value={value}
+        value={colorInputValue(value)}
         onChange={(event) => {
           onChange(event.target.value);
         }}

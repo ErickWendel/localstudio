@@ -135,6 +135,7 @@ describe('ScrollingCanvasWorkspace', () => {
     const onOpenFontPanel = vi.fn();
     const onTranslateSelectedText = vi.fn();
     const onUpdateElementStyle = vi.fn();
+    const onAlignSelectedElement = vi.fn();
 
     render(
       <ScrollingCanvasWorkspace
@@ -144,6 +145,7 @@ describe('ScrollingCanvasWorkspace', () => {
         canTranslateSelection
         onOpenAnimations={onOpenAnimations}
         onOpenFontPanel={onOpenFontPanel}
+        onAlignSelectedElement={onAlignSelectedElement}
         onTranslateSelectedText={onTranslateSelectedText}
         onUpdateElementStyle={onUpdateElementStyle}
       />,
@@ -179,8 +181,14 @@ describe('ScrollingCanvasWorkspace', () => {
     );
     expect(onTranslateSelectedText).toHaveBeenCalledTimes(1);
 
+    await user.click(screen.getByRole('button', { name: 'Text alignment menu' }));
+    expect(screen.getByRole('menu', { name: 'Text alignment' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Align text left' }));
     expect(onUpdateElementStyle).toHaveBeenCalledWith('text-subtitle', { align: 'left' });
+
+    await user.click(screen.getByRole('button', { name: 'Text alignment menu' }));
+    await user.click(screen.getByRole('button', { name: 'Center left' }));
+    expect(onAlignSelectedElement).toHaveBeenCalledWith('page-left-center');
 
     await user.click(screen.getByRole('button', { name: 'Edit text hyperlink' }));
     await user.clear(screen.getByRole('textbox', { name: 'Text hyperlink URL' }));
