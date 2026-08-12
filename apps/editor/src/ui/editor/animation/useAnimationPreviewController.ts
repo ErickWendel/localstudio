@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { ElementAnimationBuild, ProjectDocument } from '../../../domain/documents/model';
 import { pageVisibility } from '../../../domain/documents/pageVisibility';
+import { animationPlaybackTiming } from './animationPlaybackTiming';
 
 export interface AnimationPreviewState {
   activeBuild: ElementAnimationBuild | undefined;
@@ -9,6 +10,7 @@ export interface AnimationPreviewState {
   hiddenElementIds: string[];
   mode: 'editor' | 'presenter';
   pageId: string;
+  pendingMediaActionBuildIds: string[];
   phase: 'transition' | 'animation' | 'waiting' | 'complete';
   playbackRunId?: number;
   playing: boolean;
@@ -21,12 +23,6 @@ interface AnimationPreviewControllerOptions {
   projectRef: MutableRefObject<ProjectDocument>;
   setActivePageId: (pageId: string) => void;
   setSelectedElementIds: (elementIds: string[]) => void;
-}
-
-function getBuildPlaybackDurationMs(build: ElementAnimationBuild) {
-  const durationMs = Math.max(0, build.durationMs ?? build.delayMs);
-  if (build.mediaAction === 'play') return Math.max(75, durationMs);
-  return durationMs;
 }
 
 export function useAnimationPreviewController({
@@ -75,6 +71,7 @@ export function useAnimationPreviewController({
             activeBuildElementId: undefined,
             animationProgress: 1,
             hiddenElementIds: [],
+            pendingMediaActionBuildIds: [],
             phase: 'complete',
             waitingForClick: false,
           }
@@ -100,7 +97,7 @@ export function useAnimationPreviewController({
   }
 
   function animateActiveBuild(build: ElementAnimationBuild) {
-    const durationMs = getBuildPlaybackDurationMs(build);
+    const durationMs = animationPlaybackTiming.getBuildDurationMs(build);
     const startMs = window.performance.now();
     if (animationPreviewFrameRef.current !== undefined) {
       window.cancelAnimationFrame(animationPreviewFrameRef.current);
@@ -114,6 +111,9 @@ export function useAnimationPreviewController({
             activeBuild: build,
             activeBuildElementId: build.elementId,
             animationProgress: durationMs === 0 ? 1 : 0,
+            pendingMediaActionBuildIds: current.pendingMediaActionBuildIds.filter(
+              (buildId) => buildId !== build.id,
+            ),
             phase: 'animation',
             waitingForClick: false,
           }
@@ -170,7 +170,7 @@ export function useAnimationPreviewController({
     scheduleAnimationPreview(() => {
       revealAnimationBuild(nextBuild);
       runNextAnimationBuild();
-    }, getBuildPlaybackDurationMs(nextBuild));
+    }, animationPlaybackTiming.getBuildDurationMs(nextBuild));
   }
 
   function advanceAnimationPreview() {
@@ -184,7 +184,7 @@ export function useAnimationPreviewController({
     scheduleAnimationPreview(() => {
       revealAnimationBuild(nextBuild);
       runNextAnimationBuild();
-    }, getBuildPlaybackDurationMs(nextBuild));
+    }, animationPlaybackTiming.getBuildDurationMs(nextBuild));
   }
 
   function playAnimationPreview(
@@ -210,6 +210,9 @@ export function useAnimationPreviewController({
         .map((build) => build.elementId),
       mode,
       pageId: page.id,
+      pendingMediaActionBuildIds: builds
+        .filter((build) => build.mediaAction === 'play')
+        .map((build) => build.id),
       phase: transitionDelay > 0 ? 'transition' : builds.length > 0 ? 'animation' : 'complete',
       playbackRunId: animationPreviewRunIdRef.current,
       playing: true,
@@ -297,6 +300,10 @@ export function useAnimationPreviewController({
               .slice(targetBuildIndex)
               .filter((build) => build.mediaAction !== 'play')
               .map((build) => build.elementId),
+            pendingMediaActionBuildIds: builds
+              .slice(targetBuildIndex)
+              .filter((build) => build.mediaAction === 'play')
+              .map((build) => build.id),
             phase: 'waiting',
             waitingForClick: true,
           }

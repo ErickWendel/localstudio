@@ -39,6 +39,7 @@ import {
 } from '../components/KeyboardShortcutsDialog';
 import { isKeyboardShortcutEditableTarget } from '../components/isKeyboardShortcutEditableTarget';
 import { CanvasWorkspace } from '../editor/canvas/CanvasWorkspace';
+import { animationPlaybackTiming } from '../editor/animation/animationPlaybackTiming';
 import { ProjectVideoPreloader } from '../editor/media/ProjectVideoPreloader';
 import {
   presentationMovieControls,
@@ -70,6 +71,7 @@ interface AnimationPreviewState {
   hiddenElementIds: string[];
   mode: 'presenter';
   pageId: string;
+  pendingMediaActionBuildIds: string[];
   phase: 'transition' | 'animation' | 'waiting' | 'complete';
   playing: boolean;
   waitingForClick: boolean;
@@ -357,10 +359,6 @@ function getTranscriptSegmentPageIndex(
   segmentIndex: number,
 ) {
   return resolveTranscriptSegmentPageIndex(segment, pages, segmentIndex) ?? 0;
-}
-
-function getBuildPlaybackDurationMs(build: ElementAnimationBuild) {
-  return Math.max(0, build.durationMs ?? build.delayMs);
 }
 
 function hasFinishedAssetPreload(loaded: number, total: number) {
@@ -1630,6 +1628,7 @@ export function PublicDeckViewer({
             activeBuildElementId: undefined,
             animationProgress: 1,
             hiddenElementIds: [],
+            pendingMediaActionBuildIds: [],
             phase: 'complete',
             waitingForClick: false,
           }
@@ -1655,7 +1654,7 @@ export function PublicDeckViewer({
   }, []);
 
   const animateActiveBuild = useCallback((build: ElementAnimationBuild) => {
-    const durationMs = getBuildPlaybackDurationMs(build);
+    const durationMs = animationPlaybackTiming.getBuildDurationMs(build);
     const startMs = window.performance.now();
     if (animationFrameRef.current !== undefined) {
       window.cancelAnimationFrame(animationFrameRef.current);
@@ -1669,6 +1668,9 @@ export function PublicDeckViewer({
             activeBuild: build,
             activeBuildElementId: build.elementId,
             animationProgress: durationMs === 0 ? 1 : 0,
+            pendingMediaActionBuildIds: current.pendingMediaActionBuildIds.filter(
+              (buildId) => buildId !== build.id,
+            ),
             phase: 'animation',
             waitingForClick: false,
           }
@@ -1725,7 +1727,7 @@ export function PublicDeckViewer({
     scheduleAnimation(() => {
       revealAnimationBuild(nextBuild);
       runNextAnimationBuildRef.current();
-    }, getBuildPlaybackDurationMs(nextBuild));
+    }, animationPlaybackTiming.getBuildDurationMs(nextBuild));
   }, [animateActiveBuild, completeAnimationSlide, revealAnimationBuild, scheduleAnimation]);
   useEffect(() => {
     runNextAnimationBuildRef.current = runNextAnimationBuild;
@@ -1742,7 +1744,7 @@ export function PublicDeckViewer({
     scheduleAnimation(() => {
       revealAnimationBuild(nextBuild);
       runNextAnimationBuild();
-    }, getBuildPlaybackDurationMs(nextBuild));
+    }, animationPlaybackTiming.getBuildDurationMs(nextBuild));
   }, [
     animateActiveBuild,
     completeAnimationSlide,
@@ -1771,6 +1773,9 @@ export function PublicDeckViewer({
           .map((build) => build.elementId),
         mode: 'presenter',
         pageId: page.id,
+        pendingMediaActionBuildIds: builds
+          .filter((build) => build.mediaAction === 'play')
+          .map((build) => build.id),
         phase: transitionDelay > 0 ? 'transition' : builds.length > 0 ? 'animation' : 'complete',
         playing: true,
         waitingForClick: false,

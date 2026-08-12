@@ -39,7 +39,7 @@ test.describe('public deck media playback journey', () => {
     };
     payload.project.elements['video-public'] = {
       assetId: 'asset-public-video',
-      autoplayInPreview: false,
+      autoplayInPreview: true,
       controls: true,
       height: 405,
       id: 'video-public',
@@ -105,6 +105,18 @@ test.describe('public deck media playback journey', () => {
     };
     payload.project.pages[0].elementIds.push('image-public');
     payload.project.pages[1].elementIds.push('video-public', 'gif-public');
+    payload.project.pages[1].transition = { delayMs: 100, effect: 'fade' };
+    payload.project.pages[1].animationBuilds = [
+      {
+        delayMs: 0,
+        durationMs: 0,
+        effect: 'reveal',
+        elementId: 'video-public',
+        id: 'video-public-play',
+        mediaAction: 'play',
+        trigger: 'after-transition',
+      },
+    ];
 
     await page.route('**/e2e-share-with-video.json', async (route) => {
       await route.fulfill({ contentType: 'application/json', json: payload });
@@ -154,15 +166,14 @@ test.describe('public deck media playback journey', () => {
     const gif = page.locator('img[aria-label="Public animated loop"]');
     await expect(gif).toBeVisible();
     await expect(gif).toHaveAttribute('src', /e2e-public-loop\.png/);
+    await expect(page.getByTestId('slide-canvas-frame')).toHaveAttribute(
+      'data-animation-preview-phase',
+      'complete',
+    );
+    await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.paused)).toBe(false);
+    const playbackTime = await video.evaluate((node: HTMLVideoElement) => node.currentTime);
     await expect
-      .poll(() =>
-        video.evaluate((node: HTMLVideoElement) =>
-          node.play().then(
-            () => !node.paused,
-            () => false,
-          ),
-        ),
-      )
-      .toBe(true);
+      .poll(() => video.evaluate((node: HTMLVideoElement) => node.currentTime))
+      .toBeGreaterThan(playbackTime);
   });
 });
