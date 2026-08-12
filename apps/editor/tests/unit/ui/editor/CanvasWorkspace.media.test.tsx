@@ -1,4 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { createRef } from 'react';
+import type Konva from 'konva';
 import { vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
 import { CanvasWorkspace } from '../../../../src/ui/editor/canvas/CanvasWorkspace';
@@ -75,6 +77,31 @@ describe('CanvasWorkspace media elements', () => {
     expect(previewVideo.preload).toBe('auto');
     expect(previewVideo.dataset.trimStart).toBe('2');
     expect(previewVideo.dataset.trimEnd).toBe('6');
+  });
+
+  it('renders video frames inside the Konva element stack so later images can cover them', async () => {
+    const stageRef = createRef<Konva.Stage>();
+    const project = createMediaProject();
+    project.pages[0]!.elementIds = ['video-demo', 'image-hero'];
+    const { container } = render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        stageRef={stageRef}
+      />,
+    );
+
+    const video = container.querySelector('video[aria-label="Demo clip"]') as HTMLVideoElement;
+
+    await waitFor(() => {
+      const videoNode = stageRef.current
+        ?.find('Image')
+        .find((node) => (node as Konva.Image).image() === video);
+      expect(videoNode).toBeDefined();
+      expect(videoNode?.getZIndex()).toBe(1);
+      expect(videoNode?.getLayer()?.getChildren()[2]).not.toBe(videoNode);
+    });
   });
 
   it('plays start-on-click videos when their animation build becomes active', async () => {
