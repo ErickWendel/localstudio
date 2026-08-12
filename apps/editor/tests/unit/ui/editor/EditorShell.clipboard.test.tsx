@@ -112,8 +112,15 @@ describe('EditorShell clipboard workflows', () => {
   it('persists and mirrors a whole slide pasted from the system clipboard', async () => {
     const user = userEvent.setup();
     const initialProject = sampleProject.createSampleProject();
+    initialProject.assets['asset-hero'] = {
+      ...initialProject.assets['asset-hero']!,
+      fileName: 'hero.png',
+      objectUrl: 'data:image/png;base64,aGVyby1ieXRlcw==',
+      storage: 'file',
+    };
     const backgroundAsset = {
       ...initialProject.assets['asset-hero']!,
+      fileName: 'background.png',
       id: 'asset-background',
       name: 'Slide background',
     };
@@ -172,7 +179,11 @@ describe('EditorShell clipboard workflows', () => {
       expect(pastedPage?.background).toMatchObject({ type: 'asset' });
       if (pastedPage?.background.type !== 'asset') throw new Error('Expected an asset background.');
       expect(pastedPage.background.assetId).not.toBe('asset-background');
-      expect(savedProject?.assets[pastedPage.background.assetId]).toBeDefined();
+      expect(savedProject?.assets[pastedPage.background.assetId]).toMatchObject({
+        objectUrl: backgroundAsset.objectUrl,
+      });
+      expect(savedProject?.assets[pastedPage.background.assetId]).not.toHaveProperty('fileName');
+      expect(savedProject?.assets[pastedPage.background.assetId]).not.toHaveProperty('storage');
       expect(pastedPage.animationBuilds?.[0]?.elementId).toBe(pastedPage.elementIds[0]);
       expect(pastedPage.animationBuilds?.[0]?.id).not.toBe('build-image-hero');
     });
@@ -275,6 +286,4 @@ describe('EditorShell clipboard workflows', () => {
       'true',
     );
   });
-
-
 });

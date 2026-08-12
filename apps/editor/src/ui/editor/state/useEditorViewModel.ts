@@ -3359,6 +3359,12 @@ export function useEditorViewModel(services: AppServices) {
       Object.entries(clipboard.assets).map(([assetId, asset]) => {
         const nextAssetId = createPrefixedId(`${assetId}-slide`);
         assetIds.set(assetId, nextAssetId);
+        if (asset.storage === 'file' && /^(?:blob|data):/.test(asset.objectUrl ?? '')) {
+          const { fileName, storage, ...transferableAsset } = asset;
+          void fileName;
+          void storage;
+          return [nextAssetId, { ...transferableAsset, id: nextAssetId }];
+        }
         return [nextAssetId, { ...asset, id: nextAssetId }];
       }),
     );
@@ -3392,7 +3398,8 @@ export function useEditorViewModel(services: AppServices) {
           ? {
               ...clipboard.page.background,
               assetId:
-                assetIds.get(clipboard.page.background.assetId) ?? clipboard.page.background.assetId,
+                assetIds.get(clipboard.page.background.assetId) ??
+                clipboard.page.background.assetId,
             }
           : clipboard.page.background,
       ...(animationBuilds ? { animationBuilds } : {}),
