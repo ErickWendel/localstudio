@@ -29,6 +29,7 @@ function CanvasVideoElement({
   opacity,
   previewMode,
   scale,
+  onMediaElementChange,
 }: {
   animationState: ElementAnimationRenderState;
   assetName: string;
@@ -38,6 +39,10 @@ function CanvasVideoElement({
   opacity: number;
   previewMode: boolean;
   scale: { x: number; y: number };
+  onMediaElementChange: (
+    elementId: string,
+    media: HTMLImageElement | HTMLVideoElement | null,
+  ) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const reverseIntervalRef = useRef<number | undefined>(undefined);
@@ -58,6 +63,13 @@ function CanvasVideoElement({
     !element.startOnClick &&
     !animationState.hidden &&
     !animationState.mediaActionPending;
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    onMediaElementChange(element.id, video);
+    return () => onMediaElementChange(element.id, null);
+  }, [element.id, onMediaElementChange]);
 
   function stopReversePlayback() {
     if (reverseIntervalRef.current === undefined) return;
@@ -259,6 +271,57 @@ function CanvasVideoElement({
   );
 }
 
+function CanvasGifElement({
+  animationState,
+  assetName,
+  assetUrl,
+  element,
+  interactive,
+  opacity,
+  previewMode,
+  scale,
+  onMediaElementChange,
+}: {
+  animationState: ElementAnimationRenderState;
+  assetName: string;
+  assetUrl: string | undefined;
+  element: GifElement;
+  interactive: boolean;
+  opacity: number;
+  previewMode: boolean;
+  scale: { x: number; y: number };
+  onMediaElementChange: (
+    elementId: string,
+    media: HTMLImageElement | HTMLVideoElement | null,
+  ) => void;
+}) {
+  const imageRef = useRef<HTMLImageElement>(null);
+  const shouldPlayGif =
+    element.playing &&
+    (!previewMode || !animationState.hidden || Boolean(animationState.activeBuild));
+  const gifPlaybackKey = animationState.activeBuild
+    ? `${element.id}-${animationState.playbackRunId ?? 'static'}-${animationState.activeBuild.id}`
+    : `${element.id}-${animationState.playbackRunId ?? 'static'}-${shouldPlayGif ? 'playing' : 'hidden'}`;
+
+  useEffect(() => {
+    const image = imageRef.current;
+    if (!image) return;
+    onMediaElementChange(element.id, image);
+    return () => onMediaElementChange(element.id, null);
+  }, [element.id, gifPlaybackKey, onMediaElementChange]);
+
+  return (
+    <img
+      aria-label={assetName}
+      className="canvas-media-element"
+      key={gifPlaybackKey}
+      ref={imageRef}
+      src={shouldPlayGif ? assetUrl : undefined}
+      style={getMediaStyle(element, scale, interactive, opacity)}
+    />
+  );
+}
+
 export function CanvasMediaElement({
   animationState,
   assetName,
@@ -268,6 +331,7 @@ export function CanvasMediaElement({
   opacity,
   previewMode,
   scale,
+  onMediaElementChange,
 }: {
   animationState: ElementAnimationRenderState;
   assetName: string;
@@ -277,21 +341,23 @@ export function CanvasMediaElement({
   opacity: number;
   previewMode: boolean;
   scale: { x: number; y: number };
+  onMediaElementChange: (
+    elementId: string,
+    media: HTMLImageElement | HTMLVideoElement | null,
+  ) => void;
 }) {
   if (element.type === 'gif') {
-    const shouldPlayGif =
-      element.playing &&
-      (!previewMode || !animationState.hidden || Boolean(animationState.activeBuild));
-    const gifPlaybackKey = animationState.activeBuild
-      ? `${element.id}-${animationState.playbackRunId ?? 'static'}-${animationState.activeBuild.id}`
-      : `${element.id}-${animationState.playbackRunId ?? 'static'}-${shouldPlayGif ? 'playing' : 'hidden'}`;
     return (
-      <img
-        aria-label={assetName}
-        className="canvas-media-element"
-        key={gifPlaybackKey}
-        src={shouldPlayGif ? assetUrl : undefined}
-        style={getMediaStyle(element, scale, interactive, opacity)}
+      <CanvasGifElement
+        animationState={animationState}
+        assetName={assetName}
+        assetUrl={assetUrl}
+        element={element}
+        interactive={interactive}
+        opacity={opacity}
+        previewMode={previewMode}
+        scale={scale}
+        onMediaElementChange={onMediaElementChange}
       />
     );
   }
@@ -306,6 +372,7 @@ export function CanvasMediaElement({
       opacity={opacity}
       previewMode={previewMode}
       scale={scale}
+      onMediaElementChange={onMediaElementChange}
     />
   );
 }

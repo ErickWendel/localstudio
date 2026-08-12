@@ -37,6 +37,7 @@ import { animationPresetEngine } from '../animation/animationPresetEngine';
 import { BackgroundSelectionPreview } from './BackgroundSelectionPreview';
 import { CanvasImageElement } from './CanvasImageElement';
 import { CanvasMediaElement } from './CanvasMediaElement';
+import { CanvasMediaNode } from './CanvasMediaNode';
 import { CanvasReadOnlyMediaElement } from './CanvasReadOnlyMediaElement';
 import { CanvasShapeElement } from './CanvasShapeElement';
 import { CanvasStatusHint } from './CanvasStatusHint';
@@ -232,6 +233,9 @@ export function CanvasWorkspace({
   } | null>(null);
   const [magnetGuides, setMagnetGuides] = useState<CanvasMagnetGuide[]>([]);
   const [marqueeSelection, setMarqueeSelection] = useState<MarqueeSelection | null>(null);
+  const [mediaElements, setMediaElements] = useState<
+    Record<string, HTMLImageElement | HTMLVideoElement>
+  >({});
   const [cropModeElementId, setCropModeElementId] = useState<string | null>(null);
   const [cropDraft, setCropDraft] = useState<
     | {
@@ -352,6 +356,19 @@ export function CanvasWorkspace({
   const setElementNodeRef = useCallback((elementId: string, node: Konva.Node | null) => {
     nodeRefs.current[elementId] = node;
   }, []);
+  const handleMediaElementChange = useCallback(
+    (elementId: string, media: HTMLImageElement | HTMLVideoElement | null) => {
+      setMediaElements((current) => {
+        if (current[elementId] === media) return current;
+        if (!media && !(elementId in current)) return current;
+        const next = { ...current };
+        if (media) next[elementId] = media;
+        else delete next[elementId];
+        return next;
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     const selectedNodes = selection.elementIds
@@ -1179,6 +1196,7 @@ export function CanvasWorkspace({
             />
           ) : null}
           <Stage
+            className="canvas-konva-stage"
             ref={stageRef}
             height={stageHeight}
             width={stageWidth}
@@ -1234,6 +1252,18 @@ export function CanvasWorkspace({
                 if (element.type === 'gif' || element.type === 'video') {
                   const selected = selection.elementIds.includes(element.id);
                   const asset = project.assets[element.assetId];
+                  const mediaElement = mediaElements[element.id];
+                  if (mediaElement && (!readOnly || hideReadOnlyMediaPlaceholder)) {
+                    return (
+                      <CanvasMediaNode
+                        commonProps={commonProps}
+                        key={element.id}
+                        media={mediaElement}
+                        nodeRef={nodeRef}
+                        redrawContinuously={element.type === 'gif' && element.playing}
+                      />
+                    );
+                  }
                   if (readOnly) {
                     return (
                       <CanvasReadOnlyMediaElement
@@ -1349,7 +1379,7 @@ export function CanvasWorkspace({
           </Stage>
           <div
             className="canvas-media-layer"
-            aria-hidden={visibleMediaElements.length === 0 ? true : undefined}
+            aria-hidden="true"
           >
             {visibleMediaElements.map((element) => {
               const asset = project.assets[element.assetId];
@@ -1367,6 +1397,7 @@ export function CanvasWorkspace({
                   opacity={getAnimationOpacity(element.opacity, animationState)}
                   previewMode={presentationMode || readOnly || isAnimationPreviewRunning}
                   scale={{ x: scaleX, y: scaleY }}
+                  onMediaElementChange={handleMediaElementChange}
                 />
               );
             })}
