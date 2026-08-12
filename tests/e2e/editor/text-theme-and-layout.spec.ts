@@ -33,6 +33,7 @@ test.describe('editor text theme and layout journey', () => {
       'aria-pressed',
       'true',
     );
+    await toolbar.getByRole('button', { name: 'Text alignment menu' }).click();
     await expect(toolbar.getByRole('button', { name: 'Align text right' })).toHaveAttribute(
       'aria-pressed',
       'true',
