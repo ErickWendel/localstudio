@@ -19,6 +19,7 @@ test.describe('editor text theme and layout journey', () => {
     await expect(toolbar).toBeVisible();
     await toolbar.getByRole('spinbutton', { name: 'Text font size' }).fill('48');
     await toolbar.getByRole('button', { name: 'Bold text' }).click();
+    await toolbar.getByRole('button', { name: 'Text alignment menu' }).click();
     await toolbar.getByRole('button', { name: 'Align text right' }).click();
     await toolbar.getByRole('button', { name: 'Edit text hyperlink' }).click();
     await toolbar.getByRole('textbox', { name: 'Text hyperlink URL' }).fill('localstudio.dev');
@@ -32,6 +33,7 @@ test.describe('editor text theme and layout journey', () => {
       'aria-pressed',
       'true',
     );
+    await toolbar.getByRole('button', { name: 'Text alignment menu' }).click();
     await expect(toolbar.getByRole('button', { name: 'Align text right' })).toHaveAttribute(
       'aria-pressed',
       'true',
@@ -46,7 +48,8 @@ test.describe('editor text theme and layout journey', () => {
       .getByRole('tablist', { name: 'Movie inspector sections' })
       .getByRole('tab', { name: 'Arrange' })
       .click();
-    await expect.poll(async () => Number(await page.getByLabel('Selected element height').inputValue()))
+    await expect
+      .poll(async () => Number(await page.getByLabel('Selected element height').inputValue()))
       .toBeLessThan(120);
     await expect(page.getByRole('button', { name: 'Group', exact: true })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Ungroup' })).toBeDisabled();
@@ -63,7 +66,9 @@ test.describe('editor text theme and layout journey', () => {
     await expect(
       page.getByRole('button', { name: 'Open theme picker, current theme Default theme' }),
     ).toBeVisible();
-    await page.getByRole('button', { name: 'Open theme picker, current theme Default theme' }).click();
+    await page
+      .getByRole('button', { name: 'Open theme picker, current theme Default theme' })
+      .click();
     const themeChooser = page.getByRole('region', { name: 'Choose a theme' });
     await expect(themeChooser).toBeVisible();
     await expect(themeChooser.getByText('Default theme')).toBeVisible();
@@ -77,8 +82,13 @@ test.describe('editor text theme and layout journey', () => {
     const canvas = frame.locator('canvas').first();
     const canvasBox = await canvas.boundingBox();
     expect(canvasBox).not.toBeNull();
-    await page.mouse.click(canvasBox!.x + canvasBox!.width / 2, canvasBox!.y + canvasBox!.height / 2);
-    await expect(page.getByRole('button', { name: 'Open layout picker, current layout Blank' })).toBeVisible();
+    await page.mouse.click(
+      canvasBox!.x + canvasBox!.width / 2,
+      canvasBox!.y + canvasBox!.height / 2,
+    );
+    await expect(
+      page.getByRole('button', { name: 'Open layout picker, current layout Blank' }),
+    ).toBeVisible();
     await page.getByRole('button', { name: 'Open layout picker, current layout Blank' }).click();
     await expect(page.getByRole('region', { name: 'Choose a layout' })).toBeVisible();
     await expect(page.getByText('No imported layouts yet.')).toBeVisible();
