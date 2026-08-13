@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import Konva from 'konva';
 import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
@@ -159,6 +160,72 @@ describe('PresenterView', () => {
     const initialSize = notes.style.fontSize;
     fireEvent.click(screen.getByRole('button', { name: 'Increase notes size' }));
     expect(notes.style.fontSize).not.toBe(initialSize);
+  });
+
+  it('renders video frames instead of the read-only filename placeholder', () => {
+    window.localStorage.setItem('localstudio.presenterWindowIntroDismissed', '1');
+    render(<PresenterView sessionId="session-1" />);
+
+    const project = sampleProject.createSampleProject();
+    project.assets['presenter-video-asset'] = {
+      id: 'presenter-video-asset',
+      mimeType: 'video/mp4',
+      name: 'Presenter video',
+      objectUrl: 'blob:presenter-video',
+      type: 'video',
+    };
+    project.elements['presenter-video'] = {
+      assetId: 'presenter-video-asset',
+      autoplayInPreview: false,
+      controls: false,
+      height: 360,
+      id: 'presenter-video',
+      locked: false,
+      loop: false,
+      muted: true,
+      opacity: 1,
+      rotation: 0,
+      trimStartSeconds: 0,
+      type: 'video',
+      visible: true,
+      volume: 1,
+      width: 640,
+      x: 120,
+      y: 80,
+    };
+    project.pages[0]!.elementIds.push('presenter-video');
+
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          origin: window.location.origin,
+          data: {
+            payload: {
+              activePageId: project.pages[0]!.id,
+              animationPreview: undefined,
+              project,
+            },
+            sessionId: 'session-1',
+            source: 'localstudio-presenter-main',
+            type: 'state',
+          },
+        }),
+      );
+    });
+
+    const currentSlide = screen.getByRole('region', { name: 'Current slide' });
+    const video = currentSlide.querySelector(
+      'video[aria-label="Presenter video"]',
+    ) as HTMLVideoElement;
+    expect(video).toBeInTheDocument();
+
+    const presenterStage = Konva.stages.find((stage) =>
+      currentSlide.contains(stage.container()),
+    );
+    const videoNode = presenterStage
+      ?.find('Image')
+      .find((node) => (node as Konva.Image).image() === video);
+    expect(videoNode).toBeDefined();
   });
 
   it('resizes presenter notes with the divider drag handle', () => {
