@@ -329,4 +329,39 @@ describe('BrowserPptxExportService', () => {
       ]),
     );
   });
+
+  it('infers GIF and video package types when Blob and stored MIME metadata are generic', async () => {
+    const project = createExportProject();
+    project.assets.gifAsset!.mimeType = 'application/octet-stream';
+    project.assets.gifAsset!.objectUrl = tinyGifDataUrl.replace(
+      'image/gif',
+      'application/octet-stream',
+    );
+    project.assets.videoAsset!.mimeType = 'application/octet-stream';
+    project.assets.videoAsset!.objectUrl = tinyMp4DataUrl.replace(
+      'video/mp4',
+      'application/octet-stream',
+    );
+
+    const result = await new BrowserPptxExportService().exportPowerPoint(project);
+    const entries = await readPptxEntries(result.blob);
+    const mediaPaths = Object.keys(entries).filter((path) => path.startsWith('ppt/media/'));
+
+    const gifPath = mediaPaths.find((path) => path.endsWith('.gif'));
+    const videoPath = mediaPaths.find((path) => path.endsWith('.mp4'));
+    expect(gifPath).toBeDefined();
+    expect(videoPath).toBeDefined();
+    if (!gifPath || !videoPath) throw new Error('Expected GIF and MP4 package parts.');
+    expect(strFromU8(entries[gifPath]!.subarray(0, 6))).toBe('GIF89a');
+    expect(strFromU8(entries[videoPath]!.subarray(4, 8))).toBe('ftyp');
+    expect(readEntry(entries, '[Content_Types].xml')).toContain(
+      'Extension="gif" ContentType="image/gif"',
+    );
+    expect(readEntry(entries, '[Content_Types].xml')).toContain(
+      'Extension="mp4" ContentType="video/mp4"',
+    );
+    expect(readEntry(entries, 'ppt/slides/_rels/slide1.xml.rels')).toContain(
+      'relationships/video',
+    );
+  });
 });
