@@ -114,7 +114,7 @@ function createVideoElement(input: {
     controls: true,
     muted: true,
     autoplayInPreview: true,
-    playing: true,
+    playing: false,
     trimStartSeconds: 0,
     repeatMode: 'loop',
     ...(input.durationSeconds !== undefined

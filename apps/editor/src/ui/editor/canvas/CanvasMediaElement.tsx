@@ -170,7 +170,7 @@ function CanvasVideoElement({
       playVideo(video);
       return;
     }
-    if (animationState.hidden || element.startOnClick || animationState.mediaActionPending) {
+    if (animationState.hidden || animationState.mediaActionPending) {
       stopReversePlayback();
       video.pause();
       video.currentTime = Math.max(0, element.trimStartSeconds);

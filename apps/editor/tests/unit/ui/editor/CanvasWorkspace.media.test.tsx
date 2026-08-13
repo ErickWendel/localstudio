@@ -167,6 +167,30 @@ describe('CanvasWorkspace media elements', () => {
 
     await waitFor(() => expect(playSpy).toHaveBeenCalled());
     expect(video.style.opacity).toBe('1');
+    const pauseCallsAfterPlayback = pauseSpy.mock.calls.length;
+
+    rerender(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        animationPreview={{
+          activeBuild: undefined,
+          activeBuildElementId: undefined,
+          animationProgress: 1,
+          hiddenElementIds: [],
+          pageId: 'page-1',
+          pendingMediaActionBuildIds: [],
+          phase: 'complete',
+          playing: true,
+          waitingForClick: false,
+        }}
+        presentationMode
+        readOnly
+      />,
+    );
+
+    expect(pauseSpy).toHaveBeenCalledTimes(pauseCallsAfterPlayback);
     playSpy.mockRestore();
     pauseSpy.mockRestore();
   });

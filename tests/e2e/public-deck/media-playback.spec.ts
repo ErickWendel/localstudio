@@ -30,6 +30,13 @@ test.describe('public deck media playback journey', () => {
       objectUrl: 'http://localhost/e2e-public-video.mp4',
       type: 'video',
     };
+    payload.project.assets['asset-public-click-video'] = {
+      id: 'asset-public-click-video',
+      mimeType: 'video/mp4',
+      name: 'Click-start public fixture',
+      objectUrl: 'http://localhost/e2e-public-video.mp4',
+      type: 'video',
+    };
     payload.project.assets['asset-public-gif'] = {
       id: 'asset-public-gif',
       mimeType: 'image/gif',
@@ -61,6 +68,31 @@ test.describe('public deck media playback journey', () => {
       width: 720,
       x: 600,
       y: 420,
+    };
+    payload.project.elements['video-public-click'] = {
+      assetId: 'asset-public-click-video',
+      autoplayInPreview: true,
+      controls: true,
+      height: 202,
+      id: 'video-public-click',
+      locked: false,
+      loop: false,
+      muted: true,
+      opacity: 1,
+      playAcrossSlides: false,
+      playbackPositionSeconds: 0,
+      playing: false,
+      posterFrameSeconds: 0,
+      repeatMode: 'none',
+      rotation: 0,
+      startOnClick: true,
+      trimStartSeconds: 0,
+      type: 'video',
+      visible: true,
+      volume: 0.5,
+      width: 360,
+      x: 120,
+      y: 120,
     };
     payload.project.elements['gif-public'] = {
       assetId: 'asset-public-gif',
@@ -104,7 +136,7 @@ test.describe('public deck media playback journey', () => {
       },
     };
     payload.project.pages[0].elementIds.push('image-public');
-    payload.project.pages[1].elementIds.push('video-public', 'gif-public');
+    payload.project.pages[1].elementIds.push('video-public', 'video-public-click', 'gif-public');
     payload.project.pages[1].transition = { delayMs: 100, effect: 'fade' };
     payload.project.pages[1].animationBuilds = [
       {
@@ -115,6 +147,15 @@ test.describe('public deck media playback journey', () => {
         id: 'video-public-play',
         mediaAction: 'play',
         trigger: 'after-transition',
+      },
+      {
+        delayMs: 0,
+        durationMs: 0,
+        effect: 'reveal',
+        elementId: 'video-public-click',
+        id: 'video-public-click-play',
+        mediaAction: 'play',
+        trigger: 'on-click',
       },
     ];
 
@@ -163,17 +204,32 @@ test.describe('public deck media playback journey', () => {
     const video = page.locator('video[aria-label="Big Buck Bunny public fixture"]');
     await expect(video).toBeVisible();
     await expect(video).toHaveAttribute('src', /e2e-public-video\.mp4/);
+    const clickVideo = page.locator('video[aria-label="Click-start public fixture"]');
+    await expect(clickVideo).toBeVisible();
+    await expect(clickVideo).toHaveAttribute('src', /e2e-public-video\.mp4/);
     const gif = page.locator('img[aria-label="Public animated loop"]');
     await expect(gif).toBeVisible();
     await expect(gif).toHaveAttribute('src', /e2e-public-loop\.png/);
     await expect(page.getByTestId('slide-canvas-frame')).toHaveAttribute(
       'data-animation-preview-phase',
-      'complete',
+      'waiting',
     );
     await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.paused)).toBe(false);
     const playbackTime = await video.evaluate((node: HTMLVideoElement) => node.currentTime);
     await expect
       .poll(() => video.evaluate((node: HTMLVideoElement) => node.currentTime))
       .toBeGreaterThan(playbackTime);
+    await expect(clickVideo.evaluate((node: HTMLVideoElement) => node.paused)).resolves.toBe(true);
+
+    await page.locator('canvas').click({ position: { x: 400, y: 220 } });
+    await expect(page.getByTestId('slide-canvas-frame')).toHaveAttribute(
+      'data-animation-preview-phase',
+      'complete',
+    );
+    await expect.poll(() => clickVideo.evaluate((node: HTMLVideoElement) => node.paused)).toBe(false);
+    const clickPlaybackTime = await clickVideo.evaluate((node: HTMLVideoElement) => node.currentTime);
+    await expect
+      .poll(() => clickVideo.evaluate((node: HTMLVideoElement) => node.currentTime))
+      .toBeGreaterThan(clickPlaybackTime);
   });
 });
