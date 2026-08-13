@@ -1,8 +1,11 @@
 import type { WebMcpModelContext } from '../../../services/webmcp/webMcpToolAdapter';
+import { assetFileUtils } from '../../../services/storage/assetFileUtils';
+import type { SlideClipboardState } from '../state/editorViewModelElements';
 
 const EDITOR_OBJECT_CLIPBOARD_TYPE = 'application/x-localstudio-editor-elements';
 const EDITOR_OBJECT_CLIPBOARD_MARKER = '1';
 const MAX_EDITOR_OBJECT_CLIPBOARD_BYTES = 1024 * 1024;
+const MAX_SLIDE_CLIPBOARD_BYTES = 16 * 1024 * 1024;
 const SLIDE_CLIPBOARD_PREFIX = 'LocalStudio.dev slide: ';
 
 function isEditableElement(target: EventTarget | null) {
@@ -66,21 +69,64 @@ function readEditorObjectClipboardPayload(clipboardData: DataTransfer | null) {
   return payload;
 }
 
-async function writeSlideClipboardPayload(payload: string) {
-  if (payload.length > MAX_EDITOR_OBJECT_CLIPBOARD_BYTES || !navigator.clipboard?.writeText) return false;
+async function resolveSlideClipboardPayload(payload: string | Promise<string>) {
+  const resolvedPayload = await payload;
+  if (resolvedPayload.length > MAX_SLIDE_CLIPBOARD_BYTES) {
+    throw new Error('Slide clipboard payload exceeds the supported size.');
+  }
+  return `${SLIDE_CLIPBOARD_PREFIX}${resolvedPayload}`;
+}
+
+async function writeSlideClipboardPayload(payload: string | Promise<string>) {
+  if (!navigator.clipboard) return false;
   try {
-    await navigator.clipboard.writeText(`${SLIDE_CLIPBOARD_PREFIX}${payload}`);
+    if (navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
+      const clipboardText = resolveSlideClipboardPayload(payload);
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/plain': clipboardText.then(
+            (text) => new Blob([text], { type: 'text/plain' }),
+          ),
+        }),
+      ]);
+      return true;
+    }
+    if (!navigator.clipboard.writeText) return false;
+    await navigator.clipboard.writeText(await resolveSlideClipboardPayload(payload));
     return true;
   } catch {
     return false;
   }
 }
 
+async function makeSlideClipboardPayloadTransferable(
+  payload: SlideClipboardState,
+  requestFetch: typeof fetch = globalThis.fetch.bind(globalThis),
+) {
+  const assets = Object.fromEntries(
+    await Promise.all(
+      Object.entries(payload.assets).map(async ([assetId, asset]) => {
+        if (!assetFileUtils.isBlobUrl(asset.objectUrl)) return [assetId, asset] as const;
+        try {
+          const blob = await assetFileUtils.objectUrlToBlob(asset.objectUrl, requestFetch);
+          return [
+            assetId,
+            { ...asset, objectUrl: await assetFileUtils.blobToDataUrl(blob) },
+          ] as const;
+        } catch {
+          return [assetId, asset] as const;
+        }
+      }),
+    ),
+  );
+  return { ...payload, assets };
+}
+
 function readSlideClipboardPayload(clipboardData: DataTransfer | null) {
   const text = clipboardData?.getData?.('text/plain') ?? '';
   if (!text.startsWith(SLIDE_CLIPBOARD_PREFIX)) return undefined;
   const payload = text.slice(SLIDE_CLIPBOARD_PREFIX.length);
-  return payload.length <= MAX_EDITOR_OBJECT_CLIPBOARD_BYTES ? payload : undefined;
+  return payload.length <= MAX_SLIDE_CLIPBOARD_BYTES ? payload : undefined;
 }
 
 function isWebMcpEnabled() {
@@ -107,6 +153,7 @@ export const editorShellBrowserUtils = {
   writeEditorObjectClipboardPayload,
   readEditorObjectClipboardPayload,
   writeSlideClipboardPayload,
+  makeSlideClipboardPayloadTransferable,
   readSlideClipboardPayload,
   isWebMcpEnabled,
   isWebMcpProtocolEnabled,

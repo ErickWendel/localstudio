@@ -37,6 +37,23 @@ function dataUrlToBlob(dataUrl: string) {
   return new Blob([bytes], { type: mimeType });
 }
 
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener('load', () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error('Asset could not be read as a data URL.'));
+    });
+    reader.addEventListener('error', () => {
+      reject(reader.error ?? new Error('Asset could not be read.'));
+    });
+    reader.readAsDataURL(blob);
+  });
+}
+
 function isReadableObjectUrl(value: string | undefined): value is string {
   return isDataUrl(value) || isBlobUrl(value);
 }
@@ -79,6 +96,7 @@ export const assetFileUtils = {
   isBlobUrl,
   isSafeRemoteUrl,
   dataUrlToBlob,
+  blobToDataUrl,
   isReadableObjectUrl,
   objectUrlToBlob,
   objectUrlToBlobIfReadable,

@@ -322,7 +322,7 @@ function mapObject(
   pageId: string,
   pageWidth: number,
   pageHeight: number,
-  backgroundColor: string,
+  backgroundColor: string | undefined,
   layoutId?: string,
 ): DesignElement | undefined {
   if (object.kind === 'text') {
@@ -348,7 +348,7 @@ function mapObject(
       ...(object.placeholderRole ? { placeholderRole: object.placeholderRole } : {}),
       importSource: getImportSource(object, pageId, layoutId),
       ...style,
-      fill: getReadableTextFill(style.fill, backgroundColor),
+      fill: backgroundColor ? getReadableTextFill(style.fill, backgroundColor) : style.fill,
       fontSize,
     };
   }
@@ -423,6 +423,32 @@ const defaultPlaceholderVisibility: Record<PlaceholderRole, boolean> = {
   title: true,
 };
 
+function mapBackgroundImage(
+  backgroundAssetPath: string | undefined,
+  pptxPackage: PptxPackage,
+  assets: Record<string, Asset>,
+  pageId: string,
+  pageWidth: number,
+  pageHeight: number,
+): DesignElement | undefined {
+  if (!backgroundAssetPath) return undefined;
+  const asset = getOrCreateAsset(backgroundAssetPath, pptxPackage, assets);
+  if (!asset || asset.type !== 'image') return undefined;
+  return {
+    id: `${pageId}-background-image`,
+    type: 'image',
+    assetId: asset.id,
+    x: 0,
+    y: 0,
+    width: pageWidth,
+    height: pageHeight,
+    rotation: 0,
+    locked: false,
+    visible: true,
+    opacity: 1,
+  };
+}
+
 function createLayout(
   layout: PptxLayout,
   pptxPackage: PptxPackage,
@@ -442,7 +468,7 @@ function createLayout(
       layout.id,
       pageWidth,
       pageHeight,
-      layout.backgroundColor,
+      layout.backgroundAssetPath ? undefined : layout.backgroundColor,
       layout.id,
     );
     if (!element) continue;
@@ -472,6 +498,7 @@ function createSlideFallbackLayout(
   return createLayout(
     {
       backgroundColor: slide.backgroundColor,
+      ...(slide.backgroundAssetPath ? { backgroundAssetPath: slide.backgroundAssetPath } : {}),
       id: slide.layoutId,
       name: slide.layoutName ?? slide.layoutId,
       objects: slide.layoutObjects,
@@ -502,6 +529,18 @@ function map(deck: PptxDeck, pptxPackage: PptxPackage): ProjectDocument {
       ? undefined
       : createSlideFallbackLayout(slide, pptxPackage, assets, warnings, deck.width, deck.height);
     if (layout) slideLayouts[layout.id] = layout;
+    const backgroundImage = mapBackgroundImage(
+      slide.backgroundAssetPath,
+      pptxPackage,
+      assets,
+      slide.id,
+      deck.width,
+      deck.height,
+    );
+    if (backgroundImage) {
+      elements[backgroundImage.id] = backgroundImage;
+      elementIds.push(backgroundImage.id);
+    }
     for (const object of slide.objects.sort((left, right) => left.zIndex - right.zIndex)) {
       const element = mapObject(
         object,
@@ -511,7 +550,7 @@ function map(deck: PptxDeck, pptxPackage: PptxPackage): ProjectDocument {
         slide.id,
         deck.width,
         deck.height,
-        slide.backgroundColor,
+        slide.backgroundAssetPath ? undefined : slide.backgroundColor,
       );
       if (!element) continue;
       elements[element.id] = element;

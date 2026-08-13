@@ -115,7 +115,7 @@ describe('EditorShell clipboard workflows', () => {
     initialProject.assets['asset-hero'] = {
       ...initialProject.assets['asset-hero']!,
       fileName: 'hero.png',
-      objectUrl: 'data:image/png;base64,aGVyby1ieXRlcw==',
+      objectUrl: 'blob:https://localstudio.dev/hero',
       storage: 'file',
     };
     const backgroundAsset = {
@@ -148,6 +148,9 @@ describe('EditorShell clipboard workflows', () => {
     services.projectRepository = repository;
     services.mirrorService = mirrorService;
     const writeText = vi.fn<(text: string) => Promise<void>>(() => Promise.resolve());
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      blob: () => Promise.resolve(new Blob(['hero-bytes'], { type: 'image/png' })),
+    } as Response);
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: { writeText },
@@ -163,8 +166,10 @@ describe('EditorShell clipboard workflows', () => {
     mirrorService.syncProject.mockClear();
 
     await user.click(screen.getByRole('button', { name: 'Copy Slide 1 to clipboard' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     const copiedText = writeText.mock.calls[0]?.[0];
     expect(copiedText).toContain('asset-background');
+    expect(copiedText).toContain('data:image/png;base64,aGVyby1ieXRlcw==');
 
     fireEvent.paste(window, {
       clipboardData: {
@@ -180,7 +185,7 @@ describe('EditorShell clipboard workflows', () => {
       if (pastedPage?.background.type !== 'asset') throw new Error('Expected an asset background.');
       expect(pastedPage.background.assetId).not.toBe('asset-background');
       expect(savedProject?.assets[pastedPage.background.assetId]).toMatchObject({
-        objectUrl: backgroundAsset.objectUrl,
+        objectUrl: 'data:image/png;base64,aGVyby1ieXRlcw==',
       });
       expect(savedProject?.assets[pastedPage.background.assetId]).not.toHaveProperty('fileName');
       expect(savedProject?.assets[pastedPage.background.assetId]).not.toHaveProperty('storage');

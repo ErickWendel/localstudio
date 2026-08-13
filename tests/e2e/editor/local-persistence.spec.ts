@@ -86,6 +86,9 @@ test.describe('editor local persistence journey', () => {
     await page.goto(sourceUrl.toString());
     await expect(page.getByRole('button', { name: 'Browser storage enabled' })).toBeVisible();
     await page.getByRole('button', { name: 'Copy Source Slide to clipboard' }).click();
+    await expect
+      .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+      .toContain('"objectUrl":"data:');
     const clipboardPayload = await page.evaluate(() => navigator.clipboard.readText());
 
     const destinationPage = await context.newPage();

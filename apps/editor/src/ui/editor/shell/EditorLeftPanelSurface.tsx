@@ -40,6 +40,7 @@ export function EditorLeftPanelSurface({
       onDownloadFont={isHistoryReadOnly ? undefined : vm.downloadFontForSelection}
       onImportLocalFont={isHistoryReadOnly ? undefined : vm.importLocalFontForSelection}
       onSelectElement={isHistoryReadOnly ? undefined : onSelectElement}
+      onSelectSlide={isHistoryReadOnly ? undefined : vm.selectSlideBackground}
       onSetElementVisibility={isHistoryReadOnly ? undefined : vm.setElementVisibility}
       onSetElementLock={isHistoryReadOnly ? undefined : vm.setElementLock}
       onDeleteElement={isHistoryReadOnly ? undefined : vm.deleteElement}

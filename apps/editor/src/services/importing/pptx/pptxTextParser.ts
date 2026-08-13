@@ -95,8 +95,14 @@ function getTextBody(shape: Element) {
   return pptxXml.firstDescendant(shape, 'txBody');
 }
 
-function getFirstRunProperties(paragraph: Element | undefined) {
-  const run = paragraph ? pptxXml.firstDescendant(paragraph, 'r') : undefined;
+function getDominantRunProperties(paragraph: Element | undefined) {
+  const runs = paragraph ? pptxXml.descendants(paragraph, 'r') : [];
+  const run = runs.reduce<Element | undefined>((dominant, candidate) => {
+    if (!dominant) return candidate;
+    const dominantLength = pptxXml.textContent(dominant, 't').trim().length;
+    const candidateLength = pptxXml.textContent(candidate, 't').trim().length;
+    return candidateLength > dominantLength ? candidate : dominant;
+  }, undefined);
   return run ? pptxXml.firstDescendant(run, 'rPr') : undefined;
 }
 
@@ -156,7 +162,7 @@ function hasLineSpacing(...paragraphProperties: Array<Element | undefined>) {
 function getLocalStyleSources(shape: Element) {
   const paragraph = getFirstParagraph(shape);
   const paragraphProperties = paragraph ? pptxXml.firstDescendant(paragraph, 'pPr') : undefined;
-  const runProperties = getFirstRunProperties(paragraph);
+  const runProperties = getDominantRunProperties(paragraph);
   const paragraphDefaultRunProperties = getParagraphDefaultRunProperties(paragraphProperties);
   const textBodyListDefaultRunProperties = getTextBodyListDefaultRunProperties(shape);
   const listParagraphProperties = getListParagraphProperties(shape);

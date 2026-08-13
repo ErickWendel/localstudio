@@ -117,6 +117,7 @@ interface LeftToolPanelProps {
   activePageId: string;
   selection: SelectionState;
   onSelectElement?: ((elementId: string, options?: { additive?: boolean }) => void) | undefined;
+  onSelectSlide?: (() => void) | undefined;
   onSetElementVisibility?: ((elementId: string, visible: boolean) => void) | undefined;
   onSetElementLock?: ((elementId: string, locked: boolean) => void) | undefined;
   onDeleteElement?: ((elementId: string) => void) | undefined;
@@ -223,6 +224,7 @@ export function LeftToolPanel({
   activePageId,
   selection,
   onSelectElement,
+  onSelectSlide,
   onSetElementVisibility,
   onSetElementLock,
   onDeleteElement,
@@ -347,6 +349,7 @@ export function LeftToolPanel({
             activePageId={activePageId}
             selection={selection}
             {...(onSelectElement ? { onSelectElement } : {})}
+            {...(onSelectSlide ? { onSelectSlide } : {})}
             {...(onSetElementVisibility ? { onSetElementVisibility } : {})}
             {...(onSetElementLock ? { onSetElementLock } : {})}
             {...(onDeleteElement ? { onDeleteElement } : {})}
