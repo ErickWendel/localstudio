@@ -341,6 +341,16 @@ export class BrowserPresenterSessionService {
         });
         return;
       }
+      if (command === 'recording-checkpoint') {
+        if (!event.data.recording || typeof event.data.recording !== 'object') return;
+        if (event.data.audioChunk !== undefined && !(event.data.audioChunk instanceof Blob)) return;
+        handler({
+          audioChunk: event.data.audioChunk,
+          command,
+          recording: event.data.recording,
+        });
+        return;
+      }
       if (
         command === 'close' ||
         command === 'next' ||

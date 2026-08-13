@@ -235,6 +235,21 @@ describe('PublicDeckViewer', () => {
         ],
       },
     };
+    const newestRecording = project.recordings.recording1!;
+    project.recordings = {
+      'recording-old': {
+        ...newestRecording,
+        id: 'recording-old',
+        name: 'Older presenter recording',
+        createdAt: '2026-07-17T12:00:00.000Z',
+        updatedAt: '2026-07-17T12:00:00.000Z',
+        audio: {
+          ...newestRecording.audio,
+          objectUrl: 'https://cdn.localstudio.test/recordings/recording-old.webm',
+        },
+      },
+      recording1: newestRecording,
+    };
     const { share, shareService } = createRemoteShare(
       '00000000-0000-4000-8000-000000000207',
       project,
@@ -252,6 +267,10 @@ describe('PublicDeckViewer', () => {
     expect(screen.getByRole('region', { name: 'Presentation playback' })).toBeInTheDocument();
     let audio = document.querySelector('audio');
     expect(audio).toBeInstanceOf(HTMLAudioElement);
+    expect(audio).toHaveAttribute(
+      'src',
+      'https://cdn.localstudio.test/recordings/recording1.webm',
+    );
     expect(screen.getByRole('button', { name: 'Jump to slide 1: Slide 1' })).toHaveStyle({
       '--public-deck-chapter-preview-left': '0px',
       '--public-deck-chapter-preview-x': '0%',

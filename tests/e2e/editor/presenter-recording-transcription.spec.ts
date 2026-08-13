@@ -248,6 +248,7 @@ test.describe('editor presenter recording transcription journey', () => {
     const commandNames = await page.evaluate(
       () => window.__LOCALSTUDIO_E2E_PRESENTER__?.commands ?? [],
     );
+    expect(commandNames).toContain('recording-checkpoint');
     expect(commandNames).toContain('save-recording');
     const savedRecordingSegments = await page.evaluate(
       () =>
@@ -268,5 +269,12 @@ test.describe('editor presenter recording transcription journey', () => {
         ).__LOCALSTUDIO_E2E_TRANSCRIPTION_LANGUAGES ?? [],
     );
     expect(transcriptionLanguages).toContain('en-US');
+
+    await page.getByRole('button', { name: 'Start recording' }).click();
+    await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect.poll(async () =>
+      page.evaluate(() => window.__LOCALSTUDIO_E2E_PRESENTER__?.commands.slice(-2) ?? []),
+    ).toEqual(['save-recording', 'close']);
   });
 });

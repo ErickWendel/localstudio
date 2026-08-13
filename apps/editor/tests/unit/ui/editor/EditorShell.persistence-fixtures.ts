@@ -145,7 +145,11 @@ class RecordingMirrorService implements MirrorService<MinioMirrorConfig> {
       void repository;
       void config;
       void options;
-      return Promise.resolve({ enabled: true, status: 'synced' });
+      return Promise.resolve({
+        enabled: true,
+        status: 'synced',
+        lastSyncedAt: new Date().toISOString(),
+      });
     },
   );
 

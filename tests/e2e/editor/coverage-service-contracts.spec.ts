@@ -650,6 +650,7 @@ test.describe('editor service contracts coverage batch', () => {
         'update-stream-peer',
         'go-to-page',
         'next',
+        'recording-checkpoint',
         'save-recording',
         'close',
         'previous',

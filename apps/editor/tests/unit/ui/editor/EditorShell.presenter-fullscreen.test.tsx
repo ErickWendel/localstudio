@@ -7,10 +7,14 @@ import { EditorShell } from '../../../../src/ui/editor/shell/EditorShell';
 import { editorShellTestHarness } from './EditorShell.test-harness';
 
 const {
+  LoadingProjectRepository,
+  RecordingMirrorService,
+  RecordingShareService,
   SavingProjectRepository,
   createAppServices,
   selectImageLayer,
   startFullscreenPresentation,
+  waitForShareButtonReady,
 } = editorShellTestHarness;
 
 describe('EditorShell presenter fullscreen workflows', () => {
@@ -277,6 +281,151 @@ describe('EditorShell presenter fullscreen workflows', () => {
         ],
       });
     });
+  });
+
+  it('finalizes a checkpointed recording when the presenter closes and updates the existing public link', async () => {
+    const popup = {
+      close: vi.fn(),
+      closed: false,
+      location: { href: '' },
+      postMessage: vi.fn(),
+    } as unknown as Window;
+    Object.defineProperty(window, 'open', {
+      configurable: true,
+      value: vi.fn(() => popup),
+    });
+    vi.spyOn(BrowserPresenterSessionService.prototype, 'openRemoteControlSession').mockResolvedValue({
+      code: 'peer-published-recording',
+      connectedControllerCount: 0,
+      expiresAt: '2026-08-14T12:00:00.000Z',
+      presenterDeviceId: 'presenter-device-published-recording',
+      presenterLabel: 'MacBook Pro',
+      qrUrl: 'http://localhost:4176/joystick/?peer=peer-published-recording',
+      sessionId: 'remote-session-published-recording',
+      transport: 'peerjs',
+    });
+    const project = sampleProject.createSampleProject();
+    project.recordings = {
+      'recording-old': {
+        id: 'recording-old',
+        name: 'Older presenter recording',
+        createdAt: '2026-08-12T12:00:00.000Z',
+        updatedAt: '2026-08-12T12:00:00.000Z',
+        durationMs: 1200,
+        modelPresetId: 'web-speech-api',
+        audio: {
+          mimeType: 'audio/webm;codecs=opus',
+          objectUrl: 'blob:recording-old',
+          storage: 'inline',
+        },
+        segments: [
+          {
+            id: 'segment-old',
+            text: 'The older public recording.',
+            startMs: 0,
+            endMs: 1200,
+            final: true,
+            pageId: 'page-1',
+            pageIndex: 0,
+            pageName: 'Slide 1',
+          },
+        ],
+      },
+    };
+    const mirrorService = new RecordingMirrorService();
+    const shareService = new RecordingShareService();
+    const repository = new LoadingProjectRepository(project);
+    const services = createAppServices();
+    services.mirrorService = mirrorService;
+    services.shareService = shareService;
+    services.projectRepository = repository;
+    services.persistenceAvailable = true;
+    services.skipStoredProjectLoad = false;
+    render(<EditorShell services={services} />);
+
+    await waitForShareButtonReady();
+    fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link' }));
+    await waitFor(() => {
+      expect(shareService.updateShare).toHaveBeenCalledWith(
+        'project-project-1',
+        expect.any(Object),
+        expect.any(Object),
+      );
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close share panel' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Presentation play options' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Presenter view' }));
+    const presenterSessionId = new URL(popup.location.href).searchParams.get('presenterSession');
+    const audioBlob = new Blob(['latest audio'], { type: 'audio/webm;codecs=opus' });
+
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: {
+          audioChunk: audioBlob,
+          command: 'recording-checkpoint',
+          recording: {
+            id: 'recording-latest',
+            name: 'Latest presenter recording',
+            createdAt: '2026-08-13T12:00:00.000Z',
+            updatedAt: '2026-08-13T12:00:00.000Z',
+            durationMs: 1800,
+            modelPresetId: 'web-speech-api',
+            audio: {
+              mimeType: 'audio/webm;codecs=opus',
+              storage: 'inline',
+            },
+            segments: [
+              {
+                id: 'segment-latest',
+                text: 'The newest public recording.',
+                startMs: 0,
+                endMs: 1800,
+                final: true,
+                pageId: 'page-1',
+                pageIndex: 0,
+                pageName: 'Slide 1',
+              },
+            ],
+          },
+          sessionId: presenterSessionId,
+          source: 'localstudio-presenter-window',
+          type: 'command',
+        },
+        origin: window.location.origin,
+      }),
+    );
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: {
+          command: 'close',
+          sessionId: presenterSessionId,
+          source: 'localstudio-presenter-window',
+          type: 'command',
+        },
+        origin: window.location.origin,
+      }),
+    );
+
+    await waitFor(
+      () => {
+        expect(
+          shareService.updateShare.mock.calls.some(
+            ([shareId, sharedProject]) =>
+              shareId === 'project-project-1' &&
+              Object.keys(sharedProject.recordings ?? {}).join(',') === 'recording-latest',
+          ),
+        ).toBe(true);
+      },
+      { timeout: 3_000 },
+    );
+    expect(repository.savedProjects.at(-1)?.recordings?.['recording-latest']).toBeDefined();
+    expect(new Set(shareService.updateShare.mock.calls.map(([shareId]) => shareId))).toEqual(
+      new Set(['project-project-1']),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+    expect(screen.getByLabelText('Recording for public share')).toHaveValue('recording-latest');
   });
 
   it('hides page insert controls in fullscreen presenter mode and restores a clean editor state on exit', async () => {

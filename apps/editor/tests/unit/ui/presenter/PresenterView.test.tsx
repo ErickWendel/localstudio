@@ -3,6 +3,8 @@ import Konva from 'konva';
 import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
+import { PresenterAudioRecorder } from '../../../../src/services/transcription/presenterAudioRecorder';
+import { PresenterSpeechTranscriber } from '../../../../src/services/transcription/presenterSpeechTranscriber';
 import { PresenterView } from '../../../../src/ui/presenter/PresenterView';
 
 const remoteStreamPublisherMock = vi.hoisted(() => {
@@ -931,5 +933,52 @@ describe('PresenterView', () => {
       }),
       window.location.origin,
     );
+  });
+
+  it('checkpoints an active recording synchronously before pagehide closes the session', async () => {
+    const postMessage = vi.fn<(message: { command: string }, targetOrigin: string) => void>();
+    const opener = { postMessage };
+    Object.defineProperty(window, 'opener', {
+      configurable: true,
+      value: opener,
+    });
+    vi.spyOn(PresenterAudioRecorder.prototype, 'start').mockResolvedValue(undefined);
+    vi.spyOn(PresenterSpeechTranscriber.prototype, 'start').mockImplementation(() => undefined);
+    window.localStorage.setItem('localstudio.presenterWindowIntroDismissed', '1');
+    render(<PresenterView sessionId="session-1" />);
+    const project = sampleProject.createSampleProject();
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          origin: window.location.origin,
+          data: {
+            payload: {
+              activePageId: 'page-1',
+              animationPreview: undefined,
+              project,
+            },
+            sessionId: 'session-1',
+            source: 'localstudio-presenter-main',
+            type: 'state',
+          },
+        }),
+      );
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Start recording' }));
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('button', { name: 'Stop recording' })).toBeInTheDocument();
+    postMessage.mockClear();
+
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'));
+    });
+
+    expect(postMessage.mock.calls.map(([message]) => message.command)).toEqual([
+      'recording-checkpoint',
+      'close',
+    ]);
   });
 });

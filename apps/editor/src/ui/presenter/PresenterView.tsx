@@ -246,7 +246,9 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     { pageId: string; pageIndex: number; pageName: string } | undefined
   >(undefined);
   const recorderRef = useRef<PresenterAudioRecorder | undefined>(undefined);
+  const activeRecordingRef = useRef<TranscriptRecording | undefined>(undefined);
   const recordingStartedAtRef = useRef(0);
+  const recordingStopPromiseRef = useRef<Promise<void> | undefined>(undefined);
   const recordingObjectUrlRef = useRef<string | undefined>(undefined);
   const transcriptChannelRef = useRef<BroadcastChannel | undefined>(undefined);
   const speechTranscriberRef = useRef<PresenterSpeechTranscriber | undefined>(undefined);
@@ -366,6 +368,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
   useEffect(() => {
     return () => {
       void speechTranscriberRef.current?.stop();
+      recorderRef.current?.cancel();
       recorderRef.current?.revokeObjectUrl();
       if (recordingObjectUrlRef.current) URL.revokeObjectURL(recordingObjectUrlRef.current);
     };
@@ -411,17 +414,6 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
       window.removeEventListener('message', handleMessage);
     };
   }, [applyTimerCommand, postCommand, resolvedSessionId]);
-
-  useEffect(() => {
-    function handlePageHide() {
-      postCommand({ command: 'close' });
-    }
-
-    window.addEventListener('pagehide', handlePageHide);
-    return () => {
-      window.removeEventListener('pagehide', handlePageHide);
-    };
-  }, [postCommand]);
 
   useEffect(() => {
     if (!remotePanelOpen) return;
@@ -605,6 +597,28 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     [getCurrentTranscriptMarker, refreshTranscriptSegments],
   );
 
+  const postRecordingCheckpoint = useCallback((audioChunk?: Blob) => {
+    const activeRecording = activeRecordingRef.current;
+    if (!activeRecording) return;
+    const now = new Date().toISOString();
+    const recording: TranscriptRecording = {
+      ...activeRecording,
+      updatedAt: now,
+      durationMs: Math.max(0, Date.now() - recordingStartedAtRef.current),
+      audio: {
+        ...activeRecording.audio,
+        ...(audioChunk?.type ? { mimeType: audioChunk.type } : {}),
+      },
+      segments: transcriptSegmentsRef.current,
+    };
+    activeRecordingRef.current = recording;
+    postCommand({
+      ...(audioChunk ? { audioChunk } : {}),
+      command: 'recording-checkpoint',
+      recording,
+    });
+  }, [postCommand]);
+
   const startRecording = useCallback(async () => {
     if (
       recordingStatus === 'recording' ||
@@ -621,10 +635,30 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
       fullTranscriptTextRef.current = '';
       transcriptSegmentsRef.current = [];
       slideTranscriptMarkersRef.current = [];
-      const recorder = new PresenterAudioRecorder();
+      const now = new Date().toISOString();
+      activeRecordingRef.current = {
+        id: createTranscriptId('recording'),
+        name: `Presenter recording ${new Date(now).toLocaleString()}`,
+        createdAt: now,
+        updatedAt: now,
+        durationMs: 0,
+        ...(transcriptionLanguageCodeRef.current
+          ? { language: transcriptionLanguageCodeRef.current }
+          : {}),
+        modelPresetId: webSpeechTranscriptionModelId,
+        audio: {
+          mimeType: 'audio/webm',
+          storage: 'inline',
+        },
+        segments: [],
+      };
+      const recorder = new PresenterAudioRecorder({
+        onChunk: (chunk) => postRecordingCheckpoint(chunk.blob),
+        timesliceMs: 250,
+      });
       recorderRef.current = recorder;
-      await recorder.start();
       recordingStartedAtRef.current = Date.now();
+      await recorder.start();
       slideTranscriptMarkersRef.current = [getCurrentTranscriptMarker(0)];
       refreshTranscriptSegments('', false);
       const speechTranscriber = new PresenterSpeechTranscriber({
@@ -636,6 +670,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
       } catch (error) {
         recorder.cancel();
         recorderRef.current = undefined;
+        activeRecordingRef.current = undefined;
         throw error;
       }
       speechTranscriberRef.current = speechTranscriber;
@@ -649,55 +684,65 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     }
   }, [
     getCurrentTranscriptMarker,
+    postRecordingCheckpoint,
     publishTranscriptState,
     recordingStatus,
     refreshTranscriptSegments,
     updateLiveTranscript,
   ]);
 
-  const stopRecording = useCallback(async () => {
+  const stopRecording = useCallback(() => {
+    if (recordingStopPromiseRef.current) return recordingStopPromiseRef.current;
     const recorder = recorderRef.current;
-    if (!recorder) return;
-    try {
-      setRecordingStatus('transcribing');
-      await speechTranscriberRef.current?.stop();
-      const finalTranscriptText = speechTranscriberRef.current?.getText();
-      if (finalTranscriptText) {
-        updateLiveTranscript(finalTranscriptText, true);
-      } else {
-        refreshTranscriptSegments(fullTranscriptTextRef.current, true);
+    if (!recorder) return Promise.resolve();
+    const stopPromise = (async () => {
+      try {
+        setRecordingStatus('transcribing');
+        await speechTranscriberRef.current?.stop();
+        const finalTranscriptText = speechTranscriberRef.current?.getText();
+        if (finalTranscriptText) {
+          updateLiveTranscript(finalTranscriptText, true);
+        } else {
+          refreshTranscriptSegments(fullTranscriptTextRef.current, true);
+        }
+        const result = await recorder.stop();
+        const objectUrl = recorder.getObjectUrl() ?? URL.createObjectURL(result.blob);
+        recordingObjectUrlRef.current = objectUrl;
+        const now = new Date().toISOString();
+        const activeRecording = activeRecordingRef.current;
+        const recordingId = activeRecording?.id ?? createTranscriptId('recording');
+        const recording: TranscriptRecording = {
+          ...activeRecording,
+          id: recordingId,
+          name: activeRecording?.name ?? `Presenter recording ${new Date(now).toLocaleString()}`,
+          createdAt: activeRecording?.createdAt ?? now,
+          updatedAt: now,
+          durationMs: result.durationMs,
+          ...(transcriptionLanguageCode ? { language: transcriptionLanguageCode } : {}),
+          modelPresetId: webSpeechTranscriptionModelId,
+          audio: {
+            mimeType: result.mimeType,
+            objectUrl,
+            storage: 'inline',
+          },
+          segments: transcriptSegmentsRef.current,
+        };
+        postCommand({ audioBlob: result.blob, command: 'save-recording', recording });
+        setRecordingStatus('saved');
+        publishTranscriptState('saved');
+      } catch (error) {
+        setRecordingError(error instanceof Error ? error.message : 'Recording could not be saved.');
+        setRecordingStatus('save-failed');
+        publishTranscriptState('save-failed');
+      } finally {
+        recorderRef.current = undefined;
+        activeRecordingRef.current = undefined;
+        speechTranscriberRef.current = undefined;
+        recordingStopPromiseRef.current = undefined;
       }
-      const result = await recorder.stop();
-      const objectUrl = recorder.getObjectUrl() ?? URL.createObjectURL(result.blob);
-      recordingObjectUrlRef.current = objectUrl;
-      const now = new Date().toISOString();
-      const recordingId = createTranscriptId('recording');
-      const recording: TranscriptRecording = {
-        id: recordingId,
-        name: `Presenter recording ${new Date(now).toLocaleString()}`,
-        createdAt: now,
-        updatedAt: now,
-        durationMs: result.durationMs,
-        ...(transcriptionLanguageCode ? { language: transcriptionLanguageCode } : {}),
-        modelPresetId: webSpeechTranscriptionModelId,
-        audio: {
-          mimeType: result.mimeType,
-          objectUrl,
-          storage: 'inline',
-        },
-        segments: transcriptSegmentsRef.current,
-      };
-      postCommand({ audioBlob: result.blob, command: 'save-recording', recording });
-      setRecordingStatus('saved');
-      publishTranscriptState('saved');
-    } catch (error) {
-      setRecordingError(error instanceof Error ? error.message : 'Recording could not be saved.');
-      setRecordingStatus('save-failed');
-      publishTranscriptState('save-failed');
-    } finally {
-      recorderRef.current = undefined;
-      speechTranscriberRef.current = undefined;
-    }
+    })();
+    recordingStopPromiseRef.current = stopPromise;
+    return stopPromise;
   }, [
     postCommand,
     publishTranscriptState,
@@ -705,6 +750,29 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     transcriptionLanguageCode,
     updateLiveTranscript,
   ]);
+
+  const finishPresenterView = useCallback(async (closeWindow: boolean) => {
+    if (!recorderRef.current && !recordingStopPromiseRef.current) {
+      postCommand({ command: 'close' });
+      if (closeWindow) window.close();
+      return;
+    }
+    await stopRecording();
+    postCommand({ command: 'close' });
+    if (closeWindow) window.close();
+  }, [postCommand, stopRecording]);
+
+  useEffect(() => {
+    function handlePageHide() {
+      postRecordingCheckpoint();
+      postCommand({ command: 'close' });
+    }
+
+    window.addEventListener('pagehide', handlePageHide);
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide);
+    };
+  }, [postCommand, postRecordingCheckpoint]);
 
   useEffect(() => {
     const channel = transcriptChannelRef.current;
@@ -893,10 +961,11 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     if (action === 'fast-forward-movie') pulsePresenterMovieHold('fast-forward');
     if (action === 'jump-movie-start') controlPresenterMovies('start');
     if (action === 'jump-movie-end') controlPresenterMovies('end');
-    if (action === 'quit-presentation') window.close();
+    if (action === 'quit-presentation') void finishPresenterView(true);
   }, [
     activePageIndex,
     controlPresenterMovies,
+    finishPresenterView,
     goToPage,
     pulsePresenterMovieHold,
     postCommand,
@@ -952,6 +1021,11 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
         return;
       }
       if (!snapshot) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        executePresenterShortcut('quit-presentation');
+        return;
+      }
       if (event.key === '#') {
         event.preventDefault();
         executePresenterShortcut('open-slide-navigator');

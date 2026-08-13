@@ -227,7 +227,7 @@ describe('BrowserPresenterSessionService', () => {
     unsubscribe();
   });
 
-  it('forwards saved presenter recordings from the active presenter session', () => {
+  it('forwards presenter recording checkpoints and final saves from the active session', () => {
     const popup = { location: { href: '' }, postMessage: vi.fn(), closed: false } as unknown as Window;
     const commandHandler = vi.fn();
     const service = new BrowserPresenterSessionService({
@@ -238,6 +238,7 @@ describe('BrowserPresenterSessionService', () => {
     });
     const project = sampleProject.createSampleProject();
     const audioBlob = new Blob(['partial talk audio'], { type: 'audio/webm;codecs=opus' });
+    const audioChunk = new Blob(['checkpoint audio'], { type: 'audio/webm;codecs=opus' });
     const recording = {
       id: 'recording-1',
       name: 'Presenter recording',
@@ -269,6 +270,26 @@ describe('BrowserPresenterSessionService', () => {
       new MessageEvent('message', {
         origin: 'https://localstudio.test',
         data: {
+          audioChunk,
+          command: 'recording-checkpoint',
+          recording,
+          sessionId: 'session-7',
+          source: 'localstudio-presenter-window',
+          type: 'command',
+        },
+      }),
+    );
+
+    expect(commandHandler).toHaveBeenCalledWith({
+      audioChunk,
+      command: 'recording-checkpoint',
+      recording,
+    });
+
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        origin: 'https://localstudio.test',
+        data: {
           audioBlob,
           command: 'save-recording',
           recording,
@@ -284,6 +305,22 @@ describe('BrowserPresenterSessionService', () => {
       command: 'save-recording',
       recording,
     });
+
+    commandHandler.mockClear();
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        origin: 'https://localstudio.test',
+        data: {
+          audioChunk: 'not-a-blob',
+          command: 'recording-checkpoint',
+          recording,
+          sessionId: 'session-7',
+          source: 'localstudio-presenter-window',
+          type: 'command',
+        },
+      }),
+    );
+    expect(commandHandler).not.toHaveBeenCalled();
     unsubscribe();
   });
 });
