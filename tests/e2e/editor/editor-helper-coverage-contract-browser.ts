@@ -158,6 +158,9 @@ export async function evaluateEditorHelperCoverageContract() {
   const blipOpacity = pptxVisualStyle.getOpacity(
     parseXml('<a:blipFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:blip><a:alphaModFix amt="42000"/></a:blip></a:blipFill>'),
   );
+  const defaultBlipOpacity = pptxVisualStyle.getOpacity(
+    parseXml('<a:blipFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:blip><a:alphaModFix/></a:blip></a:blipFill>'),
+  );
   const solidOpacity = pptxVisualStyle.getOpacity(
     parseXml('<a:spPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:solidFill><a:alpha val="25000"/></a:solidFill></a:spPr>'),
   );
@@ -213,7 +216,7 @@ export async function evaluateEditorHelperCoverageContract() {
     generatedElementIds: generatedProject.pages[0]?.elementIds,
     generatedPageName: generatedProject.pages[0]?.name,
     normalizedCrop,
-    opacities: [blipOpacity, solidOpacity],
+    opacities: [blipOpacity, defaultBlipOpacity, solidOpacity],
     polygonPoints,
     shapeLabels,
     visualColors: [themedColor, shadedColor, systemColor],

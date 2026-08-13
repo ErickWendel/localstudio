@@ -67,6 +67,7 @@ function getHexColor(element: ParentNode | undefined, fallback: string, theme?: 
 }
 
 function toUnitInterval(value: string | null | undefined) {
+  if (value === null || value === undefined || value.trim() === '') return undefined;
   const numericValue = Number(value);
   return Number.isFinite(numericValue)
     ? Math.max(0, Math.min(1, numericValue / 100000))

@@ -10,7 +10,7 @@ import {
   type RefObject,
 } from 'react';
 import type Konva from 'konva';
-import { Circle, Group, Layer, Rect, Stage, Text, Transformer } from 'react-konva';
+import { Circle, Group, Image as KonvaImage, Layer, Rect, Stage, Text, Transformer } from 'react-konva';
 import type {
   AlignMode,
   ElementFramePatch,
@@ -255,6 +255,11 @@ export function CanvasWorkspace({
     | undefined
   >();
   const page = project.pages.find((item) => item.id === activePageId) ?? project.pages[0];
+  const pageBackgroundAssetUrl =
+    page?.background.type === 'asset'
+      ? project.assets[page.background.assetId]?.objectUrl
+      : undefined;
+  const pageBackgroundImage = canvasWorkspaceUtils.useCanvasImage(pageBackgroundAssetUrl);
   const activeLayout = page?.layoutId ? project.slideLayouts?.[page.layoutId] : undefined;
   const layoutVisibleElements = useMemo(
     () =>
@@ -1296,6 +1301,16 @@ export function CanvasWorkspace({
                 x={0}
                 y={0}
               />
+              {pageBackgroundImage ? (
+                <KonvaImage
+                  height={stageHeight}
+                  image={pageBackgroundImage}
+                  listening={false}
+                  width={stageWidth}
+                  x={0}
+                  y={0}
+                />
+              ) : null}
               {visibleElements.map((element) => {
                 const animationState = getElementAnimationState(element);
                 const isLayoutElement = layoutVisibleElementIds.has(element.id);

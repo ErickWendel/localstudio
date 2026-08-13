@@ -22,7 +22,7 @@ test('executes editor visual and crop helper contracts in the browser runtime', 
     { height: 0.75, width: 0.75, x: 0.25, y: 0.25 },
   ]);
   expect(result.normalizedCrop).toEqual({ height: 1, width: 1, x: 0, y: 0 });
-  expect(result.opacities).toEqual([0.42, 0.25]);
+  expect(result.opacities).toEqual([0.42, undefined, 0.25]);
   expect(result.visualColors).toEqual(['#E0E0E0', '#334D66', '#ABCDEF']);
   expect(result.exportSummary).toBe(
     'PowerPoint exported: 1 slide, 3 media items, 2 animation builds; 1 animation fallback, 1 transition fallback, 1 media fallback, 1 fallback.',

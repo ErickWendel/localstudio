@@ -243,6 +243,19 @@ function getBackgroundColor(document: Document, theme: ParseScope['theme'], fall
   return pptxVisualStyle.getHexColor(background, fallback, theme);
 }
 
+function getBackgroundAssetPath(
+  document: Document,
+  relationships: Map<string, PptxRelationship>,
+) {
+  const background = pptxXml.firstDescendant(document, 'bgPr');
+  const blip = background ? pptxXml.firstDescendant(background, 'blip') : undefined;
+  const relationshipId = pptxXml.getRelationshipAttr(blip, 'embed');
+  if (!relationshipId) return undefined;
+  const relationship = relationships.get(relationshipId);
+  if (!relationship || relationship.targetMode !== 'Internal') return undefined;
+  return relationship.target;
+}
+
 function findRelationshipByType(relationships: Map<string, PptxRelationship>, typeSuffix: string) {
   return Array.from(relationships.values()).find((relationship) =>
     relationship.type.endsWith(typeSuffix),
@@ -844,7 +857,9 @@ async function parseLayout(
     ...object,
     zIndex: index,
   }));
+  const backgroundAssetPath = getBackgroundAssetPath(document, relationships);
   return {
+    ...(backgroundAssetPath ? { backgroundAssetPath } : {}),
     backgroundColor: getBackgroundColor(document, theme, '#FFFFFF'),
     id: layoutId,
     name: getLayoutNameFromDocument(document, layoutPath),
@@ -902,7 +917,10 @@ async function parseSlide(
     if (object.kind === 'video' && startTrigger) object.startTrigger = startTrigger;
   }
   const resolvedLayoutId = parsedLayout?.id ?? layoutId;
+  const backgroundAssetPath =
+    getBackgroundAssetPath(document, rels) ?? parsedLayout?.backgroundAssetPath;
   return {
+    ...(backgroundAssetPath ? { backgroundAssetPath } : {}),
     backgroundColor: getBackgroundColor(document, theme, parsedLayout?.backgroundColor ?? '#000000'),
     id: slideId,
     ...(resolvedLayoutId ? { layoutId: resolvedLayoutId } : {}),

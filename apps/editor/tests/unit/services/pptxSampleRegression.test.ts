@@ -1,12 +1,82 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { BrowserPptxImportService } from '../../../src/services/importing/pptx/pptxImportService';
+import { pptxZip } from '../../../src/services/importing/pptx/pptxZip';
 
 const samplePath = '/Users/erickwendel/Downloads/web-ai-beyond-chat-codecon-meetup-26052026.pptx';
+const browserAiSamplePath =
+  '/Users/erickwendel/Downloads/A revolução de IA integrada em navegadores.pptx';
 const sampleRegressionEnabled = process.env.LOCALSTUDIO_PPTX_SAMPLE_REGRESSION === '1';
 const sampleTest = sampleRegressionEnabled ? it : it.skip;
 
 describe('PowerPoint sample regression', () => {
+  sampleTest('preserves image backgrounds and dominant text styling in the browser AI deck', async () => {
+    const bytes = await readFile(browserAiSamplePath);
+    const service = new BrowserPptxImportService();
+    const packageFiles = await pptxZip.readPackage(
+      new File([bytes], 'A revolução de IA integrada em navegadores.pptx'),
+    );
+    const slideOneImageSizes = packageFiles
+      .filter((file) =>
+        /ppt\/media\/(image1\.png|image4\.png|image9\.png|image19\.png|image37\.jpg|image43\.png)$/.test(
+          file.path,
+        ),
+      )
+      .map((file) => file.blob.size);
+    const project = await service.importPowerPoint({
+      file: new File([bytes], 'A revolução de IA integrada em navegadores.pptx', {
+        type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      }),
+    });
+    const firstPage = project.pages[0];
+    const title = firstPage?.elementIds
+      .map((elementId) => project.elements[elementId])
+      .find(
+        (element) =>
+          element?.type === 'text' &&
+          element.text.includes('A revolução de IA integrada em navegadores'),
+      );
+
+    expect(project.pages).toHaveLength(59);
+    expect(firstPage?.background).toEqual({ type: 'color', color: '#FFFFFF' });
+    if (!firstPage) throw new Error('Expected slide 1.');
+    const backgroundImage = project.elements[firstPage.elementIds[0] ?? ''];
+    expect(backgroundImage).toMatchObject({
+      id: `${firstPage.id}-background-image`,
+      type: 'image',
+      x: 0,
+      y: 0,
+      width: firstPage.width,
+      height: firstPage.height,
+      locked: false,
+    });
+    if (!backgroundImage || backgroundImage.type !== 'image') {
+      throw new Error('Expected slide 1 to preserve its editable background image.');
+    }
+    expect(project.assets[backgroundImage.assetId]?.fileName).toBe('image47.png');
+    expect(title).toMatchObject({ fill: '#FFFFFF', fontFamily: 'Roboto' });
+    const firstPageImages = firstPage.elementIds
+      .map((elementId) => project.elements[elementId])
+      .filter((element) => element?.type === 'image');
+    expect(firstPageImages).toHaveLength(7);
+    expect(firstPageImages.every((element) => element.opacity === 1)).toBe(true);
+    expect(firstPageImages.every((element) => project.assets[element.assetId]?.objectUrl)).toBe(true);
+    expect(
+      firstPageImages.map((element) => project.assets[element.assetId]?.fileName).sort(),
+    ).toEqual(
+      [
+        'image1.png',
+        'image4.png',
+        'image9.png',
+        'image19.png',
+        'image37.jpg',
+        'image43.png',
+        'image47.png',
+      ].sort(),
+    );
+    expect(slideOneImageSizes.every((size) => size > 1_000)).toBe(true);
+  });
+
   sampleTest('imports the exported Codecon PPTX with editable objects and media', async () => {
     const bytes = await readFile(samplePath);
     const service = new BrowserPptxImportService();

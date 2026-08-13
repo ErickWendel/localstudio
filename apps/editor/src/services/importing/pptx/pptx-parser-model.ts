@@ -110,6 +110,7 @@ export type PptxSlideObject =
     };
 
 export interface PptxSlide {
+  backgroundAssetPath?: string;
   backgroundColor: string;
   id: string;
   layoutId?: string;
@@ -125,6 +126,7 @@ export interface PptxSlide {
 }
 
 export interface PptxLayout {
+  backgroundAssetPath?: string;
   backgroundColor: string;
   id: string;
   name: string;

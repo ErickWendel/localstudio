@@ -1331,7 +1331,10 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   async function copyPageToClipboard(pageId: string) {
     const payload = vm.getSlideClipboardPayload(pageId);
     if (!payload) return;
-    await editorShellBrowserUtils.writeSlideClipboardPayload(JSON.stringify(payload));
+    const transferablePayload = editorShellBrowserUtils
+      .makeSlideClipboardPayloadTransferable(payload)
+      .then((nextPayload) => JSON.stringify(nextPayload));
+    await editorShellBrowserUtils.writeSlideClipboardPayload(transferablePayload);
   }
 
   useEffect(() => {

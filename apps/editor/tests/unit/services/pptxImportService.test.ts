@@ -440,6 +440,43 @@ function createStandardsFixture() {
 }
 
 describe('BrowserPptxImportService', () => {
+  it('imports image-filled slide backgrounds and uses the dominant text run style', async () => {
+    const imageBackgroundSlideXml = slideXml
+      .replace(
+        '<p:bg><p:bgPr><a:solidFill><a:srgbClr val="101010"/></a:solidFill></p:bgPr></p:bg>',
+        '<p:bg><p:bgPr><a:blipFill><a:blip r:embed="rIdImage"/><a:stretch><a:fillRect/></a:stretch></a:blipFill></p:bgPr></p:bg>',
+      )
+      .replace(
+        '<a:r><a:rPr sz="2400" b="1"><a:solidFill><a:srgbClr val="ffcc00"/></a:solidFill><a:latin typeface="Arial"/></a:rPr><a:t>Editable title</a:t></a:r>',
+        '<a:r><a:rPr sz="2400" b="1"><a:solidFill><a:srgbClr val="00aa00"/></a:solidFill><a:latin typeface="Arial"/></a:rPr><a:t>&lt;/ </a:t></a:r><a:r><a:rPr sz="2400" b="1"><a:solidFill><a:srgbClr val="ffffff"/></a:solidFill><a:latin typeface="Roboto"/></a:rPr><a:t>Editable title</a:t></a:r>',
+      );
+    const service = new BrowserPptxImportService();
+    const project = await service.importPowerPoint({ file: createPptxFixture(imageBackgroundSlideXml) });
+    const page = project.pages[0];
+    const title = Object.values(project.elements).find(
+      (element) => element.type === 'text' && element.text === '</ Editable title',
+    );
+
+    expect(page?.background).toEqual({ type: 'color', color: '#FFFFFF' });
+    const backgroundImage = page?.elementIds
+      .map((elementId) => project.elements[elementId])
+      .find((element) => element?.id.endsWith('-background-image'));
+    expect(backgroundImage).toMatchObject({
+      type: 'image',
+      x: 0,
+      y: 0,
+      width: 1920,
+      height: 1080,
+      locked: false,
+    });
+    if (!backgroundImage || backgroundImage.type !== 'image') {
+      throw new Error('Expected an editable background image layer.');
+    }
+    expect(page?.elementIds[0]).toBe(backgroundImage.id);
+    expect(project.assets[backgroundImage.assetId]?.fileName).toBe('image1.png');
+    expect(title).toMatchObject({ fill: '#FFFFFF', fontFamily: 'Roboto' });
+  });
+
   it('imports editable text, original images, and playable video assets from PPTX', async () => {
     const service = new BrowserPptxImportService();
     const project = await service.importPowerPoint({ file: createPptxFixture() });

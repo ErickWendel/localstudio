@@ -6,7 +6,9 @@ import { selectLayerAndExpectCanvasSelection } from './drag-reorder-layer-select
 
 export async function reorderAnimationBuilds(editor: EditorAppPage, page: Page) {
   await editor.openTool('Layout');
-  await expect(page.locator('.layer-list article[role="button"]')).toHaveCount(2);
+  await expect(
+    page.locator('.layer-list article[role="button"]:not(.layer-row-static)'),
+  ).toHaveCount(2);
   await selectLayerAndExpectCanvasSelection(page, 'Layer text', /text-/);
   await editor.openTool('Animate');
   await expect(page.getByRole('button', { name: 'Add animation' })).toBeEnabled();

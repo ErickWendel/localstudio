@@ -36,6 +36,7 @@ interface LayersPanelProps {
   activePageId: string;
   selection: SelectionState;
   onSelectElement?: (elementId: string, options?: { additive?: boolean }) => void;
+  onSelectSlide?: () => void;
   onSetElementVisibility?: (elementId: string, visible: boolean) => void;
   onSetElementLock?: (elementId: string, locked: boolean) => void;
   onDeleteElement?: (elementId: string) => void;
@@ -68,6 +69,9 @@ function getLayerLabel(element: DesignElement, project: ProjectDocument) {
   if (element.id === 'text-subtitle') return 'Subtitle';
   if (element.id.startsWith('text-subtitle-copy')) return 'Subtitle copy';
   if (element.id === 'image-hero') return 'Selected Image';
+  if (element.type === 'image' && element.id.endsWith('-background-image')) {
+    return `Slide background — ${project.assets[element.assetId]?.name ?? 'Imported Image'}`;
+  }
   if (element.type === 'image' && element.assetId === 'asset-hero') return 'Selected Image copy';
   if (element.type === 'image' && element.id.includes('-copy')) {
     return `${project.assets[element.assetId]?.name ?? 'Imported Image'} copy`;
@@ -104,6 +108,7 @@ export function LayersPanel({
   activePageId,
   selection,
   onSelectElement,
+  onSelectSlide,
   onSetElementVisibility,
   onSetElementLock,
   onDeleteElement,
@@ -420,7 +425,18 @@ export function LayersPanel({
               </article>
             );
           })}
-          <article className="layer-row layer-row-static ew-surface ew-compact-row">
+          <article
+            aria-label="Page Background"
+            className="layer-row layer-row-static ew-surface ew-compact-row"
+            role="button"
+            tabIndex={0}
+            onClick={() => onSelectSlide?.()}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter' && event.key !== ' ') return;
+              event.preventDefault();
+              onSelectSlide?.();
+            }}
+          >
             <GripVertical size={15} />
             <Square size={16} />
             <span className="layer-row-name ew-ellipsis">Page Background</span>
