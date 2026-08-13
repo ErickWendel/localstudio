@@ -83,6 +83,19 @@ export async function runPresenterSessionServiceContractScenario(
   window.dispatchEvent(
     new MessageEvent('message', {
       data: {
+        audioChunk: new Blob(['checkpoint'], { type: 'audio/webm' }),
+        command: 'recording-checkpoint',
+        recording: { id: 'recording-1', segments: [] },
+        sessionId: opened.sessionId,
+        source: 'localstudio-presenter-window',
+        type: 'command',
+      },
+      origin: new URL(window.location.href).origin,
+    }),
+  );
+  window.dispatchEvent(
+    new MessageEvent('message', {
+      data: {
         command: 'save-recording',
         recording: { id: 'recording-1', segments: [] },
         sessionId: opened.sessionId,
@@ -106,6 +119,7 @@ export async function runPresenterSessionServiceContractScenario(
     );
   }
   for (const invalidCommand of [
+    { audioChunk: 'invalid', command: 'recording-checkpoint', recording: { id: 'invalid' } },
     { command: 'save-recording' },
     { command: 'update-stream-peer', peerId: 42 },
     { command: 'update-timer', timer: { elapsedMs: '1', paused: false } },

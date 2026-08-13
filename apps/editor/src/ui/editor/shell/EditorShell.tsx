@@ -3,7 +3,7 @@ import { localStudioAnalyticsConfig } from '@localstudio/analytics-config/config
 import type Konva from 'konva';
 import type { AppServices } from '../../../app/composition';
 import { placeholderImage } from '../../../domain/assets/placeholderImage';
-import type { ProjectDocument } from '../../../domain/documents/model';
+import type { ProjectDocument, TranscriptRecording } from '../../../domain/documents/model';
 import { pageVisibility } from '../../../domain/documents/pageVisibility';
 import type { ShareMetadata, SharePublishProgress } from '../../../services/contracts/interfaces';
 import { analyticsModelProperties } from '../../../services/analytics/analyticsModelProperties';
@@ -169,6 +169,9 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const imageExportNoticeTimeoutRef = useRef<number | undefined>(undefined);
   const presenterFullscreenEnteredRef = useRef(false);
   const pendingShareAfterLocalSaveRef = useRef(false);
+  const pendingPresenterRecordingsRef = useRef(
+    new Map<string, { chunks: Blob[]; recording: TranscriptRecording }>(),
+  );
   const lastPublishedShareSelectionRef = useRef<
     | {
         projectSignature: string;
@@ -201,7 +204,15 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const deckTranslationStatus = vm.deckTranslationProgress
     ? `Translating ${vm.deckTranslationProgress.currentPageName} · ${vm.deckTranslationProgress.completedPages}/${vm.deckTranslationProgress.totalPages}`
     : undefined;
-  const publicSharingAvailable = vm.mirrorState.enabled && vm.mirrorState.status === 'synced';
+  const publicSharingConfigured = vm.hasMirrorConfig;
+  const lastMirrorSyncTime = Date.parse(vm.mirrorState.lastSyncedAt ?? '');
+  const mirrorHasCurrentProject =
+    vm.mirrorState.enabled &&
+    vm.mirrorState.status === 'synced' &&
+    Number.isFinite(lastMirrorSyncTime) &&
+    lastMirrorSyncTime >= Date.parse(vm.project.updatedAt);
+  const publicSharingAvailable =
+    publicSharingConfigured && (Boolean(shareMetadata?.shareId) || mirrorHasCurrentProject);
   const publicSharingUnavailableReason = 'Public links cannot be created without remote storage.';
   const hasDirectoryPersistence = services.persistenceMode === 'directory';
   const shareRecordingOptions = Object.values(vm.project.recordings ?? {})
@@ -212,6 +223,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       label: recording.name,
       segmentCount: recording.segments.length,
     }));
+  const latestShareRecordingId = shareRecordingOptions[0]?.id;
   const imageGenerationState = vm.modelStates.find(
     (model) => model.id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID,
   );
@@ -538,7 +550,21 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   }
 
   const closePresenterViewSession = useCallback(() => {
+    for (const pendingRecording of pendingPresenterRecordingsRef.current.values()) {
+      if (pendingRecording.chunks.length === 0) continue;
+      const audioBlob = new Blob(pendingRecording.chunks, {
+        type: pendingRecording.recording.audio.mimeType,
+      });
+      vm.addTranscriptRecording({
+        ...pendingRecording.recording,
+        audio: {
+          ...pendingRecording.recording.audio,
+          objectUrl: URL.createObjectURL(audioBlob),
+        },
+      });
+    }
     presenterSessionServiceRef.current?.closePresenterWindow();
+    pendingPresenterRecordingsRef.current.clear();
     presenterFullscreenEnteredRef.current = false;
     vm.clearAnimationPreview();
     setAudienceFullscreenPromptOpen(false);
@@ -1113,6 +1139,38 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   useEffect(() => {
     if (!presenterRemoteSession && !presenterSessionId) return undefined;
     return getPresenterSessionService().subscribeToCommands((message) => {
+      const savePresenterRecording = (
+        recording: TranscriptRecording,
+        audioBlob?: Blob,
+      ) => {
+        const editorOwnedRecording = audioBlob
+          ? {
+              ...recording,
+              audio: {
+                ...recording.audio,
+                objectUrl: URL.createObjectURL(audioBlob),
+              },
+            }
+          : recording;
+        const projectWithRecording = {
+          ...vm.project,
+          recordings: {
+            ...(vm.project.recordings ?? {}),
+            [editorOwnedRecording.id]: editorOwnedRecording,
+          },
+          updatedAt: new Date().toISOString(),
+        };
+        vm.addTranscriptRecording(editorOwnedRecording);
+        getPresenterSessionService().publishState(
+          createPresenterStatePayload({
+            activePageId: vm.activePageId,
+            animationPreview: vm.animationPreview,
+            presenterMode: presenterSessionId || remotePresenterActive ? 'presenting' : 'ready',
+            project: projectWithRecording,
+          }),
+        );
+      };
+
       if (message.command === 'start-presenting') {
         const firstPageId =
           pageVisibility.getFirstVisiblePage(vm.project)?.id ??
@@ -1160,32 +1218,19 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         return;
       }
       if (message.command === 'save-recording') {
-        const editorOwnedRecording = message.audioBlob
-          ? {
-              ...message.recording,
-              audio: {
-                ...message.recording.audio,
-                objectUrl: URL.createObjectURL(message.audioBlob),
-              },
-            }
-          : message.recording;
-        const projectWithRecording = {
-          ...vm.project,
-          recordings: {
-            ...(vm.project.recordings ?? {}),
-            [editorOwnedRecording.id]: editorOwnedRecording,
-          },
-          updatedAt: new Date().toISOString(),
-        };
-        vm.addTranscriptRecording(editorOwnedRecording);
-        getPresenterSessionService().publishState(
-          createPresenterStatePayload({
-            activePageId: vm.activePageId,
-            animationPreview: vm.animationPreview,
-            presenterMode: presenterSessionId || remotePresenterActive ? 'presenting' : 'ready',
-            project: projectWithRecording,
-          }),
-        );
+        pendingPresenterRecordingsRef.current.delete(message.recording.id);
+        savePresenterRecording(message.recording, message.audioBlob);
+        return;
+      }
+      if (message.command === 'recording-checkpoint') {
+        const pendingRecording = pendingPresenterRecordingsRef.current.get(message.recording.id);
+        pendingPresenterRecordingsRef.current.set(message.recording.id, {
+          chunks: [
+            ...(pendingRecording?.chunks ?? []),
+            ...(message.audioChunk ? [message.audioChunk] : []),
+          ],
+          recording: message.recording,
+        });
         return;
       }
       if (message.command === 'update-stream-peer') {
@@ -1367,23 +1412,29 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   );
 
   useEffect(() => {
-    if (!publicSharingAvailable) {
-      if (!shareMetadata?.shareId) return undefined;
+    if (!shareMetadata?.shareId) return undefined;
+    if (!mirrorHasCurrentProject) {
+      const nextStatus = vm.mirrorState.status === 'failed' ? 'sync-failed' : 'syncing';
+      if (shareMetadata.status === nextStatus) return undefined;
       const timeoutId = window.setTimeout(() => {
-        setShareMetadata((current) => (current ? { ...current, status: 'sync-failed' } : current));
+        setShareMetadata((current) => (current ? { ...current, status: nextStatus } : current));
       }, 0);
       return () => {
         window.clearTimeout(timeoutId);
       };
     }
-    if (!shareMetadata?.shareId) return undefined;
-    if (hasPublishedCurrentProjectShare(shareMetadata, undefined, vm.project)) return undefined;
-    void publishCurrentProjectShare().catch(() => undefined);
+    if (
+      hasPublishedCurrentProjectShare(shareMetadata, latestShareRecordingId, vm.project)
+    ) {
+      return undefined;
+    }
+    void publishCurrentProjectShare(latestShareRecordingId).catch(() => undefined);
     return undefined;
   }, [
     hasPublishedCurrentProjectShare,
+    latestShareRecordingId,
+    mirrorHasCurrentProject,
     publishCurrentProjectShare,
-    publicSharingAvailable,
     shareMetadata,
     vm.mirrorState.status,
     vm.project,

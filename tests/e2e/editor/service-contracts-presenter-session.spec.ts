@@ -38,6 +38,7 @@ test('executes presenter session service contracts in the browser runtime', asyn
     'update-stream-peer',
     'go-to-page',
     'next',
+    'recording-checkpoint',
     'save-recording',
     'close',
     'previous',

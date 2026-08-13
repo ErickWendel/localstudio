@@ -203,7 +203,9 @@ function formatTranscriptTimestamp(milliseconds: number) {
 }
 
 function getTranscriptRecordings(project: ProjectDocument): TranscriptRecording[] {
-  return Object.values(project.recordings ?? {}).filter((recording) => recording.segments.length > 0);
+  return Object.values(project.recordings ?? {})
+    .filter((recording) => recording.segments.length > 0)
+    .sort((first, second) => Date.parse(second.createdAt) - Date.parse(first.createdAt));
 }
 
 function getTranscriptQuestionContext(

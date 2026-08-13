@@ -70,6 +70,31 @@ test.describe('public deck view journey', () => {
       align: 'center',
     };
     payload.project.recordings = {
+      'e2e-recording-old': {
+        id: 'e2e-recording-old',
+        name: 'Older E2E presenter recording',
+        createdAt: '2026-07-05T12:00:00.000Z',
+        updatedAt: '2026-07-05T12:00:00.000Z',
+        durationMs: 2200,
+        language: 'en',
+        modelPresetId: 'web-speech-api',
+        audio: {
+          mimeType: 'audio/webm;codecs=opus',
+          objectUrl: 'https://cdn.localstudio.test/recordings/e2e-recording-old.webm',
+          storage: 'remote',
+        },
+        segments: [
+          {
+            id: 'old-segment',
+            text: 'This older recording must not play by default.',
+            startMs: 0,
+            endMs: 2200,
+            final: true,
+            pageIndex: 0,
+            pageName: 'Opening',
+          },
+        ],
+      },
       'e2e-recording': {
         id: 'e2e-recording',
         name: 'E2E presenter recording',
@@ -126,6 +151,10 @@ test.describe('public deck view journey', () => {
     const missingShareSrc = encodeURIComponent('http://localhost/missing-share.json');
     await publicDeck.goto(`/editor/?share=e2e-share&src=${shareSrc}`);
     await publicDeck.expectReady(false);
+    await expect(page.locator('audio').first()).toHaveAttribute(
+      'src',
+      'https://cdn.localstudio.test/recordings/e2e-recording.webm',
+    );
     await expect(page.getByText('1 / 3')).toBeVisible();
     await page.getByRole('button', { name: 'Next slide' }).click();
     await expect(page.getByText('2 / 3')).toBeVisible();

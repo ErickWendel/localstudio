@@ -55,6 +55,7 @@ export type PresenterWindowCommand =
   | { command: 'request-state' }
   | { command: 'reset-timer' }
   | { command: 'resume-timer' }
+  | { audioChunk?: Blob | undefined; command: 'recording-checkpoint'; recording: TranscriptRecording }
   | { command: 'set-prompt-provider'; providerId: string }
   | { audioBlob?: Blob | undefined; command: 'save-recording'; recording: TranscriptRecording }
   | { command: 'start-presenting' }
