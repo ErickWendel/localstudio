@@ -5,6 +5,7 @@ import {
   type ReactNode,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
 } from 'react';
 import type { ElementStylePatch } from '../../../domain/commands/elements/basicCommands';
@@ -88,7 +89,7 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
       activePageIndex === project.pages.length - 1 ? activePageIndex - 1 : activePageIndex + 1;
     useImperativeHandle(ref, () => scrollerRef.current as HTMLDivElement, []);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
       if (ignoreNextActiveScrollRef.current) {
         ignoreNextActiveScrollRef.current = false;
         return;
