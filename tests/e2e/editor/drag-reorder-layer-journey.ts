@@ -6,7 +6,7 @@ import { expect } from '../support/journey-test';
 export async function reorderCanvasLayers(editor: EditorAppPage, page: Page) {
   await editor.openTool('Layout');
 
-  const layerRows = page.locator('.layer-list article[role="button"]');
+  const layerRows = page.locator('.layer-list article[role="button"]:not(.layer-row-static)');
   await expect(layerRows).toHaveCount(2);
   await expect(layerRows.nth(0)).toHaveAttribute('aria-label', 'Background Shape');
   await expect(layerRows.nth(1)).toHaveAttribute('aria-label', 'Layer text');

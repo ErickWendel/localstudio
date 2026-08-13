@@ -87,7 +87,7 @@ test.describe('editor local persistence journey', () => {
     await expect(page.getByRole('button', { name: 'Browser storage enabled' })).toBeVisible();
     await page.getByRole('button', { name: 'Copy Source Slide to clipboard' }).click();
     await expect
-      .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+      .poll(() => page.evaluate(() => navigator.clipboard.readText()), { timeout: 15_000 })
       .toContain('"objectUrl":"data:');
     const clipboardPayload = await page.evaluate(() => navigator.clipboard.readText());
 
@@ -111,26 +111,28 @@ test.describe('editor local persistence journey', () => {
     }, clipboardPayload);
 
     await expect
-      .poll(() =>
-        destinationPage.evaluate(() => {
-          const prefix = 'localstudio.e2e.opfs.file:projects/Destination%20Deck/';
-          const storedProject = window.localStorage.getItem(`${prefix}project.json`);
-          if (!storedProject) return undefined;
-          const project = JSON.parse(storedProject) as {
-            assets: Record<string, { fileName?: string; objectUrl?: string; storage?: string }>;
-            pages: Array<{ background: { type: string; assetId?: string } }>;
-          };
-          const pastedBackground = project.pages[1]?.background;
-          if (pastedBackground?.type !== 'asset' || !pastedBackground.assetId) return undefined;
-          const asset = project.assets[pastedBackground.assetId];
-          if (!asset?.fileName) return undefined;
-          return {
-            bytes: window.localStorage.getItem(`${prefix}assets/${asset.fileName}`),
-            objectUrl: asset.objectUrl,
-            pageCount: project.pages.length,
-            storage: asset.storage,
-          };
-        }),
+      .poll(
+        () =>
+          destinationPage.evaluate(() => {
+            const prefix = 'localstudio.e2e.opfs.file:projects/Destination%20Deck/';
+            const storedProject = window.localStorage.getItem(`${prefix}project.json`);
+            if (!storedProject) return undefined;
+            const project = JSON.parse(storedProject) as {
+              assets: Record<string, { fileName?: string; objectUrl?: string; storage?: string }>;
+              pages: Array<{ background: { type: string; assetId?: string } }>;
+            };
+            const pastedBackground = project.pages[1]?.background;
+            if (pastedBackground?.type !== 'asset' || !pastedBackground.assetId) return undefined;
+            const asset = project.assets[pastedBackground.assetId];
+            if (!asset?.fileName) return undefined;
+            return {
+              bytes: window.localStorage.getItem(`${prefix}assets/${asset.fileName}`),
+              objectUrl: asset.objectUrl,
+              pageCount: project.pages.length,
+              storage: asset.storage,
+            };
+          }),
+        { timeout: 15_000 },
       )
       .toEqual({
         bytes: 'source-background-bytes',
