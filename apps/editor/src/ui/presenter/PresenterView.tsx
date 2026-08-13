@@ -1318,6 +1318,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
             project={snapshot.project}
             activePageId={activePage.id}
             selection={{ ...emptySelection, pageId: activePage.id }}
+            hideReadOnlyMediaPlaceholder
             presentationMode
             readOnly
             zoomPercent={100}
