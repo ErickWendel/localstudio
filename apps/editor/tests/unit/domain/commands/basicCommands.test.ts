@@ -542,6 +542,38 @@ describe('editor commands', () => {
     expect(project.pages[0]?.animationBuilds).toBeUndefined();
   });
 
+  it('updates an existing animation build without changing build order or neighboring builds', () => {
+    const project = new basicCommands.SetElementAnimationBuildsCommand(
+      'page-1',
+      ['image-hero', 'text-subtitle', 'text-title'],
+      (elementId) => `build-${elementId}`,
+      { effect: 'reveal', trigger: 'on-click', delayMs: 0 },
+    ).execute(sampleProject.createSampleProject());
+    const previousBuilds = project.pages[0]?.animationBuilds;
+
+    const next = new basicCommands.SetElementAnimationBuildsCommand(
+      'page-1',
+      ['text-subtitle'],
+      (elementId) => `replacement-${elementId}`,
+      { effect: 'dissolve', trigger: 'after-previous', delayMs: 500 },
+    ).execute(project);
+
+    expect(next.pages[0]?.animationBuilds?.map((build) => build.elementId)).toEqual([
+      'image-hero',
+      'text-subtitle',
+      'text-title',
+    ]);
+    expect(next.pages[0]?.animationBuilds?.[1]).toEqual({
+      id: 'build-text-subtitle',
+      elementId: 'text-subtitle',
+      effect: 'dissolve',
+      trigger: 'after-previous',
+      delayMs: 500,
+    });
+    expect(next.pages[0]?.animationBuilds?.[0]).toBe(previousBuilds?.[0]);
+    expect(next.pages[0]?.animationBuilds?.[2]).toBe(previousBuilds?.[2]);
+  });
+
   it('removes an element animation build without affecting other builds', () => {
     const project = new basicCommands.SetElementAnimationBuildsCommand(
       'page-1',

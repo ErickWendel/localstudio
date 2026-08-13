@@ -30,6 +30,11 @@ export const animationMixedSequence = {
     await page.getByRole('button', { name: 'Move Typing headline animation up' }).click();
     await expect(page.getByRole('listitem', { name: /Build 1: Typing headline/ })).toBeVisible();
     await expect(page.getByRole('listitem', { name: /Build 2: Arrow/ })).toBeVisible();
+    await page.getByLabel('Effect for Typing headline').selectOption('dissolve');
+    await expect(page.getByRole('listitem', { name: /Build 1: Typing headline/ })).toBeVisible();
+    await expect(page.getByRole('listitem', { name: /Build 2: Arrow/ })).toBeVisible();
+    await expect(page.getByLabel('Effect for Typing headline')).toHaveValue('dissolve');
+    await expect(page.getByLabel('Effect for Arrow')).toHaveValue('line-draw');
     await page.getByLabel('Start for Typing headline').selectOption('after-transition');
     await page.getByLabel('Start for Arrow').selectOption('after-previous');
     const canvasFrame = page.getByTestId('slide-canvas-frame');

@@ -37,15 +37,13 @@ class SetElementAnimationBuildsCommand implements EditorCommand {
           selectedIds.has(elementId),
         );
         if (orderedSelectedIds.length === 0) return page;
+        const existingBuilds = getPageAnimationBuilds(page);
         const existingByElementId = new Map(
-          getPageAnimationBuilds(page).map((build) => [build.elementId, build]),
+          existingBuilds.map((build) => [build.elementId, build]),
         );
-        const retainedBuilds = getPageAnimationBuilds(page).filter(
-          (build) => !selectedIds.has(build.elementId) && pageElementIds.has(build.elementId),
-        );
-        const nextBuilds = orderedSelectedIds.map((elementId) => {
+        const updatedByElementId = new Map(orderedSelectedIds.map((elementId) => {
           const existing = existingByElementId.get(elementId);
-          return {
+          return [elementId, {
             id: existing?.id ?? this.createBuildId(elementId),
             elementId,
             effect: this.patch.effect,
@@ -60,9 +58,18 @@ class SetElementAnimationBuildsCommand implements EditorCommand {
               ? { lineDrawDirection: this.patch.lineDrawDirection }
               : {}),
             ...(this.patch.mediaAction ? { mediaAction: this.patch.mediaAction } : {}),
-          };
+          }] as const;
+        }));
+        const nextBuilds = existingBuilds.flatMap((build) => {
+          if (!pageElementIds.has(build.elementId)) return [];
+          if (!selectedIds.has(build.elementId)) return [build];
+          const updated = updatedByElementId.get(build.elementId);
+          if (!updated) return [];
+          updatedByElementId.delete(build.elementId);
+          return [updated];
         });
-        return { ...page, animationBuilds: [...retainedBuilds, ...nextBuilds] };
+        nextBuilds.push(...updatedByElementId.values());
+        return { ...page, animationBuilds: nextBuilds };
       }),
       updatedAt: projectMutationUtils.getProjectUpdatedAt(),
     };
