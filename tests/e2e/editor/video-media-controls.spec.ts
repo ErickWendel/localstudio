@@ -21,11 +21,11 @@ test.describe('editor video media controls journey', () => {
     await editor.openTool('Design');
     const movieTabs = page.getByRole('tablist', { name: 'Movie inspector sections' });
     await movieTabs.getByRole('tab', { name: 'Movie' }).click();
-    await expect(page.getByRole('button', { name: 'Pause movie' })).toBeVisible();
-    await page.getByRole('button', { name: 'Pause movie' }).click();
     await expect(page.getByRole('button', { name: 'Play movie' })).toBeVisible();
     await page.getByRole('button', { name: 'Play movie' }).click();
     await expect(page.getByRole('button', { name: 'Pause movie' })).toBeVisible();
+    await page.getByRole('button', { name: 'Pause movie' }).click();
+    await expect(page.getByRole('button', { name: 'Play movie' })).toBeVisible();
 
     await page.getByLabel('Selected video volume').fill('25');
     await expect(page.getByLabel('Selected video volume')).toHaveValue('25');

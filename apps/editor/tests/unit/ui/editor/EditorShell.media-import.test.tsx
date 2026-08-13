@@ -78,7 +78,7 @@ describe('EditorShell media import workflows', () => {
       );
       expect(importedVideo).toMatchObject({
         autoplayInPreview: true,
-        playing: true,
+        playing: false,
         type: 'video',
       });
       expect(savedProject?.assets[importedVideo?.assetId ?? '']?.name).toBe('toolbar-video.mp4');
