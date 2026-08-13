@@ -43,6 +43,10 @@
   transform-origin: top left;
 }
 
+.canvas-presenting-gif-layer {
+  z-index: 2;
+}
+
 .project-video-preloader {
   position: fixed;
   width: 1px;

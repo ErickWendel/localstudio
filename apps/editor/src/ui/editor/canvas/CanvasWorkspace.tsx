@@ -1191,6 +1191,34 @@ export function CanvasWorkspace({
   const marqueeRect = marqueeSelection
     ? getNormalizedStageRect(marqueeSelection.anchor, marqueeSelection.current)
     : undefined;
+  const previewMedia = presentationMode || readOnly || isAnimationPreviewRunning;
+  const presentingGifElements = visibleMediaElements.filter(
+    (element) => previewMedia && element.type === 'gif' && element.playing,
+  );
+  const backgroundMediaElements = visibleMediaElements.filter(
+    (element) => !presentingGifElements.includes(element),
+  );
+
+  function renderMediaElement(element: GifElement | VideoElement) {
+    const asset = project.assets[element.assetId];
+    const animationState = getElementAnimationState(element);
+    return (
+      <CanvasMediaElement
+        animationState={animationState}
+        key={element.id}
+        assetName={
+          asset?.name ?? (element.type === 'video' ? 'Imported video' : 'Imported GIF')
+        }
+        assetUrl={asset?.objectUrl}
+        element={element}
+        interactive={presentationMode || readOnly}
+        opacity={getAnimationOpacity(element.opacity, animationState)}
+        previewMode={previewMedia}
+        scale={{ x: scaleX, y: scaleY }}
+        onMediaElementChange={handleMediaElementChange}
+      />
+    );
+  }
 
   return (
     <div
@@ -1436,27 +1464,16 @@ export function CanvasWorkspace({
             className="canvas-media-layer"
             aria-hidden="true"
           >
-            {visibleMediaElements.map((element) => {
-              const asset = project.assets[element.assetId];
-              const animationState = getElementAnimationState(element);
-              return (
-                <CanvasMediaElement
-                  animationState={animationState}
-                  key={element.id}
-                  assetName={
-                    asset?.name ?? (element.type === 'video' ? 'Imported video' : 'Imported GIF')
-                  }
-                  assetUrl={asset?.objectUrl}
-                  element={element}
-                  interactive={presentationMode || readOnly}
-                  opacity={getAnimationOpacity(element.opacity, animationState)}
-                  previewMode={presentationMode || readOnly || isAnimationPreviewRunning}
-                  scale={{ x: scaleX, y: scaleY }}
-                  onMediaElementChange={handleMediaElementChange}
-                />
-              );
-            })}
+            {backgroundMediaElements.map(renderMediaElement)}
           </div>
+          {presentingGifElements.length > 0 ? (
+            <div
+              className="canvas-media-layer canvas-presenting-gif-layer"
+              aria-hidden="true"
+            >
+              {presentingGifElements.map(renderMediaElement)}
+            </div>
+          ) : null}
           {showEditorOverlays && selectedElement?.type === 'image' && isCropModeActive ? (
             <CropFrameOverlay
               element={selectedElement}

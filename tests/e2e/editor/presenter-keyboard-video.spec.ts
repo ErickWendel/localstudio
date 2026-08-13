@@ -13,6 +13,28 @@ test('presents from the editor and controls slides and video with keyboard short
   await runPresenterKeyboardVideoJourney(page, getServer().baseURL);
 });
 
+test('renders changing GIF frames in the presenter viewer', async ({ page }, testInfo) => {
+  await presenterKeyboardVideoSetup.installFullscreenMock(page);
+  const editor = new EditorAppPage(page, getServer().baseURL);
+  await editor.gotoNewProject();
+  await presenterKeyboardVideoSetup.addGif(editor, page, testInfo);
+
+  const presenterPage = await presenterNotesWindow.open(page);
+  const currentSlide = presenterPage.getByRole('region', { name: 'Current slide' });
+  const gif = currentSlide.locator(
+    'img.canvas-media-element[aria-label="localstudio-e2e-pixel.gif"]',
+  );
+  await expect(gif).toBeVisible();
+  await expect(gif).toHaveAttribute('src', /^blob:/);
+  const firstFrame = await gif.screenshot();
+  await expect
+    .poll(async () => !(await gif.screenshot()).equals(firstFrame), {
+      intervals: [137, 233, 379, 521],
+      timeout: 15_000,
+    })
+    .toBe(true);
+});
+
 test('renders changing video frames in the presenter viewer', async ({ page }) => {
   await presenterKeyboardVideoSetup.installFullscreenMock(page);
   const editor = new EditorAppPage(page, getServer().baseURL);
