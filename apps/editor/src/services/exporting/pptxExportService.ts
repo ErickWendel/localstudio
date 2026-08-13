@@ -101,6 +101,34 @@ function blobToBase64Data(mimeType: string, bytes: Uint8Array) {
   return `${mimeType};base64,${btoa(binary)}`;
 }
 
+function normalizeMimeType(mimeType: string | undefined) {
+  return mimeType?.split(';', 1)[0]?.trim().toLowerCase() || undefined;
+}
+
+function getSpecificMimeType(mimeType: string | undefined) {
+  const normalized = normalizeMimeType(mimeType);
+  return normalized === 'application/octet-stream' || normalized?.endsWith('/*')
+    ? undefined
+    : normalized;
+}
+
+function inferMediaMimeType(asset: Asset) {
+  const fileName = (asset.fileName ?? asset.name).toLowerCase();
+  if (asset.type === 'gif' || fileName.endsWith('.gif')) return 'image/gif';
+  if (asset.type === 'video') {
+    if (fileName.endsWith('.mov')) return 'video/quicktime';
+    if (fileName.endsWith('.webm')) return 'video/webm';
+    return 'video/mp4';
+  }
+  if (fileName.endsWith('.jpg') || fileName.endsWith('.jpeg')) return 'image/jpeg';
+  if (fileName.endsWith('.webp')) return 'image/webp';
+  return 'image/png';
+}
+
+function resolveReadableMimeType(asset: Asset, blob: Blob) {
+  return getSpecificMimeType(blob.type) ?? getSpecificMimeType(asset.mimeType) ?? inferMediaMimeType(asset);
+}
+
 async function assetToData(asset: Asset | undefined, warnings: PresentationExportWarning[], element: DesignElement, page: Page) {
   if (!asset?.objectUrl) {
     warnings.push({
@@ -123,7 +151,11 @@ async function assetToData(asset: Asset | undefined, warnings: PresentationExpor
     });
     return undefined;
   }
-  return blobToBase64Data(asset.mimeType || blob.type || 'application/octet-stream', new Uint8Array(await blob.arrayBuffer()));
+  const mimeType = resolveReadableMimeType(asset, blob);
+  return {
+    data: blobToBase64Data(mimeType, new Uint8Array(await blob.arrayBuffer())),
+    mimeType,
+  };
 }
 
 async function backgroundAssetToData(
@@ -208,11 +240,11 @@ async function addImageElement(
     stage: 'embedding-media',
     total: context.stats.mediaElementCount,
   });
-  const data = await assetToData(asset, context.warnings, element, page);
-  if (!data) return;
+  const media = await assetToData(asset, context.warnings, element, page);
+  if (!media) return;
   slide.addImage({
     ...toPosition(element),
-    data,
+    data: media.data,
     ...(element.type === 'image' && element.flipX ? { flipH: true } : {}),
     objectName: element.id,
     rotate: element.rotation,
@@ -236,12 +268,12 @@ async function addVideoElement(
     stage: 'embedding-media',
     total: context.stats.mediaElementCount,
   });
-  const data = await assetToData(asset, context.warnings, element, page);
-  if (!data) return;
+  const media = await assetToData(asset, context.warnings, element, page);
+  if (!media) return;
   slide.addMedia({
     ...toPosition(element),
-    data,
-    extn: assetFileUtils.getAssetFileExtension(asset?.mimeType ?? 'video/mp4'),
+    data: media.data,
+    extn: assetFileUtils.getAssetFileExtension(media.mimeType),
     objectName: element.id,
     type: 'video',
   });

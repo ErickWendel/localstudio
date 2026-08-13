@@ -4,11 +4,15 @@ import { test, withIsolatedDevServer } from '../support/journey-test';
 const getServer = withIsolatedDevServer(test);
 
 test.describe('editor PowerPoint animation and media export journey', () => {
-  test('exports transition timing, object animation timing, and embedded video package parts', async ({
+  test('exports transition timing, object animation timing, GIFs, and video package parts', async ({
     page,
-  }) => {
+  }, testInfo) => {
     test.setTimeout(90_000);
-    await pptxAnimationMediaExportJourney.runAnimationMediaExport(page, getServer().baseURL);
+    await pptxAnimationMediaExportJourney.runAnimationMediaExport(
+      page,
+      getServer().baseURL,
+      testInfo,
+    );
   });
 
   test('exports styled shape geometry and imported image media to PowerPoint', async ({
