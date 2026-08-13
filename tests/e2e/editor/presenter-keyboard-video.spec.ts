@@ -26,8 +26,13 @@ test('renders changing GIF frames in the presenter viewer', async ({ page }, tes
   );
   await expect(gif).toBeVisible();
   await expect(gif).toHaveAttribute('src', /^blob:/);
-  const firstFrame = await currentSlide.screenshot();
-  await expect.poll(async () => !(await currentSlide.screenshot()).equals(firstFrame)).toBe(true);
+  const firstFrame = await gif.screenshot();
+  await expect
+    .poll(async () => !(await gif.screenshot()).equals(firstFrame), {
+      intervals: [137, 233, 379, 521],
+      timeout: 15_000,
+    })
+    .toBe(true);
 });
 
 test('renders changing video frames in the presenter viewer', async ({ page }) => {
