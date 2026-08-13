@@ -497,6 +497,7 @@ describe('CanvasWorkspace media elements', () => {
       'img[aria-label="Animated loop"]',
     ) as HTMLImageElement;
     expect(editorGif.getAttribute('src')).toBe('blob:gif');
+    expect(container.querySelector('.canvas-media-layer-presenting-gif')).not.toBeInTheDocument();
 
     rerender(
       <CanvasWorkspace
@@ -524,6 +525,7 @@ describe('CanvasWorkspace media elements', () => {
     ) as HTMLImageElement;
     expect(firstPresentationGif).not.toBe(editorGif);
     expect(firstPresentationGif.getAttribute('src')).toBe('blob:gif');
+    expect(container.querySelector('.canvas-media-layer-presenting-gif')).toBeInTheDocument();
 
     rerender(
       <CanvasWorkspace

@@ -26,7 +26,6 @@
 .canvas-media-layer {
   position: absolute;
   inset: 0;
-  z-index: 0;
   pointer-events: none;
 }
 
@@ -41,6 +40,14 @@
   border-radius: 6px;
   object-fit: fill;
   transform-origin: top left;
+}
+
+.canvas-media-layer-presenting-gif {
+  z-index: 2;
+}
+
+.canvas-media-layer-presenting-gif video {
+  visibility: hidden;
 }
 
 .project-video-preloader {

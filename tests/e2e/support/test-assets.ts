@@ -7,6 +7,8 @@ import { createStoredPptxFile } from '../../../apps/editor/tests/unit/services/p
 
 const tinyPngBase64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
+const animatedGifBase64 =
+  'R0lGODlhQABAAPAAAP8AAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQAMgAAACwAAAAAQABAAAACRYSPqcvtD6OctNqLs968+w+G4kiW5omm6sq27gvH8kzX9o3n+s73/g8MCofEovGITCqXzKbzCY1Kp9Sq9YrNarfcrhdQAAAh+QQAMgAAACwAAAAAQABAAIAAAP8AAAACRYSPqcvtD6OctNqLs968+w+G4kiW5omm6sq27gvH8kzX9o3n+s73/g8MCofEovGITCqXzKbzCY1Kp9Sq9YrNarfcrhdQAAA7';
 const bigBuckBunnyMp4FixturePath = fileURLToPath(
   new URL('../fixtures/media/Big_Buck_Bunny_360_10s_1MB.mp4', import.meta.url),
 );
@@ -19,7 +21,7 @@ export async function createTinyPngFixture(testInfo: TestInfo) {
 
 export async function createTinyGifFixture(testInfo: TestInfo) {
   const filePath = testInfo.outputPath('localstudio-e2e-pixel.gif');
-  await writeFile(filePath, Buffer.from(tinyPngBase64, 'base64'));
+  await writeFile(filePath, Buffer.from(animatedGifBase64, 'base64'));
   return filePath;
 }
 

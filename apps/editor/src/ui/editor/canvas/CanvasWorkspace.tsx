@@ -1433,7 +1433,12 @@ export function CanvasWorkspace({
             </Layer>
           </Stage>
           <div
-            className="canvas-media-layer"
+            className={`canvas-media-layer${
+              (presentationMode || readOnly || isAnimationPreviewRunning) &&
+              visibleMediaElements.some((element) => element.type === 'gif' && element.playing)
+                ? ' canvas-media-layer-presenting-gif'
+                : ''
+            }`}
             aria-hidden="true"
           >
             {visibleMediaElements.map((element) => {

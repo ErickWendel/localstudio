@@ -2,10 +2,20 @@ import { type Locator, type Page } from '@playwright/test';
 
 import { EditorAppPage } from '../pages/editor-app.page';
 import { expect } from '../support/journey-test';
-import { getBigBuckBunnyMp4Fixture } from '../support/test-assets';
+import { createTinyGifFixture, getBigBuckBunnyMp4Fixture } from '../support/test-assets';
 import { presenterKeyboardFullscreenMock } from './presenter-keyboard-fullscreen-mock';
 
 export const presenterKeyboardVideoSetup = {
+  async addGif(editor: EditorAppPage, page: Page, testInfo: Parameters<typeof createTinyGifFixture>[0]): Promise<void> {
+    const gifPath = await createTinyGifFixture(testInfo);
+    await editor.openTool('Assets');
+    await page.getByLabel('Import media file').setInputFiles(gifPath);
+    await expect(page.getByText('localstudio-e2e-pixel.gif')).toBeVisible();
+
+    await editor.openTool('Layout');
+    await page.getByRole('button', { name: 'localstudio-e2e-pixel.gif', exact: true }).click();
+  },
+
   async addVideoAndSecondSlide(editor: EditorAppPage, page: Page): Promise<void> {
     await editor.openTool('Assets');
     await page.getByLabel('Import media file').setInputFiles(getBigBuckBunnyMp4Fixture());
