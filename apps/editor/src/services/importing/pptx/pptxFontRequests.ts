@@ -49,17 +49,29 @@ function shouldDownloadFont(fontFamily: string | undefined) {
 
 function collect(project: ProjectDocument): FontImportRequest[] {
   const requests = new Map<string, FontImportRequest>();
-  for (const element of Object.values(project.elements)) {
-    if (element.type !== 'text') continue;
-    const family = normalizeFontFamily(element.fontFamily);
-    if (!family) continue;
-    if (!shouldDownloadFont(family)) continue;
+  const addRequest = (
+    fontFamily: string,
+    fontStyle: FontImportRequest['fontStyle'],
+    fontWeight: number,
+  ) => {
+    const family = normalizeFontFamily(fontFamily);
+    if (!family || !shouldDownloadFont(family)) return;
     const request: FontImportRequest = {
       family,
-      fontStyle: 'normal',
-      fontWeight: element.fontWeight >= 700 ? 700 : 400,
+      fontStyle,
+      fontWeight: fontWeight >= 700 ? 700 : 400,
     };
     requests.set(`${request.family.toLowerCase()}:${request.fontStyle}:${request.fontWeight}`, request);
+  };
+  for (const element of Object.values(project.elements)) {
+    if (element.type !== 'text') continue;
+    addRequest(element.fontFamily, 'normal', element.fontWeight);
+    for (const paragraph of element.paragraphs ?? []) {
+      addRequest(paragraph.fontFamily, paragraph.fontStyle, paragraph.fontWeight);
+      for (const run of paragraph.runs ?? []) {
+        addRequest(run.fontFamily, run.fontStyle, run.fontWeight);
+      }
+    }
   }
   return Array.from(requests.values());
 }

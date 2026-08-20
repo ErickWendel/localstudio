@@ -13,10 +13,12 @@ interface EditorToolbarSurfaceProps {
   hasSelection: boolean;
   imageExportNotice: OperationNoticeState | undefined;
   isExportingImages: boolean;
+  isExportingPdf: boolean;
   isHistoryReadOnly: boolean;
   services: AppServices;
   vm: EditorViewModel;
   onExportImages: () => void;
+  onExportPdf: () => void;
   onNewProject: () => void;
   onOpenKeyboardShortcuts: () => void;
   onOpenPresenterView: () => void;
@@ -33,10 +35,12 @@ export function EditorToolbarSurface({
   hasSelection,
   imageExportNotice,
   isExportingImages,
+  isExportingPdf,
   isHistoryReadOnly,
   services,
   vm,
   onExportImages,
+  onExportPdf,
   onNewProject,
   onOpenKeyboardShortcuts,
   onOpenPresenterView,
@@ -84,6 +88,7 @@ export function EditorToolbarSurface({
       deckTranslationStatus={deckTranslationStatus}
       isTranslatingDeck={Boolean(vm.deckTranslationProgress)}
       isExportingImages={isExportingImages}
+      isExportingPdf={isExportingPdf}
       isExportingPowerPoint={vm.isExportingPowerPoint}
       translationLanguageOptions={vm.translationLanguageOptions}
       translationSourceLanguage={vm.activeSlideLanguage.code}
@@ -116,6 +121,7 @@ export function EditorToolbarSurface({
         void vm.exportPowerPoint();
       }}
       onExportImages={onExportImages}
+      onExportPdf={onExportPdf}
       onMirrorNow={() => {
         vm.requestMirrorNow();
       }}

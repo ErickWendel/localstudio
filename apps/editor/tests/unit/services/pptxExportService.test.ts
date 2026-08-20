@@ -106,6 +106,7 @@ function createExportProject(): ProjectDocument {
         opacity: 0.9,
         crop: { x: 0.1, y: 0.2, width: 0.7, height: 0.6 },
         flipX: true,
+        mask: 'ellipse',
       },
       gif: {
         id: 'gif',
@@ -289,6 +290,7 @@ describe('BrowserPptxExportService', () => {
     expect(slideXml).toContain('<p:timing>');
     expect(slideXml).toContain('<a:srcRect l="10000" t="20000" r="20000" b="20000"/>');
     expect(slideXml).toContain('flipH="1"');
+    expect(slideXml).toContain('prst="ellipse"');
     expect(slideXml).toContain('<a:headEnd type="oval"/>');
     expect(slideXml).toContain('<a:tailEnd type="arrow"/>');
     expect(slideXml).toContain('presetClass="entr"');
@@ -308,6 +310,114 @@ describe('BrowserPptxExportService', () => {
         }),
       ]),
     );
+  });
+
+  it('preserves layout artwork, rich text runs, PowerPoint font units, and connector presets', async () => {
+    const project = createExportProject();
+    const title = project.elements.title;
+    const box = project.elements.box;
+    if (!title || title.type !== 'text') throw new Error('Expected a title text element.');
+    if (!box || box.type !== 'shape') throw new Error('Expected a connector shape element.');
+    project.elements.title = {
+      ...title,
+      paragraphs: [
+        {
+          align: 'center',
+          fill: '#ffcc00',
+          fontFamily: 'Arial',
+          fontSize: 34,
+          fontStyle: 'normal',
+          fontWeight: 700,
+          indent: 0,
+          lineHeight: 1.1,
+          marginLeft: 0,
+          runs: [
+            {
+              fill: '#ffcc00',
+              fontFamily: 'Arial',
+              fontSize: 34,
+              fontStyle: 'normal',
+              fontWeight: 700,
+              highlight: '#45bb8b',
+              text: 'Editable ',
+            },
+            {
+              fill: '#ffffff',
+              fontFamily: 'Aptos',
+              fontSize: 28,
+              fontStyle: 'italic',
+              fontWeight: 400,
+              text: 'title',
+            },
+          ],
+          spaceAfter: 0,
+          spaceBefore: 0,
+          text: 'Editable title',
+        },
+      ],
+    };
+    project.elements.box = {
+      ...box,
+      connectorPreset: 'bentConnector3',
+      shape: 'line',
+    };
+    project.slideLayouts = {
+      layout: {
+        background: { color: '#101010', type: 'color' },
+        elementIds: ['layout-brand'],
+        elements: {
+          'layout-brand': {
+            align: 'left',
+            fill: '#ffffff',
+            fontFamily: 'Arial',
+            fontSize: 18,
+            fontWeight: 400,
+            height: 30,
+            id: 'layout-brand',
+            locked: true,
+            opacity: 1,
+            rotation: 0,
+            text: 'Layout brand artwork',
+            type: 'text',
+            visible: true,
+            width: 240,
+            x: 20,
+            y: 680,
+          },
+        },
+        id: 'layout',
+        name: 'Brand layout',
+        placeholderRoles: [],
+        placeholderVisibility: { body: true, footer: true, slideNumber: true, title: true },
+      },
+    };
+    project.pages[0] = { ...project.pages[0]!, layoutId: 'layout' };
+
+    const result = await new BrowserPptxExportService().exportPowerPoint(project);
+    const slideXml = readEntry(await readPptxEntries(result.blob), 'ppt/slides/slide1.xml');
+
+    expect(slideXml).toContain('Layout brand artwork');
+    expect(slideXml).toContain('<a:highlight><a:srgbClr val="45BB8B"/></a:highlight>');
+    expect(slideXml).toContain('typeface="Aptos"');
+    expect(slideXml).toContain('sz="1700"');
+    expect(slideXml).not.toContain('sz="3400"');
+    expect(slideXml).toContain('prst="bentConnector3"');
+  });
+
+  it('preserves imported PowerPoint physical page and font units', async () => {
+    const project = createExportProject();
+    project.pageSizePoints = { height: 405, width: 720 };
+    const title = project.elements.title;
+    if (!title || title.type !== 'text') throw new Error('Expected a title text element.');
+    project.elements.title = { ...title, fontSize: 32 };
+
+    const result = await new BrowserPptxExportService().exportPowerPoint(project);
+    const entries = await readPptxEntries(result.blob);
+    const presentationXml = readEntry(entries, 'ppt/presentation.xml');
+    const slideXml = readEntry(entries, 'ppt/slides/slide1.xml');
+
+    expect(presentationXml).toContain('<p:sldSz cx="9144000" cy="5143500"/>');
+    expect(slideXml).toContain('sz="1800"');
   });
 
   it('warns and omits unsupported transitions without blocking export', async () => {

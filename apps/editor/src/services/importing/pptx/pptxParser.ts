@@ -1,5 +1,13 @@
-import type { PlaceholderRole, ShapeKind, ShapeLineEndpoint } from '../../../domain/documents/model';
+import type {
+  ConnectorPreset,
+  PlaceholderRole,
+  ShapeKind,
+  ShapeLineDash,
+  ShapeLineEndpoint,
+} from '../../../domain/documents/model';
+import { shapeLineDashValues } from '../../../domain/documents/model';
 import { pptxAnimationBuilds } from './pptx-animation-builds';
+import { pptxConnectorGeometry } from './pptxConnectorGeometry';
 import type {
   ParseContext,
   ParseScope,
@@ -21,13 +29,23 @@ function getPresentationSize(document: Document) {
   const cx = Number(size?.getAttribute('cx'));
   const cy = Number(size?.getAttribute('cy'));
   if (!Number.isFinite(cx) || !Number.isFinite(cy) || cx <= 0 || cy <= 0) {
-    return { width: pptxParserDefaults.pageWidth, height: pptxParserDefaults.pageHeight, scaleX: 1, scaleY: 1 };
+    return {
+      height: pptxParserDefaults.pageHeight,
+      pageSizePoints: {
+        height: pptxParserDefaults.pageHeight / 2,
+        width: pptxParserDefaults.pageWidth / 2,
+      },
+      scaleX: 1,
+      scaleY: 1,
+      width: pptxParserDefaults.pageWidth,
+    };
   }
   const width = pptxParserDefaults.pageWidth;
   const height = Math.round((cy / cx) * width);
   return {
     width,
     height,
+    pageSizePoints: { height: cy / 12700, width: cx / 12700 },
     scaleX: width / cx,
     scaleY: height / cy,
   };
@@ -54,27 +72,44 @@ function parseFrame(element: Element, scaleX: number, scaleY: number, groupTrans
     height: Math.max(1, height * scaleY),
     rotation: getRotation(transform),
     ...(transform?.getAttribute('flipH') === '1' ? { flipX: true } : {}),
+    ...(transform?.getAttribute('flipV') === '1' ? { flipY: true } : {}),
   };
   if (!groupTransform) {
-    return {
+    return preserveFrameCenter({
       ...localFrame,
       x: Math.round(localFrame.x),
       y: Math.round(localFrame.y),
       width: Math.round(localFrame.width),
       height: Math.round(localFrame.height),
-    };
+    });
   }
   const childOffsetX = groupTransform.childOffsetX ?? 0;
   const childOffsetY = groupTransform.childOffsetY ?? 0;
   const childScaleX = groupTransform.scaleX ?? 1;
   const childScaleY = groupTransform.scaleY ?? 1;
-  return {
+  return preserveFrameCenter({
     ...localFrame,
     x: Math.round(groupTransform.x + (localFrame.x - childOffsetX) * childScaleX),
     y: Math.round(groupTransform.y + (localFrame.y - childOffsetY) * childScaleY),
     width: Math.round(localFrame.width * childScaleX),
     height: Math.round(localFrame.height * childScaleY),
     rotation: groupTransform.rotation + localFrame.rotation,
+  });
+}
+
+function preserveFrameCenter(frame: PptxTransform): PptxTransform {
+  if (frame.rotation === 0) return frame;
+  const radians = (frame.rotation * Math.PI) / 180;
+  const halfWidth = frame.width / 2;
+  const halfHeight = frame.height / 2;
+  return {
+    ...frame,
+    x: Math.round(
+      frame.x + halfWidth - (Math.cos(radians) * halfWidth - Math.sin(radians) * halfHeight),
+    ),
+    y: Math.round(
+      frame.y + halfHeight - (Math.sin(radians) * halfWidth + Math.cos(radians) * halfHeight),
+    ),
   };
 }
 
@@ -99,10 +134,23 @@ function parseTextObject(
     (idScope === 'slide' ? '' : pptxTextParser.getPlaceholderFallbackText(placeholderRole));
   if (!rawText) return undefined;
   const style = pptxTextParser.getTextStyle(shape, scaleY, textDefaults, scope.theme, placeholderRole);
-  const styleOverrides = pptxTextParser.getTextStyleOverrides(shape, scope.theme);
+  const styleOverrides = pptxTextParser.getTextStyleOverrides(
+    shape,
+    scope.theme,
+    placeholderRole,
+  );
   const textBox = pptxTextParser.getTextBox(shape, scaleX, scaleY);
   const textBoxOverrides = pptxTextParser.getTextBoxOverrides(shape);
   const text = pptxTextParser.applyTextStyle(rawText, style);
+  const paragraphs = pptxTextParser.getTextParagraphFormats(
+    shape,
+    scaleX,
+    scaleY,
+    textDefaults,
+    scope.theme,
+    placeholderRole,
+    style,
+  );
   if (!text) return undefined;
   const frame = parseFrame(shape, scaleX, scaleY, scope.groupTransform);
   if (!frame && !placeholderRole) return undefined;
@@ -123,6 +171,7 @@ function parseTextObject(
     style,
     ...(Object.keys(styleOverrides).length > 0 ? { styleOverrides } : {}),
     text,
+    ...(paragraphs.length > 0 ? { paragraphs } : {}),
     textBox,
     ...(Object.keys(textBoxOverrides).length > 0 ? { textBoxOverrides } : {}),
     zIndex,
@@ -204,6 +253,10 @@ function parsePictureObject(
   const shapeId = localShapeId(picture, String(zIndex));
   const opacity = pptxVisualStyle.getOpacity(picture);
   const crop = parsePictureCrop(picture);
+  const mask =
+    pptxXml.firstDescendant(picture, 'prstGeom')?.getAttribute('prst') === 'ellipse'
+      ? 'ellipse'
+      : undefined;
   const resolvedFrame = frame ?? { height: 1, width: 1, x: 0, y: 0, rotation: 0 };
   return {
     assetPath,
@@ -212,6 +265,7 @@ function parsePictureObject(
     frameSource: frame ? 'self' : 'inherited',
     id: `${slideId}-${idScope}-${assetType}-${shapeId}`,
     kind: assetType,
+    ...(mask && assetType === 'image' ? { mask } : {}),
     ...(opacity !== undefined ? { opacity } : {}),
     ...(placeholderIndex ? { placeholderIndex } : {}),
     rotation: resolvedFrame.rotation,
@@ -238,22 +292,50 @@ function parsePictureCrop(picture: Element) {
   return { x: left, y: top, width, height };
 }
 
-function getBackgroundColor(document: Document, theme: ParseScope['theme'], fallback = '#000000') {
-  const background = pptxXml.firstDescendant(document, 'bgPr');
-  return pptxVisualStyle.getHexColor(background, fallback, theme);
+interface ResolvedBackground {
+  backgroundAssetPath?: string;
+  backgroundColor: string;
 }
 
-function getBackgroundAssetPath(
+function resolveBackground(
   document: Document,
   relationships: Map<string, PptxRelationship>,
-) {
-  const background = pptxXml.firstDescendant(document, 'bgPr');
+  theme: ParseScope['theme'],
+  inherited: ResolvedBackground,
+): ResolvedBackground {
+  const backgroundElement = pptxXml.firstDescendant(document, 'bg');
+  if (!backgroundElement) return inherited;
+  const background = pptxXml.firstDescendant(backgroundElement, 'bgPr');
   const blip = background ? pptxXml.firstDescendant(background, 'blip') : undefined;
   const relationshipId = pptxXml.getRelationshipAttr(blip, 'embed');
-  if (!relationshipId) return undefined;
-  const relationship = relationships.get(relationshipId);
-  if (!relationship || relationship.targetMode !== 'Internal') return undefined;
-  return relationship.target;
+  const relationship = relationshipId ? relationships.get(relationshipId) : undefined;
+  const backgroundAssetPath =
+    relationship?.targetMode === 'Internal' ? relationship.target : undefined;
+  return {
+    ...(backgroundAssetPath ? { backgroundAssetPath } : {}),
+    backgroundColor: pptxVisualStyle.getHexColor(
+      background,
+      inherited.backgroundColor,
+      theme,
+    ),
+  };
+}
+
+async function loadPartBackground(
+  context: ParseContext,
+  sourcePath: string | undefined,
+  theme: ParseScope['theme'],
+  inherited: ResolvedBackground,
+) {
+  if (!sourcePath) return inherited;
+  const xml = await context.package.readText(sourcePath);
+  if (!xml) return inherited;
+  return resolveBackground(
+    pptxXml.parseXml(xml),
+    context.package.getRelationships(sourcePath),
+    theme,
+    inherited,
+  );
 }
 
 function findRelationshipByType(relationships: Map<string, PptxRelationship>, typeSuffix: string) {
@@ -273,6 +355,9 @@ function shapeKindForPreset(preset: string | null | undefined): ShapeKind | unde
   if (preset === 'pentagon') return 'pentagon';
   if (preset === 'line') return 'line';
   if (preset === 'arc') return 'arc';
+  if (/^(?:bent|curved)Connector[2-5]$/.test(preset) || preset === 'straightConnector1') {
+    return 'line';
+  }
   if (preset.toLowerCase().includes('arrow')) return 'arrow';
   return undefined;
 }
@@ -289,6 +374,16 @@ function getLineEndpoint(value: string | null | undefined): ShapeLineEndpoint | 
 function getStrokeWidth(line: Element | undefined, scaleY: number) {
   const width = Number(line?.getAttribute('w'));
   return Number.isFinite(width) && width > 0 ? Math.max(1, Math.round(width * scaleY)) : undefined;
+}
+
+const shapeLineDashes: ReadonlySet<string> = new Set(shapeLineDashValues);
+function isConnectorPreset(value: string | null | undefined): value is ConnectorPreset {
+  return value === 'straightConnector1' || /^(?:bent|curved)Connector[2-5]$/.test(value ?? '');
+}
+
+function getLineDash(line: Element | undefined): ShapeLineDash | undefined {
+  const value = line ? pptxXml.firstDescendant(line, 'prstDash')?.getAttribute('val') : undefined;
+  return value && shapeLineDashes.has(value) ? (value as ShapeLineDash) : undefined;
 }
 
 function parseShapeObject(
@@ -315,6 +410,9 @@ function parseShapeObject(
   const startEndpoint = getLineEndpoint(pptxXml.firstDescendant(line ?? shape, 'headEnd')?.getAttribute('type'));
   const endEndpoint = getLineEndpoint(pptxXml.firstDescendant(line ?? shape, 'tailEnd')?.getAttribute('type'));
   const strokeWidth = getStrokeWidth(line, scaleY);
+  const lineDash = getLineDash(line);
+  const path = pptxConnectorGeometry.getPath(shape, preset, frame);
+  const connectorPreset = isConnectorPreset(preset) ? preset : undefined;
   return {
     frame,
     id: `${slideId}-${idScope}-shape-${shapeId}`,
@@ -322,9 +420,12 @@ function parseShapeObject(
     ...(fill ? { fill } : {}),
     ...(stroke ? { stroke } : {}),
     ...(strokeWidth ? { strokeWidth } : {}),
+    ...(lineDash ? { lineDash } : {}),
     ...(startEndpoint ? { startEndpoint } : {}),
     ...(endEndpoint ? { endEndpoint } : {}),
     ...(opacity !== undefined ? { opacity } : {}),
+    ...(path ? { path } : {}),
+    ...(connectorPreset ? { connectorPreset } : {}),
     ...(pptxTextParser.getPlaceholderIndex(shape) ? { placeholderIndex: pptxTextParser.getPlaceholderIndex(shape)! } : {}),
     ...(placeholderRole ? { placeholderRole } : {}),
     rotation: frame.rotation,
@@ -496,7 +597,7 @@ function parseSlideTreeObjects(
   if (!tree) return objects;
   for (const child of pptxXml.childElements(tree)) {
     const zIndex = zIndexStart + objects.length;
-    if (child.localName === 'sp') {
+    if (child.localName === 'sp' || child.localName === 'cxnSp') {
       const picturePlaceholderObject = parsePicturePlaceholderObject(
         child,
         slideId,
@@ -510,12 +611,33 @@ function parseSlideTreeObjects(
         objects.push(picturePlaceholderObject);
         continue;
       }
-      const textObject = parseTextObject(child, slideId, zIndex, scaleX, scaleY, textDefaults, scope, idScope);
-      if (textObject) objects.push(textObject);
-      if (!textObject || !pptxTextParser.getTextParagraphs(child)) {
-        const shapeObject = parseShapeObject(child, slideId, zIndexStart + objects.length, scaleX, scaleY, scope, idScope);
-        if (shapeObject) objects.push(shapeObject);
+      const hasAuthoredText = Boolean(pptxTextParser.getTextParagraphs(child));
+      const shapeObject = parseShapeObject(
+        child,
+        slideId,
+        zIndexStart + objects.length,
+        scaleX,
+        scaleY,
+        scope,
+        idScope,
+      );
+      if (
+        shapeObject?.kind === 'shape' &&
+        (!hasAuthoredText || shapeObject.fill || shapeObject.stroke)
+      ) {
+        objects.push(shapeObject);
       }
+      const textObject = parseTextObject(
+        child,
+        slideId,
+        zIndexStart + objects.length,
+        scaleX,
+        scaleY,
+        textDefaults,
+        scope,
+        idScope,
+      );
+      if (textObject) objects.push(textObject);
     }
     if (child.localName === 'pic') {
       const object = parsePictureObject(context, child, slideId, zIndex, scaleX, scaleY, relationships, scope, idScope);
@@ -674,7 +796,9 @@ function findInheritedPlaceholder(
         : inheritedObject.placeholderIndex === object.placeholderIndex),
   );
   const exactMatch = object.placeholderIndex
-    ? candidates.find((candidate) => candidate.placeholderIndex === object.placeholderIndex)
+    ? [...candidates]
+        .reverse()
+        .find((candidate) => candidate.placeholderIndex === object.placeholderIndex)
     : undefined;
   if (exactMatch) return exactMatch;
   if (candidates.length <= 1) return candidates[0];
@@ -713,9 +837,17 @@ function inheritTextBox(
   const textBoxOverrides = object.textBoxOverrides ?? {};
   return {
     ...inheritedObject.textBox,
-    ...(textBoxOverrides.autoFit ? { autoFit: object.textBox.autoFit } : {}),
+    ...(textBoxOverrides.autoFit
+      ? {
+          autoFit: object.textBox.autoFit,
+          ...(object.textBox.fontScale !== undefined ? { fontScale: object.textBox.fontScale } : {}),
+        }
+      : {}),
     ...(textBoxOverrides.insets ? { insets: object.textBox.insets } : {}),
     ...(textBoxOverrides.verticalAlign ? { verticalAlign: object.textBox.verticalAlign } : {}),
+    ...(textBoxOverrides.verticalOverflow
+      ? { verticalOverflow: object.textBox.verticalOverflow }
+      : {}),
   };
 }
 
@@ -729,8 +861,9 @@ function inheritPlaceholderTextObject(
   const styleOverrides = object.styleOverrides ?? {};
   const style = {
     ...inheritedStyle,
-    align: object.style.align,
+    ...(styleOverrides.align ? { align: object.style.align } : {}),
     ...(styleOverrides.fill ? { fill: object.style.fill } : {}),
+    ...(styleOverrides.highlight ? { highlight: object.style.highlight } : {}),
     ...(styleOverrides.fontFamily ? { fontFamily: object.style.fontFamily } : {}),
     ...(styleOverrides.fontSize ? { fontSize: object.style.fontSize } : {}),
     fontWeight:
@@ -741,12 +874,46 @@ function inheritPlaceholderTextObject(
     ...(styleOverrides.verticalAlign ? { verticalAlign: object.style.verticalAlign } : {}),
     ...(object.style.capitalization ? { capitalization: object.style.capitalization } : {}),
   };
+  const paragraphs = object.paragraphs?.map((paragraph) => ({
+    ...paragraph,
+    ...(paragraph.align === object.style.align ? { align: style.align } : {}),
+    ...(paragraph.fill === object.style.fill ? { fill: style.fill } : {}),
+    ...(paragraph.fontFamily === object.style.fontFamily ? { fontFamily: style.fontFamily } : {}),
+    ...(paragraph.fontSize === object.style.fontSize ? { fontSize: style.fontSize } : {}),
+    ...(paragraph.fontWeight === object.style.fontWeight ? { fontWeight: style.fontWeight } : {}),
+    ...(paragraph.highlight === object.style.highlight ? { highlight: style.highlight } : {}),
+    ...(paragraph.lineHeight === object.style.lineHeight ? { lineHeight: style.lineHeight } : {}),
+    ...(paragraph.runs
+      ? {
+          runs: paragraph.runs.map((run) => ({
+            ...run,
+            ...(!run.styleOverrides?.fill && run.fill === object.style.fill
+              ? { fill: style.fill }
+              : {}),
+            ...(!run.styleOverrides?.fontFamily && run.fontFamily === object.style.fontFamily
+              ? { fontFamily: style.fontFamily }
+              : {}),
+            ...(!run.styleOverrides?.fontSize && run.fontSize === object.style.fontSize
+              ? { fontSize: style.fontSize }
+              : {}),
+            ...(!run.styleOverrides?.fontWeight && run.fontWeight === object.style.fontWeight
+              ? { fontWeight: style.fontWeight }
+              : {}),
+            ...(!run.styleOverrides?.highlight && run.highlight === object.style.highlight
+              ? { highlight: style.highlight }
+              : {}),
+          })),
+        }
+      : {}),
+    verticalAlign: style.verticalAlign,
+  }));
   return {
     ...object,
     frame: inheritsFrame ? inheritedObject.frame : object.frame,
     ...(inheritsFrame ? { frameSource: 'self' as const } : {}),
     style,
     text: pptxTextParser.applyTextStyle(object.text, style),
+    ...(paragraphs ? { paragraphs } : {}),
     textBox,
   };
 }
@@ -853,14 +1020,20 @@ async function parseLayout(
     scope,
     'layout',
   );
-  const objects = [...masterObjects, ...layoutObjects].map((object, index) => ({
+  const inheritedLayoutObjects = inheritSlidePlaceholderObjects(layoutObjects, masterObjects);
+  const objects = [...masterObjects, ...inheritedLayoutObjects].map((object, index) => ({
     ...object,
     zIndex: index,
   }));
-  const backgroundAssetPath = getBackgroundAssetPath(document, relationships);
+  const masterBackground = await loadPartBackground(
+    context,
+    resolvedMasterPath,
+    theme,
+    { backgroundColor: '#FFFFFF' },
+  );
+  const background = resolveBackground(document, relationships, theme, masterBackground);
   return {
-    ...(backgroundAssetPath ? { backgroundAssetPath } : {}),
-    backgroundColor: getBackgroundColor(document, theme, '#FFFFFF'),
+    ...background,
     id: layoutId,
     name: getLayoutNameFromDocument(document, layoutPath),
     objects,
@@ -917,11 +1090,14 @@ async function parseSlide(
     if (object.kind === 'video' && startTrigger) object.startTrigger = startTrigger;
   }
   const resolvedLayoutId = parsedLayout?.id ?? layoutId;
-  const backgroundAssetPath =
-    getBackgroundAssetPath(document, rels) ?? parsedLayout?.backgroundAssetPath;
+  const background = resolveBackground(document, rels, theme, {
+    ...(parsedLayout?.backgroundAssetPath
+      ? { backgroundAssetPath: parsedLayout.backgroundAssetPath }
+      : {}),
+    backgroundColor: parsedLayout?.backgroundColor ?? '#000000',
+  });
   return {
-    ...(backgroundAssetPath ? { backgroundAssetPath } : {}),
-    backgroundColor: getBackgroundColor(document, theme, parsedLayout?.backgroundColor ?? '#000000'),
+    ...background,
     id: slideId,
     ...(resolvedLayoutId ? { layoutId: resolvedLayoutId } : {}),
     ...(parsedLayout?.name ? { layoutName: parsedLayout.name } : {}),
@@ -1015,6 +1191,7 @@ async function parse(context: ParseContext, name: string): Promise<PptxDeck> {
     height: size.height,
     layouts,
     name: normalizeName(name),
+    pageSizePoints: size.pageSizePoints,
     slides: await Promise.all(
       slideEntries.map((entry, index) =>
         parseSlide(

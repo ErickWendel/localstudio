@@ -109,6 +109,24 @@ describe('TopToolbar', () => {
     expect(onExportPowerPoint).toHaveBeenCalledTimes(1);
   });
 
+  it('opens the PDF export action from the File menu', () => {
+    const onExportPdf = vi.fn();
+
+    render(
+      <TopToolbar
+        project={sampleProject.createSampleProject()}
+        language="PT-BR"
+        onExportPdf={onExportPdf}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Export to' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'PDF (.pdf)' }));
+
+    expect(onExportPdf).toHaveBeenCalledTimes(1);
+  });
+
   it('opens file submenus when users hover their triggers', () => {
     render(<TopToolbar project={sampleProject.createSampleProject()} language="PT-BR" />);
 

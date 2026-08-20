@@ -79,13 +79,29 @@ function fontWeightMatches(cssWeight: string | undefined, requestedWeight: numbe
   return requestedWeight >= minimum && requestedWeight <= maximum;
 }
 
+function unicodeRangeIncludesBasicLatin(block: string) {
+  const unicodeRange = getCssProperty(block, 'unicode-range');
+  if (!unicodeRange) return true;
+  return unicodeRange.split(',').some((range) => {
+    const match = range.trim().match(/^U\+([0-9A-F?]+)(?:-([0-9A-F]+))?$/i);
+    if (!match?.[1]) return false;
+    const startValue = match[1].replaceAll('?', '0');
+    const endValue = (match[2] ?? match[1]).replaceAll('?', 'F');
+    const start = Number.parseInt(startValue, 16);
+    const end = Number.parseInt(endValue, 16);
+    return Number.isFinite(start) && Number.isFinite(end) && start <= 0x41 && end >= 0x7a;
+  });
+}
+
 function extractWoff2Url(css: string, request: FontImportRequest) {
   const blocks = Array.from(css.matchAll(/@font-face\s*{([^}]+)}/gi)).map((match) => match[1] ?? '');
-  const matchingBlock = blocks.find((block) => {
+  const matchingBlocks = blocks.filter((block) => {
     const style = getCssProperty(block, 'font-style');
     const weight = getCssProperty(block, 'font-weight');
     return (!style || style === request.fontStyle) && fontWeightMatches(weight, request.fontWeight);
   });
+  const matchingBlock =
+    matchingBlocks.find((block) => unicodeRangeIncludesBasicLatin(block)) ?? matchingBlocks[0];
   const matchedUrl = matchingBlock ? getCssFontUrl(matchingBlock) : undefined;
   if (matchedUrl) return matchedUrl;
   return blocks.map(getCssFontUrl).find((url): url is string => Boolean(url));

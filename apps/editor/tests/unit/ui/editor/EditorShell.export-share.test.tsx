@@ -12,6 +12,12 @@ import type {
 import { EditorShell } from '../../../../src/ui/editor/shell/EditorShell';
 import { editorShellTestHarness } from './EditorShell.test-harness';
 
+vi.mock('../../../../src/services/exporting/pdfExportService', () => ({
+  pdfExportService: {
+    createBlob: () => new Blob(['%PDF-'], { type: 'application/pdf' }),
+  },
+}));
+
 const {
   LoadingProjectRepository,
   RecordingMirrorService,
@@ -155,6 +161,33 @@ describe('EditorShell export and share workflows', () => {
       'deck-hidden-summary.png',
       'deck-slide-1.png',
     ]);
+  });
+
+  it('exports every slide to one PDF from the File menu', async () => {
+    const services = createAppServices();
+    const downloadBlob = vi.fn();
+    services.exportService = {
+      getImagesArchiveFileName: () => 'deck-images.zip',
+      getPageImageFileName: () => 'slide.png',
+      getPdfFileName: () => 'deck.pdf',
+      getPowerPointFileName: () => 'deck.pptx',
+      downloadBlob,
+      downloadDataUrl: vi.fn(),
+    };
+
+    render(<EditorShell services={services} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Export to' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'PDF (.pdf)' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Exporting PDF...');
+    await waitFor(() => {
+      expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), 'deck.pdf');
+    });
+    const [pdfBlob] = downloadBlob.mock.calls[0] as [Blob, string];
+    expect(pdfBlob.type).toBe('application/pdf');
+    expect(new TextDecoder().decode(await pdfBlob.slice(0, 5).arrayBuffer())).toBe('%PDF-');
   });
 
   it('exports a single readable final-state image when animation images are disabled', async () => {

@@ -1,6 +1,10 @@
 import type Konva from 'konva';
 import { Circle, Group, Line, Rect } from 'react-konva';
-import type { ShapeElement, ShapeLineEndpoint } from '../../../domain/documents/model';
+import type {
+  ShapeElement,
+  ShapeLineDash,
+  ShapeLineEndpoint,
+} from '../../../domain/documents/model';
 import type { CommonElementProps } from './canvas-element-props';
 import { shapeLineDraw } from './shape-line-draw';
 
@@ -24,6 +28,24 @@ function getEndpointColor(element: ShapeElement) {
 
 function getEndpointAngle(start: { x: number; y: number }, end: { x: number; y: number }) {
   return Math.atan2(end.y - start.y, end.x - start.x);
+}
+
+const lineDashUnits: Record<Exclude<ShapeLineDash, 'solid'>, number[]> = {
+  dash: [4, 3],
+  dashDot: [4, 3, 1, 3],
+  dot: [0, 3],
+  lgDash: [8, 3],
+  lgDashDot: [8, 3, 1, 3],
+  lgDashDotDot: [8, 3, 1, 3, 1, 3],
+  sysDash: [3, 1],
+  sysDashDot: [3, 1, 1, 1],
+  sysDashDotDot: [3, 1, 1, 1, 1, 1],
+  sysDot: [0, 1],
+};
+
+function getLineDash(element: ShapeElement, strokeWidth: number) {
+  if (!element.lineDash || element.lineDash === 'solid') return undefined;
+  return lineDashUnits[element.lineDash].map((unit) => unit * strokeWidth);
 }
 
 function EndpointMarker({
@@ -161,8 +183,13 @@ export function LinearShapeElement({
 }) {
   const stroke = getEndpointColor(element);
   const strokeWidth = getEndpointStrokeWidth(element);
+  const dash = getLineDash(element, strokeWidth);
   const fullPoints =
-    element.shape === 'arc'
+    element.path
+      ? element.path.points.map((coordinate, index) =>
+          coordinate * (index % 2 === 0 ? commonProps.width : commonProps.height),
+        )
+      : element.shape === 'arc'
       ? [
           0,
           commonProps.height,
@@ -176,8 +203,9 @@ export function LinearShapeElement({
       : element.shape === 'line'
         ? [0, commonProps.height, commonProps.width, 0]
         : [0, commonProps.height / 2, commonProps.width, commonProps.height / 2];
+  const usesBezierPath = element.path?.kind === 'bezier' || element.shape === 'arc';
   const points =
-    lineDrawState.direction && element.shape !== 'arc'
+    lineDrawState.direction && !element.path && element.shape !== 'arc'
       ? shapeLineDraw.getPoints(fullPoints, lineDrawState.progress, lineDrawState.direction)
       : fullPoints;
   const startPoint = { x: points[0] ?? 0, y: points[1] ?? 0 };
@@ -190,15 +218,23 @@ export function LinearShapeElement({
     x: fullPoints[fullPoints.length - 2] ?? fullStartPoint.x,
     y: fullPoints[fullPoints.length - 1] ?? fullStartPoint.y,
   };
-  const startAngle = getEndpointAngle(fullEndPoint, fullStartPoint);
-  const endAngle = getEndpointAngle(fullStartPoint, fullEndPoint);
+  const startReferencePoint = {
+    x: fullPoints[2] ?? fullEndPoint.x,
+    y: fullPoints[3] ?? fullEndPoint.y,
+  };
+  const endReferencePoint = {
+    x: fullPoints[fullPoints.length - 4] ?? fullStartPoint.x,
+    y: fullPoints[fullPoints.length - 3] ?? fullStartPoint.y,
+  };
+  const startAngle = getEndpointAngle(startReferencePoint, fullStartPoint);
+  const endAngle = getEndpointAngle(endReferencePoint, fullEndPoint);
 
   return (
     <Group {...commonProps} key={element.id} ref={nodeRef}>
       <Line
-        bezier={element.shape === 'arc'}
+        bezier={usesBezierPath}
         points={points}
-        {...(lineDrawState.direction && element.shape === 'arc'
+        {...(lineDrawState.direction && (usesBezierPath || element.path)
           ? shapeLineDraw.getDash(
               commonProps.width * 2 + commonProps.height,
               lineDrawState.progress,
@@ -207,6 +243,7 @@ export function LinearShapeElement({
           : {})}
         stroke={stroke}
         strokeWidth={strokeWidth}
+        {...(dash && !lineDrawState.direction ? { dash, lineCap: 'round' as const } : {})}
       />
       <EndpointMarker
         angle={startAngle}
