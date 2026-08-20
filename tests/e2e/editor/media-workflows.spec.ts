@@ -28,6 +28,23 @@ test.describe('editor media workflow journey', () => {
     await expect(page.getByLabel('Crop top left')).toBeVisible();
     await page.getByRole('button', { name: 'Done' }).click();
 
+    await page.getByRole('button', { name: 'Align' }).click();
+    const alignMenu = page.getByRole('menu');
+    await expect(alignMenu).toBeVisible();
+    await expect
+      .poll(() =>
+        alignMenu.evaluate((menu) => {
+          const bounds = menu.getBoundingClientRect();
+          const topmostElement = document.elementFromPoint(
+            bounds.left + bounds.width / 2,
+            bounds.top + Math.min(50, bounds.height - 1),
+          );
+          return topmostElement !== null && menu.contains(topmostElement);
+        }),
+      )
+      .toBe(true);
+    await page.getByRole('menuitem', { name: 'Center', exact: true }).click();
+
     await editor.openTool('Design');
     await page
       .getByRole('tablist', { name: 'Movie inspector sections' })
