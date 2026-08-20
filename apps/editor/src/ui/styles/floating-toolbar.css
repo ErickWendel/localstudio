@@ -1,5 +1,6 @@
 .floating-toolbar {
   position: absolute;
+  z-index: 20;
   left: 50%;
   top: -48px;
   display: flex;
