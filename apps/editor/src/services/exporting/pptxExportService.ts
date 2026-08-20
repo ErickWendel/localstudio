@@ -6,7 +6,9 @@ import type {
   ProjectDocument,
   ShapeLineEndpoint,
   ShapeElement,
+  TextRun,
 } from '../../domain/documents/model';
+import { pageElementResolver } from '../../domain/documents/pageElementResolver';
 import type {
   PresentationExportOptions,
   PresentationExportProgress,
@@ -66,15 +68,27 @@ function getTransparency(opacity: number | undefined) {
   return Math.round((1 - Math.min(1, Math.max(0, opacity ?? 1))) * 100);
 }
 
-function getPageScale() {
+function getPageScale(project: ProjectDocument, page: Page) {
+  const pageSizePoints = project.pageSizePoints ?? {
+    height: (page.height / exportConstants.pixelsPerInch) * 72,
+    width: (page.width / exportConstants.pixelsPerInch) * 72,
+  };
   return {
-    x: exportConstants.pixelsPerInch,
-    y: exportConstants.pixelsPerInch,
+    x: page.width / (pageSizePoints.width / 72),
+    y: page.height / (pageSizePoints.height / 72),
   };
 }
 
-function toPosition(element: DesignElement): PptxGenJS.PositionProps {
-  const scale = getPageScale();
+function toPoints(pixels: number, project: ProjectDocument, page: Page) {
+  return (pixels / getPageScale(project, page).y) * 72;
+}
+
+function toPosition(
+  element: DesignElement,
+  project: ProjectDocument,
+  page: Page,
+): PptxGenJS.PositionProps {
+  const scale = getPageScale(project, page);
   return {
     x: element.x / scale.x,
     y: element.y / scale.y,
@@ -189,6 +203,7 @@ async function backgroundAssetToData(
 }
 
 function getShapeName(element: ShapeElement): PptxGenJS.SHAPE_NAME {
+  if (element.connectorPreset) return element.connectorPreset as PptxGenJS.SHAPE_NAME;
   const shapeMap: Partial<Record<ShapeElement['shape'], PptxGenJS.SHAPE_NAME>> = {
     arc: 'arc',
     arrow: 'rightArrow',
@@ -204,18 +219,91 @@ function getShapeName(element: ShapeElement): PptxGenJS.SHAPE_NAME {
   return shapeMap[element.shape] ?? 'rect';
 }
 
-function addTextElement(slide: PptxGenJS.Slide, element: Extract<DesignElement, { type: 'text' }>) {
-  slide.addText(element.text, {
-    ...toPosition(element),
+function getTextStyleOptions(
+  style: Pick<
+    TextRun,
+    | 'fill'
+    | 'fontFamily'
+    | 'fontSize'
+    | 'fontStyle'
+    | 'fontWeight'
+    | 'highlight'
+    | 'textDecoration'
+  >,
+  project: ProjectDocument,
+  page: Page,
+): PptxGenJS.TextPropsOptions {
+  return {
+    bold: style.fontWeight >= 600,
+    color: normalizeHexColor(style.fill, '111111'),
+    fontFace: style.fontFamily,
+    fontSize: toPoints(style.fontSize, project, page),
+    ...(style.highlight ? { highlight: normalizeHexColor(style.highlight) } : {}),
+    italic: style.fontStyle === 'italic',
+    ...(style.textDecoration === 'line-through' ? { strike: 'sngStrike' as const } : {}),
+    ...(style.textDecoration === 'underline' ? { underline: { style: 'sng' as const } } : {}),
+  };
+}
+
+function getTextRuns(
+  element: Extract<DesignElement, { type: 'text' }>,
+  project: ProjectDocument,
+  page: Page,
+) {
+  if (!element.paragraphs?.length) return element.text;
+  return element.paragraphs.flatMap((paragraph, paragraphIndex) => {
+    const runs = paragraph.runs?.length
+      ? paragraph.runs
+      : [
+          {
+            fill: paragraph.fill,
+            fontFamily: paragraph.fontFamily,
+            fontSize: paragraph.fontSize,
+            fontStyle: paragraph.fontStyle,
+            fontWeight: paragraph.fontWeight,
+            ...(paragraph.highlight ? { highlight: paragraph.highlight } : {}),
+            text: paragraph.text,
+            ...(paragraph.textDecoration
+              ? { textDecoration: paragraph.textDecoration }
+              : {}),
+          },
+        ];
+    return runs.map((run, runIndex) => ({
+      options: {
+        ...getTextStyleOptions(run, project, page),
+        align: paragraph.align,
+        ...(runIndex === runs.length - 1 && paragraphIndex < element.paragraphs!.length - 1
+          ? { breakLine: true }
+          : {}),
+        lineSpacing: toPoints(paragraph.fontSize, project, page) * paragraph.lineHeight,
+        paraSpaceAfter: toPoints(paragraph.spaceAfter, project, page),
+        paraSpaceBefore: toPoints(paragraph.spaceBefore, project, page),
+      },
+      text: run.text,
+    }));
+  });
+}
+
+function addTextElement(
+  slide: PptxGenJS.Slide,
+  project: ProjectDocument,
+  page: Page,
+  element: Extract<DesignElement, { type: 'text' }>,
+) {
+  slide.addText(getTextRuns(element, project, page), {
+    ...toPosition(element, project, page),
     align: element.align,
     bold: element.fontWeight >= 600,
-    breakLine: false,
     color: normalizeHexColor(element.fill, '111111'),
-    fit: 'shrink',
+    fit: 'none',
     fontFace: element.fontFamily,
-    fontSize: element.fontSize,
+    fontSize: toPoints(element.fontSize, project, page),
+    ...(element.highlight ? { highlight: normalizeHexColor(element.highlight) } : {}),
     ...(element.hyperlink ? { hyperlink: { url: element.hyperlink } } : {}),
-    margin: 0,
+    ...(element.lineHeight
+      ? { lineSpacing: toPoints(element.fontSize, project, page) * element.lineHeight }
+      : {}),
+    margin: toPoints(6, project, page),
     objectName: element.id,
     rotate: element.rotation,
     transparency: getTransparency(element.opacity),
@@ -243,10 +331,11 @@ async function addImageElement(
   const media = await assetToData(asset, context.warnings, element, page);
   if (!media) return;
   slide.addImage({
-    ...toPosition(element),
+    ...toPosition(element, project, page),
     data: media.data,
     ...(element.type === 'image' && element.flipX ? { flipH: true } : {}),
     objectName: element.id,
+    ...(element.type === 'image' && element.mask === 'ellipse' ? { rounding: true } : {}),
     rotate: element.rotation,
     transparency: getTransparency(element.opacity),
   });
@@ -271,7 +360,7 @@ async function addVideoElement(
   const media = await assetToData(asset, context.warnings, element, page);
   if (!media) return;
   slide.addMedia({
-    ...toPosition(element),
+    ...toPosition(element, project, page),
     data: media.data,
     extn: assetFileUtils.getAssetFileExtension(media.mimeType),
     objectName: element.id,
@@ -315,18 +404,32 @@ function mapLineEndpoint(endpoint: ShapeLineEndpoint | undefined) {
   return 'none';
 }
 
-function addShapeElement(slide: PptxGenJS.Slide, element: ShapeElement) {
+function mapLineDash(lineDash: ShapeElement['lineDash']) {
+  if (!lineDash) return undefined;
+  if (lineDash === 'dot' || lineDash === 'sysDot') return 'sysDot' as const;
+  if (lineDash === 'sysDashDot' || lineDash === 'sysDashDotDot') return 'dashDot' as const;
+  return lineDash;
+}
+
+function addShapeElement(
+  slide: PptxGenJS.Slide,
+  project: ProjectDocument,
+  page: Page,
+  element: ShapeElement,
+) {
+  const dashType = mapLineDash(element.lineDash);
   slide.addShape(getShapeName(element), {
-    ...toPosition(element),
+    ...toPosition(element, project, page),
     fill: element.fill
       ? { color: normalizeHexColor(element.fill), transparency: getTransparency(element.opacity) }
       : { transparency: 100 },
     line: {
       beginArrowType: mapLineEndpoint(element.startEndpoint),
       color: normalizeHexColor(element.stroke, '111111'),
+      ...(dashType ? { dashType } : {}),
       endArrowType: mapLineEndpoint(element.endEndpoint),
       transparency: element.stroke ? getTransparency(element.opacity) : 100,
-      width: element.strokeWidth ?? 0,
+      width: toPoints(element.strokeWidth ?? 0, project, page),
     },
     objectName: element.id,
     rotate: element.rotation,
@@ -360,17 +463,14 @@ function collectExportStats(project: ProjectDocument, pages: Page[]): Presentati
   let animationBuildCount = 0;
   let mediaElementCount = 0;
   for (const page of pages) {
-    const visibleElementIds = page.elementIds.filter((elementId) => {
-      const element = project.elements[elementId];
-      return Boolean(element && element.visible !== false);
-    });
+    const visibleElements = pageElementResolver.getVisibleElements(project, page);
+    const visibleElementIds = visibleElements.map((element) => element.id);
     const visibleElementIdSet = new Set(visibleElementIds);
     animationBuildCount += (page.animationBuilds ?? []).filter((build) =>
       visibleElementIdSet.has(build.elementId),
     ).length;
-    mediaElementCount += visibleElementIds.filter((elementId) => {
-      const element = project.elements[elementId];
-      return element?.type === 'image' || element?.type === 'gif' || element?.type === 'video';
+    mediaElementCount += visibleElements.filter((element) => {
+      return element.type === 'image' || element.type === 'gif' || element.type === 'video';
     }).length;
   }
   return {
@@ -380,12 +480,16 @@ function collectExportStats(project: ProjectDocument, pages: Page[]): Presentati
   };
 }
 
-function defineProjectLayout(pptx: PptxGenJS, pages: Page[]) {
+function defineProjectLayout(pptx: PptxGenJS, project: ProjectDocument, pages: Page[]) {
   const firstPage = pages[0] ?? { width: 1920, height: 1080 };
+  const pageSizePoints = project.pageSizePoints ?? {
+    height: (firstPage.height / exportConstants.pixelsPerInch) * 72,
+    width: (firstPage.width / exportConstants.pixelsPerInch) * 72,
+  };
   pptx.defineLayout({
     name: exportConstants.customLayoutName,
-    width: firstPage.width / exportConstants.pixelsPerInch,
-    height: firstPage.height / exportConstants.pixelsPerInch,
+    width: pageSizePoints.width / 72,
+    height: pageSizePoints.height / 72,
   });
   pptx.layout = exportConstants.customLayoutName;
 }
@@ -474,8 +578,8 @@ async function patchPackage(
 
 function collectPackagePatchPages(project: ProjectDocument, pages: Page[]): PptxPackagePatchPage[] {
   return pages.map((page) => ({
-    elements: page.elementIds
-      .map((elementId) => project.elements[elementId])
+    elements: pageElementResolver
+      .getVisibleElements(project, page)
       .filter((element): element is Extract<DesignElement, { type: 'image' }> =>
         Boolean(element && element.type === 'image' && element.crop),
       )
@@ -519,7 +623,7 @@ export class BrowserPptxExportService {
     pptx.company = 'LocalStudio';
     pptx.subject = project.name;
     pptx.title = project.name;
-    defineProjectLayout(pptx, pages);
+    defineProjectLayout(pptx, project, pages);
 
     for (const [pageIndex, page] of pages.entries()) {
       emitProgress(context, {
@@ -532,13 +636,11 @@ export class BrowserPptxExportService {
       const slide = pptx.addSlide();
       await addPageBackground(slide, page, project, context);
       if (page.speakerNotes?.trim()) slide.addNotes(page.speakerNotes);
-      for (const elementId of page.elementIds) {
-        const element = project.elements[elementId];
-        if (!element || element.visible === false) continue;
-        if (element.type === 'text') addTextElement(slide, element);
+      for (const element of pageElementResolver.getVisibleElements(project, page)) {
+        if (element.type === 'text') addTextElement(slide, project, page, element);
         else if (element.type === 'image' || element.type === 'gif') await addImageElement(slide, project, element, page, context);
         else if (element.type === 'video') await addVideoElement(slide, project, element, page, context);
-        else if (element.type === 'shape') addShapeElement(slide, element);
+        else if (element.type === 'shape') addShapeElement(slide, project, page, element);
       }
     }
 

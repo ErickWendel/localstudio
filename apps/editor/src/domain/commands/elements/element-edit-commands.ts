@@ -108,13 +108,15 @@ class UpdateTextContentCommand implements EditorCommand {
   execute(project: ProjectDocument): ProjectDocument {
     const element = project.elements[this.elementId];
     if (!element || element.type !== 'text' || element.locked) return project;
+    const { paragraphs, ...elementWithoutParagraphs } = element;
+    void paragraphs;
 
     return {
       ...project,
       elements: {
         ...project.elements,
         [this.elementId]: {
-          ...element,
+          ...elementWithoutParagraphs,
           text: this.text,
         },
       },

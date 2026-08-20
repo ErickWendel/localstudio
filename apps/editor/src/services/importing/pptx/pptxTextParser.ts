@@ -4,6 +4,8 @@ import type {
   PptxTextBox,
   PptxTextBoxOverrides,
   PptxTextDefaults,
+  PptxTextParagraph,
+  PptxTextRun,
   PptxTextStyle,
   PptxTextStyleOverrides,
   PptxTheme,
@@ -149,8 +151,26 @@ function hasTypeface(...runProperties: Array<Element | undefined>) {
   return Boolean(getTypeface(...runProperties));
 }
 
+function getTextPropertyColor(
+  propertyName: 'highlight' | 'solidFill',
+  theme: PptxTheme | undefined,
+  element: Element | undefined,
+) {
+  if (!element) return undefined;
+  const propertyScope =
+    element.localName === 'sp' ? pptxXml.firstDescendant(element, 'spPr') : element;
+  const property = propertyScope
+    ? pptxXml.childElements(propertyScope, propertyName)[0]
+    : undefined;
+  return property ? pptxVisualStyle.getHexColor(property, '', theme) || undefined : undefined;
+}
+
 function hasFill(theme: PptxTheme | undefined, ...elements: Array<Element | undefined>) {
-  return elements.some((element) => Boolean(pptxVisualStyle.getHexColor(element, '', theme)));
+  return elements.some((element) => Boolean(getTextPropertyColor('solidFill', theme, element)));
+}
+
+function hasHighlight(theme: PptxTheme | undefined, ...elements: Array<Element | undefined>) {
+  return elements.some((element) => Boolean(getTextPropertyColor('highlight', theme, element)));
 }
 
 function hasLineSpacing(...paragraphProperties: Array<Element | undefined>) {
@@ -271,6 +291,9 @@ function getTextStyle(
     runProperties,
     textBodyListDefaultRunProperties,
   } = getLocalStyleSources(shape);
+  // A direct run property applies only to that DrawingML run. For placeholders,
+  // the object-wide base continues to inherit from the layout or master.
+  const objectRunProperties = placeholderRole ? undefined : runProperties;
   const verticalAlign = getVerticalAlign(shape);
   const roleParagraphProperties = getRoleParagraphProperties(placeholderRole, textDefaults);
   const roleRunProperties = getRoleRunProperties(placeholderRole, textDefaults);
@@ -285,7 +308,7 @@ function getTextStyle(
   const size = Number(
     getFirstAttribute(
       'sz',
-      runProperties,
+      objectRunProperties,
       paragraphDefaultRunProperties,
       textBodyListDefaultRunProperties,
       listDefaultRunProperties,
@@ -296,7 +319,7 @@ function getTextStyle(
     ),
   );
   const font = getTypeface(
-    runProperties,
+    objectRunProperties,
     paragraphDefaultRunProperties,
     textBodyListDefaultRunProperties,
     listDefaultRunProperties,
@@ -307,7 +330,7 @@ function getTextStyle(
   );
   const resolvedFont = resolveThemeFontFamily(font, theme);
   const bold = hasEnabledBold(
-    runProperties,
+    objectRunProperties,
     paragraphDefaultRunProperties,
     textBodyListDefaultRunProperties,
     listDefaultRunProperties,
@@ -318,7 +341,7 @@ function getTextStyle(
   );
   const capitalization = getFirstAttribute(
     'cap',
-    runProperties,
+    objectRunProperties,
     paragraphDefaultRunProperties,
     textBodyListDefaultRunProperties,
     listDefaultRunProperties,
@@ -328,12 +351,21 @@ function getTextStyle(
     textDefaults.defaultRunProperties,
   );
   const fontSize = getFontSize(size, scaleY);
+  const highlight = getOptionalTextHighlight(
+    theme,
+    paragraphDefaultRunProperties,
+    textBodyListDefaultRunProperties,
+    listDefaultRunProperties,
+    roleRunProperties,
+    inheritedRunProperties,
+    fallbackInheritedRunProperties,
+  );
   return {
     align: getTextAlign(paragraphProperties, listParagraphProperties, textDefaults, fontSize, verticalAlign),
     ...(capitalization === 'all' ? { capitalization: 'all' as const } : {}),
     fill: getTextFill(
       theme,
-      runProperties,
+      objectRunProperties,
       paragraphDefaultRunProperties,
       textBodyListDefaultRunProperties,
       listDefaultRunProperties,
@@ -345,6 +377,7 @@ function getTextStyle(
     fontFamily: resolvedFont ?? pptxParserDefaults.textStyle.fontFamily,
     fontSize,
     fontWeight: bold ? 700 : pptxParserDefaults.textStyle.fontWeight,
+    ...(highlight ? { highlight } : {}),
     lineHeight: getLineHeight(
       paragraphProperties,
       listParagraphProperties,
@@ -357,13 +390,17 @@ function getTextStyle(
 
 function getTextFill(theme: PptxTheme | undefined, ...elements: Array<Element | undefined>) {
   for (const element of elements) {
-    const color = pptxVisualStyle.getHexColor(element, '', theme);
+    const color = getTextPropertyColor('solidFill', theme, element);
     if (color) return color;
   }
   return pptxParserDefaults.textStyle.fill;
 }
 
-function getTextStyleOverrides(shape: Element, theme: PptxTheme | undefined): PptxTextStyleOverrides {
+function getTextStyleOverrides(
+  shape: Element,
+  theme: PptxTheme | undefined,
+  placeholderRole?: PlaceholderRole,
+): PptxTextStyleOverrides {
   const {
     listDefaultRunProperties,
     listParagraphProperties,
@@ -373,7 +410,7 @@ function getTextStyleOverrides(shape: Element, theme: PptxTheme | undefined): Pp
     textBodyListDefaultRunProperties,
   } = getLocalStyleSources(shape);
   const runSources = [
-    runProperties,
+    ...(placeholderRole ? [] : [runProperties]),
     paragraphDefaultRunProperties,
     textBodyListDefaultRunProperties,
     listDefaultRunProperties,
@@ -382,6 +419,16 @@ function getTextStyleOverrides(shape: Element, theme: PptxTheme | undefined): Pp
   if (getFirstAttribute('algn', paragraphProperties, listParagraphProperties)) overrides.align = true;
   if (getFirstAttribute('cap', ...runSources)) overrides.capitalization = true;
   if (hasFill(theme, ...runSources, shape)) overrides.fill = true;
+  if (
+    hasHighlight(
+      theme,
+      paragraphDefaultRunProperties,
+      textBodyListDefaultRunProperties,
+      listDefaultRunProperties,
+    )
+  ) {
+    overrides.highlight = true;
+  }
   if (hasTypeface(...runSources)) overrides.fontFamily = true;
   if (getFirstAttribute('sz', ...runSources)) overrides.fontSize = true;
   if (getFirstAttribute('b', ...runSources)) overrides.fontWeight = true;
@@ -396,24 +443,317 @@ function applyRunCapitalization(text: string, runProperties: Element | undefined
   return text;
 }
 
-function getParagraphText(paragraph: Element) {
+function getParagraphProperties(paragraph: Element) {
+  return pptxXml.childElements(paragraph, 'pPr')[0];
+}
+
+function getParagraphLevel(paragraphProperties: Element | undefined) {
+  const level = Number(paragraphProperties?.getAttribute('lvl'));
+  return Number.isInteger(level) && level >= 0 && level <= 8 ? level : 0;
+}
+
+function getParagraphListProperties(shape: Element, paragraph: Element) {
+  const textBody = getTextBody(shape);
+  const listStyle = textBody ? pptxXml.childElements(textBody, 'lstStyle')[0] : undefined;
+  return listStyle
+    ? pptxXml.childElements(listStyle, `lvl${getParagraphLevel(getParagraphProperties(paragraph)) + 1}pPr`)[0]
+    : undefined;
+}
+
+function getParagraphBullet(shape: Element, paragraph: Element) {
+  const paragraphProperties = getParagraphProperties(paragraph);
+  const listProperties = getParagraphListProperties(shape, paragraph);
+  if (
+    (paragraphProperties && pptxXml.firstDescendant(paragraphProperties, 'buNone')) ||
+    (!paragraphProperties && listProperties && pptxXml.firstDescendant(listProperties, 'buNone'))
+  ) {
+    return '';
+  }
+  const bullet =
+    (paragraphProperties
+      ? pptxXml.firstDescendant(paragraphProperties, 'buChar')?.getAttribute('char')
+      : undefined) ??
+    (listProperties ? pptxXml.firstDescendant(listProperties, 'buChar')?.getAttribute('char') : undefined);
+  return bullet ? `${bullet} ` : '';
+}
+
+function getParagraphText(shape: Element, paragraph: Element) {
   const runs = pptxXml.descendants(paragraph, 'r');
-  if (runs.length === 0) return pptxXml.textContent(paragraph, 't');
-  return runs
-    .map((run) => {
-      const runProperties = pptxXml.firstDescendant(run, 'rPr');
-      return applyRunCapitalization(pptxXml.textContent(run, 't'), runProperties);
-    })
-    .join('');
+  const text =
+    runs.length === 0
+      ? pptxXml.textContent(paragraph, 't')
+      : runs
+          .map((run) => {
+            const runProperties = pptxXml.firstDescendant(run, 'rPr');
+            return applyRunCapitalization(pptxXml.textContent(run, 't'), runProperties);
+          })
+          .join('');
+  return `${getParagraphBullet(shape, paragraph)}${text}`;
 }
 
 function getTextParagraphs(shape: Element) {
   const body = getTextBody(shape);
   const paragraphs = body ? pptxXml.descendants(body, 'p') : [];
   return paragraphs
-    .map((paragraph) => getParagraphText(paragraph).replace(/[ \t\r\f\v]+/g, ' ').trim())
+    .map((paragraph) => getParagraphText(shape, paragraph).replace(/[ \t\r\f\v]+/g, ' ').trim())
     .filter(Boolean)
     .join('\n');
+}
+
+function getOptionalTextFill(theme: PptxTheme | undefined, ...elements: Array<Element | undefined>) {
+  for (const element of elements) {
+    const color = getTextPropertyColor('solidFill', theme, element);
+    if (color) return color;
+  }
+  return undefined;
+}
+
+function getOptionalTextHighlight(
+  theme: PptxTheme | undefined,
+  ...elements: Array<Element | undefined>
+) {
+  for (const element of elements) {
+    const color = getTextPropertyColor('highlight', theme, element);
+    if (color) return color;
+  }
+  return undefined;
+}
+
+function getParagraphLength(
+  attributeName: 'indent' | 'marL',
+  paragraphProperties: Element | undefined,
+  listProperties: Element | undefined,
+  scaleX: number,
+) {
+  const rawValue = getFirstAttribute(attributeName, paragraphProperties, listProperties);
+  const value = Number(rawValue);
+  return Number.isFinite(value) ? Math.round(value * scaleX) : 0;
+}
+
+function getParagraphSpacing(
+  spacingName: 'spcAft' | 'spcBef',
+  paragraphProperties: Element | undefined,
+  listProperties: Element | undefined,
+  scaleY: number,
+) {
+  for (const properties of [paragraphProperties, listProperties]) {
+    const spacing = properties ? pptxXml.firstDescendant(properties, spacingName) : undefined;
+    const points = Number(
+      spacing ? pptxXml.firstDescendant(spacing, 'spcPts')?.getAttribute('val') : undefined,
+    );
+    if (Number.isFinite(points)) return Math.round((points / 100) * EMUS_PER_POINT * scaleY);
+  }
+  return 0;
+}
+
+function getUniformTextDecoration(paragraph: Element): PptxTextParagraph['textDecoration'] {
+  const runs = pptxXml
+    .descendants(paragraph, 'r')
+    .filter((run) => Boolean(pptxXml.textContent(run, 't').trim()));
+  if (runs.length === 0) return undefined;
+  const runProperties = runs.map((run) => pptxXml.firstDescendant(run, 'rPr'));
+  if (
+    runProperties.every((properties) => {
+      const underline = properties?.getAttribute('u');
+      return Boolean(underline && underline !== 'none');
+    })
+  ) {
+    return 'underline';
+  }
+  if (
+    runProperties.every((properties) => {
+      const strike = properties?.getAttribute('strike');
+      return Boolean(strike && strike !== 'noStrike');
+    })
+  ) {
+    return 'line-through';
+  }
+  return undefined;
+}
+
+function getTextDecoration(
+  ...properties: Array<Element | undefined>
+): PptxTextRun['textDecoration'] {
+  const underline = getFirstAttribute('u', ...properties);
+  if (underline && underline !== 'none') return 'underline';
+  const strike = getFirstAttribute('strike', ...properties);
+  if (strike && strike !== 'noStrike') return 'line-through';
+  return undefined;
+}
+
+function getTextRun(
+  text: string,
+  properties: Array<Element | undefined>,
+  scaleY: number,
+  theme: PptxTheme | undefined,
+  fallback: PptxTextRun,
+  trackOverrides = false,
+): PptxTextRun {
+  const rawSize = Number(getFirstAttribute('sz', ...properties));
+  const font = resolveThemeFontFamily(getTypeface(...properties), theme);
+  const bold = getFirstAttribute('b', ...properties);
+  const italic = getFirstAttribute('i', ...properties);
+  const decoration = getTextDecoration(...properties);
+  const highlight = getOptionalTextHighlight(theme, ...properties) ?? fallback.highlight;
+  const explicitProperties = properties[0];
+  const styleOverrides = trackOverrides
+    ? {
+        ...(getTextPropertyColor('solidFill', theme, explicitProperties)
+          ? { fill: true as const }
+          : {}),
+        ...(hasTypeface(explicitProperties) ? { fontFamily: true as const } : {}),
+        ...(explicitProperties?.getAttribute('sz') ? { fontSize: true as const } : {}),
+        ...(explicitProperties?.getAttribute('i') ? { fontStyle: true as const } : {}),
+        ...(explicitProperties?.getAttribute('b') ? { fontWeight: true as const } : {}),
+        ...(getTextPropertyColor('highlight', theme, explicitProperties)
+          ? { highlight: true as const }
+          : {}),
+        ...(getTextDecoration(explicitProperties) ? { textDecoration: true as const } : {}),
+      }
+    : undefined;
+  return {
+    fill: getOptionalTextFill(theme, ...properties) ?? fallback.fill,
+    fontFamily: font ?? fallback.fontFamily,
+    fontSize:
+      Number.isFinite(rawSize) && rawSize > 0 ? getFontSize(rawSize, scaleY) : fallback.fontSize,
+    fontStyle: italic === '1' ? 'italic' : italic === '0' ? 'normal' : fallback.fontStyle,
+    fontWeight: bold === '1' ? 700 : bold === '0' ? 400 : fallback.fontWeight,
+    ...(highlight ? { highlight } : {}),
+    text,
+    ...(decoration ? { textDecoration: decoration } : {}),
+    ...(styleOverrides && Object.keys(styleOverrides).length > 0 ? { styleOverrides } : {}),
+  };
+}
+
+function getTextParagraphFormats(
+  shape: Element,
+  scaleX: number,
+  scaleY: number,
+  textDefaults: PptxTextDefaults,
+  theme: PptxTheme | undefined,
+  placeholderRole: PlaceholderRole | undefined,
+  fallbackStyle: PptxTextStyle,
+): PptxTextParagraph[] {
+  const body = getTextBody(shape);
+  const paragraphs = body ? pptxXml.descendants(body, 'p') : [];
+  const roleRunProperties = getRoleRunProperties(placeholderRole, textDefaults);
+  return paragraphs.flatMap((paragraph) => {
+    const text = getParagraphText(shape, paragraph).replace(/[ \t\r\f\v]+/g, ' ').trim();
+    if (!text) return [];
+    const paragraphProperties = getParagraphProperties(paragraph);
+    const listProperties = getParagraphListProperties(shape, paragraph);
+    const runProperties = getDominantRunProperties(paragraph);
+    const paragraphDefaultRunProperties = getParagraphDefaultRunProperties(paragraphProperties);
+    const listDefaultRunProperties = getParagraphDefaultRunProperties(listProperties);
+    const runSources = [
+      runProperties,
+      paragraphDefaultRunProperties,
+      listDefaultRunProperties,
+      roleRunProperties,
+    ];
+    const baseRun: PptxTextRun = {
+      fill: fallbackStyle.fill,
+      fontFamily: fallbackStyle.fontFamily,
+      fontSize: fallbackStyle.fontSize,
+      fontStyle: 'normal',
+      fontWeight: fallbackStyle.fontWeight,
+      ...(fallbackStyle.highlight ? { highlight: fallbackStyle.highlight } : {}),
+      text,
+    };
+    const inheritedRun = getTextRun(
+      text,
+      [paragraphDefaultRunProperties, listDefaultRunProperties, roleRunProperties],
+      scaleY,
+      theme,
+      baseRun,
+    );
+    const paragraphRun = getTextRun(text, runSources, scaleY, theme, inheritedRun);
+    const fontSize = paragraphRun.fontSize;
+    const verticalAlign = getVerticalAlign(shape);
+    const bulletText = getParagraphBullet(shape, paragraph);
+    const bulletColor = paragraphProperties
+      ? pptxXml.firstDescendant(paragraphProperties, 'buClr')
+      : listProperties
+        ? pptxXml.firstDescendant(listProperties, 'buClr')
+        : undefined;
+    const bulletFont = paragraphProperties
+      ? pptxXml.firstDescendant(paragraphProperties, 'buFont')?.getAttribute('typeface')
+      : listProperties
+        ? pptxXml.firstDescendant(listProperties, 'buFont')?.getAttribute('typeface')
+        : undefined;
+    const bulletSize = Number(
+      (paragraphProperties
+        ? pptxXml.firstDescendant(paragraphProperties, 'buSzPts')
+        : listProperties
+          ? pptxXml.firstDescendant(listProperties, 'buSzPts')
+          : undefined
+      )?.getAttribute('val'),
+    );
+    const runs: PptxTextRun[] = [
+      ...(bulletText
+        ? [
+            {
+              ...inheritedRun,
+              fill: pptxVisualStyle.getHexColor(bulletColor, '', theme) || fallbackStyle.fill,
+              ...(bulletFont ? { fontFamily: bulletFont } : {}),
+              ...(Number.isFinite(bulletSize) && bulletSize > 0
+                ? { fontSize: getFontSize(bulletSize, scaleY) }
+                : {}),
+              text: bulletText,
+            },
+          ]
+        : []),
+      ...pptxXml.descendants(paragraph, 'r').flatMap((run) => {
+        const runText = applyRunCapitalization(
+          pptxXml.textContent(run, 't'),
+          pptxXml.firstDescendant(run, 'rPr'),
+        );
+        if (!runText) return [];
+        return [
+          getTextRun(
+            runText,
+            [
+              pptxXml.firstDescendant(run, 'rPr'),
+              paragraphDefaultRunProperties,
+              listDefaultRunProperties,
+              roleRunProperties,
+            ],
+            scaleY,
+            theme,
+            inheritedRun,
+            true,
+          ),
+        ];
+      }),
+    ];
+    return [
+      {
+        align: getTextAlign(
+          paragraphProperties,
+          listProperties,
+          textDefaults,
+          fontSize,
+          verticalAlign,
+        ),
+        fill: paragraphRun.fill,
+        fontFamily: paragraphRun.fontFamily,
+        fontSize: paragraphRun.fontSize,
+        fontStyle: paragraphRun.fontStyle,
+        fontWeight: paragraphRun.fontWeight,
+        indent: getParagraphLength('indent', paragraphProperties, listProperties, scaleX),
+        lineHeight: getLineHeight(paragraphProperties, listProperties),
+        marginLeft: getParagraphLength('marL', paragraphProperties, listProperties, scaleX),
+        ...(runs.length > 0 ? { runs } : {}),
+        spaceAfter: getParagraphSpacing('spcAft', paragraphProperties, listProperties, scaleY),
+        spaceBefore: getParagraphSpacing('spcBef', paragraphProperties, listProperties, scaleY),
+        text,
+        ...(getUniformTextDecoration(paragraph)
+          ? { textDecoration: getUniformTextDecoration(paragraph)! }
+          : {}),
+        verticalAlign,
+      },
+    ];
+  });
 }
 
 function applyTextStyle(text: string, style: PptxTextStyle) {
@@ -451,8 +791,15 @@ function getTextInset(
 function getTextBox(shape: Element, scaleX: number, scaleY: number): PptxTextBox {
   const bodyProperties = pptxXml.firstDescendant(shape, 'bodyPr');
   const anchor = bodyProperties?.getAttribute('anchor');
+  const normalAutoFit = bodyProperties
+    ? pptxXml.firstDescendant(bodyProperties, 'normAutofit')
+    : undefined;
+  const rawFontScale = Number(normalAutoFit?.getAttribute('fontScale'));
+  const fontScale =
+    Number.isFinite(rawFontScale) && rawFontScale > 0 ? Math.min(1, rawFontScale / 100000) : undefined;
   return {
-    autoFit: bodyProperties && pptxXml.firstDescendant(bodyProperties, 'normAutofit') ? 'shrink-text' : 'none',
+    autoFit: normalAutoFit ? 'shrink-text' : 'none',
+    ...(fontScale !== undefined ? { fontScale } : {}),
     insets: {
       bottom: getTextInset(bodyProperties, 'bIns', pptxParserDefaults.textInsetsEmu.bottom, scaleY),
       left: getTextInset(bodyProperties, 'lIns', pptxParserDefaults.textInsetsEmu.left, scaleX),
@@ -460,6 +807,8 @@ function getTextBox(shape: Element, scaleX: number, scaleY: number): PptxTextBox
       top: getTextInset(bodyProperties, 'tIns', pptxParserDefaults.textInsetsEmu.top, scaleY),
     },
     verticalAlign: anchor === 'b' ? 'bottom' : anchor === 'ctr' ? 'middle' : 'top',
+    verticalOverflow:
+      bodyProperties?.getAttribute('vertOverflow') === 'clip' ? 'clip' : 'overflow',
   };
 }
 
@@ -469,6 +818,7 @@ function getTextBoxOverrides(shape: Element): PptxTextBoxOverrides {
   if (!bodyProperties) return overrides;
   if (pptxXml.firstDescendant(bodyProperties, 'normAutofit')) overrides.autoFit = true;
   if (bodyProperties.getAttribute('anchor')) overrides.verticalAlign = true;
+  if (bodyProperties.getAttribute('vertOverflow')) overrides.verticalOverflow = true;
   if (
     bodyProperties.getAttribute('bIns') !== null ||
     bodyProperties.getAttribute('lIns') !== null ||
@@ -490,6 +840,7 @@ export const pptxTextParser = {
   getPresentationTextDefaults,
   getTextBox,
   getTextBoxOverrides,
+  getTextParagraphFormats,
   getTextParagraphs,
   getTextStyle,
   getTextStyleOverrides,

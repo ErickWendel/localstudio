@@ -1,4 +1,5 @@
 import type { DesignElement, Page, ProjectDocument } from '../../../domain/documents/model';
+import { RichTextPreview } from '../../shared/RichTextPreview';
 
 export function MiniPagePreview({
   page,
@@ -90,7 +91,7 @@ function MiniElement({
           whiteSpace: 'pre-wrap',
         }}
       >
-        {element.text}
+        <RichTextPreview element={element} pageWidth={page.width} />
       </span>
     );
   }

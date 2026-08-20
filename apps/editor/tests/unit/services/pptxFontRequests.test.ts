@@ -61,6 +61,32 @@ describe('pptxFontRequests', () => {
           fontFamily: 'Merriweather',
           fontSize: 20,
           fontWeight: 400,
+          paragraphs: [
+            {
+              align: 'left',
+              fill: '#111111',
+              fontFamily: 'Merriweather',
+              fontSize: 20,
+              fontStyle: 'normal',
+              fontWeight: 400,
+              indent: 0,
+              lineHeight: 1,
+              marginLeft: 0,
+              runs: [
+                {
+                  fill: '#111111',
+                  fontFamily: 'Lora',
+                  fontSize: 20,
+                  fontStyle: 'italic',
+                  fontWeight: 400,
+                  text: 'Rich run',
+                },
+              ],
+              spaceAfter: 0,
+              spaceBefore: 0,
+              text: 'Rich run',
+            },
+          ],
         },
         compatibleOffice: {
           id: 'system',
@@ -104,6 +130,7 @@ describe('pptxFontRequests', () => {
     expect(pptxFontRequests.collect(project)).toEqual([
       { family: 'Montserrat', fontStyle: 'normal', fontWeight: 700 },
       { family: 'Merriweather', fontStyle: 'normal', fontWeight: 400 },
+      { family: 'Lora', fontStyle: 'italic', fontWeight: 400 },
       { family: 'Calibri', fontStyle: 'normal', fontWeight: 400 },
     ]);
   });

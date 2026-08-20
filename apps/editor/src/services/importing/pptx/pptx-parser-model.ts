@@ -1,12 +1,15 @@
 import type {
   AnimationEffect,
   AnimationTrigger,
+  ConnectorPreset,
   CropRect,
   ElementAnimationBuild,
   ImportWarning,
   PlaceholderRole,
   ShapeKind,
+  ShapeLineDash,
   ShapeLineEndpoint,
+  ShapePath,
 } from '../../../domain/documents/model';
 import type { PptxPackage } from './pptxPackage';
 
@@ -21,6 +24,7 @@ export interface PptxTransform extends PptxRect {
   childOffsetX?: number;
   childOffsetY?: number;
   flipX?: boolean;
+  flipY?: boolean;
   rotation: number;
   scaleX?: number;
   scaleY?: number;
@@ -33,8 +37,37 @@ export interface PptxTextStyle {
   fontFamily: string;
   fontSize: number;
   fontWeight: number;
+  highlight?: string;
   lineHeight: number;
   verticalAlign: 'bottom' | 'middle' | 'top';
+}
+
+export interface PptxTextParagraph extends PptxTextStyle {
+  fontStyle: 'italic' | 'normal';
+  indent: number;
+  marginLeft: number;
+  runs?: PptxTextRun[];
+  spaceAfter: number;
+  spaceBefore: number;
+  text: string;
+  textDecoration?: 'line-through' | 'underline';
+}
+
+export interface PptxTextRun {
+  fill: string;
+  fontFamily: string;
+  fontSize: number;
+  fontStyle: 'italic' | 'normal';
+  fontWeight: number;
+  highlight?: string;
+  text: string;
+  textDecoration?: 'line-through' | 'underline';
+  styleOverrides?: Partial<
+    Record<
+      'fill' | 'fontFamily' | 'fontSize' | 'fontStyle' | 'fontWeight' | 'highlight' | 'textDecoration',
+      true
+    >
+  >;
 }
 
 export type PptxTextStyleOverrides = Partial<Record<keyof PptxTextStyle, true>>;
@@ -48,11 +81,15 @@ export interface PptxTextInsets {
 
 export interface PptxTextBox {
   autoFit: 'none' | 'shrink-text';
+  fontScale?: number;
   insets: PptxTextInsets;
   verticalAlign: 'bottom' | 'middle' | 'top';
+  verticalOverflow: 'clip' | 'overflow';
 }
 
-export type PptxTextBoxOverrides = Partial<Record<'autoFit' | 'insets' | 'verticalAlign', true>>;
+export type PptxTextBoxOverrides = Partial<
+  Record<'autoFit' | 'insets' | 'verticalAlign' | 'verticalOverflow', true>
+>;
 
 export type PptxSlideObject =
   | {
@@ -63,6 +100,7 @@ export type PptxSlideObject =
       opacity?: number;
       placeholderIndex?: string;
       placeholderRole?: PlaceholderRole;
+      paragraphs?: PptxTextParagraph[];
       rotation?: number;
       source: 'layout' | 'master' | 'slide';
       sourceShapeId: string;
@@ -80,6 +118,7 @@ export type PptxSlideObject =
       frameSource?: 'inherited' | 'self';
       id: string;
       kind: 'image' | 'gif' | 'video';
+      mask?: 'ellipse';
       opacity?: number;
       placeholderIndex?: string;
       placeholderOnly?: boolean;
@@ -92,11 +131,14 @@ export type PptxSlideObject =
     }
   | {
       endEndpoint?: ShapeLineEndpoint;
+      connectorPreset?: ConnectorPreset;
       fill?: string;
       frame: PptxRect;
       id: string;
       kind: 'shape';
+      lineDash?: ShapeLineDash;
       opacity?: number;
+      path?: ShapePath;
       placeholderIndex?: string;
       placeholderRole?: PlaceholderRole;
       rotation?: number;
@@ -139,6 +181,7 @@ export interface PptxDeck {
   height: number;
   layouts: PptxLayout[];
   name: string;
+  pageSizePoints: { height: number; width: number };
   slides: PptxSlide[];
   warnings: ImportWarning[];
   width: number;

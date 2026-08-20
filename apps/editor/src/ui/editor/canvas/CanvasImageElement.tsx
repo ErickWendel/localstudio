@@ -1,5 +1,5 @@
 import type Konva from 'konva';
-import { Image as KonvaImage, Rect } from 'react-konva';
+import { Group, Image as KonvaImage, Rect } from 'react-konva';
 import { placeholderImage } from '../../../domain/assets/placeholderImage';
 import type { DesignElement } from '../../../domain/documents/model';
 import { canvasWorkspaceUtils } from './canvasWorkspaceUtils';
@@ -67,6 +67,36 @@ export function CanvasImageElement({
           listening={false}
         />
       </>
+    );
+  }
+
+  if (element.mask === 'ellipse') {
+    return (
+      <Group
+        {...imageProps}
+        clipFunc={(context) => {
+          context.beginPath();
+          context.ellipse(
+            imageProps.width / 2,
+            imageProps.height / 2,
+            imageProps.width / 2,
+            imageProps.height / 2,
+            0,
+            0,
+            Math.PI * 2,
+          );
+          context.closePath();
+        }}
+        ref={nodeRef}
+      >
+        <KonvaImage
+          image={image}
+          {...(crop ? { crop } : {})}
+          height={imageProps.height}
+          listening={false}
+          width={imageProps.width}
+        />
+      </Group>
     );
   }
 

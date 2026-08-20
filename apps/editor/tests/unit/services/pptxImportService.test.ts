@@ -145,7 +145,7 @@ const slideXml = `<?xml version="1.0" encoding="UTF-8"?>
       <p:pic>
         <p:nvPicPr><p:cNvPr id="3" name="Hero image"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>
         <p:blipFill><a:blip r:embed="rIdImage"/></p:blipFill>
-        <p:spPr><a:xfrm><a:off x="4572000" y="914400"/><a:ext cx="1828800" cy="914400"/></a:xfrm><a:effectLst><a:outerShdw><a:srgbClr val="000000"><a:alpha val="70000"/></a:srgbClr></a:outerShdw></a:effectLst></p:spPr>
+        <p:spPr><a:xfrm><a:off x="4572000" y="914400"/><a:ext cx="1828800" cy="914400"/></a:xfrm><a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom><a:effectLst><a:outerShdw><a:srgbClr val="000000"><a:alpha val="70000"/></a:srgbClr></a:outerShdw></a:effectLst></p:spPr>
       </p:pic>
       <p:pic>
         <p:nvPicPr><p:cNvPr id="9" name="Wide screenshot"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>
@@ -221,6 +221,7 @@ function createPptxFixture(
   slideContents = slideXml,
   presentationContents = presentationXml,
   layoutContents = layoutXml,
+  masterContents = masterXml,
 ) {
   return createStoredPptxFile([
     { path: 'ppt/presentation.xml', contents: presentationContents },
@@ -231,7 +232,7 @@ function createPptxFixture(
     { path: 'ppt/slideLayouts/slideLayout1.xml', contents: layoutContents },
     { path: 'ppt/slideLayouts/slideLayout2.xml', contents: unusedLayoutXml },
     { path: 'ppt/slideLayouts/_rels/slideLayout1.xml.rels', contents: layoutRels },
-    { path: 'ppt/slideMasters/slideMaster1.xml', contents: masterXml },
+    { path: 'ppt/slideMasters/slideMaster1.xml', contents: masterContents },
     { path: 'ppt/slideMasters/_rels/slideMaster1.xml.rels', contents: masterRels },
     { path: 'ppt/media/image1.png', contents: new Uint8Array([137, 80, 78, 71]) },
     { path: 'ppt/media/layout-icon.png', contents: new Uint8Array([137, 80, 78, 71]) },
@@ -440,6 +441,175 @@ function createStandardsFixture() {
 }
 
 describe('BrowserPptxImportService', () => {
+  it('inherits title placeholder styling from the matching master placeholder', async () => {
+    const inheritedMasterXml = `<?xml version="1.0" encoding="UTF-8"?>
+<p:sldMaster xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:cSld><p:spTree>
+    <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>
+    <p:sp><p:nvSpPr><p:cNvPr id="2" name="Master title"/><p:cNvSpPr/><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="457200" y="457200"/><a:ext cx="8229600" cy="914400"/></a:xfrm></p:spPr><p:txBody><a:bodyPr anchor="ctr"/><a:lstStyle/><a:p><a:pPr algn="ctr"><a:defRPr sz="7200" b="1"><a:latin typeface="Work Sans"/></a:defRPr></a:pPr><a:r><a:t>Master title</a:t></a:r></a:p></p:txBody></p:sp>
+  </p:spTree></p:cSld>
+  <p:sldLayoutIdLst><p:sldLayoutId id="1" r:id="rIdLayout1"/><p:sldLayoutId id="2" r:id="rIdLayout2"/></p:sldLayoutIdLst>
+</p:sldMaster>`;
+    const inheritedLayoutXml = `<?xml version="1.0" encoding="UTF-8"?>
+<p:sldLayout xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:cSld name="Inherited title"><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Layout title"/><p:cNvSpPr/><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Layout title</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld>
+</p:sldLayout>`;
+    const inheritedSlideXml = `<?xml version="1.0" encoding="UTF-8"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="3" name="Slide title"/><p:cNvSpPr/><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Inherited title</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>`;
+    const service = new BrowserPptxImportService();
+    const project = await service.importPowerPoint({
+      file: createPptxFixture(
+        inheritedSlideXml,
+        presentationXml,
+        inheritedLayoutXml,
+        inheritedMasterXml,
+      ),
+    });
+    const title = Object.values(project.elements).find(
+      (element) => element.type === 'text' && element.text === 'Inherited title',
+    );
+
+    expect(title).toMatchObject({
+      align: 'center',
+      fontFamily: 'Work Sans',
+      fontWeight: 700,
+      placeholderRole: 'title',
+    });
+    if (!title || title.type !== 'text') throw new Error('Expected inherited title.');
+    expect(title.fontSize).toBeGreaterThan(100);
+  });
+
+  it('inherits master backgrounds and DrawingML text highlights through the slide layout', async () => {
+    const inheritedBackgroundMasterXml = `<?xml version="1.0" encoding="UTF-8"?>
+<p:sldMaster xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val="000022"/></a:solidFill></p:bgPr></p:bg><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>
+    <p:sp><p:nvSpPr><p:cNvPr id="2" name="Master subtitle"/><p:cNvSpPr/><p:nvPr><p:ph type="subTitle" idx="1"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="457200" y="457200"/><a:ext cx="3657600" cy="914400"/></a:xfrm></p:spPr><p:txBody><a:bodyPr/><a:lstStyle><a:lvl1pPr><a:defRPr sz="2800"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:defRPr></a:lvl1pPr></a:lstStyle><a:p/></p:txBody></p:sp>
+  </p:spTree></p:cSld>
+  <p:sldLayoutIdLst><p:sldLayoutId id="1" r:id="rIdLayout1"/><p:sldLayoutId id="2" r:id="rIdLayout2"/></p:sldLayoutIdLst>
+</p:sldMaster>`;
+    const highlightedLayoutXml = `<?xml version="1.0" encoding="UTF-8"?>
+<p:sldLayout xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:cSld name="Highlighted subtitle"><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>
+    <p:sp><p:nvSpPr><p:cNvPr id="2" name="Layout subtitle"/><p:cNvSpPr/><p:nvPr><p:ph type="subTitle" idx="1"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="457200" y="457200"/><a:ext cx="3657600" cy="914400"/></a:xfrm></p:spPr><p:txBody><a:bodyPr/><a:lstStyle><a:lvl1pPr><a:defRPr sz="2800"><a:solidFill><a:srgbClr val="000000"/></a:solidFill><a:highlight><a:srgbClr val="45BB8B"/></a:highlight></a:defRPr></a:lvl1pPr></a:lstStyle><a:p/></p:txBody></p:sp>
+  </p:spTree></p:cSld>
+</p:sldLayout>`;
+    const highlightedSlideXml = `<?xml version="1.0" encoding="UTF-8"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>
+  <p:sp><p:nvSpPr><p:cNvPr id="3" name="Slide subtitle"/><p:cNvSpPr/><p:nvPr><p:ph type="subTitle" idx="1"/></p:nvPr></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Highlighted </a:t></a:r><a:r><a:rPr><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:highlight><a:srgbClr val="FF9900"/></a:highlight></a:rPr><a:t>subtitle</a:t></a:r></a:p></p:txBody></p:sp>
+</p:spTree></p:cSld></p:sld>`;
+    const service = new BrowserPptxImportService();
+    const project = await service.importPowerPoint({
+      file: createPptxFixture(
+        highlightedSlideXml,
+        presentationXml,
+        highlightedLayoutXml,
+        inheritedBackgroundMasterXml,
+      ),
+    });
+    const subtitle = Object.values(project.elements).find(
+      (element) => element.type === 'text' && element.text === 'Highlighted subtitle',
+    );
+
+    expect(project.pages[0]?.background).toEqual({ type: 'color', color: '#000022' });
+    expect(project.pageSizePoints).toEqual({ height: 405, width: 720 });
+    expect(subtitle).toMatchObject({
+      fill: '#000000',
+      highlight: '#45BB8B',
+      paragraphs: [
+        {
+          runs: [
+            { fill: '#000000', highlight: '#45BB8B', text: 'Highlighted ' },
+            { fill: '#FFFFFF', highlight: '#FF9900', text: 'subtitle' },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('imports standard straight, bent, and curved DrawingML connector geometry', async () => {
+    const connectorSlideXml = `<?xml version="1.0" encoding="UTF-8"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree>
+  <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>
+  <p:cxnSp><p:nvCxnSpPr><p:cNvPr id="60" name="Straight connector"/><p:cNvCxnSpPr/><p:nvPr/></p:nvCxnSpPr><p:spPr><a:xfrm><a:off x="457200" y="457200"/><a:ext cx="914400" cy="914400"/></a:xfrm><a:prstGeom prst="straightConnector1"><a:avLst/></a:prstGeom><a:ln w="25400"><a:solidFill><a:srgbClr val="45BB8B"/></a:solidFill><a:prstDash val="dot"/><a:tailEnd type="triangle"/></a:ln></p:spPr></p:cxnSp>
+  <p:cxnSp><p:nvCxnSpPr><p:cNvPr id="61" name="Bent connector"/><p:cNvCxnSpPr/><p:nvPr/></p:nvCxnSpPr><p:spPr><a:xfrm flipH="1"><a:off x="1828800" y="457200"/><a:ext cx="914400" cy="914400"/></a:xfrm><a:prstGeom prst="bentConnector3"><a:avLst><a:gd name="adj1" fmla="val 25000"/></a:avLst></a:prstGeom><a:ln w="12700"><a:solidFill><a:srgbClr val="F6B21A"/></a:solidFill></a:ln></p:spPr></p:cxnSp>
+  <p:cxnSp><p:nvCxnSpPr><p:cNvPr id="62" name="Curved connector"/><p:cNvCxnSpPr/><p:nvPr/></p:nvCxnSpPr><p:spPr><a:xfrm><a:off x="3200400" y="457200"/><a:ext cx="914400" cy="914400"/></a:xfrm><a:prstGeom prst="curvedConnector3"><a:avLst/></a:prstGeom><a:ln><a:solidFill><a:srgbClr val="197BC0"/></a:solidFill></a:ln></p:spPr></p:cxnSp>
+</p:spTree></p:cSld></p:sld>`;
+    const service = new BrowserPptxImportService();
+    const project = await service.importPowerPoint({
+      file: createPptxFixture(connectorSlideXml),
+    });
+    const connectors = Object.values(project.elements)
+      .filter((element) => element.type === 'shape' && element.importSource?.source === 'slide')
+      .sort((left, right) => left.id.localeCompare(right.id));
+
+    expect(connectors).toMatchObject([
+      {
+        connectorPreset: 'straightConnector1',
+        endEndpoint: 'arrow',
+        lineDash: 'dot',
+        path: { kind: 'polyline', points: [0, 0, 1, 1] },
+        shape: 'line',
+        stroke: '#45BB8B',
+      },
+      {
+        connectorPreset: 'bentConnector3',
+        path: { kind: 'polyline', points: [1, 0, 0.75, 0, 0.75, 1, 0, 1] },
+        shape: 'line',
+        stroke: '#F6B21A',
+      },
+      {
+        connectorPreset: 'curvedConnector3',
+        path: {
+          kind: 'bezier',
+          points: [0, 0, 0.25, 0, 0.5, 0.25, 0.5, 0.5, 0.5, 0.75, 0.75, 1, 1, 1],
+        },
+        shape: 'line',
+        stroke: '#197BC0',
+      },
+    ]);
+  });
+
+  it('preserves filled text shapes, bullets, auto-fit scaling, and mixed run formatting', async () => {
+    const fidelitySlideXml = `<?xml version="1.0" encoding="UTF-8"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree>
+  <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>
+  <p:sp><p:nvSpPr><p:cNvPr id="40" name="White mask"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="457200" y="457200"/><a:ext cx="1828800" cy="914400"/></a:xfrm><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr sz="2400"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:rPr><a:t>v</a:t></a:r></a:p></p:txBody></p:sp>
+  <p:sp><p:nvSpPr><p:cNvPr id="41" name="Rich text"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="457200" y="1828800"/><a:ext cx="8229600" cy="914400"/></a:xfrm></p:spPr><p:txBody><a:bodyPr><a:normAutofit fontScale="50000"/></a:bodyPr><a:lstStyle/><a:p><a:pPr><a:buClr><a:srgbClr val="000000"/></a:buClr><a:buChar char="•"/></a:pPr><a:r><a:rPr sz="4800" u="sng"><a:solidFill><a:srgbClr val="0000FF"/></a:solidFill><a:latin typeface="Roboto"/></a:rPr><a:t>Linked</a:t></a:r><a:r><a:rPr sz="4800" strike="sngStrike"><a:solidFill><a:srgbClr val="000000"/></a:solidFill><a:latin typeface="Roboto"/></a:rPr><a:t> struck</a:t></a:r><a:r><a:rPr sz="4800"><a:solidFill><a:srgbClr val="000000"/></a:solidFill><a:highlight><a:srgbClr val="45BB8B"/></a:highlight><a:latin typeface="Roboto"/></a:rPr><a:t> hi</a:t></a:r></a:p></p:txBody></p:sp>
+</p:spTree></p:cSld></p:sld>`;
+    const service = new BrowserPptxImportService();
+    const project = await service.importPowerPoint({ file: createPptxFixture(fidelitySlideXml) });
+    const pageElements = project.pages[0]?.elementIds.map((elementId) => project.elements[elementId]);
+    const maskShape = pageElements?.find(
+      (element) => element?.type === 'shape' && element.importSource?.shapeId === '40',
+    );
+    const maskText = pageElements?.find(
+      (element) => element?.type === 'text' && element.importSource?.shapeId === '40',
+    );
+    const richText = pageElements?.find(
+      (element) => element?.type === 'text' && element.importSource?.shapeId === '41',
+    );
+
+    expect(maskShape).toMatchObject({ fill: '#FFFFFF', shape: 'rounded-rect', type: 'shape' });
+    expect(maskText).toMatchObject({ fill: '#FFFFFF', text: 'v', type: 'text' });
+    expect(richText).toMatchObject({
+      fontSize: 64,
+      text: '• Linked struck hi',
+      type: 'text',
+      verticalOverflow: 'overflow',
+      paragraphs: [
+        {
+          text: '• Linked struck hi',
+          runs: [
+            { fill: '#000000', text: '• ' },
+            { fill: '#0000FF', text: 'Linked', textDecoration: 'underline' },
+            { fill: '#000000', text: ' struck', textDecoration: 'line-through' },
+            { fill: '#000000', highlight: '#45BB8B', text: ' hi' },
+          ],
+        },
+      ],
+    });
+  });
+
   it('imports image-filled slide backgrounds and uses the dominant text run style', async () => {
     const imageBackgroundSlideXml = slideXml
       .replace(
@@ -626,7 +796,7 @@ describe('BrowserPptxImportService', () => {
     expect(autoFitElement.align).toBe('center');
     expect(project.pages[0]?.elementIds.some((elementId) => elementId.includes('placeholder'))).toBe(false);
     expect(imageElements).toHaveLength(2);
-    expect(imageElement).toMatchObject({ locked: false, opacity: 1, type: 'image' });
+    expect(imageElement).toMatchObject({ locked: false, mask: 'ellipse', opacity: 1, type: 'image' });
     expect(wideImageElement).toMatchObject({
       crop: { x: 0.25, y: 0, width: 0.5, height: 1 },
       locked: false,
@@ -1004,6 +1174,8 @@ describe('BrowserPptxImportService', () => {
       stroke: '#111111',
       strokeWidth: 5,
       rotation: 90,
+      x: 336,
+      y: 144,
     });
     expect(allCapsText).toMatchObject({
       type: 'text',

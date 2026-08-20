@@ -21,6 +21,32 @@ export type ShapeLineEndpoint =
   | 'open-square'
   | 'square';
 
+export const shapeLineDashValues = [
+  'dash',
+  'dashDot',
+  'dot',
+  'lgDash',
+  'lgDashDot',
+  'lgDashDotDot',
+  'solid',
+  'sysDash',
+  'sysDashDot',
+  'sysDashDotDot',
+  'sysDot',
+] as const;
+
+export type ShapeLineDash = (typeof shapeLineDashValues)[number];
+
+export type ConnectorPreset =
+  | 'straightConnector1'
+  | `bentConnector${2 | 3 | 4 | 5}`
+  | `curvedConnector${2 | 3 | 4 | 5}`;
+
+export interface ShapePath {
+  kind: 'bezier' | 'polyline';
+  points: number[];
+}
+
 export interface ProjectDocument {
   id: string;
   name: string;
@@ -33,6 +59,7 @@ export interface ProjectDocument {
   themeId?: string;
   themeGallery?: string[];
   slideLayouts?: Record<string, SlideLayout>;
+  pageSizePoints?: { height: number; width: number };
   createdAt: string;
   updatedAt: string;
   importWarnings?: ImportWarning[];
@@ -252,12 +279,44 @@ export interface TextElement extends BaseElement {
   fontSize: number;
   fontWeight: number;
   fill: string;
+  highlight?: string;
   stroke?: string;
   strokeWidth?: number;
   align: 'left' | 'center' | 'right';
   hyperlink?: string;
   lineHeight?: number;
+  paragraphs?: TextParagraph[];
   verticalAlign?: 'bottom' | 'middle' | 'top';
+  verticalOverflow?: 'clip' | 'overflow';
+}
+
+export interface TextParagraph {
+  align: 'left' | 'center' | 'right';
+  fill: string;
+  fontFamily: string;
+  fontSize: number;
+  fontStyle: 'italic' | 'normal';
+  fontWeight: number;
+  highlight?: string;
+  indent: number;
+  lineHeight: number;
+  marginLeft: number;
+  runs?: TextRun[];
+  spaceAfter: number;
+  spaceBefore: number;
+  text: string;
+  textDecoration?: 'line-through' | 'underline';
+}
+
+export interface TextRun {
+  fill: string;
+  fontFamily: string;
+  fontSize: number;
+  fontStyle: 'italic' | 'normal';
+  fontWeight: number;
+  highlight?: string;
+  text: string;
+  textDecoration?: 'line-through' | 'underline';
 }
 
 export interface ImageElement extends BaseElement {
@@ -265,6 +324,7 @@ export interface ImageElement extends BaseElement {
   assetId: string;
   crop?: CropRect;
   flipX?: boolean;
+  mask?: 'ellipse';
 }
 
 export interface GifElement extends BaseElement {
@@ -300,8 +360,11 @@ export interface ShapeElement extends BaseElement {
   fill?: string;
   stroke?: string;
   strokeWidth?: number;
+  lineDash?: ShapeLineDash;
   startEndpoint?: ShapeLineEndpoint;
   endEndpoint?: ShapeLineEndpoint;
+  path?: ShapePath;
+  connectorPreset?: ConnectorPreset;
 }
 
 export interface CropRect {

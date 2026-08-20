@@ -10,7 +10,7 @@ import {
   type RefObject,
 } from 'react';
 import type Konva from 'konva';
-import { Circle, Group, Image as KonvaImage, Layer, Rect, Stage, Text, Transformer } from 'react-konva';
+import { Circle, Group, Image as KonvaImage, Layer, Rect, Stage, Transformer } from 'react-konva';
 import type {
   AlignMode,
   ElementFramePatch,
@@ -27,6 +27,7 @@ import type {
   SelectionState,
   VideoElement,
 } from '../../../domain/documents/model';
+import { pageElementResolver } from '../../../domain/documents/pageElementResolver';
 import { getNormalizedElementPoint } from '../background-selection/backgroundSelection';
 import { FloatingSelectionToolbar } from '../toolbars/FloatingSelectionToolbar';
 import { imageCrop } from './imageCrop';
@@ -41,6 +42,7 @@ import { CanvasMediaNode } from './CanvasMediaNode';
 import { CanvasReadOnlyMediaElement } from './CanvasReadOnlyMediaElement';
 import { CanvasShapeElement } from './CanvasShapeElement';
 import { CanvasStatusHint } from './CanvasStatusHint';
+import { CanvasTextElement } from './CanvasTextElement';
 import { CanvasDragGuide } from './CanvasDragGuide';
 import {
   canvasMagnetGuides,
@@ -260,26 +262,17 @@ export function CanvasWorkspace({
       ? project.assets[page.background.assetId]?.objectUrl
       : undefined;
   const pageBackgroundImage = canvasWorkspaceUtils.useCanvasImage(pageBackgroundAssetUrl);
-  const activeLayout = page?.layoutId ? project.slideLayouts?.[page.layoutId] : undefined;
   const layoutVisibleElements = useMemo(
-    () =>
-      activeLayout?.elementIds
-        .map((id) => activeLayout.elements[id])
-        .filter(canvasWorkspaceUtils.isDesignElement)
-        .filter((element) => element.visible !== false && !element.placeholderRole) ?? [],
-    [activeLayout],
+    () => (page ? pageElementResolver.getLayoutElements(project, page) : []),
+    [page, project],
   );
   const layoutVisibleElementIds = useMemo(
     () => new Set(layoutVisibleElements.map((element) => element.id)),
     [layoutVisibleElements],
   );
   const sourceVisibleElements = useMemo(
-    () =>
-      page?.elementIds
-        .map((id) => project.elements[id])
-        .filter(canvasWorkspaceUtils.isDesignElement)
-        .filter((element) => element.visible !== false) ?? [],
-    [page, project.elements],
+    () => (page ? pageElementResolver.getPageElements(project, page) : []),
+    [page, project],
   );
   const getDraftedElement = useCallback(
     (element: DesignElement | undefined): DesignElement | undefined => {
@@ -1391,23 +1384,13 @@ export function CanvasWorkspace({
                 }
 
                 return (
-                  <Text
-                    {...commonProps}
+                  <CanvasTextElement
+                    commonProps={commonProps}
+                    displayText={getTypedText(element.text, animationState)}
+                    element={element}
                     key={`${element.id}-font-${fontRenderVersion}`}
-                    text={getTypedText(element.text, animationState)}
-                    fontFamily={element.fontFamily}
-                    fontSize={element.fontSize * scaleY}
-                    fontStyle={element.fontWeight >= 700 ? 'bold' : 'normal'}
-                    fill={element.fill}
-                    {...(element.stroke && (element.strokeWidth ?? 0) > 0
-                      ? { stroke: element.stroke, strokeWidth: element.strokeWidth }
-                      : {})}
-                    align={element.align}
-                    lineHeight={element.lineHeight ?? 1.05}
-                    padding={TEXT_FRAME_PADDING * scaleY}
-                    ref={nodeRef}
-                    {...(element.hyperlink ? { textDecoration: 'underline' } : {})}
-                    verticalAlign={element.verticalAlign ?? 'top'}
+                    nodeRef={nodeRef}
+                    scale={{ x: scaleX, y: scaleY }}
                     visible={editingTextId !== element.id}
                   />
                 );

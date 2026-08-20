@@ -154,6 +154,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const [imageExportNotice, setImageExportNotice] = useState<OperationNoticeState | undefined>();
   const [imageExportFrame, setImageExportFrame] = useState<ImageExportFrame | undefined>();
   const [isExportingImages, setIsExportingImages] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [sharePanelOpen, setSharePanelOpen] = useState(false);
   const [shareMetadata, setShareMetadata] = useState<ShareMetadata | undefined>();
   const [sharePublishProgress, setSharePublishProgress] = useState<
@@ -423,7 +424,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   }
 
   async function exportImages(options: ImageExportOptions) {
-    if (isExportingImages) return;
+    if (isExportingImages || isExportingPdf) return;
     const frames = getImageExportFrames(options);
     if (frames.length === 0) return;
     setIsExportingImages(true);
@@ -473,6 +474,66 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     } finally {
       setImageExportFrame(undefined);
       setIsExportingImages(false);
+    }
+  }
+
+  async function exportPdf() {
+    if (isExportingImages || isExportingPdf) return;
+    const frames = getImageExportFrames({
+      format: 'png',
+      includeAnimationFrames: false,
+      slideRange: 'all',
+    });
+    if (frames.length === 0) return;
+    setIsExportingPdf(true);
+    showImageExportNotice(
+      {
+        detail: `Preparing 1 of ${frames.length}`,
+        message: 'Exporting PDF...',
+        progress: { current: 1, total: frames.length },
+        tone: 'info',
+      },
+      { persistent: true },
+    );
+
+    try {
+      const pages = [];
+      for (const [index, frame] of frames.entries()) {
+        const page = vm.project.pages.find((candidate) => candidate.id === frame.pageId);
+        if (!page) continue;
+        showImageExportNotice(
+          {
+            detail: page.name,
+            message: 'Exporting PDF...',
+            progress: { current: index + 1, total: frames.length },
+            tone: 'info',
+          },
+          { persistent: true },
+        );
+        pages.push({
+          bytes: await renderImageExportFrame(frame, 'png'),
+          heightPoints: vm.project.pageSizePoints?.height ?? page.height / 2,
+          widthPoints: vm.project.pageSizePoints?.width ?? page.width / 2,
+        });
+      }
+      setImageExportFrame(undefined);
+      const { pdfExportService } = await import(
+        '../../../services/exporting/pdfExportService'
+      );
+      services.exportService.downloadBlob(
+        pdfExportService.createBlob(pages),
+        services.exportService.getPdfFileName(vm.project),
+      );
+      showImageExportNotice({
+        message: `PDF exported: ${pages.length} slide${pages.length === 1 ? '' : 's'}.`,
+        tone: 'success',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown export error.';
+      showImageExportNotice({ message: `PDF export failed: ${message}`, tone: 'error' });
+    } finally {
+      setImageExportFrame(undefined);
+      setIsExportingPdf(false);
     }
   }
 
@@ -1458,11 +1519,15 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         hasSelection={hasSelection}
         imageExportNotice={imageExportNotice}
         isExportingImages={isExportingImages}
+        isExportingPdf={isExportingPdf}
         isHistoryReadOnly={isHistoryReadOnly}
         services={services}
         vm={vm}
         onExportImages={() => {
           setImageExportPanelOpen(true);
+        }}
+        onExportPdf={() => {
+          void exportPdf();
         }}
         onNewProject={openBlankProjectInNewTab}
         onOpenKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}

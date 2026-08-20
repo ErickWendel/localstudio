@@ -10,7 +10,12 @@ import type {
 } from '../../../domain/documents/model';
 import { pptxFileUtils } from './pptxFileUtils';
 import type { PptxPackage } from './pptxPackage';
-import type { PptxDeck, PptxLayout, PptxSlideObject } from './pptx-parser-model';
+import type {
+  PptxDeck,
+  PptxLayout,
+  PptxSlideObject,
+  PptxTextRun,
+} from './pptx-parser-model';
 
 const TEXT_FRAME_FIT = {
   averageCharacterWidth: 0.9,
@@ -25,45 +30,6 @@ const TEXT_FRAME_FIT = {
 const IMAGE_FIT = {
   aspectRatioTolerance: 0.03,
 };
-
-const TEXT_CONTRAST = {
-  minimumRatio: 2,
-};
-
-function parseHexChannel(value: string, start: number) {
-  return Number.parseInt(value.slice(start, start + 2), 16);
-}
-
-function getRelativeLuminance(color: string) {
-  const normalized = color.replace(/^#/, '');
-  if (!/^[0-9a-f]{6}$/i.test(normalized)) return undefined;
-  const channels = [
-    parseHexChannel(normalized, 0),
-    parseHexChannel(normalized, 2),
-    parseHexChannel(normalized, 4),
-  ] as const;
-  const [red, green, blue] = channels.map((channel) => {
-    const value = channel / 255;
-    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
-  }) as [number, number, number];
-  return red * 0.2126 + green * 0.7152 + blue * 0.0722;
-}
-
-function getContrastRatio(firstColor: string, secondColor: string) {
-  const firstLuminance = getRelativeLuminance(firstColor);
-  const secondLuminance = getRelativeLuminance(secondColor);
-  if (firstLuminance === undefined || secondLuminance === undefined) return Number.POSITIVE_INFINITY;
-  const lighter = Math.max(firstLuminance, secondLuminance);
-  const darker = Math.min(firstLuminance, secondLuminance);
-  return (lighter + 0.05) / (darker + 0.05);
-}
-
-function getReadableTextFill(fill: string, backgroundColor: string) {
-  if (getContrastRatio(fill, backgroundColor) >= TEXT_CONTRAST.minimumRatio) return fill;
-  return getContrastRatio('#FFFFFF', backgroundColor) >= getContrastRatio('#000000', backgroundColor)
-    ? '#FFFFFF'
-    : '#000000';
-}
 
 function createAssetId(path: string, index: number) {
   const slug = path
@@ -241,6 +207,12 @@ function getAutoFitFontSize(
   pageWidth: number,
   pageHeight: number,
 ) {
+  if (object.textBox.fontScale !== undefined) {
+    return Math.max(
+      TEXT_FRAME_FIT.minimumAutoFitFontSize,
+      Math.round(object.style.fontSize * object.textBox.fontScale),
+    );
+  }
   const shouldFitText =
     object.textBox.autoFit === 'shrink-text' ||
     (object.placeholderRole !== undefined && object.style.fontSize >= 128);
@@ -314,6 +286,18 @@ function getImportSource(object: PptxSlideObject, pageId: string, layoutId?: str
   };
 }
 
+function mapTextRun(run: PptxTextRun, fontScale: number) {
+  const { styleOverrides, ...mappedRun } = run;
+  void styleOverrides;
+  return {
+    ...mappedRun,
+    fontSize: Math.max(
+      TEXT_FRAME_FIT.minimumAutoFitFontSize,
+      Math.round(run.fontSize * fontScale),
+    ),
+  };
+}
+
 function mapObject(
   object: PptxSlideObject,
   pptxPackage: PptxPackage,
@@ -322,13 +306,25 @@ function mapObject(
   pageId: string,
   pageWidth: number,
   pageHeight: number,
-  backgroundColor: string | undefined,
   layoutId?: string,
 ): DesignElement | undefined {
   if (object.kind === 'text') {
     const { capitalization, ...style } = object.style;
     void capitalization;
     const fontSize = getAutoFitFontSize(object, pageWidth, pageHeight);
+    const paragraphFontScale = object.style.fontSize > 0 ? fontSize / object.style.fontSize : 1;
+    const paragraphs = object.paragraphs?.map((paragraph) => ({
+      ...paragraph,
+      fontSize: Math.max(
+        TEXT_FRAME_FIT.minimumAutoFitFontSize,
+        Math.round(paragraph.fontSize * paragraphFontScale),
+      ),
+      ...(paragraph.runs
+        ? {
+            runs: paragraph.runs.map((run) => mapTextRun(run, paragraphFontScale)),
+          }
+        : {}),
+    }));
     const frame =
       object.textBox.autoFit === 'shrink-text'
         ? getAutoFitTextFrame(object, pageWidth, pageHeight)
@@ -348,8 +344,10 @@ function mapObject(
       ...(object.placeholderRole ? { placeholderRole: object.placeholderRole } : {}),
       importSource: getImportSource(object, pageId, layoutId),
       ...style,
-      fill: backgroundColor ? getReadableTextFill(style.fill, backgroundColor) : style.fill,
+      fill: style.fill,
       fontSize,
+      ...(paragraphs ? { paragraphs } : {}),
+      verticalOverflow: object.textBox.verticalOverflow,
     };
   }
   if (object.kind === 'shape') {
@@ -368,8 +366,11 @@ function mapObject(
       ...(object.fill ? { fill: object.fill } : {}),
       ...(object.stroke ? { stroke: object.stroke } : {}),
       ...(object.strokeWidth !== undefined ? { strokeWidth: object.strokeWidth } : {}),
+      ...(object.lineDash ? { lineDash: object.lineDash } : {}),
       ...(object.startEndpoint ? { startEndpoint: object.startEndpoint } : {}),
       ...(object.endEndpoint ? { endEndpoint: object.endEndpoint } : {}),
+      ...(object.path ? { path: object.path } : {}),
+      ...(object.connectorPreset ? { connectorPreset: object.connectorPreset } : {}),
     };
   }
   if (object.placeholderOnly) return undefined;
@@ -413,6 +414,7 @@ function mapObject(
     ...base,
     type: 'image',
     ...(crop ? { crop } : {}),
+    ...(object.mask ? { mask: object.mask } : {}),
   };
 }
 
@@ -468,7 +470,6 @@ function createLayout(
       layout.id,
       pageWidth,
       pageHeight,
-      layout.backgroundAssetPath ? undefined : layout.backgroundColor,
       layout.id,
     );
     if (!element) continue;
@@ -550,7 +551,6 @@ function map(deck: PptxDeck, pptxPackage: PptxPackage): ProjectDocument {
         slide.id,
         deck.width,
         deck.height,
-        slide.backgroundAssetPath ? undefined : slide.backgroundColor,
       );
       if (!element) continue;
       elements[element.id] = element;
@@ -584,6 +584,7 @@ function map(deck: PptxDeck, pptxPackage: PptxPackage): ProjectDocument {
     assets,
     elements,
     pages,
+    pageSizePoints: deck.pageSizePoints,
     ...(Object.keys(slideLayouts).length > 0 ? { slideLayouts } : {}),
     ...(warnings.length > 0 ? { importWarnings: warnings } : {}),
   };

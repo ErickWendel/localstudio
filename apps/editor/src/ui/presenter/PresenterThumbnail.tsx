@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { DesignElement, Page, ProjectDocument } from '../../domain/documents/model';
+import { RichTextPreview } from '../shared/RichTextPreview';
 
 function getElementStyle(element: DesignElement, page: Page): CSSProperties {
   return {
@@ -57,7 +58,7 @@ export function PresenterThumbnail({ page, project }: { page: Page; project: Pro
                 textAlign: element.align,
               }}
             >
-              {element.text}
+              <RichTextPreview element={element} pageWidth={page.width} />
             </span>
           );
         }

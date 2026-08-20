@@ -41,6 +41,7 @@ interface TopToolbarProps {
   deckTranslationStatus?: string | undefined;
   isTranslatingDeck?: boolean;
   isExportingImages?: boolean;
+  isExportingPdf?: boolean;
   isExportingPowerPoint?: boolean;
   translationLanguageOptions?: TranslationLanguageOption[];
   translationSourceLanguage?: string;
@@ -48,6 +49,7 @@ interface TopToolbarProps {
   onDelete?: (() => void) | undefined;
   onDuplicate?: (() => void) | undefined;
   onExportImages?: (() => void) | undefined;
+  onExportPdf?: (() => void) | undefined;
   onExportPowerPoint?: (() => void) | undefined;
   onImportPowerPoint?: (() => void) | undefined;
   onImportProject?: (() => void) | undefined;
@@ -126,6 +128,7 @@ export function TopToolbar({
   deckTranslationStatus,
   isTranslatingDeck = false,
   isExportingImages = false,
+  isExportingPdf = false,
   isExportingPowerPoint = false,
   translationLanguageOptions = [],
   translationSourceLanguage = language.toLowerCase(),
@@ -133,6 +136,7 @@ export function TopToolbar({
   onDelete,
   onDuplicate,
   onExportImages,
+  onExportPdf,
   onExportPowerPoint,
   onImportPowerPoint,
   onImportProject,
@@ -266,6 +270,11 @@ export function TopToolbar({
             label: isExportingImages ? 'Exporting images...' : 'Images (.zip)',
             disabled: isExportingImages || !onExportImages,
             onSelect: onExportImages,
+          },
+          {
+            label: isExportingPdf ? 'Exporting PDF...' : 'PDF (.pdf)',
+            disabled: isExportingPdf || !onExportPdf,
+            onSelect: onExportPdf,
           },
           {
             label: isExportingPowerPoint ? 'Exporting PowerPoint...' : 'Powerpoint (.pptx)',

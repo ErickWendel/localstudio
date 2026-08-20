@@ -172,6 +172,47 @@ describe('BrowserGoogleFontsImportService', () => {
     );
   });
 
+  it('selects the basic Latin subset when Google Fonts returns unicode-specific files', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = getRequestUrl(input);
+      if (url.startsWith('https://fonts.googleapis.com/css2')) {
+        return Promise.resolve(
+          new Response(
+            `@font-face {
+              font-family: 'Work Sans';
+              font-style: normal;
+              font-weight: 700;
+              src: url(https://fonts.gstatic.com/s/worksans/v24/work-sans-cyrillic.woff2) format('woff2');
+              unicode-range: U+0460-052F;
+            }
+            @font-face {
+              font-family: 'Work Sans';
+              font-style: normal;
+              font-weight: 700;
+              src: url(https://fonts.gstatic.com/s/worksans/v24/work-sans-latin.woff2) format('woff2');
+              unicode-range: U+0000-00FF;
+            }`,
+            { status: 200, headers: { 'content-type': 'text/css' } },
+          ),
+        );
+      }
+      if (url === 'https://fonts.gstatic.com/s/worksans/v24/work-sans-latin.woff2') {
+        return Promise.resolve(new Response(new TextEncoder().encode('font'), { status: 200 }));
+      }
+      return Promise.resolve(new Response('', { status: 404 }));
+    });
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:work-sans-latin');
+    const service = new BrowserGoogleFontsImportService({ fetch: fetchMock });
+
+    const result = await service.resolveAndDownloadFonts([
+      { family: 'Work Sans', fontStyle: 'normal', fontWeight: 700 },
+    ]);
+
+    expect(result.fonts['google-fonts-work-sans-normal-700']?.sourceUrl).toBe(
+      'https://fonts.gstatic.com/s/worksans/v24/work-sans-latin.woff2',
+    );
+  });
+
   it('returns a warning instead of failing when Google Fonts has no exact match', async () => {
     const fetchMock = vi.fn(() => Promise.resolve(new Response('', { status: 400 })));
     const service = new BrowserGoogleFontsImportService({
