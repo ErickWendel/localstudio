@@ -8,6 +8,7 @@ export const presenterNotesEditorMenu = {
     await page.getByRole('button', { name: 'Presentation play options' }).click();
     await expect(page.getByRole('menu', { name: 'Presentation play menu' })).toBeVisible();
     await expect(page.getByRole('menuitem', { name: /Present in fullscreen/i })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /Play in window/i })).toBeVisible();
     await expect(page.getByRole('menuitem', { name: /Presenter view/i })).toBeVisible();
     await expect(page.getByRole('menuitem', { name: /Play from beginning/i })).toBeVisible();
 

@@ -80,4 +80,22 @@ describe('TopToolbar presentation actions', () => {
 
     expect(onOpenPresenterView).toHaveBeenCalledTimes(1);
   });
+
+  it('opens presenter view in window mode from the play menu', async () => {
+    const user = userEvent.setup();
+    const onOpenPresenterView = vi.fn();
+
+    render(
+      <TopToolbar
+        project={sampleProject.createSampleProject()}
+        language="PT-BR"
+        onOpenPresenterView={onOpenPresenterView}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Presentation play options' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Play in window' }));
+
+    expect(onOpenPresenterView).toHaveBeenCalledWith({ audienceMode: 'window' });
+  });
 });

@@ -6,7 +6,7 @@ export function ProjectPlayControl({
 }: {
   isMenuOpen: boolean;
   onMenuOpenChange: (isOpen: boolean) => void;
-  onOpenPresenterView?: (() => void) | undefined;
+  onOpenPresenterView?: ((options?: { audienceMode?: 'fullscreen' | 'window' }) => void) | undefined;
   onStartPresenterMode?: ((options?: { fromBeginning?: boolean }) => void) | undefined;
 }) {
   function startPresenterMode(options?: { fromBeginning?: boolean }) {
@@ -72,6 +72,20 @@ export function ProjectPlayControl({
               fullscreen
             </span>
             <span>Present in fullscreen</span>
+          </button>
+          <button
+            className="toolbar-dropdown-item project-play-dropdown-item"
+            role="menuitem"
+            type="button"
+            onClick={() => {
+              onMenuOpenChange(false);
+              onOpenPresenterView?.({ audienceMode: 'window' });
+            }}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              open_in_browser
+            </span>
+            <span>Play in window</span>
           </button>
           <button
             className="toolbar-dropdown-item project-play-dropdown-item"

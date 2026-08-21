@@ -21,7 +21,7 @@ interface EditorToolbarSurfaceProps {
   onExportPdf: () => void;
   onNewProject: () => void;
   onOpenKeyboardShortcuts: () => void;
-  onOpenPresenterView: () => void;
+  onOpenPresenterView: (options?: { audienceMode?: 'fullscreen' | 'window' }) => void;
   onLocalProjectSetupCancel?: () => void;
   onLocalProjectSetupConfirm?: () => void;
   onShare: () => void;

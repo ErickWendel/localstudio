@@ -65,7 +65,7 @@ interface TopToolbarProps {
   onSaveLocal?: (() => void) | undefined;
   onSaveLocalAs?: (() => void) | undefined;
   onProjectNameChange?: ((name: string) => void) | undefined;
-  onOpenPresenterView?: (() => void) | undefined;
+  onOpenPresenterView?: ((options?: { audienceMode?: 'fullscreen' | 'window' }) => void) | undefined;
   onRedo?: (() => void) | undefined;
   onResetZoom?: (() => void) | undefined;
   onShare?: (() => void) | undefined;

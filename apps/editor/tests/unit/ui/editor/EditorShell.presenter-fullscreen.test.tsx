@@ -120,6 +120,69 @@ describe('EditorShell presenter fullscreen workflows', () => {
     expect(popupClose).not.toHaveBeenCalled();
   });
 
+  it('opens presenter view with windowed audience playback without requesting fullscreen', async () => {
+    const popupClose = vi.fn();
+    const popup = {
+      close: popupClose,
+      closed: false,
+      location: { href: '' },
+      postMessage: vi.fn(),
+    } as unknown as Window;
+    const openWindow = vi.fn(() => popup);
+    Object.defineProperty(window, 'open', {
+      configurable: true,
+      value: openWindow,
+    });
+    const requestFullscreen = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+      configurable: true,
+      value: requestFullscreen,
+    });
+
+    render(<EditorShell services={createAppServices()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Presentation play options' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Play in window' }));
+
+    expect(openWindow).toHaveBeenCalledTimes(1);
+    expect(popup.location.href).toContain('presenter=1');
+    expect(screen.getByRole('dialog', { name: 'Audience Window' })).toHaveTextContent(
+      'start playback in this browser window',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Play in window' }));
+
+    await waitFor(() => {
+      expect(requestFullscreen).not.toHaveBeenCalled();
+      expect(screen.queryByRole('dialog', { name: 'Audience Window' })).not.toBeInTheDocument();
+      expect(screen.getByLabelText('Canvas workspace')).toHaveClass(
+        'workspace-column-windowed-presentation',
+      );
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-animation-preview-mode',
+        'presenter',
+      );
+    });
+
+    fireEvent.mouseMove(screen.getByLabelText('Canvas workspace'), { clientY: 12 });
+
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Press Esc to exit full screen');
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    await waitFor(() => {
+      expect(popupClose).toHaveBeenCalledTimes(1);
+      expect(screen.getByLabelText('Canvas workspace')).not.toHaveClass(
+        'workspace-column-windowed-presentation',
+      );
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+      expect(screen.getByLabelText('Slide canvas')).toHaveAttribute(
+        'data-animation-preview-mode',
+        'idle',
+      );
+    });
+  });
+
   it('stops presenter click navigation when the presenter window closes before audience fullscreen', async () => {
     const project = sampleProject.createSampleProject();
     project.pages = [
