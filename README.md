@@ -192,10 +192,19 @@ keys are persisted locally, so avoid root credentials outside local development.
 
 ## Quick Start
 
+Authenticate once against the project mirror:
+
 ```bash
-npm ci
-npm run dev
+vlt login --registry=https://registry.vlt.io/erickwendel/npm/
 ```
+
+```bash
+vlt install --expect-lockfile --allow-scripts='#core-js, #esbuild, #fsevents, #onnxruntime-node, #protobufjs, #sharp'
+vlt run dev
+```
+
+CI uses the same mirror through a read-only `VLT_TOKEN` repository secret. Dependency scripts run only after that
+credential has been removed from the environment, and only for the explicit allowlist in the workflow.
 
 The dev server starts the landing, editor, and joystick apps together. Use the landing URL as the public entry point;
 `/editor/` and `/joystick/` are proxied to the connected app servers.
@@ -203,7 +212,7 @@ The dev server starts the landing, editor, and joystick apps together. Use the l
 Disable the editor onboarding tour during local testing with:
 
 ```bash
-VITE_DISABLE_EDITOR_TOUR=true npm run dev
+VITE_DISABLE_EDITOR_TOUR=true vlt run dev
 ```
 
 The tour is already disabled in the automated E2E server so tests do not need to close it before interacting with the
@@ -212,11 +221,11 @@ editor.
 Quality checks:
 
 ```bash
-npm run lint
-npm run typecheck
-npm run test
-npm run test:e2e
-npm run build
+vlt run lint
+vlt run typecheck
+vlt run test
+vlt run test:e2e
+vlt run build
 ```
 
 ## Workspace

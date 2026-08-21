@@ -4,10 +4,10 @@
 
 ## Verification
 
-- [ ] `npm run lint`
-- [ ] `npm run typecheck`
-- [ ] `npm run test`
-- [ ] `npm run build`
+- [ ] `vlt run lint`
+- [ ] `vlt run typecheck`
+- [ ] `vlt run test`
+- [ ] `vlt run build`
 
 ## UI Changes
 

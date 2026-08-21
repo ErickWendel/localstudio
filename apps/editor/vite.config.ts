@@ -1,8 +1,8 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Connect, type Plugin } from 'vite';
-import { analyticsHtmlPlugin } from '../../scripts/vite/analyticsHtmlPlugin';
-import { localNetworkOriginRoute } from '../../scripts/vite/localNetworkOriginRoute';
-import { localPowerPointSampleRoute } from '../../scripts/vite/localPowerPointSampleRoute';
+import { analyticsHtmlPlugin } from '../../scripts/vite/analyticsHtmlPlugin.ts';
+import { localNetworkOriginRoute } from '../../scripts/vite/localNetworkOriginRoute.ts';
+import { localPowerPointSampleRoute } from '../../scripts/vite/localPowerPointSampleRoute.ts';
 
 const siteBase = process.env.LOCALSTUDIO_BASE_PATH ?? '/';
 const editorBase = new URL('editor/', `https://localstudio.invalid${siteBase}`).pathname;

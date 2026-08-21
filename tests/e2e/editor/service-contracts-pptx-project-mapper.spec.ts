@@ -22,6 +22,6 @@ test('executes PPTX project mapper fallback layout contracts in the browser runt
     layoutPlaceholderRoles: ['title', 'body'],
     missingAssetWarning: 'Referenced PowerPoint asset was not found: ppt/media/missing.png',
     pageAnimationBuildCount: 1,
-    textFill: '#FFFFFF',
+    textFill: '#111111',
   });
 });

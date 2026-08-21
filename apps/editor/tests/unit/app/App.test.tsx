@@ -4,7 +4,7 @@ import { App } from '../../../src/App';
 import { sampleProject } from '../../../src/domain/projects/sampleProject';
 import { TRANSLATION_LANGUAGE_OPTIONS } from '../../../src/ui/editor/translation/translationLanguages';
 
-const originalMatchMedia = window.matchMedia;
+const originalMatchMedia = window.matchMedia?.bind(window);
 
 describe('App', () => {
   beforeEach(() => {

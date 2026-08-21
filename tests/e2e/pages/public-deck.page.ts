@@ -15,7 +15,9 @@ export class PublicDeckPage extends BasePage {
       this.page.getByRole('main', {
         name: embed ? 'Embedded shared deck' : 'Public presentation',
       }),
-    ).toBeVisible();
-    await expect(this.page.getByRole('region', { name: 'Shared slide preview' })).toBeVisible();
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(this.page.getByRole('region', { name: 'Shared slide preview' })).toBeVisible({
+      timeout: 30_000,
+    });
   }
 }

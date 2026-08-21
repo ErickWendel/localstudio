@@ -6,6 +6,7 @@ import { createServer as createViteServer } from 'vite';
 
 const host = process.env.HOST ?? '0.0.0.0';
 const port = getPort();
+const workspaceRoot = fileURLToPath(new URL('..', import.meta.url));
 
 const apps = [
   {
@@ -40,6 +41,9 @@ for (const app of apps) {
     configFile: fileURLToPath(new URL(app.configFile, import.meta.url)),
     root: fileURLToPath(new URL(app.root, import.meta.url)),
     server: {
+      fs: {
+        allow: [workspaceRoot],
+      },
       hmr: {
         server: httpServer,
       },
@@ -77,7 +81,7 @@ httpServer.listen(port, host, () => {
   console.log(`  /`);
   console.log(`  /editor/`);
   console.log(`  /joystick/`);
-  console.log(`  /docs/ via npm run dev:docs`);
+  console.log(`  /docs/ via vlt run dev:docs`);
 });
 
 let shuttingDown = false;

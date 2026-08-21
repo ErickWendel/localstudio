@@ -4,9 +4,15 @@ Thanks for helping improve LocalStudio.dev.
 
 ## Local Setup
 
+Authenticate once against the project mirror:
+
 ```bash
-npm ci
-npm run dev
+vlt login --registry=https://registry.vlt.io/erickwendel/npm/
+```
+
+```bash
+vlt install --expect-lockfile --allow-scripts='#core-js, #esbuild, #fsevents, #onnxruntime-node, #protobufjs, #sharp'
+vlt run dev
 ```
 
 The default dev script starts the landing, editor, and joystick apps together. Use the landing URL as the public entry
@@ -17,10 +23,10 @@ point; `/editor/` and `/joystick/` are proxied to the connected app servers.
 Run the same checks CI runs before opening a pull request:
 
 ```bash
-npm run lint
-npm run typecheck
-npm run test
-npm run build
+vlt run lint
+vlt run typecheck
+vlt run test
+vlt run build
 ```
 
 ## Browser Notes

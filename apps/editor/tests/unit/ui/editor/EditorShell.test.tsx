@@ -15,7 +15,7 @@ const {
   selectImageLayer,
 } = editorShellTestHarness;
 
-const originalMatchMedia = window.matchMedia;
+const originalMatchMedia = window.matchMedia?.bind(window);
 
 describe('EditorShell', () => {
   afterEach(() => {

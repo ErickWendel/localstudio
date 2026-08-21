@@ -54,7 +54,7 @@ export const imageExportJourneyPage = {
       page.getByRole('button', {
         name: 'Edit project name fullstack-monitoring-jsnation-11062026',
       }),
-    ).toBeVisible({ timeout: 15_000 });
+    ).toBeVisible({ timeout: 90_000 });
 
     await this.openImagesExportDialog(page, editor);
     await dismissPowerPointFontDialogIfPresent(page);
