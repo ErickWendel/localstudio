@@ -203,7 +203,7 @@ jobs:
 
   e2e:
     name: Playwright E2E (${{ matrix.label }})
-    needs: build
+    needs: [build, lint, typecheck]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -445,7 +445,7 @@ jobs:
 
   build:
     name: Build
-    needs: [dependencies, lint, typecheck]
+    needs: dependencies
     runs-on: ubuntu-latest
     permissions:
       contents: read
