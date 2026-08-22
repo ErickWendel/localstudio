@@ -156,22 +156,38 @@ jobs:
         include:
           - label: landing
             command: npm run test --workspace @localstudio/landing
-          - label: editor 1/8
-            command: npm run test --workspace @localstudio/editor -- --shard=1/8
-          - label: editor 2/8
-            command: npm run test --workspace @localstudio/editor -- --shard=2/8
-          - label: editor 3/8
-            command: npm run test --workspace @localstudio/editor -- --shard=3/8
-          - label: editor 4/8
-            command: npm run test --workspace @localstudio/editor -- --shard=4/8
-          - label: editor 5/8
-            command: npm run test --workspace @localstudio/editor -- --shard=5/8
-          - label: editor 6/8
-            command: npm run test --workspace @localstudio/editor -- --shard=6/8
-          - label: editor 7/8
-            command: npm run test --workspace @localstudio/editor -- --shard=7/8
-          - label: editor 8/8
-            command: npm run test --workspace @localstudio/editor -- --shard=8/8
+          - label: editor 1/16
+            command: npm run test --workspace @localstudio/editor -- --shard=1/16
+          - label: editor 2/16
+            command: npm run test --workspace @localstudio/editor -- --shard=2/16
+          - label: editor 3/16
+            command: npm run test --workspace @localstudio/editor -- --shard=3/16
+          - label: editor 4/16
+            command: npm run test --workspace @localstudio/editor -- --shard=4/16
+          - label: editor 5/16
+            command: npm run test --workspace @localstudio/editor -- --shard=5/16
+          - label: editor 6/16
+            command: npm run test --workspace @localstudio/editor -- --shard=6/16
+          - label: editor 7/16
+            command: npm run test --workspace @localstudio/editor -- --shard=7/16
+          - label: editor 8/16
+            command: npm run test --workspace @localstudio/editor -- --shard=8/16
+          - label: editor 9/16
+            command: npm run test --workspace @localstudio/editor -- --shard=9/16
+          - label: editor 10/16
+            command: npm run test --workspace @localstudio/editor -- --shard=10/16
+          - label: editor 11/16
+            command: npm run test --workspace @localstudio/editor -- --shard=11/16
+          - label: editor 12/16
+            command: npm run test --workspace @localstudio/editor -- --shard=12/16
+          - label: editor 13/16
+            command: npm run test --workspace @localstudio/editor -- --shard=13/16
+          - label: editor 14/16
+            command: npm run test --workspace @localstudio/editor -- --shard=14/16
+          - label: editor 15/16
+            command: npm run test --workspace @localstudio/editor -- --shard=15/16
+          - label: editor 16/16
+            command: npm run test --workspace @localstudio/editor -- --shard=16/16
           - label: joystick
             command: npm run test --workspace @localstudio/joystick
 
@@ -211,61 +227,117 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: editor 1/8
+          - label: editor 1/16
             script: test:e2e:coverage:editor
             report: editor-shard-1
             raw_path: test-results/editor-shard-1-coverage/**/browser-coverage.json
-            shard: 1/8
+            shard: 1/16
             output_name: editor-shard-1
             coverage_threshold: '0'
-          - label: editor 2/8
+          - label: editor 2/16
             script: test:e2e:coverage:editor
             report: editor-shard-2
             raw_path: test-results/editor-shard-2-coverage/**/browser-coverage.json
-            shard: 2/8
+            shard: 2/16
             output_name: editor-shard-2
             coverage_threshold: '0'
-          - label: editor 3/8
+          - label: editor 3/16
             script: test:e2e:coverage:editor
             report: editor-shard-3
             raw_path: test-results/editor-shard-3-coverage/**/browser-coverage.json
-            shard: 3/8
+            shard: 3/16
             output_name: editor-shard-3
             coverage_threshold: '0'
-          - label: editor 4/8
+          - label: editor 4/16
             script: test:e2e:coverage:editor
             report: editor-shard-4
             raw_path: test-results/editor-shard-4-coverage/**/browser-coverage.json
-            shard: 4/8
+            shard: 4/16
             output_name: editor-shard-4
             coverage_threshold: '0'
-          - label: editor 5/8
+          - label: editor 5/16
             script: test:e2e:coverage:editor
             report: editor-shard-5
             raw_path: test-results/editor-shard-5-coverage/**/browser-coverage.json
-            shard: 5/8
+            shard: 5/16
             output_name: editor-shard-5
             coverage_threshold: '0'
-          - label: editor 6/8
+          - label: editor 6/16
             script: test:e2e:coverage:editor
             report: editor-shard-6
             raw_path: test-results/editor-shard-6-coverage/**/browser-coverage.json
-            shard: 6/8
+            shard: 6/16
             output_name: editor-shard-6
             coverage_threshold: '0'
-          - label: editor 7/8
+          - label: editor 7/16
             script: test:e2e:coverage:editor
             report: editor-shard-7
             raw_path: test-results/editor-shard-7-coverage/**/browser-coverage.json
-            shard: 7/8
+            shard: 7/16
             output_name: editor-shard-7
             coverage_threshold: '0'
-          - label: editor 8/8
+          - label: editor 8/16
             script: test:e2e:coverage:editor
             report: editor-shard-8
             raw_path: test-results/editor-shard-8-coverage/**/browser-coverage.json
-            shard: 8/8
+            shard: 8/16
             output_name: editor-shard-8
+            coverage_threshold: '0'
+          - label: editor 9/16
+            script: test:e2e:coverage:editor
+            report: editor-shard-9
+            raw_path: test-results/editor-shard-9-coverage/**/browser-coverage.json
+            shard: 9/16
+            output_name: editor-shard-9
+            coverage_threshold: '0'
+          - label: editor 10/16
+            script: test:e2e:coverage:editor
+            report: editor-shard-10
+            raw_path: test-results/editor-shard-10-coverage/**/browser-coverage.json
+            shard: 10/16
+            output_name: editor-shard-10
+            coverage_threshold: '0'
+          - label: editor 11/16
+            script: test:e2e:coverage:editor
+            report: editor-shard-11
+            raw_path: test-results/editor-shard-11-coverage/**/browser-coverage.json
+            shard: 11/16
+            output_name: editor-shard-11
+            coverage_threshold: '0'
+          - label: editor 12/16
+            script: test:e2e:coverage:editor
+            report: editor-shard-12
+            raw_path: test-results/editor-shard-12-coverage/**/browser-coverage.json
+            shard: 12/16
+            output_name: editor-shard-12
+            coverage_threshold: '0'
+          - label: editor 13/16
+            script: test:e2e:coverage:editor
+            report: editor-shard-13
+            raw_path: test-results/editor-shard-13-coverage/**/browser-coverage.json
+            shard: 13/16
+            output_name: editor-shard-13
+            coverage_threshold: '0'
+          - label: editor 14/16
+            script: test:e2e:coverage:editor
+            report: editor-shard-14
+            raw_path: test-results/editor-shard-14-coverage/**/browser-coverage.json
+            shard: 14/16
+            output_name: editor-shard-14
+            coverage_threshold: '0'
+          - label: editor 15/16
+            script: test:e2e:coverage:editor
+            report: editor-shard-15
+            raw_path: test-results/editor-shard-15-coverage/**/browser-coverage.json
+            shard: 15/16
+            output_name: editor-shard-15
+            coverage_threshold: '0'
+          - label: editor 16/16
+            script: test:e2e:coverage:editor
+            report: editor-shard-16
+            raw_path: test-results/editor-shard-16-coverage/**/browser-coverage.json
+            shard: 16/16
+            output_name: editor-shard-16
             coverage_threshold: '0'
           - label: landing
             script: test:e2e:coverage:landing
