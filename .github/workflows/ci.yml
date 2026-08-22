@@ -218,6 +218,7 @@ jobs:
             shard: 1/8
             output_name: editor-shard-1
             coverage_threshold: '0'
+            coverage_report: '0'
           - label: editor 2/8
             script: test:e2e:coverage:editor
             report: editor-shard-2
@@ -225,6 +226,7 @@ jobs:
             shard: 2/8
             output_name: editor-shard-2
             coverage_threshold: '0'
+            coverage_report: '0'
           - label: editor 3/8
             script: test:e2e:coverage:editor
             report: editor-shard-3
@@ -232,6 +234,7 @@ jobs:
             shard: 3/8
             output_name: editor-shard-3
             coverage_threshold: '0'
+            coverage_report: '0'
           - label: editor 4/8
             script: test:e2e:coverage:editor
             report: editor-shard-4
@@ -239,6 +242,7 @@ jobs:
             shard: 4/8
             output_name: editor-shard-4
             coverage_threshold: '0'
+            coverage_report: '0'
           - label: editor 5/8
             script: test:e2e:coverage:editor
             report: editor-shard-5
@@ -246,6 +250,7 @@ jobs:
             shard: 5/8
             output_name: editor-shard-5
             coverage_threshold: '0'
+            coverage_report: '0'
           - label: editor 6/8
             script: test:e2e:coverage:editor
             report: editor-shard-6
@@ -253,6 +258,7 @@ jobs:
             shard: 6/8
             output_name: editor-shard-6
             coverage_threshold: '0'
+            coverage_report: '0'
           - label: editor 7/8
             script: test:e2e:coverage:editor
             report: editor-shard-7
@@ -260,6 +266,7 @@ jobs:
             shard: 7/8
             output_name: editor-shard-7
             coverage_threshold: '0'
+            coverage_report: '0'
           - label: editor 8/8
             script: test:e2e:coverage:editor
             report: editor-shard-8
@@ -267,6 +274,7 @@ jobs:
             shard: 8/8
             output_name: editor-shard-8
             coverage_threshold: '0'
+            coverage_report: '0'
           - label: landing
             script: test:e2e:coverage:landing
             report: landing
@@ -274,6 +282,7 @@ jobs:
             shard: ''
             output_name: ''
             coverage_threshold: ''
+            coverage_report: '1'
           - label: public-deck
             script: test:e2e:coverage:public-deck
             report: public-deck
@@ -281,6 +290,7 @@ jobs:
             shard: ''
             output_name: ''
             coverage_threshold: ''
+            coverage_report: '1'
           - label: webmcp
             script: test:e2e:coverage:webmcp
             report: webmcp
@@ -288,6 +298,7 @@ jobs:
             shard: ''
             output_name: ''
             coverage_threshold: ''
+            coverage_report: '1'
           - label: joystick
             script: test:e2e:coverage:joystick
             report: joystick
@@ -295,6 +306,7 @@ jobs:
             shard: ''
             output_name: ''
             coverage_threshold: ''
+            coverage_report: '1'
 
     steps:
       - name: Checkout
@@ -344,6 +356,7 @@ jobs:
         run: npm run ${{ matrix.script }}
         env:
           E2E_SERVER: dist
+          E2E_COVERAGE_REPORT: ${{ matrix.coverage_report }}
           E2E_COVERAGE_THRESHOLD: ${{ matrix.coverage_threshold }}
           LOCALSTUDIO_E2E_OUTPUT_NAME: ${{ matrix.output_name }}
           LOCALSTUDIO_E2E_SHARD: ${{ matrix.shard }}
@@ -357,7 +370,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Add E2E coverage report to job summary
-        if: always()
+        if: ${{ always() && matrix.coverage_report != '0' }}
         run: |
           if [ -f coverage-report/${{ matrix.report }}/coverage-summary.md ]; then
             cat coverage-report/${{ matrix.report }}/coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
@@ -366,7 +379,7 @@ jobs:
           fi
 
       - name: Upload E2E coverage report
-        if: always()
+        if: ${{ always() && matrix.coverage_report != '0' }}
         uses: actions/upload-artifact@v5
         with:
           name: e2e-coverage-report-${{ matrix.report }}

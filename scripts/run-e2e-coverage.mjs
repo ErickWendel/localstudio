@@ -1,6 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { rmSync } from 'node:fs';
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { basename, join } from 'node:path';
 import process from 'node:process';
@@ -416,7 +415,42 @@ function parseShard(value) {
 
 function applyShard(files, shard) {
   if (!shard) return files;
-  return files.filter((_file, fileIndex) => fileIndex % shard.total === shard.index - 1);
+  const buckets = Array.from({ length: shard.total }, (_value, bucketIndex) => ({
+    files: [],
+    index: bucketIndex,
+    weight: 0,
+  }));
+  const weightedFiles = files
+    .map((file) => ({ file, weight: estimateSpecWeight(file) }))
+    .sort((left, right) => right.weight - left.weight || left.file.localeCompare(right.file));
+
+  for (const weightedFile of weightedFiles) {
+    buckets.sort((left, right) => left.weight - right.weight || left.index - right.index);
+    buckets[0].files.push(weightedFile.file);
+    buckets[0].weight += weightedFile.weight;
+  }
+
+  return buckets
+    .find((bucket) => bucket.index === shard.index - 1)
+    .files.sort((left, right) => left.localeCompare(right));
+}
+
+function estimateSpecWeight(file) {
+  let sourceText = '';
+  try {
+    sourceText = readFileSync(join(workspaceRoot, file), 'utf8');
+  } catch {
+    return 1;
+  }
+  const lineCount = sourceText.split('\n').length;
+  const testCount = countMatches(sourceText, /\btest(?:\.skip|\.fixme|\.only)?\s*\(/g);
+  const timeoutCount = countMatches(sourceText, /timeout:\s*[0-9_]+|test\.setTimeout/g);
+  const waitCount = countMatches(sourceText, /setTimeout\(|expect\.poll|toPass\(/g);
+  return lineCount + testCount * 80 + timeoutCount * 20 + waitCount * 30;
+}
+
+function countMatches(sourceText, pattern) {
+  return sourceText.match(pattern)?.length ?? 0;
 }
 
 function shouldRunSplit(split, files) {
