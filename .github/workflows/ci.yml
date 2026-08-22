@@ -146,7 +146,7 @@ jobs:
 
   test:
     name: Unit tests (${{ matrix.label }})
-    needs: dependencies
+    needs: [dependencies, lint, typecheck]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -516,7 +516,7 @@ jobs:
 
   build:
     name: Build
-    needs: dependencies
+    needs: [dependencies, lint, typecheck]
     runs-on: ubuntu-latest
     permissions:
       contents: read
