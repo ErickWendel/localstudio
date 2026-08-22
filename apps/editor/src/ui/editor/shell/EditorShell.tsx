@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import { localStudioAnalyticsConfig } from '@localstudio/analytics-config/config';
 import type Konva from 'konva';
 import type { AppServices } from '../../../app/composition';
@@ -129,6 +129,11 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const [designFontFocusKey, setDesignFontFocusKey] = useState(0);
   const [speakerNotesOpen, setSpeakerNotesOpen] = useState(false);
   const [audienceFullscreenPromptOpen, setAudienceFullscreenPromptOpen] = useState(false);
+  const [audiencePromptMode, setAudiencePromptMode] = useState<'fullscreen' | 'window'>(
+    'fullscreen',
+  );
+  const [windowedPresentationActive, setWindowedPresentationActive] = useState(false);
+  const [windowedExitHintVisible, setWindowedExitHintVisible] = useState(false);
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const [fontReplacementOpen, setFontReplacementOpen] = useState(false);
   const [slideNavigatorOpen, setSlideNavigatorOpen] = useState(false);
@@ -164,6 +169,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const imageExportStageRef = useRef<Konva.Stage>(null);
   const workspaceRef = useRef<HTMLElement>(null);
   const slideFrameRef = useRef<HTMLDivElement>(null);
+  const windowedExitHintTimerRef = useRef<number | undefined>(undefined);
   const presenterSessionServiceRef = useRef<BrowserPresenterSessionService | undefined>(undefined);
   const presenterRemotePanelRef = useRef<HTMLDivElement>(null);
   const aiWorkflowTourRef = useRef<EditorAiWorkflowTourHandle>(null);
@@ -198,6 +204,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const activePage = vm.project.pages[activePageIndex];
   const visiblePages = pageVisibility.getVisiblePages(vm.project);
   const visiblePageCount = visiblePages.length;
+  const browserPresentationActive = vm.isFullscreen || windowedPresentationActive;
   const activeVisiblePageIndex = Math.max(
     0,
     visiblePages.findIndex((page) => page.id === vm.activePageId),
@@ -627,6 +634,12 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     presenterSessionServiceRef.current?.closePresenterWindow();
     pendingPresenterRecordingsRef.current.clear();
     presenterFullscreenEnteredRef.current = false;
+    setWindowedPresentationActive(false);
+    setWindowedExitHintVisible(false);
+    if (windowedExitHintTimerRef.current !== undefined) {
+      window.clearTimeout(windowedExitHintTimerRef.current);
+      windowedExitHintTimerRef.current = undefined;
+    }
     vm.clearAnimationPreview();
     setAudienceFullscreenPromptOpen(false);
     setPresenterRemoteSession(undefined);
@@ -637,7 +650,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     setPresenterSessionId(undefined);
   }, [vm]);
 
-  const openPresenterView = useCallback(() => {
+  const openPresenterView = useCallback((options?: { audienceMode?: 'fullscreen' | 'window' }) => {
     if (presenterSessionId) return;
     const pageId = vm.activePageId;
     if (!pageId) return;
@@ -677,6 +690,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         );
       });
     presenterFullscreenEnteredRef.current = false;
+    setAudiencePromptMode(options?.audienceMode ?? 'fullscreen');
     setAudienceFullscreenPromptOpen(true);
     vm.playPresentationPreview(pageId);
     window.setTimeout(() => {
@@ -689,6 +703,28 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   function enterAudienceFullscreen() {
     setAudienceFullscreenPromptOpen(false);
     void vm.toggleFullscreen(workspaceRef.current);
+  }
+
+  function startWindowedAudiencePlayback() {
+    setAudienceFullscreenPromptOpen(false);
+    setWindowedPresentationActive(true);
+  }
+
+  const closeWindowedAudiencePlayback = useCallback(() => {
+    closePresenterViewSession();
+  }, [closePresenterViewSession]);
+
+  function handleWorkspacePointerMove(event: MouseEvent<HTMLElement>) {
+    if (!windowedPresentationActive) return;
+    if (event.clientY > 56) return;
+    setWindowedExitHintVisible(true);
+    if (windowedExitHintTimerRef.current !== undefined) {
+      window.clearTimeout(windowedExitHintTimerRef.current);
+    }
+    windowedExitHintTimerRef.current = window.setTimeout(() => {
+      setWindowedExitHintVisible(false);
+      windowedExitHintTimerRef.current = undefined;
+    }, 2200);
   }
 
   const playPresentationPageAt = useCallback(
@@ -773,6 +809,10 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     }
     if (action === 'quit-presentation') {
       setKeyboardShortcutsOpen(false);
+      if (windowedPresentationActive) {
+        closeWindowedAudiencePlayback();
+        return;
+      }
       if (vm.isFullscreen) void vm.toggleFullscreen(workspaceRef.current);
       return;
     }
@@ -975,7 +1015,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
 
       const isPresenterPlayback = vm.animationPreview?.mode === 'presenter';
       const isPreviewNavigationActive =
-        vm.isFullscreen || Boolean(isPresenterPlayback && vm.animationPreview?.playing);
+        browserPresentationActive || Boolean(isPresenterPlayback && vm.animationPreview?.playing);
       if (keyboardShortcutsOpen && event.key === 'Escape') {
         event.preventDefault();
         setKeyboardShortcutsOpen(false);
@@ -1018,6 +1058,10 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         }
         if (event.key === 'Escape') {
           event.preventDefault();
+          if (windowedPresentationActive) {
+            closeWindowedAudiencePlayback();
+            return;
+          }
           if (vm.isFullscreen) void vm.toggleFullscreen(workspaceRef.current);
           return;
         }
@@ -1135,6 +1179,8 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   }, [
     activePageIndex,
     advancePresentationPreviewFromUserAction,
+    browserPresentationActive,
+    closeWindowedAudiencePlayback,
     controlPresentationMovies,
     hasSelection,
     isHistoryReadOnly,
@@ -1148,11 +1194,15 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     slideNavigatorOpen,
     stopPresentationMovieHold,
     vm,
+    windowedPresentationActive,
   ]);
 
   useEffect(() => {
     return () => {
       movieHoldStateRef.current = presentationMovieControls.stopHold(movieHoldStateRef.current);
+      if (windowedExitHintTimerRef.current !== undefined) {
+        window.clearTimeout(windowedExitHintTimerRef.current);
+      }
     };
   }, []);
 
@@ -1559,6 +1609,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
             'workspace-column',
             leftPanelOpen ? 'workspace-column-left-panel-open' : '',
             vm.zoomPercent < 100 ? 'workspace-column-zoomed-out' : '',
+            windowedPresentationActive ? 'workspace-column-windowed-presentation' : '',
             presentationCursorHidden ? 'workspace-column-cursor-hidden' : '',
           ]
             .filter(Boolean)
@@ -1566,7 +1617,13 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           aria-label="Canvas workspace"
           data-tour-id="canvas-workspace"
           ref={workspaceRef}
+          onMouseMove={handleWorkspacePointerMove}
         >
+          {windowedPresentationActive && windowedExitHintVisible ? (
+            <div className="windowed-presentation-exit-tooltip" role="tooltip">
+              Press Esc to exit full screen
+            </div>
+          ) : null}
           {keyboardShortcutsOpen ? (
             <KeyboardShortcutsDialog
               onClose={() => setKeyboardShortcutsOpen(false)}
@@ -1608,7 +1665,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
             selection={vm.selection}
             slideFrameRef={slideFrameRef}
             stageRef={stageRef}
-            presentationMode={vm.isFullscreen || vm.animationPreview?.mode === 'presenter'}
+            presentationMode={browserPresentationActive || vm.animationPreview?.mode === 'presenter'}
             readOnly={isHistoryReadOnly}
             zoomPercent={vm.zoomPercent}
             backgroundSelectionMode={vm.backgroundSelectionMode}
@@ -1632,7 +1689,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
                   }
             }
             onAnimationPreviewAdvance={
-              vm.isFullscreen || vm.animationPreview?.mode === 'presenter'
+              browserPresentationActive || vm.animationPreview?.mode === 'presenter'
                 ? vm.advancePresentationPreview
                 : vm.advanceAnimationPreview
             }
@@ -1754,8 +1811,10 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           ) : null}
           {audienceFullscreenPromptOpen ? (
             <AudienceFullscreenPrompt
+              mode={audiencePromptMode}
               onClose={closePresenterViewSession}
               onEnterFullscreen={enterAudienceFullscreen}
+              onStartWindowed={startWindowedAudiencePlayback}
             />
           ) : null}
           <input
