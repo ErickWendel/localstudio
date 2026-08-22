@@ -108,8 +108,24 @@ jobs:
         if: steps.dependency-cache.outputs.cache-hit != 'true'
         run: npm ci
 
+      - name: Restore ESLint cache
+        id: eslint-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: .eslintcache
+          key: eslint-${{ runner.os }}-node26-${{ hashFiles('package-lock.json', 'eslint.config.js') }}-${{ github.sha }}
+          restore-keys: |
+            eslint-${{ runner.os }}-node26-${{ hashFiles('package-lock.json', 'eslint.config.js') }}-
+
       - name: Lint
-        run: npm run lint
+        run: npm run lint -- --cache --cache-location .eslintcache --concurrency auto
+
+      - name: Save ESLint cache
+        if: steps.eslint-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: .eslintcache
+          key: ${{ steps.eslint-cache.outputs.cache-primary-key }}
 
   typecheck:
     name: Typecheck
