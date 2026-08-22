@@ -338,7 +338,6 @@ jobs:
         run: npx playwright install-deps chromium
 
       - name: Install Playwright Chromium browser
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install chromium
 
       - name: Playwright E2E coverage test
