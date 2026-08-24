@@ -61,7 +61,6 @@ describe('LandingPage', () => {
       'Features',
       'Requirements',
       'Docs',
-      'Pricing',
     ]);
     expect(screen.getByRole('link', { name: 'About it' })).toHaveAttribute('href', '#top');
     expect(screen.getByRole('link', { name: 'Features' })).toHaveAttribute('href', '#features');
@@ -74,7 +73,7 @@ describe('LandingPage', () => {
       'href',
       localStudioAppRoutes.docs.gettingStartedAnchor,
     );
-    expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute('href', '#pricing');
+    expect(screen.queryByRole('link', { name: 'Pricing' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Workflow' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'S3 Mirror' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Showcase' })).not.toBeInTheDocument();
@@ -96,7 +95,7 @@ describe('LandingPage', () => {
     expect(screen.getByRole('link', { name: 'About it' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'About it' })).toHaveAttribute('href', '#top');
     expect(screen.getByRole('link', { name: 'Features' })).not.toHaveAttribute('aria-current');
-    expect(screen.getByRole('link', { name: 'Pricing' })).not.toHaveAttribute('aria-current');
+    expect(screen.queryByRole('link', { name: 'Pricing' })).not.toBeInTheDocument();
   });
 
   it('opens a mobile section menu from the header', async () => {
@@ -119,7 +118,6 @@ describe('LandingPage', () => {
       'Features',
       'Requirements',
       'Docs',
-      'Pricing',
     ]);
     expect(within(mobileNav).getByRole('link', { name: 'About it' })).toHaveAttribute(
       'aria-current',

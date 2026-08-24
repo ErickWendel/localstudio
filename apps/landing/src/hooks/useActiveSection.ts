@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 
-const landingSectionIds = ['top', 'features', 'pricing', 'requirements'];
+// Pricing is temporarily disabled from the landing page.
+// const landingSectionIdsWithPricing = ['top', 'features', 'pricing', 'requirements'];
+const landingSectionIds = ['top', 'features', 'requirements'];
 const sectionObserverThresholds = [0, 0.18, 0.34, 0.5, 0.66, 0.82, 1];
 
 export function useActiveSection() {

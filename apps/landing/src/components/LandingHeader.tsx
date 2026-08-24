@@ -9,7 +9,8 @@ const navItems = [
   { href: '#features', label: 'Features', sectionId: 'features' },
   { href: '#requirements', label: 'Requirements', sectionId: 'requirements' },
   { href: localStudioAppRoutes.docs.gettingStartedAnchor, label: 'Docs', sectionId: 'docs' },
-  { href: '#pricing', label: 'Pricing', sectionId: 'pricing' },
+  // Pricing is temporarily disabled from the landing navigation.
+  // { href: '#pricing', label: 'Pricing', sectionId: 'pricing' },
 ] as const;
 
 export function LandingHeader({

@@ -62,27 +62,11 @@ test.describe('landing public funnel journey', () => {
       }),
     ).toBeVisible();
 
-    await page.getByRole('link', { name: 'Pricing' }).click();
+    await expect(page.getByRole('link', { name: 'Pricing' })).toHaveCount(0);
     await expect(
       page.getByRole('heading', { name: 'Free forever locally. Cheap when convenience matters.' }),
-    ).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Speaker', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Keynote Speaker' })).toBeVisible();
-    await page.getByLabel('Email').fill('speaker@example.com');
-    await expect(page.locator('#mauticform_localstudiowaitlist')).toHaveAttribute(
-      'action',
-      'https://mautic.erickwendel.com.br/form/submit?formId=6',
-    );
-    await expect(page.getByLabel('Email')).toHaveAttribute('name', 'mauticform[email]');
-    await expect(page.locator('#mauticform_localstudiowaitlist_id')).toHaveValue('6');
-    await expect(page.locator('#mauticform_localstudiowaitlist_return')).toHaveAttribute(
-      'name',
-      'mauticform[return]',
-    );
-    await expect(page.locator('#mauticform_localstudiowaitlist_name')).toHaveValue(
-      'localstudiowaitlist',
-    );
-    await expect(page.getByRole('button', { name: 'Join waitlist' })).toBeVisible();
+    ).toHaveCount(0);
+    await expect(page.locator('#mauticform_localstudiowaitlist')).toHaveCount(0);
 
     await expect(
       page.getByRole('link', { name: /Star LocalStudio.dev on GitHub/i }),

@@ -7,7 +7,8 @@ import { ClosingSection } from './sections/ClosingSection';
 import { DemoSection } from './sections/DemoSection';
 import { FeaturesSection } from './sections/FeaturesSection';
 import { HeroSection } from './sections/HeroSection';
-import { PricingSection } from './sections/PricingSection';
+// Pricing is temporarily disabled from the landing page.
+// import { PricingSection } from './sections/PricingSection';
 import { RequirementsSection } from './sections/RequirementsSection';
 import { ShowcaseSection } from './sections/ShowcaseSection';
 import { ThanksSection } from './sections/ThanksSection';
@@ -26,7 +27,7 @@ export function LandingPage() {
       <DemoSection />
       <WebAiSection />
       <FeaturesSection />
-      <PricingSection />
+      {/* <PricingSection /> */}
       <RequirementsSection />
       <ThanksSection />
       <ClosingSection />
