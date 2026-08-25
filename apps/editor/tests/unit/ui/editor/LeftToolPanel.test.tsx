@@ -49,6 +49,26 @@ describe('LeftToolPanel', () => {
     expect(screen.queryByText('Image Editing Models')).not.toBeInTheDocument();
   });
 
+  it('renders the layout panel without a slide selection handler', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <LeftToolPanel
+        activeTab="layout"
+        open
+        onTabChange={vi.fn()}
+        project={sampleProject.createSampleProject()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
+        modelStates={modelStates}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Page Background' }));
+
+    expect(screen.getByRole('button', { name: 'Page Background' })).toBeInTheDocument();
+  });
+
   it('imports media files from the Assets menu', async () => {
     const user = userEvent.setup();
     const onImportMedia = vi.fn();

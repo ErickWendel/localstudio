@@ -141,6 +141,7 @@ describe('TopToolbar', () => {
     expect(screen.queryByRole('menu', { name: 'Import' })).not.toBeInTheDocument();
     expect(screen.getByRole('menu', { name: 'Export to' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Images (.zip)' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'PDF (.pdf)' })).toBeDisabled();
   });
 
   it('switches open header menus when users hover another header item', () => {
