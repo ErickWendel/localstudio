@@ -120,7 +120,10 @@ class AuthoringAutomationController {
     height?: number | undefined;
   }): Promise<AuthoringResult<unknown>> {
     try {
-      return success(await this.delegate.createPresentation(input));
+      await Promise.allSettled([...this.upserts.values()].map(({ promise }) => promise));
+      const result = await this.delegate.createPresentation(input);
+      this.upserts.clear();
+      return success(result);
     } catch (error) {
       return failure('create_presentation', this.describeError(error));
     }

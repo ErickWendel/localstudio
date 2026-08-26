@@ -102,6 +102,32 @@ describe('createAuthoringAutomationDelegate', () => {
     });
   });
 
+  it('reports a description as stale when its source revision no longer matches the slide', async () => {
+    const harness = createHarness();
+    const initialState = (await harness.delegate.getPresentationState({ detail: 'summary' })) as {
+      slides: Array<{ revision: string }>;
+    };
+    const page = harness.getProject().pages[0];
+    if (!page) throw new Error('Expected a first page.');
+    page.semanticDescription = {
+      text: 'An old description',
+      language: 'en',
+      generatedAt: '2026-08-26T00:00:00.000Z',
+      generator: 'test',
+      sourceRevision: initialState.slides[0]?.revision ?? '',
+      reviewed: false,
+      stale: false,
+    };
+
+    expect(await harness.delegate.getPresentationState({ detail: 'summary' })).toMatchObject({
+      slides: [{ slideNumber: 1, descriptionFreshness: 'fresh' }],
+    });
+    page.name = 'Changed after description generation';
+    expect(await harness.delegate.getPresentationState({ detail: 'summary' })).toMatchObject({
+      slides: [{ slideNumber: 1, descriptionFreshness: 'stale' }],
+    });
+  });
+
   it('downloads an available referenced font before applying the exact text element', async () => {
     const harness = createHarness();
 

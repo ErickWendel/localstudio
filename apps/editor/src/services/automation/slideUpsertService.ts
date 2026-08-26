@@ -390,6 +390,8 @@ async function apply(
   const previousElementIds = existingPage?.elementIds ?? [];
   const deleteIds = new Set(batch.deleteElementIds ?? []);
   if (batch.mode === 'replace') previousElementIds.forEach((elementId) => deleteIds.add(elementId));
+  const upsertElementIds = new Set(batch.elements.map((element) => element.elementId));
+  const deletedElementIds = [...deleteIds].filter((elementId) => !upsertElementIds.has(elementId));
 
   const resolvedElements = await Promise.all(
     batch.elements.map(async (input) => ({ input, ...(await createElement(input, options)) })),
@@ -475,7 +477,7 @@ async function apply(
     updatedElements: batch.elements.filter((element) =>
       Boolean(project.elements[element.elementId]),
     ).length,
-    deletedElements: deleteIds.size,
+    deletedElements: deletedElementIds.length,
     elementCount: orderedElementIds.length,
     project: nextProject,
   };

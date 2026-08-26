@@ -45,15 +45,29 @@ function validateRemoteUrl(value: string) {
 function getSlideRevision(project: ProjectDocument, pageId: string) {
   const page = project.pages.find((candidate) => candidate.id === pageId);
   if (!page) return '';
+  const elements = page.elementIds.map((elementId) => project.elements[elementId]);
+  const assetIds = new Set<string>();
+  if (page.background.type === 'asset') assetIds.add(page.background.assetId);
+  elements.forEach((element) => {
+    if (element && 'assetId' in element && typeof element.assetId === 'string') {
+      assetIds.add(element.assetId);
+    }
+  });
   const value = JSON.stringify({
     page: {
+      name: page.name,
       width: page.width,
       height: page.height,
       background: page.background,
       elementIds: page.elementIds,
+      transition: page.transition,
+      animationBuilds: page.animationBuilds,
+      layoutId: page.layoutId,
       speakerNotes: page.speakerNotes,
+      visible: page.visible,
     },
-    elements: page.elementIds.map((elementId) => project.elements[elementId]),
+    elements,
+    assets: [...assetIds].sort().map((assetId) => project.assets[assetId]),
   });
   let hash = 2166136261;
   for (let index = 0; index < value.length; index += 1) {
@@ -83,37 +97,40 @@ function createPresentationState(
   const detailed = input.detail === 'elements';
   const elementCursor = Math.floor(Math.max(0, input.elementCursor ?? 0));
   const elementLimit = Math.floor(Math.max(1, Math.min(50, input.elementLimit ?? 25)));
-  const slides = candidates.slice(0, detailed ? 5 : 20).map(({ page, slideNumber }) => ({
-    slideId: page.id,
-    slideNumber,
-    name: page.name,
-    width: page.width,
-    height: page.height,
-    background: page.background,
-    elementCount: page.elementIds.length,
-    speakerNotes: boundedText(page.speakerNotes),
-    semanticDescription: page.semanticDescription
-      ? { ...page.semanticDescription, text: boundedText(page.semanticDescription.text) }
-      : undefined,
-    descriptionFreshness: page.semanticDescription
-      ? page.semanticDescription.stale
-        ? 'stale'
-        : 'fresh'
-      : 'missing',
-    revision: getSlideRevision(project, page.id),
-    ...(detailed
-      ? {
-          elements: page.elementIds
-            .slice(elementCursor, elementCursor + elementLimit)
-            .map((elementId) => boundedElement(project.elements[elementId]))
-            .filter(Boolean),
-          nextElementCursor:
-            elementCursor + elementLimit < page.elementIds.length
-              ? elementCursor + elementLimit
-              : undefined,
-        }
-      : {}),
-  }));
+  const slides = candidates.slice(0, detailed ? 5 : 20).map(({ page, slideNumber }) => {
+    const revision = getSlideRevision(project, page.id);
+    return {
+      slideId: page.id,
+      slideNumber,
+      name: page.name,
+      width: page.width,
+      height: page.height,
+      background: page.background,
+      elementCount: page.elementIds.length,
+      speakerNotes: boundedText(page.speakerNotes),
+      semanticDescription: page.semanticDescription
+        ? { ...page.semanticDescription, text: boundedText(page.semanticDescription.text) }
+        : undefined,
+      descriptionFreshness: page.semanticDescription
+        ? page.semanticDescription.stale || page.semanticDescription.sourceRevision !== revision
+          ? 'stale'
+          : 'fresh'
+        : 'missing',
+      revision,
+      ...(detailed
+        ? {
+            elements: page.elementIds
+              .slice(elementCursor, elementCursor + elementLimit)
+              .map((elementId) => boundedElement(project.elements[elementId]))
+              .filter(Boolean),
+            nextElementCursor:
+              elementCursor + elementLimit < page.elementIds.length
+                ? elementCursor + elementLimit
+                : undefined,
+          }
+        : {}),
+    };
+  });
   return {
     projectId: project.id,
     name: project.name,

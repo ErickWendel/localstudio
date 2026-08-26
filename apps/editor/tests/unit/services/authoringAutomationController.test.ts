@@ -117,6 +117,42 @@ describe('authoringAutomationController', () => {
     expect(upsertSlideContent).toHaveBeenCalledTimes(1);
   });
 
+  it('scopes idempotent request IDs to the current presentation', async () => {
+    const upsertSlideContent = vi.fn((input: SlideUpsertBatch) =>
+      Promise.resolve({
+        requestId: input.requestId,
+        slideId: 'page-1',
+        slideNumber: 1,
+        createdSlide: false,
+        createdElements: 0,
+        updatedElements: 0,
+        deletedElements: 0,
+        elementCount: 0,
+        project: {} as never,
+      }),
+    );
+    const controller = new authoringAutomationController.AuthoringAutomationController(
+      createDelegate({ upsertSlideContent }),
+    );
+    const input: SlideUpsertBatch = {
+      requestId: 'reusable-after-create',
+      slideNumber: 1,
+      mode: 'merge',
+      elements: [],
+    };
+
+    await expect(controller.upsertSlideContent(input)).resolves.toMatchObject({
+      ok: true,
+      data: { idempotentReplay: false },
+    });
+    await controller.createPresentation({ name: 'A different deck' });
+    await expect(controller.upsertSlideContent(input)).resolves.toMatchObject({
+      ok: true,
+      data: { idempotentReplay: false },
+    });
+    expect(upsertSlideContent).toHaveBeenCalledTimes(2);
+  });
+
   it('rejects a reused request ID when the batch body changes', async () => {
     const upsertSlideContent = vi.fn((input: SlideUpsertBatch) =>
       Promise.resolve({
