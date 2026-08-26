@@ -1,83 +1,118 @@
-import { promptRecipes } from '../../../src/ui/editor/prompting/promptRecipes';
+import { authoringAutomationController } from '../../../src/services/automation/authoringAutomationController';
+import type { AuthoringAutomationDelegate } from '../../../src/services/automation/authoringAutomationController';
 import { WebMcpToolAdapter, type WebMcpTool } from '../../../src/services/webmcp/webMcpToolAdapter';
 
+const expectedToolNames = [
+  'create_presentation',
+  'get_presentation_state',
+  'import_powerpoint_from_url',
+  'translate_deck_and_notes',
+  'generate_deck_detailed_description',
+  'list_authoring_catalog',
+  'upsert_slide_content',
+  'generate_image',
+  'get_slide_preview',
+  'get_ai_model_status',
+  'prepare_ai_models',
+  'search_media',
+  'export_presentation',
+  'publish_presentation',
+  'get_operation_status',
+];
+
+function createDelegate(
+  overrides: Partial<AuthoringAutomationDelegate> = {},
+): AuthoringAutomationDelegate {
+  return {
+    createPresentation: vi.fn(() => ({ projectId: 'project-1', name: 'Untitled' })),
+    getPresentationState: vi.fn(() => ({ projectId: 'project-1', pageCount: 1 })),
+    importPowerPointFromUrl: vi.fn(() => Promise.resolve({ pageCount: 1 })),
+    translateDeckAndNotes: vi.fn(() => Promise.resolve({ translatedPageIds: [] })),
+    generateDeckDetailedDescription: vi.fn(() => Promise.resolve({ describedSlides: 1 })),
+    listAuthoringCatalog: vi.fn(() => ({ fonts: [] })),
+    upsertSlideContent: vi.fn(() => Promise.reject(new Error('not used'))),
+    generateImage: vi.fn(() => Promise.resolve({ assetId: 'asset-1' })),
+    getSlidePreview: vi.fn(() => ({ slideId: 'page-1' })),
+    getAiModelStatus: vi.fn(() => Promise.resolve({ models: [] })),
+    prepareAiModels: vi.fn(() => Promise.resolve([])),
+    searchMedia: vi.fn(() => Promise.resolve({ results: [] })),
+    exportPresentation: vi.fn(() => Promise.resolve({ fileName: 'deck.pptx' })),
+    publishPresentation: vi.fn(() => Promise.resolve({ publicUrl: 'https://example.test/deck' })),
+    ...overrides,
+  };
+}
+
+function createAdapter(delegate = createDelegate()) {
+  return new WebMcpToolAdapter(
+    new authoringAutomationController.AuthoringAutomationController(delegate),
+  );
+}
+
 describe('WebMcpToolAdapter', () => {
-  function createAdapter() {
-    return new WebMcpToolAdapter({
-      createProject: vi.fn(),
-      generateSlides: vi.fn(),
-      generateImage: vi.fn(),
-      translateText: vi.fn(),
-      getProjectSnapshot: vi.fn(),
-    });
-  }
-
-  it('registers discoverable WebMCP tools with prompt examples in metadata', () => {
+  it('registers only the refined authoring catalog with safety metadata', () => {
     const registerTools = vi.fn<(tools: WebMcpTool[]) => void>();
-    const adapter = createAdapter();
-
-    adapter.register({ registerTools });
+    createAdapter().register({ registerTools });
 
     const tools = registerTools.mock.calls[0]?.[0] ?? [];
-    expect(tools).toHaveLength(5);
-    expect(tools.map((tool) => tool.name)).toEqual([
-      'create_project',
-      'generate_slides',
-      'generate_image',
-      'translate_text',
-      'get_project_snapshot',
-    ]);
-    const generateSlidesTool = tools.find((tool) => tool.name === 'generate_slides');
-    const generateImageTool = tools.find((tool) => tool.name === 'generate_image');
-    expect(generateSlidesTool?.description).toContain(promptRecipes.slidePromptExamples[0]);
-    expect(generateImageTool?.description).toContain(promptRecipes.imagePromptExamples[0]);
+    expect(tools.map((tool) => tool.name)).toEqual(expectedToolNames);
+    expect(tools).toHaveLength(15);
+    expect(tools.every((tool) => Boolean(tool.title))).toBe(true);
+    expect(tools.every((tool) => tool.annotations?.untrustedContentHint)).toBe(true);
+    expect(tools.find((tool) => tool.name === 'generate_image')?.description).toContain(
+      'upsert_slide_content',
+    );
   });
 
-  it('runs WebMCP cleanup callbacks returned by the browser runtime', () => {
+  it('runs cleanup callbacks returned by the browser runtime', () => {
     const cleanup = vi.fn();
-    const adapter = createAdapter();
-    const unregister = adapter.register({
-      registerTools: vi.fn(() => cleanup),
-    });
+    const unregister = createAdapter().register({ registerTools: vi.fn(() => cleanup) });
 
     unregister();
 
     expect(cleanup).toHaveBeenCalledTimes(1);
   });
 
-  it('ignores duplicate WebMCP tool registration errors from an existing runtime registration', () => {
-    const adapter = createAdapter();
+  it('ignores duplicate tool registration errors', () => {
     const registerTool = vi.fn(() => {
       throw new DOMException('Duplicate tool name', 'InvalidStateError');
     });
 
-    expect(() => adapter.register({ registerTool })).not.toThrow();
-    expect(registerTool).toHaveBeenCalledTimes(5);
+    expect(() => createAdapter().register({ registerTool })).not.toThrow();
+    expect(registerTool).toHaveBeenCalledTimes(15);
   });
 
-  it('forwards tool calls to the automation controller', async () => {
-    const generateSlides = vi.fn(() =>
-      Promise.resolve({ ok: true as const, data: { snapshot: { projectId: 'project-1' } as never } }),
+  it('normalizes create presentation input before forwarding it', async () => {
+    const createPresentation = vi.fn(() => ({ projectId: 'project-1', name: 'WebMCP Deck' }));
+    const adapter = createAdapter(createDelegate({ createPresentation }));
+    const tool = adapter
+      .createTools()
+      .find((candidate) => candidate.name === 'create_presentation');
+
+    await expect(tool?.execute({ name: 'WebMCP Deck', width: 1600, height: 900 })).resolves.toEqual(
+      {
+        ok: true,
+        data: { projectId: 'project-1', name: 'WebMCP Deck' },
+      },
     );
-    const registerTools = vi.fn<(tools: WebMcpTool[]) => void>();
-    const adapter = new WebMcpToolAdapter({
-      createProject: vi.fn(),
-      generateSlides,
-      generateImage: vi.fn(),
-      translateText: vi.fn(),
-      getProjectSnapshot: vi.fn(),
+    expect(createPresentation).toHaveBeenCalledWith({
+      name: 'WebMCP Deck',
+      width: 1600,
+      height: 900,
     });
+  });
 
-    adapter.register({ registerTools });
-    const tools = registerTools.mock.calls[0]?.[0] ?? [];
-    const generateSlidesTool = tools.find((tool) => tool.name === 'generate_slides');
+  it('publishes a strict discriminated schema for slide upserts', () => {
+    const tool = createAdapter()
+      .createTools()
+      .find((candidate) => candidate.name === 'upsert_slide_content');
+    const schema = tool?.inputSchema as {
+      additionalProperties?: boolean;
+      oneOf?: unknown[];
+      properties?: { elements?: { items?: { oneOf?: unknown[] } } };
+    };
 
-    await expect(generateSlidesTool?.execute({ prompt: 'Three-image grid about Web AI, with matching captions.' })).resolves.toEqual({
-      ok: true,
-      data: { snapshot: { projectId: 'project-1' } },
-    });
-    expect(generateSlides).toHaveBeenCalledWith({
-      prompt: 'Three-image grid about Web AI, with matching captions.',
-    });
+    expect(schema.additionalProperties).toBe(false);
+    expect(schema.oneOf).toHaveLength(2);
+    expect(schema.properties?.elements?.items?.oneOf).toHaveLength(5);
   });
 });

@@ -724,6 +724,13 @@ export function useEditorViewModel(services: AppServices) {
     setLastEditedAt(nextProject.updatedAt);
   }
 
+  function applyProjectForAutomation(nextProject: ProjectDocument, nextActivePageId?: string) {
+    commitProject(() => nextProject, {
+      ...(nextActivePageId ? { activePageId: nextActivePageId } : {}),
+      selectedElementIds: [],
+    });
+  }
+
   async function downloadRequiredModels() {
     setModelStates((currentStates) =>
       currentStates.map((state) =>
@@ -3596,6 +3603,8 @@ export function useEditorViewModel(services: AppServices) {
   return {
     project: previewProject ?? project,
     automation,
+    applyProjectForAutomation,
+    replaceProjectForAutomation,
     activePageId,
     activePageFocusKey,
     zoomPercent,

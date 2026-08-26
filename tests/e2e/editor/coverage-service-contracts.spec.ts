@@ -41,7 +41,10 @@ import { evaluateProgressContract } from './progress-contract-browser';
 import { evaluateProjectMutationUtilsContract } from './project-mutation-utils-contract-browser';
 import { evaluateSampleProjectContract } from './sample-project-contract-browser';
 import { serviceContractsSupport } from './service-contracts-support';
-import { createMirrorStorageContractProject, createStorageContractProject } from './storage-contract-project';
+import {
+  createMirrorStorageContractProject,
+  createStorageContractProject,
+} from './storage-contract-project';
 import { storageContractRuntimePage } from './storage-contract-runtime-page';
 import { evaluateStorageDisabledContract } from './storage-disabled-contract-browser';
 import { evaluateStorageMirrorImportContract } from './storage-mirror-import-contract-browser';
@@ -154,8 +157,16 @@ test.describe('editor service contracts coverage batch', () => {
         pptx: pptxPatcherContractFixtures.createInput(),
       });
 
-      expect(result.generatedTexts).toEqual(['plain', 'chat content', 'nested chat', 'object text']);
-      expect(result.detectedLanguages).toEqual([{ language: 'pt', score: 0.91 }, { language: 'en' }]);
+      expect(result.generatedTexts).toEqual([
+        'plain',
+        'chat content',
+        'nested chat',
+        'object text',
+      ]);
+      expect(result.detectedLanguages).toEqual([
+        { language: 'pt', score: 0.91 },
+        { language: 'en' },
+      ]);
       expect(result.parsingErrors).toHaveLength(2);
       expect(result.patchedWarningCodes).toEqual(
         expect.arrayContaining([
@@ -202,10 +213,7 @@ test.describe('editor service contracts coverage batch', () => {
       expect(result.session.stateCount).toBeGreaterThan(0);
       expect(result.speech).toMatchObject({
         changedSpeechLanguage: 'en-US',
-        errors: [
-          'Microphone permission is required for live transcription.',
-          'Network down',
-        ],
+        errors: ['Microphone permission is required for live transcription.', 'Network down'],
         text: 'ola mundo',
       });
       expect(result.speech.updates).toContainEqual({ final: false, text: 'ola mundo' });
@@ -322,7 +330,11 @@ test.describe('editor service contracts coverage batch', () => {
         translationState: { progress: 100, status: 'ready' },
       });
       expect(download.modelLoads).toEqual(
-        expect.arrayContaining(['image-editing', 'image-generation', expect.stringMatching(/^text:/)]),
+        expect.arrayContaining([
+          'image-editing',
+          'image-generation',
+          expect.stringMatching(/^text:/),
+        ]),
       );
       expect(download.storageWrites).toEqual(
         expect.arrayContaining([expect.stringMatching(/:true$/)]),
@@ -462,7 +474,10 @@ test.describe('editor service contracts coverage batch', () => {
         expect.arrayContaining([expect.objectContaining({ progress: 50 })]),
       );
 
-      const language = await transformersRuntimeContractPage.runLanguageWorkerContract(page, baseURL);
+      const language = await transformersRuntimeContractPage.runLanguageWorkerContract(
+        page,
+        baseURL,
+      );
       expect(language).toMatchObject({
         detectedLanguage: { language: 'es', score: 0.92 },
         requests: ['preload-language-detection', 'detect-language'],
@@ -551,12 +566,16 @@ test.describe('editor service contracts coverage batch', () => {
         expect.arrayContaining([
           expect.stringContaining('info:[LocalStudio presenter remote]|enabled'),
           expect.stringContaining('warn:[LocalStudio presenter remote]|object|{"ok":true}'),
-          expect.stringContaining('error:[LocalStudio presenter remote]|failure|TypeError: bad stream'),
+          expect.stringContaining(
+            'error:[LocalStudio presenter remote]|failure|TypeError: bad stream',
+          ),
           expect.stringContaining('warn:[LocalStudio presenter remote]|circular|[object Object]'),
         ]),
       );
       expect(logging.logs).not.toEqual(
-        expect.arrayContaining([expect.stringContaining('info:[LocalStudio presenter remote]|ready')]),
+        expect.arrayContaining([
+          expect.stringContaining('info:[LocalStudio presenter remote]|ready'),
+        ]),
       );
 
       await gotoNewProject(page);
@@ -726,7 +745,9 @@ test.describe('editor service contracts coverage batch', () => {
         trustedOffer: { status: 'pending' },
         untrustedOffer: { status: 'not-found' },
       });
-      expect(offer.pendingOffers).toEqual([{ controllerId: 'controller-1', offerSdp: 'offer-sdp' }]);
+      expect(offer.pendingOffers).toEqual([
+        { controllerId: 'controller-1', offerSdp: 'offer-sdp' },
+      ]);
 
       const answer = await presenterSignalingWebRtcContractPage.runAnswer(page, options);
       expect(answer).toMatchObject({
@@ -756,13 +777,23 @@ test.describe('editor service contracts coverage batch', () => {
       evaluateWebMcpToolAdapterMetadataContract,
     );
     expect(metadata.toolNames).toEqual([
-      'create_project',
-      'generate_slides',
+      'create_presentation',
+      'get_presentation_state',
+      'import_powerpoint_from_url',
+      'translate_deck_and_notes',
+      'generate_deck_detailed_description',
+      'list_authoring_catalog',
+      'upsert_slide_content',
       'generate_image',
-      'translate_text',
-      'get_project_snapshot',
+      'get_slide_preview',
+      'get_ai_model_status',
+      'prepare_ai_models',
+      'search_media',
+      'export_presentation',
+      'publish_presentation',
+      'get_operation_status',
     ]);
-    expect(metadata.toolDescriptions.join('\n')).toContain('Good prompt examples');
+    expect(metadata.toolTitles.every(Boolean)).toBe(true);
 
     const execution = await webMcpContractPage.run(
       page,
@@ -770,22 +801,16 @@ test.describe('editor service contracts coverage batch', () => {
       evaluateWebMcpToolAdapterExecutionContract,
     );
     expect(execution).toMatchObject({
-      createProjectBlank: { data: { name: 'Untitled' }, ok: true },
-      createProjectNamed: { data: { name: 'WebMCP Deck' }, ok: true },
-      generatedImage: { data: { assetId: 'asset-generated' }, ok: true },
-      generatedSlides: { data: { prompt: 'Create a launch slide' }, ok: true },
-      snapshot: { data: { pageCount: 1 }, ok: true },
-      translated: { data: { scope: 'slide' }, ok: true },
-      translatedWithoutPage: { data: { scope: 'deck' }, ok: true },
+      created: { data: { name: 'WebMCP Deck' }, ok: true },
+      state: { data: { pageCount: 1 }, ok: true },
+      preview: { data: { slideId: 'page-1' }, ok: true },
+      imageStatus: { data: { state: 'completed' }, ok: true },
     });
     expect(execution.controllerCalls.map((call) => call.name)).toEqual([
-      'createProject',
-      'createProject',
-      'generateSlides',
+      'createPresentation',
+      'getPresentationState',
+      'getSlidePreview',
       'generateImage',
-      'translateText',
-      'translateText',
-      'getProjectSnapshot',
     ]);
 
     const registration = await webMcpContractPage.run(
@@ -793,13 +818,7 @@ test.describe('editor service contracts coverage batch', () => {
       baseURL,
       evaluateWebMcpToolAdapterRegistrationContract,
     );
-    expect(registration.registeredNames).toEqual([
-      'create_project',
-      'generate_slides',
-      'generate_image',
-      'translate_text',
-      'get_project_snapshot',
-    ]);
+    expect(registration.registeredNames).toEqual(metadata.toolNames);
     expect(registration.individuallyRegisteredNames).toEqual(registration.registeredNames);
   });
 });

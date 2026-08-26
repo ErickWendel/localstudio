@@ -7,8 +7,8 @@ import type { ProjectDocument, TranscriptRecording } from '../../../domain/docum
 import { pageVisibility } from '../../../domain/documents/pageVisibility';
 import type { ShareMetadata, SharePublishProgress } from '../../../services/contracts/interfaces';
 import { analyticsModelProperties } from '../../../services/analytics/analyticsModelProperties';
-import { editorAutomationController } from '../../../services/automation/editorAutomationController';
-import type { EditorAutomationDelegate } from '../../../services/automation/editorAutomationController';
+import { authoringAutomationController } from '../../../services/automation/authoringAutomationController';
+import { createAuthoringAutomationDelegate } from '../../../services/automation/createAuthoringAutomationDelegate';
 import { imageGenerationModel } from '../../../services/image-generation/imageGenerationModel';
 import {
   WebMcpToolAdapter,
@@ -118,6 +118,7 @@ export function EditorShell({ services }: EditorShellProps) {
 
 function EditorDesktopShell({ services }: EditorShellProps) {
   const vm = useEditorViewModel(services);
+  const authoringVmRef = useRef(vm);
   const presenterTranscriptionLanguage =
     vm.translationLanguageOptions.find(
       (language) => language.code === vm.translationTargetLanguage,
@@ -1210,6 +1211,8 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     automationDelegateRef.current = vm.automation;
   }, [vm.automation]);
 
+  authoringVmRef.current = vm;
+
   useEffect(() => {
     prepareProjectFontsForPublicShareRef.current = vm.prepareProjectFontsForPublicShare;
   });
@@ -1495,15 +1498,15 @@ function EditorDesktopShell({ services }: EditorShellProps) {
 
   useEffect(() => {
     if (!editorShellBrowserUtils.isWebMcpProtocolEnabled()) return undefined;
-    const delegate: EditorAutomationDelegate = {
-      createProject: (input) => automationDelegateRef.current.createProject(input),
-      generateSlides: (input) => automationDelegateRef.current.generateSlides(input),
-      generateImage: (input) => automationDelegateRef.current.generateImage(input),
-      translateText: (input) => automationDelegateRef.current.translateText(input),
-      getState: () => automationDelegateRef.current.getState(),
-    };
+    const delegate = createAuthoringAutomationDelegate({
+      fontImportService: services.fontImportService,
+      getProject: () => automationDelegateRef.current.getState().project,
+      replaceProject: (project) => authoringVmRef.current.replaceProjectForAutomation(project),
+      applyProject: (project, activePageId) =>
+        authoringVmRef.current.applyProjectForAutomation(project, activePageId),
+    });
     const adapter = new WebMcpToolAdapter(
-      new editorAutomationController.EditorAutomationController(delegate),
+      new authoringAutomationController.AuthoringAutomationController(delegate),
     );
     const demoWindow = window as WebMcpDemoWindow;
     const modelContext = editorShellBrowserUtils.getWebMcpModelContext();
@@ -1514,7 +1517,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       unregister?.();
       delete demoWindow.localStudioWebMcpTools;
     };
-  }, []);
+  }, [services.fontImportService]);
 
   useEffect(
     () => () => {

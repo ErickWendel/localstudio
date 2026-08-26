@@ -1,7 +1,5 @@
-import { Bot, FileJson, ImagePlus, Languages, Play, Radar, SendHorizontal } from 'lucide-react';
+import { Bot, FileJson, Play, Radar, SendHorizontal } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
-import { promptRecipes } from '../editor/prompting/promptRecipes';
-import { TRANSLATION_LANGUAGE_OPTIONS } from '../editor/translation/translationLanguages';
 
 interface WebMcpToolLike {
   call?: (input: Record<string, unknown>) => unknown;
@@ -24,34 +22,59 @@ interface DemoStep {
 
 const demoSteps: DemoStep[] = [
   {
-    label: 'Create project',
-    toolName: 'create_project',
+    label: 'Create presentation',
+    toolName: 'create_presentation',
     input: { name: 'WebMCP Demo Deck' },
   },
   {
-    label: 'Generate slide',
-    toolName: 'generate_slides',
-    input: { prompt: promptRecipes.slidePromptExamples[1] },
-  },
-  {
-    label: 'Generate image',
-    toolName: 'generate_image',
+    label: 'Upsert slide',
+    toolName: 'upsert_slide_content',
     input: {
-      prompt: promptRecipes.imagePromptExamples[1],
-      width: 512,
-      height: 512,
-      steps: 4,
+      requestId: 'webmcp-showcase-slide-1',
+      slideNumber: 1,
+      mode: 'replace',
+      slide: {
+        name: 'Agent-native presentations',
+        background: { type: 'color', color: '#050D10' },
+      },
+      elements: [
+        {
+          elementId: 'showcase-title',
+          type: 'text',
+          frame: { x: 180, y: 260, width: 1560, height: 220 },
+          zIndex: 1,
+          content: { text: 'Presentations become agent-native' },
+          style: {
+            fontFamily: 'Orbitron',
+            fontSize: 88,
+            fontWeight: 800,
+            color: '#37FD76',
+            align: 'center',
+          },
+        },
+        {
+          elementId: 'showcase-body',
+          type: 'text',
+          frame: { x: 360, y: 560, width: 1200, height: 120 },
+          zIndex: 2,
+          content: {
+            text: 'Create, inspect, localize, export, and publish through browser-native tools.',
+          },
+          style: {
+            fontFamily: 'Open Sans',
+            fontSize: 42,
+            fontWeight: 600,
+            color: '#FFFFFF',
+            align: 'center',
+          },
+        },
+      ],
     },
   },
   {
-    label: 'Translate deck',
-    toolName: 'translate_text',
-    input: { scope: 'deck', targetLanguage: 'pt' },
-  },
-  {
-    label: 'Read snapshot',
-    toolName: 'get_project_snapshot',
-    input: {},
+    label: 'Read presentation state',
+    toolName: 'get_presentation_state',
+    input: { detail: 'elements', slideNumbers: [1] },
   },
 ];
 
@@ -61,10 +84,13 @@ function getBrowserModelContext() {
 }
 
 function isWebMcpToolLikeArray(value: unknown): value is WebMcpToolLike[] {
-  return Array.isArray(value) && value.every((item) => {
-    if (!item || typeof item !== 'object') return false;
-    return typeof (item as { name?: unknown }).name === 'string';
-  });
+  return (
+    Array.isArray(value) &&
+    value.every((item) => {
+      if (!item || typeof item !== 'object') return false;
+      return typeof (item as { name?: unknown }).name === 'string';
+    })
+  );
 }
 
 function getLocalDemoTools(iframe: HTMLIFrameElement) {
@@ -79,7 +105,8 @@ function callTool(
   input: Record<string, unknown>,
   modelContext = getBrowserModelContext(),
 ) {
-  if (modelContext?.executeTool) return Promise.resolve(modelContext.executeTool(tool, JSON.stringify(input)));
+  if (modelContext?.executeTool)
+    return Promise.resolve(modelContext.executeTool(tool, JSON.stringify(input)));
   const callable = tool.call ?? tool.execute ?? tool.invoke;
   if (!callable) throw new Error(`${tool.name} is not callable in this WebMCP runtime.`);
   return Promise.resolve(callable(input));
@@ -90,20 +117,20 @@ function formatPayload(value: unknown) {
 }
 
 function getDefaultCommandValue(step: DemoStep) {
-  const primaryValue = step.input.name ?? step.input.prompt ?? step.input.targetLanguage;
+  const primaryValue = step.input.name;
   return typeof primaryValue === 'string' ? primaryValue : formatPayload(step.input);
 }
 
 function getCommandInput(step: DemoStep, value: string) {
-  if (step.toolName === 'create_project') return { name: value };
-  if (step.toolName === 'generate_slides') return { prompt: value };
-  if (step.toolName === 'generate_image') return { ...step.input, prompt: value };
-  if (step.toolName === 'translate_text') return { ...step.input, targetLanguage: value };
+  if (step.toolName === 'create_presentation') return { name: value };
+  if (step.toolName === 'upsert_slide_content') {
+    return JSON.parse(value) as Record<string, unknown>;
+  }
   return step.input;
 }
 
 function hasCommandInput(step: DemoStep) {
-  return step.toolName !== 'get_project_snapshot';
+  return step.toolName !== 'get_presentation_state';
 }
 
 export function WebMcpShowcasePage() {
@@ -154,7 +181,9 @@ export function WebMcpShowcasePage() {
       ? await modelContext.getTools({ fromOrigins: [iframeOrigin] })
       : fallbackTools;
     if (!discoveredTools) {
-      setStatus('No WebMCP runtime or same-origin demo tools found. Wait for the editor frame, then try again.');
+      setStatus(
+        'No WebMCP runtime or same-origin demo tools found. Wait for the editor frame, then try again.',
+      );
       setTools([]);
       return;
     }
@@ -164,7 +193,11 @@ export function WebMcpShowcasePage() {
         ? `Discovered ${discoveredTools.length} tools through WebMCP.`
         : `Discovered ${discoveredTools.length} tools through the local demo bridge.`,
     );
-    setLastResult(formatPayload(discoveredTools.map((tool) => ({ name: tool.name, description: tool.description }))));
+    setLastResult(
+      formatPayload(
+        discoveredTools.map((tool) => ({ name: tool.name, description: tool.description })),
+      ),
+    );
   }
 
   async function runStep(step: DemoStep, input = step.input) {
@@ -200,8 +233,8 @@ export function WebMcpShowcasePage() {
           <p className="webmcp-kicker">Browser agent surface</p>
           <h1>WebMCP showcase</h1>
           <p>
-            A host page discovers semantic tools from the editor iframe and calls the same automation layer
-            used by the LocalStudio interface.
+            A host page discovers semantic tools from the editor iframe and calls the same
+            automation layer used by the LocalStudio interface.
           </p>
         </div>
 
@@ -251,7 +284,9 @@ export function WebMcpShowcasePage() {
                   'webmcp-step-button',
                   activeStepName === step.toolName ? 'webmcp-step-button-active' : '',
                   focusedStepName === step.toolName ? 'webmcp-step-button-focused' : '',
-                ].filter(Boolean).join(' ')}
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
                 disabled={isRunning}
                 type="button"
                 onClick={() => {
@@ -259,10 +294,8 @@ export function WebMcpShowcasePage() {
                 }}
               >
                 <span className="webmcp-step-index">{index + 1}</span>
-                {step.toolName === 'generate_image' ? <ImagePlus size={16} /> : null}
-                {step.toolName === 'translate_text' ? <Languages size={16} /> : null}
-                {step.toolName === 'get_project_snapshot' ? <FileJson size={16} /> : null}
-                {step.toolName === 'generate_slides' || step.toolName === 'create_project' ? <Play size={16} /> : null}
+                {step.toolName === 'get_presentation_state' ? <FileJson size={16} /> : null}
+                {step.toolName !== 'get_presentation_state' ? <Play size={16} /> : null}
                 <span>{step.label}</span>
               </button>
               {activeStepName === step.toolName && hasCommandInput(step) ? (
@@ -273,35 +306,16 @@ export function WebMcpShowcasePage() {
                     void runStep(step, getCommandInput(step, commandValues[step.toolName] ?? ''));
                   }}
                 >
-                  {step.toolName === 'translate_text' ? (
-                    <select
-                      aria-label={`${step.label} command input`}
-                      value={commandValues[step.toolName] ?? ''}
-                      onChange={(event) => {
-                        setCommandValues((current) => ({
-                          ...current,
-                          [step.toolName]: event.target.value,
-                        }));
-                      }}
-                    >
-                      {TRANSLATION_LANGUAGE_OPTIONS.map((language) => (
-                        <option key={language.code} value={language.code}>
-                          {language.label} ({language.code}) {language.flag}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      aria-label={`${step.label} command input`}
-                      value={commandValues[step.toolName] ?? ''}
-                      onChange={(event) => {
-                        setCommandValues((current) => ({
-                          ...current,
-                          [step.toolName]: event.target.value,
-                        }));
-                      }}
-                    />
-                  )}
+                  <input
+                    aria-label={`${step.label} command input`}
+                    value={commandValues[step.toolName] ?? ''}
+                    onChange={(event) => {
+                      setCommandValues((current) => ({
+                        ...current,
+                        [step.toolName]: event.target.value,
+                      }));
+                    }}
+                  />
                   <button aria-label={`Send ${step.label}`} disabled={isRunning} type="submit">
                     <SendHorizontal size={15} />
                   </button>

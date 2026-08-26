@@ -9,13 +9,26 @@ import type {
 import { EditorShell } from '../../../../src/ui/editor/shell/EditorShell';
 import { editorShellTestHarness } from './EditorShell.test-harness';
 
-const {
-  createAppServices,
-  openLeftTab,
-  selectImageLayer,
-} = editorShellTestHarness;
+const { createAppServices, openLeftTab, selectImageLayer } = editorShellTestHarness;
 
 const originalMatchMedia = window.matchMedia;
+const authoringToolNames = [
+  'create_presentation',
+  'get_presentation_state',
+  'import_powerpoint_from_url',
+  'translate_deck_and_notes',
+  'generate_deck_detailed_description',
+  'list_authoring_catalog',
+  'upsert_slide_content',
+  'generate_image',
+  'get_slide_preview',
+  'get_ai_model_status',
+  'prepare_ai_models',
+  'search_media',
+  'export_presentation',
+  'publish_presentation',
+  'get_operation_status',
+];
 
 describe('EditorShell', () => {
   afterEach(() => {
@@ -54,13 +67,7 @@ describe('EditorShell', () => {
       expect(registerTools).toHaveBeenCalled();
     });
     const tools = registerTools.mock.calls[0]?.[0] ?? [];
-    expect(tools.map((tool) => tool.name)).toEqual([
-      'create_project',
-      'generate_slides',
-      'generate_image',
-      'translate_text',
-      'get_project_snapshot',
-    ]);
+    expect(tools.map((tool) => tool.name)).toEqual(authoringToolNames);
   });
 
   it('can disable WebMCP protocol registration from the editor URL', async () => {
@@ -86,15 +93,11 @@ describe('EditorShell', () => {
     render(<EditorShell services={createAppServices()} />);
 
     await waitFor(() => {
-      expect((window as WebMcpDemoWindow).localStudioWebMcpTools).toHaveLength(5);
+      expect((window as WebMcpDemoWindow).localStudioWebMcpTools).toHaveLength(15);
     });
-    expect((window as WebMcpDemoWindow).localStudioWebMcpTools?.map((tool) => tool.name)).toEqual([
-      'create_project',
-      'generate_slides',
-      'generate_image',
-      'translate_text',
-      'get_project_snapshot',
-    ]);
+    expect((window as WebMcpDemoWindow).localStudioWebMcpTools?.map((tool) => tool.name)).toEqual(
+      authoringToolNames,
+    );
   });
 
   it('keeps WebMCP embeds available inside narrow host frames', async () => {
@@ -115,7 +118,7 @@ describe('EditorShell', () => {
     expect(
       screen.queryByRole('heading', { name: 'Open this workspace on a desktop screen.' }),
     ).not.toBeInTheDocument();
-    expect((window as WebMcpDemoWindow).localStudioWebMcpTools).toHaveLength(5);
+    expect((window as WebMcpDemoWindow).localStudioWebMcpTools).toHaveLength(15);
   });
 
   it('renders the approved editor shell landmarks', async () => {
