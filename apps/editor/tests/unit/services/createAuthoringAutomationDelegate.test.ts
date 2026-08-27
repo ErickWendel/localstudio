@@ -5,7 +5,9 @@ import type {
   FontImportService,
 } from '../../../src/services/contracts/interfaces';
 
-function createHarness() {
+function createHarness(
+  overrides: Partial<Parameters<typeof createAuthoringAutomationDelegate>[0]> = {},
+) {
   let project = sampleProject.createBlankProject();
   const resolveAndDownloadFonts = vi.fn((requests: FontImportRequest[]) =>
     Promise.resolve({
@@ -50,11 +52,57 @@ function createHarness() {
     applyProject: (nextProject) => {
       project = nextProject;
     },
+    ...overrides,
   });
   return { delegate, resolveAndDownloadFonts, getProject: () => project };
 }
 
 describe('createAuthoringAutomationDelegate', () => {
+  it('exposes every configured production authoring capability as a callable delegate method', () => {
+    const harness = createHarness({
+      assetCapabilities: {
+        generateImage: vi.fn(),
+        getAiModelStatus: vi.fn(),
+        listAuthoringCatalog: vi.fn(),
+        prepareAiModels: vi.fn(),
+        resolveMediaRef: vi.fn(),
+        searchMedia: vi.fn(),
+      },
+      deckLocalization: {
+        generateDeckDetailedDescription: vi.fn(),
+        translateDeckAndNotes: vi.fn(),
+      },
+      powerPointUrlImportService: {
+        importPowerPointFromUrl: vi.fn(),
+      } as never,
+      publishingCapability: {
+        publish: vi.fn(),
+      } as never,
+      visualCapability: {
+        exportPresentation: vi.fn(),
+        getSlidePreview: vi.fn(),
+      },
+    });
+
+    expect(
+      [
+        'importPowerPointFromUrl',
+        'translateDeckAndNotes',
+        'generateDeckDetailedDescription',
+        'listAuthoringCatalog',
+        'generateImage',
+        'getAiModelStatus',
+        'prepareAiModels',
+        'searchMedia',
+        'getSlidePreview',
+        'exportPresentation',
+        'publishPresentation',
+      ].every(
+        (method) => typeof harness.delegate[method as keyof typeof harness.delegate] === 'function',
+      ),
+    ).toBe(true);
+  });
+
   it('creates a named 1920x1080 presentation and returns bounded state', async () => {
     const harness = createHarness();
 
@@ -69,6 +117,10 @@ describe('createAuthoringAutomationDelegate', () => {
       pageCount: 1,
       slides: [{ slideNumber: 1, descriptionFreshness: 'missing' }],
     });
+    expect(
+      ((await harness.delegate.getPresentationState({ detail: 'summary' })) as { revision: string })
+        .revision,
+    ).toMatch(/^presentation-/);
     expect(() => harness.delegate.createPresentation({ width: 0 })).toThrow(
       'dimensions must be positive',
     );

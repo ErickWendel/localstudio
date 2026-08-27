@@ -24,6 +24,7 @@ import type {
   ModelDownloadProgressDetails,
   ShareService,
 } from '../../services/contracts/interfaces';
+import { authoringRevision } from '../../services/automation/getAuthoringSlideRevision';
 import { modelSetupService } from '../../services/model-setup/modelSetupService';
 import { browserPromptService } from '../../services/prompting/browserPromptService';
 import { webGpuTextGenerationRuntime } from '../../services/prompting/webGpuTextGenerationRuntime';
@@ -2222,6 +2223,7 @@ export function PublicDeckViewer({
       ref={publicViewerRef}
       className={readyViewerClassName}
       aria-label={embed ? 'Embedded shared deck' : 'Public presentation'}
+      data-authoring-revision={authoringRevision.getPresentation(project)}
     >
       <ProjectVideoPreloader project={project} />
       <section className="public-deck-stage-shell" aria-label="Shared slide preview">

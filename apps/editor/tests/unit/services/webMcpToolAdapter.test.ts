@@ -61,6 +61,9 @@ describe('WebMcpToolAdapter', () => {
     expect(tools.find((tool) => tool.name === 'generate_image')?.description).toContain(
       'upsert_slide_content',
     );
+    expect(tools.find((tool) => tool.name === 'get_slide_preview')?.annotations?.readOnlyHint).toBe(
+      false,
+    );
   });
 
   it('runs cleanup callbacks returned by the browser runtime', () => {
@@ -114,5 +117,79 @@ describe('WebMcpToolAdapter', () => {
     expect(schema.additionalProperties).toBe(false);
     expect(schema.oneOf).toHaveLength(2);
     expect(schema.properties?.elements?.items?.oneOf).toHaveLength(5);
+  });
+
+  it('rejects invalid local-bridge input before dispatch', async () => {
+    const createPresentation = vi.fn(() => ({ projectId: 'project-1', name: 'WebMCP Deck' }));
+    const tool = createAdapter(createDelegate({ createPresentation }))
+      .createTools()
+      .find((candidate) => candidate.name === 'create_presentation');
+
+    expect(await tool?.execute({ width: 0, unexpected: true })).toEqual({
+      ok: false,
+      errorCode: 'invalid_input',
+      message: 'input.unexpected is not allowed.',
+    });
+    expect(createPresentation).not.toHaveBeenCalled();
+  });
+
+  it('enforces nested slide-upsert bounds and discriminated shapes', async () => {
+    const upsertSlideContent = vi.fn<AuthoringAutomationDelegate['upsertSlideContent']>(() =>
+      Promise.reject(new Error('not used')),
+    );
+    const tool = createAdapter(createDelegate({ upsertSlideContent }))
+      .createTools()
+      .find((candidate) => candidate.name === 'upsert_slide_content');
+
+    expect(
+      await tool?.execute({
+        requestId: 'invalid-upsert',
+        mode: 'replace',
+        slideId: 'slide-1',
+        slideNumber: 1,
+        elements: [],
+      }),
+    ).toMatchObject({
+      ok: false,
+      errorCode: 'invalid_input',
+    });
+    expect(upsertSlideContent).not.toHaveBeenCalled();
+  });
+
+  it('forwards the expected exact revision when publishing', async () => {
+    const publishPresentation = vi.fn(() =>
+      Promise.resolve({ publicUrl: 'https://example.test/deck' }),
+    );
+    const tool = createAdapter(createDelegate({ publishPresentation }))
+      .createTools()
+      .find((candidate) => candidate.name === 'publish_presentation');
+
+    expect(
+      await tool?.execute({
+        shareId: 'stable-share',
+        expectedRevision: 'presentation-abcd',
+      }),
+    ).toMatchObject({ ok: true, data: { status: 'queued' } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(publishPresentation).toHaveBeenCalledWith(
+      {
+        shareId: 'stable-share',
+        expectedRevision: 'presentation-abcd',
+      },
+      expect.any(Function),
+    );
+  });
+
+  it('does not let WebMCP callers self-authorize private recording audio', async () => {
+    const publishPresentation = vi.fn();
+    const tool = createAdapter(createDelegate({ publishPresentation }))
+      .createTools()
+      .find((candidate) => candidate.name === 'publish_presentation');
+
+    expect(await tool?.execute({ authorizedRecordingIds: ['private-recording'] })).toMatchObject({
+      errorCode: 'invalid_input',
+      ok: false,
+    });
+    expect(publishPresentation).not.toHaveBeenCalled();
   });
 });

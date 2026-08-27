@@ -1,5 +1,6 @@
 import { Bot, FileJson, Play, Radar, SendHorizontal } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
+import { type WebMcpShowcaseStep, webMcpShowcaseSteps } from './webMcpShowcaseSteps';
 
 interface WebMcpToolLike {
   call?: (input: Record<string, unknown>) => unknown;
@@ -10,73 +11,9 @@ interface WebMcpToolLike {
 }
 
 interface BrowserModelContext {
-  executeTool?: (tool: WebMcpToolLike, inputArgsJson: string) => unknown;
+  executeTool?: (tool: WebMcpToolLike, input: Record<string, unknown>) => unknown;
   getTools(options: { fromOrigins: string[] }): Promise<WebMcpToolLike[]>;
 }
-
-interface DemoStep {
-  input: Record<string, unknown>;
-  label: string;
-  toolName: string;
-}
-
-const demoSteps: DemoStep[] = [
-  {
-    label: 'Create presentation',
-    toolName: 'create_presentation',
-    input: { name: 'WebMCP Demo Deck' },
-  },
-  {
-    label: 'Upsert slide',
-    toolName: 'upsert_slide_content',
-    input: {
-      requestId: 'webmcp-showcase-slide-1',
-      slideNumber: 1,
-      mode: 'replace',
-      slide: {
-        name: 'Agent-native presentations',
-        background: { type: 'color', color: '#050D10' },
-      },
-      elements: [
-        {
-          elementId: 'showcase-title',
-          type: 'text',
-          frame: { x: 180, y: 260, width: 1560, height: 220 },
-          zIndex: 1,
-          content: { text: 'Presentations become agent-native' },
-          style: {
-            fontFamily: 'Orbitron',
-            fontSize: 88,
-            fontWeight: 800,
-            color: '#37FD76',
-            align: 'center',
-          },
-        },
-        {
-          elementId: 'showcase-body',
-          type: 'text',
-          frame: { x: 360, y: 560, width: 1200, height: 120 },
-          zIndex: 2,
-          content: {
-            text: 'Create, inspect, localize, export, and publish through browser-native tools.',
-          },
-          style: {
-            fontFamily: 'Open Sans',
-            fontSize: 42,
-            fontWeight: 600,
-            color: '#FFFFFF',
-            align: 'center',
-          },
-        },
-      ],
-    },
-  },
-  {
-    label: 'Read presentation state',
-    toolName: 'get_presentation_state',
-    input: { detail: 'elements', slideNumbers: [1] },
-  },
-];
 
 function getBrowserModelContext() {
   if (typeof document === 'undefined') return undefined;
@@ -100,13 +37,22 @@ function getLocalDemoTools(iframe: HTMLIFrameElement) {
   return isWebMcpToolLikeArray(tools) ? tools : undefined;
 }
 
+async function waitForLocalDemoTools(iframe: HTMLIFrameElement) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const tools = getLocalDemoTools(iframe);
+    if (tools?.length) return tools;
+    await new Promise((resolve) => window.setTimeout(resolve, 100));
+  }
+  return undefined;
+}
+
 function callTool(
   tool: WebMcpToolLike,
   input: Record<string, unknown>,
-  modelContext = getBrowserModelContext(),
+  useProtocolExecution: boolean,
 ) {
-  if (modelContext?.executeTool)
-    return Promise.resolve(modelContext.executeTool(tool, JSON.stringify(input)));
+  const modelContext = useProtocolExecution ? getBrowserModelContext() : undefined;
+  if (modelContext?.executeTool) return Promise.resolve(modelContext.executeTool(tool, input));
   const callable = tool.call ?? tool.execute ?? tool.invoke;
   if (!callable) throw new Error(`${tool.name} is not callable in this WebMCP runtime.`);
   return Promise.resolve(callable(input));
@@ -116,21 +62,33 @@ function formatPayload(value: unknown) {
   return JSON.stringify(value, null, 2);
 }
 
-function getDefaultCommandValue(step: DemoStep) {
+function getDefaultCommandValue(step: WebMcpShowcaseStep) {
   const primaryValue = step.input.name;
-  return typeof primaryValue === 'string' ? primaryValue : formatPayload(step.input);
+  return step.inputKind === 'name' && typeof primaryValue === 'string'
+    ? primaryValue
+    : formatPayload(step.input);
 }
 
-function getCommandInput(step: DemoStep, value: string) {
-  if (step.toolName === 'create_presentation') return { name: value };
-  if (step.toolName === 'upsert_slide_content') {
-    return JSON.parse(value) as Record<string, unknown>;
-  }
-  return step.input;
+function getCommandInput(step: WebMcpShowcaseStep, value: string) {
+  if (step.inputKind === 'name') return { name: value };
+  return JSON.parse(value) as Record<string, unknown>;
 }
 
-function hasCommandInput(step: DemoStep) {
-  return step.toolName !== 'get_presentation_state';
+function getOperationId(value: unknown) {
+  if (!value || typeof value !== 'object') return undefined;
+  const data = (value as { data?: unknown }).data;
+  if (!data || typeof data !== 'object') return undefined;
+  const operationId = (data as { operationId?: unknown }).operationId;
+  return typeof operationId === 'string' ? operationId : undefined;
+}
+
+function getToolFailure(value: unknown) {
+  if (!value || typeof value !== 'object') return undefined;
+  const result = value as { errorCode?: unknown; message?: unknown; ok?: unknown };
+  if (result.ok !== false) return undefined;
+  if (typeof result.message === 'string') return result.message;
+  if (typeof result.errorCode === 'string') return result.errorCode;
+  return 'The tool returned an unsuccessful result.';
 }
 
 export function WebMcpShowcasePage() {
@@ -140,18 +98,20 @@ export function WebMcpShowcasePage() {
   const [status, setStatus] = useState('Ready to discover page tools.');
   const [lastResult, setLastResult] = useState<string>('{}');
   const [isRunning, setIsRunning] = useState(false);
+  const [useProtocolExecution, setUseProtocolExecution] = useState(false);
   const [activeStepName, setActiveStepName] = useState<string | undefined>();
   const [focusedStepName, setFocusedStepName] = useState<string | undefined>();
   const [commandValues, setCommandValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(demoSteps.map((step) => [step.toolName, getDefaultCommandValue(step)])),
+    Object.fromEntries(
+      webMcpShowcaseSteps.map((step) => [step.toolName, getDefaultCommandValue(step)]),
+    ),
   );
   const editorSrc = '/editor/?webmcp=1&newProject=1';
   const toolsByName = useMemo(() => new Map(tools.map((tool) => [tool.name, tool])), [tools]);
 
-  function openStep(step: DemoStep) {
+  function openStep(step: WebMcpShowcaseStep) {
     setActiveStepName(step.toolName);
     setFocusedStepName(step.toolName);
-    if (!hasCommandInput(step)) void runStep(step);
   }
 
   function focusStep(toolName: string) {
@@ -176,10 +136,13 @@ export function WebMcpShowcasePage() {
     setStatus('Discovering tools from LocalStudio...');
     const modelContext = getBrowserModelContext();
     const iframeOrigin = new URL(iframe.src).origin;
-    const fallbackTools = getLocalDemoTools(iframe);
-    const discoveredTools = modelContext
+    const protocolTools = modelContext
       ? await modelContext.getTools({ fromOrigins: [iframeOrigin] })
-      : fallbackTools;
+      : undefined;
+    const discoveredTools = protocolTools?.length
+      ? protocolTools
+      : await waitForLocalDemoTools(iframe);
+    const usedProtocolTools = Boolean(protocolTools?.length);
     if (!discoveredTools) {
       setStatus(
         'No WebMCP runtime or same-origin demo tools found. Wait for the editor frame, then try again.',
@@ -188,8 +151,9 @@ export function WebMcpShowcasePage() {
       return;
     }
     setTools(discoveredTools);
+    setUseProtocolExecution(usedProtocolTools);
     setStatus(
-      modelContext
+      usedProtocolTools
         ? `Discovered ${discoveredTools.length} tools through WebMCP.`
         : `Discovered ${discoveredTools.length} tools through the local demo bridge.`,
     );
@@ -200,7 +164,7 @@ export function WebMcpShowcasePage() {
     );
   }
 
-  async function runStep(step: DemoStep, input = step.input) {
+  async function runStep(step: WebMcpShowcaseStep, commandValue: string) {
     const tool = toolsByName.get(step.toolName);
     if (!tool) {
       setStatus(`${step.toolName} has not been discovered yet.`);
@@ -210,11 +174,22 @@ export function WebMcpShowcasePage() {
     setIsRunning(true);
     setStatus(`Running ${step.label}...`);
     try {
-      const result = await callTool(tool, input);
-      setStatus(`${step.label} completed.`);
+      const input = getCommandInput(step, commandValue);
+      const result = await callTool(tool, input, useProtocolExecution);
       setLastResult(formatPayload(result));
+      const failure = getToolFailure(result);
+      setStatus(failure ? `${step.label} failed: ${failure}` : `${step.label} completed.`);
+      const operationId = getOperationId(result);
+      if (operationId) {
+        setCommandValues((current) => ({
+          ...current,
+          get_operation_status: formatPayload({ operationId, waitForChangeMs: 1000 }),
+        }));
+      }
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : `${step.label} failed.`);
+      setStatus(
+        `${step.label} failed: ${error instanceof Error ? error.message : 'Unknown error.'}`,
+      );
     } finally {
       setIsRunning(false);
     }
@@ -273,7 +248,7 @@ export function WebMcpShowcasePage() {
         </div>
 
         <div className="webmcp-workflow" aria-label="Demo workflow">
-          {demoSteps.map((step, index) => (
+          {webMcpShowcaseSteps.map((step, index) => (
             <div className="webmcp-step" key={step.toolName}>
               <button
                 ref={(element) => {
@@ -298,24 +273,38 @@ export function WebMcpShowcasePage() {
                 {step.toolName !== 'get_presentation_state' ? <Play size={16} /> : null}
                 <span>{step.label}</span>
               </button>
-              {activeStepName === step.toolName && hasCommandInput(step) ? (
+              {activeStepName === step.toolName ? (
                 <form
                   className="webmcp-step-command"
                   onSubmit={(event) => {
                     event.preventDefault();
-                    void runStep(step, getCommandInput(step, commandValues[step.toolName] ?? ''));
+                    void runStep(step, commandValues[step.toolName] ?? '');
                   }}
                 >
-                  <input
-                    aria-label={`${step.label} command input`}
-                    value={commandValues[step.toolName] ?? ''}
-                    onChange={(event) => {
-                      setCommandValues((current) => ({
-                        ...current,
-                        [step.toolName]: event.target.value,
-                      }));
-                    }}
-                  />
+                  {step.inputKind === 'name' ? (
+                    <input
+                      aria-label={`${step.label} command input`}
+                      value={commandValues[step.toolName] ?? ''}
+                      onChange={(event) => {
+                        setCommandValues((current) => ({
+                          ...current,
+                          [step.toolName]: event.target.value,
+                        }));
+                      }}
+                    />
+                  ) : (
+                    <textarea
+                      aria-label={`${step.label} command input`}
+                      rows={5}
+                      value={commandValues[step.toolName] ?? ''}
+                      onChange={(event) => {
+                        setCommandValues((current) => ({
+                          ...current,
+                          [step.toolName]: event.target.value,
+                        }));
+                      }}
+                    />
+                  )}
                   <button aria-label={`Send ${step.label}`} disabled={isRunning} type="submit">
                     <SendHorizontal size={15} />
                   </button>

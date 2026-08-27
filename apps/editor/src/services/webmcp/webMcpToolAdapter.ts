@@ -3,6 +3,7 @@ import { authoringAutomationController } from '../automation/authoringAutomation
 import type { SlideUpsertBatch } from '../automation/slideUpsertService';
 import { promptRecipes } from '../../ui/editor/prompting/promptRecipes';
 import { slideUpsertInputSchema } from './slideUpsertInputSchema';
+import { webMcpInputValidator } from './webMcpInputValidator';
 
 type ToolInput = Record<string, unknown>;
 type AuthoringAutomationController = InstanceType<
@@ -81,7 +82,7 @@ export class WebMcpToolAdapter {
   constructor(private readonly controller: AuthoringAutomationController) {}
 
   createTools(): WebMcpTool[] {
-    return [
+    const tools: WebMcpTool[] = [
       {
         name: 'create_presentation',
         title: 'Create presentation',
@@ -308,7 +309,7 @@ export class WebMcpToolAdapter {
         title: 'Focus slide preview',
         description:
           'Select and fit a slide in the visible editor for browser-vision inspection and return its render hash.',
-        annotations: readerAnnotations,
+        annotations: operationAnnotations,
         inputSchema: {
           type: 'object',
           additionalProperties: false,
@@ -415,12 +416,18 @@ export class WebMcpToolAdapter {
         inputSchema: {
           type: 'object',
           additionalProperties: false,
-          properties: { shareId: { type: 'string', minLength: 1, maxLength: 500 } },
+          properties: {
+            shareId: { type: 'string', minLength: 1, maxLength: 128 },
+            expectedRevision: { type: 'string', minLength: 1, maxLength: 200 },
+          },
         },
         execute: (input) =>
           this.controller.publishPresentation({
             ...(optionalStringInput(input, 'shareId')
               ? { shareId: optionalStringInput(input, 'shareId') }
+              : {}),
+            ...(optionalStringInput(input, 'expectedRevision')
+              ? { expectedRevision: optionalStringInput(input, 'expectedRevision') }
               : {}),
           }),
       },
@@ -448,6 +455,20 @@ export class WebMcpToolAdapter {
           }),
       },
     ];
+    return tools.map((tool) => ({
+      ...tool,
+      execute: (input) => {
+        const validationError = webMcpInputValidator.validate(tool.inputSchema, input);
+        if (validationError) {
+          return {
+            ok: false,
+            errorCode: 'invalid_input',
+            message: validationError,
+          };
+        }
+        return tool.execute(input);
+      },
+    }));
   }
 
   register(modelContext: WebMcpModelContext): () => void {

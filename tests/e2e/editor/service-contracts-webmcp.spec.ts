@@ -33,7 +33,6 @@ test('executes WebMCP tool adapter metadata contracts in the browser runtime', a
   expect(result.readOnlyNames).toEqual([
     'get_presentation_state',
     'list_authoring_catalog',
-    'get_slide_preview',
     'get_ai_model_status',
     'search_media',
     'get_operation_status',

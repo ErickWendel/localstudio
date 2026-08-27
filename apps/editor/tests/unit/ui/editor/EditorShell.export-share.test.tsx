@@ -550,6 +550,7 @@ describe('EditorShell export and share workflows', () => {
     )?.[1];
     expect(Object.keys(sharedProject?.recordings ?? {})).toEqual(['recording-old']);
     expect(sharedProject?.recordings?.['recording-old']?.segments[0]?.text).toBe('Old transcript');
+    expect(sharedProject?.recordings?.['recording-old']?.audio.publicShareAuthorized).toBe(true);
   });
 
   it('enters fullscreen presentation mode from the share panel', async () => {
