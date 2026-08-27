@@ -1,8 +1,7 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '../../../src/App';
 import { sampleProject } from '../../../src/domain/projects/sampleProject';
-import { TRANSLATION_LANGUAGE_OPTIONS } from '../../../src/ui/editor/translation/translationLanguages';
 
 const originalMatchMedia = window.matchMedia;
 
@@ -159,11 +158,17 @@ describe('App', () => {
         );
       }),
     );
-    window.history.replaceState({}, '', `/editor/s/${shareId}?src=${encodeURIComponent(sourceUrl)}`);
+    window.history.replaceState(
+      {},
+      '',
+      `/editor/s/${shareId}?src=${encodeURIComponent(sourceUrl)}`,
+    );
 
     render(<App />);
 
-    expect(await screen.findByLabelText('Public presentation')).toHaveClass('public-deck-viewer-present');
+    expect(await screen.findByLabelText('Public presentation')).toHaveClass(
+      'public-deck-viewer-present',
+    );
     expect(screen.getByText('1 / 1')).toBeInTheDocument();
   });
 
@@ -187,11 +192,17 @@ describe('App', () => {
         );
       }),
     );
-    window.history.replaceState({}, '', `/editor/?share=${shareId}&src=${encodeURIComponent(sourceUrl)}`);
+    window.history.replaceState(
+      {},
+      '',
+      `/editor/?share=${shareId}&src=${encodeURIComponent(sourceUrl)}`,
+    );
 
     render(<App />);
 
-    expect(await screen.findByLabelText('Public presentation')).toHaveClass('public-deck-viewer-present');
+    expect(await screen.findByLabelText('Public presentation')).toHaveClass(
+      'public-deck-viewer-present',
+    );
     expect(screen.getByText('1 / 1')).toBeInTheDocument();
   });
 
@@ -215,7 +226,11 @@ describe('App', () => {
         );
       }),
     );
-    window.history.replaceState({}, '', `/editor/embed/${shareId}?src=${encodeURIComponent(sourceUrl)}`);
+    window.history.replaceState(
+      {},
+      '',
+      `/editor/embed/${shareId}?src=${encodeURIComponent(sourceUrl)}`,
+    );
 
     render(<App />);
 
@@ -243,7 +258,11 @@ describe('App', () => {
         );
       }),
     );
-    window.history.replaceState({}, '', `/editor/?embed=${shareId}&src=${encodeURIComponent(sourceUrl)}`);
+    window.history.replaceState(
+      {},
+      '',
+      `/editor/?embed=${shareId}&src=${encodeURIComponent(sourceUrl)}`,
+    );
 
     render(<App />);
 
@@ -263,79 +282,86 @@ describe('App', () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create project' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create presentation' }));
 
-    expect(screen.getByLabelText('Create project command input')).toHaveValue('WebMCP Demo Deck');
-    expect(screen.getByRole('button', { name: 'Send Create project' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Create presentation command input')).toHaveValue(
+      'WebMCP Demo Deck',
+    );
+    expect(screen.getByRole('button', { name: 'Send Create presentation' })).toBeInTheDocument();
   });
 
-  it('shows the AI tools translation options for the WebMCP translate step', () => {
+  it('shows the complete JSON batch for the WebMCP upsert step', () => {
     window.history.replaceState({}, '', '/webmcp');
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Translate deck' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Upsert slide' }));
 
-    const languageSelect = screen.getByLabelText('Translate deck command input');
-    const options = within(languageSelect).getAllByRole<HTMLOptionElement>('option');
-    expect(options).toHaveLength(TRANSLATION_LANGUAGE_OPTIONS.length);
-    expect(options.map((option) => option.value)).toEqual(
-      TRANSLATION_LANGUAGE_OPTIONS.map((language) => language.code),
-    );
-    expect(screen.getByRole('option', { name: 'Hebrew (iw) 🇮🇱' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'Chinese (Traditional) (zh-Hant) 🇹🇼' })).toBeInTheDocument();
+    const batchInput = screen.getByLabelText<HTMLInputElement>('Upsert slide command input');
+    expect(batchInput.value).toContain('"requestId"');
+    expect(batchInput.value).toContain('"elements"');
   });
 
   it('runs the WebMCP snapshot step without showing a command input', async () => {
-    const executeSnapshot = vi.fn().mockResolvedValue({ project: { name: 'Demo' } });
+    const executeState = vi.fn().mockResolvedValue({ projectId: 'project-1', name: 'Demo' });
     window.history.replaceState({}, '', '/webmcp');
     Object.defineProperty(document, 'modelContext', {
       configurable: true,
       value: {
-        getTools: vi.fn().mockResolvedValue([
-          { name: 'get_project_snapshot', description: 'Read snapshot', execute: executeSnapshot },
-        ]),
+        getTools: vi
+          .fn()
+          .mockResolvedValue([
+            { name: 'get_presentation_state', description: 'Read state', execute: executeState },
+          ]),
       },
     });
 
     render(<App />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'get_project_snapshot' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Read snapshot' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'get_presentation_state' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Read presentation state' }));
 
     await waitFor(() => {
-      expect(executeSnapshot).toHaveBeenCalledWith({});
+      expect(executeState).toHaveBeenCalledWith({ detail: 'elements', slideNumbers: [1] });
     });
-    expect(screen.queryByLabelText('Read snapshot command input')).not.toBeInTheDocument();
-    expect(screen.getByText('Read snapshot completed.')).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('Read presentation state command input'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Read presentation state completed.')).toBeInTheDocument();
   });
 
   it('runs WebMCP descriptor tools through the browser runtime executor', async () => {
-    const createProjectTool = { name: 'create_project', description: 'Create project' };
+    const createPresentationTool = {
+      name: 'create_presentation',
+      description: 'Create presentation',
+    };
     const executeTool = vi.fn().mockResolvedValue({ ok: true, data: { name: 'Runtime Deck' } });
     window.history.replaceState({}, '', '/webmcp');
     Object.defineProperty(document, 'modelContext', {
       configurable: true,
       value: {
         executeTool,
-        getTools: vi.fn().mockResolvedValue([createProjectTool]),
+        getTools: vi.fn().mockResolvedValue([createPresentationTool]),
       },
     });
 
     render(<App />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Create project' }));
-    fireEvent.change(screen.getByLabelText('Create project command input'), {
+    fireEvent.click(await screen.findByRole('button', { name: 'Create presentation' }));
+    fireEvent.change(screen.getByLabelText('Create presentation command input'), {
       target: { value: 'Runtime Deck' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Send Create project' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send Create presentation' }));
 
     await waitFor(() => {
-      expect(executeTool).toHaveBeenCalledWith(createProjectTool, JSON.stringify({ name: 'Runtime Deck' }));
+      expect(executeTool).toHaveBeenCalledWith(
+        createPresentationTool,
+        JSON.stringify({ name: 'Runtime Deck' }),
+      );
     });
-    expect(screen.getByText('Create project completed.')).toBeInTheDocument();
+    expect(screen.getByText('Create presentation completed.')).toBeInTheDocument();
   });
 
   it('focuses the matching workflow step when a discovered tool is selected', async () => {
@@ -344,8 +370,8 @@ describe('App', () => {
       configurable: true,
       value: {
         getTools: vi.fn().mockResolvedValue([
-          { name: 'create_project', description: 'Create project', execute: vi.fn() },
-          { name: 'generate_slides', description: 'Generate slides', execute: vi.fn() },
+          { name: 'create_presentation', description: 'Create presentation', execute: vi.fn() },
+          { name: 'upsert_slide_content', description: 'Upsert slide', execute: vi.fn() },
         ]),
       },
     });
@@ -353,9 +379,9 @@ describe('App', () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'generate_slides' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'upsert_slide_content' }));
 
-    const stepButton = screen.getByRole('button', { name: 'Generate slide' });
+    const stepButton = screen.getByRole('button', { name: 'Upsert slide' });
     expect(stepButton).toHaveFocus();
     expect(stepButton).toHaveClass('webmcp-step-button-focused');
   });

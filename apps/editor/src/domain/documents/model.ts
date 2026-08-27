@@ -76,7 +76,18 @@ export interface Page {
   animationBuilds?: ElementAnimationBuild[];
   layoutId?: string;
   speakerNotes?: string;
+  semanticDescription?: SemanticSlideDescription;
   visible?: boolean;
+}
+
+export interface SemanticSlideDescription {
+  text: string;
+  language: string;
+  generatedAt: string;
+  generator: string;
+  sourceRevision: string;
+  reviewed: boolean;
+  stale: boolean;
 }
 
 export type PageBackground =
@@ -140,6 +151,7 @@ export interface ElementAnimationBuild {
   direction?: AnimationDirection;
   durationMs?: number;
   kind?: ElementAnimationKind;
+  order?: number;
   lineDrawDirection?: AnimationLineDrawDirection;
   mediaAction?: 'play';
 }
