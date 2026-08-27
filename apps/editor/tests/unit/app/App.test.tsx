@@ -340,7 +340,9 @@ describe('App', () => {
       name: 'create_presentation',
       description: 'Create presentation',
     };
-    const executeTool = vi.fn().mockResolvedValue({ ok: true, data: { name: 'Runtime Deck' } });
+    const executeTool = vi
+      .fn()
+      .mockResolvedValue(JSON.stringify({ ok: true, data: { name: 'Runtime Deck' } }));
     window.history.replaceState({}, '', '/webmcp');
     Object.defineProperty(document, 'modelContext', {
       configurable: true,
@@ -360,7 +362,10 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send Create presentation' }));
 
     await waitFor(() => {
-      expect(executeTool).toHaveBeenCalledWith(createPresentationTool, { name: 'Runtime Deck' });
+      expect(executeTool).toHaveBeenCalledWith(
+        createPresentationTool,
+        JSON.stringify({ name: 'Runtime Deck' }),
+      );
     });
     expect(screen.getByText('Create presentation completed.')).toBeInTheDocument();
   });
@@ -420,7 +425,7 @@ describe('App', () => {
       name: step.toolName,
       description: step.label,
     }));
-    const executeTool = vi.fn().mockResolvedValue({ ok: true, data: {} });
+    const executeTool = vi.fn().mockResolvedValue(JSON.stringify({ ok: true, data: {} }));
     window.history.replaceState({}, '', '/webmcp');
     Object.defineProperty(document, 'modelContext', {
       configurable: true,
@@ -439,7 +444,11 @@ describe('App', () => {
       fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${step.label}$`) }));
       fireEvent.click(screen.getByRole('button', { name: new RegExp(`^Send ${step.label}$`) }));
       await waitFor(() => expect(executeTool).toHaveBeenCalledTimes(index + 1));
-      expect(executeTool).toHaveBeenNthCalledWith(index + 1, tools[index], step.input);
+      expect(executeTool).toHaveBeenNthCalledWith(
+        index + 1,
+        tools[index],
+        JSON.stringify(step.input),
+      );
     }
   });
 });

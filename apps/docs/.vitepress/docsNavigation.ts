@@ -65,6 +65,7 @@ const guideSidebar: DefaultTheme.SidebarItem[] = [
           { text: 'Prompt to Image', link: '/guide/work-with-web-ai/prompt/image' },
         ],
       },
+      { text: 'WebMCP Authoring', link: '/guide/work-with-web-ai/webmcp' },
       { text: 'Translate Decks', link: '/guide/work-with-web-ai/translate-decks' },
       { text: 'Edit Images', link: '/guide/work-with-web-ai/edit-images' },
     ],

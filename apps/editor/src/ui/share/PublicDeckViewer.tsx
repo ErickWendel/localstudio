@@ -1474,6 +1474,7 @@ export function PublicDeckViewer({
     loaded: 0,
     total: 0,
   });
+  const [publishedAuthoringRevision, setPublishedAuthoringRevision] = useState<string>();
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [animationPreview, setAnimationPreview] = useState<AnimationPreviewState | undefined>();
   const animationQueueRef = useRef<ElementAnimationBuild[]>([]);
@@ -1842,12 +1843,16 @@ export function PublicDeckViewer({
     void shareService.getShare(shareId).then(async (record) => {
       if (!isActive) return;
       if (!record) {
+        setPublishedAuthoringRevision(undefined);
         setViewerState({ status: 'missing' });
         setActivePageIndex(0);
         setAnimationPreview(undefined);
         return;
       }
       const shareRecord = record;
+      setPublishedAuthoringRevision(
+        shareRecord.authoringRevision ?? authoringRevision.getPresentation(shareRecord.project),
+      );
 
       let hasStartedPlayback = false;
       function startPlaybackWhenReady(loaded: number, total: number) {
@@ -2223,7 +2228,9 @@ export function PublicDeckViewer({
       ref={publicViewerRef}
       className={readyViewerClassName}
       aria-label={embed ? 'Embedded shared deck' : 'Public presentation'}
-      data-authoring-revision={authoringRevision.getPresentation(project)}
+      data-authoring-revision={
+        publishedAuthoringRevision ?? authoringRevision.getPresentation(project)
+      }
     >
       <ProjectVideoPreloader project={project} />
       <section className="public-deck-stage-shell" aria-label="Shared slide preview">

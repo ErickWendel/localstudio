@@ -317,8 +317,10 @@ describe('PresentationPublishingCapability', () => {
 
     const pointerUrl = 'https://storage.test/localstudio/mirrors/shares/stable-share.json';
     const pointer = JSON.parse(await uploadedBodies.get(pointerUrl)!.text()) as {
+      authoringRevision: string;
       project: ProjectDocument;
     };
+    expect(pointer.authoringRevision).toBe('revision-1');
     expect(pointer.project.assets.hero?.objectUrl).toBe(
       'https://cdn.test/localstudio/mirrors/Untitled%20AI%20Deck/assets/hero.png',
     );

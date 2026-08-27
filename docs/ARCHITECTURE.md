@@ -35,6 +35,54 @@ needed for public links and remote reimport.
 
 LocalStudio.dev uses Chrome built-in AI APIs when available and WebGPU/Hugging Face model paths for local browser execution. Some flows require Chrome experimental features, WebGPU support, and enough local disk space for model caches.
 
+## WebMCP Authoring
+
+WebMCP is an editor-route integration over the existing application services. It does not create a second presentation
+backend or bypass the visible editor state.
+
+```text
+/editor/webmcp showcase
+  -> document.modelContext.getTools inside the same-origin editor iframe
+  -> localStudioWebMcpTools fallback for manual browser testing
+
+/editor/?webmcp=1
+  -> WebMcpToolAdapter
+     -> strict JSON-schema validation
+     -> AuthoringAutomationController
+        -> immediate readers/mutations
+        -> AuthoringOperationRegistry for long-running work
+        -> authoring capability services
+           -> native PPTX import, font, translation, description, media,
+              model, render/export, mirror, and share services
+```
+
+The adapter owns the 15 public tool names, titles, descriptions, schemas, and annotations. Inputs are validated again
+inside the application boundary. Reader tools are marked read-only; results that may contain imported or user-authored
+content are marked untrusted. The controller normalizes every call to `{ ok, data }` or `{ ok: false, errorCode,
+message }`.
+
+Browser-native discovery is document-scoped. Agents should open `/editor/?webmcp=1` directly; the showcase intentionally
+queries its child iframe and presents the same contracts as editable cards for manual testing.
+
+Long-running import, translation, description, image-generation, model-preparation, export, and publish actions return
+an operation ID. `get_operation_status` exposes monotonic progress, byte or slide totals when available, bounded
+warnings, and a typed final result. Immediate tools include bounded state/catalog/media reads, slide upsert, preview,
+and AI status.
+
+PowerPoint automation is deliberately URL-only. The import capability accepts HTTP(S), including presigned object
+storage and localhost URLs, validates status/MIME/name/size, streams bounded bytes, and then reuses the native parser,
+mapper, warning, normalization, and font pipeline. Human disk import remains a separate File-menu workflow; WebMCP
+never accepts binary data, a disk path, or a staged local file.
+
+Publishing clones and mirrors one exact authoring revision before updating a stable share pointer. It rejects an
+optional stale `expectedRevision` guard and also aborts if the live project changes during upload. The public payload can
+include mirrored fonts, semantic descriptions with revision freshness, transcript context, and only recording audio
+authorized by the existing share policy. The returned result contains the public and embed URLs, published revision,
+bounded context, media manifest, and warnings.
+
+The public viewer currently consumes the published artifact but does not register attendee WebMCP tools. Slide-context,
+transcript-search, recording-info, and navigation tools are a future, separately authorized read-only surface.
+
 ## Build Output
 
 The production build places the landing app at the site root and the editor under `/editor/`. GitHub Pages builds can set `LOCALSTUDIO_BASE_PATH` so assets work from a project Pages subpath.
