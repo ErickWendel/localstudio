@@ -51,9 +51,9 @@
 }
 
 .webmcp-step-command input,
+.webmcp-step-command textarea,
 .webmcp-step-command select {
   min-width: 0;
-  height: 38px;
   padding: 0 11px;
   border: 1px solid rgba(122, 255, 199, 0.2);
   border-radius: 6px;
@@ -64,11 +64,23 @@
   line-height: 18px;
 }
 
+.webmcp-step-command input,
+.webmcp-step-command select {
+  height: 38px;
+}
+
+.webmcp-step-command textarea {
+  min-height: 112px;
+  padding-block: 9px;
+  resize: vertical;
+}
+
 .webmcp-step-command select {
   cursor: pointer;
 }
 
 .webmcp-step-command input:focus,
+.webmcp-step-command textarea:focus,
 .webmcp-step-command select:focus {
   border-color: rgba(159, 255, 210, 0.66);
   box-shadow: 0 0 0 2px rgba(159, 255, 210, 0.12);

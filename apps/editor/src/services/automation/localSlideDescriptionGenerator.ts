@@ -6,7 +6,7 @@ import {
 import type {
   LocalSlideDescriptionGenerator,
   SlideDescriptionScene,
-} from './deckLocalizationCapability';
+} from './deckDescriptionCapability';
 
 function buildGroundedPrompt(input: {
   instruction: string;

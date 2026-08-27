@@ -262,6 +262,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       segmentCount: recording.segments.length,
     }));
   const latestShareRecordingId = shareRecordingOptions[0]?.id;
+  const persistTranscriptRecording = vm.addTranscriptRecording;
   const imageGenerationState = vm.modelStates.find(
     (model) => model.id === imageGenerationModel.IMAGE_GENERATION_MODEL_ID,
   );
@@ -351,6 +352,15 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       sharePublishPromiseRef.current = { promise: publishPromise, selectedRecordingId };
       try {
         const nextShare = await publishPromise;
+        const selectedRecording = selectedRecordingId
+          ? vm.project.recordings?.[selectedRecordingId]
+          : undefined;
+        if (selectedRecording && !selectedRecording.audio.publicShareAuthorized) {
+          persistTranscriptRecording({
+            ...selectedRecording,
+            audio: { ...selectedRecording.audio, publicShareAuthorized: true },
+          });
+        }
         lastPublishedShareSelectionRef.current = {
           projectSignature: getProjectPublishSignature(vm.project),
           selectedRecordingId,
@@ -374,7 +384,13 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         setSharePublishProgress(undefined);
       }
     },
-    [services.analyticsService, services.shareService, shareMetadata?.shareId, vm.project],
+    [
+      services.analyticsService,
+      services.shareService,
+      shareMetadata?.shareId,
+      persistTranscriptRecording,
+      vm.project,
+    ],
   );
 
   function getReusablePublishedShare(
@@ -1679,6 +1695,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       mirror: services.mirrorService,
       repository: services.projectRepository,
       share: services.shareService,
+      isRawRecordingAuthorized: (recording) => recording.audio.publicShareAuthorized === true,
     });
     const delegate = createAuthoringAutomationDelegate({
       assetCapabilities,

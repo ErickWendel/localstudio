@@ -1,9 +1,7 @@
 import type { ProjectDocument, TextElement } from '../../../src/domain/documents/model';
 import { sampleProject } from '../../../src/domain/projects/sampleProject';
-import {
-  deckLocalizationCapability,
-  type LocalSlideDescriptionGenerator,
-} from '../../../src/services/automation/deckLocalizationCapability';
+import { type LocalSlideDescriptionGenerator } from '../../../src/services/automation/deckDescriptionCapability';
+import { deckLocalizationCapability } from '../../../src/services/automation/deckLocalizationCapability';
 import type { TranslatorService } from '../../../src/services/contracts/interfaces';
 
 function createText(id: string, text: string, visible = true): TextElement {
@@ -95,8 +93,12 @@ function createHarness(overrides?: {
   };
   project.pages[0]!.semanticDescription!.sourceRevision = getRevision(project, 'page-1');
   const prepareTranslation = vi.fn(() => Promise.resolve());
+  const detectLanguage = vi.fn((text: string) => {
+    void text;
+    return Promise.resolve('en');
+  });
   const translatorService: TranslatorService = {
-    detectLanguage: vi.fn(() => Promise.resolve('en')),
+    detectLanguage,
     prepareTranslation,
     translate: vi.fn(
       overrides?.translate ??
@@ -117,6 +119,7 @@ function createHarness(overrides?: {
   });
   return {
     capability,
+    detectLanguage,
     getProject: () => project,
     prepareTranslation,
     report,
@@ -127,6 +130,23 @@ function createHarness(overrides?: {
 }
 
 describe('deckLocalizationCapability', () => {
+  it('bounds language-detection samples while collecting them', async () => {
+    const harness = createHarness();
+    const project = harness.getProject();
+    harness.setProject({
+      ...project,
+      elements: {
+        ...project.elements,
+        'visible-title': createText('visible-title', 'A'.repeat(100_000)),
+      },
+    });
+
+    await harness.capability.translateDeckAndNotes({ targetLanguage: 'en' }, harness.report);
+
+    expect(harness.detectLanguage).toHaveBeenCalledOnce();
+    expect(harness.detectLanguage.mock.calls[0]?.[0]).toHaveLength(4_000);
+  });
+
   it('translates visible text, notes, and semantic descriptions while preserving structure', async () => {
     const harness = createHarness();
     const before = harness.getProject();
@@ -340,7 +360,7 @@ describe('deckLocalizationCapability', () => {
     );
   });
 
-  it('records deterministic fallback descriptions as English for non-English requests', async () => {
+  it('translates deterministic grounded fallback descriptions into the requested language', async () => {
     const harness = createHarness({
       generator: {
         id: 'local-model',
@@ -355,11 +375,15 @@ describe('deckLocalizationCapability', () => {
 
     expect(result.descriptions[0]).toMatchObject({
       generator: 'deterministic-scene-graph-v1',
-      language: 'en',
+      language: 'pt-BR',
     });
     expect(harness.getProject().pages[1]?.semanticDescription).toMatchObject({
-      language: 'en',
+      language: 'pt-BR',
     });
+    expect(harness.getProject().pages[1]?.semanticDescription?.text).toContain(
+      'translated into Portuguese',
+    );
+    expect(harness.prepareTranslation).toHaveBeenCalledWith('en', 'pt-BR');
   });
 
   it('bounds detailed result entries while retaining complete slide counts', async () => {

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '../../../src/App';
 import { sampleProject } from '../../../src/domain/projects/sampleProject';
+import { webMcpShowcaseSteps } from '../../../src/ui/webmcp/webMcpShowcaseSteps';
 
 const originalMatchMedia = window.matchMedia;
 
@@ -295,14 +296,16 @@ describe('App', () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Upsert slide' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Upsert slide content' }));
 
-    const batchInput = screen.getByLabelText<HTMLInputElement>('Upsert slide command input');
+    const batchInput = screen.getByLabelText<HTMLTextAreaElement>(
+      'Upsert slide content command input',
+    );
     expect(batchInput.value).toContain('"requestId"');
     expect(batchInput.value).toContain('"elements"');
   });
 
-  it('runs the WebMCP snapshot step without showing a command input', async () => {
+  it('runs the WebMCP snapshot step with editable JSON input', async () => {
     const executeState = vi.fn().mockResolvedValue({ projectId: 'project-1', name: 'Demo' });
     window.history.replaceState({}, '', '/webmcp');
     Object.defineProperty(document, 'modelContext', {
@@ -320,15 +323,16 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
     fireEvent.click(await screen.findByRole('button', { name: 'get_presentation_state' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Read presentation state' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Inspect presentation state' }));
+    expect(
+      screen.getByLabelText<HTMLTextAreaElement>('Inspect presentation state command input').value,
+    ).toContain('"detail": "elements"');
+    fireEvent.click(screen.getByRole('button', { name: 'Send Inspect presentation state' }));
 
     await waitFor(() => {
       expect(executeState).toHaveBeenCalledWith({ detail: 'elements', slideNumbers: [1] });
     });
-    expect(
-      screen.queryByLabelText('Read presentation state command input'),
-    ).not.toBeInTheDocument();
-    expect(screen.getByText('Read presentation state completed.')).toBeInTheDocument();
+    expect(screen.getByText('Inspect presentation state completed.')).toBeInTheDocument();
   });
 
   it('runs WebMCP descriptor tools through the browser runtime executor', async () => {
@@ -356,10 +360,7 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send Create presentation' }));
 
     await waitFor(() => {
-      expect(executeTool).toHaveBeenCalledWith(
-        createPresentationTool,
-        JSON.stringify({ name: 'Runtime Deck' }),
-      );
+      expect(executeTool).toHaveBeenCalledWith(createPresentationTool, { name: 'Runtime Deck' });
     });
     expect(screen.getByText('Create presentation completed.')).toBeInTheDocument();
   });
@@ -381,8 +382,64 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
     fireEvent.click(await screen.findByRole('button', { name: 'upsert_slide_content' }));
 
-    const stepButton = screen.getByRole('button', { name: 'Upsert slide' });
+    const stepButton = screen.getByRole('button', { name: 'Upsert slide content' });
     expect(stepButton).toHaveFocus();
     expect(stepButton).toHaveClass('webmcp-step-button-focused');
+  });
+
+  it('reports malformed JSON from an editable WebMCP card', async () => {
+    window.history.replaceState({}, '', '/webmcp');
+    Object.defineProperty(document, 'modelContext', {
+      configurable: true,
+      value: {
+        getTools: vi.fn().mockResolvedValue([
+          {
+            name: 'list_authoring_catalog',
+            description: 'List catalog',
+            execute: vi.fn(),
+          },
+        ]),
+      },
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
+    await screen.findByRole('button', { name: 'list_authoring_catalog' });
+    fireEvent.click(screen.getByRole('button', { name: 'List authoring catalog' }));
+    fireEvent.change(screen.getByLabelText('List authoring catalog command input'), {
+      target: { value: '{' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send List authoring catalog' }));
+
+    expect(await screen.findByText(/List authoring catalog failed:/)).toBeInTheDocument();
+  });
+
+  it('dispatches the editable payload for every WebMCP showcase card', async () => {
+    const tools = webMcpShowcaseSteps.map((step) => ({
+      name: step.toolName,
+      description: step.label,
+    }));
+    const executeTool = vi.fn().mockResolvedValue({ ok: true, data: {} });
+    window.history.replaceState({}, '', '/webmcp');
+    Object.defineProperty(document, 'modelContext', {
+      configurable: true,
+      value: {
+        executeTool,
+        getTools: vi.fn().mockResolvedValue(tools),
+      },
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
+    await screen.findByRole('button', { name: 'publish_presentation' });
+    for (let index = 0; index < webMcpShowcaseSteps.length; index += 1) {
+      const step = webMcpShowcaseSteps[index]!;
+      fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${step.label}$`) }));
+      fireEvent.click(screen.getByRole('button', { name: new RegExp(`^Send ${step.label}$`) }));
+      await waitFor(() => expect(executeTool).toHaveBeenCalledTimes(index + 1));
+      expect(executeTool).toHaveBeenNthCalledWith(index + 1, tools[index], step.input);
+    }
   });
 });

@@ -10,7 +10,10 @@ export function createProjectForSelectedShareRecording(
   return {
     ...project,
     recordings: {
-      [selectedRecordingId]: selectedRecording,
+      [selectedRecordingId]: {
+        ...selectedRecording,
+        audio: { ...selectedRecording.audio, publicShareAuthorized: true },
+      },
     },
   };
 }

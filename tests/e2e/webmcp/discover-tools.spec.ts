@@ -2,9 +2,37 @@ import { WebMcpPage } from '../pages/webmcp.page';
 import { expect, test, withIsolatedDevServer } from '../support/journey-test';
 
 const getServer = withIsolatedDevServer(test);
+const showcaseCards = [
+  ['create_presentation', 'Create presentation'],
+  ['get_presentation_state', 'Inspect presentation state'],
+  ['import_powerpoint_from_url', 'Import PowerPoint from URL'],
+  ['translate_deck_and_notes', 'Translate deck and notes'],
+  ['generate_deck_detailed_description', 'Generate detailed descriptions'],
+  ['list_authoring_catalog', 'List authoring catalog'],
+  ['upsert_slide_content', 'Upsert slide content'],
+  ['generate_image', 'Generate image'],
+  ['get_slide_preview', 'Focus slide preview'],
+  ['get_ai_model_status', 'Inspect AI model status'],
+  ['prepare_ai_models', 'Prepare AI models'],
+  ['search_media', 'Search stock media'],
+  ['export_presentation', 'Export presentation'],
+  ['publish_presentation', 'Publish presentation'],
+  ['get_operation_status', 'Get operation status'],
+] as const;
 
 test.describe('WebMCP discover tools journey', () => {
   test('discovers tools and inspects the workflow without running AI actions', async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(document, 'modelContext', {
+        configurable: true,
+        value: {
+          executeTool: () => {
+            throw new Error('The native runtime must not execute bridge-discovered tools.');
+          },
+          getTools: () => Promise.resolve([]),
+        },
+      });
+    });
     const webmcp = new WebMcpPage(page, getServer().baseURL);
     await webmcp.gotoShowcase();
 
@@ -16,9 +44,16 @@ test.describe('WebMCP discover tools journey', () => {
         .getByRole('heading', { name: 'LocalStudio.dev' }),
     ).toBeVisible();
     await page.getByRole('button', { name: 'Discover tools' }).click();
-    await expect(page.getByText(/Discovered \d+ tools/)).toBeVisible();
+    await expect(
+      page.getByText('Discovered 15 tools through the local demo bridge.'),
+    ).toBeVisible();
     await expect(page.getByRole('button', { name: 'create_presentation' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'import_powerpoint_from_disk' })).toHaveCount(0);
+    const workflow = page.locator('[aria-label="Demo workflow"]');
+    await expect(workflow.getByRole('button')).toHaveCount(15);
+    for (const [, label] of showcaseCards) {
+      await expect(workflow.getByRole('button', { name: label })).toBeVisible();
+    }
     await page.getByRole('button', { name: 'Create presentation' }).click();
     await expect(page.getByLabel('Create presentation command input')).toBeVisible();
     await page.getByLabel('Create presentation command input').fill('E2E WebMCP project');
@@ -28,10 +63,10 @@ test.describe('WebMCP discover tools journey', () => {
       'E2E WebMCP project',
     );
 
-    await page.getByRole('button', { name: 'Upsert slide' }).click();
-    await expect(page.getByLabel('Upsert slide command input')).toBeVisible();
-    await page.getByRole('button', { name: 'Send Upsert slide' }).click();
-    await expect(page.getByText('Upsert slide completed.')).toBeVisible();
+    await page.getByRole('button', { name: 'Upsert slide content' }).click();
+    await expect(page.getByLabel('Upsert slide content command input')).toBeVisible();
+    await page.getByRole('button', { name: 'Send Upsert slide content' }).click();
+    await expect(page.getByText('Upsert slide content completed.')).toBeVisible();
     await expect(page.getByRole('region', { name: 'Last WebMCP result' })).toContainText(
       'idempotentReplay',
     );
@@ -42,13 +77,72 @@ test.describe('WebMCP discover tools journey', () => {
     ).toBeVisible();
 
     await page.getByRole('button', { name: 'get_presentation_state' }).click();
-    await page.getByRole('button', { name: 'Read presentation state' }).click();
-    await expect(page.getByText('Read presentation state completed.')).toBeVisible();
+    await expect(page.getByLabel('Inspect presentation state command input')).toBeVisible();
+    await page.getByRole('button', { name: 'Send Inspect presentation state' }).click();
+    await expect(page.getByText('Inspect presentation state completed.')).toBeVisible();
     await expect(page.getByRole('region', { name: 'Last WebMCP result' })).toContainText(
       'E2E WebMCP project',
     );
     await expect(page.getByRole('region', { name: 'Last WebMCP result' })).toContainText(
       'Presentations become agent-native',
     );
+
+    await page.getByRole('button', { name: 'Prepare AI models' }).click();
+    await page.getByLabel('Prepare AI models command input').fill('{"modelIds":[]}');
+    await page.getByRole('button', { name: 'Send Prepare AI models' }).click();
+    await expect(page.getByText('Prepare AI models completed.')).toBeVisible();
+    await page.getByRole('button', { name: 'Get operation status' }).click();
+    await expect(page.getByLabel('Get operation status command input')).not.toHaveValue(
+      /run-an-operation-first/,
+    );
+    await expect(page.getByLabel('Get operation status command input')).toHaveValue(/operationId/);
+
+    await page.getByRole('button', { name: 'Search stock media' }).click();
+    await page.getByRole('button', { name: 'Send Search stock media' }).click();
+    await expect(page.getByText(/Search stock media failed:/)).toBeVisible();
+  });
+
+  test('dispatches every editable showcase card through the browser WebMCP runtime', async ({
+    page,
+  }) => {
+    await page.addInitScript((cards) => {
+      const calls: Array<{ input: Record<string, unknown>; name: string }> = [];
+      Object.defineProperty(window, '__webMcpShowcaseCalls', {
+        configurable: true,
+        value: calls,
+      });
+      const tools = cards.map(([name, label]) => ({ description: label, name }));
+      Object.defineProperty(document, 'modelContext', {
+        configurable: true,
+        value: {
+          executeTool: (tool: { name: string }, input: Record<string, unknown>) => {
+            calls.push({ input, name: tool.name });
+            return Promise.resolve({ data: { toolName: tool.name }, ok: true });
+          },
+          getTools: () => Promise.resolve(tools),
+        },
+      });
+    }, showcaseCards);
+    const webmcp = new WebMcpPage(page, getServer().baseURL);
+    await webmcp.gotoShowcase();
+    await page.getByRole('button', { name: 'Discover tools' }).click();
+    await expect(page.getByText('Discovered 15 tools through WebMCP.')).toBeVisible();
+
+    for (const [, label] of showcaseCards) {
+      await page.getByRole('button', { name: label, exact: true }).click();
+      await page.getByRole('button', { name: `Send ${label}`, exact: true }).click();
+      await expect(page.getByText(`${label} completed.`)).toBeVisible();
+    }
+
+    const calls = await page.evaluate(
+      () =>
+        (
+          window as typeof window & {
+            __webMcpShowcaseCalls: Array<{ input: Record<string, unknown>; name: string }>;
+          }
+        ).__webMcpShowcaseCalls,
+    );
+    expect(calls.map(({ name }) => name)).toEqual(showcaseCards.map(([name]) => name));
+    expect(calls.every(({ input }) => input && typeof input === 'object')).toBe(true);
   });
 });

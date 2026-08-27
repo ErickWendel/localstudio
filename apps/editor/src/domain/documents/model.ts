@@ -204,6 +204,7 @@ export interface TranscriptRecordingAudio {
   fileName?: string;
   objectUrl?: string;
   storage?: 'file' | 'inline' | 'remote';
+  publicShareAuthorized?: boolean;
 }
 
 export interface TranscriptSegment {

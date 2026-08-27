@@ -101,6 +101,7 @@ async function startOperation(page: Page, name: string, input: Record<string, un
 
 test.describe('production WebMCP authoring capabilities', () => {
   test('runs the non-visual catalog and publishes the exact authored revision', async ({
+    browser,
     context,
     page,
   }) => {
@@ -242,24 +243,36 @@ test.describe('production WebMCP authoring capabilities', () => {
     expect(sharePointer).toBeDefined();
     expect(sharePointer?.body.toString('utf8')).toContain(sentinel);
 
-    const publicPage = await context.newPage();
-    await publicPage.goto(published.result!.publicUrl);
-    await expect(publicPage.getByRole('main', { name: 'Public presentation' })).toBeVisible({
-      timeout: 30_000,
-    });
-    const renderedSlide = publicPage.getByRole('region', { name: 'Shared slide preview' });
-    await expect(renderedSlide).toBeVisible();
-    const renderedLayers = await renderedSlide.locator('canvas').evaluateAll((canvases) =>
-      canvases.map((canvas) => (canvas as HTMLCanvasElement).toDataURL('image/png')),
-    );
-    expect(renderedLayers.length).toBeGreaterThan(0);
-    expect(
-      Math.max(
-        ...renderedLayers.map((dataUrl) =>
-          readPngVisiblePixelRatio(Buffer.from(dataUrl.split(',')[1] ?? '', 'base64')),
+    const publicContext = await browser.newContext();
+    try {
+      await remoteMirrorShareRoutes.install(publicContext, storedObjects);
+      const publicPage = await publicContext.newPage();
+      await publicPage.goto(published.result!.publicUrl);
+      await expect(publicPage.getByRole('main', { name: 'Public presentation' })).toBeVisible({
+        timeout: 30_000,
+      });
+      await expect(publicPage.getByRole('main', { name: 'Public presentation' })).toHaveAttribute(
+        'data-authoring-revision',
+        expectedRevision,
+      );
+      const renderedSlide = publicPage.getByRole('region', { name: 'Shared slide preview' });
+      await expect(renderedSlide).toBeVisible();
+      const renderedLayers = await renderedSlide
+        .locator('canvas')
+        .evaluateAll((canvases) =>
+          canvases.map((canvas) => (canvas as HTMLCanvasElement).toDataURL('image/png')),
+        );
+      expect(renderedLayers.length).toBeGreaterThan(0);
+      expect(
+        Math.max(
+          ...renderedLayers.map((dataUrl) =>
+            readPngVisiblePixelRatio(Buffer.from(dataUrl.split(',')[1] ?? '', 'base64')),
+          ),
         ),
-      ),
-    ).toBeGreaterThan(0.005);
+      ).toBeGreaterThan(0.005);
+    } finally {
+      await publicContext.close();
+    }
 
     await page.evaluate(() => {
       Object.defineProperty(window, 'Worker', { configurable: true, value: undefined });
