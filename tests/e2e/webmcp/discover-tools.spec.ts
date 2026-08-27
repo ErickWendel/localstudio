@@ -106,7 +106,7 @@ test.describe('WebMCP discover tools journey', () => {
     page,
   }) => {
     await page.addInitScript((cards) => {
-      const calls: Array<{ input: Record<string, unknown>; name: string }> = [];
+      const calls: Array<{ inputArguments: string; name: string }> = [];
       Object.defineProperty(window, '__webMcpShowcaseCalls', {
         configurable: true,
         value: calls,
@@ -115,9 +115,27 @@ test.describe('WebMCP discover tools journey', () => {
       Object.defineProperty(document, 'modelContext', {
         configurable: true,
         value: {
-          executeTool: (tool: { name: string }, input: Record<string, unknown>) => {
-            calls.push({ input, name: tool.name });
-            return Promise.resolve({ data: { toolName: tool.name }, ok: true });
+          executeTool: (tool: { name: string }, inputArguments: string) => {
+            if (typeof inputArguments !== 'string') {
+              throw new Error('Failed to parse input arguments.');
+            }
+            JSON.parse(inputArguments);
+            calls.push({ inputArguments, name: tool.name });
+            if (tool.name === 'search_media') {
+              return Promise.resolve(
+                JSON.stringify({
+                  errorCode: 'missing_integration',
+                  message: 'Configure Unsplash before searching.',
+                  ok: false,
+                }),
+              );
+            }
+            if (tool.name === 'prepare_ai_models') {
+              return Promise.resolve(
+                JSON.stringify({ data: { operationId: 'operation-native-1' }, ok: true }),
+              );
+            }
+            return Promise.resolve(JSON.stringify({ data: { toolName: tool.name }, ok: true }));
           },
           getTools: () => Promise.resolve(tools),
         },
@@ -131,18 +149,34 @@ test.describe('WebMCP discover tools journey', () => {
     for (const [, label] of showcaseCards) {
       await page.getByRole('button', { name: label, exact: true }).click();
       await page.getByRole('button', { name: `Send ${label}`, exact: true }).click();
-      await expect(page.getByText(`${label} completed.`)).toBeVisible();
+      if (label === 'Search stock media') {
+        await expect(
+          page.getByText('Search stock media failed: Configure Unsplash before searching.'),
+        ).toBeVisible();
+      } else {
+        await expect(page.getByText(`${label} completed.`)).toBeVisible();
+      }
+      if (label === 'Get operation status') {
+        await expect(page.getByLabel('Get operation status command input')).toHaveValue(
+          /operation-native-1/,
+        );
+      }
     }
 
     const calls = await page.evaluate(
       () =>
         (
           window as typeof window & {
-            __webMcpShowcaseCalls: Array<{ input: Record<string, unknown>; name: string }>;
+            __webMcpShowcaseCalls: Array<{ inputArguments: string; name: string }>;
           }
         ).__webMcpShowcaseCalls,
     );
     expect(calls.map(({ name }) => name)).toEqual(showcaseCards.map(([name]) => name));
-    expect(calls.every(({ input }) => input && typeof input === 'object')).toBe(true);
+    expect(
+      calls.every(({ inputArguments }) => {
+        const input: unknown = JSON.parse(inputArguments);
+        return input && typeof input === 'object';
+      }),
+    ).toBe(true);
   });
 });

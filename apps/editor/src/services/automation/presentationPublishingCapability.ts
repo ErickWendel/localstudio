@@ -221,6 +221,7 @@ export class PresentationPublishingCapability<TConfig> {
     let share: ShareMetadata;
     try {
       const options = {
+        authoringRevision: snapshot.revision,
         onProgress: (progress: SharePublishProgress) =>
           report({
             stage: 'pointer',

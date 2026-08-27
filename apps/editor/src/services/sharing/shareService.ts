@@ -1,6 +1,7 @@
 import { publicBasePath } from '../../app/routing/publicBasePath';
 import { collectReferencedAssetIds } from '../../domain/assets/assetUsage';
 import type { ProjectDocument } from '../../domain/documents/model';
+import { authoringRevision } from '../automation/getAuthoringSlideRevision';
 import type {
   ShareMetadata,
   SharePublishOptions,
@@ -153,6 +154,7 @@ export class BrowserShareService implements ShareService {
       if (payload.shareId !== shareId || !payload.project) return null;
       return {
         shareId,
+        ...(payload.authoringRevision ? { authoringRevision: payload.authoringRevision } : {}),
         createdAt: payload.createdAt ?? new Date().toISOString(),
         updatedAt: payload.updatedAt ?? payload.createdAt ?? new Date().toISOString(),
         project: cloneProject(payload.project),
@@ -212,6 +214,7 @@ export class BrowserShareService implements ShareService {
     const payload: PublicSharePayload = {
       schemaVersion: 1,
       shareId,
+      authoringRevision: options?.authoringRevision ?? authoringRevision.getPresentation(project),
       createdAt: now,
       updatedAt: now,
       project: projectForShare,

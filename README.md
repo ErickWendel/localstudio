@@ -28,12 +28,12 @@ LocalStudio.dev runs in the browser without a product backend. Your deck remains
 as normal assets, translated text updates in place, presenter controls can run from the companion PWA, spoken sessions
 can become accessible transcripts, and project files can be saved to a local folder you control.
 
-| Landing section | What it proves |
-| --- | --- |
-| Watch the workflow | Import, prompt, generate images, translate, save locally, present, record, and share. |
-| Feature showcase | Every AI action returns to editable slide layers inside the same deck. |
-| WebMCP Showcase | Host pages and agents can discover editor tools and drive the same local-first surface. |
-| Requirements | Chrome-first browser APIs, WebGPU model caches, and local storage expectations. |
+| Landing section    | What it proves                                                                          |
+| ------------------ | --------------------------------------------------------------------------------------- |
+| Watch the workflow | Import, prompt, generate images, translate, save locally, present, record, and share.   |
+| Feature showcase   | Every AI action returns to editable slide layers inside the same deck.                  |
+| WebMCP Showcase    | Host pages and agents can discover editor tools and drive the same local-first surface. |
+| Requirements       | Chrome-first browser APIs, WebGPU model caches, and local storage expectations.         |
 
 ![LocalStudio prompt-to-slide workflow](apps/landing/public/demo-prompt-to-slides.gif)
 
@@ -44,15 +44,15 @@ can become accessible transcripts, and project files can be saved to a local fol
 The landing page now walks through the full LocalStudio loop with short product demos. Each step keeps the deck editable
 instead of producing a locked screenshot.
 
-| Workflow | Demo |
-| --- | --- |
-| Bring your own PPT | ![Import an existing presentation into LocalStudio](apps/landing/public/demo-bring-your-ppt.gif) |
-| Prompt-to-slide | ![Generate editable slides from a prompt](apps/landing/public/demo-prompt-to-slides.gif) |
-| Prompt-to-image | ![Generate an image asset and keep composing the same slide](apps/landing/public/demo-prompt-to-image.gif) |
-| Translate | ![Translate slide text in place](apps/landing/public/demo-translate.gif) |
-| Work locally | ![Save project files locally and browse version history](apps/landing/public/demo-work-locally.gif) |
-| Present with confidence | ![Run a LocalStudio deck in presenter mode](apps/landing/public/demo-present-with-confidence.gif) |
-| Share your presentation | ![Publish a portable LocalStudio deck preview](apps/landing/public/demo-share-presentation.gif) |
+| Workflow                | Demo                                                                                                       |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Bring your own PPT      | ![Import an existing presentation into LocalStudio](apps/landing/public/demo-bring-your-ppt.gif)           |
+| Prompt-to-slide         | ![Generate editable slides from a prompt](apps/landing/public/demo-prompt-to-slides.gif)                   |
+| Prompt-to-image         | ![Generate an image asset and keep composing the same slide](apps/landing/public/demo-prompt-to-image.gif) |
+| Translate               | ![Translate slide text in place](apps/landing/public/demo-translate.gif)                                   |
+| Work locally            | ![Save project files locally and browse version history](apps/landing/public/demo-work-locally.gif)        |
+| Present with confidence | ![Run a LocalStudio deck in presenter mode](apps/landing/public/demo-present-with-confidence.gif)          |
+| Share your presentation | ![Publish a portable LocalStudio deck preview](apps/landing/public/demo-share-presentation.gif)            |
 
 ### Feature showcase
 
@@ -112,14 +112,20 @@ need explicit control over the model behind each workflow.
 
 ## WebMCP Showcase
 
-WebMCP exposes LocalStudio actions as semantic browser tools, so an external page can discover capabilities, create a
-project, generate assets, translate the deck, and read the resulting project snapshot.
+WebMCP exposes LocalStudio's production authoring actions as semantic browser tools, so an agent and a person can work
+against the same visible editor state. The showcase provides an editable test card for every shipped tool.
 
-- Tool discovery from the editor iframe
-- Prompt, image, translate, and snapshot actions
-- Same local-first editor surface behind every call
+- 15 tools covering creation, bounded inspection, URL-based PPTX import, translation, semantic descriptions, catalogs,
+  exact slide upserts, image assets, visible previews, AI model status/preparation, stock media, exports, publishing, and
+  long-running operation status
+- Strict JSON schemas, bounded results, read-only/untrusted annotations, and visible editor updates
+- Exact-revision public publishing with mirrored fonts, descriptions, transcripts, and authorized recording audio
+- Same-origin discovery from the editor iframe, plus a local bridge for manual testing in browsers without WebMCP
 
 [Open the WebMCP showcase](https://localstudio.dev/webmcp/)
+
+[Read the WebMCP authoring guide](apps/docs/guide/work-with-web-ai/webmcp.md) for setup, all tool contracts, operation
+polling, the URL-only PowerPoint boundary, the manual/judge workflow, and troubleshooting.
 
 ![WebMCP showcase](apps/landing/public/webmcp-showcase.png)
 
@@ -130,6 +136,8 @@ LocalStudio runs in the browser, but modern browser AI workflows still need the 
 - Chrome browser is recommended for Chrome-first browser AI and file system APIs.
 - At least 10GB free storage is recommended for model weights, browser-managed caches, generated assets, and local project history.
 - Local folder permissions are required for project persistence flows.
+- WebMCP requires a supporting in-app browser or an experimental Chrome build with WebMCP testing enabled.
+- WebMCP publishing requires S3-compatible remote storage; stock search requires configured Unsplash or GIPHY keys.
 
 ## S3-Compatible Project Setup
 

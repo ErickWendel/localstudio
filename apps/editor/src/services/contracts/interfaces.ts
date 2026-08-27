@@ -336,11 +336,13 @@ export interface SharePublishProgress {
 }
 
 export interface SharePublishOptions {
+  authoringRevision?: string;
   onProgress?: (progress: SharePublishProgress) => void;
 }
 
 export interface ShareRecord {
   shareId: string;
+  authoringRevision?: string;
   createdAt: string;
   updatedAt: string;
   project: ProjectDocument;
