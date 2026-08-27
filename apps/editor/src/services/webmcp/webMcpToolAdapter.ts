@@ -308,7 +308,7 @@ export class WebMcpToolAdapter {
         title: 'Focus slide preview',
         description:
           'Select and fit a slide in the visible editor for browser-vision inspection and return its render hash.',
-        annotations: readerAnnotations,
+        annotations: operationAnnotations,
         inputSchema: {
           type: 'object',
           additionalProperties: false,
@@ -415,12 +415,18 @@ export class WebMcpToolAdapter {
         inputSchema: {
           type: 'object',
           additionalProperties: false,
-          properties: { shareId: { type: 'string', minLength: 1, maxLength: 500 } },
+          properties: {
+            shareId: { type: 'string', minLength: 1, maxLength: 128 },
+            expectedRevision: { type: 'string', minLength: 1, maxLength: 200 },
+          },
         },
         execute: (input) =>
           this.controller.publishPresentation({
             ...(optionalStringInput(input, 'shareId')
               ? { shareId: optionalStringInput(input, 'shareId') }
+              : {}),
+            ...(optionalStringInput(input, 'expectedRevision')
+              ? { expectedRevision: optionalStringInput(input, 'expectedRevision') }
               : {}),
           }),
       },

@@ -3,6 +3,12 @@ import { sampleProject } from '../../domain/projects/sampleProject';
 import type { FontImportService } from '../contracts/interfaces';
 import { createPrefixedId } from '../ids/idUtils';
 import type { AuthoringAutomationDelegate } from './authoringAutomationController';
+import type { AuthoringAssetCapabilities } from './createAuthoringAssetCapabilities';
+import type { deckLocalizationCapability } from './deckLocalizationCapability';
+import type { createAuthoringVisualCapability } from './authoringVisualCapability';
+import type { PowerPointUrlImportService } from './powerPointUrlImportService';
+import type { PresentationPublishingCapability } from './presentationPublishingCapability';
+import { authoringRevision } from './getAuthoringSlideRevision';
 import {
   slideUpsertService,
   type SlideMediaContentInput,
@@ -10,10 +16,15 @@ import {
 } from './slideUpsertService';
 
 interface CreateAuthoringDelegateOptions {
+  assetCapabilities?: AuthoringAssetCapabilities | undefined;
+  deckLocalization?: ReturnType<typeof deckLocalizationCapability.create> | undefined;
   fontImportService: FontImportService;
   getProject(): ProjectDocument;
   replaceProject(project: ProjectDocument): void;
   applyProject(project: ProjectDocument, activePageId?: string): void;
+  powerPointUrlImportService?: PowerPointUrlImportService | undefined;
+  publishingCapability?: PresentationPublishingCapability<unknown> | undefined;
+  visualCapability?: ReturnType<typeof createAuthoringVisualCapability> | undefined;
 }
 
 const builtInFonts = new Set(['arial', 'inter', 'open sans', 'orbitron']);
@@ -42,41 +53,6 @@ function validateRemoteUrl(value: string) {
   return url.toString();
 }
 
-function getSlideRevision(project: ProjectDocument, pageId: string) {
-  const page = project.pages.find((candidate) => candidate.id === pageId);
-  if (!page) return '';
-  const elements = page.elementIds.map((elementId) => project.elements[elementId]);
-  const assetIds = new Set<string>();
-  if (page.background.type === 'asset') assetIds.add(page.background.assetId);
-  elements.forEach((element) => {
-    if (element && 'assetId' in element && typeof element.assetId === 'string') {
-      assetIds.add(element.assetId);
-    }
-  });
-  const value = JSON.stringify({
-    page: {
-      name: page.name,
-      width: page.width,
-      height: page.height,
-      background: page.background,
-      elementIds: page.elementIds,
-      transition: page.transition,
-      animationBuilds: page.animationBuilds,
-      layoutId: page.layoutId,
-      speakerNotes: page.speakerNotes,
-      visible: page.visible,
-    },
-    elements,
-    assets: [...assetIds].sort().map((assetId) => project.assets[assetId]),
-  });
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return `slide-${(hash >>> 0).toString(16)}`;
-}
-
 function createPresentationState(
   project: ProjectDocument,
   input: Parameters<AuthoringAutomationDelegate['getPresentationState']>[0],
@@ -98,7 +74,7 @@ function createPresentationState(
   const elementCursor = Math.floor(Math.max(0, input.elementCursor ?? 0));
   const elementLimit = Math.floor(Math.max(1, Math.min(50, input.elementLimit ?? 25)));
   const slides = candidates.slice(0, detailed ? 5 : 20).map(({ page, slideNumber }) => {
-    const revision = getSlideRevision(project, page.id);
+    const revision = authoringRevision.getSlide(project, page.id);
     return {
       slideId: page.id,
       slideNumber,
@@ -135,7 +111,7 @@ function createPresentationState(
     projectId: project.id,
     name: project.name,
     updatedAt: project.updatedAt,
-    revision: `${project.id}:${project.updatedAt}`,
+    revision: authoringRevision.getPresentation(project),
     pageCount: project.pages.length,
     assetCount: Object.keys(project.assets).length,
     recordingCount: Object.keys(project.recordings ?? {}).length,
@@ -150,6 +126,12 @@ function createPresentationState(
 export function createAuthoringAutomationDelegate(
   options: CreateAuthoringDelegateOptions,
 ): AuthoringAutomationDelegate {
+  const assetCapabilities = options.assetCapabilities;
+  const deckLocalization = options.deckLocalization;
+  const powerPointUrlImportService = options.powerPointUrlImportService;
+  const publishingCapability = options.publishingCapability;
+  const visualCapability = options.visualCapability;
+
   function resolveMedia(
     input: SlideMediaContentInput,
     context: { elementId: string; type: 'gif' | 'image' | 'video' },
@@ -163,7 +145,10 @@ export function createAuthoringAutomationDelegate(
       return Promise.resolve(asset);
     }
     if (input.mediaRef) {
-      throw new Error('mediaRef insertion will be enabled with search_media in #175.');
+      if (!assetCapabilities) {
+        throw new Error('Stock media is not configured for this editor.');
+      }
+      return assetCapabilities.resolveMediaRef(input.mediaRef);
     }
     if (!input.url) throw new Error(`${context.elementId} needs assetId or url.`);
     return Promise.resolve({
@@ -208,6 +193,58 @@ export function createAuthoringAutomationDelegate(
     getPresentationState(input) {
       return createPresentationState(options.getProject(), input);
     },
+
+    ...(powerPointUrlImportService
+      ? {
+          importPowerPointFromUrl: (
+            input: Parameters<
+              NonNullable<AuthoringAutomationDelegate['importPowerPointFromUrl']>
+            >[0],
+            report: Parameters<
+              NonNullable<AuthoringAutomationDelegate['importPowerPointFromUrl']>
+            >[1],
+          ) => powerPointUrlImportService.importPowerPointFromUrl(input, report),
+        }
+      : {}),
+
+    ...(deckLocalization
+      ? {
+          translateDeckAndNotes: (
+            input: Parameters<NonNullable<AuthoringAutomationDelegate['translateDeckAndNotes']>>[0],
+            report: Parameters<
+              NonNullable<AuthoringAutomationDelegate['translateDeckAndNotes']>
+            >[1],
+          ) => deckLocalization.translateDeckAndNotes(input, report),
+          generateDeckDetailedDescription: (
+            input: Parameters<
+              NonNullable<AuthoringAutomationDelegate['generateDeckDetailedDescription']>
+            >[0],
+            report: Parameters<
+              NonNullable<AuthoringAutomationDelegate['generateDeckDetailedDescription']>
+            >[1],
+          ) => deckLocalization.generateDeckDetailedDescription(input, report),
+        }
+      : {}),
+
+    ...(assetCapabilities
+      ? {
+          listAuthoringCatalog: (
+            input: Parameters<NonNullable<AuthoringAutomationDelegate['listAuthoringCatalog']>>[0],
+          ) => assetCapabilities.listAuthoringCatalog(input),
+          generateImage: (
+            input: Parameters<NonNullable<AuthoringAutomationDelegate['generateImage']>>[0],
+            report: Parameters<NonNullable<AuthoringAutomationDelegate['generateImage']>>[1],
+          ) => assetCapabilities.generateImage(input, report),
+          getAiModelStatus: () => assetCapabilities.getAiModelStatus(),
+          prepareAiModels: (
+            input: Parameters<NonNullable<AuthoringAutomationDelegate['prepareAiModels']>>[0],
+            report: Parameters<NonNullable<AuthoringAutomationDelegate['prepareAiModels']>>[1],
+          ) => assetCapabilities.prepareAiModels(input, report),
+          searchMedia: (
+            input: Parameters<NonNullable<AuthoringAutomationDelegate['searchMedia']>>[0],
+          ) => assetCapabilities.searchMedia(input),
+        }
+      : {}),
 
     async upsertSlideContent(batch: SlideUpsertBatch) {
       let project = options.getProject();
@@ -262,5 +299,23 @@ export function createAuthoringAutomationDelegate(
       options.applyProject(result.project, result.slideId);
       return result;
     },
+    ...(visualCapability
+      ? {
+          getSlidePreview: (input: { slideNumber: number }) =>
+            visualCapability.getSlidePreview(input),
+          exportPresentation: (
+            input: Parameters<NonNullable<AuthoringAutomationDelegate['exportPresentation']>>[0],
+            report: Parameters<NonNullable<AuthoringAutomationDelegate['exportPresentation']>>[1],
+          ) => visualCapability.exportPresentation(input, report),
+        }
+      : {}),
+    ...(publishingCapability
+      ? {
+          publishPresentation: (
+            input: Parameters<NonNullable<AuthoringAutomationDelegate['publishPresentation']>>[0],
+            report: Parameters<NonNullable<AuthoringAutomationDelegate['publishPresentation']>>[1],
+          ) => publishingCapability.publish(input, report),
+        }
+      : {}),
   };
 }

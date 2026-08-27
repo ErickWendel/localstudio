@@ -77,7 +77,10 @@ export interface AuthoringAutomationDelegate {
     report: AuthoringProgressReporter,
   ): Promise<unknown>;
   publishPresentation?(
-    input: { shareId?: string | undefined },
+    input: {
+      shareId?: string | undefined;
+      expectedRevision?: string | undefined;
+    },
     report: AuthoringProgressReporter,
   ): Promise<unknown>;
 }
@@ -296,7 +299,10 @@ class AuthoringAutomationController {
     );
   }
 
-  publishPresentation(input: { shareId?: string | undefined }) {
+  publishPresentation(input: {
+    shareId?: string | undefined;
+    expectedRevision?: string | undefined;
+  }) {
     if (!this.delegate.publishPresentation) return this.pending('publish_presentation', 177);
     const run = this.delegate.publishPresentation.bind(this.delegate);
     return operationStarted(

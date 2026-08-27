@@ -7,8 +7,22 @@ import type { ProjectDocument, TranscriptRecording } from '../../../domain/docum
 import { pageVisibility } from '../../../domain/documents/pageVisibility';
 import type { ShareMetadata, SharePublishProgress } from '../../../services/contracts/interfaces';
 import { analyticsModelProperties } from '../../../services/analytics/analyticsModelProperties';
-import { authoringAutomationController } from '../../../services/automation/authoringAutomationController';
+import {
+  authoringAutomationController,
+  type AuthoringProgressReporter,
+} from '../../../services/automation/authoringAutomationController';
+import {
+  createAuthoringVisualCapability,
+  type AuthoringExportInput,
+  type AuthoringRenderedExportResult,
+} from '../../../services/automation/authoringVisualCapability';
 import { createAuthoringAutomationDelegate } from '../../../services/automation/createAuthoringAutomationDelegate';
+import { createAuthoringAssetCapabilities } from '../../../services/automation/createAuthoringAssetCapabilities';
+import { deckLocalizationCapability } from '../../../services/automation/deckLocalizationCapability';
+import { authoringRevision } from '../../../services/automation/getAuthoringSlideRevision';
+import { localSlideDescriptionGenerator } from '../../../services/automation/localSlideDescriptionGenerator';
+import { PowerPointUrlImportService } from '../../../services/automation/powerPointUrlImportService';
+import { PresentationPublishingCapability } from '../../../services/automation/presentationPublishingCapability';
 import { imageGenerationModel } from '../../../services/image-generation/imageGenerationModel';
 import {
   WebMcpToolAdapter,
@@ -35,6 +49,7 @@ import { SettingsPanel } from '../panels/SettingsPanel';
 import { VersionHistoryPanel } from '../panels/VersionHistoryPanel';
 import { presentationMovieControls, type MovieHoldState } from '../media/presentationMovieControls';
 import { useEditorViewModel, type OperationNoticeState } from '../state/useEditorViewModel';
+import { editorViewModelProject } from '../state/editorViewModelProject';
 import { SharePanel } from '../../share/SharePanel';
 import { copyShareText } from '../../share/shareClipboard';
 import {
@@ -119,6 +134,17 @@ export function EditorShell({ services }: EditorShellProps) {
 function EditorDesktopShell({ services }: EditorShellProps) {
   const vm = useEditorViewModel(services);
   const authoringVmRef = useRef(vm);
+  const authoringVisualRuntimeRef = useRef<
+    | {
+        exportRendered(
+          project: ProjectDocument,
+          input: AuthoringExportInput,
+          report: AuthoringProgressReporter,
+        ): Promise<AuthoringRenderedExportResult>;
+        focusSlide(pageId: string): Promise<void>;
+      }
+    | undefined
+  >(undefined);
   const presenterTranscriptionLanguage =
     vm.translationLanguageOptions.find(
       (language) => language.code === vm.translationTargetLanguage,
@@ -158,7 +184,9 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const [presenterViewError, setPresenterViewError] = useState<string | undefined>();
   const [imageExportPanelOpen, setImageExportPanelOpen] = useState(false);
   const [imageExportNotice, setImageExportNotice] = useState<OperationNoticeState | undefined>();
-  const [imageExportFrame, setImageExportFrame] = useState<ImageExportFrame | undefined>();
+  const [imageExportRender, setImageExportRender] = useState<
+    { frame: ImageExportFrame; project: ProjectDocument } | undefined
+  >();
   const [isExportingImages, setIsExportingImages] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [sharePanelOpen, setSharePanelOpen] = useState(false);
@@ -168,6 +196,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   >();
   const stageRef = useRef<Konva.Stage>(null);
   const imageExportStageRef = useRef<Konva.Stage>(null);
+  const renderedExportInProgressRef = useRef(false);
   const workspaceRef = useRef<HTMLElement>(null);
   const slideFrameRef = useRef<HTMLDivElement>(null);
   const windowedExitHintTimerRef = useRef<number | undefined>(undefined);
@@ -418,9 +447,10 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   async function renderImageExportFrame(
     frame: ImageExportFrame,
     format: ImageExportOptions['format'],
+    sourceProject = vm.project,
   ) {
-    await editorImageExport.preloadFrameImages(vm.project, frame.pageId);
-    setImageExportFrame(frame);
+    await editorImageExport.preloadFrameImages(sourceProject, frame.pageId);
+    setImageExportRender({ frame, project: sourceProject });
     await editorImageExport.waitForNextPaint();
     const dataUrl = imageExportStageRef.current?.toDataURL(
       format === 'jpeg'
@@ -431,10 +461,85 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     return editorImageExport.dataUrlToBytes(dataUrl);
   }
 
+  async function exportRenderedForAutomation(
+    project: ProjectDocument,
+    input: AuthoringExportInput,
+    report: AuthoringProgressReporter,
+  ): Promise<AuthoringRenderedExportResult> {
+    if (input.format === 'pptx') throw new Error('PowerPoint uses the native export pipeline.');
+    if (renderedExportInProgressRef.current) {
+      throw new Error('Another rendered export is running.');
+    }
+    const imageFormat = input.format === 'pdf' ? 'png' : input.format;
+    const frames = editorImageExport.getFrames({
+      getPageImageFileName: services.exportService.getPageImageFileName.bind(
+        services.exportService,
+      ),
+      options: {
+        format: imageFormat,
+        includeAnimationFrames: input.includeAnimationFrames ?? false,
+        slideRange: 'all',
+      },
+      project,
+    });
+    if (frames.length === 0) throw new Error('The presentation has no slides to export.');
+    renderedExportInProgressRef.current = true;
+    if (input.format === 'pdf') setIsExportingPdf(true);
+    else setIsExportingImages(true);
+    try {
+      const renderedFrames: Array<{ bytes: Uint8Array; frame: ImageExportFrame }> = [];
+      for (const [index, frame] of frames.entries()) {
+        report({
+          stage: 'rendering-slides',
+          progress: 10 + Math.round(((index + 1) / frames.length) * 75),
+          current: index + 1,
+          total: frames.length,
+          detail: frame.fileName,
+        });
+        renderedFrames.push({
+          bytes: await renderImageExportFrame(frame, imageFormat, project),
+          frame,
+        });
+      }
+      if (input.format === 'pdf') {
+        const pages = renderedFrames.map(({ bytes, frame }) => {
+          const page = project.pages.find((candidate) => candidate.id === frame.pageId);
+          if (!page) throw new Error(`Could not find rendered slide ${frame.pageId}.`);
+          return {
+            bytes,
+            heightPoints: project.pageSizePoints?.height ?? page.height / 2,
+            widthPoints: project.pageSizePoints?.width ?? page.width / 2,
+          };
+        });
+        const { pdfExportService } = await import('../../../services/exporting/pdfExportService');
+        return {
+          blob: pdfExportService.createBlob(pages),
+          frameCount: renderedFrames.length,
+          slideCount: project.pages.length,
+          warnings: [],
+        };
+      }
+      return {
+        blob: editorImageExport.createZipBlob(
+          Object.fromEntries(renderedFrames.map(({ bytes, frame }) => [frame.fileName, bytes])),
+        ),
+        frameCount: renderedFrames.length,
+        slideCount: project.pages.length,
+        warnings: [],
+      };
+    } finally {
+      setImageExportRender(undefined);
+      renderedExportInProgressRef.current = false;
+      if (input.format === 'pdf') setIsExportingPdf(false);
+      else setIsExportingImages(false);
+    }
+  }
+
   async function exportImages(options: ImageExportOptions) {
-    if (isExportingImages || isExportingPdf) return;
+    if (renderedExportInProgressRef.current) return;
     const frames = getImageExportFrames(options);
     if (frames.length === 0) return;
+    renderedExportInProgressRef.current = true;
     setIsExportingImages(true);
     showImageExportNotice(
       {
@@ -460,7 +565,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         );
         archiveFiles[frame.fileName] = await renderImageExportFrame(frame, options.format);
       }
-      setImageExportFrame(undefined);
+      setImageExportRender(undefined);
       services.exportService.downloadBlob(
         editorImageExport.createZipBlob(archiveFiles),
         services.exportService.getImagesArchiveFileName(vm.project),
@@ -480,19 +585,21 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       const message = error instanceof Error ? error.message : 'Unknown export error.';
       showImageExportNotice({ message: `Image export failed: ${message}`, tone: 'error' });
     } finally {
-      setImageExportFrame(undefined);
+      setImageExportRender(undefined);
+      renderedExportInProgressRef.current = false;
       setIsExportingImages(false);
     }
   }
 
   async function exportPdf() {
-    if (isExportingImages || isExportingPdf) return;
+    if (renderedExportInProgressRef.current) return;
     const frames = getImageExportFrames({
       format: 'png',
       includeAnimationFrames: false,
       slideRange: 'all',
     });
     if (frames.length === 0) return;
+    renderedExportInProgressRef.current = true;
     setIsExportingPdf(true);
     showImageExportNotice(
       {
@@ -524,7 +631,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           widthPoints: vm.project.pageSizePoints?.width ?? page.width / 2,
         });
       }
-      setImageExportFrame(undefined);
+      setImageExportRender(undefined);
       const { pdfExportService } = await import(
         '../../../services/exporting/pdfExportService'
       );
@@ -540,7 +647,8 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       const message = error instanceof Error ? error.message : 'Unknown export error.';
       showImageExportNotice({ message: `PDF export failed: ${message}`, tone: 'error' });
     } finally {
-      setImageExportFrame(undefined);
+      setImageExportRender(undefined);
+      renderedExportInProgressRef.current = false;
       setIsExportingPdf(false);
     }
   }
@@ -1212,6 +1320,14 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   }, [vm.automation]);
 
   authoringVmRef.current = vm;
+  authoringVisualRuntimeRef.current = {
+    exportRendered: exportRenderedForAutomation,
+    async focusSlide(pageId: string) {
+      authoringVmRef.current.selectPage(pageId);
+      authoringVmRef.current.resetZoom();
+      await editorImageExport.waitForNextPaint();
+    },
+  };
 
   useEffect(() => {
     prepareProjectFontsForPublicShareRef.current = vm.prepareProjectFontsForPublicShare;
@@ -1498,12 +1614,82 @@ function EditorDesktopShell({ services }: EditorShellProps) {
 
   useEffect(() => {
     if (!editorShellBrowserUtils.isWebMcpProtocolEnabled()) return undefined;
-    const delegate = createAuthoringAutomationDelegate({
+    const getProject = () => automationDelegateRef.current.getState().project;
+    const applyProject = (project: ProjectDocument, activePageId?: string) =>
+      authoringVmRef.current.applyProjectForAutomation(project, activePageId);
+    const assetCapabilities = createAuthoringAssetCapabilities({
+      applyProject,
       fontImportService: services.fontImportService,
+      getProject,
+      imageGenerationService: services.imageGenerationService,
+      localFontMirrorService: services.localFontMirrorService,
+      modelSetupService: services.modelSetupService,
+      promptService: services.promptService,
+      stockMediaService: services.stockMediaService,
+      translatorService: services.translatorService,
+    });
+    const deckLocalization = deckLocalizationCapability.create({
+      applyProject,
+      descriptionGenerator: localSlideDescriptionGenerator.create(),
+      getProject,
+      getProjectRevision: authoringRevision.getPresentation,
+      getSlideRevision: authoringRevision.getSlide,
+      translatorService: services.translatorService,
+    });
+    const powerPointUrlImportService = new PowerPointUrlImportService({
+      applyProject: (project) => authoringVmRef.current.replaceProjectForAutomation(project),
+      fontImportService: services.fontImportService,
+      normalizeProject: editorViewModelProject.normalizeProjectDocument,
+      presentationImportService: services.presentationImportService,
+    });
+    const visualCapability = createAuthoringVisualCapability({
+      downloadBlob: services.exportService.downloadBlob.bind(services.exportService),
+      exportPowerPoint: (project, report) =>
+        services.presentationExportService.exportPowerPoint(project, {
+          onProgress: (progress) =>
+            report({
+              stage: progress.stage,
+              detail: progress.detail ?? progress.label,
+              progress:
+                progress.current !== undefined && progress.total
+                  ? Math.max(5, Math.min(90, Math.round((progress.current / progress.total) * 90)))
+                  : 20,
+              ...(progress.current !== undefined ? { current: progress.current } : {}),
+              ...(progress.total !== undefined ? { total: progress.total } : {}),
+            }),
+        }),
+      exportRendered: (project, input, report) => {
+        const runtime = authoringVisualRuntimeRef.current;
+        if (!runtime) throw new Error('The editor rendering surface is not ready.');
+        return runtime.exportRendered(project, input, report);
+      },
+      focusSlide: (pageId) => {
+        const runtime = authoringVisualRuntimeRef.current;
+        if (!runtime) throw new Error('The editor rendering surface is not ready.');
+        return runtime.focusSlide(pageId);
+      },
+      getActivePageId: () => authoringVmRef.current.activePageId,
       getProject: () => automationDelegateRef.current.getState().project,
+    });
+    const publishingCapability = new PresentationPublishingCapability({
+      getSnapshot: () => {
+        const project = getProject();
+        return { project, revision: authoringRevision.getPresentation(project) };
+      },
+      mirror: services.mirrorService,
+      repository: services.projectRepository,
+      share: services.shareService,
+    });
+    const delegate = createAuthoringAutomationDelegate({
+      assetCapabilities,
+      deckLocalization,
+      fontImportService: services.fontImportService,
+      getProject,
       replaceProject: (project) => authoringVmRef.current.replaceProjectForAutomation(project),
-      applyProject: (project, activePageId) =>
-        authoringVmRef.current.applyProjectForAutomation(project, activePageId),
+      applyProject,
+      powerPointUrlImportService,
+      publishingCapability,
+      visualCapability,
     });
     const adapter = new WebMcpToolAdapter(
       new authoringAutomationController.AuthoringAutomationController(delegate),
@@ -1517,7 +1703,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       unregister?.();
       delete demoWindow.localStudioWebMcpTools;
     };
-  }, [services.fontImportService]);
+  }, [services]);
 
   useEffect(
     () => () => {
@@ -2045,15 +2231,15 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         onZoomIn={vm.zoomIn}
         onZoomOut={vm.zoomOut}
       />
-      {imageExportFrame ? (
+      {imageExportRender ? (
         <div className="image-export-renderer" aria-hidden="true">
           <CanvasWorkspace
-            project={vm.project}
-            activePageId={imageExportFrame.pageId}
-            animationPreview={imageExportFrame.animationPreview}
+            project={imageExportRender.project}
+            activePageId={imageExportRender.frame.pageId}
+            animationPreview={imageExportRender.frame.animationPreview}
             canvasLabel="Image export canvas"
             readOnly
-            selection={{ elementIds: [], pageId: imageExportFrame.pageId }}
+            selection={{ elementIds: [], pageId: imageExportRender.frame.pageId }}
             stageRef={imageExportStageRef}
             zoomPercent={100}
           />

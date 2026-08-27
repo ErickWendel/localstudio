@@ -61,6 +61,9 @@ describe('WebMcpToolAdapter', () => {
     expect(tools.find((tool) => tool.name === 'generate_image')?.description).toContain(
       'upsert_slide_content',
     );
+    expect(tools.find((tool) => tool.name === 'get_slide_preview')?.annotations?.readOnlyHint).toBe(
+      false,
+    );
   });
 
   it('runs cleanup callbacks returned by the browser runtime', () => {
@@ -114,5 +117,29 @@ describe('WebMcpToolAdapter', () => {
     expect(schema.additionalProperties).toBe(false);
     expect(schema.oneOf).toHaveLength(2);
     expect(schema.properties?.elements?.items?.oneOf).toHaveLength(5);
+  });
+
+  it('forwards the expected exact revision when publishing', async () => {
+    const publishPresentation = vi.fn(() =>
+      Promise.resolve({ publicUrl: 'https://example.test/deck' }),
+    );
+    const tool = createAdapter(createDelegate({ publishPresentation }))
+      .createTools()
+      .find((candidate) => candidate.name === 'publish_presentation');
+
+    expect(
+      await tool?.execute({
+        shareId: 'stable-share',
+        expectedRevision: 'presentation-abcd',
+      }),
+    ).toMatchObject({ ok: true, data: { status: 'queued' } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(publishPresentation).toHaveBeenCalledWith(
+      {
+        shareId: 'stable-share',
+        expectedRevision: 'presentation-abcd',
+      },
+      expect.any(Function),
+    );
   });
 });
