@@ -13,7 +13,8 @@ export function WebMcpShowcasePage() {
     focusStep,
     focusedStepName,
     iframeRef,
-    isRunning,
+    isDiscovering,
+    isStepDisabled,
     openStep,
     runStep,
     selectedOptionIds,
@@ -44,7 +45,7 @@ export function WebMcpShowcasePage() {
         <div className="webmcp-action-row">
           <button
             className="webmcp-primary-action"
-            disabled={isRunning}
+            disabled={isDiscovering}
             type="button"
             onClick={() => {
               void discoverTools();
@@ -180,7 +181,7 @@ export function WebMcpShowcasePage() {
                               )}
                               <button
                                 aria-label={`Send ${step.label}`}
-                                disabled={isRunning}
+                                disabled={isStepDisabled(step)}
                                 type="submit"
                               >
                                 <SendHorizontal size={15} />

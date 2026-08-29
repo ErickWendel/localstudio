@@ -1,4 +1,5 @@
 export interface WebMcpShowcaseStep {
+  execution?: 'exclusive' | 'parallel';
   input: Record<string, unknown>;
   inputKind?: 'name' | undefined;
   label: string;
@@ -33,6 +34,7 @@ const sections: WebMcpShowcaseSection[] = [
       {
         label: 'Inspect AI model status',
         toolName: 'get_ai_model_status',
+        execution: 'parallel',
         input: {},
       },
     ],
@@ -125,6 +127,7 @@ const sections: WebMcpShowcaseSection[] = [
       {
         label: 'List authoring catalog',
         toolName: 'list_authoring_catalog',
+        execution: 'parallel',
         input: { kind: 'fonts' },
         options: [
           { id: 'fonts', label: 'Fonts', input: { kind: 'fonts' } },
@@ -158,6 +161,7 @@ const sections: WebMcpShowcaseSection[] = [
       {
         label: 'Search stock media',
         toolName: 'search_media',
+        execution: 'parallel',
         input: { kind: 'image', term: 'presentations', limit: 6 },
         options: [
           {
@@ -182,6 +186,7 @@ const sections: WebMcpShowcaseSection[] = [
       {
         label: 'Focus slide preview',
         toolName: 'get_slide_preview',
+        execution: 'parallel',
         input: { slideNumber: 1 },
       },
     ],
@@ -206,11 +211,13 @@ const sections: WebMcpShowcaseSection[] = [
       {
         label: 'Inspect presentation state',
         toolName: 'get_presentation_state',
+        execution: 'parallel',
         input: { detail: 'elements', slideNumbers: [1] },
       },
       {
         label: 'Get operation status',
         toolName: 'get_operation_status',
+        execution: 'parallel',
         input: { operationId: 'run-an-operation-first', waitForChangeMs: 1000 },
       },
     ],

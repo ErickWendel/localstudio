@@ -137,7 +137,11 @@ export function useWebMcpShowcase() {
   const [discoveryStatus, setDiscoveryStatus] = useState('Ready to discover page tools.');
   const [actionStatuses, setActionStatuses] = useState<Record<string, string>>({});
   const [actionResults, setActionResults] = useState<Record<string, string>>({});
-  const [isRunning, setIsRunning] = useState(false);
+  const [isDiscovering, setIsDiscovering] = useState(false);
+  const runningStepNamesRef = useRef(new Set<string>());
+  const [runningStepNames, setRunningStepNames] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   const [useProtocolExecution, setUseProtocolExecution] = useState(false);
   const [activeStepName, setActiveStepName] = useState<string | undefined>();
   const [focusedStepName, setFocusedStepName] = useState<string | undefined>();
@@ -148,6 +152,15 @@ export function useWebMcpShowcase() {
     ),
   );
   const toolsByName = useMemo(() => new Map(tools.map((tool) => [tool.name, tool])), [tools]);
+
+  function isStepDisabled(step: WebMcpShowcaseStep) {
+    if (runningStepNames.has(step.toolName)) return true;
+    if (step.execution === 'parallel') return false;
+    return webMcpShowcaseCatalog.steps.some(
+      (catalogStep) =>
+        catalogStep.execution !== 'parallel' && runningStepNames.has(catalogStep.toolName),
+    );
+  }
 
   function openStep(step: WebMcpShowcaseStep) {
     setActiveStepName((current) => (current === step.toolName ? undefined : step.toolName));
@@ -181,45 +194,59 @@ export function useWebMcpShowcase() {
   }
 
   async function discoverTools() {
+    if (isDiscovering) return;
     const iframe = iframeRef.current;
     if (!iframe) {
       setDiscoveryStatus('Editor iframe is not ready yet.');
       setTools([]);
       return;
     }
-    setDiscoveryStatus('Discovering tools from LocalStudio...');
-    const modelContext = getBrowserModelContext();
-    const iframeOrigin = new URL(iframe.src).origin;
-    const protocolTools = modelContext
-      ? await modelContext.getTools({ fromOrigins: [iframeOrigin] })
-      : undefined;
-    const discoveredTools = protocolTools?.length
-      ? protocolTools
-      : await waitForLocalDemoTools(iframe);
-    const usedProtocolTools = Boolean(protocolTools?.length);
-    if (!discoveredTools) {
+    setIsDiscovering(true);
+    try {
+      setDiscoveryStatus('Discovering tools from LocalStudio...');
+      const modelContext = getBrowserModelContext();
+      const iframeOrigin = new URL(iframe.src).origin;
+      const protocolTools = modelContext
+        ? await modelContext.getTools({ fromOrigins: [iframeOrigin] })
+        : undefined;
+      const discoveredTools = protocolTools?.length
+        ? protocolTools
+        : await waitForLocalDemoTools(iframe);
+      const usedProtocolTools = Boolean(protocolTools?.length);
+      if (!discoveredTools) {
+        setDiscoveryStatus(
+          'No WebMCP runtime or same-origin demo tools found. Wait for the editor frame, then try again.',
+        );
+        setTools([]);
+        return;
+      }
+      setTools(discoveredTools);
+      setUseProtocolExecution(usedProtocolTools);
       setDiscoveryStatus(
-        'No WebMCP runtime or same-origin demo tools found. Wait for the editor frame, then try again.',
+        usedProtocolTools
+          ? `Discovered ${discoveredTools.length} tools through WebMCP.`
+          : `Discovered ${discoveredTools.length} tools through the local demo bridge.`,
       );
-      setTools([]);
-      return;
+    } finally {
+      setIsDiscovering(false);
     }
-    setTools(discoveredTools);
-    setUseProtocolExecution(usedProtocolTools);
-    setDiscoveryStatus(
-      usedProtocolTools
-        ? `Discovered ${discoveredTools.length} tools through WebMCP.`
-        : `Discovered ${discoveredTools.length} tools through the local demo bridge.`,
-    );
   }
 
   async function runStep(step: WebMcpShowcaseStep, commandValue: string) {
+    const runningSteps = runningStepNamesRef.current;
+    const hasExclusiveStepRunning = webMcpShowcaseCatalog.steps.some(
+      (catalogStep) =>
+        catalogStep.execution !== 'parallel' && runningSteps.has(catalogStep.toolName),
+    );
+    if (runningSteps.has(step.toolName)) return;
+    if (step.execution !== 'parallel' && hasExclusiveStepRunning) return;
     const tool = toolsByName.get(step.toolName);
     if (!tool) {
       setActionStatus(step.toolName, `${step.toolName} has not been discovered yet.`);
       return;
     }
-    setIsRunning(true);
+    runningSteps.add(step.toolName);
+    setRunningStepNames(new Set(runningSteps));
     setActionStatus(step.toolName, `Running ${step.label}...`);
     setActionResults((current) => ({ ...current, [step.toolName]: '' }));
     try {
@@ -291,7 +318,8 @@ export function useWebMcpShowcase() {
         `${step.label} failed: ${error instanceof Error ? error.message : 'Unknown error.'}`,
       );
     } finally {
-      setIsRunning(false);
+      runningSteps.delete(step.toolName);
+      setRunningStepNames(new Set(runningSteps));
     }
   }
 
@@ -305,7 +333,8 @@ export function useWebMcpShowcase() {
     focusStep,
     focusedStepName,
     iframeRef,
-    isRunning,
+    isDiscovering,
+    isStepDisabled,
     openStep,
     runStep,
     selectedOptionIds,

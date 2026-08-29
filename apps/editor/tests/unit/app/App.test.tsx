@@ -502,6 +502,70 @@ describe('App', () => {
     expect(executeMedia).toHaveBeenLastCalledWith({ kind: 'image', limit: 6, term: 'presentations' });
   });
 
+  it('keeps parallel-safe actions available while an authoring operation is running', async () => {
+    let finishTranslation!: () => void;
+    const translationFinished = new Promise<string>((resolve) => {
+      finishTranslation = () => {
+        resolve(
+          JSON.stringify({
+            ok: true,
+            data: { operationId: 'translate-1', state: 'completed', stage: 'completed' },
+          }),
+        );
+      };
+    });
+    const tools = webMcpShowcaseCatalog.steps.map((step) => ({
+      name: step.toolName,
+      description: step.label,
+    }));
+    const executeTool = vi.fn((tool: { name: string }) => {
+      if (tool.name === 'translate_deck_and_notes') {
+        return Promise.resolve(
+          JSON.stringify({ ok: true, data: { operationId: 'translate-1' } }),
+        );
+      }
+      if (tool.name === 'get_operation_status') return translationFinished;
+      return Promise.resolve(JSON.stringify({ ok: true, data: {} }));
+    });
+    window.history.replaceState({}, '', '/webmcp');
+    Object.defineProperty(document, 'modelContext', {
+      configurable: true,
+      value: { executeTool, getTools: vi.fn().mockResolvedValue(tools) },
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
+    await screen.findByRole('button', { name: 'translate_deck_and_notes' });
+    fireEvent.click(screen.getByRole('button', { name: 'Translate deck and notes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send Translate deck and notes' }));
+    await waitFor(() =>
+      expect(executeTool).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'get_operation_status' }),
+        expect.any(String),
+      ),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Search stock media' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Images' }));
+    const searchButton = screen.getByRole('button', { name: 'Send Search stock media' });
+    expect(searchButton).toBeEnabled();
+    fireEvent.click(searchButton);
+    await waitFor(() =>
+      expect(executeTool).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'search_media' }),
+        expect.any(String),
+      ),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Upsert slide content' }));
+    expect(screen.getByRole('button', { name: 'Send Upsert slide content' })).toBeDisabled();
+    finishTranslation();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Send Upsert slide content' })).toBeEnabled(),
+    );
+  });
+
   it('dispatches the editable payload for every WebMCP showcase card', async () => {
     const tools = webMcpShowcaseCatalog.steps.map((step) => ({
       name: step.toolName,

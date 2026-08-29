@@ -167,6 +167,12 @@ test.describe('WebMCP discover tools journey', () => {
         .frameLocator('iframe[title="LocalStudio editor WebMCP demo"]')
         .getByRole('progressbar', { name: 'PowerPoint import progress' }),
     ).toBeVisible();
+    await workflow.getByRole('button', { name: 'Search stock media' }).click();
+    await workflow.getByRole('button', { name: 'Images' }).click();
+    await expect(workflow.getByRole('button', { name: 'Send Search stock media' })).toBeEnabled();
+    await workflow.getByRole('button', { name: 'Upsert slide content' }).click();
+    await expect(workflow.getByRole('button', { name: 'Send Upsert slide content' })).toBeDisabled();
+    await importAction.click();
     releaseImport();
     await expect(importStep.getByRole('status')).toHaveText(
       'Import PowerPoint from URL completed.',
@@ -262,8 +268,8 @@ test.describe('WebMCP discover tools journey', () => {
     );
 
     await page.getByRole('button', { name: 'Search stock media' }).click();
-    await expect(page.getByLabel('Search stock media command input')).toHaveCount(0);
-    await page.getByRole('button', { name: 'Images' }).click();
+    await page.getByRole('button', { name: 'GIFs' }).click();
+    await expect(page.getByLabel('Search stock media command input')).toHaveValue(/"kind": "gif"/);
     await page.getByRole('button', { name: 'Send Search stock media' }).click();
     await expect(page.getByText(/Search stock media failed:/)).toBeVisible();
   });
