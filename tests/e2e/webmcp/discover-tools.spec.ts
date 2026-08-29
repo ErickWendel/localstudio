@@ -54,6 +54,10 @@ test.describe('WebMCP discover tools journey', () => {
     for (const [, label] of showcaseCards) {
       await expect(workflow.getByRole('button', { name: label })).toBeVisible();
     }
+    await page.getByRole('button', { name: 'Import PowerPoint from URL' }).click();
+    await expect(page.getByLabel('Import PowerPoint from URL command input')).toHaveValue(
+      /https:\/\/localstudio\.erickwendel\.com\.br\/localstudio\/public\/web-ai-beyond-chat-renderatl-14082026%20%282%29\.pptx/,
+    );
     await page.getByRole('button', { name: 'Create presentation' }).click();
     await expect(page.getByLabel('Create presentation command input')).toBeVisible();
     await page.getByLabel('Create presentation command input').fill('E2E WebMCP project');

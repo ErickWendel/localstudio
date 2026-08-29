@@ -20,7 +20,9 @@ export const webMcpShowcaseSteps: WebMcpShowcaseStep[] = [
   {
     label: 'Import PowerPoint from URL',
     toolName: 'import_powerpoint_from_url',
-    input: { url: 'http://localhost:8000/presentation.pptx' },
+    input: {
+      url: 'https://localstudio.erickwendel.com.br/localstudio/public/web-ai-beyond-chat-renderatl-14082026%20%282%29.pptx',
+    },
   },
   {
     label: 'Translate deck and notes',
