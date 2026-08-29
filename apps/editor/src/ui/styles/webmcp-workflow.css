@@ -58,6 +58,37 @@
   gap: 7px;
 }
 
+.webmcp-step-body {
+  display: grid;
+  gap: 7px;
+}
+
+.webmcp-step-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: 30px;
+}
+
+.webmcp-step-option {
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid rgba(100, 183, 255, 0.28);
+  border-radius: 6px;
+  cursor: pointer;
+  background: rgba(100, 183, 255, 0.08);
+  color: #bfe5ff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.webmcp-step-option:hover,
+.webmcp-step-option[aria-pressed='true'] {
+  border-color: rgba(159, 255, 210, 0.62);
+  background: rgba(159, 255, 210, 0.14);
+  color: #9fffd2;
+}
+
 .webmcp-step-status {
   margin: 0 0 0 30px;
   padding: 7px 10px;

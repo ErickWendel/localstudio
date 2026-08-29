@@ -2,7 +2,14 @@ export interface WebMcpShowcaseStep {
   input: Record<string, unknown>;
   inputKind?: 'name' | undefined;
   label: string;
+  options?: WebMcpShowcaseStepOption[];
   toolName: string;
+}
+
+export interface WebMcpShowcaseStepOption {
+  id: string;
+  input: Record<string, unknown>;
+  label: string;
 }
 
 export interface WebMcpShowcaseSection {
@@ -33,7 +40,7 @@ const sections: WebMcpShowcaseSection[] = [
   {
     id: 'create-refine',
     title: 'Create and refine',
-    description: 'Start, import, translate, compose, and describe presentation content.',
+    description: 'Start, import, translate, and compose presentation content.',
     steps: [
       {
         label: 'Create presentation',
@@ -108,11 +115,6 @@ const sections: WebMcpShowcaseSection[] = [
           steps: 4,
         },
       },
-      {
-        label: 'Generate detailed descriptions',
-        toolName: 'generate_deck_detailed_description',
-        input: { slideNumbers: [1], language: 'en', force: true },
-      },
     ],
   },
   {
@@ -124,11 +126,51 @@ const sections: WebMcpShowcaseSection[] = [
         label: 'List authoring catalog',
         toolName: 'list_authoring_catalog',
         input: { kind: 'fonts' },
+        options: [
+          { id: 'fonts', label: 'Fonts', input: { kind: 'fonts' } },
+          {
+            id: 'text-animations',
+            label: 'Text animations',
+            input: { kind: 'animations', elementType: 'text' },
+          },
+          {
+            id: 'image-animations',
+            label: 'Image animations',
+            input: { kind: 'animations', elementType: 'image' },
+          },
+          {
+            id: 'gif-animations',
+            label: 'GIF animations',
+            input: { kind: 'animations', elementType: 'gif' },
+          },
+          {
+            id: 'video-animations',
+            label: 'Video animations',
+            input: { kind: 'animations', elementType: 'video' },
+          },
+          {
+            id: 'shape-animations',
+            label: 'Shape animations',
+            input: { kind: 'animations', elementType: 'shape' },
+          },
+        ],
       },
       {
         label: 'Search stock media',
         toolName: 'search_media',
         input: { kind: 'image', term: 'presentations', limit: 6 },
+        options: [
+          {
+            id: 'images',
+            label: 'Images',
+            input: { kind: 'image', term: 'presentations', limit: 6 },
+          },
+          {
+            id: 'gifs',
+            label: 'GIFs',
+            input: { kind: 'gif', term: 'presentations', limit: 6 },
+          },
+        ],
       },
     ],
   },

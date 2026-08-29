@@ -16,7 +16,9 @@ export function WebMcpShowcasePage() {
     isRunning,
     openStep,
     runStep,
+    selectedOptionIds,
     setCommandValue,
+    selectStepOption,
     stepButtonRefs,
     tools,
   } = useWebMcpShowcase();
@@ -89,87 +91,118 @@ export function WebMcpShowcasePage() {
                   <span>{section.steps.length}</span>
                 </header>
                 <div className="webmcp-workflow-section-tools">
-                  {section.steps.map((step) => (
-                    <div className="webmcp-step" key={step.toolName}>
-                      <button
-                        ref={(element) => {
-                          stepButtonRefs.current[step.toolName] = element;
-                        }}
-                        aria-expanded={activeStepName === step.toolName}
-                        aria-label={step.label}
-                        className={[
-                          'webmcp-step-button',
-                          activeStepName === step.toolName
-                            ? 'webmcp-step-button-active'
-                            : '',
-                          focusedStepName === step.toolName
-                            ? 'webmcp-step-button-focused'
-                            : '',
-                        ]
-                          .filter(Boolean)
-                          .join(' ')}
-                        type="button"
-                        onClick={() => {
-                          openStep(step);
-                        }}
-                      >
-                        {step.toolName === 'get_presentation_state' ? (
-                          <FileJson size={16} />
-                        ) : (
-                          <Play size={16} />
-                        )}
-                        <span>{step.label}</span>
-                      </button>
-                      {actionStatuses[step.toolName] ? (
-                        <p className="webmcp-step-status" role="status" aria-live="polite">
-                          {actionStatuses[step.toolName]}
-                        </p>
-                      ) : null}
-                      {activeStepName === step.toolName ? (
-                        <form
-                          className="webmcp-step-command"
-                          onSubmit={(event) => {
-                            event.preventDefault();
-                            void runStep(step, commandValues[step.toolName] ?? '');
+                  {section.steps.map((step) => {
+                    const isActive = activeStepName === step.toolName;
+                    const selectedOptionId = selectedOptionIds[step.toolName];
+                    const showCommand = !step.options || Boolean(selectedOptionId);
+                    return (
+                      <div className="webmcp-step" key={step.toolName}>
+                        <button
+                          ref={(element) => {
+                            stepButtonRefs.current[step.toolName] = element;
+                          }}
+                          aria-expanded={isActive}
+                          aria-label={step.label}
+                          className={[
+                            'webmcp-step-button',
+                            isActive ? 'webmcp-step-button-active' : '',
+                            focusedStepName === step.toolName
+                              ? 'webmcp-step-button-focused'
+                              : '',
+                          ]
+                            .filter(Boolean)
+                            .join(' ')}
+                          type="button"
+                          onClick={() => {
+                            openStep(step);
                           }}
                         >
-                          {step.inputKind === 'name' ? (
-                            <input
-                              aria-label={`${step.label} command input`}
-                              value={commandValues[step.toolName] ?? ''}
-                              onChange={(event) => {
-                                setCommandValue(step.toolName, event.target.value);
-                              }}
-                            />
+                          {step.toolName === 'get_presentation_state' ? (
+                            <FileJson size={16} />
                           ) : (
-                            <textarea
-                              aria-label={`${step.label} command input`}
-                              rows={5}
-                              value={commandValues[step.toolName] ?? ''}
-                              onChange={(event) => {
-                                setCommandValue(step.toolName, event.target.value);
-                              }}
-                            />
+                            <Play size={16} />
                           )}
-                          <button
-                            aria-label={`Send ${step.label}`}
-                            disabled={isRunning}
-                            type="submit"
-                          >
-                            <SendHorizontal size={15} />
-                          </button>
-                        </form>
-                      ) : null}
-                      {activeStepName === step.toolName && actionResults[step.toolName] ? (
-                        <details className="webmcp-step-result-shell" open>
-                          <summary>Result</summary>
-                          <pre aria-label={`${step.label} result`} className="webmcp-step-result">
-                            {actionResults[step.toolName]}
-                          </pre>
-                        </details>
-                      ) : null}
-                    </div>
-                  ))}
+                          <span>{step.label}</span>
+                        </button>
+                        {isActive ? (
+                          <div className="webmcp-step-body">
+                          {actionStatuses[step.toolName] ? (
+                            <p className="webmcp-step-status" role="status" aria-live="polite">
+                              {actionStatuses[step.toolName]}
+                            </p>
+                          ) : null}
+                          {step.options ? (
+                            <div
+                              aria-label={`${step.label} options`}
+                              className="webmcp-step-options"
+                              role="group"
+                            >
+                              {step.options.map((option) => (
+                                <button
+                                  aria-pressed={selectedOptionId === option.id}
+                                  className="webmcp-step-option"
+                                  key={option.id}
+                                  type="button"
+                                  onClick={() => {
+                                    selectStepOption(step, option);
+                                  }}
+                                >
+                                  {option.label}
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
+                          {showCommand ? (
+                            <form
+                              className="webmcp-step-command"
+                              onSubmit={(event) => {
+                                event.preventDefault();
+                                void runStep(step, commandValues[step.toolName] ?? '');
+                              }}
+                            >
+                              {step.inputKind === 'name' ? (
+                                <input
+                                  aria-label={`${step.label} command input`}
+                                  value={commandValues[step.toolName] ?? ''}
+                                  onChange={(event) => {
+                                    setCommandValue(step.toolName, event.target.value);
+                                  }}
+                                />
+                              ) : (
+                                <textarea
+                                  aria-label={`${step.label} command input`}
+                                  rows={5}
+                                  value={commandValues[step.toolName] ?? ''}
+                                  onChange={(event) => {
+                                    setCommandValue(step.toolName, event.target.value);
+                                  }}
+                                />
+                              )}
+                              <button
+                                aria-label={`Send ${step.label}`}
+                                disabled={isRunning}
+                                type="submit"
+                              >
+                                <SendHorizontal size={15} />
+                              </button>
+                            </form>
+                          ) : null}
+                          {actionResults[step.toolName] ? (
+                            <details className="webmcp-step-result-shell" open>
+                              <summary>Result</summary>
+                              <pre
+                                aria-label={`${step.label} result`}
+                                className="webmcp-step-result"
+                              >
+                                {actionResults[step.toolName]}
+                              </pre>
+                            </details>
+                          ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
                 </div>
               </section>
             ))}

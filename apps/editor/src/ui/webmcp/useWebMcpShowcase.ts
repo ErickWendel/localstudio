@@ -1,5 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
-import { webMcpShowcaseCatalog, type WebMcpShowcaseStep } from './webMcpShowcaseSteps';
+import {
+  webMcpShowcaseCatalog,
+  type WebMcpShowcaseStep,
+  type WebMcpShowcaseStepOption,
+} from './webMcpShowcaseSteps';
 
 interface WebMcpToolLike {
   call?: (input: Record<string, unknown>) => unknown;
@@ -137,6 +141,7 @@ export function useWebMcpShowcase() {
   const [useProtocolExecution, setUseProtocolExecution] = useState(false);
   const [activeStepName, setActiveStepName] = useState<string | undefined>();
   const [focusedStepName, setFocusedStepName] = useState<string | undefined>();
+  const [selectedOptionIds, setSelectedOptionIds] = useState<Record<string, string>>({});
   const [commandValues, setCommandValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(
       webMcpShowcaseCatalog.steps.map((step) => [step.toolName, getDefaultCommandValue(step)]),
@@ -155,6 +160,13 @@ export function useWebMcpShowcase() {
 
   function setCommandValue(toolName: string, value: string) {
     setCommandValues((current) => ({ ...current, [toolName]: value }));
+  }
+
+  function selectStepOption(step: WebMcpShowcaseStep, option: WebMcpShowcaseStepOption) {
+    setSelectedOptionIds((current) => ({ ...current, [step.toolName]: option.id }));
+    setCommandValue(step.toolName, formatPayload(option.input));
+    setActionStatuses((current) => ({ ...current, [step.toolName]: '' }));
+    setActionResults((current) => ({ ...current, [step.toolName]: '' }));
   }
 
   function focusStep(toolName: string) {
@@ -296,7 +308,9 @@ export function useWebMcpShowcase() {
     isRunning,
     openStep,
     runStep,
+    selectedOptionIds,
     setCommandValue,
+    selectStepOption,
     stepButtonRefs,
     tools,
   };

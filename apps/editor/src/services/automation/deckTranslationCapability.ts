@@ -170,7 +170,9 @@ function createCapability(options: DeckLocalizationCapabilityOptions) {
             });
           }
           if (translated !== element.text) {
-            nextElements[elementId] = { ...element, text: translated };
+            const { paragraphs, ...elementWithoutParagraphs } = element;
+            void paragraphs;
+            nextElements[elementId] = { ...elementWithoutParagraphs, text: translated };
             slideChanged = true;
           }
           translatedTextElements += 1;

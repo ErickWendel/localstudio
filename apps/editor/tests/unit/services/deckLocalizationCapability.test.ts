@@ -201,6 +201,63 @@ describe('deckLocalizationCapability', () => {
     );
   });
 
+  it('removes stale imported rich-text runs when translating an element', async () => {
+    const harness = createHarness({ translate: (text) => Promise.resolve(`PT: ${text}`) });
+    const project = harness.getProject();
+    const visibleTitle = project.elements['visible-title'];
+    if (visibleTitle?.type !== 'text') throw new Error('Expected the visible title fixture.');
+    harness.setProject({
+      ...project,
+      elements: {
+        ...project.elements,
+        'visible-title': {
+          ...visibleTitle,
+          importSource: {
+            format: 'pptx',
+            pageId: project.pages[0]!.id,
+            shapeId: '3',
+            source: 'slide',
+          },
+          paragraphs: [
+            {
+              align: 'left',
+              fill: '#111111',
+              fontFamily: 'Arial',
+              fontSize: 20,
+              fontStyle: 'normal',
+              fontWeight: 400,
+              indent: 0,
+              lineHeight: 1.05,
+              marginLeft: 0,
+              runs: [
+                {
+                  fill: '#111111',
+                  fontFamily: 'Arial',
+                  fontSize: 20,
+                  fontStyle: 'normal',
+                  fontWeight: 400,
+                  text: 'Hello',
+                },
+              ],
+              spaceAfter: 0,
+              spaceBefore: 0,
+              text: 'Hello',
+            },
+          ],
+        },
+      },
+    });
+
+    await harness.capability.translateDeckAndNotes(
+      { targetLanguage: 'pt', sourceLanguage: 'en' },
+      harness.report,
+    );
+
+    const translatedTitle = harness.getProject().elements['visible-title'];
+    expect(translatedTitle).toMatchObject({ text: 'PT: Hello' });
+    expect(translatedTitle?.type === 'text' ? translatedTitle.paragraphs : undefined).toBeUndefined();
+  });
+
   it('reports field failures and marks a description stale after a partial visual translation', async () => {
     const harness = createHarness({
       translate: (text) =>

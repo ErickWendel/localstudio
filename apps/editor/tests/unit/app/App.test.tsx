@@ -431,6 +431,7 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
     await screen.findByRole('button', { name: 'list_authoring_catalog' });
     fireEvent.click(screen.getByRole('button', { name: 'List authoring catalog' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Fonts' }));
     fireEvent.change(screen.getByLabelText('List authoring catalog command input'), {
       target: { value: '{' },
     });
@@ -467,21 +468,38 @@ describe('App', () => {
     await screen.findByRole('button', { name: 'list_authoring_catalog' });
     const action = screen.getByRole('button', { name: 'List authoring catalog' });
     fireEvent.click(action);
+    expect(screen.queryByLabelText('List authoring catalog command input')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Fonts' }));
     fireEvent.click(screen.getByRole('button', { name: 'Send List authoring catalog' }));
 
     expect(await screen.findByLabelText('List authoring catalog result')).toHaveTextContent(
       'Orbitron',
     );
+    expect(executeCatalog).toHaveBeenLastCalledWith({ kind: 'fonts' });
+    expect(screen.getByRole('status')).toHaveTextContent('List authoring catalog completed.');
     fireEvent.click(action);
     expect(screen.queryByLabelText('List authoring catalog result')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('List authoring catalog command input')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
     fireEvent.click(action);
     expect(screen.getByLabelText('List authoring catalog result')).toHaveTextContent('Orbitron');
     expect(screen.getByLabelText('List authoring catalog command input')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Text animations' }));
+    expect(screen.queryByLabelText('List authoring catalog result')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('List authoring catalog command input')).toHaveValue(
+      JSON.stringify({ kind: 'animations', elementType: 'text' }, null, 2),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Send List authoring catalog' }));
+    await waitFor(() =>
+      expect(executeCatalog).toHaveBeenLastCalledWith({ elementType: 'text', kind: 'animations' }),
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Search stock media' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Images' }));
     fireEvent.click(screen.getByRole('button', { name: 'Send Search stock media' }));
     expect(await screen.findByLabelText('Search stock media result')).toHaveTextContent('unsplash');
+    expect(executeMedia).toHaveBeenLastCalledWith({ kind: 'image', limit: 6, term: 'presentations' });
   });
 
   it('dispatches the editable payload for every WebMCP showcase card', async () => {
@@ -506,6 +524,9 @@ describe('App', () => {
     for (let index = 0; index < webMcpShowcaseCatalog.steps.length; index += 1) {
       const step = webMcpShowcaseCatalog.steps[index]!;
       fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${step.label}$`) }));
+      if (step.options) {
+        fireEvent.click(screen.getByRole('button', { name: step.options[0]!.label }));
+      }
       fireEvent.click(screen.getByRole('button', { name: new RegExp(`^Send ${step.label}$`) }));
       await waitFor(() => expect(executeTool).toHaveBeenCalledTimes(index + 1));
       expect(executeTool).toHaveBeenNthCalledWith(
