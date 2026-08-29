@@ -19,9 +19,28 @@ const showcaseCards = [
   ['publish_presentation', 'Publish presentation'],
   ['get_operation_status', 'Get operation status'],
 ] as const;
+const showcaseSections = [
+  ['Dependencies', ['Prepare AI models', 'Inspect AI model status']],
+  [
+    'Create and refine',
+    [
+      'Create presentation',
+      'Import PowerPoint from URL',
+      'Translate deck and notes',
+      'Upsert slide content',
+      'Generate image',
+      'Generate detailed descriptions',
+    ],
+  ],
+  ['Assets and styling', ['List authoring catalog', 'Search stock media']],
+  ['Review', ['Focus slide preview']],
+  ['Export and publish', ['Export presentation', 'Publish presentation']],
+  ['Context and progress', ['Inspect presentation state', 'Get operation status']],
+] as const;
 
 test.describe('WebMCP discover tools journey', () => {
   test('discovers tools and inspects the workflow without running AI actions', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
     await page.addInitScript(() => {
       Object.defineProperty(document, 'modelContext', {
         configurable: true,
@@ -54,6 +73,30 @@ test.describe('WebMCP discover tools journey', () => {
     for (const [, label] of showcaseCards) {
       await expect(workflow.getByRole('button', { name: label })).toBeVisible();
     }
+    for (const [sectionName, actionNames] of showcaseSections) {
+      const section = workflow.getByRole('region', { name: sectionName });
+      await expect(section).toBeVisible();
+      await expect(section.getByRole('button')).toHaveCount(actionNames.length);
+      for (const actionName of actionNames) {
+        await expect(section.getByRole('button', { name: actionName })).toBeVisible();
+      }
+    }
+    const scrollMetrics = await page.evaluate(() => {
+      const controlPlane = document.querySelector<HTMLElement>('.webmcp-control-plane');
+      if (!controlPlane) throw new Error('WebMCP control plane is missing.');
+      return {
+        controlOverflow: getComputedStyle(controlPlane).overflowY,
+        controlScrollable: controlPlane.scrollHeight > controlPlane.clientHeight,
+        pageScrollable: document.documentElement.scrollHeight > window.innerHeight,
+      };
+    });
+    expect(scrollMetrics).toEqual({
+      controlOverflow: 'auto',
+      controlScrollable: true,
+      pageScrollable: false,
+    });
+    await workflow.getByRole('region', { name: 'Context and progress' }).scrollIntoViewIfNeeded();
+    await expect(workflow.getByRole('region', { name: 'Context and progress' })).toBeInViewport();
     await page.getByRole('button', { name: 'Import PowerPoint from URL' }).click();
     await expect(page.getByLabel('Import PowerPoint from URL command input')).toHaveValue(
       /https:\/\/localstudio\.erickwendel\.com\.br\/localstudio\/public\/web-ai-beyond-chat-renderatl-14082026%20%282%29\.pptx/,

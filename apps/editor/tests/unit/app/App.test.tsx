@@ -2,9 +2,10 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '../../../src/App';
 import { sampleProject } from '../../../src/domain/projects/sampleProject';
-import { webMcpShowcaseSteps } from '../../../src/ui/webmcp/webMcpShowcaseSteps';
+import { webMcpShowcaseSections } from '../../../src/ui/webmcp/webMcpShowcaseSteps';
 
 const originalMatchMedia = window.matchMedia;
+const webMcpShowcaseSteps = webMcpShowcaseSections.flatMap((section) => section.steps);
 
 describe('App', () => {
   beforeEach(() => {

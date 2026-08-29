@@ -1,14 +1,19 @@
 .webmcp-page {
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   display: grid;
   grid-template-columns: minmax(380px, 520px) minmax(720px, 1fr);
   background:
     linear-gradient(90deg, rgba(46, 167, 255, 0.14), transparent 42%),
     linear-gradient(180deg, rgba(55, 253, 118, 0.08), transparent 36%), #05090a;
   color: #eefaf5;
+  overflow: hidden;
 }
 
 .webmcp-control-plane {
+  max-height: 100vh;
+  max-height: 100dvh;
   display: flex;
   flex-direction: column;
   gap: 22px;
@@ -16,6 +21,10 @@
   padding: 28px;
   border-right: 1px solid rgba(122, 255, 199, 0.18);
   background: rgba(5, 12, 13, 0.9);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .webmcp-brand-row {

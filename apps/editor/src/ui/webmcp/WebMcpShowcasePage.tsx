@@ -1,6 +1,8 @@
 import { Bot, FileJson, Play, Radar, SendHorizontal } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
-import { type WebMcpShowcaseStep, webMcpShowcaseSteps } from './webMcpShowcaseSteps';
+import { type WebMcpShowcaseStep, webMcpShowcaseSections } from './webMcpShowcaseSteps';
+
+const webMcpShowcaseSteps = webMcpShowcaseSections.flatMap((section) => section.steps);
 
 interface WebMcpToolLike {
   call?: (input: Record<string, unknown>) => unknown;
@@ -256,69 +258,89 @@ export function WebMcpShowcasePage() {
         </div>
 
         <div className="webmcp-workflow" aria-label="Demo workflow">
-          {webMcpShowcaseSteps.map((step, index) => (
-            <div className="webmcp-step" key={step.toolName}>
-              <button
-                ref={(element) => {
-                  stepButtonRefs.current[step.toolName] = element;
-                }}
-                aria-label={step.label}
-                className={[
-                  'webmcp-step-button',
-                  activeStepName === step.toolName ? 'webmcp-step-button-active' : '',
-                  focusedStepName === step.toolName ? 'webmcp-step-button-focused' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-                disabled={isRunning}
-                type="button"
-                onClick={() => {
-                  openStep(step);
-                }}
-              >
-                <span className="webmcp-step-index">{index + 1}</span>
-                {step.toolName === 'get_presentation_state' ? <FileJson size={16} /> : null}
-                {step.toolName !== 'get_presentation_state' ? <Play size={16} /> : null}
-                <span>{step.label}</span>
-              </button>
-              {activeStepName === step.toolName ? (
-                <form
-                  className="webmcp-step-command"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    void runStep(step, commandValues[step.toolName] ?? '');
-                  }}
-                >
-                  {step.inputKind === 'name' ? (
-                    <input
-                      aria-label={`${step.label} command input`}
-                      value={commandValues[step.toolName] ?? ''}
-                      onChange={(event) => {
-                        setCommandValues((current) => ({
-                          ...current,
-                          [step.toolName]: event.target.value,
-                        }));
+          {webMcpShowcaseSections.map((section) => (
+            <section
+              aria-labelledby={`webmcp-section-${section.id}`}
+              className="webmcp-workflow-section"
+              key={section.id}
+            >
+              <header className="webmcp-workflow-section-heading">
+                <div>
+                  <h2 id={`webmcp-section-${section.id}`}>{section.title}</h2>
+                  <p>{section.description}</p>
+                </div>
+                <span>{section.steps.length}</span>
+              </header>
+              <div className="webmcp-workflow-section-tools">
+                {section.steps.map((step) => (
+                  <div className="webmcp-step" key={step.toolName}>
+                    <button
+                      ref={(element) => {
+                        stepButtonRefs.current[step.toolName] = element;
                       }}
-                    />
-                  ) : (
-                    <textarea
-                      aria-label={`${step.label} command input`}
-                      rows={5}
-                      value={commandValues[step.toolName] ?? ''}
-                      onChange={(event) => {
-                        setCommandValues((current) => ({
-                          ...current,
-                          [step.toolName]: event.target.value,
-                        }));
+                      aria-label={step.label}
+                      className={[
+                        'webmcp-step-button',
+                        activeStepName === step.toolName ? 'webmcp-step-button-active' : '',
+                        focusedStepName === step.toolName ? 'webmcp-step-button-focused' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                      disabled={isRunning}
+                      type="button"
+                      onClick={() => {
+                        openStep(step);
                       }}
-                    />
-                  )}
-                  <button aria-label={`Send ${step.label}`} disabled={isRunning} type="submit">
-                    <SendHorizontal size={15} />
-                  </button>
-                </form>
-              ) : null}
-            </div>
+                    >
+                      {step.toolName === 'get_presentation_state' ? <FileJson size={16} /> : null}
+                      {step.toolName !== 'get_presentation_state' ? <Play size={16} /> : null}
+                      <span>{step.label}</span>
+                    </button>
+                    {activeStepName === step.toolName ? (
+                      <form
+                        className="webmcp-step-command"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          void runStep(step, commandValues[step.toolName] ?? '');
+                        }}
+                      >
+                        {step.inputKind === 'name' ? (
+                          <input
+                            aria-label={`${step.label} command input`}
+                            value={commandValues[step.toolName] ?? ''}
+                            onChange={(event) => {
+                              setCommandValues((current) => ({
+                                ...current,
+                                [step.toolName]: event.target.value,
+                              }));
+                            }}
+                          />
+                        ) : (
+                          <textarea
+                            aria-label={`${step.label} command input`}
+                            rows={5}
+                            value={commandValues[step.toolName] ?? ''}
+                            onChange={(event) => {
+                              setCommandValues((current) => ({
+                                ...current,
+                                [step.toolName]: event.target.value,
+                              }));
+                            }}
+                          />
+                        )}
+                        <button
+                          aria-label={`Send ${step.label}`}
+                          disabled={isRunning}
+                          type="submit"
+                        >
+                          <SendHorizontal size={15} />
+                        </button>
+                      </form>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </section>
           ))}
         </div>
 

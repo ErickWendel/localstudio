@@ -33,16 +33,20 @@
 }
 
 .webmcp-editor-frame {
+  height: 100vh;
+  height: 100dvh;
   min-width: 0;
-  min-height: 100vh;
+  min-height: 0;
   padding: 18px;
   background:
     linear-gradient(135deg, rgba(159, 255, 210, 0.08), transparent 30%), rgba(3, 5, 6, 0.88);
+  overflow: hidden;
 }
 
 .webmcp-editor-frame iframe {
   width: 100%;
   height: calc(100vh - 36px);
+  height: calc(100dvh - 36px);
   display: block;
   border: 1px solid rgba(159, 255, 210, 0.2);
   border-radius: 8px;

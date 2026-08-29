@@ -1,5 +1,55 @@
 .webmcp-workflow {
   display: grid;
+  gap: 18px;
+}
+
+.webmcp-workflow-section {
+  display: grid;
+  gap: 10px;
+}
+
+.webmcp-workflow-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid rgba(100, 183, 255, 0.18);
+}
+
+.webmcp-workflow-section-heading h2 {
+  margin: 0;
+  color: #ffffff;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 18px;
+}
+
+.webmcp-workflow-section-heading p {
+  margin: 4px 0 0;
+  color: rgba(238, 250, 245, 0.56);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.webmcp-workflow-section-heading > span {
+  min-width: 24px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(100, 183, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(100, 183, 255, 0.09);
+  color: #bfe5ff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.webmcp-workflow-section-tools {
+  display: grid;
   gap: 9px;
 }
 
@@ -29,18 +79,6 @@
   animation: webmcp-step-pulse 900ms ease-in-out 3;
   border-color: #9fffd2;
   box-shadow: 0 0 0 2px rgba(159, 255, 210, 0.14);
-}
-
-.webmcp-step-index {
-  width: 22px;
-  height: 22px;
-  display: inline-grid;
-  place-items: center;
-  border-radius: 4px;
-  background: rgba(100, 183, 255, 0.16);
-  color: #bfe5ff;
-  font-size: 11px;
-  font-weight: 900;
 }
 
 .webmcp-step-command {
