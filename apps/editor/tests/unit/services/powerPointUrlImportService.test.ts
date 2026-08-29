@@ -189,6 +189,55 @@ describe('PowerPointUrlImportService', () => {
     ).resolves.toMatchObject({ fileName: 'local.pptx' });
   });
 
+  it('accepts a declared large response when no deployment limit is configured', async () => {
+    const harness = createHarness({
+      fetch: vi.fn(() =>
+        Promise.resolve(
+          createResponse(undefined, {
+            contentLength: '263634771',
+            contentType: pptxMimeType,
+          }),
+        ),
+      ),
+    });
+
+    await expect(
+      harness.run({ url: 'https://localstudio.example/showcase.pptx' }),
+    ).resolves.toMatchObject({ fileName: 'showcase.pptx' });
+  });
+
+  it('coalesces streamed download reports to visible percentage changes', async () => {
+    const chunkCount = 100;
+    const harness = createHarness({
+      fetch: vi.fn(() =>
+        Promise.resolve(
+          createResponse(
+            new ReadableStream({
+              start(controller) {
+                for (let index = 0; index < chunkCount; index += 1) {
+                  controller.enqueue(new Uint8Array([index]));
+                }
+                controller.close();
+              },
+            }),
+            { contentLength: String(chunkCount), contentType: pptxMimeType },
+          ),
+        ),
+      ),
+    });
+
+    await harness.run({ url: 'https://example.com/streamed.pptx' });
+
+    const downloadReports = harness.reports.filter(
+      (report) => report.stage === 'downloading-powerpoint',
+    );
+    expect(downloadReports.length).toBeLessThan(chunkCount / 2);
+    expect(downloadReports.at(-1)).toMatchObject({ progress: 45 });
+    expect(harness.reports).toContainEqual(
+      expect.objectContaining({ loadedBytes: chunkCount, stage: 'importing-package' }),
+    );
+  });
+
   it.each([
     ['not a URL', 'invalid-url'],
     ['file:///tmp/deck.pptx', 'invalid-url'],

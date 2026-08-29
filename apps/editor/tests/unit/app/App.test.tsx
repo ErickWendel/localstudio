@@ -2,9 +2,22 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '../../../src/App';
 import { sampleProject } from '../../../src/domain/projects/sampleProject';
-import { webMcpShowcaseSteps } from '../../../src/ui/webmcp/webMcpShowcaseSteps';
+import { webMcpShowcaseCatalog } from '../../../src/ui/webmcp/webMcpShowcaseSteps';
 
 const originalMatchMedia = window.matchMedia;
+
+function installWebMcpShowcaseTools() {
+  Object.defineProperty(document, 'modelContext', {
+    configurable: true,
+    value: {
+      getTools: vi.fn().mockResolvedValue(
+        webMcpShowcaseCatalog.steps.map((step) => ({
+          name: step.toolName,
+        })),
+      ),
+    },
+  });
+}
 
 describe('App', () => {
   beforeEach(() => {
@@ -108,6 +121,7 @@ describe('App', () => {
 
     expect(await screen.findByRole('heading', { name: 'WebMCP showcase' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Discover tools' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Demo workflow')).not.toBeInTheDocument();
     expect(screen.getByTitle('LocalStudio editor WebMCP demo')).toHaveAttribute(
       'src',
       '/editor/?webmcp=1&newProject=1',
@@ -278,25 +292,31 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'WebMCP showcase' })).toBeInTheDocument();
   });
 
-  it('opens editable command input for a WebMCP workflow step', () => {
+  it('opens editable command input for a discovered WebMCP workflow step', async () => {
     window.history.replaceState({}, '', '/webmcp');
+    installWebMcpShowcaseTools();
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create presentation' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Create presentation' }));
 
     expect(screen.getByLabelText('Create presentation command input')).toHaveValue(
       'WebMCP Demo Deck',
     );
     expect(screen.getByRole('button', { name: 'Send Create presentation' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Create presentation' }));
+    expect(screen.queryByLabelText('Create presentation command input')).not.toBeInTheDocument();
   });
 
-  it('shows the complete JSON batch for the WebMCP upsert step', () => {
+  it('shows the complete JSON batch for the discovered WebMCP upsert step', async () => {
     window.history.replaceState({}, '', '/webmcp');
+    installWebMcpShowcaseTools();
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Upsert slide content' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Upsert slide content' }));
 
     const batchInput = screen.getByLabelText<HTMLTextAreaElement>(
       'Upsert slide content command input',
@@ -323,7 +343,6 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
     fireEvent.click(await screen.findByRole('button', { name: 'get_presentation_state' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Inspect presentation state' }));
     expect(
       screen.getByLabelText<HTMLTextAreaElement>('Inspect presentation state command input').value,
     ).toContain('"detail": "elements"');
@@ -412,6 +431,7 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
     await screen.findByRole('button', { name: 'list_authoring_catalog' });
     fireEvent.click(screen.getByRole('button', { name: 'List authoring catalog' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Fonts' }));
     fireEvent.change(screen.getByLabelText('List authoring catalog command input'), {
       target: { value: '{' },
     });
@@ -420,8 +440,134 @@ describe('App', () => {
     expect(await screen.findByText(/List authoring catalog failed:/)).toBeInTheDocument();
   });
 
+  it('keeps catalog and stock-media results inside their collapsible action cards', async () => {
+    const executeCatalog = vi.fn(() =>
+      Promise.resolve({ ok: true, data: { fonts: [{ family: 'Orbitron' }] } }),
+    );
+    const executeMedia = vi.fn(() =>
+      Promise.resolve({ ok: true, data: { items: [{ provider: 'unsplash' }] } }),
+    );
+    window.history.replaceState({}, '', '/webmcp');
+    Object.defineProperty(document, 'modelContext', {
+      configurable: true,
+      value: {
+        getTools: vi.fn().mockResolvedValue([
+          {
+            name: 'list_authoring_catalog',
+            description: 'List catalog',
+            execute: executeCatalog,
+          },
+          { name: 'search_media', description: 'Search stock media', execute: executeMedia },
+        ]),
+      },
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
+    await screen.findByRole('button', { name: 'list_authoring_catalog' });
+    const action = screen.getByRole('button', { name: 'List authoring catalog' });
+    fireEvent.click(action);
+    expect(screen.queryByLabelText('List authoring catalog command input')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Fonts' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send List authoring catalog' }));
+
+    expect(await screen.findByLabelText('List authoring catalog result')).toHaveTextContent(
+      'Orbitron',
+    );
+    expect(executeCatalog).toHaveBeenLastCalledWith({ kind: 'fonts' });
+    expect(screen.getByRole('status')).toHaveTextContent('List authoring catalog completed.');
+    fireEvent.click(action);
+    expect(screen.queryByLabelText('List authoring catalog result')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('List authoring catalog command input')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    fireEvent.click(action);
+    expect(screen.getByLabelText('List authoring catalog result')).toHaveTextContent('Orbitron');
+    expect(screen.getByLabelText('List authoring catalog command input')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Text animations' }));
+    expect(screen.queryByLabelText('List authoring catalog result')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('List authoring catalog command input')).toHaveValue(
+      JSON.stringify({ kind: 'animations', elementType: 'text' }, null, 2),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Send List authoring catalog' }));
+    await waitFor(() =>
+      expect(executeCatalog).toHaveBeenLastCalledWith({ elementType: 'text', kind: 'animations' }),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Search stock media' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Images' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send Search stock media' }));
+    expect(await screen.findByLabelText('Search stock media result')).toHaveTextContent('unsplash');
+    expect(executeMedia).toHaveBeenLastCalledWith({ kind: 'image', limit: 6, term: 'presentations' });
+  });
+
+  it('keeps parallel-safe actions available while an authoring operation is running', async () => {
+    let finishTranslation!: () => void;
+    const translationFinished = new Promise<string>((resolve) => {
+      finishTranslation = () => {
+        resolve(
+          JSON.stringify({
+            ok: true,
+            data: { operationId: 'translate-1', state: 'completed', stage: 'completed' },
+          }),
+        );
+      };
+    });
+    const tools = webMcpShowcaseCatalog.steps.map((step) => ({
+      name: step.toolName,
+      description: step.label,
+    }));
+    const executeTool = vi.fn((tool: { name: string }) => {
+      if (tool.name === 'translate_deck_and_notes') {
+        return Promise.resolve(
+          JSON.stringify({ ok: true, data: { operationId: 'translate-1' } }),
+        );
+      }
+      if (tool.name === 'get_operation_status') return translationFinished;
+      return Promise.resolve(JSON.stringify({ ok: true, data: {} }));
+    });
+    window.history.replaceState({}, '', '/webmcp');
+    Object.defineProperty(document, 'modelContext', {
+      configurable: true,
+      value: { executeTool, getTools: vi.fn().mockResolvedValue(tools) },
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
+    await screen.findByRole('button', { name: 'translate_deck_and_notes' });
+    fireEvent.click(screen.getByRole('button', { name: 'Translate deck and notes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send Translate deck and notes' }));
+    await waitFor(() =>
+      expect(executeTool).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'get_operation_status' }),
+        expect.any(String),
+      ),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Search stock media' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Images' }));
+    const searchButton = screen.getByRole('button', { name: 'Send Search stock media' });
+    expect(searchButton).toBeEnabled();
+    fireEvent.click(searchButton);
+    await waitFor(() =>
+      expect(executeTool).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'search_media' }),
+        expect.any(String),
+      ),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Upsert slide content' }));
+    expect(screen.getByRole('button', { name: 'Send Upsert slide content' })).toBeDisabled();
+    finishTranslation();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Send Upsert slide content' })).toBeEnabled(),
+    );
+  });
+
   it('dispatches the editable payload for every WebMCP showcase card', async () => {
-    const tools = webMcpShowcaseSteps.map((step) => ({
+    const tools = webMcpShowcaseCatalog.steps.map((step) => ({
       name: step.toolName,
       description: step.label,
     }));
@@ -438,10 +584,13 @@ describe('App', () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
-    await screen.findByRole('button', { name: 'publish_presentation' });
-    for (let index = 0; index < webMcpShowcaseSteps.length; index += 1) {
-      const step = webMcpShowcaseSteps[index]!;
+    await screen.findByRole('button', { name: 'export_presentation' });
+    for (let index = 0; index < webMcpShowcaseCatalog.steps.length; index += 1) {
+      const step = webMcpShowcaseCatalog.steps[index]!;
       fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${step.label}$`) }));
+      if (step.options) {
+        fireEvent.click(screen.getByRole('button', { name: step.options[0]!.label }));
+      }
       fireEvent.click(screen.getByRole('button', { name: new RegExp(`^Send ${step.label}$`) }));
       await waitFor(() => expect(executeTool).toHaveBeenCalledTimes(index + 1));
       expect(executeTool).toHaveBeenNthCalledWith(

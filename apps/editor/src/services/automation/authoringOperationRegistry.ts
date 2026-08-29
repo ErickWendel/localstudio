@@ -44,6 +44,8 @@ function cloneStatus(status: AuthoringOperationStatus): AuthoringOperationStatus
 export class AuthoringOperationRegistry {
   private readonly operations = new Map<string, AuthoringOperationStatus>();
 
+  constructor(private readonly onStatusChange?: (status: AuthoringOperationStatus) => void) {}
+
   start(stage: string, task: OperationTask): AuthoringOperationStatus {
     const operationId = createOperationId();
     const timestamp = new Date().toISOString();
@@ -59,6 +61,7 @@ export class AuthoringOperationRegistry {
       warnings: [],
     };
     this.operations.set(operationId, status);
+    this.onStatusChange?.(cloneStatus(status));
 
     void Promise.resolve().then(async () => {
       this.update(operationId, { state: 'running', progress: 1 });
@@ -94,7 +97,7 @@ export class AuthoringOperationRegistry {
       patch.progress === undefined
         ? current.progress
         : Math.max(current.progress, Math.min(100, Math.round(patch.progress)));
-    this.operations.set(operationId, {
+    const nextStatus: AuthoringOperationStatus = {
       ...current,
       ...patch,
       progress,
@@ -102,6 +105,8 @@ export class AuthoringOperationRegistry {
       revision: current.revision + 1,
       updatedAt: new Date().toISOString(),
       warnings: patch.warnings ? [...patch.warnings] : current.warnings,
-    });
+    };
+    this.operations.set(operationId, nextStatus);
+    this.onStatusChange?.(cloneStatus(nextStatus));
   }
 }

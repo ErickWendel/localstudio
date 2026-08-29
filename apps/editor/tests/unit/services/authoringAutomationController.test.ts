@@ -1,5 +1,6 @@
 import { authoringAutomationController } from '../../../src/services/automation/authoringAutomationController';
 import type { AuthoringAutomationDelegate } from '../../../src/services/automation/authoringAutomationController';
+import type { AuthoringOperationStatus } from '../../../src/services/automation/authoringOperationRegistry';
 import type { SlideUpsertBatch } from '../../../src/services/automation/slideUpsertService';
 
 function createDelegate(
@@ -15,6 +16,7 @@ function createDelegate(
 
 describe('authoringAutomationController', () => {
   it('reports asynchronous operation progress and completion', async () => {
+    const onOperationStatusChange = vi.fn<(status: AuthoringOperationStatus) => void>();
     const controller = new authoringAutomationController.AuthoringAutomationController(
       createDelegate({
         importPowerPointFromUrl: (_input, report) => {
@@ -22,6 +24,7 @@ describe('authoringAutomationController', () => {
           return Promise.resolve({ pageCount: 3 });
         },
       }),
+      { onOperationStatusChange },
     );
 
     const started = controller.importPowerPointFromUrl({ url: 'https://example.test/deck.pptx' });
@@ -39,6 +42,12 @@ describe('authoringAutomationController', () => {
         result: { pageCount: 3 },
       },
     });
+    expect(onOperationStatusChange.mock.calls.map(([status]) => status.state)).toEqual([
+      'queued',
+      'running',
+      'running',
+      'completed',
+    ]);
   });
 
   it('returns the original result for an idempotent upsert replay', async () => {
@@ -190,18 +199,5 @@ describe('authoringAutomationController', () => {
       message: 'requestId conflict was already used with a different batch.',
     });
     expect(upsertSlideContent).toHaveBeenCalledTimes(1);
-  });
-
-  it('returns an explicit pending result for reserved catalog capabilities', () => {
-    const controller = new authoringAutomationController.AuthoringAutomationController(
-      createDelegate(),
-    );
-
-    expect(controller.publishPresentation({})).toEqual({
-      ok: false,
-      errorCode: 'capability_pending',
-      message:
-        'publish_presentation is reserved in the authoring catalog and will be implemented in #177.',
-    });
   });
 });

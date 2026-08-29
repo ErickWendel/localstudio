@@ -25,6 +25,7 @@ import type {
 import { sampleProject } from '../../../domain/projects/sampleProject';
 import { analyticsModelProperties } from '../../../services/analytics/analyticsModelProperties';
 import type { EditorAutomationDelegate } from '../../../services/automation/editorAutomationController';
+import type { AuthoringOperationStatus } from '../../../services/automation/authoringOperationRegistry';
 import type {
   AiProviderState,
   FontCatalogItem,
@@ -59,6 +60,11 @@ import { powerPointIo } from './power-point-io';
 import { textTranslationLayout } from './text-translation-layout';
 import type { TranslationPatch } from './text-translation-layout';
 import { useOperationNotice } from './use-operation-notice';
+import {
+  authoringOperationUiProgress,
+  type DeckTranslationProgressState,
+  type PresentationImportProgressState,
+} from './authoringOperationUiProgress';
 import { useStockMediaLibrary } from './use-stock-media-library';
 import { editorViewModelProgress } from './editorViewModelProgress';
 import { editorViewModelProject } from './editorViewModelProject';
@@ -89,6 +95,10 @@ export type RightPanelTab =
   | 'animations';
 export type TextPreset = 'title' | 'subtitle' | 'body';
 export type { OperationNoticeState } from './use-operation-notice';
+export type {
+  DeckTranslationProgressState,
+  PresentationImportProgressState,
+} from './authoringOperationUiProgress';
 
 export interface MissingPowerPointFont {
   family: string;
@@ -105,20 +115,6 @@ interface PromptPreparationState extends ModelDownloadProgressDetails {
   availability: PromptApiAvailability;
   progress: number;
   status: 'idle' | 'downloading' | 'ready' | 'failed';
-}
-
-export interface PresentationImportProgressState {
-  detail: string;
-  progress: number;
-  stage:
-    | 'reading'
-    | 'inspecting'
-    | 'extracting-objects'
-    | 'downloading-fonts'
-    | 'extracting-media'
-    | 'mapping-animations'
-    | 'opening';
-  title: string;
 }
 
 export type RemoteImportStatus =
@@ -205,13 +201,6 @@ function getMissingPowerPointFonts(project: ProjectDocument, missingFamilies: st
     fonts.set(family.toLowerCase(), current);
   }
   return Array.from(fonts.values()).sort((a, b) => a.family.localeCompare(b.family));
-}
-
-interface DeckTranslationProgressState {
-  activePageIds: string[];
-  completedPages: number;
-  currentPageName: string;
-  totalPages: number;
 }
 
 export function useEditorViewModel(services: AppServices) {
@@ -729,6 +718,21 @@ export function useEditorViewModel(services: AppServices) {
       ...(nextActivePageId ? { activePageId: nextActivePageId } : {}),
       selectedElementIds: [],
     });
+  }
+
+  function updateAuthoringOperationProgress(
+    operationKind: string,
+    status: AuthoringOperationStatus,
+  ) {
+    authoringOperationUiProgress.update(
+      { operationKind, project: projectRef.current, status },
+      {
+        setDeckTranslationProgress,
+        setIsTranslating,
+        setPresentationImportProgress,
+        showOperationNotice,
+      },
+    );
   }
 
   async function downloadRequiredModels() {
@@ -3605,6 +3609,7 @@ export function useEditorViewModel(services: AppServices) {
     automation,
     applyProjectForAutomation,
     replaceProjectForAutomation,
+    updateAuthoringOperationProgress,
     activePageId,
     activePageFocusKey,
     zoomPercent,

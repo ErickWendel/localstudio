@@ -7,7 +7,6 @@ import type { AuthoringAssetCapabilities } from './createAuthoringAssetCapabilit
 import type { deckLocalizationCapability } from './deckLocalizationCapability';
 import type { createAuthoringVisualCapability } from './authoringVisualCapability';
 import type { PowerPointUrlImportService } from './powerPointUrlImportService';
-import type { PresentationPublishingCapability } from './presentationPublishingCapability';
 import { authoringRevision } from './getAuthoringSlideRevision';
 import {
   slideUpsertService,
@@ -23,7 +22,6 @@ interface CreateAuthoringDelegateOptions {
   replaceProject(project: ProjectDocument): void;
   applyProject(project: ProjectDocument, activePageId?: string): void;
   powerPointUrlImportService?: PowerPointUrlImportService | undefined;
-  publishingCapability?: PresentationPublishingCapability<unknown> | undefined;
   visualCapability?: ReturnType<typeof createAuthoringVisualCapability> | undefined;
 }
 
@@ -129,7 +127,6 @@ export function createAuthoringAutomationDelegate(
   const assetCapabilities = options.assetCapabilities;
   const deckLocalization = options.deckLocalization;
   const powerPointUrlImportService = options.powerPointUrlImportService;
-  const publishingCapability = options.publishingCapability;
   const visualCapability = options.visualCapability;
 
   function resolveMedia(
@@ -307,14 +304,6 @@ export function createAuthoringAutomationDelegate(
             input: Parameters<NonNullable<AuthoringAutomationDelegate['exportPresentation']>>[0],
             report: Parameters<NonNullable<AuthoringAutomationDelegate['exportPresentation']>>[1],
           ) => visualCapability.exportPresentation(input, report),
-        }
-      : {}),
-    ...(publishingCapability
-      ? {
-          publishPresentation: (
-            input: Parameters<NonNullable<AuthoringAutomationDelegate['publishPresentation']>>[0],
-            report: Parameters<NonNullable<AuthoringAutomationDelegate['publishPresentation']>>[1],
-          ) => publishingCapability.publish(input, report),
         }
       : {}),
   };

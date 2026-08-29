@@ -44,7 +44,6 @@ export async function evaluateWebMcpToolAdapterExecutionContract(): Promise<WebM
     prepareAiModels: () => Promise.resolve([]),
     searchMedia: unused,
     exportPresentation: unused,
-    publishPresentation: unused,
   });
   const tools = new WebMcpToolAdapter(controller).createTools();
   const byName = new Map(tools.map((tool) => [tool.name, tool]));

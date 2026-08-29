@@ -1,21 +1,53 @@
 .webmcp-page {
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   display: grid;
   grid-template-columns: minmax(380px, 520px) minmax(720px, 1fr);
   background:
     linear-gradient(90deg, rgba(46, 167, 255, 0.14), transparent 42%),
     linear-gradient(180deg, rgba(55, 253, 118, 0.08), transparent 36%), #05090a;
   color: #eefaf5;
+  overflow: hidden;
 }
 
 .webmcp-control-plane {
-  display: flex;
-  flex-direction: column;
+  max-height: 100vh;
+  max-height: 100dvh;
+  display: grid;
+  grid-auto-rows: max-content;
+  align-content: start;
   gap: 22px;
   min-width: 0;
   padding: 28px;
   border-right: 1px solid rgba(122, 255, 199, 0.18);
   background: rgba(5, 12, 13, 0.9);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.webmcp-editor-frame {
+  height: 100vh;
+  height: 100dvh;
+  min-width: 0;
+  min-height: 0;
+  padding: 18px;
+  background:
+    linear-gradient(135deg, rgba(159, 255, 210, 0.08), transparent 30%), rgba(3, 5, 6, 0.88);
+  overflow: hidden;
+}
+
+.webmcp-editor-frame iframe {
+  width: 100%;
+  height: calc(100vh - 36px);
+  height: calc(100dvh - 36px);
+  display: block;
+  border: 1px solid rgba(159, 255, 210, 0.2);
+  border-radius: 8px;
+  background: #050d10;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.45);
 }
 
 .webmcp-brand-row {
@@ -113,8 +145,7 @@
   border-color: #9fffd2;
 }
 
-.webmcp-primary-action:disabled,
-.webmcp-step-button:disabled {
+.webmcp-primary-action:disabled {
   cursor: not-allowed;
   opacity: 0.52;
 }

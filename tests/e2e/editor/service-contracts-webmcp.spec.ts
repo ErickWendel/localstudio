@@ -26,7 +26,6 @@ test('executes WebMCP tool adapter metadata contracts in the browser runtime', a
     'prepare_ai_models',
     'search_media',
     'export_presentation',
-    'publish_presentation',
     'get_operation_status',
   ]);
   expect(result.toolTitles.every(Boolean)).toBe(true);
@@ -86,12 +85,11 @@ test('executes WebMCP tool adapter registration contracts in the browser runtime
     'prepare_ai_models',
     'search_media',
     'export_presentation',
-    'publish_presentation',
     'get_operation_status',
   ]);
   expect(result.individuallyRegisteredNames).toEqual(result.registeredNames);
-  expect(result.batchCleanupCount).toBe(15);
-  expect(result.individualCleanupCount).toBe(15);
+  expect(result.batchCleanupCount).toBe(14);
+  expect(result.individualCleanupCount).toBe(14);
   expect(result.duplicateBatchIgnored).toBe(true);
   expect(result.duplicateIndividualIgnored).toBe(true);
   expect(result.nonDuplicateErrorName).toBe('registration failed');

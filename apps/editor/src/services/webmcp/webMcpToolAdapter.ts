@@ -408,30 +408,6 @@ export class WebMcpToolAdapter {
           }),
       },
       {
-        name: 'publish_presentation',
-        title: 'Publish presentation',
-        description:
-          'Publish the exact current revision, fonts, descriptions, transcript, and authorized recording media.',
-        annotations: operationAnnotations,
-        inputSchema: {
-          type: 'object',
-          additionalProperties: false,
-          properties: {
-            shareId: { type: 'string', minLength: 1, maxLength: 128 },
-            expectedRevision: { type: 'string', minLength: 1, maxLength: 200 },
-          },
-        },
-        execute: (input) =>
-          this.controller.publishPresentation({
-            ...(optionalStringInput(input, 'shareId')
-              ? { shareId: optionalStringInput(input, 'shareId') }
-              : {}),
-            ...(optionalStringInput(input, 'expectedRevision')
-              ? { expectedRevision: optionalStringInput(input, 'expectedRevision') }
-              : {}),
-          }),
-      },
-      {
         name: 'get_operation_status',
         title: 'Get authoring operation status',
         description:

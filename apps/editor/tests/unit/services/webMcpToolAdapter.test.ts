@@ -16,7 +16,6 @@ const expectedToolNames = [
   'prepare_ai_models',
   'search_media',
   'export_presentation',
-  'publish_presentation',
   'get_operation_status',
 ];
 
@@ -37,7 +36,6 @@ function createDelegate(
     prepareAiModels: vi.fn(() => Promise.resolve([])),
     searchMedia: vi.fn(() => Promise.resolve({ results: [] })),
     exportPresentation: vi.fn(() => Promise.resolve({ fileName: 'deck.pptx' })),
-    publishPresentation: vi.fn(() => Promise.resolve({ publicUrl: 'https://example.test/deck' })),
     ...overrides,
   };
 }
@@ -55,7 +53,7 @@ describe('WebMcpToolAdapter', () => {
 
     const tools = registerTools.mock.calls[0]?.[0] ?? [];
     expect(tools.map((tool) => tool.name)).toEqual(expectedToolNames);
-    expect(tools).toHaveLength(15);
+    expect(tools).toHaveLength(14);
     expect(tools.every((tool) => Boolean(tool.title))).toBe(true);
     expect(tools.every((tool) => tool.annotations?.untrustedContentHint)).toBe(true);
     expect(tools.find((tool) => tool.name === 'generate_image')?.description).toContain(
@@ -81,7 +79,7 @@ describe('WebMcpToolAdapter', () => {
     });
 
     expect(() => createAdapter().register({ registerTool })).not.toThrow();
-    expect(registerTool).toHaveBeenCalledTimes(15);
+    expect(registerTool).toHaveBeenCalledTimes(14);
   });
 
   it('normalizes create presentation input before forwarding it', async () => {
@@ -154,42 +152,5 @@ describe('WebMcpToolAdapter', () => {
       errorCode: 'invalid_input',
     });
     expect(upsertSlideContent).not.toHaveBeenCalled();
-  });
-
-  it('forwards the expected exact revision when publishing', async () => {
-    const publishPresentation = vi.fn(() =>
-      Promise.resolve({ publicUrl: 'https://example.test/deck' }),
-    );
-    const tool = createAdapter(createDelegate({ publishPresentation }))
-      .createTools()
-      .find((candidate) => candidate.name === 'publish_presentation');
-
-    expect(
-      await tool?.execute({
-        shareId: 'stable-share',
-        expectedRevision: 'presentation-abcd',
-      }),
-    ).toMatchObject({ ok: true, data: { status: 'queued' } });
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(publishPresentation).toHaveBeenCalledWith(
-      {
-        shareId: 'stable-share',
-        expectedRevision: 'presentation-abcd',
-      },
-      expect.any(Function),
-    );
-  });
-
-  it('does not let WebMCP callers self-authorize private recording audio', async () => {
-    const publishPresentation = vi.fn();
-    const tool = createAdapter(createDelegate({ publishPresentation }))
-      .createTools()
-      .find((candidate) => candidate.name === 'publish_presentation');
-
-    expect(await tool?.execute({ authorizedRecordingIds: ['private-recording'] })).toMatchObject({
-      errorCode: 'invalid_input',
-      ok: false,
-    });
-    expect(publishPresentation).not.toHaveBeenCalled();
   });
 });

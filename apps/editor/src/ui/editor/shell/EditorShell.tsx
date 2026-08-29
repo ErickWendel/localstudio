@@ -11,6 +11,7 @@ import {
   authoringAutomationController,
   type AuthoringProgressReporter,
 } from '../../../services/automation/authoringAutomationController';
+import type { AuthoringOperationStatus } from '../../../services/automation/authoringOperationRegistry';
 import {
   createAuthoringVisualCapability,
   type AuthoringExportInput,
@@ -22,7 +23,6 @@ import { deckLocalizationCapability } from '../../../services/automation/deckLoc
 import { authoringRevision } from '../../../services/automation/getAuthoringSlideRevision';
 import { localSlideDescriptionGenerator } from '../../../services/automation/localSlideDescriptionGenerator';
 import { PowerPointUrlImportService } from '../../../services/automation/powerPointUrlImportService';
-import { PresentationPublishingCapability } from '../../../services/automation/presentationPublishingCapability';
 import { imageGenerationModel } from '../../../services/image-generation/imageGenerationModel';
 import {
   WebMcpToolAdapter,
@@ -529,7 +529,15 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         });
         const { pdfExportService } = await import('../../../services/exporting/pdfExportService');
         return {
-          blob: pdfExportService.createBlob(pages),
+          blob: await pdfExportService.createBlob(pages, {
+            onProgress: (current, total) =>
+              report({
+                stage: 'assembling-pdf',
+                progress: 85 + Math.round((current / total) * 10),
+                current,
+                total,
+              }),
+          }),
           frameCount: renderedFrames.length,
           slideCount: project.pages.length,
           warnings: [],
@@ -652,7 +660,18 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         '../../../services/exporting/pdfExportService'
       );
       services.exportService.downloadBlob(
-        pdfExportService.createBlob(pages),
+        await pdfExportService.createBlob(pages, {
+          onProgress: (current, total) =>
+            showImageExportNotice(
+              {
+                detail: `Assembling ${current} of ${total}`,
+                message: 'Exporting PDF...',
+                progress: { current, total },
+                tone: 'info',
+              },
+              { persistent: true },
+            ),
+        }),
         services.exportService.getPdfFileName(vm.project),
       );
       showImageExportNotice({
@@ -1630,6 +1649,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
 
   useEffect(() => {
     if (!editorShellBrowserUtils.isWebMcpProtocolEnabled()) return undefined;
+    const operationKinds = new Map<string, string>();
     const getProject = () => automationDelegateRef.current.getState().project;
     const applyProject = (project: ProjectDocument, activePageId?: string) =>
       authoringVmRef.current.applyProjectForAutomation(project, activePageId);
@@ -1687,16 +1707,6 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       getActivePageId: () => authoringVmRef.current.activePageId,
       getProject: () => automationDelegateRef.current.getState().project,
     });
-    const publishingCapability = new PresentationPublishingCapability({
-      getSnapshot: () => {
-        const project = getProject();
-        return { project, revision: authoringRevision.getPresentation(project) };
-      },
-      mirror: services.mirrorService,
-      repository: services.projectRepository,
-      share: services.shareService,
-      isRawRecordingAuthorized: (recording) => recording.audio.publicShareAuthorized === true,
-    });
     const delegate = createAuthoringAutomationDelegate({
       assetCapabilities,
       deckLocalization,
@@ -1705,11 +1715,24 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       replaceProject: (project) => authoringVmRef.current.replaceProjectForAutomation(project),
       applyProject,
       powerPointUrlImportService,
-      publishingCapability,
       visualCapability,
     });
+    const handleOperationStatusChange = (status: AuthoringOperationStatus) => {
+      if (status.state === 'queued') {
+        operationKinds.set(status.operationId, status.stage);
+      }
+      const operationKind = operationKinds.get(status.operationId);
+      if (operationKind) {
+        authoringVmRef.current.updateAuthoringOperationProgress(operationKind, status);
+      }
+      if (status.state === 'completed' || status.state === 'failed') {
+        operationKinds.delete(status.operationId);
+      }
+    };
     const adapter = new WebMcpToolAdapter(
-      new authoringAutomationController.AuthoringAutomationController(delegate),
+      new authoringAutomationController.AuthoringAutomationController(delegate, {
+        onOperationStatusChange: handleOperationStatusChange,
+      }),
     );
     const demoWindow = window as WebMcpDemoWindow;
     const modelContext = editorShellBrowserUtils.getWebMcpModelContext();
@@ -1719,6 +1742,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     return () => {
       unregister?.();
       delete demoWindow.localStudioWebMcpTools;
+      operationKinds.clear();
     };
   }, [services]);
 

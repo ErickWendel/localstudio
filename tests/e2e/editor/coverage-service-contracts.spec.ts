@@ -790,7 +790,6 @@ test.describe('editor service contracts coverage batch', () => {
       'prepare_ai_models',
       'search_media',
       'export_presentation',
-      'publish_presentation',
       'get_operation_status',
     ]);
     expect(metadata.toolTitles.every(Boolean)).toBe(true);

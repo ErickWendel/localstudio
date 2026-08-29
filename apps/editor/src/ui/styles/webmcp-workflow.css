@@ -1,11 +1,132 @@
 .webmcp-workflow {
   display: grid;
+  gap: 18px;
+}
+
+.webmcp-workflow-section {
+  display: grid;
+  gap: 10px;
+}
+
+.webmcp-workflow-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid rgba(100, 183, 255, 0.18);
+}
+
+.webmcp-workflow-section-heading h2 {
+  margin: 0;
+  color: #ffffff;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 18px;
+}
+
+.webmcp-workflow-section-heading p {
+  margin: 4px 0 0;
+  color: rgba(238, 250, 245, 0.56);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.webmcp-workflow-section-heading > span {
+  min-width: 24px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(100, 183, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(100, 183, 255, 0.09);
+  color: #bfe5ff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.webmcp-workflow-section-tools {
+  display: grid;
   gap: 9px;
 }
 
 .webmcp-step {
   display: grid;
   gap: 7px;
+}
+
+.webmcp-step-body {
+  display: grid;
+  gap: 7px;
+}
+
+.webmcp-step-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: 30px;
+}
+
+.webmcp-step-option {
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid rgba(100, 183, 255, 0.28);
+  border-radius: 6px;
+  cursor: pointer;
+  background: rgba(100, 183, 255, 0.08);
+  color: #bfe5ff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.webmcp-step-option:hover,
+.webmcp-step-option[aria-pressed='true'] {
+  border-color: rgba(159, 255, 210, 0.62);
+  background: rgba(159, 255, 210, 0.14);
+  color: #9fffd2;
+}
+
+.webmcp-step-status {
+  margin: 0 0 0 30px;
+  padding: 7px 10px;
+  border-left: 2px solid rgba(100, 183, 255, 0.52);
+  background: linear-gradient(90deg, rgba(100, 183, 255, 0.1), transparent 82%);
+  color: rgba(238, 250, 245, 0.76);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.webmcp-step-result {
+  max-height: 320px;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid rgba(122, 255, 199, 0.16);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.26);
+  color: rgba(238, 250, 245, 0.82);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: pre-wrap;
+}
+
+.webmcp-step-result-shell {
+  margin-left: 30px;
+}
+
+.webmcp-step-result-shell > summary {
+  margin-bottom: 7px;
+  cursor: pointer;
+  color: #9fffd2;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .webmcp-step-button {
@@ -19,7 +140,7 @@
   text-align: left;
 }
 
-.webmcp-step-button:hover:not(:disabled),
+.webmcp-step-button:hover,
 .webmcp-step-button-active {
   border-color: rgba(159, 255, 210, 0.62);
   background: rgba(159, 255, 210, 0.1);
@@ -29,18 +150,6 @@
   animation: webmcp-step-pulse 900ms ease-in-out 3;
   border-color: #9fffd2;
   box-shadow: 0 0 0 2px rgba(159, 255, 210, 0.14);
-}
-
-.webmcp-step-index {
-  width: 22px;
-  height: 22px;
-  display: inline-grid;
-  place-items: center;
-  border-radius: 4px;
-  background: rgba(100, 183, 255, 0.16);
-  color: #bfe5ff;
-  font-size: 11px;
-  font-weight: 900;
 }
 
 .webmcp-step-command {

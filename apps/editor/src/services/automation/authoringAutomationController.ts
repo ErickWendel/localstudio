@@ -3,6 +3,7 @@ import type { SlideUpsertBatch, SlideUpsertResult } from './slideUpsertService';
 import {
   AuthoringOperationRegistry,
   type AuthoringOperationProgress,
+  type AuthoringOperationStatus,
 } from './authoringOperationRegistry';
 
 export type AuthoringResult<T> =
@@ -76,13 +77,6 @@ export interface AuthoringAutomationDelegate {
     },
     report: AuthoringProgressReporter,
   ): Promise<unknown>;
-  publishPresentation?(
-    input: {
-      shareId?: string | undefined;
-      expectedRevision?: string | undefined;
-    },
-    report: AuthoringProgressReporter,
-  ): Promise<unknown>;
 }
 
 function success<T>(data: T): AuthoringResult<T> {
@@ -109,13 +103,20 @@ function canonicalize(value: unknown): unknown {
 }
 
 class AuthoringAutomationController {
-  private readonly operations = new AuthoringOperationRegistry();
+  private readonly operations: AuthoringOperationRegistry;
   private readonly upserts = new Map<
     string,
     { inputKey: string; promise: Promise<SlideUpsertResult> }
   >();
 
-  constructor(private readonly delegate: AuthoringAutomationDelegate) {}
+  constructor(
+    private readonly delegate: AuthoringAutomationDelegate,
+    options: {
+      onOperationStatusChange?: (status: AuthoringOperationStatus) => void;
+    } = {},
+  ) {
+    this.operations = new AuthoringOperationRegistry(options.onOperationStatusChange);
+  }
 
   async createPresentation(input: {
     name?: string | undefined;
@@ -296,17 +297,6 @@ class AuthoringAutomationController {
     const run = this.delegate.exportPresentation.bind(this.delegate);
     return operationStarted(
       this.operations.start('exporting-presentation', (report) => run(input, report)),
-    );
-  }
-
-  publishPresentation(input: {
-    shareId?: string | undefined;
-    expectedRevision?: string | undefined;
-  }) {
-    if (!this.delegate.publishPresentation) return this.pending('publish_presentation', 177);
-    const run = this.delegate.publishPresentation.bind(this.delegate);
-    return operationStarted(
-      this.operations.start('publishing-presentation', (report) => run(input, report)),
     );
   }
 

@@ -28,7 +28,6 @@ export async function evaluateWebMcpToolAdapterMetadataContract(): Promise<WebMc
     prepareAiModels: () => Promise.resolve([]),
     searchMedia: unused,
     exportPresentation: unused,
-    publishPresentation: unused,
   });
   const tools = new WebMcpToolAdapter(controller).createTools();
 

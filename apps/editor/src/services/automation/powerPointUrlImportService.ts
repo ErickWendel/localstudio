@@ -30,7 +30,6 @@ export interface PowerPointUrlImportServiceOptions {
 const powerPointMimeType =
   'application/vnd.openxmlformats-officedocument.presentationml.presentation';
 const acceptedMimeTypes = new Set([powerPointMimeType, 'application/octet-stream']);
-const defaultMaxFileSizeBytes = 100 * 1024 * 1024;
 const defaultMaxWarnings = 20;
 const maxWarningMessageLength = 500;
 
@@ -125,18 +124,18 @@ function toBlobPart(bytes: Uint8Array) {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
-async function readBoundedResponse(
+async function readResponseBytes(
   response: Response,
-  maxBytes: number,
+  maxBytes: number | undefined,
   report: AuthoringProgressReporter,
 ) {
   const declaredBytes = parseContentLength(response);
-  if (declaredBytes !== undefined && declaredBytes > maxBytes) {
+  if (maxBytes !== undefined && declaredBytes !== undefined && declaredBytes > maxBytes) {
     return fail('file-too-large', `The file exceeds the ${maxBytes.toLocaleString()} byte limit.`);
   }
   if (!response.body) {
     const buffer = await response.arrayBuffer();
-    if (buffer.byteLength > maxBytes) {
+    if (maxBytes !== undefined && buffer.byteLength > maxBytes) {
       return fail(
         'file-too-large',
         `The file exceeds the ${maxBytes.toLocaleString()} byte limit.`,
@@ -153,12 +152,13 @@ async function readBoundedResponse(
   const reader = response.body.getReader();
   const chunks: ArrayBuffer[] = [];
   let loadedBytes = 0;
+  let lastReportedProgress = 5;
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
       loadedBytes += value.byteLength;
-      if (loadedBytes > maxBytes) {
+      if (maxBytes !== undefined && loadedBytes > maxBytes) {
         await reader.cancel('PowerPoint file exceeds configured size limit.');
         return fail(
           'file-too-large',
@@ -169,12 +169,15 @@ async function readBoundedResponse(
       const downloadProgress = declaredBytes
         ? 5 + Math.min(40, Math.round((loadedBytes / declaredBytes) * 40))
         : Math.min(44, 5 + Math.floor(loadedBytes / (1024 * 1024)));
-      report({
-        stage: 'downloading-powerpoint',
-        progress: downloadProgress,
-        loadedBytes,
-        ...(declaredBytes !== undefined ? { totalBytes: declaredBytes } : {}),
-      });
+      if (downloadProgress !== lastReportedProgress) {
+        lastReportedProgress = downloadProgress;
+        report({
+          stage: 'downloading-powerpoint',
+          progress: downloadProgress,
+          loadedBytes,
+          ...(declaredBytes !== undefined ? { totalBytes: declaredBytes } : {}),
+        });
+      }
     }
   } finally {
     reader.releaseLock();
@@ -208,14 +211,17 @@ function getDefaultFetch() {
 
 export class PowerPointUrlImportService {
   private readonly requestFetch: typeof fetch;
-  private readonly maxFileSizeBytes: number;
+  private readonly maxFileSizeBytes: number | undefined;
   private readonly maxWarnings: number;
 
   constructor(private readonly options: PowerPointUrlImportServiceOptions) {
     this.requestFetch = options.fetch ?? getDefaultFetch();
-    this.maxFileSizeBytes = options.maxFileSizeBytes ?? defaultMaxFileSizeBytes;
+    this.maxFileSizeBytes = options.maxFileSizeBytes;
     this.maxWarnings = options.maxWarnings ?? defaultMaxWarnings;
-    if (!Number.isSafeInteger(this.maxFileSizeBytes) || this.maxFileSizeBytes < 1) {
+    if (
+      this.maxFileSizeBytes !== undefined &&
+      (!Number.isSafeInteger(this.maxFileSizeBytes) || this.maxFileSizeBytes < 1)
+    ) {
       throw new Error('maxFileSizeBytes must be a positive safe integer.');
     }
     if (!Number.isSafeInteger(this.maxWarnings) || this.maxWarnings < 1) {
@@ -251,7 +257,7 @@ export class PowerPointUrlImportService {
 
     const contentType = validateContentType(response);
     const fileName = resolveFileName(input, url, response);
-    const download = await readBoundedResponse(response, this.maxFileSizeBytes, report);
+    const download = await readResponseBytes(response, this.maxFileSizeBytes, report);
     const file = new File(download.bytes, fileName, {
       type: contentType === 'application/octet-stream' ? powerPointMimeType : contentType,
     });

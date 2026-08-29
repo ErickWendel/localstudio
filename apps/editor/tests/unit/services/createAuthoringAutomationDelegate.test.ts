@@ -75,9 +75,6 @@ describe('createAuthoringAutomationDelegate', () => {
       powerPointUrlImportService: {
         importPowerPointFromUrl: vi.fn(),
       } as never,
-      publishingCapability: {
-        publish: vi.fn(),
-      } as never,
       visualCapability: {
         exportPresentation: vi.fn(),
         getSlidePreview: vi.fn(),
@@ -96,7 +93,6 @@ describe('createAuthoringAutomationDelegate', () => {
         'searchMedia',
         'getSlidePreview',
         'exportPresentation',
-        'publishPresentation',
       ].every(
         (method) => typeof harness.delegate[method as keyof typeof harness.delegate] === 'function',
       ),

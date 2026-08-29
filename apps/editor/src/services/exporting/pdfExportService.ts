@@ -1,38 +1,60 @@
-import { jsPDF } from 'jspdf';
+import type {
+  PdfExportPage,
+  PdfExportWorkerRequest,
+  PdfExportWorkerResponse,
+} from './pdfExportWorkerProtocol';
 
-export interface PdfExportPage {
-  bytes: Uint8Array;
-  heightPoints: number;
-  widthPoints: number;
-}
+export type { PdfExportPage } from './pdfExportWorkerProtocol';
 
-function getPageFormat(page: PdfExportPage): [number, number] {
-  return [page.widthPoints, page.heightPoints];
+function createPdfWorker() {
+  if (typeof Worker === 'undefined') throw new Error('Web workers are required for PDF export.');
+  return new Worker(new URL('./pdfExport.worker.ts', import.meta.url), { type: 'module' });
 }
 
 export const pdfExportService = {
-  createBlob(pages: PdfExportPage[]) {
-    const firstPage = pages[0];
-    if (!firstPage) throw new Error('A PDF export needs at least one slide.');
-    const firstFormat = getPageFormat(firstPage);
-    const document = new jsPDF({
-      compress: true,
-      format: firstFormat,
-      orientation: firstPage.widthPoints >= firstPage.heightPoints ? 'landscape' : 'portrait',
-      unit: 'pt',
-    });
-
-    pages.forEach((page, index) => {
-      const format = getPageFormat(page);
-      if (index > 0) {
-        document.addPage(
-          format,
-          page.widthPoints >= page.heightPoints ? 'landscape' : 'portrait',
-        );
+  createBlob(
+    pages: PdfExportPage[],
+    options: { onProgress?: (current: number, total: number) => void } = {},
+  ) {
+    if (!pages.length) return Promise.reject(new Error('A PDF export needs at least one slide.'));
+    return new Promise<Blob>((resolve, reject) => {
+      let worker: Worker;
+      try {
+        worker = createPdfWorker();
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error('PDF export worker is unavailable.'));
+        return;
       }
-      document.addImage(page.bytes, 'PNG', 0, 0, format[0], format[1], undefined, 'FAST');
+      worker.onmessage = (event: MessageEvent<PdfExportWorkerResponse>) => {
+        const response = event.data;
+        if (response.type === 'progress') {
+          options.onProgress?.(response.current, response.total);
+          return;
+        }
+        worker.terminate();
+        if (response.type === 'error') {
+          reject(new Error(response.message));
+          return;
+        }
+        resolve(new Blob([response.bytes], { type: 'application/pdf' }));
+      };
+      worker.onerror = (event) => {
+        worker.terminate();
+        reject(new Error(event.message || 'PDF export worker failed.'));
+      };
+      try {
+        const transfer = [
+          ...new Set(
+            pages
+              .map((page) => page.bytes.buffer)
+              .filter((buffer): buffer is ArrayBuffer => buffer instanceof ArrayBuffer),
+          ),
+        ];
+        worker.postMessage({ pages, type: 'create-pdf' } satisfies PdfExportWorkerRequest, transfer);
+      } catch (error) {
+        worker.terminate();
+        reject(error instanceof Error ? error : new Error('PDF export could not be started.'));
+      }
     });
-
-    return document.output('blob');
   },
 };

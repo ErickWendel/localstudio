@@ -1,207 +1,28 @@
-import { Bot, FileJson, Play, Radar, SendHorizontal } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
-import { type WebMcpShowcaseStep, webMcpShowcaseSteps } from './webMcpShowcaseSteps';
-
-interface WebMcpToolLike {
-  call?: (input: Record<string, unknown>) => unknown;
-  description?: string;
-  execute?: (input: Record<string, unknown>) => unknown;
-  invoke?: (input: Record<string, unknown>) => unknown;
-  name: string;
-}
-
-interface BrowserModelContext {
-  executeTool?: (tool: WebMcpToolLike, inputArguments: string) => unknown;
-  getTools(options: { fromOrigins: string[] }): Promise<WebMcpToolLike[]>;
-}
-
-function getBrowserModelContext() {
-  if (typeof document === 'undefined') return undefined;
-  return (document as Document & { modelContext?: BrowserModelContext }).modelContext;
-}
-
-function isWebMcpToolLikeArray(value: unknown): value is WebMcpToolLike[] {
-  return (
-    Array.isArray(value) &&
-    value.every((item) => {
-      if (!item || typeof item !== 'object') return false;
-      return typeof (item as { name?: unknown }).name === 'string';
-    })
-  );
-}
-
-function getLocalDemoTools(iframe: HTMLIFrameElement) {
-  const frameWindow = iframe.contentWindow;
-  if (!frameWindow || !('localStudioWebMcpTools' in frameWindow)) return undefined;
-  const tools = frameWindow.localStudioWebMcpTools;
-  return isWebMcpToolLikeArray(tools) ? tools : undefined;
-}
-
-async function waitForLocalDemoTools(iframe: HTMLIFrameElement) {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const tools = getLocalDemoTools(iframe);
-    if (tools?.length) return tools;
-    await new Promise((resolve) => window.setTimeout(resolve, 100));
-  }
-  return undefined;
-}
-
-async function callTool(
-  tool: WebMcpToolLike,
-  input: Record<string, unknown>,
-  useProtocolExecution: boolean,
-) {
-  const modelContext = useProtocolExecution ? getBrowserModelContext() : undefined;
-  if (modelContext?.executeTool) {
-    const result = await modelContext.executeTool(tool, JSON.stringify(input));
-    if (typeof result !== 'string') return result;
-    try {
-      return JSON.parse(result) as unknown;
-    } catch {
-      return result;
-    }
-  }
-  const callable = tool.call ?? tool.execute ?? tool.invoke;
-  if (!callable) throw new Error(`${tool.name} is not callable in this WebMCP runtime.`);
-  return callable(input);
-}
-
-function formatPayload(value: unknown) {
-  return JSON.stringify(value, null, 2);
-}
-
-function getDefaultCommandValue(step: WebMcpShowcaseStep) {
-  const primaryValue = step.input.name;
-  return step.inputKind === 'name' && typeof primaryValue === 'string'
-    ? primaryValue
-    : formatPayload(step.input);
-}
-
-function getCommandInput(step: WebMcpShowcaseStep, value: string) {
-  if (step.inputKind === 'name') return { name: value };
-  return JSON.parse(value) as Record<string, unknown>;
-}
-
-function getOperationId(value: unknown) {
-  if (!value || typeof value !== 'object') return undefined;
-  const data = (value as { data?: unknown }).data;
-  if (!data || typeof data !== 'object') return undefined;
-  const operationId = (data as { operationId?: unknown }).operationId;
-  return typeof operationId === 'string' ? operationId : undefined;
-}
-
-function getToolFailure(value: unknown) {
-  if (!value || typeof value !== 'object') return undefined;
-  const result = value as { errorCode?: unknown; message?: unknown; ok?: unknown };
-  if (result.ok !== false) return undefined;
-  if (typeof result.message === 'string') return result.message;
-  if (typeof result.errorCode === 'string') return result.errorCode;
-  return 'The tool returned an unsuccessful result.';
-}
+import { FileJson, Play, Radar, SendHorizontal } from 'lucide-react';
+import { webMcpShowcaseCatalog } from './webMcpShowcaseSteps';
+import { useWebMcpShowcase } from './useWebMcpShowcase';
 
 export function WebMcpShowcasePage() {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const stepButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const [tools, setTools] = useState<WebMcpToolLike[]>([]);
-  const [status, setStatus] = useState('Ready to discover page tools.');
-  const [lastResult, setLastResult] = useState<string>('{}');
-  const [isRunning, setIsRunning] = useState(false);
-  const [useProtocolExecution, setUseProtocolExecution] = useState(false);
-  const [activeStepName, setActiveStepName] = useState<string | undefined>();
-  const [focusedStepName, setFocusedStepName] = useState<string | undefined>();
-  const [commandValues, setCommandValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(
-      webMcpShowcaseSteps.map((step) => [step.toolName, getDefaultCommandValue(step)]),
-    ),
-  );
-  const editorSrc = '/editor/?webmcp=1&newProject=1';
-  const toolsByName = useMemo(() => new Map(tools.map((tool) => [tool.name, tool])), [tools]);
-
-  function openStep(step: WebMcpShowcaseStep) {
-    setActiveStepName(step.toolName);
-    setFocusedStepName(step.toolName);
-  }
-
-  function focusStep(toolName: string) {
-    setActiveStepName(toolName);
-    setFocusedStepName(toolName);
-    stepButtonRefs.current[toolName]?.focus();
-    window.requestAnimationFrame(() => {
-      const stepButton = stepButtonRefs.current[toolName];
-      stepButton?.focus();
-      stepButton?.scrollIntoView?.({ block: 'nearest' });
-    });
-  }
-
-  async function discoverTools() {
-    const iframe = iframeRef.current;
-    if (!iframe) {
-      setStatus('Editor iframe is not ready yet.');
-      setTools([]);
-      return;
-    }
-
-    setStatus('Discovering tools from LocalStudio...');
-    const modelContext = getBrowserModelContext();
-    const iframeOrigin = new URL(iframe.src).origin;
-    const protocolTools = modelContext
-      ? await modelContext.getTools({ fromOrigins: [iframeOrigin] })
-      : undefined;
-    const discoveredTools = protocolTools?.length
-      ? protocolTools
-      : await waitForLocalDemoTools(iframe);
-    const usedProtocolTools = Boolean(protocolTools?.length);
-    if (!discoveredTools) {
-      setStatus(
-        'No WebMCP runtime or same-origin demo tools found. Wait for the editor frame, then try again.',
-      );
-      setTools([]);
-      return;
-    }
-    setTools(discoveredTools);
-    setUseProtocolExecution(usedProtocolTools);
-    setStatus(
-      usedProtocolTools
-        ? `Discovered ${discoveredTools.length} tools through WebMCP.`
-        : `Discovered ${discoveredTools.length} tools through the local demo bridge.`,
-    );
-    setLastResult(
-      formatPayload(
-        discoveredTools.map((tool) => ({ name: tool.name, description: tool.description })),
-      ),
-    );
-  }
-
-  async function runStep(step: WebMcpShowcaseStep, commandValue: string) {
-    const tool = toolsByName.get(step.toolName);
-    if (!tool) {
-      setStatus(`${step.toolName} has not been discovered yet.`);
-      return;
-    }
-
-    setIsRunning(true);
-    setStatus(`Running ${step.label}...`);
-    try {
-      const input = getCommandInput(step, commandValue);
-      const result = await callTool(tool, input, useProtocolExecution);
-      setLastResult(formatPayload(result));
-      const failure = getToolFailure(result);
-      setStatus(failure ? `${step.label} failed: ${failure}` : `${step.label} completed.`);
-      const operationId = getOperationId(result);
-      if (operationId) {
-        setCommandValues((current) => ({
-          ...current,
-          get_operation_status: formatPayload({ operationId, waitForChangeMs: 1000 }),
-        }));
-      }
-    } catch (error) {
-      setStatus(
-        `${step.label} failed: ${error instanceof Error ? error.message : 'Unknown error.'}`,
-      );
-    } finally {
-      setIsRunning(false);
-    }
-  }
+  const {
+    actionResults,
+    actionStatuses,
+    activeStepName,
+    commandValues,
+    discoverTools,
+    discoveryStatus,
+    focusStep,
+    focusedStepName,
+    iframeRef,
+    isDiscovering,
+    isStepDisabled,
+    openStep,
+    runStep,
+    selectedOptionIds,
+    setCommandValue,
+    selectStepOption,
+    stepButtonRefs,
+    tools,
+  } = useWebMcpShowcase();
 
   return (
     <main className="webmcp-page">
@@ -224,7 +45,7 @@ export function WebMcpShowcasePage() {
         <div className="webmcp-action-row">
           <button
             className="webmcp-primary-action"
-            disabled={isRunning}
+            disabled={isDiscovering}
             type="button"
             onClick={() => {
               void discoverTools();
@@ -233,7 +54,7 @@ export function WebMcpShowcasePage() {
             <Radar size={16} />
             <span>Discover tools</span>
           </button>
-          <span className="webmcp-status">{status}</span>
+          <span className="webmcp-status">{discoveryStatus}</span>
         </div>
 
         <div className="webmcp-tool-list" aria-label="Discovered tools">
@@ -255,84 +76,147 @@ export function WebMcpShowcasePage() {
           )}
         </div>
 
-        <div className="webmcp-workflow" aria-label="Demo workflow">
-          {webMcpShowcaseSteps.map((step, index) => (
-            <div className="webmcp-step" key={step.toolName}>
-              <button
-                ref={(element) => {
-                  stepButtonRefs.current[step.toolName] = element;
-                }}
-                aria-label={step.label}
-                className={[
-                  'webmcp-step-button',
-                  activeStepName === step.toolName ? 'webmcp-step-button-active' : '',
-                  focusedStepName === step.toolName ? 'webmcp-step-button-focused' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-                disabled={isRunning}
-                type="button"
-                onClick={() => {
-                  openStep(step);
-                }}
+        {tools.length > 0 ? (
+          <div className="webmcp-workflow" aria-label="Demo workflow">
+            {webMcpShowcaseCatalog.sections.map((section) => (
+              <section
+                aria-labelledby={`webmcp-section-${section.id}`}
+                className="webmcp-workflow-section"
+                key={section.id}
               >
-                <span className="webmcp-step-index">{index + 1}</span>
-                {step.toolName === 'get_presentation_state' ? <FileJson size={16} /> : null}
-                {step.toolName !== 'get_presentation_state' ? <Play size={16} /> : null}
-                <span>{step.label}</span>
-              </button>
-              {activeStepName === step.toolName ? (
-                <form
-                  className="webmcp-step-command"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    void runStep(step, commandValues[step.toolName] ?? '');
-                  }}
-                >
-                  {step.inputKind === 'name' ? (
-                    <input
-                      aria-label={`${step.label} command input`}
-                      value={commandValues[step.toolName] ?? ''}
-                      onChange={(event) => {
-                        setCommandValues((current) => ({
-                          ...current,
-                          [step.toolName]: event.target.value,
-                        }));
-                      }}
-                    />
-                  ) : (
-                    <textarea
-                      aria-label={`${step.label} command input`}
-                      rows={5}
-                      value={commandValues[step.toolName] ?? ''}
-                      onChange={(event) => {
-                        setCommandValues((current) => ({
-                          ...current,
-                          [step.toolName]: event.target.value,
-                        }));
-                      }}
-                    />
-                  )}
-                  <button aria-label={`Send ${step.label}`} disabled={isRunning} type="submit">
-                    <SendHorizontal size={15} />
-                  </button>
-                </form>
-              ) : null}
-            </div>
-          ))}
-        </div>
-
-        <section className="webmcp-result-panel" aria-label="Last WebMCP result">
-          <div className="webmcp-result-heading">
-            <Bot size={16} />
-            <span>Last result</span>
+                <header className="webmcp-workflow-section-heading">
+                  <div>
+                    <h2 id={`webmcp-section-${section.id}`}>{section.title}</h2>
+                    <p>{section.description}</p>
+                  </div>
+                  <span>{section.steps.length}</span>
+                </header>
+                <div className="webmcp-workflow-section-tools">
+                  {section.steps.map((step) => {
+                    const isActive = activeStepName === step.toolName;
+                    const selectedOptionId = selectedOptionIds[step.toolName];
+                    const showCommand = !step.options || Boolean(selectedOptionId);
+                    return (
+                      <div className="webmcp-step" key={step.toolName}>
+                        <button
+                          ref={(element) => {
+                            stepButtonRefs.current[step.toolName] = element;
+                          }}
+                          aria-expanded={isActive}
+                          aria-label={step.label}
+                          className={[
+                            'webmcp-step-button',
+                            isActive ? 'webmcp-step-button-active' : '',
+                            focusedStepName === step.toolName
+                              ? 'webmcp-step-button-focused'
+                              : '',
+                          ]
+                            .filter(Boolean)
+                            .join(' ')}
+                          type="button"
+                          onClick={() => {
+                            openStep(step);
+                          }}
+                        >
+                          {step.toolName === 'get_presentation_state' ? (
+                            <FileJson size={16} />
+                          ) : (
+                            <Play size={16} />
+                          )}
+                          <span>{step.label}</span>
+                        </button>
+                        {isActive ? (
+                          <div className="webmcp-step-body">
+                          {actionStatuses[step.toolName] ? (
+                            <p className="webmcp-step-status" role="status" aria-live="polite">
+                              {actionStatuses[step.toolName]}
+                            </p>
+                          ) : null}
+                          {step.options ? (
+                            <div
+                              aria-label={`${step.label} options`}
+                              className="webmcp-step-options"
+                              role="group"
+                            >
+                              {step.options.map((option) => (
+                                <button
+                                  aria-pressed={selectedOptionId === option.id}
+                                  className="webmcp-step-option"
+                                  key={option.id}
+                                  type="button"
+                                  onClick={() => {
+                                    selectStepOption(step, option);
+                                  }}
+                                >
+                                  {option.label}
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
+                          {showCommand ? (
+                            <form
+                              className="webmcp-step-command"
+                              onSubmit={(event) => {
+                                event.preventDefault();
+                                void runStep(step, commandValues[step.toolName] ?? '');
+                              }}
+                            >
+                              {step.inputKind === 'name' ? (
+                                <input
+                                  aria-label={`${step.label} command input`}
+                                  value={commandValues[step.toolName] ?? ''}
+                                  onChange={(event) => {
+                                    setCommandValue(step.toolName, event.target.value);
+                                  }}
+                                />
+                              ) : (
+                                <textarea
+                                  aria-label={`${step.label} command input`}
+                                  rows={5}
+                                  value={commandValues[step.toolName] ?? ''}
+                                  onChange={(event) => {
+                                    setCommandValue(step.toolName, event.target.value);
+                                  }}
+                                />
+                              )}
+                              <button
+                                aria-label={`Send ${step.label}`}
+                                disabled={isStepDisabled(step)}
+                                type="submit"
+                              >
+                                <SendHorizontal size={15} />
+                              </button>
+                            </form>
+                          ) : null}
+                          {actionResults[step.toolName] ? (
+                            <details className="webmcp-step-result-shell" open>
+                              <summary>Result</summary>
+                              <pre
+                                aria-label={`${step.label} result`}
+                                className="webmcp-step-result"
+                              >
+                                {actionResults[step.toolName]}
+                              </pre>
+                            </details>
+                          ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
           </div>
-          <pre>{lastResult}</pre>
-        </section>
+        ) : null}
       </section>
 
       <section className="webmcp-editor-frame" aria-label="LocalStudio editor frame">
-        <iframe ref={iframeRef} src={editorSrc} title="LocalStudio editor WebMCP demo" />
+        <iframe
+          ref={iframeRef}
+          src="/editor/?webmcp=1&newProject=1"
+          title="LocalStudio editor WebMCP demo"
+        />
       </section>
     </main>
   );

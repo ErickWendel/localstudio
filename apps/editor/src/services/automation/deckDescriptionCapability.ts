@@ -57,6 +57,7 @@ export interface DeckDescriptionResult {
     language: string;
     sourceRevision: string;
     freshness: 'fresh';
+    text: string;
   }>;
   failures: DeckDescriptionFailure[];
   failureCount: number;
@@ -67,6 +68,7 @@ export interface DeckDescriptionResult {
 const descriptionLimits = {
   maxCharacters: 12_000,
   maxEntries: 100,
+  maxResultCharacters: 2_000,
   maxSceneElements: 100,
   maxSceneTextCharacters: 2_000,
 } as const;
@@ -296,6 +298,7 @@ function createCapability(options: DeckLocalizationCapabilityOptions) {
         language: descriptionLanguage,
         sourceRevision,
         freshness: 'fresh',
+        text: text.slice(0, descriptionLimits.maxResultCharacters),
       });
       report({
         stage: 'describing-slides',
