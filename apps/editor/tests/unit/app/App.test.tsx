@@ -475,8 +475,11 @@ describe('App', () => {
       'Orbitron',
     );
     fireEvent.click(action);
-    expect(screen.getByLabelText('List authoring catalog result')).toBeInTheDocument();
+    expect(screen.queryByLabelText('List authoring catalog result')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('List authoring catalog command input')).not.toBeInTheDocument();
+    fireEvent.click(action);
+    expect(screen.getByLabelText('List authoring catalog result')).toHaveTextContent('Orbitron');
+    expect(screen.getByLabelText('List authoring catalog command input')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Search stock media' }));
     fireEvent.click(screen.getByRole('button', { name: 'Send Search stock media' }));

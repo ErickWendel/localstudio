@@ -193,6 +193,18 @@ test.describe('WebMCP discover tools journey', () => {
     await expect(page.getByLabel('Inspect presentation state result')).toContainText(
       'Presentations become agent-native',
     );
+    const stateAction = workflow.getByRole('button', {
+      name: 'Inspect presentation state',
+      exact: true,
+    });
+    await stateAction.click();
+    await expect(page.getByLabel('Inspect presentation state command input')).toHaveCount(0);
+    await expect(page.getByLabel('Inspect presentation state result')).toHaveCount(0);
+    await stateAction.click();
+    await expect(page.getByLabel('Inspect presentation state command input')).toBeVisible();
+    await expect(page.getByLabel('Inspect presentation state result')).toContainText(
+      'Presentations become agent-native',
+    );
 
     await page.getByRole('button', { name: 'Prepare AI models' }).click();
     await page.getByLabel('Prepare AI models command input').fill('{"modelIds":[]}');

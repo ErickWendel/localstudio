@@ -439,7 +439,7 @@ export function WebMcpShowcasePage() {
                           </button>
                         </form>
                       ) : null}
-                      {actionResults[step.toolName] ? (
+                      {activeStepName === step.toolName && actionResults[step.toolName] ? (
                         <details className="webmcp-step-result-shell" open>
                           <summary>Result</summary>
                           <pre aria-label={`${step.label} result`} className="webmcp-step-result">
