@@ -17,6 +17,13 @@ interface BrowserModelContext {
   getTools(options: { fromOrigins: string[] }): Promise<WebMcpToolLike[]>;
 }
 
+interface WebMcpOperationStatus {
+  error?: string;
+  percentage?: number;
+  stage?: string;
+  state: 'queued' | 'running' | 'completed' | 'failed';
+}
+
 function getBrowserModelContext() {
   if (typeof document === 'undefined') return undefined;
   return (document as Document & { modelContext?: BrowserModelContext }).modelContext;
@@ -99,6 +106,27 @@ function getToolFailure(value: unknown) {
   if (typeof result.message === 'string') return result.message;
   if (typeof result.errorCode === 'string') return result.errorCode;
   return 'The tool returned an unsuccessful result.';
+}
+
+function getOperationStatus(value: unknown): WebMcpOperationStatus | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const data = (value as { data?: unknown }).data;
+  if (!data || typeof data !== 'object') return undefined;
+  const status = data as {
+    error?: unknown;
+    percentage?: unknown;
+    stage?: unknown;
+    state?: unknown;
+  };
+  if (!['queued', 'running', 'completed', 'failed'].includes(String(status.state))) {
+    return undefined;
+  }
+  return {
+    ...(typeof status.error === 'string' ? { error: status.error } : {}),
+    ...(typeof status.percentage === 'number' ? { percentage: status.percentage } : {}),
+    ...(typeof status.stage === 'string' ? { stage: status.stage } : {}),
+    state: status.state as WebMcpOperationStatus['state'],
+  };
 }
 
 export function WebMcpShowcasePage() {
@@ -188,14 +216,48 @@ export function WebMcpShowcasePage() {
       const result = await callTool(tool, input, useProtocolExecution);
       setLastResult(formatPayload(result));
       const failure = getToolFailure(result);
-      setStatus(failure ? `${step.label} failed: ${failure}` : `${step.label} completed.`);
+      if (failure) {
+        setStatus(`${step.label} failed: ${failure}`);
+        return;
+      }
       const operationId = getOperationId(result);
-      if (operationId) {
+      if (operationId && step.toolName !== 'get_operation_status') {
         setCommandValues((current) => ({
           ...current,
           get_operation_status: formatPayload({ operationId, waitForChangeMs: 1000 }),
         }));
+        const operationTool = toolsByName.get('get_operation_status');
+        if (!operationTool) {
+          setStatus(`${step.label} started. Use Get operation status to follow its progress.`);
+          return;
+        }
+        setStatus(`${step.label} started. Waiting for the operation to finish.`);
+        while (true) {
+          const operationResult = await callTool(
+            operationTool,
+            { operationId, waitForChangeMs: 1000 },
+            useProtocolExecution,
+          );
+          setLastResult(formatPayload(operationResult));
+          const operationFailure = getToolFailure(operationResult);
+          if (operationFailure) throw new Error(operationFailure);
+          const operationStatus = getOperationStatus(operationResult);
+          if (!operationStatus) throw new Error('The operation returned an invalid status.');
+          if (operationStatus.state === 'completed') {
+            setStatus(`${step.label} completed.`);
+            return;
+          }
+          if (operationStatus.state === 'failed') {
+            setStatus(`${step.label} failed: ${operationStatus.error ?? 'The operation failed.'}`);
+            return;
+          }
+          const stage = operationStatus.stage ? `: ${operationStatus.stage}` : '';
+          const percentage =
+            operationStatus.percentage === undefined ? '' : ` (${operationStatus.percentage}%)`;
+          setStatus(`${step.label} is ${operationStatus.state}${stage}${percentage}.`);
+        }
       }
+      setStatus(`${step.label} completed.`);
     } catch (error) {
       setStatus(
         `${step.label} failed: ${error instanceof Error ? error.message : 'Unknown error.'}`,
@@ -257,92 +319,94 @@ export function WebMcpShowcasePage() {
           )}
         </div>
 
-        <div className="webmcp-workflow" aria-label="Demo workflow">
-          {webMcpShowcaseSections.map((section) => (
-            <section
-              aria-labelledby={`webmcp-section-${section.id}`}
-              className="webmcp-workflow-section"
-              key={section.id}
-            >
-              <header className="webmcp-workflow-section-heading">
-                <div>
-                  <h2 id={`webmcp-section-${section.id}`}>{section.title}</h2>
-                  <p>{section.description}</p>
-                </div>
-                <span>{section.steps.length}</span>
-              </header>
-              <div className="webmcp-workflow-section-tools">
-                {section.steps.map((step) => (
-                  <div className="webmcp-step" key={step.toolName}>
-                    <button
-                      ref={(element) => {
-                        stepButtonRefs.current[step.toolName] = element;
-                      }}
-                      aria-label={step.label}
-                      className={[
-                        'webmcp-step-button',
-                        activeStepName === step.toolName ? 'webmcp-step-button-active' : '',
-                        focusedStepName === step.toolName ? 'webmcp-step-button-focused' : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' ')}
-                      disabled={isRunning}
-                      type="button"
-                      onClick={() => {
-                        openStep(step);
-                      }}
-                    >
-                      {step.toolName === 'get_presentation_state' ? <FileJson size={16} /> : null}
-                      {step.toolName !== 'get_presentation_state' ? <Play size={16} /> : null}
-                      <span>{step.label}</span>
-                    </button>
-                    {activeStepName === step.toolName ? (
-                      <form
-                        className="webmcp-step-command"
-                        onSubmit={(event) => {
-                          event.preventDefault();
-                          void runStep(step, commandValues[step.toolName] ?? '');
+        {tools.length > 0 ? (
+          <div className="webmcp-workflow" aria-label="Demo workflow">
+            {webMcpShowcaseSections.map((section) => (
+              <section
+                aria-labelledby={`webmcp-section-${section.id}`}
+                className="webmcp-workflow-section"
+                key={section.id}
+              >
+                <header className="webmcp-workflow-section-heading">
+                  <div>
+                    <h2 id={`webmcp-section-${section.id}`}>{section.title}</h2>
+                    <p>{section.description}</p>
+                  </div>
+                  <span>{section.steps.length}</span>
+                </header>
+                <div className="webmcp-workflow-section-tools">
+                  {section.steps.map((step) => (
+                    <div className="webmcp-step" key={step.toolName}>
+                      <button
+                        ref={(element) => {
+                          stepButtonRefs.current[step.toolName] = element;
+                        }}
+                        aria-label={step.label}
+                        className={[
+                          'webmcp-step-button',
+                          activeStepName === step.toolName ? 'webmcp-step-button-active' : '',
+                          focusedStepName === step.toolName ? 'webmcp-step-button-focused' : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                        disabled={isRunning}
+                        type="button"
+                        onClick={() => {
+                          openStep(step);
                         }}
                       >
-                        {step.inputKind === 'name' ? (
-                          <input
-                            aria-label={`${step.label} command input`}
-                            value={commandValues[step.toolName] ?? ''}
-                            onChange={(event) => {
-                              setCommandValues((current) => ({
-                                ...current,
-                                [step.toolName]: event.target.value,
-                              }));
-                            }}
-                          />
-                        ) : (
-                          <textarea
-                            aria-label={`${step.label} command input`}
-                            rows={5}
-                            value={commandValues[step.toolName] ?? ''}
-                            onChange={(event) => {
-                              setCommandValues((current) => ({
-                                ...current,
-                                [step.toolName]: event.target.value,
-                              }));
-                            }}
-                          />
-                        )}
-                        <button
-                          aria-label={`Send ${step.label}`}
-                          disabled={isRunning}
-                          type="submit"
+                        {step.toolName === 'get_presentation_state' ? <FileJson size={16} /> : null}
+                        {step.toolName !== 'get_presentation_state' ? <Play size={16} /> : null}
+                        <span>{step.label}</span>
+                      </button>
+                      {activeStepName === step.toolName ? (
+                        <form
+                          className="webmcp-step-command"
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            void runStep(step, commandValues[step.toolName] ?? '');
+                          }}
                         >
-                          <SendHorizontal size={15} />
-                        </button>
-                      </form>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            </section>
-          ))}
-        </div>
+                          {step.inputKind === 'name' ? (
+                            <input
+                              aria-label={`${step.label} command input`}
+                              value={commandValues[step.toolName] ?? ''}
+                              onChange={(event) => {
+                                setCommandValues((current) => ({
+                                  ...current,
+                                  [step.toolName]: event.target.value,
+                                }));
+                              }}
+                            />
+                          ) : (
+                            <textarea
+                              aria-label={`${step.label} command input`}
+                              rows={5}
+                              value={commandValues[step.toolName] ?? ''}
+                              onChange={(event) => {
+                                setCommandValues((current) => ({
+                                  ...current,
+                                  [step.toolName]: event.target.value,
+                                }));
+                              }}
+                            />
+                          )}
+                          <button
+                            aria-label={`Send ${step.label}`}
+                            disabled={isRunning}
+                            type="submit"
+                          >
+                            <SendHorizontal size={15} />
+                          </button>
+                        </form>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        ) : null}
 
         <section className="webmcp-result-panel" aria-label="Last WebMCP result">
           <div className="webmcp-result-heading">

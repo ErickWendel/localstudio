@@ -1,5 +1,7 @@
+import { readFile } from 'node:fs/promises';
 import { WebMcpPage } from '../pages/webmcp.page';
 import { expect, test, withIsolatedDevServer } from '../support/journey-test';
+import { createTinyPptxFixture } from '../support/test-assets';
 
 const getServer = withIsolatedDevServer(test);
 const showcaseCards = [
@@ -39,7 +41,28 @@ const showcaseSections = [
 ] as const;
 
 test.describe('WebMCP discover tools journey', () => {
-  test('discovers tools and inspects the workflow without running AI actions', async ({ page }) => {
+  test('reveals discovered tools and waits for an imported deck to open', async ({
+    context,
+    page,
+  }, testInfo) => {
+    const pptx = await readFile(await createTinyPptxFixture(testInfo));
+    let releaseImport!: () => void;
+    let markImportRequested!: () => void;
+    const importRelease = new Promise<void>((resolve) => {
+      releaseImport = resolve;
+    });
+    const importRequested = new Promise<void>((resolve) => {
+      markImportRequested = resolve;
+    });
+    await context.route('http://localhost:9100/showcase.pptx', async (route) => {
+      markImportRequested();
+      await importRelease;
+      await route.fulfill({
+        body: pptx,
+        contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        headers: { 'access-control-allow-origin': '*' },
+      });
+    });
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.addInitScript(() => {
       Object.defineProperty(document, 'modelContext', {
@@ -57,6 +80,7 @@ test.describe('WebMCP discover tools journey', () => {
 
     await expect(page.getByRole('region', { name: 'WebMCP control plane' })).toBeVisible();
     await expect(page.getByLabel('Discovered tools')).toContainText('No tools discovered');
+    await expect(page.getByLabel('Demo workflow')).toHaveCount(0);
     await expect(
       page
         .frameLocator('iframe[title="LocalStudio editor WebMCP demo"]')
@@ -98,8 +122,21 @@ test.describe('WebMCP discover tools journey', () => {
     await workflow.getByRole('region', { name: 'Context and progress' }).scrollIntoViewIfNeeded();
     await expect(workflow.getByRole('region', { name: 'Context and progress' })).toBeInViewport();
     await page.getByRole('button', { name: 'Import PowerPoint from URL' }).click();
-    await expect(page.getByLabel('Import PowerPoint from URL command input')).toHaveValue(
+    const importInput = page.getByLabel('Import PowerPoint from URL command input');
+    await expect(importInput).toHaveValue(
       /https:\/\/localstudio\.erickwendel\.com\.br\/localstudio\/public\/web-ai-beyond-chat-renderatl-14082026%20%282%29\.pptx/,
+    );
+    await importInput.fill('{"url":"http://localhost:9100/showcase.pptx"}');
+    await page.getByRole('button', { name: 'Send Import PowerPoint from URL' }).click();
+    await importRequested;
+    await expect(page.getByText(/Import PowerPoint from URL (started|is running)/)).toBeVisible();
+    releaseImport();
+    await expect(page.getByText('Import PowerPoint from URL completed.')).toBeVisible();
+    await workflow.getByRole('button', { name: 'Inspect presentation state' }).click();
+    await page.getByRole('button', { name: 'Send Inspect presentation state' }).click();
+    await expect(page.getByText('Inspect presentation state completed.')).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Last WebMCP result' })).toContainText(
+      'E2E imported deck',
     );
     await page.getByRole('button', { name: 'Create presentation' }).click();
     await expect(page.getByLabel('Create presentation command input')).toBeVisible();
@@ -182,6 +219,19 @@ test.describe('WebMCP discover tools journey', () => {
                 JSON.stringify({ data: { operationId: 'operation-native-1' }, ok: true }),
               );
             }
+            if (tool.name === 'get_operation_status') {
+              return Promise.resolve(
+                JSON.stringify({
+                  data: {
+                    operationId: 'operation-native-1',
+                    percentage: 100,
+                    stage: 'completed',
+                    state: 'completed',
+                  },
+                  ok: true,
+                }),
+              );
+            }
             return Promise.resolve(JSON.stringify({ data: { toolName: tool.name }, ok: true }));
           },
           getTools: () => Promise.resolve(tools),
@@ -218,7 +268,11 @@ test.describe('WebMCP discover tools journey', () => {
           }
         ).__webMcpShowcaseCalls,
     );
-    expect(calls.map(({ name }) => name)).toEqual(showcaseCards.map(([name]) => name));
+    expect(calls.map(({ name }) => name)).toEqual(
+      showcaseCards.flatMap(([name]) =>
+        name === 'prepare_ai_models' ? [name, 'get_operation_status'] : [name],
+      ),
+    );
     expect(
       calls.every(({ inputArguments }) => {
         const input: unknown = JSON.parse(inputArguments);

@@ -14,8 +14,9 @@
 .webmcp-control-plane {
   max-height: 100vh;
   max-height: 100dvh;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-auto-rows: max-content;
+  align-content: start;
   gap: 22px;
   min-width: 0;
   padding: 28px;

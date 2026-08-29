@@ -7,6 +7,20 @@ import { webMcpShowcaseSections } from '../../../src/ui/webmcp/webMcpShowcaseSte
 const originalMatchMedia = window.matchMedia;
 const webMcpShowcaseSteps = webMcpShowcaseSections.flatMap((section) => section.steps);
 
+function installWebMcpShowcaseTools() {
+  Object.defineProperty(document, 'modelContext', {
+    configurable: true,
+    value: {
+      getTools: vi.fn().mockResolvedValue(
+        webMcpShowcaseSteps.map((step) => ({
+          description: step.label,
+          name: step.toolName,
+        })),
+      ),
+    },
+  });
+}
+
 describe('App', () => {
   beforeEach(() => {
     window.history.replaceState({}, '', '/');
@@ -109,6 +123,7 @@ describe('App', () => {
 
     expect(await screen.findByRole('heading', { name: 'WebMCP showcase' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Discover tools' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Demo workflow')).not.toBeInTheDocument();
     expect(screen.getByTitle('LocalStudio editor WebMCP demo')).toHaveAttribute(
       'src',
       '/editor/?webmcp=1&newProject=1',
@@ -279,12 +294,14 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'WebMCP showcase' })).toBeInTheDocument();
   });
 
-  it('opens editable command input for a WebMCP workflow step', () => {
+  it('opens editable command input for a discovered WebMCP workflow step', async () => {
     window.history.replaceState({}, '', '/webmcp');
+    installWebMcpShowcaseTools();
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create presentation' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Create presentation' }));
 
     expect(screen.getByLabelText('Create presentation command input')).toHaveValue(
       'WebMCP Demo Deck',
@@ -292,12 +309,14 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Send Create presentation' })).toBeInTheDocument();
   });
 
-  it('shows the complete JSON batch for the WebMCP upsert step', () => {
+  it('shows the complete JSON batch for the discovered WebMCP upsert step', async () => {
     window.history.replaceState({}, '', '/webmcp');
+    installWebMcpShowcaseTools();
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Upsert slide content' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Upsert slide content' }));
 
     const batchInput = screen.getByLabelText<HTMLTextAreaElement>(
       'Upsert slide content command input',
