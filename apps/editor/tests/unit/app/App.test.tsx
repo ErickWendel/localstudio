@@ -2,18 +2,16 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '../../../src/App';
 import { sampleProject } from '../../../src/domain/projects/sampleProject';
-import { webMcpShowcaseSections } from '../../../src/ui/webmcp/webMcpShowcaseSteps';
+import { webMcpShowcaseCatalog } from '../../../src/ui/webmcp/webMcpShowcaseSteps';
 
 const originalMatchMedia = window.matchMedia;
-const webMcpShowcaseSteps = webMcpShowcaseSections.flatMap((section) => section.steps);
 
 function installWebMcpShowcaseTools() {
   Object.defineProperty(document, 'modelContext', {
     configurable: true,
     value: {
       getTools: vi.fn().mockResolvedValue(
-        webMcpShowcaseSteps.map((step) => ({
-          description: step.label,
+        webMcpShowcaseCatalog.steps.map((step) => ({
           name: step.toolName,
         })),
       ),
@@ -487,7 +485,7 @@ describe('App', () => {
   });
 
   it('dispatches the editable payload for every WebMCP showcase card', async () => {
-    const tools = webMcpShowcaseSteps.map((step) => ({
+    const tools = webMcpShowcaseCatalog.steps.map((step) => ({
       name: step.toolName,
       description: step.label,
     }));
@@ -505,8 +503,8 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
     await screen.findByRole('button', { name: 'export_presentation' });
-    for (let index = 0; index < webMcpShowcaseSteps.length; index += 1) {
-      const step = webMcpShowcaseSteps[index]!;
+    for (let index = 0; index < webMcpShowcaseCatalog.steps.length; index += 1) {
+      const step = webMcpShowcaseCatalog.steps[index]!;
       fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${step.label}$`) }));
       fireEvent.click(screen.getByRole('button', { name: new RegExp(`^Send ${step.label}$`) }));
       await waitFor(() => expect(executeTool).toHaveBeenCalledTimes(index + 1));

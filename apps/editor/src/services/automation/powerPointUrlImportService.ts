@@ -124,7 +124,7 @@ function toBlobPart(bytes: Uint8Array) {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
-async function readBoundedResponse(
+async function readResponseBytes(
   response: Response,
   maxBytes: number | undefined,
   report: AuthoringProgressReporter,
@@ -152,6 +152,7 @@ async function readBoundedResponse(
   const reader = response.body.getReader();
   const chunks: ArrayBuffer[] = [];
   let loadedBytes = 0;
+  let lastReportedProgress = 5;
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -168,12 +169,15 @@ async function readBoundedResponse(
       const downloadProgress = declaredBytes
         ? 5 + Math.min(40, Math.round((loadedBytes / declaredBytes) * 40))
         : Math.min(44, 5 + Math.floor(loadedBytes / (1024 * 1024)));
-      report({
-        stage: 'downloading-powerpoint',
-        progress: downloadProgress,
-        loadedBytes,
-        ...(declaredBytes !== undefined ? { totalBytes: declaredBytes } : {}),
-      });
+      if (downloadProgress !== lastReportedProgress) {
+        lastReportedProgress = downloadProgress;
+        report({
+          stage: 'downloading-powerpoint',
+          progress: downloadProgress,
+          loadedBytes,
+          ...(declaredBytes !== undefined ? { totalBytes: declaredBytes } : {}),
+        });
+      }
     }
   } finally {
     reader.releaseLock();
@@ -253,7 +257,7 @@ export class PowerPointUrlImportService {
 
     const contentType = validateContentType(response);
     const fileName = resolveFileName(input, url, response);
-    const download = await readBoundedResponse(response, this.maxFileSizeBytes, report);
+    const download = await readResponseBytes(response, this.maxFileSizeBytes, report);
     const file = new File(download.bytes, fileName, {
       type: contentType === 'application/octet-stream' ? powerPointMimeType : contentType,
     });

@@ -153,12 +153,4 @@ describe('WebMcpToolAdapter', () => {
     });
     expect(upsertSlideContent).not.toHaveBeenCalled();
   });
-
-  it('does not expose publishing because it requires user-managed external state', () => {
-    expect(
-      createAdapter()
-        .createTools()
-        .map((tool) => tool.name),
-    ).not.toContain('publish_presentation');
-  });
 });

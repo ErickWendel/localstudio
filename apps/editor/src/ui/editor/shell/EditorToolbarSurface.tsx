@@ -11,8 +11,7 @@ interface EditorToolbarSurfaceProps {
   deckTranslationStatus: string | undefined;
   hasDirectoryPersistence: boolean;
   hasSelection: boolean;
-  isTranslatingDeck: boolean;
-  operationNotice: OperationNoticeState | undefined;
+  imageExportNotice: OperationNoticeState | undefined;
   isExportingImages: boolean;
   isExportingPdf: boolean;
   isHistoryReadOnly: boolean;
@@ -34,8 +33,7 @@ export function EditorToolbarSurface({
   deckTranslationStatus,
   hasDirectoryPersistence,
   hasSelection,
-  isTranslatingDeck,
-  operationNotice,
+  imageExportNotice,
   isExportingImages,
   isExportingPdf,
   isHistoryReadOnly,
@@ -67,7 +65,7 @@ export function EditorToolbarSurface({
       mirrorDisabledBySettings={vm.mirrorDisabledBySettings}
       persistenceAttention={vm.persistenceAttention}
       persistenceError={vm.persistenceError}
-      operationNotice={operationNotice ?? vm.operationNotice}
+      operationNotice={imageExportNotice ?? vm.operationNotice}
       localProjectSetupPanel={
         vm.localProjectSetupOpen ? (
           <LocalProjectSetupPanel
@@ -88,7 +86,7 @@ export function EditorToolbarSurface({
       saveAnimationKey={vm.saveAnimationKey}
       canTranslateDeck={vm.canTranslateDeck}
       deckTranslationStatus={deckTranslationStatus}
-      isTranslatingDeck={isTranslatingDeck}
+      isTranslatingDeck={Boolean(vm.deckTranslationProgress)}
       isExportingImages={isExportingImages}
       isExportingPdf={isExportingPdf}
       isExportingPowerPoint={vm.isExportingPowerPoint}

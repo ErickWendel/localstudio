@@ -252,7 +252,7 @@ Build deterministic WebMCP evals around user outcomes, not only registration:
 - schema rejection and recoverable errors;
 - visible UI update after each successful tool;
 - cancellation of import/translation/description work;
-- publish confirmation and returned URL opening the exact revision;
+- human share confirmation and returned URL opening the exact revision, outside the WebMCP catalog;
 - transcript search returning bounded timestamped evidence;
 - navigation synchronizing slide and audio position;
 - injected instructions inside PPTX text/transcript/description staying treated as content, not commands;
@@ -270,7 +270,10 @@ Editor route (shipped)
     -> schema validation
     -> AuthoringAutomationController
        -> AuthoringOperationRegistry
-       -> PPTX import / translation / slide-description / media / export / share services
+       -> PPTX import / translation / slide-description / media / export services
+
+Human share flow (shipped separately)
+  Editor share controls -> mirror / share services
 
 Public share route (future, not shipped)
   WebMcpAttendeeAdapter
@@ -306,32 +309,32 @@ Rendered-canvas multimodal generation remains a future quality upgrade, not ship
 atomic and explicit. Passing the browser execution `AbortSignal` through every capability remains future work.
 
 PowerPoint WebMCP import is exclusively `import_powerpoint_from_url`, with strict protocol, status, MIME, safe-name,
-size, redirect, and CORS handling. It reuses the native parser, mapper, warnings, normalization, and font pipeline. There
+optional configured size limit, redirect, and CORS handling. It reuses the native parser, mapper, warnings, normalization, and font pipeline. There
 is no WebMCP disk, binary, base64, picker, prepared-file, or staged-file contract.
 
 ### Definition of done by workflow
 
 Verification has two complementary author paths. The clean creation journey creates a presentation, applies replace and
-merge batches, inspects detailed state and a visible preview, translates text/notes/descriptions, exports a real file,
-publishes an exact revision, and opens the URL in a clean browser context. Separate representative URL-import coverage
+merge batches, inspects detailed state and a visible preview, translates text/notes/descriptions, and exports a real file.
+The existing human share flow is verified separately and is not a WebMCP authoring tool. Representative URL-import coverage
 exercises valid and invalid PPTX sources, mapping, notes, warnings, and fonts. Long-running work must be followed through
 `get_operation_status`, and exports must be inspected as generated files rather than accepted from a success message.
 
-The public artifact must contain the published revision, mirrored fonts, descriptions, transcript context, and only
-authorized raw recording audio. Discoverable attendee tools, transcript search, and evidence navigation remain future
-work and are not part of the shipped acceptance claim.
+When a person uses the separate share flow, the public artifact must contain the published revision, mirrored fonts,
+descriptions, transcript context, and only authorized raw recording audio. Discoverable attendee tools, transcript
+search, evidence navigation, and hands-off WebMCP publishing remain future work.
 
 The feature is not done from unit contracts alone. Extend the current WebMCP service-contract suite, `tests/e2e/webmcp/discover-tools.spec.ts`, PPTX import journeys, share journeys, `public-transcript-chat.spec.ts`, and public-deck viewer journeys. Then run the relevant editor/public coverage scopes, repo unit tests, typecheck, lint, and production builds. Cross-client acceptance must include ChatGPT's in-app browser and Chrome 149+ with WebMCP enabled.
 
 ## Storytelling options
 
-### Recommended shipped story: “From file to published knowledge”
+### Recommended shipped story: “From file to agent-authored deck”
 
 **Problem:** Decks are dead files. The creator repeats mechanical work to import, localize, verify, export, and distribute them.
 
-**Transformation:** LocalStudio makes the browser-native authoring surface agent-readable and agent-actionable. The creator's agent works through visible, deterministic tools, while the person can inspect the same canvas, progress, warnings, downloads, and exact published result.
+**Transformation:** LocalStudio makes the browser-native authoring surface agent-readable and agent-actionable. The creator's agent works through visible, deterministic tools, while the person can inspect the same canvas, progress, warnings, and exported result.
 
-**Payoff:** One editable artifact crosses language and publishing boundaries without a separate MCP server or brittle UI automation. Attendee-side WebMCP can extend this story later but is not required for the shipped demo.
+**Payoff:** One editable artifact crosses language and file-format boundaries without a separate MCP server or brittle UI automation. Human sharing remains available separately; attendee-side WebMCP can extend this story later.
 
 Suggested line: **“Your deck should not stop being useful when the talk ends.”**
 
@@ -357,18 +360,18 @@ The demo should use a short, visually distinctive 3–5 slide deck, one obvious 
 
 ### Delivered authoring scope
 
-1. Fifteen production authoring tools with strict schemas and annotations.
+1. Fourteen production authoring tools with strict schemas and annotations.
 2. URL-only PPTX import through the native parsing/font pipeline.
-3. Translate → describe → preview → export/publish with visible state and verifiable outputs.
+3. Translate → describe → preview → export with visible state and verifiable outputs.
 4. Bounded state, catalogs, media results, operation progress, warnings, and final results.
-5. Exact-revision publishing with fonts, descriptions, transcript context, and authorized raw audio.
-6. Editable showcase cards and browser/unit coverage for discovery, dispatch, schema failures, generated files, and clean-context publication.
+5. Editable showcase cards and browser/unit coverage for discovery, dispatch, schema failures, and generated files.
 
 Eligibility remains an external submission requirement: obtain a written answer from the hackathon manager before representing LocalStudio as an eligible prize entry.
 
 ### Future, separate scope
 
 - attendee-route WebMCP retrieval and navigation tools;
+- hands-off publishing after its storage and authorization inputs can be configured without external clicks;
 - transcript search and cross-modal evidence deep links;
 - citeable deep links such as `?slide=4&t=83s`;
 - author review/edit UI for generated descriptions;

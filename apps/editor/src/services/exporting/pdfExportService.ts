@@ -1,13 +1,13 @@
+import type {
+  PdfExportWorkerRequest,
+  PdfExportWorkerResponse,
+} from './pdfExportWorkerProtocol';
+
 export interface PdfExportPage {
   bytes: Uint8Array;
   heightPoints: number;
   widthPoints: number;
 }
-
-type PdfExportWorkerResponse =
-  | { current: number; total: number; type: 'progress' }
-  | { bytes: ArrayBuffer; type: 'result' }
-  | { message: string; type: 'error' };
 
 function createPdfWorker() {
   if (typeof Worker === 'undefined') throw new Error('Web workers are required for PDF export.');
@@ -53,7 +53,7 @@ export const pdfExportService = {
               .filter((buffer): buffer is ArrayBuffer => buffer instanceof ArrayBuffer),
           ),
         ];
-        worker.postMessage({ pages, type: 'create-pdf' }, transfer);
+        worker.postMessage({ pages, type: 'create-pdf' } satisfies PdfExportWorkerRequest, transfer);
       } catch (error) {
         worker.terminate();
         reject(error instanceof Error ? error : new Error('PDF export could not be started.'));

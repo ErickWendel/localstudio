@@ -73,7 +73,7 @@ The server must:
 - provide a safe `.pptx` name in the URL, `Content-Disposition`, or `fileName` input;
 - stay within any deployment-specific size limit. LocalStudio does not impose a default PPTX size cap.
 
-LocalStudio streams and bounds the download, then uses the same native parser, mapper, warnings, normalization, and font workflow as visible PowerPoint import. Expired URLs, unreachable servers, CORS failures, wrong MIME types, oversized files, and corrupt packages fail without replacing the current project.
+LocalStudio streams the download and enforces a deployment-specific limit when one is configured, then uses the same native parser, mapper, warnings, normalization, and font workflow as visible PowerPoint import. Expired URLs, unreachable servers, CORS failures, wrong MIME types, configured-limit violations, and corrupt packages fail without replacing the current project.
 
 The normal **File > Import > PowerPoint** picker remains available for a person using the editor. It is intentionally not exposed as a WebMCP disk-import tool.
 

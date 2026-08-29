@@ -145,8 +145,7 @@
   border-color: #9fffd2;
 }
 
-.webmcp-primary-action:disabled,
-.webmcp-step-button:disabled {
+.webmcp-primary-action:disabled {
   cursor: not-allowed;
   opacity: 0.52;
 }

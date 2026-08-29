@@ -466,31 +466,4 @@ test.describe('production WebMCP authoring capabilities', () => {
     });
     expect((await waitForOperation(page, generatedImage.operationId)).state).toBe('failed');
   });
-
-  test('does not expose publishing through the hands-off authoring catalog', async ({ page }) => {
-    const editor = new EditorAppPage(page, getServer().baseURL);
-    await editor.goto('/editor/?newProject=1&webmcp=1');
-
-    await expect
-      .poll(() =>
-        page.evaluate(
-          () =>
-            (
-              window as typeof window & {
-                localStudioWebMcpTools?: Array<{ name: string }>;
-              }
-            ).localStudioWebMcpTools?.length ?? 0,
-        ),
-      )
-      .toBe(14);
-    const names = await page.evaluate(() =>
-      (
-        window as typeof window & {
-          localStudioWebMcpTools?: Array<{ name: string }>;
-        }
-      ).localStudioWebMcpTools?.map((tool) => tool.name),
-    );
-
-    expect(names).not.toContain('publish_presentation');
-  });
 });

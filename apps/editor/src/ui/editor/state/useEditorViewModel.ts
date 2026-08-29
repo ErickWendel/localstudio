@@ -25,6 +25,7 @@ import type {
 import { sampleProject } from '../../../domain/projects/sampleProject';
 import { analyticsModelProperties } from '../../../services/analytics/analyticsModelProperties';
 import type { EditorAutomationDelegate } from '../../../services/automation/editorAutomationController';
+import type { AuthoringOperationStatus } from '../../../services/automation/authoringOperationRegistry';
 import type {
   AiProviderState,
   FontCatalogItem,
@@ -59,6 +60,7 @@ import { powerPointIo } from './power-point-io';
 import { textTranslationLayout } from './text-translation-layout';
 import type { TranslationPatch } from './text-translation-layout';
 import { useOperationNotice } from './use-operation-notice';
+import { authoringOperationUiProgress } from './authoringOperationUiProgress';
 import { useStockMediaLibrary } from './use-stock-media-library';
 import { editorViewModelProgress } from './editorViewModelProgress';
 import { editorViewModelProject } from './editorViewModelProject';
@@ -207,7 +209,7 @@ function getMissingPowerPointFonts(project: ProjectDocument, missingFamilies: st
   return Array.from(fonts.values()).sort((a, b) => a.family.localeCompare(b.family));
 }
 
-interface DeckTranslationProgressState {
+export interface DeckTranslationProgressState {
   activePageIds: string[];
   completedPages: number;
   currentPageName: string;
@@ -729,6 +731,21 @@ export function useEditorViewModel(services: AppServices) {
       ...(nextActivePageId ? { activePageId: nextActivePageId } : {}),
       selectedElementIds: [],
     });
+  }
+
+  function updateAuthoringOperationProgress(
+    operationKind: string,
+    status: AuthoringOperationStatus,
+  ) {
+    authoringOperationUiProgress.update(
+      { operationKind, project: projectRef.current, status },
+      {
+        setDeckTranslationProgress,
+        setIsTranslating,
+        setPresentationImportProgress,
+        showOperationNotice,
+      },
+    );
   }
 
   async function downloadRequiredModels() {
@@ -3605,6 +3622,7 @@ export function useEditorViewModel(services: AppServices) {
     automation,
     applyProjectForAutomation,
     replaceProjectForAutomation,
+    updateAuthoringOperationProgress,
     activePageId,
     activePageFocusKey,
     zoomPercent,

@@ -155,6 +155,11 @@ test.describe('WebMCP discover tools journey', () => {
     await expect(
       importStep.getByRole('status').getByText(/Import PowerPoint from URL (started|is running)/),
     ).toBeVisible();
+    await expect(
+      page
+        .frameLocator('iframe[title="LocalStudio editor WebMCP demo"]')
+        .getByRole('progressbar', { name: 'PowerPoint import progress' }),
+    ).toBeVisible();
     releaseImport();
     await expect(importStep.getByRole('status')).toHaveText(
       'Import PowerPoint from URL completed.',

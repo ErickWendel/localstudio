@@ -12,7 +12,7 @@ export interface WebMcpShowcaseSection {
   title: string;
 }
 
-export const webMcpShowcaseSections: WebMcpShowcaseSection[] = [
+const sections: WebMcpShowcaseSection[] = [
   {
     id: 'dependencies',
     title: 'Dependencies',
@@ -85,7 +85,7 @@ export const webMcpShowcaseSections: WebMcpShowcaseSection[] = [
               frame: { x: 360, y: 560, width: 1200, height: 120 },
               zIndex: 2,
               content: {
-                text: 'Create, inspect, localize, export, and publish through browser-native tools.',
+                text: 'Create, inspect, localize, and export through browser-native tools.',
               },
               style: {
                 fontFamily: 'Open Sans',
@@ -174,3 +174,8 @@ export const webMcpShowcaseSections: WebMcpShowcaseSection[] = [
     ],
   },
 ];
+
+export const webMcpShowcaseCatalog = {
+  sections,
+  steps: sections.flatMap((section) => section.steps),
+};

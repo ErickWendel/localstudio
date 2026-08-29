@@ -1,15 +1,8 @@
-import type { PdfExportPage } from './pdfExportService';
 import { pdfDocumentBuilder } from './pdfDocumentBuilder';
-
-interface PdfExportWorkerRequest {
-  pages: PdfExportPage[];
-  type: 'create-pdf';
-}
-
-type PdfExportWorkerResponse =
-  | { current: number; total: number; type: 'progress' }
-  | { bytes: ArrayBuffer; type: 'result' }
-  | { message: string; type: 'error' };
+import type {
+  PdfExportWorkerRequest,
+  PdfExportWorkerResponse,
+} from './pdfExportWorkerProtocol';
 
 const workerScope = self as unknown as {
   onmessage: ((event: MessageEvent<PdfExportWorkerRequest>) => void) | null;

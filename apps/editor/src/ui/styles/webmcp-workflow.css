@@ -109,7 +109,7 @@
   text-align: left;
 }
 
-.webmcp-step-button:hover:not(:disabled),
+.webmcp-step-button:hover,
 .webmcp-step-button-active {
   border-color: rgba(159, 255, 210, 0.62);
   background: rgba(159, 255, 210, 0.1);
