@@ -1,13 +1,10 @@
 import type {
+  PdfExportPage,
   PdfExportWorkerRequest,
   PdfExportWorkerResponse,
 } from './pdfExportWorkerProtocol';
 
-export interface PdfExportPage {
-  bytes: Uint8Array;
-  heightPoints: number;
-  widthPoints: number;
-}
+export type { PdfExportPage } from './pdfExportWorkerProtocol';
 
 function createPdfWorker() {
   if (typeof Worker === 'undefined') throw new Error('Web workers are required for PDF export.');

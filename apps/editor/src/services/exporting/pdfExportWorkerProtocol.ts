@@ -1,4 +1,8 @@
-import type { PdfExportPage } from './pdfExportService';
+export interface PdfExportPage {
+  bytes: Uint8Array;
+  heightPoints: number;
+  widthPoints: number;
+}
 
 export interface PdfExportWorkerRequest {
   pages: PdfExportPage[];

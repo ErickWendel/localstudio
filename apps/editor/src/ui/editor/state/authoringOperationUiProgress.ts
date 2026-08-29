@@ -1,10 +1,27 @@
 import type { ProjectDocument } from '../../../domain/documents/model';
 import type { AuthoringOperationStatus } from '../../../services/automation/authoringOperationRegistry';
-import type {
-  DeckTranslationProgressState,
-  OperationNoticeState,
-  PresentationImportProgressState,
-} from './useEditorViewModel';
+import type { OperationNoticeState } from './use-operation-notice';
+
+export interface DeckTranslationProgressState {
+  activePageIds: string[];
+  completedPages: number;
+  currentPageName: string;
+  totalPages: number;
+}
+
+export interface PresentationImportProgressState {
+  detail: string;
+  progress: number;
+  stage:
+    | 'reading'
+    | 'inspecting'
+    | 'extracting-objects'
+    | 'downloading-fonts'
+    | 'extracting-media'
+    | 'mapping-animations'
+    | 'opening';
+  title: string;
+}
 
 interface AuthoringOperationProgressActions {
   setDeckTranslationProgress(progress: DeckTranslationProgressState | undefined): void;
