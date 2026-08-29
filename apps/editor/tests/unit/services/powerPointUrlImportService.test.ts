@@ -189,6 +189,23 @@ describe('PowerPointUrlImportService', () => {
     ).resolves.toMatchObject({ fileName: 'local.pptx' });
   });
 
+  it('accepts the advertised showcase deck size with the bounded default limit', async () => {
+    const harness = createHarness({
+      fetch: vi.fn(() =>
+        Promise.resolve(
+          createResponse(undefined, {
+            contentLength: '263634771',
+            contentType: pptxMimeType,
+          }),
+        ),
+      ),
+    });
+
+    await expect(
+      harness.run({ url: 'https://localstudio.example/showcase.pptx' }),
+    ).resolves.toMatchObject({ fileName: 'showcase.pptx' });
+  });
+
   it.each([
     ['not a URL', 'invalid-url'],
     ['file:///tmp/deck.pptx', 'invalid-url'],

@@ -133,7 +133,8 @@ export function WebMcpShowcasePage() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const stepButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [tools, setTools] = useState<WebMcpToolLike[]>([]);
-  const [status, setStatus] = useState('Ready to discover page tools.');
+  const [discoveryStatus, setDiscoveryStatus] = useState('Ready to discover page tools.');
+  const [actionStatuses, setActionStatuses] = useState<Record<string, string>>({});
   const [lastResult, setLastResult] = useState<string>('{}');
   const [isRunning, setIsRunning] = useState(false);
   const [useProtocolExecution, setUseProtocolExecution] = useState(false);
@@ -148,8 +149,12 @@ export function WebMcpShowcasePage() {
   const toolsByName = useMemo(() => new Map(tools.map((tool) => [tool.name, tool])), [tools]);
 
   function openStep(step: WebMcpShowcaseStep) {
-    setActiveStepName(step.toolName);
+    setActiveStepName((current) => (current === step.toolName ? undefined : step.toolName));
     setFocusedStepName(step.toolName);
+  }
+
+  function setActionStatus(toolName: string, nextStatus: string) {
+    setActionStatuses((current) => ({ ...current, [toolName]: nextStatus }));
   }
 
   function focusStep(toolName: string) {
@@ -166,12 +171,12 @@ export function WebMcpShowcasePage() {
   async function discoverTools() {
     const iframe = iframeRef.current;
     if (!iframe) {
-      setStatus('Editor iframe is not ready yet.');
+      setDiscoveryStatus('Editor iframe is not ready yet.');
       setTools([]);
       return;
     }
 
-    setStatus('Discovering tools from LocalStudio...');
+    setDiscoveryStatus('Discovering tools from LocalStudio...');
     const modelContext = getBrowserModelContext();
     const iframeOrigin = new URL(iframe.src).origin;
     const protocolTools = modelContext
@@ -182,7 +187,7 @@ export function WebMcpShowcasePage() {
       : await waitForLocalDemoTools(iframe);
     const usedProtocolTools = Boolean(protocolTools?.length);
     if (!discoveredTools) {
-      setStatus(
+      setDiscoveryStatus(
         'No WebMCP runtime or same-origin demo tools found. Wait for the editor frame, then try again.',
       );
       setTools([]);
@@ -190,7 +195,7 @@ export function WebMcpShowcasePage() {
     }
     setTools(discoveredTools);
     setUseProtocolExecution(usedProtocolTools);
-    setStatus(
+    setDiscoveryStatus(
       usedProtocolTools
         ? `Discovered ${discoveredTools.length} tools through WebMCP.`
         : `Discovered ${discoveredTools.length} tools through the local demo bridge.`,
@@ -205,19 +210,19 @@ export function WebMcpShowcasePage() {
   async function runStep(step: WebMcpShowcaseStep, commandValue: string) {
     const tool = toolsByName.get(step.toolName);
     if (!tool) {
-      setStatus(`${step.toolName} has not been discovered yet.`);
+      setActionStatus(step.toolName, `${step.toolName} has not been discovered yet.`);
       return;
     }
 
     setIsRunning(true);
-    setStatus(`Running ${step.label}...`);
+    setActionStatus(step.toolName, `Running ${step.label}...`);
     try {
       const input = getCommandInput(step, commandValue);
       const result = await callTool(tool, input, useProtocolExecution);
       setLastResult(formatPayload(result));
       const failure = getToolFailure(result);
       if (failure) {
-        setStatus(`${step.label} failed: ${failure}`);
+        setActionStatus(step.toolName, `${step.label} failed: ${failure}`);
         return;
       }
       const operationId = getOperationId(result);
@@ -228,10 +233,16 @@ export function WebMcpShowcasePage() {
         }));
         const operationTool = toolsByName.get('get_operation_status');
         if (!operationTool) {
-          setStatus(`${step.label} started. Use Get operation status to follow its progress.`);
+          setActionStatus(
+            step.toolName,
+            `${step.label} started. Use Get operation status to follow its progress.`,
+          );
           return;
         }
-        setStatus(`${step.label} started. Waiting for the operation to finish.`);
+        setActionStatus(
+          step.toolName,
+          `${step.label} started. Waiting for the operation to finish.`,
+        );
         while (true) {
           const operationResult = await callTool(
             operationTool,
@@ -244,22 +255,29 @@ export function WebMcpShowcasePage() {
           const operationStatus = getOperationStatus(operationResult);
           if (!operationStatus) throw new Error('The operation returned an invalid status.');
           if (operationStatus.state === 'completed') {
-            setStatus(`${step.label} completed.`);
+            setActionStatus(step.toolName, `${step.label} completed.`);
             return;
           }
           if (operationStatus.state === 'failed') {
-            setStatus(`${step.label} failed: ${operationStatus.error ?? 'The operation failed.'}`);
+            setActionStatus(
+              step.toolName,
+              `${step.label} failed: ${operationStatus.error ?? 'The operation failed.'}`,
+            );
             return;
           }
           const stage = operationStatus.stage ? `: ${operationStatus.stage}` : '';
           const percentage =
             operationStatus.percentage === undefined ? '' : ` (${operationStatus.percentage}%)`;
-          setStatus(`${step.label} is ${operationStatus.state}${stage}${percentage}.`);
+          setActionStatus(
+            step.toolName,
+            `${step.label} is ${operationStatus.state}${stage}${percentage}.`,
+          );
         }
       }
-      setStatus(`${step.label} completed.`);
+      setActionStatus(step.toolName, `${step.label} completed.`);
     } catch (error) {
-      setStatus(
+      setActionStatus(
+        step.toolName,
         `${step.label} failed: ${error instanceof Error ? error.message : 'Unknown error.'}`,
       );
     } finally {
@@ -297,7 +315,7 @@ export function WebMcpShowcasePage() {
             <Radar size={16} />
             <span>Discover tools</span>
           </button>
-          <span className="webmcp-status">{status}</span>
+          <span className="webmcp-status">{discoveryStatus}</span>
         </div>
 
         <div className="webmcp-tool-list" aria-label="Discovered tools">
@@ -341,6 +359,7 @@ export function WebMcpShowcasePage() {
                         ref={(element) => {
                           stepButtonRefs.current[step.toolName] = element;
                         }}
+                        aria-expanded={activeStepName === step.toolName}
                         aria-label={step.label}
                         className={[
                           'webmcp-step-button',
@@ -349,7 +368,6 @@ export function WebMcpShowcasePage() {
                         ]
                           .filter(Boolean)
                           .join(' ')}
-                        disabled={isRunning}
                         type="button"
                         onClick={() => {
                           openStep(step);
@@ -359,6 +377,11 @@ export function WebMcpShowcasePage() {
                         {step.toolName !== 'get_presentation_state' ? <Play size={16} /> : null}
                         <span>{step.label}</span>
                       </button>
+                      {actionStatuses[step.toolName] ? (
+                        <p className="webmcp-step-status" role="status" aria-live="polite">
+                          {actionStatuses[step.toolName]}
+                        </p>
+                      ) : null}
                       {activeStepName === step.toolName ? (
                         <form
                           className="webmcp-step-command"

@@ -30,7 +30,7 @@ export interface PowerPointUrlImportServiceOptions {
 const powerPointMimeType =
   'application/vnd.openxmlformats-officedocument.presentationml.presentation';
 const acceptedMimeTypes = new Set([powerPointMimeType, 'application/octet-stream']);
-const defaultMaxFileSizeBytes = 100 * 1024 * 1024;
+const defaultMaxFileSizeBytes = 300 * 1024 * 1024;
 const defaultMaxWarnings = 20;
 const maxWarningMessageLength = 500;
 

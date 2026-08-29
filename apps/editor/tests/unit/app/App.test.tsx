@@ -307,6 +307,8 @@ describe('App', () => {
       'WebMCP Demo Deck',
     );
     expect(screen.getByRole('button', { name: 'Send Create presentation' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Create presentation' }));
+    expect(screen.queryByLabelText('Create presentation command input')).not.toBeInTheDocument();
   });
 
   it('shows the complete JSON batch for the discovered WebMCP upsert step', async () => {
@@ -343,7 +345,6 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
     fireEvent.click(await screen.findByRole('button', { name: 'get_presentation_state' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Inspect presentation state' }));
     expect(
       screen.getByLabelText<HTMLTextAreaElement>('Inspect presentation state command input').value,
     ).toContain('"detail": "elements"');

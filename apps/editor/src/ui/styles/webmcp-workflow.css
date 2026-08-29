@@ -58,6 +58,17 @@
   gap: 7px;
 }
 
+.webmcp-step-status {
+  margin: 0 0 0 30px;
+  padding: 7px 10px;
+  border-left: 2px solid rgba(100, 183, 255, 0.52);
+  background: linear-gradient(90deg, rgba(100, 183, 255, 0.1), transparent 82%);
+  color: rgba(238, 250, 245, 0.76);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  line-height: 16px;
+}
+
 .webmcp-step-button {
   justify-content: flex-start;
   width: 100%;

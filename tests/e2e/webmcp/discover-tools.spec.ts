@@ -129,9 +129,21 @@ test.describe('WebMCP discover tools journey', () => {
     await importInput.fill('{"url":"http://localhost:9100/showcase.pptx"}');
     await page.getByRole('button', { name: 'Send Import PowerPoint from URL' }).click();
     await importRequested;
-    await expect(page.getByText(/Import PowerPoint from URL (started|is running)/)).toBeVisible();
+    const importAction = workflow.getByRole('button', {
+      name: 'Import PowerPoint from URL',
+      exact: true,
+    });
+    const importStep = importAction.locator('..');
+    await expect(
+      importStep.getByRole('status').getByText(/Import PowerPoint from URL (started|is running)/),
+    ).toBeVisible();
+    await importAction.click();
+    await expect(importInput).toBeHidden();
+    await expect(importStep.getByRole('status')).toBeVisible();
     releaseImport();
-    await expect(page.getByText('Import PowerPoint from URL completed.')).toBeVisible();
+    await expect(importStep.getByRole('status')).toHaveText(
+      'Import PowerPoint from URL completed.',
+    );
     await workflow.getByRole('button', { name: 'Inspect presentation state' }).click();
     await page.getByRole('button', { name: 'Send Inspect presentation state' }).click();
     await expect(page.getByText('Inspect presentation state completed.')).toBeVisible();
