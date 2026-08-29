@@ -26,7 +26,6 @@ const authoringToolNames = [
   'prepare_ai_models',
   'search_media',
   'export_presentation',
-  'publish_presentation',
   'get_operation_status',
 ];
 
@@ -93,7 +92,7 @@ describe('EditorShell', () => {
     render(<EditorShell services={createAppServices()} />);
 
     await waitFor(() => {
-      expect((window as WebMcpDemoWindow).localStudioWebMcpTools).toHaveLength(15);
+      expect((window as WebMcpDemoWindow).localStudioWebMcpTools).toHaveLength(14);
     });
     expect((window as WebMcpDemoWindow).localStudioWebMcpTools?.map((tool) => tool.name)).toEqual(
       authoringToolNames,
@@ -118,7 +117,7 @@ describe('EditorShell', () => {
     expect(
       screen.queryByRole('heading', { name: 'Open this workspace on a desktop screen.' }),
     ).not.toBeInTheDocument();
-    expect((window as WebMcpDemoWindow).localStudioWebMcpTools).toHaveLength(15);
+    expect((window as WebMcpDemoWindow).localStudioWebMcpTools).toHaveLength(14);
   });
 
   it('renders the approved editor shell landmarks', async () => {

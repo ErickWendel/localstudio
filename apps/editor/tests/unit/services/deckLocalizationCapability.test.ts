@@ -92,7 +92,9 @@ function createHarness(overrides?: {
     },
   };
   project.pages[0]!.semanticDescription!.sourceRevision = getRevision(project, 'page-1');
-  const prepareTranslation = vi.fn(() => Promise.resolve());
+  const prepareTranslation = vi.fn<TranslatorService['prepareTranslation']>(() =>
+    Promise.resolve(),
+  );
   const detectLanguage = vi.fn((text: string) => {
     void text;
     return Promise.resolve('en');
@@ -192,7 +194,8 @@ describe('deckLocalizationCapability', () => {
     expect(project.pages[0]!.semanticDescription!.sourceRevision).toBe(
       getRevision(project, 'page-1'),
     );
-    expect(harness.prepareTranslation).toHaveBeenCalledWith('en', 'pt-BR');
+    expect(harness.prepareTranslation.mock.calls[0]?.slice(0, 2)).toEqual(['en', 'pt-BR']);
+    expect(typeof harness.prepareTranslation.mock.calls[0]?.[2]?.onProgress).toBe('function');
     expect(harness.report).toHaveBeenLastCalledWith(
       expect.objectContaining({ stage: 'translating-slides', current: 2, total: 2 }),
     );
@@ -264,7 +267,14 @@ describe('deckLocalizationCapability', () => {
     expect(first).toMatchObject({
       generatedSlides: [2],
       skippedSlides: [],
-      descriptions: [{ slideNumber: 2, generator: 'local-gemma', freshness: 'fresh' }],
+      descriptions: [
+        {
+          slideNumber: 2,
+          generator: 'local-gemma',
+          freshness: 'fresh',
+          text: 'A red ellipse appears on the slide.',
+        },
+      ],
       failureCount: 0,
     });
     expect(second).toMatchObject({ generatedSlides: [], skippedSlides: [2] });
@@ -289,6 +299,21 @@ describe('deckLocalizationCapability', () => {
       reviewed: false,
       stale: false,
     });
+  });
+
+  it('stores the full bounded semantic description while bounding the operation result', async () => {
+    const generatedText = 'Detailed slide fact. '.repeat(150).trim();
+    const harness = createHarness({
+      generator: { id: 'local-model', generate: () => Promise.resolve(generatedText) },
+    });
+
+    const result = await harness.capability.generateDeckDetailedDescription(
+      { slideNumbers: [1], language: 'en', force: true },
+      harness.report,
+    );
+
+    expect(harness.getProject().pages[0]!.semanticDescription!.text).toBe(generatedText);
+    expect(result.descriptions[0]?.text).toBe(generatedText.slice(0, 2_000));
   });
 
   it('force-refreshes selected descriptions and reports missing slides', async () => {

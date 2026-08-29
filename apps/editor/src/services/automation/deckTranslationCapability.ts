@@ -117,7 +117,16 @@ function createCapability(options: DeckLocalizationCapabilityOptions) {
         progress: 2,
         detail: `${detectedLanguage} to ${targetLanguage}`,
       });
-      await options.translatorService.prepareTranslation(detectedLanguage, targetLanguage);
+      await options.translatorService.prepareTranslation(detectedLanguage, targetLanguage, {
+        onProgress: (progress, details) =>
+          report({
+            stage: 'preparing-translation-model',
+            progress: 2 + Math.round((Math.max(0, Math.min(100, progress)) / 100) * 8),
+            detail: `${detectedLanguage} to ${targetLanguage}`,
+            ...(details?.loadedBytes !== undefined ? { loadedBytes: details.loadedBytes } : {}),
+            ...(details?.totalBytes !== undefined ? { totalBytes: details.totalBytes } : {}),
+          }),
+      });
     }
 
     const nextElements = { ...project.elements };
@@ -252,7 +261,7 @@ function createCapability(options: DeckLocalizationCapabilityOptions) {
       report({
         stage: 'translating-slides',
         progress: project.pages.length
-          ? Math.round(((index + 1) / project.pages.length) * 90) + 5
+          ? Math.round(((index + 1) / project.pages.length) * 85) + 10
           : 95,
         current: index + 1,
         total: project.pages.length,

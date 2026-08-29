@@ -12,6 +12,8 @@ export interface DeckCapabilityProgress {
   current?: number;
   total?: number;
   detail?: string;
+  loadedBytes?: number;
+  totalBytes?: number;
   warnings?: string[];
 }
 

@@ -11,6 +11,7 @@ import {
   authoringAutomationController,
   type AuthoringProgressReporter,
 } from '../../../services/automation/authoringAutomationController';
+import type { AuthoringOperationStatus } from '../../../services/automation/authoringOperationRegistry';
 import {
   createAuthoringVisualCapability,
   type AuthoringExportInput,
@@ -22,7 +23,6 @@ import { deckLocalizationCapability } from '../../../services/automation/deckLoc
 import { authoringRevision } from '../../../services/automation/getAuthoringSlideRevision';
 import { localSlideDescriptionGenerator } from '../../../services/automation/localSlideDescriptionGenerator';
 import { PowerPointUrlImportService } from '../../../services/automation/powerPointUrlImportService';
-import { PresentationPublishingCapability } from '../../../services/automation/presentationPublishingCapability';
 import { imageGenerationModel } from '../../../services/image-generation/imageGenerationModel';
 import {
   WebMcpToolAdapter,
@@ -75,6 +75,7 @@ import { editorShortcutActions } from './editor-shortcut-actions';
 import { PresentationSlideNavigator } from './PresentationSlideNavigator';
 import { SpeakerNotesEditor } from './SpeakerNotesEditor';
 import { createProjectForSelectedShareRecording } from './createProjectForSelectedShareRecording';
+import { WebMcpOperationNotice } from './WebMcpOperationNotice';
 
 interface EditorShellProps {
   services: AppServices;
@@ -184,6 +185,9 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const [presenterViewError, setPresenterViewError] = useState<string | undefined>();
   const [imageExportPanelOpen, setImageExportPanelOpen] = useState(false);
   const [imageExportNotice, setImageExportNotice] = useState<OperationNoticeState | undefined>();
+  const [webMcpOperationStatus, setWebMcpOperationStatus] = useState<
+    AuthoringOperationStatus | undefined
+  >();
   const [imageExportRender, setImageExportRender] = useState<
     { frame: ImageExportFrame; project: ProjectDocument } | undefined
   >();
@@ -529,7 +533,15 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         });
         const { pdfExportService } = await import('../../../services/exporting/pdfExportService');
         return {
-          blob: pdfExportService.createBlob(pages),
+          blob: await pdfExportService.createBlob(pages, {
+            onProgress: (current, total) =>
+              report({
+                stage: 'assembling-pdf',
+                progress: 85 + Math.round((current / total) * 10),
+                current,
+                total,
+              }),
+          }),
           frameCount: renderedFrames.length,
           slideCount: project.pages.length,
           warnings: [],
@@ -652,7 +664,18 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         '../../../services/exporting/pdfExportService'
       );
       services.exportService.downloadBlob(
-        pdfExportService.createBlob(pages),
+        await pdfExportService.createBlob(pages, {
+          onProgress: (current, total) =>
+            showImageExportNotice(
+              {
+                detail: `Assembling ${current} of ${total}`,
+                message: 'Exporting PDF...',
+                progress: { current, total },
+                tone: 'info',
+              },
+              { persistent: true },
+            ),
+        }),
         services.exportService.getPdfFileName(vm.project),
       );
       showImageExportNotice({
@@ -1687,16 +1710,6 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       getActivePageId: () => authoringVmRef.current.activePageId,
       getProject: () => automationDelegateRef.current.getState().project,
     });
-    const publishingCapability = new PresentationPublishingCapability({
-      getSnapshot: () => {
-        const project = getProject();
-        return { project, revision: authoringRevision.getPresentation(project) };
-      },
-      mirror: services.mirrorService,
-      repository: services.projectRepository,
-      share: services.shareService,
-      isRawRecordingAuthorized: (recording) => recording.audio.publicShareAuthorized === true,
-    });
     const delegate = createAuthoringAutomationDelegate({
       assetCapabilities,
       deckLocalization,
@@ -1705,11 +1718,12 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       replaceProject: (project) => authoringVmRef.current.replaceProjectForAutomation(project),
       applyProject,
       powerPointUrlImportService,
-      publishingCapability,
       visualCapability,
     });
     const adapter = new WebMcpToolAdapter(
-      new authoringAutomationController.AuthoringAutomationController(delegate),
+      new authoringAutomationController.AuthoringAutomationController(delegate, {
+        onOperationStatusChange: setWebMcpOperationStatus,
+      }),
     );
     const demoWindow = window as WebMcpDemoWindow;
     const modelContext = editorShellBrowserUtils.getWebMcpModelContext();
@@ -1719,8 +1733,25 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     return () => {
       unregister?.();
       delete demoWindow.localStudioWebMcpTools;
+      setWebMcpOperationStatus(undefined);
     };
   }, [services]);
+
+  useEffect(() => {
+    if (!webMcpOperationStatus || ['queued', 'running'].includes(webMcpOperationStatus.state)) {
+      return undefined;
+    }
+    const terminalStatus = webMcpOperationStatus;
+    const timeoutId = window.setTimeout(() => {
+      setWebMcpOperationStatus((current) =>
+        current?.operationId === terminalStatus.operationId &&
+        current.revision === terminalStatus.revision
+          ? undefined
+          : current,
+      );
+    }, 6_000);
+    return () => window.clearTimeout(timeoutId);
+  }, [webMcpOperationStatus]);
 
   useEffect(
     () => () => {
@@ -1825,6 +1856,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           ref={workspaceRef}
           onMouseMove={handleWorkspacePointerMove}
         >
+          {webMcpOperationStatus ? <WebMcpOperationNotice status={webMcpOperationStatus} /> : null}
           {windowedPresentationActive && windowedExitHintVisible ? (
             <div className="windowed-presentation-exit-tooltip" role="tooltip">
               Press Esc to exit full screen

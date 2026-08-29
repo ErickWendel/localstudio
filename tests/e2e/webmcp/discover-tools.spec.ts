@@ -18,7 +18,6 @@ const showcaseCards = [
   ['prepare_ai_models', 'Prepare AI models'],
   ['search_media', 'Search stock media'],
   ['export_presentation', 'Export presentation'],
-  ['publish_presentation', 'Publish presentation'],
   ['get_operation_status', 'Get operation status'],
 ] as const;
 const showcaseSections = [
@@ -36,7 +35,7 @@ const showcaseSections = [
   ],
   ['Assets and styling', ['List authoring catalog', 'Search stock media']],
   ['Review', ['Focus slide preview']],
-  ['Export and publish', ['Export presentation', 'Publish presentation']],
+  ['Export', ['Export presentation']],
   ['Context and progress', ['Inspect presentation state', 'Get operation status']],
 ] as const;
 
@@ -88,12 +87,12 @@ test.describe('WebMCP discover tools journey', () => {
     ).toBeVisible();
     await page.getByRole('button', { name: 'Discover tools' }).click();
     await expect(
-      page.getByText('Discovered 15 tools through the local demo bridge.'),
+      page.getByText('Discovered 14 tools through the local demo bridge.'),
     ).toBeVisible();
     await expect(page.getByRole('button', { name: 'create_presentation' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'import_powerpoint_from_disk' })).toHaveCount(0);
     const workflow = page.locator('[aria-label="Demo workflow"]');
-    await expect(workflow.getByRole('button')).toHaveCount(15);
+    await expect(workflow.getByRole('button')).toHaveCount(14);
     for (const [, label] of showcaseCards) {
       await expect(workflow.getByRole('button', { name: label })).toBeVisible();
     }
@@ -137,9 +136,6 @@ test.describe('WebMCP discover tools journey', () => {
     await expect(
       importStep.getByRole('status').getByText(/Import PowerPoint from URL (started|is running)/),
     ).toBeVisible();
-    await importAction.click();
-    await expect(importInput).toBeHidden();
-    await expect(importStep.getByRole('status')).toBeVisible();
     releaseImport();
     await expect(importStep.getByRole('status')).toHaveText(
       'Import PowerPoint from URL completed.',
@@ -147,7 +143,7 @@ test.describe('WebMCP discover tools journey', () => {
     await workflow.getByRole('button', { name: 'Inspect presentation state' }).click();
     await page.getByRole('button', { name: 'Send Inspect presentation state' }).click();
     await expect(page.getByText('Inspect presentation state completed.')).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Last WebMCP result' })).toContainText(
+    await expect(page.getByLabel('Inspect presentation state result')).toContainText(
       'E2E imported deck',
     );
     await page.getByRole('button', { name: 'Create presentation' }).click();
@@ -155,17 +151,13 @@ test.describe('WebMCP discover tools journey', () => {
     await page.getByLabel('Create presentation command input').fill('E2E WebMCP project');
     await page.getByRole('button', { name: 'Send Create presentation' }).click();
     await expect(page.getByText('Create presentation completed.')).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Last WebMCP result' })).toContainText(
-      'E2E WebMCP project',
-    );
+    await expect(page.getByLabel('Create presentation result')).toContainText('E2E WebMCP project');
 
     await page.getByRole('button', { name: 'Upsert slide content' }).click();
     await expect(page.getByLabel('Upsert slide content command input')).toBeVisible();
     await page.getByRole('button', { name: 'Send Upsert slide content' }).click();
     await expect(page.getByText('Upsert slide content completed.')).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Last WebMCP result' })).toContainText(
-      'idempotentReplay',
-    );
+    await expect(page.getByLabel('Upsert slide content result')).toContainText('idempotentReplay');
     await expect(
       page
         .frameLocator('iframe[title="LocalStudio editor WebMCP demo"]')
@@ -176,10 +168,10 @@ test.describe('WebMCP discover tools journey', () => {
     await expect(page.getByLabel('Inspect presentation state command input')).toBeVisible();
     await page.getByRole('button', { name: 'Send Inspect presentation state' }).click();
     await expect(page.getByText('Inspect presentation state completed.')).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Last WebMCP result' })).toContainText(
+    await expect(page.getByLabel('Inspect presentation state result')).toContainText(
       'E2E WebMCP project',
     );
-    await expect(page.getByRole('region', { name: 'Last WebMCP result' })).toContainText(
+    await expect(page.getByLabel('Inspect presentation state result')).toContainText(
       'Presentations become agent-native',
     );
 
@@ -253,7 +245,7 @@ test.describe('WebMCP discover tools journey', () => {
     const webmcp = new WebMcpPage(page, getServer().baseURL);
     await webmcp.gotoShowcase();
     await page.getByRole('button', { name: 'Discover tools' }).click();
-    await expect(page.getByText('Discovered 15 tools through WebMCP.')).toBeVisible();
+    await expect(page.getByText('Discovered 14 tools through WebMCP.')).toBeVisible();
 
     for (const [, label] of showcaseCards) {
       await page.getByRole('button', { name: label, exact: true }).click();

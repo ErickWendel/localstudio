@@ -145,19 +145,14 @@ export const webMcpShowcaseSections: WebMcpShowcaseSection[] = [
     ],
   },
   {
-    id: 'export-publish',
-    title: 'Export and publish',
-    description: 'Package the deck or publish its exact current revision.',
+    id: 'export',
+    title: 'Export',
+    description: 'Package the deck in a portable presentation format.',
     steps: [
       {
         label: 'Export presentation',
         toolName: 'export_presentation',
         input: { format: 'pdf', slideRange: 'all' },
-      },
-      {
-        label: 'Publish presentation',
-        toolName: 'publish_presentation',
-        input: {},
       },
     ],
   },

@@ -69,6 +69,35 @@
   line-height: 16px;
 }
 
+.webmcp-step-result {
+  max-height: 320px;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid rgba(122, 255, 199, 0.16);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.26);
+  color: rgba(238, 250, 245, 0.82);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: pre-wrap;
+}
+
+.webmcp-step-result-shell {
+  margin-left: 30px;
+}
+
+.webmcp-step-result-shell > summary {
+  margin-bottom: 7px;
+  cursor: pointer;
+  color: #9fffd2;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
 .webmcp-step-button {
   justify-content: flex-start;
   width: 100%;

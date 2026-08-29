@@ -1,4 +1,4 @@
-import { Bot, FileJson, Play, Radar, SendHorizontal } from 'lucide-react';
+import { FileJson, Play, Radar, SendHorizontal } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { type WebMcpShowcaseStep, webMcpShowcaseSections } from './webMcpShowcaseSteps';
 
@@ -18,10 +18,14 @@ interface BrowserModelContext {
 }
 
 interface WebMcpOperationStatus {
+  current?: number;
+  detail?: string;
   error?: string;
   percentage?: number;
+  result?: unknown;
   stage?: string;
   state: 'queued' | 'running' | 'completed' | 'failed';
+  total?: number;
 }
 
 function getBrowserModelContext() {
@@ -113,19 +117,27 @@ function getOperationStatus(value: unknown): WebMcpOperationStatus | undefined {
   const data = (value as { data?: unknown }).data;
   if (!data || typeof data !== 'object') return undefined;
   const status = data as {
+    current?: unknown;
+    detail?: unknown;
     error?: unknown;
     percentage?: unknown;
+    result?: unknown;
     stage?: unknown;
     state?: unknown;
+    total?: unknown;
   };
   if (!['queued', 'running', 'completed', 'failed'].includes(String(status.state))) {
     return undefined;
   }
   return {
+    ...(typeof status.current === 'number' ? { current: status.current } : {}),
+    ...(typeof status.detail === 'string' ? { detail: status.detail } : {}),
     ...(typeof status.error === 'string' ? { error: status.error } : {}),
     ...(typeof status.percentage === 'number' ? { percentage: status.percentage } : {}),
+    ...(status.result !== undefined ? { result: status.result } : {}),
     ...(typeof status.stage === 'string' ? { stage: status.stage } : {}),
     state: status.state as WebMcpOperationStatus['state'],
+    ...(typeof status.total === 'number' ? { total: status.total } : {}),
   };
 }
 
@@ -135,7 +147,7 @@ export function WebMcpShowcasePage() {
   const [tools, setTools] = useState<WebMcpToolLike[]>([]);
   const [discoveryStatus, setDiscoveryStatus] = useState('Ready to discover page tools.');
   const [actionStatuses, setActionStatuses] = useState<Record<string, string>>({});
-  const [lastResult, setLastResult] = useState<string>('{}');
+  const [actionResults, setActionResults] = useState<Record<string, string>>({});
   const [isRunning, setIsRunning] = useState(false);
   const [useProtocolExecution, setUseProtocolExecution] = useState(false);
   const [activeStepName, setActiveStepName] = useState<string | undefined>();
@@ -200,11 +212,6 @@ export function WebMcpShowcasePage() {
         ? `Discovered ${discoveredTools.length} tools through WebMCP.`
         : `Discovered ${discoveredTools.length} tools through the local demo bridge.`,
     );
-    setLastResult(
-      formatPayload(
-        discoveredTools.map((tool) => ({ name: tool.name, description: tool.description })),
-      ),
-    );
   }
 
   async function runStep(step: WebMcpShowcaseStep, commandValue: string) {
@@ -216,10 +223,11 @@ export function WebMcpShowcasePage() {
 
     setIsRunning(true);
     setActionStatus(step.toolName, `Running ${step.label}...`);
+    setActionResults((current) => ({ ...current, [step.toolName]: '' }));
     try {
       const input = getCommandInput(step, commandValue);
       const result = await callTool(tool, input, useProtocolExecution);
-      setLastResult(formatPayload(result));
+      setActionResults((current) => ({ ...current, [step.toolName]: formatPayload(result) }));
       const failure = getToolFailure(result);
       if (failure) {
         setActionStatus(step.toolName, `${step.label} failed: ${failure}`);
@@ -249,7 +257,10 @@ export function WebMcpShowcasePage() {
             { operationId, waitForChangeMs: 1000 },
             useProtocolExecution,
           );
-          setLastResult(formatPayload(operationResult));
+          setActionResults((current) => ({
+            ...current,
+            [step.toolName]: formatPayload(operationResult),
+          }));
           const operationFailure = getToolFailure(operationResult);
           if (operationFailure) throw new Error(operationFailure);
           const operationStatus = getOperationStatus(operationResult);
@@ -268,9 +279,14 @@ export function WebMcpShowcasePage() {
           const stage = operationStatus.stage ? `: ${operationStatus.stage}` : '';
           const percentage =
             operationStatus.percentage === undefined ? '' : ` (${operationStatus.percentage}%)`;
+          const count =
+            operationStatus.current !== undefined && operationStatus.total !== undefined
+              ? ` ${operationStatus.current}/${operationStatus.total}`
+              : '';
+          const detail = operationStatus.detail ? ` — ${operationStatus.detail}` : '';
           setActionStatus(
             step.toolName,
-            `${step.label} is ${operationStatus.state}${stage}${percentage}.`,
+            `${step.label} is ${operationStatus.state}${stage}${percentage}${count}${detail}.`,
           );
         }
       }
@@ -423,6 +439,14 @@ export function WebMcpShowcasePage() {
                           </button>
                         </form>
                       ) : null}
+                      {actionResults[step.toolName] ? (
+                        <details className="webmcp-step-result-shell" open>
+                          <summary>Result</summary>
+                          <pre aria-label={`${step.label} result`} className="webmcp-step-result">
+                            {actionResults[step.toolName]}
+                          </pre>
+                        </details>
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -430,14 +454,6 @@ export function WebMcpShowcasePage() {
             ))}
           </div>
         ) : null}
-
-        <section className="webmcp-result-panel" aria-label="Last WebMCP result">
-          <div className="webmcp-result-heading">
-            <Bot size={16} />
-            <span>Last result</span>
-          </div>
-          <pre>{lastResult}</pre>
-        </section>
       </section>
 
       <section className="webmcp-editor-frame" aria-label="LocalStudio editor frame">

@@ -144,7 +144,7 @@ The challenge delta should therefore be framed as connecting existing deep produ
 
 ## Shipped authoring implementation
 
-The source now exposes 15 production authoring tools through the editor route:
+The source now exposes 14 production authoring tools through the editor route:
 
 1. `create_presentation`
 2. `get_presentation_state`
@@ -159,8 +159,7 @@ The source now exposes 15 production authoring tools through the editor route:
 11. `prepare_ai_models`
 12. `search_media`
 13. `export_presentation`
-14. `publish_presentation`
-15. `get_operation_status`
+14. `get_operation_status`
 
 The authoritative setup, input summaries, operation lifecycle, manual workflow, and failure guidance live in
 [`apps/docs/guide/work-with-web-ai/webmcp.md`](../../apps/docs/guide/work-with-web-ai/webmcp.md). The adapter's JSON
@@ -178,7 +177,7 @@ The hosted editor at `https://localstudio.dev/editor/` was inspected in ChatGPT'
 - `translate_text`
 - `get_project_snapshot`
 
-That hosted `/editor/webmcp/` showcase presented the same five-stage workflow inside a same-origin editor iframe. Do not use this historical observation as the current source contract; deployment should be re-audited after the 15-tool implementation ships.
+That hosted `/editor/webmcp/` showcase presented the same five-stage workflow inside a same-origin editor iframe. Do not use this historical observation as the current source contract; deployment should be re-audited after the 14-tool implementation ships.
 
 The current source routes public shares to `PublicDeckApp` before mounting `EditorApp`, while WebMCP registration lives in `EditorShell`. Therefore public attendee pages do not currently receive the editor tools or a public-view-specific WebMCP adapter. That separation is useful: add a dedicated public adapter instead of teaching the editor adapter about two unrelated authorization/state models.
 
@@ -194,13 +193,13 @@ The authoring orchestration contracts and semantic slide metadata are now implem
 ### Immediate product blockers
 
 1. **Eligibility:** obtain a written answer from the hackathon manager before representing this as an eligible submission. Continue the work as a public showcase if the answer is no.
-2. **Zero-setup publishing:** LocalStudio's current browser share service requires external S3-compatible storage configuration. A judge opening a clean browser will not have that configuration, so `publish_presentation` would otherwise fail at the climax of the demo.
+2. **Zero-setup publishing:** LocalStudio's current browser share service requires external S3-compatible storage configuration and user interaction. It is intentionally excluded from the authoring catalog until it can complete without hidden setup or external clicks.
 
 For the challenge build, prefer a narrowly scoped managed publisher—such as a small Cloudflare Worker issuing bounded upload capability URLs into R2—over shipping reusable writer credentials to the browser. Restrict size/content types, rate-limit creation, generate unguessable share IDs, and return a stable LocalStudio public URL. Keep bring-your-own S3 as the normal product path. If a managed publisher cannot be completed by the second build day, use a documented judge account/configuration flow and show it before the demo; do not hide a preconfigured local browser as if publishing were zero setup.
 
 ### Author flow: “one intent, visible stages”
 
-Demo prompt: **“Import this presentation, translate the entire deck to Spanish, and publish a link I can send to attendees.”**
+Demo prompt: **“Import this presentation, translate the entire deck to Spanish, describe it for AI, and export the finished deck.”**
 
 Shipped tools used by this workflow:
 
@@ -209,7 +208,6 @@ Shipped tools used by this workflow:
 | `import_powerpoint_from_url`         | Import an authorized HTTP(S), presigned object-storage, or localhost `.pptx` URL | page/byte/font counts, warnings, imported project ID          |
 | `translate_deck_and_notes`           | Translate visible text, speaker notes, and existing descriptions                 | language, changed/skipped counts, failures, overflow warnings |
 | `generate_deck_detailed_description` | Generate or refresh revision-linked semantic descriptions                        | described/skipped slides, language, generator, freshness      |
-| `publish_presentation`               | Publish the current validated snapshot                                           | stable public URL, publish revision, included media/context   |
 | `get_presentation_state`             | Read bounded state and the current revision                                      | page/element state, description freshness, revision           |
 | `get_operation_status`               | Poll each long-running stage                                                     | progress, byte/slide totals, warnings, typed final result     |
 
@@ -348,8 +346,8 @@ Suggested line: **“Your deck should not stop being useful when the talk ends.�
 ### Three-minute demo spine
 
 1. **0:00–0:20 — Stakes:** show a foreign-language `.pptx`; state that creators lose time and attendees lose context.
-2. **0:20–1:20 — Author agent:** discover the 15 tools, import a CORS-enabled PPTX URL, and poll byte/slide progress. Translate the deck and notes, generate fresh semantic descriptions, and show the visible canvas changes.
-3. **1:20–2:15 — Verify and deliver:** focus the translated slide for visual inspection, export one format, read the exact revision, and publish it. Open the returned URL in a clean context and show the matching revision plus transcript/authorized-media boundary.
+2. **0:20–1:20 — Author agent:** discover the 14 tools, import a CORS-enabled PPTX URL, and poll byte/slide progress. Translate the deck and notes, generate fresh semantic descriptions, and show the visible canvas changes.
+3. **1:20–2:15 — Verify and deliver:** focus the translated slide for visual inspection, read the exact revision and semantic description, then export one format. Treat public sharing as a separately configured human workflow until it can run hands-off.
 4. **2:15–2:45 — Breadth and trust:** briefly show the editable cards for catalogs, media, AI status/preparation, image generation, and operation status. Reveal read-only/untrusted annotations and strict schemas.
 5. **2:45–3:00 — Thesis:** “One presentation workflow, shared visibly by a person and their agent.”
 

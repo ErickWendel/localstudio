@@ -441,6 +441,48 @@ describe('App', () => {
     expect(await screen.findByText(/List authoring catalog failed:/)).toBeInTheDocument();
   });
 
+  it('keeps catalog and stock-media results inside their collapsible action cards', async () => {
+    const executeCatalog = vi.fn(() =>
+      Promise.resolve({ ok: true, data: { fonts: [{ family: 'Orbitron' }] } }),
+    );
+    const executeMedia = vi.fn(() =>
+      Promise.resolve({ ok: true, data: { items: [{ provider: 'unsplash' }] } }),
+    );
+    window.history.replaceState({}, '', '/webmcp');
+    Object.defineProperty(document, 'modelContext', {
+      configurable: true,
+      value: {
+        getTools: vi.fn().mockResolvedValue([
+          {
+            name: 'list_authoring_catalog',
+            description: 'List catalog',
+            execute: executeCatalog,
+          },
+          { name: 'search_media', description: 'Search stock media', execute: executeMedia },
+        ]),
+      },
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
+    await screen.findByRole('button', { name: 'list_authoring_catalog' });
+    const action = screen.getByRole('button', { name: 'List authoring catalog' });
+    fireEvent.click(action);
+    fireEvent.click(screen.getByRole('button', { name: 'Send List authoring catalog' }));
+
+    expect(await screen.findByLabelText('List authoring catalog result')).toHaveTextContent(
+      'Orbitron',
+    );
+    fireEvent.click(action);
+    expect(screen.getByLabelText('List authoring catalog result')).toBeInTheDocument();
+    expect(screen.queryByLabelText('List authoring catalog command input')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Search stock media' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send Search stock media' }));
+    expect(await screen.findByLabelText('Search stock media result')).toHaveTextContent('unsplash');
+  });
+
   it('dispatches the editable payload for every WebMCP showcase card', async () => {
     const tools = webMcpShowcaseSteps.map((step) => ({
       name: step.toolName,
@@ -459,7 +501,7 @@ describe('App', () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Discover tools' }));
-    await screen.findByRole('button', { name: 'publish_presentation' });
+    await screen.findByRole('button', { name: 'export_presentation' });
     for (let index = 0; index < webMcpShowcaseSteps.length; index += 1) {
       const step = webMcpShowcaseSteps[index]!;
       fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${step.label}$`) }));

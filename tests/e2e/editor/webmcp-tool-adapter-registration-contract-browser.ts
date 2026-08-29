@@ -32,7 +32,6 @@ export async function evaluateWebMcpToolAdapterRegistrationContract(): Promise<W
       prepareAiModels: () => Promise.resolve([]),
       searchMedia: unused,
       exportPresentation: unused,
-      publishPresentation: unused,
     }),
   );
   const registeredNames: string[] = [];
