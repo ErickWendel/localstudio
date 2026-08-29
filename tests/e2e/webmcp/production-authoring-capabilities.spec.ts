@@ -364,9 +364,7 @@ test.describe('production WebMCP authoring capabilities', () => {
       sourceLanguage: 'en',
       targetLanguage: 'pt',
     });
-    await expect(page.getByRole('status', { name: 'WebMCP authoring progress' })).toContainText(
-      /WebMCP is working|preparing translation|translating slides/,
-    );
+    await expect(page.locator('.deck-translation-status')).toContainText('Translating');
     const translated = await waitForOperation<{
       changedSlideCount: number;
       translatedDescriptions: number;

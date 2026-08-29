@@ -75,7 +75,7 @@ import { editorShortcutActions } from './editor-shortcut-actions';
 import { PresentationSlideNavigator } from './PresentationSlideNavigator';
 import { SpeakerNotesEditor } from './SpeakerNotesEditor';
 import { createProjectForSelectedShareRecording } from './createProjectForSelectedShareRecording';
-import { WebMcpOperationNotice } from './WebMcpOperationNotice';
+import { webMcpEditorProgress } from './webMcpEditorProgress';
 
 interface EditorShellProps {
   services: AppServices;
@@ -188,6 +188,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const [webMcpOperationStatus, setWebMcpOperationStatus] = useState<
     AuthoringOperationStatus | undefined
   >();
+  const webMcpOperationKindsRef = useRef(new Map<string, string>());
   const [imageExportRender, setImageExportRender] = useState<
     { frame: ImageExportFrame; project: ProjectDocument } | undefined
   >();
@@ -243,8 +244,19 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     0,
     visiblePages.findIndex((page) => page.id === vm.activePageId),
   );
-  const deckTranslationStatus = vm.deckTranslationProgress
-    ? `Translating ${vm.deckTranslationProgress.currentPageName} · ${vm.deckTranslationProgress.completedPages}/${vm.deckTranslationProgress.totalPages}`
+  const webMcpProgress = webMcpEditorProgress.derive({
+    operationKind: webMcpOperationStatus
+      ? webMcpOperationKindsRef.current.get(webMcpOperationStatus.operationId)
+      : undefined,
+    project: vm.project,
+    status: webMcpOperationStatus,
+  });
+  const deckTranslationProgress =
+    vm.deckTranslationProgress ?? webMcpProgress.translationProgress;
+  const presentationImportProgress =
+    vm.presentationImportProgress ?? webMcpProgress.importProgress;
+  const deckTranslationStatus = deckTranslationProgress
+    ? `Translating ${deckTranslationProgress.currentPageName} · ${deckTranslationProgress.completedPages}/${deckTranslationProgress.totalPages}`
     : undefined;
   const publicSharingConfigured = vm.hasMirrorConfig;
   const lastMirrorSyncTime = Date.parse(vm.mirrorState.lastSyncedAt ?? '');
@@ -1653,6 +1665,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
 
   useEffect(() => {
     if (!editorShellBrowserUtils.isWebMcpProtocolEnabled()) return undefined;
+    const operationKinds = webMcpOperationKindsRef.current;
     const getProject = () => automationDelegateRef.current.getState().project;
     const applyProject = (project: ProjectDocument, activePageId?: string) =>
       authoringVmRef.current.applyProjectForAutomation(project, activePageId);
@@ -1720,9 +1733,15 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       powerPointUrlImportService,
       visualCapability,
     });
+    const handleOperationStatusChange = (status: AuthoringOperationStatus) => {
+      if (status.state === 'queued') {
+        operationKinds.set(status.operationId, status.stage);
+      }
+      setWebMcpOperationStatus(status);
+    };
     const adapter = new WebMcpToolAdapter(
       new authoringAutomationController.AuthoringAutomationController(delegate, {
-        onOperationStatusChange: setWebMcpOperationStatus,
+        onOperationStatusChange: handleOperationStatusChange,
       }),
     );
     const demoWindow = window as WebMcpDemoWindow;
@@ -1733,6 +1752,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     return () => {
       unregister?.();
       delete demoWindow.localStudioWebMcpTools;
+      operationKinds.clear();
       setWebMcpOperationStatus(undefined);
     };
   }, [services]);
@@ -1743,12 +1763,16 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     }
     const terminalStatus = webMcpOperationStatus;
     const timeoutId = window.setTimeout(() => {
-      setWebMcpOperationStatus((current) =>
-        current?.operationId === terminalStatus.operationId &&
-        current.revision === terminalStatus.revision
-          ? undefined
-          : current,
-      );
+      setWebMcpOperationStatus((current) => {
+        if (
+          current?.operationId !== terminalStatus.operationId ||
+          current.revision !== terminalStatus.revision
+        ) {
+          return current;
+        }
+        webMcpOperationKindsRef.current.delete(terminalStatus.operationId);
+        return undefined;
+      });
     }, 6_000);
     return () => window.clearTimeout(timeoutId);
   }, [webMcpOperationStatus]);
@@ -1804,7 +1828,8 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         deckTranslationStatus={deckTranslationStatus}
         hasDirectoryPersistence={hasDirectoryPersistence}
         hasSelection={hasSelection}
-        imageExportNotice={imageExportNotice}
+        isTranslatingDeck={Boolean(deckTranslationProgress)}
+        operationNotice={imageExportNotice ?? webMcpProgress.operationNotice}
         isExportingImages={isExportingImages}
         isExportingPdf={isExportingPdf}
         isHistoryReadOnly={isHistoryReadOnly}
@@ -1856,7 +1881,6 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           ref={workspaceRef}
           onMouseMove={handleWorkspacePointerMove}
         >
-          {webMcpOperationStatus ? <WebMcpOperationNotice status={webMcpOperationStatus} /> : null}
           {windowedPresentationActive && windowedExitHintVisible ? (
             <div className="windowed-presentation-exit-tooltip" role="tooltip">
               Press Esc to exit full screen
@@ -1913,9 +1937,9 @@ function EditorDesktopShell({ services }: EditorShellProps) {
             animationPreview={vm.animationPreview}
             backgroundPreparation={vm.backgroundPreparation}
             canTranslateCurrentSlide={vm.canTranslateCurrentSlide}
-            translatingPageIds={vm.deckTranslationProgress?.activePageIds}
+            translatingPageIds={deckTranslationProgress?.activePageIds}
             canTranslateSelection={vm.canTranslateSelection}
-            isTranslating={vm.isTranslating}
+            isTranslating={vm.isTranslating || Boolean(webMcpProgress.translationProgress)}
             translationNotice={vm.translationNotice}
             onAlignSelectedElement={isHistoryReadOnly ? undefined : vm.alignSelectedElement}
             onEditSelectionGrid={
@@ -2257,8 +2281,8 @@ function EditorDesktopShell({ services }: EditorShellProps) {
           onReplaceFont={vm.replacePowerPointFont}
         />
       ) : null}
-      {vm.presentationImportProgress ? (
-        <PresentationImportProgressOverlay progress={vm.presentationImportProgress} />
+      {presentationImportProgress ? (
+        <PresentationImportProgressOverlay progress={presentationImportProgress} />
       ) : null}
       {vm.mediaImportProgress ? (
         <MediaImportProgressOverlay
