@@ -85,6 +85,25 @@ test.describe('WebMCP discover tools journey', () => {
         .frameLocator('iframe[title="LocalStudio editor WebMCP demo"]')
         .getByRole('heading', { name: 'LocalStudio.dev' }),
     ).toBeVisible();
+    const editorFrameGeometry = await page.evaluate(() => {
+      const frame = document.querySelector<HTMLElement>('.webmcp-editor-frame');
+      const iframe = frame?.querySelector('iframe');
+      if (!frame || !iframe) throw new Error('WebMCP editor frame is missing.');
+      const frameBounds = frame.getBoundingClientRect();
+      const iframeBounds = iframe.getBoundingClientRect();
+      return {
+        frameHeight: frameBounds.height,
+        frameWidth: frameBounds.width,
+        iframeHeight: iframeBounds.height,
+        iframeWidth: iframeBounds.width,
+      };
+    });
+    expect(editorFrameGeometry.iframeWidth).toBeGreaterThan(
+      editorFrameGeometry.frameWidth - 40,
+    );
+    expect(editorFrameGeometry.iframeHeight).toBeGreaterThan(
+      editorFrameGeometry.frameHeight - 40,
+    );
     await page.getByRole('button', { name: 'Discover tools' }).click();
     await expect(
       page.getByText('Discovered 14 tools through the local demo bridge.'),

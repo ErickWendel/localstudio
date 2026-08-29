@@ -28,6 +28,28 @@
   scrollbar-gutter: stable;
 }
 
+.webmcp-editor-frame {
+  height: 100vh;
+  height: 100dvh;
+  min-width: 0;
+  min-height: 0;
+  padding: 18px;
+  background:
+    linear-gradient(135deg, rgba(159, 255, 210, 0.08), transparent 30%), rgba(3, 5, 6, 0.88);
+  overflow: hidden;
+}
+
+.webmcp-editor-frame iframe {
+  width: 100%;
+  height: calc(100vh - 36px);
+  height: calc(100dvh - 36px);
+  display: block;
+  border: 1px solid rgba(159, 255, 210, 0.2);
+  border-radius: 8px;
+  background: #050d10;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.45);
+}
+
 .webmcp-brand-row {
   display: flex;
   align-items: center;
