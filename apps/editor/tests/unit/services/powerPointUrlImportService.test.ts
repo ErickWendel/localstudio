@@ -189,7 +189,7 @@ describe('PowerPointUrlImportService', () => {
     ).resolves.toMatchObject({ fileName: 'local.pptx' });
   });
 
-  it('accepts the advertised showcase deck size with the bounded default limit', async () => {
+  it('accepts a declared large response when no deployment limit is configured', async () => {
     const harness = createHarness({
       fetch: vi.fn(() =>
         Promise.resolve(
