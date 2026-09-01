@@ -60,11 +60,15 @@ describe('LandingPage', () => {
       'About it',
       'Features',
       'Requirements',
+      'WebMCP Playground',
       'Docs',
     ]);
     expect(screen.getByRole('link', { name: 'About it' })).toHaveAttribute('href', '#top');
     expect(screen.getByRole('link', { name: 'Features' })).toHaveAttribute('href', '#features');
-    expect(screen.queryByRole('link', { name: 'WebMCP Showcase' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'WebMCP Playground' })).toHaveAttribute(
+      'href',
+      '/editor/webmcp',
+    );
     expect(screen.getByRole('link', { name: 'Requirements' })).toHaveAttribute(
       'href',
       '#requirements',
@@ -117,6 +121,7 @@ describe('LandingPage', () => {
       'About it',
       'Features',
       'Requirements',
+      'WebMCP Playground',
       'Docs',
     ]);
     expect(within(mobileNav).getByRole('link', { name: 'About it' })).toHaveAttribute(

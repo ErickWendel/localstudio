@@ -84,13 +84,17 @@ test.describe('landing public funnel journey', () => {
     }
 
     await page.goto(new URL('/', getServer().baseURL).toString());
+    await expect(page.getByRole('link', { name: 'WebMCP Playground' })).toHaveAttribute(
+      'href',
+      '/editor/webmcp',
+    );
     await expect(page.getByRole('link', { name: 'Open WebMCP demo' })).toHaveAttribute(
       'href',
       '/editor/webmcp',
     );
 
     if (!isLandingCoverageRun) {
-      await page.getByRole('link', { name: 'Open WebMCP demo' }).click();
+      await page.getByRole('link', { name: 'WebMCP Playground' }).click();
       await expect(page).toHaveURL(/\/editor\/webmcp$/);
       await expect(page.getByRole('heading', { name: /WebMCP showcase/i })).toBeVisible();
     }
