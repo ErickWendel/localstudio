@@ -66,6 +66,7 @@ export function EditorLeftPanelSurface({
         isHistoryReadOnly
           ? undefined
           : (elementId, file) => {
+              // replaceVideoAsset never rejects; failures surface via mediaImportProgress.
               void vm.replaceVideoAsset(elementId, file);
             }
       }

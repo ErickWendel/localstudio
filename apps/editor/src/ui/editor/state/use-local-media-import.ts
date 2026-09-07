@@ -16,6 +16,46 @@ export interface MediaImportProgressState {
   tone: 'loading' | 'error';
 }
 
+const unsupportedVideoFormatProgress: MediaImportProgressState = {
+  detail:
+    'Video import supports MP4 and WebM files. Convert this clip to MP4 or WebM and import it again.',
+  title: 'Unsupported video format',
+  tone: 'error',
+};
+
+const loadingVideoProgress: MediaImportProgressState = {
+  detail: 'Loading video metadata without copying the full file into memory.',
+  title: 'Loading media',
+  tone: 'loading',
+};
+
+function mediaImportFailedProgress(error: unknown): MediaImportProgressState {
+  return {
+    detail: error instanceof Error ? error.message : 'The selected media file could not be loaded.',
+    title: 'Media import failed',
+    tone: 'error',
+  };
+}
+
+/**
+ * Creates an object URL for a video file and reads its dimensions/duration
+ * without ever copying the full file into memory as a data URL. If reading
+ * the metadata fails, the object URL is revoked before the error propagates
+ * so callers never have to manage cleanup on the failure path themselves.
+ */
+async function loadVideoMedia(file: File) {
+  const objectUrl = localMediaFiles.createMediaObjectUrl(file);
+  try {
+    const mediaSize = await localMediaFiles.readVideoSize(objectUrl);
+    return { objectUrl, mediaSize };
+  } catch (error) {
+    if (typeof URL.revokeObjectURL === 'function') {
+      URL.revokeObjectURL(objectUrl);
+    }
+    throw error;
+  }
+}
+
 interface UseLocalMediaImportOptions {
   activePageId: string;
   analyticsService: AppServices['analyticsService'];
@@ -52,39 +92,42 @@ export function useLocalMediaImport({
   async function importImageFile(file: File) {
     const assetType = localMediaFiles.getMediaAssetType(file);
     if (assetType === 'video' && !localMediaFiles.isSupportedLocalVideoFile(file)) {
-      setMediaImportProgress({
-        detail:
-          'Video import supports MP4 and WebM files. Convert this clip to MP4 or WebM and import it again.',
-        title: 'Unsupported video format',
-        tone: 'error',
-      });
+      setMediaImportProgress(unsupportedVideoFormatProgress);
       return;
     }
 
-    setMediaImportProgress({
-      detail:
-        assetType === 'video'
-          ? 'Loading video metadata without copying the full file into memory.'
-          : assetType === 'gif'
-            ? 'Loading animated media from disk.'
-            : 'Loading image from disk.',
-      title: 'Loading media',
-      tone: 'loading',
-    });
+    setMediaImportProgress(
+      assetType === 'video'
+        ? loadingVideoProgress
+        : {
+            detail:
+              assetType === 'gif'
+                ? 'Loading animated media from disk.'
+                : 'Loading image from disk.',
+            title: 'Loading media',
+            tone: 'loading',
+          },
+    );
     await waitForNextPaint();
 
     let imported = false;
     let objectUrl: string | undefined;
     try {
-      objectUrl =
-        assetType === 'video' || assetType === 'gif'
-          ? localMediaFiles.createMediaObjectUrl(file)
-          : undefined;
-      const mediaUrl = objectUrl ?? (await localMediaFiles.readImageFileAsDataUrl(file));
-      const mediaSize =
-        assetType === 'video'
-          ? await localMediaFiles.readVideoSize(mediaUrl)
-          : await localMediaFiles.readImageSize(mediaUrl);
+      let mediaUrl: string;
+      let mediaSize: { height: number; width: number; durationSeconds?: number };
+      if (assetType === 'video') {
+        const loaded = await loadVideoMedia(file);
+        objectUrl = loaded.objectUrl;
+        mediaUrl = loaded.objectUrl;
+        mediaSize = loaded.mediaSize;
+      } else if (assetType === 'gif') {
+        objectUrl = localMediaFiles.createMediaObjectUrl(file);
+        mediaUrl = objectUrl;
+        mediaSize = await localMediaFiles.readImageSize(mediaUrl);
+      } else {
+        mediaUrl = await localMediaFiles.readImageFileAsDataUrl(file);
+        mediaSize = await localMediaFiles.readImageSize(mediaUrl);
+      }
       const videoDurationSeconds =
         assetType === 'video' &&
         'durationSeconds' in mediaSize &&
@@ -278,12 +321,7 @@ export function useLocalMediaImport({
       );
       imported = true;
     } catch (error) {
-      setMediaImportProgress({
-        detail:
-          error instanceof Error ? error.message : 'The selected media file could not be loaded.',
-        title: 'Media import failed',
-        tone: 'error',
-      });
+      setMediaImportProgress(mediaImportFailedProgress(error));
       return;
     } finally {
       if (!imported && objectUrl && typeof URL.revokeObjectURL === 'function') {
@@ -306,31 +344,44 @@ export function useLocalMediaImport({
 
   async function replaceVideoAsset(elementId: string, file: File) {
     if (localMediaFiles.getMediaAssetType(file) !== 'video') return;
-    const dataUrl = await localMediaFiles.readImageFileAsDataUrl(file);
-    const mediaSize = await localMediaFiles.readVideoSize(dataUrl);
-    const videoDurationSeconds = mediaSize.durationSeconds;
-    const assetId = createPrefixedId('asset');
-    const mediaName = file.name.trim() || 'Replacement video';
 
-    commitProject(
-      (currentProject) =>
-        new basicCommands.ReplaceVideoAssetCommand(
-          elementId,
-          {
-            id: assetId,
-            type: 'video',
-            name: mediaName,
-            mimeType: file.type || 'video/mp4',
-            objectUrl: dataUrl,
-          },
-          videoDurationSeconds !== undefined ? { durationSeconds: videoDurationSeconds } : {},
-        ).execute(currentProject),
-      { selectedElementIds: [elementId] },
-    );
-    analyticsService.capture(postHogEvents.localMediaImported, {
-      assetType: 'video',
-      replacedExistingMedia: true,
-    });
+    if (!localMediaFiles.isSupportedLocalVideoFile(file)) {
+      setMediaImportProgress(unsupportedVideoFormatProgress);
+      return;
+    }
+
+    setMediaImportProgress(loadingVideoProgress);
+    await waitForNextPaint();
+
+    try {
+      const { objectUrl, mediaSize } = await loadVideoMedia(file);
+      const videoDurationSeconds = mediaSize.durationSeconds;
+      const assetId = createPrefixedId('asset');
+      const mediaName = file.name.trim() || 'Replacement video';
+
+      commitProject(
+        (currentProject) =>
+          new basicCommands.ReplaceVideoAssetCommand(
+            elementId,
+            {
+              id: assetId,
+              type: 'video',
+              name: mediaName,
+              mimeType: file.type || 'video/mp4',
+              objectUrl,
+            },
+            videoDurationSeconds !== undefined ? { durationSeconds: videoDurationSeconds } : {},
+          ).execute(currentProject),
+        { selectedElementIds: [elementId] },
+      );
+      analyticsService.capture(postHogEvents.localMediaImported, {
+        assetType: 'video',
+        replacedExistingMedia: true,
+      });
+      setMediaImportProgress(undefined);
+    } catch (error) {
+      setMediaImportProgress(mediaImportFailedProgress(error));
+    }
   }
 
   function clearMediaImportProgress() {

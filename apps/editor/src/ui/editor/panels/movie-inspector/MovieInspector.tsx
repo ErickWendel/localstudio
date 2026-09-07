@@ -1,4 +1,13 @@
-import { FileVideo, FolderOpen, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react';
+import {
+  FileVideo,
+  FolderOpen,
+  Pause,
+  Play,
+  SkipBack,
+  SkipForward,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
 import { useRef } from 'react';
 import type {
   ElementAnimationBuild,
@@ -7,6 +16,7 @@ import type {
   VideoRepeatMode,
 } from '../../../../domain/documents/model';
 import type { MediaPlaybackPatch } from '../../../../domain/commands/elements/basicCommands';
+import { localMediaImportConfig } from '../../media/localMediaImportConfig';
 
 type ElementAnimationPatch = Omit<ElementAnimationBuild, 'elementId' | 'id'>;
 type MovieStartTrigger = ElementAnimationBuild['trigger'];
@@ -21,7 +31,9 @@ interface MovieInspectorProps {
   assetName?: string | undefined;
   element: VideoElement;
   onReplaceVideoAsset?: ((file: File) => void) | undefined;
-  onSetElementAnimationBuilds?: ((elementIds: string[], patch: ElementAnimationPatch) => void) | undefined;
+  onSetElementAnimationBuilds?:
+    | ((elementIds: string[], patch: ElementAnimationPatch) => void)
+    | undefined;
   onUpdateMedia: (patch: MediaPlaybackPatch) => void;
   page?: ProjectDocument['pages'][number] | undefined;
 }
@@ -73,7 +85,7 @@ export function MovieInspector({
           <input
             ref={replaceVideoInputRef}
             aria-label="Replace video file"
-            accept="video/*"
+            accept={localMediaImportConfig.videoReplaceAccept}
             className="visually-hidden-input"
             type="file"
             onChange={(event) => {
@@ -176,7 +188,10 @@ export function MovieInspector({
               type="range"
               value={trimEndSeconds}
               onChange={(event) => {
-                const nextEnd = Math.max(toTrimSeconds(event.target.value), element.trimStartSeconds);
+                const nextEnd = Math.max(
+                  toTrimSeconds(event.target.value),
+                  element.trimStartSeconds,
+                );
                 onUpdateMedia({ trimEndSeconds: nextEnd });
               }}
             />
@@ -275,7 +290,9 @@ function formatMovieTime(seconds: number) {
   const displaySeconds = (totalSeconds % 60).toString().padStart(2, '0');
   const totalMinutes = Math.floor(totalSeconds / 60);
   const displayMinutes = (totalMinutes % 60).toString().padStart(2, '0');
-  const hours = Math.floor(totalMinutes / 60).toString().padStart(2, '0');
+  const hours = Math.floor(totalMinutes / 60)
+    .toString()
+    .padStart(2, '0');
   return `${hours}:${displayMinutes}:${displaySeconds},${milliseconds}`;
 }
 

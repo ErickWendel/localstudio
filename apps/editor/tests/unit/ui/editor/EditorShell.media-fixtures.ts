@@ -70,9 +70,17 @@ class ReadyStockMediaService implements StockMediaService {
     this.downloadedItems.push({ item, sourceUrl });
     return Promise.resolve({
       blob: new Blob(['stock-media'], {
-        type: sourceUrl.endsWith('.mp4') ? 'video/mp4' : item.kind === 'gif' ? 'image/gif' : 'image/jpeg',
+        type: sourceUrl.endsWith('.mp4')
+          ? 'video/mp4'
+          : item.kind === 'gif'
+            ? 'image/gif'
+            : 'image/jpeg',
       }),
-      mimeType: sourceUrl.endsWith('.mp4') ? 'video/mp4' : item.kind === 'gif' ? 'image/gif' : 'image/jpeg',
+      mimeType: sourceUrl.endsWith('.mp4')
+        ? 'video/mp4'
+        : item.kind === 'gif'
+          ? 'image/gif'
+          : 'image/jpeg',
       objectUrl:
         sourceUrl === stockGif.videoUrl
           ? 'blob:giphy-video'
@@ -143,6 +151,21 @@ function mockVideoMetadataLoad() {
     });
 }
 
+function mockVideoMetadataLoadFailure() {
+  const createElement = document.createElement.bind(document);
+  return vi
+    .spyOn(document, 'createElement')
+    .mockImplementation((tagName: string, options?: ElementCreationOptions) => {
+      const element = createElement(tagName, options);
+      if (tagName.toLowerCase() === 'video') {
+        queueMicrotask(() => {
+          element.dispatchEvent(new Event('error'));
+        });
+      }
+      return element;
+    });
+}
+
 function mockControllableVideoMetadataLoad() {
   const createElement = document.createElement.bind(document);
   let videoElement: HTMLElement | undefined;
@@ -153,6 +176,7 @@ function mockControllableVideoMetadataLoad() {
       if (tagName.toLowerCase() === 'video') {
         Object.defineProperty(element, 'videoWidth', { configurable: true, value: 1280 });
         Object.defineProperty(element, 'videoHeight', { configurable: true, value: 720 });
+        Object.defineProperty(element, 'duration', { configurable: true, value: 8.5 });
         videoElement = element;
       }
       return element;
@@ -175,5 +199,6 @@ export const editorShellMediaFixtures = {
   createProjectWithVideo,
   mockControllableVideoMetadataLoad,
   mockVideoMetadataLoad,
+  mockVideoMetadataLoadFailure,
   stockImage,
 };
