@@ -2,6 +2,7 @@ const slideRels = `<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rIdLayout" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>
   <Relationship Id="rIdBackground" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/background-image.png"/>
+  <Relationship Id="rIdShapeImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/shape-image.png"/>
 </Relationships>`;
 
 const slideXml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -15,6 +16,14 @@ const slideXml = `<?xml version="1.0" encoding="UTF-8"?>
         <p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
         <p:spPr><a:xfrm><a:off x="914400" y="914400"/><a:ext cx="3657600" cy="914400"/></a:xfrm></p:spPr>
         <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr sz="2400"><a:solidFill><a:srgbClr val="00aa00"/></a:solidFill></a:rPr><a:t>&lt;/ </a:t></a:r><a:r><a:rPr sz="2400"><a:solidFill><a:srgbClr val="101010"/></a:solidFill></a:rPr><a:t>Editable title</a:t></a:r></a:p></p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="3" name="Shape image fill"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="914400" y="457200"/><a:ext cx="914400" cy="914400"/></a:xfrm>
+          <a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect r="r" b="b" t="t" l="l"/><a:pathLst><a:path h="914400" w="914400"><a:moveTo><a:pt x="0" y="0"/></a:moveTo><a:lnTo><a:pt x="914400" y="0"/></a:lnTo><a:lnTo><a:pt x="914400" y="914400"/></a:lnTo><a:close/></a:path></a:pathLst></a:custGeom>
+          <a:blipFill><a:blip r:embed="rIdShapeImage"/><a:stretch><a:fillRect/></a:stretch></a:blipFill>
+        </p:spPr>
       </p:sp>
     </p:spTree>
   </p:cSld>

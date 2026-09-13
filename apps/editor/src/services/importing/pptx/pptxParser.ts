@@ -275,6 +275,64 @@ function parsePictureObject(
   };
 }
 
+function parseShapeImageFillObject(
+  context: ParseContext,
+  shape: Element,
+  slideId: string,
+  zIndex: number,
+  scaleX: number,
+  scaleY: number,
+  relationships: Map<string, PptxRelationship>,
+  scope: ParseScope,
+  idScope: 'layout' | 'master' | 'slide' = 'slide',
+): PptxSlideObject | undefined {
+  const shapeProperties = pptxXml.firstDescendant(shape, 'spPr');
+  const blipFill = shapeProperties
+    ? pptxXml.firstDescendant(shapeProperties, 'blipFill')
+    : undefined;
+  if (!blipFill) return undefined;
+  const imageRelId =
+    pptxXml.getRelationshipAttr(pptxXml.firstDescendant(blipFill, 'blip'), 'embed') ??
+    pptxXml.getRelationshipAttr(pptxXml.firstDescendant(blipFill, 'svgBlip'), 'embed');
+  const assetPath = getRelationshipTarget(context, relationships, imageRelId, slideId);
+  if (!assetPath) return undefined;
+  const mimeType = context.package.getContentType(assetPath) ?? pptxFileUtils.getMimeType(assetPath);
+  const assetType = pptxFileUtils.getAssetType(assetPath, mimeType);
+  if (!assetType) {
+    context.package.warnings.push({
+      code: 'pptx-unsupported-asset',
+      message: `Skipped unsupported PowerPoint asset: ${assetPath}`,
+      pageId: slideId,
+      severity: 'warning',
+    });
+    return undefined;
+  }
+  const frame = parseFrame(shape, scaleX, scaleY, scope.groupTransform);
+  if (!frame) return undefined;
+  const shapeId = localShapeId(shape, String(zIndex));
+  const opacity = pptxVisualStyle.getOpacity(shapeProperties);
+  const crop = parsePictureCrop(blipFill);
+  const mask =
+    shapeProperties &&
+    pptxXml.firstDescendant(shapeProperties, 'prstGeom')?.getAttribute('prst') === 'ellipse'
+      ? 'ellipse'
+      : undefined;
+  return {
+    assetPath,
+    ...(crop ? { crop } : {}),
+    frame,
+    frameSource: 'self',
+    id: `${slideId}-${idScope}-${assetType}-${shapeId}`,
+    kind: assetType,
+    ...(mask && assetType === 'image' ? { mask } : {}),
+    ...(opacity !== undefined ? { opacity } : {}),
+    rotation: frame.rotation,
+    source: idScope,
+    sourceShapeId: shapeId,
+    zIndex,
+  };
+}
+
 function parseCropCoordinate(value: string | null | undefined) {
   const coordinate = Number(value);
   return Number.isFinite(coordinate) ? Math.max(0, coordinate / 100000) : 0;
@@ -598,6 +656,18 @@ function parseSlideTreeObjects(
   for (const child of pptxXml.childElements(tree)) {
     const zIndex = zIndexStart + objects.length;
     if (child.localName === 'sp' || child.localName === 'cxnSp') {
+      const shapeImageFillObject = parseShapeImageFillObject(
+        context,
+        child,
+        slideId,
+        zIndex,
+        scaleX,
+        scaleY,
+        relationships,
+        scope,
+        idScope,
+      );
+      if (shapeImageFillObject) objects.push(shapeImageFillObject);
       const picturePlaceholderObject = parsePicturePlaceholderObject(
         child,
         slideId,

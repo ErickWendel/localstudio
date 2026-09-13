@@ -143,6 +143,7 @@ test.describe('editor import and export journey', () => {
       .poll(() => canvas.evaluate(readCanvasPixel, { x: 5, y: 5 }))
       .toEqual([255, 255, 255, 255]);
     await editor.openTool('Layout');
+    await expect(page.getByRole('button', { name: 'shape-image.png', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Page Background', exact: true }).click();
     await editor.openTool('Design');
     await expect(

@@ -647,6 +647,48 @@ describe('BrowserPptxImportService', () => {
     expect(title).toMatchObject({ fill: '#FFFFFF', fontFamily: 'Roboto' });
   });
 
+  it('imports images authored as filled PowerPoint shapes', async () => {
+    const imageFilledShapeSlideXml = `<?xml version="1.0" encoding="UTF-8"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree>
+  <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>
+  <p:sp>
+    <p:nvSpPr><p:cNvPr id="50" name="Freeform image fill"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+    <p:spPr>
+      <a:xfrm><a:off x="914400" y="457200"/><a:ext cx="2743200" cy="1828800"/></a:xfrm>
+      <a:custGeom>
+        <a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect r="r" b="b" t="t" l="l"/>
+        <a:pathLst><a:path h="1828800" w="2743200"><a:moveTo><a:pt x="0" y="0"/></a:moveTo><a:lnTo><a:pt x="2743200" y="0"/></a:lnTo><a:lnTo><a:pt x="2743200" y="1828800"/></a:lnTo><a:close/></a:path></a:pathLst>
+      </a:custGeom>
+      <a:blipFill><a:blip r:embed="rIdWideImage"/><a:srcRect l="10000" t="5000" r="20000" b="15000"/><a:stretch><a:fillRect/></a:stretch></a:blipFill>
+    </p:spPr>
+  </p:sp>
+</p:spTree></p:cSld></p:sld>`;
+    const service = new BrowserPptxImportService();
+    const project = await service.importPowerPoint({
+      file: createPptxFixture(imageFilledShapeSlideXml),
+    });
+    const pageElements = project.pages[0]?.elementIds.map((elementId) => project.elements[elementId]);
+    const image = pageElements?.find(
+      (element) => element?.type === 'image' && element.importSource?.shapeId === '50',
+    );
+
+    expect(image).toMatchObject({
+      height: 384,
+      type: 'image',
+      width: 576,
+      x: 192,
+      y: 96,
+    });
+    if (!image || image.type !== 'image') {
+      throw new Error('Expected image-filled shape to import as an editable image.');
+    }
+    expect(image.crop?.height).toBeCloseTo(0.8);
+    expect(image.crop?.width).toBeCloseTo(0.7);
+    expect(image.crop?.x).toBeCloseTo(0.1);
+    expect(image.crop?.y).toBeCloseTo(0.05);
+    expect(project.assets[image.assetId]?.fileName).toBe('wide.png');
+  });
+
   it('imports editable text, original images, and playable video assets from PPTX', async () => {
     const service = new BrowserPptxImportService();
     const project = await service.importPowerPoint({ file: createPptxFixture() });
