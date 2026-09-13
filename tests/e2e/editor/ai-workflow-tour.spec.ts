@@ -1,6 +1,8 @@
 import { EditorAppPage } from '../pages/editor-app.page';
 import { expect, test, withIsolatedDevServer } from '../support/journey-test';
 
+process.env.VITE_DISABLE_EDITOR_TOUR = 'false';
+
 const getServer = withIsolatedDevServer(test);
 
 const tourStepTitles = [
@@ -23,6 +25,18 @@ const tourStepTitles = [
 ];
 
 test.describe('editor AI workflow tour journey', () => {
+  test('starts automatically for a first-time visitor without a hidden opt-in', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.removeItem('localstudio.ai-workflow-tour.enabled');
+      window.localStorage.removeItem('localstudio.ai-workflow-tour.seen');
+    });
+
+    const editor = new EditorAppPage(page, getServer().baseURL);
+    await editor.gotoNewProject();
+
+    await expect(page.getByText(tourStepTitles[0], { exact: true })).toBeVisible();
+  });
+
   test('launches from Help and walks through AI setup, import, storage, mirror, and media steps', async ({
     page,
   }) => {
