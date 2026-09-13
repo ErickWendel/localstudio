@@ -50,8 +50,10 @@ button {
   font-size: 20px;
   font-variation-settings: 'FILL' 0;
   line-height: 1;
+  visibility: hidden;
 }
 
 .material-symbols-ready .material-symbols-outlined {
   color: inherit;
+  visibility: visible;
 }
