@@ -17,22 +17,33 @@ function addPreconnect(href: string, crossOrigin = false) {
   document.head.append(link);
 }
 
-function loadEditorFonts() {
-  addPreconnect('https://fonts.googleapis.com');
-  addPreconnect('https://fonts.gstatic.com', true);
-  const fontUrls = [
-    'https://fonts.googleapis.com/css2?family=Open+Sans:wght@300..800&family=Orbitron:wght@400..900&display=swap',
-    'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap',
-  ];
-  for (const href of fontUrls) {
+function loadStylesheet(href: string) {
+  return new Promise<void>((resolve, reject) => {
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = href;
+    link.addEventListener('load', () => resolve(), { once: true });
+    link.addEventListener('error', () => reject(new Error(`Failed to load stylesheet: ${href}`)), {
+      once: true,
+    });
     document.head.append(link);
-  }
-  void document.fonts?.load?.('20px "Material Symbols Outlined"').finally(() => {
-    document.documentElement.classList.add('material-symbols-ready');
   });
+}
+
+function loadEditorFonts() {
+  addPreconnect('https://fonts.googleapis.com');
+  addPreconnect('https://fonts.gstatic.com', true);
+  void loadStylesheet(
+    'https://fonts.googleapis.com/css2?family=Open+Sans:wght@300..800&family=Orbitron:wght@400..900&display=swap',
+  ).catch(() => undefined);
+  void loadStylesheet(
+    'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap',
+  )
+    .then(async () => {
+      await document.fonts?.load?.('20px "Material Symbols Outlined"');
+      document.documentElement.classList.add('material-symbols-ready');
+    })
+    .catch(() => undefined);
 }
 
 function scheduleEditorFonts() {
