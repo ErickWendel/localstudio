@@ -239,6 +239,7 @@ export function CanvasWorkspace({
   const artboardRef = useRef<HTMLDivElement>(null);
   const suppressNextBackgroundDoubleClickRef = useRef(false);
   const suppressNextCanvasClickRef = useRef(false);
+  const suppressNextArtboardClickRef = useRef(false);
   const textInputRef = useRef<HTMLTextAreaElement>(null);
   const onTextEditSelectionChangeRef = useRef(onTextEditSelectionChange);
   const [stageSize, setStageSize] = useState({ width: 768, height: 432 });
@@ -1238,6 +1239,7 @@ export function CanvasWorkspace({
   }
 
   function handleStagePointerDown(event: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
+    suppressNextArtboardClickRef.current = false;
     const linkedTextElement = getLinkedTextElementFromEventTarget(event.target);
     if (linkedTextElement && (presentationMode || readOnly)) return;
     if (canAdvanceAnimationPreviewByClick) {
@@ -1274,6 +1276,7 @@ export function CanvasWorkspace({
       if (!endPoint) return;
       const marqueeRect = getNormalizedStageRect(startPoint, endPoint);
       if (marqueeRect.width < 4 || marqueeRect.height < 4) return;
+      suppressNextArtboardClickRef.current = true;
       selectElementsInMarquee(marqueeRect);
     };
 
@@ -1299,6 +1302,10 @@ export function CanvasWorkspace({
 
   function handleArtboardClick(event: ReactMouseEvent<HTMLDivElement>) {
     if (suppressNextCanvasClickRef.current) return;
+    if (suppressNextArtboardClickRef.current) {
+      suppressNextArtboardClickRef.current = false;
+      return;
+    }
     if (readOnly || backgroundSelectionMode || editingTextId) return;
     if (!(event.target instanceof HTMLCanvasElement)) return;
 

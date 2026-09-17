@@ -911,6 +911,7 @@ describe('CanvasWorkspace', () => {
 
   it('draws a green marquee and selects elements intersecting it', async () => {
     const onSelectElement = vi.fn();
+    const onSelectSlide = vi.fn();
     const stageRef = createRef<Konva.Stage>();
     const { container } = render(
       <CanvasWorkspace
@@ -919,6 +920,7 @@ describe('CanvasWorkspace', () => {
         selection={{ pageId: 'page-1', elementIds: [] }}
         stageRef={stageRef}
         onSelectElement={onSelectElement}
+        onSelectSlide={onSelectSlide}
       />,
     );
 
@@ -946,6 +948,10 @@ describe('CanvasWorkspace', () => {
     expect(onSelectElement).toHaveBeenCalledTimes(2);
     expect(onSelectElement).toHaveBeenNthCalledWith(1, 'text-subtitle');
     expect(onSelectElement).toHaveBeenNthCalledWith(2, 'text-title', { additive: true });
+
+    const selectSlideCallsAfterMarquee = onSelectSlide.mock.calls.length;
+    fireEvent.click(canvas!, { clientX: 735, clientY: 315 });
+    expect(onSelectSlide).toHaveBeenCalledTimes(selectSlideCallsAfterMarquee);
   });
 
   it('keeps the marquee origin at the initial mouse position when dragging upward', async () => {
