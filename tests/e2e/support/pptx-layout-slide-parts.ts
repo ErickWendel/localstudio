@@ -22,7 +22,7 @@ const slideXml = `<?xml version="1.0" encoding="UTF-8"?>
         <p:spPr>
           <a:xfrm><a:off x="914400" y="457200"/><a:ext cx="914400" cy="914400"/></a:xfrm>
           <a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect r="r" b="b" t="t" l="l"/><a:pathLst><a:path h="914400" w="914400"><a:moveTo><a:pt x="0" y="0"/></a:moveTo><a:lnTo><a:pt x="914400" y="0"/></a:lnTo><a:lnTo><a:pt x="914400" y="914400"/></a:lnTo><a:close/></a:path></a:pathLst></a:custGeom>
-          <a:blipFill><a:blip r:embed="rIdShapeImage"/><a:stretch><a:fillRect/></a:stretch></a:blipFill>
+          <a:blipFill><a:blip r:embed="rIdShapeImage"/><a:stretch><a:fillRect t="-16666" b="-16666"/></a:stretch></a:blipFill>
         </p:spPr>
       </p:sp>
     </p:spTree>

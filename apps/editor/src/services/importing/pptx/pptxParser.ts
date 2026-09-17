@@ -338,16 +338,38 @@ function parseCropCoordinate(value: string | null | undefined) {
   return Number.isFinite(coordinate) ? Math.max(0, coordinate / 100000) : 0;
 }
 
+function parseFillRectCoordinate(value: string | null | undefined) {
+  const coordinate = Number(value);
+  return Number.isFinite(coordinate) ? coordinate : 0;
+}
+
 function parsePictureCrop(picture: Element) {
   const srcRect = pptxXml.firstDescendant(picture, 'srcRect');
-  if (!srcRect) return undefined;
-  const left = parseCropCoordinate(srcRect.getAttribute('l'));
-  const top = parseCropCoordinate(srcRect.getAttribute('t'));
-  const right = parseCropCoordinate(srcRect.getAttribute('r'));
-  const bottom = parseCropCoordinate(srcRect.getAttribute('b'));
-  const width = Math.max(0.01, 1 - left - right);
-  const height = Math.max(0.01, 1 - top - bottom);
-  return { x: left, y: top, width, height };
+  if (srcRect) {
+    const left = parseCropCoordinate(srcRect.getAttribute('l'));
+    const top = parseCropCoordinate(srcRect.getAttribute('t'));
+    const right = parseCropCoordinate(srcRect.getAttribute('r'));
+    const bottom = parseCropCoordinate(srcRect.getAttribute('b'));
+    const width = Math.max(0.01, 1 - left - right);
+    const height = Math.max(0.01, 1 - top - bottom);
+    return { x: left, y: top, width, height };
+  }
+  const fillRect = pptxXml.firstDescendant(picture, 'fillRect');
+  if (!fillRect) return undefined;
+  const left = parseFillRectCoordinate(fillRect.getAttribute('l'));
+  const top = parseFillRectCoordinate(fillRect.getAttribute('t'));
+  const right = parseFillRectCoordinate(fillRect.getAttribute('r'));
+  const bottom = parseFillRectCoordinate(fillRect.getAttribute('b'));
+  if (left > 0 || top > 0 || right > 0 || bottom > 0) return undefined;
+  const destinationWidth = 100000 - left - right;
+  const destinationHeight = 100000 - top - bottom;
+  if (destinationWidth <= 100000 && destinationHeight <= 100000) return undefined;
+  const width = Math.min(1, 100000 / Math.max(1, destinationWidth));
+  const height = Math.min(1, 100000 / Math.max(1, destinationHeight));
+  const x = Math.max(0, -left / Math.max(1, destinationWidth));
+  const y = Math.max(0, -top / Math.max(1, destinationHeight));
+  if (x <= 0 && y <= 0 && width >= 1 && height >= 1) return undefined;
+  return { x, y, width: Math.max(0.01, width), height: Math.max(0.01, height) };
 }
 
 interface ResolvedBackground {
