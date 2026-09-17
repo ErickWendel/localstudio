@@ -1,4 +1,5 @@
 import { buffer } from 'node:stream/consumers';
+import { strFromU8, unzipSync } from 'fflate';
 import { EditorAppPage } from '../pages/editor-app.page';
 import { installPptxFilePicker } from '../support/pptx-file-picker';
 import { createLayoutPptxFixture } from '../support/pptx-layout-fixture';
@@ -171,6 +172,9 @@ test.describe('editor import and export journey', () => {
     expect(stream).not.toBeNull();
     const contents = await buffer(stream);
     expect(contents.subarray(0, 2).toString('utf8')).toBe('PK');
+    const exportedFiles = unzipSync(new Uint8Array(contents));
+    const exportedSlideXml = strFromU8(exportedFiles['ppt/slides/slide1.xml']);
+    expect(exportedSlideXml).toContain('<a:srcRect l="0" t="12500" r="0" b="12500"/>');
 
     await editor.openTool('Assets');
     const imagePath = await createTinyPngFixture(testInfo);

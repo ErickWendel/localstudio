@@ -689,6 +689,37 @@ describe('BrowserPptxImportService', () => {
     expect(project.assets[image.assetId]?.fileName).toBe('wide.png');
   });
 
+  it('imports negative fillRect image expansion as an editable crop', async () => {
+    const imageFilledShapeSlideXml = `<?xml version="1.0" encoding="UTF-8"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree>
+  <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>
+  <p:sp>
+    <p:nvSpPr><p:cNvPr id="51" name="Expanded image fill"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+    <p:spPr>
+      <a:xfrm><a:off x="914400" y="457200"/><a:ext cx="2743200" cy="1828800"/></a:xfrm>
+      <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+      <a:blipFill><a:blip r:embed="rIdWideImage"/><a:stretch><a:fillRect t="-16666" b="-16666"/></a:stretch></a:blipFill>
+    </p:spPr>
+  </p:sp>
+</p:spTree></p:cSld></p:sld>`;
+    const service = new BrowserPptxImportService();
+    const project = await service.importPowerPoint({
+      file: createPptxFixture(imageFilledShapeSlideXml),
+    });
+    const pageElements = project.pages[0]?.elementIds.map((elementId) => project.elements[elementId]);
+    const image = pageElements?.find(
+      (element) => element?.type === 'image' && element.importSource?.shapeId === '51',
+    );
+
+    if (!image || image.type !== 'image') {
+      throw new Error('Expected expanded image-filled shape to import as an editable image.');
+    }
+    expect(image.crop?.x).toBeCloseTo(0);
+    expect(image.crop?.y).toBeCloseTo(0.125, 3);
+    expect(image.crop?.width).toBeCloseTo(1);
+    expect(image.crop?.height).toBeCloseTo(0.75, 3);
+  });
+
   it('imports editable text, original images, and playable video assets from PPTX', async () => {
     const service = new BrowserPptxImportService();
     const project = await service.importPowerPoint({ file: createPptxFixture() });
