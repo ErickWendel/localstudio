@@ -117,6 +117,7 @@ describe('CanvasWorkspace', () => {
     expect(hitRect?.width()).toBeCloseTo(project.elements['text-title']!.width * 0.4);
     expect(hitRect?.height()).toBeCloseTo(project.elements['text-title']!.height * 0.4);
     expect(hitRect?.listening()).toBe(true);
+    expect(coloredFragment?.getParent()?.getParent()?.getParent()).toBe(hitRect?.getParent());
 
     act(() => {
       hitRect!.fire('click', { evt: { shiftKey: false }, target: hitRect }, true);
@@ -160,7 +161,7 @@ describe('CanvasWorkspace', () => {
     expect(hitRect).toBeDefined();
 
     act(() => {
-      hitRect!.fire('dblclick', { target: hitRect });
+      hitRect!.getParent()!.fire('dblclick', { target: hitRect });
     });
 
     const editor = screen.getByLabelText('Edit text');
@@ -749,6 +750,54 @@ describe('CanvasWorkspace', () => {
     });
   });
 
+  it('commits toolbar-preserved text editing before clearing an empty-canvas selection', () => {
+    const onSelectSlide = vi.fn();
+    const onUpdateTextContent = vi.fn();
+    const stageRef = createRef<Konva.Stage>();
+    const project = sampleProject.createSampleProject();
+
+    render(
+      <>
+        <div className="text-selection-toolbar">
+          <input aria-label="Toolbar text color" type="color" />
+        </div>
+        <CanvasWorkspace
+          project={project}
+          activePageId="page-1"
+          selection={{ pageId: 'page-1', elementIds: ['text-title'] }}
+          stageRef={stageRef}
+          onSelectSlide={onSelectSlide}
+          onUpdateTextContent={onUpdateTextContent}
+        />
+      </>,
+    );
+
+    const textNode = stageRef.current
+      ?.find('Text')
+      .find((node) => (node as Konva.Text).text() === 'AI Design Revolution') as
+      | Konva.Text
+      | undefined;
+    expect(textNode).toBeDefined();
+
+    act(() => {
+      textNode!.fire('dblclick', { target: textNode });
+    });
+
+    const editor = screen.getByLabelText('Edit text');
+    const toolbarColor = screen.getByLabelText('Toolbar text color');
+    fireEvent.blur(editor, { relatedTarget: toolbarColor });
+    fireEvent.change(toolbarColor, { target: { value: '#ff0000' } });
+
+    const canvas = document.querySelector('canvas');
+    expect(canvas).toBeInTheDocument();
+    fireEvent.pointerDown(canvas!, { clientX: 20, clientY: 20 });
+    fireEvent.click(canvas!, { clientX: 20, clientY: 20 });
+
+    expect(onUpdateTextContent).toHaveBeenCalledWith('text-title', 'AI Design Revolution');
+    expect(onSelectSlide).toHaveBeenCalledTimes(1);
+    expect(screen.queryByLabelText('Edit text')).not.toBeInTheDocument();
+  });
+
   it('hides vertical transform handles for selected text', () => {
     const stageRef = createRef<Konva.Stage>();
     const project = sampleProject.createSampleProject();
@@ -837,6 +886,27 @@ describe('CanvasWorkspace', () => {
 
     expect(onSelectSlide).toHaveBeenCalledTimes(1);
     expect(onSelectPresentation).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears the element selection when clicking the empty canvas', () => {
+    const onSelectSlide = vi.fn();
+    const stageRef = createRef<Konva.Stage>();
+    const { container } = render(
+      <CanvasWorkspace
+        project={sampleProject.createSampleProject()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['image-hero'] }}
+        stageRef={stageRef}
+        onSelectSlide={onSelectSlide}
+      />,
+    );
+
+    const canvas = container.querySelector('canvas');
+    expect(canvas).toBeInTheDocument();
+
+    fireEvent.click(canvas!, { clientX: 450, clientY: 170 });
+
+    expect(onSelectSlide).toHaveBeenCalledTimes(1);
   });
 
   it('draws a green marquee and selects elements intersecting it', async () => {

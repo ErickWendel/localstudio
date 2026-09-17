@@ -1,5 +1,6 @@
 import { EditorAppPage } from '../pages/editor-app.page';
 import { expect, test, withIsolatedDevServer } from '../support/journey-test';
+import { getCanvasPoint } from './canvas-design-point';
 
 const getServer = withIsolatedDevServer(test);
 
@@ -96,5 +97,37 @@ test.describe('editor text theme and layout journey', () => {
     await expect(page.getByLabel('Slide background color')).toHaveValue('#ffffff');
     await expect(page.getByLabel('Slide fill type')).toHaveValue('color');
     await expect(page.getByRole('button', { name: 'Apply layout' })).toBeDisabled();
+  });
+
+  test('clears a text selection when clicking the empty artboard', async ({ page }) => {
+    const editor = new EditorAppPage(page, getServer().baseURL);
+    await editor.gotoNewProject();
+
+    await editor.openTool('Text');
+    await page.getByRole('button', { name: 'Add a text box' }).click();
+
+    const frame = page.getByTestId('slide-canvas-frame');
+    const canvas = frame.locator('canvas').first();
+    await expect(frame).toHaveAttribute('data-selected-elements', /text-/);
+    const editPoint = await getCanvasPoint(page, { x: 960, y: 540 });
+    await page.mouse.dblclick(editPoint.x, editPoint.y);
+
+    const editorText = page.getByRole('textbox', { name: 'Edit text' });
+    await expect(editorText).toBeVisible();
+    await editorText.evaluate((element) => {
+      const textarea = element as HTMLTextAreaElement;
+      textarea.setSelectionRange(6, 13);
+      textarea.dispatchEvent(new Event('select', { bubbles: true }));
+    });
+    await page.getByRole('toolbar', { name: 'Text editing controls' }).getByLabel('Text color').fill(
+      '#ff0000',
+    );
+
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).not.toBeNull();
+    await page.mouse.click(canvasBox!.x + 24, canvasBox!.y + 24);
+
+    await expect(frame).toHaveAttribute('data-selected-elements', '');
+    await expect(editorText).toHaveCount(0);
   });
 });

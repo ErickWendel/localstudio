@@ -238,6 +238,7 @@ export function CanvasWorkspace({
   const nodeRefs = useRef<Record<string, Konva.Node | null>>({});
   const artboardRef = useRef<HTMLDivElement>(null);
   const suppressNextBackgroundDoubleClickRef = useRef(false);
+  const suppressNextCanvasClickRef = useRef(false);
   const textInputRef = useRef<HTMLTextAreaElement>(null);
   const onTextEditSelectionChangeRef = useRef(onTextEditSelectionChange);
   const [stageSize, setStageSize] = useState({ width: 768, height: 432 });
@@ -408,6 +409,45 @@ export function CanvasWorkspace({
   useEffect(() => {
     onTextEditSelectionChangeRef.current = onTextEditSelectionChange;
   }, [onTextEditSelectionChange]);
+
+  useEffect(() => {
+    if (!editingTextId) return;
+    const editingId = editingTextId;
+
+    function handleDocumentPointerDown(event: PointerEvent) {
+      if (!(event.target instanceof Element)) return;
+      if (
+        event.target.closest(
+          '.canvas-text-editor, .text-selection-toolbar, .scrolling-text-toolbar-shell',
+        )
+      ) {
+        return;
+      }
+      if (!(event.target instanceof HTMLCanvasElement)) return;
+
+      const editorRect = textInputRef.current?.getBoundingClientRect();
+      const clickedInsideEditor =
+        editorRect &&
+        event.clientX >= editorRect.left &&
+        event.clientX <= editorRect.right &&
+        event.clientY >= editorRect.top &&
+        event.clientY <= editorRect.bottom;
+      if (clickedInsideEditor) return;
+
+      suppressNextCanvasClickRef.current = true;
+      window.requestAnimationFrame(() => {
+        suppressNextCanvasClickRef.current = false;
+      });
+      onUpdateTextContent?.(editingId, editingTextValue);
+      setEditingTextId(null);
+      setEditingTextValue('');
+      setEditingTextHeight(undefined);
+      onSelectSlide?.();
+    }
+
+    document.addEventListener('pointerdown', handleDocumentPointerDown, true);
+    return () => document.removeEventListener('pointerdown', handleDocumentPointerDown, true);
+  }, [editingTextId, editingTextValue, onSelectSlide, onUpdateTextContent]);
 
   useEffect(() => {
     const selectedNodes = selection.elementIds
@@ -944,6 +984,20 @@ export function CanvasWorkspace({
     return element;
   }
 
+  function getElementAtStagePoint(stage: Konva.Stage, point: { x: number; y: number }) {
+    return [...visibleElements].reverse().find((element) => {
+      const node = nodeRefs.current[element.id];
+      if (!node || !node.isVisible()) return false;
+      const rect = node.getClientRect({ relativeTo: stage });
+      return (
+        point.x >= rect.x &&
+        point.x <= rect.x + rect.width &&
+        point.y >= rect.y &&
+        point.y <= rect.y + rect.height
+      );
+    });
+  }
+
   function isClickableLinkedText(
     element: DesignElement,
   ): element is Extract<DesignElement, { type: 'text' }> {
@@ -983,6 +1037,10 @@ export function CanvasWorkspace({
       x: element.x * scaleX + (animationTransform?.x ?? 0),
       y: element.y * scaleY + (animationTransform?.y ?? 0),
       onClick: (event: Konva.KonvaEventObject<MouseEvent>) => {
+        if (suppressNextCanvasClickRef.current) {
+          event.cancelBubble = true;
+          return;
+        }
         if (!isInteractive) return;
         if (element.type === 'text' && element.hyperlink && (presentationMode || readOnly)) {
           event.cancelBubble = true;
@@ -1239,6 +1297,23 @@ export function CanvasWorkspace({
     onCanvasBackgroundDoubleClick?.();
   }
 
+  function handleArtboardClick(event: ReactMouseEvent<HTMLDivElement>) {
+    if (suppressNextCanvasClickRef.current) return;
+    if (readOnly || backgroundSelectionMode || editingTextId) return;
+    if (!(event.target instanceof HTMLCanvasElement)) return;
+
+    const stage = stageRef?.current;
+    const canvasRect = event.target.getBoundingClientRect();
+    const pointer = stage
+      ? {
+          x: ((event.nativeEvent.clientX - canvasRect.left) / canvasRect.width) * stage.width(),
+          y: ((event.nativeEvent.clientY - canvasRect.top) / canvasRect.height) * stage.height(),
+        }
+      : undefined;
+    if (stage && pointer && getElementAtStagePoint(stage, pointer)) return;
+    onSelectSlide?.();
+  }
+
   const marqueeRect = marqueeSelection
     ? getNormalizedStageRect(marqueeSelection.anchor, marqueeSelection.current)
     : undefined;
@@ -1310,6 +1385,7 @@ export function CanvasWorkspace({
           className="canvas-artboard"
           ref={artboardRef}
           style={{ background: pageBackground }}
+          onClick={handleArtboardClick}
           onDoubleClick={handleArtboardDoubleClick}
         >
           {showEditorOverlays &&

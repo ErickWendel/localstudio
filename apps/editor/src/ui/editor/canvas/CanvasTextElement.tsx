@@ -303,34 +303,24 @@ export function CanvasTextElement({
 
   if (hasInlineColorRanges) {
     return (
-      <>
+      <Group
+        {...commonProps}
+        {...(!allowsVerticalOverflow ? { clipHeight: commonProps.height } : {})}
+        clipWidth={commonProps.width}
+        ref={nodeRef}
+        visible={visible}
+      >
         <Rect
-          {...commonProps}
           fill="rgba(0,0,0,0.01)"
           height={commonProps.height}
-          ref={nodeRef}
-          visible={visible}
           width={commonProps.width}
         />
         <Group
-          {...(!allowsVerticalOverflow ? { clipHeight: commonProps.height } : {})}
-          clipWidth={commonProps.width}
-          height={commonProps.height}
           listening={false}
-          opacity={commonProps.opacity}
-          rotation={commonProps.rotation}
-          scaleX={commonProps.scaleX}
-          scaleY={commonProps.scaleY}
-          skewX={commonProps.skewX}
-          skewY={commonProps.skewY}
-          visible={visible}
-          width={commonProps.width}
-          x={commonProps.x}
-          y={commonProps.y}
         >
           {renderedParagraphFragments}
         </Group>
-      </>
+      </Group>
     );
   }
 
