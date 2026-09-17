@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type FocusEvent as ReactFocusEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type RefObject,
@@ -102,6 +103,7 @@ interface CanvasWorkspaceProps {
   canTranslateSelection?: boolean;
   isTranslating?: boolean;
   translationNotice?: string | undefined;
+  activeTextSelection?: { elementId: string; start: number; end: number } | undefined;
   onAlignSelectedElement?: ((mode: AlignMode) => void) | undefined;
   onAnimationPreviewAdvance?: (() => void) | undefined;
   onBringSelectedElementForward?: (() => void) | undefined;
@@ -130,6 +132,9 @@ interface CanvasWorkspaceProps {
   onSendSelectedElementBackward?: (() => void) | undefined;
   onTranslateSelectedText?: (() => void) | undefined;
   onEditSelectionGrid?: (() => void) | undefined;
+  onTextEditSelectionChange?:
+    | ((elementId: string, range: { start: number; end: number }) => void)
+    | undefined;
   onUpdateImageCrop?: ((elementId: string, patch: ImageCropPatch) => void) | undefined;
   onUpdateElementFrame?: ((elementId: string, patch: ElementFramePatch) => void) | undefined;
   onUpdateElementFrames?: ((patches: Record<string, ElementFramePatch>) => void) | undefined;
@@ -201,6 +206,7 @@ export function CanvasWorkspace({
   canTranslateSelection = false,
   isTranslating = false,
   translationNotice,
+  activeTextSelection,
   onAlignSelectedElement,
   onAnimationPreviewAdvance,
   onBackgroundPreviewPoint,
@@ -222,6 +228,7 @@ export function CanvasWorkspace({
   onSendSelectedElementBackward,
   onTranslateSelectedText,
   onEditSelectionGrid,
+  onTextEditSelectionChange,
   onUpdateImageCrop,
   onUpdateElementFrame,
   onUpdateElementFrames,
@@ -232,6 +239,7 @@ export function CanvasWorkspace({
   const artboardRef = useRef<HTMLDivElement>(null);
   const suppressNextBackgroundDoubleClickRef = useRef(false);
   const textInputRef = useRef<HTMLTextAreaElement>(null);
+  const onTextEditSelectionChangeRef = useRef(onTextEditSelectionChange);
   const [stageSize, setStageSize] = useState({ width: 768, height: 432 });
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [editingTextValue, setEditingTextValue] = useState('');
@@ -379,6 +387,7 @@ export function CanvasWorkspace({
           'bottom-center',
           'bottom-right',
         ] as const);
+
   const setElementNodeRef = useCallback((elementId: string, node: Konva.Node | null) => {
     nodeRefs.current[elementId] = node;
   }, []);
@@ -395,6 +404,10 @@ export function CanvasWorkspace({
     },
     [],
   );
+
+  useEffect(() => {
+    onTextEditSelectionChangeRef.current = onTextEditSelectionChange;
+  }, [onTextEditSelectionChange]);
 
   useEffect(() => {
     const selectedNodes = selection.elementIds
@@ -432,7 +445,26 @@ export function CanvasWorkspace({
     if (!editingTextId) return;
     textInputRef.current?.focus();
     textInputRef.current?.select();
+    if (textInputRef.current) {
+      onTextEditSelectionChangeRef.current?.(editingTextId, {
+        start: textInputRef.current.selectionStart,
+        end: textInputRef.current.selectionEnd,
+      });
+    }
   }, [editingTextId]);
+
+  useEffect(() => {
+    if (!editingTextId || activeTextSelection?.elementId !== editingTextId) return;
+    const input = textInputRef.current;
+    if (!input) return;
+    if (
+      input.selectionStart === activeTextSelection.start &&
+      input.selectionEnd === activeTextSelection.end
+    ) {
+      return;
+    }
+    input.setSelectionRange(activeTextSelection.start, activeTextSelection.end);
+  }, [activeTextSelection, editingTextId, editingTextValue]);
 
   useEffect(() => {
     const fontSet = document.fonts;
@@ -817,7 +849,21 @@ export function CanvasWorkspace({
     setEditingTextHeight(undefined);
   }
 
+  function handleTextEditorBlur(event: ReactFocusEvent<HTMLTextAreaElement>) {
+    if (editingTextId) {
+      handleTextEditorSelectionChange(editingTextId, event.currentTarget);
+    }
+    if (
+      event.relatedTarget instanceof Element &&
+      event.relatedTarget.closest('.text-selection-toolbar, .scrolling-text-toolbar-shell')
+    ) {
+      return;
+    }
+    commitTextEditing();
+  }
+
   function cancelTextEditing() {
+    if (editingTextId) onTextEditSelectionChange?.(editingTextId, { start: 0, end: 0 });
     setEditingTextId(null);
     setEditingTextValue('');
     setEditingTextHeight(undefined);
@@ -839,6 +885,13 @@ export function CanvasWorkspace({
     if (nextHeight !== element.height) {
       onUpdateElementFrame?.(element.id, { height: nextHeight });
     }
+  }
+
+  function handleTextEditorSelectionChange(elementId: string, input: HTMLTextAreaElement) {
+    onTextEditSelectionChange?.(elementId, {
+      start: input.selectionStart,
+      end: input.selectionEnd,
+    });
   }
 
   function pickBackgroundSubject(
@@ -1391,7 +1444,7 @@ export function CanvasWorkspace({
                     key={`${element.id}-font-${fontRenderVersion}`}
                     nodeRef={nodeRef}
                     scale={{ x: scaleX, y: scaleY }}
-                    visible={editingTextId !== element.id}
+                    visible
                   />
                 );
               })}
@@ -1504,7 +1557,10 @@ export function CanvasWorkspace({
                     ref={textInputRef}
                     value={editingTextValue}
                     style={{
-                      color: element.fill,
+                      background: 'rgba(5, 13, 16, 0.08)',
+                      caretColor: element.fill,
+                      color: 'transparent',
+                      cursor: 'text',
                       fontFamily: element.fontFamily,
                       fontSize: `${element.fontSize * scaleY}px`,
                       fontWeight: element.fontWeight,
@@ -1512,14 +1568,17 @@ export function CanvasWorkspace({
                       left: `${element.x * scaleX}px`,
                       lineHeight: element.lineHeight ?? 1.05,
                       padding: `${TEXT_FRAME_PADDING * scaleY}px`,
+                      pointerEvents: 'auto',
                       textAlign: element.align,
                       top: `${element.y * scaleY}px`,
                       transform: `rotate(${element.rotation}deg)`,
+                      userSelect: 'text',
                       width: `${element.width * scaleX}px`,
                     }}
-                    onBlur={commitTextEditing}
+                    onBlur={handleTextEditorBlur}
                     onChange={(event) => {
                       updateTextEditing(element, event.currentTarget);
+                      handleTextEditorSelectionChange(element.id, event.currentTarget);
                     }}
                     onKeyDown={(event) => {
                       if (event.key === 'Escape') {
@@ -1530,6 +1589,15 @@ export function CanvasWorkspace({
                         event.preventDefault();
                         commitTextEditing();
                       }
+                    }}
+                    onKeyUp={(event) => {
+                      handleTextEditorSelectionChange(element.id, event.currentTarget);
+                    }}
+                    onMouseUp={(event) => {
+                      handleTextEditorSelectionChange(element.id, event.currentTarget);
+                    }}
+                    onSelect={(event) => {
+                      handleTextEditorSelectionChange(element.id, event.currentTarget);
                     }}
                   />
                 );

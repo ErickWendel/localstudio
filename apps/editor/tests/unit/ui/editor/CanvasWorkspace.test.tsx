@@ -74,6 +74,107 @@ describe('CanvasWorkspace', () => {
     expect(textNode?.textDecoration()).toBe('underline');
   });
 
+  it('renders inline text color ranges as colored canvas fragments', () => {
+    const stageRef = createRef<Konva.Stage>();
+    const onSelectElement = vi.fn();
+    const baseProject = sampleProject.createSampleProject();
+    const titleElement = baseProject.elements['text-title'];
+    if (!titleElement || titleElement.type !== 'text') {
+      throw new Error('Expected text-title to be a text element');
+    }
+    const project: ProjectDocument = {
+      ...baseProject,
+      elements: {
+        ...baseProject.elements,
+        'text-title': {
+          ...titleElement,
+          colorRanges: [{ start: 0, end: 2, fill: '#FF0000' }],
+        },
+      },
+    };
+
+    render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['text-title'] }}
+        stageRef={stageRef}
+        onSelectElement={onSelectElement}
+      />,
+    );
+
+    const coloredFragment = stageRef.current
+      ?.find('Text')
+      .find((node) => (node as Konva.Text).fill() === '#FF0000') as Konva.Text | undefined;
+    expect(coloredFragment?.text()).toBe('AI');
+    expect(coloredFragment?.getParent()?.listening()).toBe(false);
+
+    const hitRect = stageRef.current
+      ?.find('Rect')
+      .find((node) => (node as Konva.Rect).fill() === 'rgba(0,0,0,0.01)') as
+      | Konva.Rect
+      | undefined;
+    expect(hitRect?.width()).toBeCloseTo(project.elements['text-title']!.width * 0.4);
+    expect(hitRect?.height()).toBeCloseTo(project.elements['text-title']!.height * 0.4);
+    expect(hitRect?.listening()).toBe(true);
+
+    act(() => {
+      hitRect!.fire('click', { evt: { shiftKey: false }, target: hitRect }, true);
+    });
+
+    expect(onSelectElement).toHaveBeenCalledWith('text-title');
+  });
+
+  it('keeps inline text colors visible while editing selected text', () => {
+    const stageRef = createRef<Konva.Stage>();
+    const baseProject = sampleProject.createSampleProject();
+    const titleElement = baseProject.elements['text-title'];
+    if (!titleElement || titleElement.type !== 'text') {
+      throw new Error('Expected text-title to be a text element');
+    }
+    const project: ProjectDocument = {
+      ...baseProject,
+      elements: {
+        ...baseProject.elements,
+        'text-title': {
+          ...titleElement,
+          colorRanges: [{ start: 0, end: 2, fill: '#FF0000' }],
+        },
+      },
+    };
+
+    render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['text-title'] }}
+        stageRef={stageRef}
+      />,
+    );
+
+    const hitRect = stageRef.current
+      ?.find('Rect')
+      .find((node) => (node as Konva.Rect).fill() === 'rgba(0,0,0,0.01)') as
+      | Konva.Rect
+      | undefined;
+    expect(hitRect).toBeDefined();
+
+    act(() => {
+      hitRect!.fire('dblclick', { target: hitRect });
+    });
+
+    const editor = screen.getByLabelText('Edit text');
+    expect(editor).toHaveStyle({ background: 'rgba(5, 13, 16, 0.08)' });
+    expect(getComputedStyle(editor).color).toBe('rgba(0, 0, 0, 0)');
+    expect(hitRect!.visible()).toBe(true);
+
+    const coloredFragment = stageRef.current
+      ?.find('Text')
+      .find((node) => (node as Konva.Text).fill() === '#FF0000') as Konva.Text | undefined;
+    expect(coloredFragment?.text()).toBe('AI');
+    expect(coloredFragment?.visible()).toBe(true);
+  });
+
   it('uses layout sizing instead of transform scaling for zoom', () => {
     render(
       <CanvasWorkspace
@@ -548,6 +649,104 @@ describe('CanvasWorkspace', () => {
     expect(lastFrameUpdate?.[0]).toBe('text-title');
     expect(typeof lastFrameUpdate?.[1].height).toBe('number');
     expect(lastFrameUpdate?.[1].height).toBeLessThan(project.elements['text-title']!.height);
+  });
+
+  it('keeps the live text editor selectable above the canvas', () => {
+    const onSelectSlide = vi.fn();
+    const onTextEditSelectionChange = vi.fn();
+    const stageRef = createRef<Konva.Stage>();
+    const project = sampleProject.createSampleProject();
+
+    render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['text-title'] }}
+        stageRef={stageRef}
+        onSelectSlide={onSelectSlide}
+        onTextEditSelectionChange={onTextEditSelectionChange}
+      />,
+    );
+
+    const textNode = stageRef.current
+      ?.find('Text')
+      .find((node) => (node as Konva.Text).text() === 'AI Design Revolution') as
+      | Konva.Text
+      | undefined;
+    expect(textNode).toBeDefined();
+
+    act(() => {
+      textNode!.fire('dblclick', { target: textNode });
+    });
+
+    const editor = screen.getByLabelText('Edit text');
+    if (!(editor instanceof HTMLTextAreaElement)) {
+      throw new Error('Expected the canvas text editor to be a textarea');
+    }
+    expect(editor.style.color).toBe('transparent');
+    expect(editor.style.cursor).toBe('text');
+    expect(editor.style.pointerEvents).toBe('auto');
+    expect(editor.style.userSelect).toBe('text');
+
+    editor.setSelectionRange(3, 9);
+    fireEvent.select(editor);
+    fireEvent.mouseDown(editor);
+
+    expect(editor.selectionStart).toBe(3);
+    expect(editor.selectionEnd).toBe(9);
+    expect(onTextEditSelectionChange).toHaveBeenLastCalledWith('text-title', {
+      start: 3,
+      end: 9,
+    });
+    expect(onSelectSlide).not.toHaveBeenCalled();
+  });
+
+  it('keeps text editing active when focus moves to the text toolbar', () => {
+    const onTextEditSelectionChange = vi.fn();
+    const stageRef = createRef<Konva.Stage>();
+    const project = sampleProject.createSampleProject();
+
+    render(
+      <>
+        <div className="text-selection-toolbar">
+          <input aria-label="Toolbar text color" type="color" />
+        </div>
+        <CanvasWorkspace
+          project={project}
+          activePageId="page-1"
+          selection={{ pageId: 'page-1', elementIds: ['text-title'] }}
+          stageRef={stageRef}
+          onTextEditSelectionChange={onTextEditSelectionChange}
+        />
+      </>,
+    );
+
+    const textNode = stageRef.current
+      ?.find('Text')
+      .find((node) => (node as Konva.Text).text() === 'AI Design Revolution') as
+      | Konva.Text
+      | undefined;
+    expect(textNode).toBeDefined();
+
+    act(() => {
+      textNode!.fire('dblclick', { target: textNode });
+    });
+
+    const editor = screen.getByLabelText('Edit text');
+    if (!(editor instanceof HTMLTextAreaElement)) {
+      throw new Error('Expected the canvas text editor to be a textarea');
+    }
+    editor.setSelectionRange(3, 9);
+    const toolbarColor = screen.getByLabelText('Toolbar text color');
+    fireEvent.blur(editor, { relatedTarget: toolbarColor });
+
+    expect(screen.getByLabelText('Edit text')).toBeInTheDocument();
+    expect(editor.selectionStart).toBe(3);
+    expect(editor.selectionEnd).toBe(9);
+    expect(onTextEditSelectionChange).toHaveBeenLastCalledWith('text-title', {
+      start: 3,
+      end: 9,
+    });
   });
 
   it('hides vertical transform handles for selected text', () => {

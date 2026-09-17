@@ -5,6 +5,7 @@ import { colorInputValue } from '../panels/design-controls/colorInputValue';
 
 interface TextSelectionToolbarProps {
   disabled?: boolean;
+  activeTextSelection?: { elementId: string; start: number; end: number } | undefined;
   canTranslateSelection?: boolean;
   element: TextElement;
   onAlignSelectedElement?: (mode: AlignMode) => void;
@@ -54,7 +55,32 @@ function normalizeHyperlink(value: string) {
   return `https://${trimmed}`;
 }
 
+function getTextColorAtIndex(element: TextElement, index: number) {
+  return (
+    element.colorRanges?.find((range) => range.start <= index && index < range.end)?.fill ??
+    element.fill
+  );
+}
+
+function getSelectedTextColor(
+  element: TextElement,
+  selection: TextSelectionToolbarProps['activeTextSelection'],
+) {
+  if (!selection || selection.elementId !== element.id || selection.start >= selection.end) {
+    return element.fill;
+  }
+  const clampedStart = Math.max(0, Math.min(element.text.length, selection.start));
+  const clampedEnd = Math.max(0, Math.min(element.text.length, selection.end));
+  if (clampedStart >= clampedEnd) return element.fill;
+  const firstColor = getTextColorAtIndex(element, clampedStart);
+  const hasMixedColor = Array.from({ length: clampedEnd - clampedStart }).some((_, offset) => {
+    return getTextColorAtIndex(element, clampedStart + offset) !== firstColor;
+  });
+  return hasMixedColor ? element.fill : firstColor;
+}
+
 export function TextSelectionToolbar({
+  activeTextSelection,
   disabled = false,
   canTranslateSelection = false,
   element,
@@ -76,6 +102,7 @@ export function TextSelectionToolbar({
   });
   const linkValue =
     linkDraft.elementId === element.id ? linkDraft.value : (element.hyperlink ?? '');
+  const selectedTextColor = colorInputValue(getSelectedTextColor(element, activeTextSelection));
 
   function updateStyle(patch: ElementStylePatch) {
     if (disabled || element.locked) return;
@@ -142,7 +169,7 @@ export function TextSelectionToolbar({
           aria-label="Text color"
           disabled={disabled || element.locked}
           type="color"
-          value={colorInputValue(element.fill)}
+          value={selectedTextColor}
           onChange={(event) => {
             updateStyle({ fill: event.target.value });
           }}

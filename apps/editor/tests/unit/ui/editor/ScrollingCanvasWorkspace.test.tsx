@@ -199,6 +199,37 @@ describe('ScrollingCanvasWorkspace', () => {
     });
   });
 
+  it('shows selected inline text color in the sticky toolbar', () => {
+    const project = sampleProject.createSampleProject();
+    const title = project.elements['text-title'];
+    if (!title || title.type !== 'text') {
+      throw new Error('Expected text-title to be a text element');
+    }
+    const onUpdateElementStyle = vi.fn();
+
+    render(
+      <ScrollingCanvasWorkspace
+        activePageId="page-1"
+        project={{
+          ...project,
+          elements: {
+            ...project.elements,
+            'text-title': {
+              ...title,
+              colorRanges: [{ start: 3, end: 9, fill: '#123456' }],
+            },
+          },
+        }}
+        selection={{ pageId: 'page-1', elementIds: ['text-title'] }}
+        activeTextSelection={{ elementId: 'text-title', start: 3, end: 9 }}
+        onUpdateElementStyle={onUpdateElementStyle}
+      />,
+    );
+
+    const colorInput = screen.getByLabelText('Text color');
+    expect(colorInput).toHaveValue('#123456');
+  });
+
   it('copies text format and pastes it across a multi-text selection', async () => {
     const user = userEvent.setup();
     const onUpdateElementStyles = vi.fn();

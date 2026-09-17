@@ -76,6 +76,7 @@ export type ElementStylePatch = Partial<{
   strokeWidth: number;
   startEndpoint: ShapeElement['startEndpoint'];
   endEndpoint: ShapeElement['endEndpoint'];
+  textColorRange: { start: number; end: number };
 }>;
 export type ElementAnimationPatch = Omit<ElementAnimationBuild, 'elementId' | 'id'>;
 

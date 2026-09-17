@@ -4,6 +4,8 @@ import type { TextElement, TextParagraph, TextRun } from '../../../domain/docume
 import type { CommonElementProps } from './canvas-element-props';
 
 const TEXT_FRAME_PADDING = 6;
+const TEXT_MEASUREMENT_CACHE_LIMIT = 1600;
+const textMeasurementCache = new Map<string, number>();
 
 interface CanvasTextElementProps {
   commonProps: CommonElementProps;
@@ -22,6 +24,17 @@ function getFontStyle(text: Pick<TextRun, 'fontStyle' | 'fontWeight'>) {
 }
 
 function measureTextRun(text: string, run: TextRun, scaleY: number) {
+  const cacheKey = [
+    text,
+    run.fontFamily,
+    run.fontSize,
+    run.fontStyle,
+    run.fontWeight,
+    scaleY,
+  ].join('\u0000');
+  const cachedWidth = textMeasurementCache.get(cacheKey);
+  if (cachedWidth !== undefined) return cachedWidth;
+
   const measurementNode = new Konva.Text({
     fontFamily: run.fontFamily,
     fontSize: run.fontSize * scaleY,
@@ -31,6 +44,10 @@ function measureTextRun(text: string, run: TextRun, scaleY: number) {
   });
   const width = measurementNode.width();
   measurementNode.destroy();
+  if (textMeasurementCache.size >= TEXT_MEASUREMENT_CACHE_LIMIT) {
+    textMeasurementCache.clear();
+  }
+  textMeasurementCache.set(cacheKey, width);
   return width;
 }
 
@@ -63,6 +80,64 @@ function getParagraphRuns(paragraph: TextParagraph): TextRun[] {
           ...(paragraph.textDecoration ? { textDecoration: paragraph.textDecoration } : {}),
         },
       ];
+}
+
+function getFillForTextIndex(element: TextElement, index: number) {
+  return (
+    element.colorRanges?.find((range) => range.start <= index && index < range.end)?.fill ??
+    element.fill
+  );
+}
+
+function getSyntheticParagraph(element: TextElement): TextParagraph {
+  const runs: TextRun[] = [];
+  let currentText = '';
+  let currentFill = getFillForTextIndex(element, 0);
+
+  for (let index = 0; index < element.text.length; index += 1) {
+    const character = element.text[index] ?? '';
+    const fill = getFillForTextIndex(element, index);
+    if (fill !== currentFill && currentText) {
+      runs.push({
+        fill: currentFill,
+        fontFamily: element.fontFamily,
+        fontSize: element.fontSize,
+        fontStyle: 'normal',
+        fontWeight: element.fontWeight,
+        text: currentText,
+      });
+      currentText = '';
+    }
+    currentFill = fill;
+    currentText += character;
+  }
+
+  if (currentText) {
+    runs.push({
+      fill: currentFill,
+      fontFamily: element.fontFamily,
+      fontSize: element.fontSize,
+      fontStyle: 'normal',
+      fontWeight: element.fontWeight,
+      text: currentText,
+    });
+  }
+
+  return {
+    align: element.align,
+    fill: element.fill,
+    fontFamily: element.fontFamily,
+    fontSize: element.fontSize,
+    fontStyle: 'normal',
+    fontWeight: element.fontWeight,
+    indent: 0,
+    lineHeight: element.lineHeight ?? 1.05,
+    marginLeft: 0,
+    runs,
+    spaceAfter: 0,
+    spaceBefore: 0,
+    text: element.text,
+  };
 }
 
 function layoutParagraph(paragraph: TextParagraph, width: number, scaleY: number) {
@@ -109,7 +184,9 @@ export function CanvasTextElement({
   scale,
   visible,
 }: CanvasTextElementProps) {
-  const paragraphs = element.paragraphs;
+  const hasInlineColorRanges = Boolean(element.colorRanges?.length && displayText === element.text);
+  const paragraphs =
+    hasInlineColorRanges ? [getSyntheticParagraph(element)] : element.paragraphs;
   if (!paragraphs?.length || displayText !== element.text) {
     return (
       <Text
@@ -180,6 +257,82 @@ export function CanvasTextElement({
     },
     [],
   );
+  const renderedParagraphFragments = positionedRows.flatMap(
+    ({ lines, paragraph, width, x, y }, paragraphIndex) =>
+      lines.flatMap((line, lineIndex) => {
+        const alignOffset =
+          paragraph.align === 'center'
+            ? Math.max(0, (width - line.width) / 2)
+            : paragraph.align === 'right'
+              ? Math.max(0, width - line.width)
+              : 0;
+        return line.fragments.map((fragment, fragmentIndex) => (
+          <Group
+            key={`${paragraphIndex}-${lineIndex}-${fragmentIndex}-${fragment.text}`}
+            listening={!hasInlineColorRanges}
+            x={x + alignOffset + fragment.x}
+            y={y + line.y}
+          >
+            {fragment.run.highlight ? (
+              <Rect
+                fill={fragment.run.highlight}
+                height={line.height}
+                listening={false}
+                width={fragment.width}
+              />
+            ) : null}
+            <Text
+              fill={fragment.run.fill}
+              fontFamily={fragment.run.fontFamily}
+              fontSize={fragment.run.fontSize * scale.y}
+              fontStyle={getFontStyle(fragment.run)}
+              height={line.height}
+              lineHeight={paragraph.lineHeight}
+              listening={!hasInlineColorRanges}
+              padding={0}
+              text={fragment.text}
+              {...(fragment.run.textDecoration
+                ? { textDecoration: fragment.run.textDecoration }
+                : {})}
+              width={fragment.width}
+            />
+          </Group>
+        ));
+      }),
+  );
+
+  if (hasInlineColorRanges) {
+    return (
+      <>
+        <Rect
+          {...commonProps}
+          fill="rgba(0,0,0,0.01)"
+          height={commonProps.height}
+          ref={nodeRef}
+          visible={visible}
+          width={commonProps.width}
+        />
+        <Group
+          {...(!allowsVerticalOverflow ? { clipHeight: commonProps.height } : {})}
+          clipWidth={commonProps.width}
+          height={commonProps.height}
+          listening={false}
+          opacity={commonProps.opacity}
+          rotation={commonProps.rotation}
+          scaleX={commonProps.scaleX}
+          scaleY={commonProps.scaleY}
+          skewX={commonProps.skewX}
+          skewY={commonProps.skewY}
+          visible={visible}
+          width={commonProps.width}
+          x={commonProps.x}
+          y={commonProps.y}
+        >
+          {renderedParagraphFragments}
+        </Group>
+      </>
+    );
+  }
 
   return (
     <Group
@@ -189,47 +342,7 @@ export function CanvasTextElement({
       ref={nodeRef}
       visible={visible}
     >
-      {positionedRows.flatMap(({ lines, paragraph, width, x, y }, paragraphIndex) =>
-        lines.flatMap((line, lineIndex) => {
-          const alignOffset =
-            paragraph.align === 'center'
-              ? Math.max(0, (width - line.width) / 2)
-              : paragraph.align === 'right'
-                ? Math.max(0, width - line.width)
-                : 0;
-          return line.fragments.map((fragment, fragmentIndex) => (
-            <Group
-              key={`${paragraphIndex}-${lineIndex}-${fragmentIndex}-${fragment.text}`}
-              x={x + alignOffset + fragment.x}
-              y={y + line.y}
-            >
-              {fragment.run.highlight ? (
-                <Rect
-                  fill={fragment.run.highlight}
-                  height={line.height}
-                  listening={false}
-                  width={fragment.width}
-                />
-              ) : null}
-              <Text
-                fill={fragment.run.fill}
-                fontFamily={fragment.run.fontFamily}
-                fontSize={fragment.run.fontSize * scale.y}
-                fontStyle={getFontStyle(fragment.run)}
-                height={line.height}
-                lineHeight={paragraph.lineHeight}
-                listening={false}
-                padding={0}
-                text={fragment.text}
-                {...(fragment.run.textDecoration
-                  ? { textDecoration: fragment.run.textDecoration }
-                  : {})}
-                width={fragment.width}
-              />
-            </Group>
-          ));
-        }),
-      )}
+      {renderedParagraphFragments}
     </Group>
   );
 }
