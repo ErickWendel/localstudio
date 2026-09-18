@@ -98,6 +98,7 @@ async function createMirrorFiles(
     ...project,
     assets: {},
     ...(project.fonts ? { fonts: {} } : {}),
+    ...(project.recordings ? { recordings: {} } : {}),
   };
   const files: Array<MirrorFile & MirrorManifestFile> = [];
 
@@ -169,8 +170,6 @@ async function createMirrorFiles(
         audio: audioForMirror,
       };
       files.push(entry);
-    } else {
-      projectForMirror.recordings![recordingId] = { ...recording };
     }
   }
 

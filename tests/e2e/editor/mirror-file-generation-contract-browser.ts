@@ -8,6 +8,7 @@ export type MirrorFileGenerationContractResult = {
   mirroredFontStorage: string | undefined;
   mirroredProjectAssetStorage: string | undefined;
   mirroredRecordingObjectUrl: string | undefined;
+  mirroredUnavailableRecordingPresent: boolean;
   mirroredRecordingStorage: string | undefined;
   mirroredProjectUnreadableObjectUrl: string | undefined;
 };
@@ -48,7 +49,9 @@ export async function evaluateMirrorFileGenerationContract({
   const mirroredProject = JSON.parse(await projectFile.blob.text()) as {
     assets: Record<string, { objectUrl?: string; storage?: string }>;
     fonts?: Record<string, { objectUrl?: string; storage?: string }>;
-    recordings?: Record<string, { audio: { objectUrl?: string; storage?: string } }>;
+    recordings?: Record<string, {
+      audio: { fileName?: string; objectUrl?: string; storage?: string };
+    }>;
   };
   const defaultPublicBaseUrlFiles = await minioMirrorFiles.createMirrorFiles(
     project,
@@ -75,6 +78,9 @@ export async function evaluateMirrorFileGenerationContract({
     mirroredProjectAssetStorage: mirroredProject.assets['asset-used']?.storage,
     mirroredRecordingObjectUrl:
       mirroredProject.recordings?.['recording-unreadable']?.audio.objectUrl,
+    mirroredUnavailableRecordingPresent: Boolean(
+      mirroredProject.recordings?.['recording-unreadable'],
+    ),
     mirroredRecordingStorage:
       mirroredProject.recordings?.['recording-readable']?.audio.storage,
     mirroredProjectUnreadableObjectUrl: mirroredProject.assets['asset-unreadable']?.objectUrl,
