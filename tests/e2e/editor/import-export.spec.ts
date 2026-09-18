@@ -42,10 +42,10 @@ test.describe('editor import and export journey', () => {
     const canvas = frame.locator('canvas').first();
     await expect
       .poll(async () => {
-        const [red = 0, green = 0, blue = 0, alpha = 0] = await canvas.evaluate(
-          readCanvasPixel,
-          { x: 5, y: 5 },
-        );
+        const [red = 0, green = 0, blue = 0, alpha = 0] = await canvas.evaluate(readCanvasPixel, {
+          x: 5,
+          y: 5,
+        });
         return (
           Math.abs(red) <= 3 &&
           Math.abs(green - 205) <= 3 &&
@@ -56,16 +56,11 @@ test.describe('editor import and export journey', () => {
       .toBe(true);
     await expect
       .poll(async () => {
-        const [red = 0, green = 0, blue = 0, alpha = 0] = await canvas.evaluate(
-          readCanvasPixel,
-          { x: 190, y: 211 },
-        );
-        return (
-          red > 120 &&
-          green > 70 &&
-          blue < 80 &&
-          alpha === 255
-        );
+        const [red = 0, green = 0, blue = 0, alpha = 0] = await canvas.evaluate(readCanvasPixel, {
+          x: 190,
+          y: 211,
+        });
+        return red > 120 && green > 70 && blue < 80 && alpha === 255;
       })
       .toBe(true);
     const sourcePortraitPixel = await canvas.evaluate(readCanvasPixel, { x: 190, y: 211 });
@@ -145,12 +140,19 @@ test.describe('editor import and export journey', () => {
       .toEqual([255, 255, 255, 255]);
     await editor.openTool('Layout');
     await expect(page.getByRole('button', { name: 'shape-image.png', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Layout author', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'shape-image.png', exact: true }).click();
+    await expect(
+      page.getByRole('button', { name: 'shape-image.png', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true');
     await page.getByRole('button', { name: 'Page Background', exact: true }).click();
     await editor.openTool('Design');
     await expect(
       page.getByRole('button', { name: 'Open layout picker, current layout Statement' }),
     ).toBeVisible();
-    await page.getByRole('button', { name: 'Open layout picker, current layout Statement' }).click();
+    await page
+      .getByRole('button', { name: 'Open layout picker, current layout Statement' })
+      .click();
     const layoutChooser = page.getByRole('region', { name: 'Choose a layout' });
     await expect(layoutChooser).toBeVisible();
     await expect(layoutChooser.getByRole('button', { name: 'Statement' })).toHaveAttribute(

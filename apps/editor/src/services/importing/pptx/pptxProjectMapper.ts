@@ -10,12 +10,7 @@ import type {
 } from '../../../domain/documents/model';
 import { pptxFileUtils } from './pptxFileUtils';
 import type { PptxPackage } from './pptxPackage';
-import type {
-  PptxDeck,
-  PptxLayout,
-  PptxSlideObject,
-  PptxTextRun,
-} from './pptx-parser-model';
+import type { PptxDeck, PptxLayout, PptxSlideObject, PptxTextRun } from './pptx-parser-model';
 
 const TEXT_FRAME_FIT = {
   averageCharacterWidth: 0.9,
@@ -41,8 +36,13 @@ function createAssetId(path: string, index: number) {
   return `pptx-asset-${index + 1}-${slug || 'asset'}`;
 }
 
-function createAsset(file: NonNullable<ReturnType<PptxPackage['getFile']>>, index: number, pptxPackage: PptxPackage): Asset | undefined {
-  const mimeType = pptxPackage.getContentType(file.path) ?? pptxFileUtils.getMimeType(file.path, file.blob.type);
+function createAsset(
+  file: NonNullable<ReturnType<PptxPackage['getFile']>>,
+  index: number,
+  pptxPackage: PptxPackage,
+): Asset | undefined {
+  const mimeType =
+    pptxPackage.getContentType(file.path) ?? pptxFileUtils.getMimeType(file.path, file.blob.type);
   const type = pptxFileUtils.getAssetType(file.path, mimeType);
   if (!type) return undefined;
   const fileName = file.path.split('/').at(-1);
@@ -58,8 +58,14 @@ function createAsset(file: NonNullable<ReturnType<PptxPackage['getFile']>>, inde
   };
 }
 
-function getOrCreateAsset(assetPath: string, pptxPackage: PptxPackage, assets: Record<string, Asset>) {
-  const existing = Object.values(assets).find((asset) => asset.fileName === assetPath.split('/').at(-1));
+function getOrCreateAsset(
+  assetPath: string,
+  pptxPackage: PptxPackage,
+  assets: Record<string, Asset>,
+) {
+  const existing = Object.values(assets).find(
+    (asset) => asset.fileName === assetPath.split('/').at(-1),
+  );
   if (existing) return existing;
   const fileIndex = pptxPackage.files.findIndex((item) => item.path === assetPath);
   const file = pptxPackage.getFile(assetPath);
@@ -175,10 +181,7 @@ function getFixedTextFrame(
 }
 
 function getVisualLineCount(text: string, width: number, fontSize: number) {
-  const contentWidth = Math.max(
-    fontSize,
-    width - fontSize * TEXT_FRAME_FIT.horizontalPaddingRatio,
-  );
+  const contentWidth = Math.max(fontSize, width - fontSize * TEXT_FRAME_FIT.horizontalPaddingRatio);
   const lineCapacity = Math.max(
     1,
     contentWidth / (fontSize * TEXT_FRAME_FIT.averageCharacterWidth),
@@ -291,10 +294,7 @@ function mapTextRun(run: PptxTextRun, fontScale: number) {
   void styleOverrides;
   return {
     ...mappedRun,
-    fontSize: Math.max(
-      TEXT_FRAME_FIT.minimumAutoFitFontSize,
-      Math.round(run.fontSize * fontScale),
-    ),
+    fontSize: Math.max(TEXT_FRAME_FIT.minimumAutoFitFontSize, Math.round(run.fontSize * fontScale)),
   };
 }
 
@@ -451,6 +451,24 @@ function mapBackgroundImage(
   };
 }
 
+function getImportedLayoutElementId(pageId: string, elementId: string) {
+  return `${pageId}-layout-${elementId}`;
+}
+
+function hasMatchingSlidePlaceholder(
+  layoutObject: PptxSlideObject,
+  slideObjects: PptxSlideObject[],
+) {
+  if (!layoutObject.placeholderRole) return false;
+  return slideObjects.some(
+    (slideObject) =>
+      slideObject.placeholderRole === layoutObject.placeholderRole &&
+      (!layoutObject.placeholderIndex ||
+        !slideObject.placeholderIndex ||
+        slideObject.placeholderIndex === layoutObject.placeholderIndex),
+  );
+}
+
 function createLayout(
   layout: PptxLayout,
   pptxPackage: PptxPackage,
@@ -521,14 +539,22 @@ function map(deck: PptxDeck, pptxPackage: PptxPackage): ProjectDocument {
   const warnings: ImportWarning[] = [...deck.warnings];
   const slideLayouts: Record<string, SlideLayout> = {};
   for (const layout of deck.layouts) {
-    const mappedLayout = createLayout(layout, pptxPackage, assets, warnings, deck.width, deck.height);
+    const mappedLayout = createLayout(
+      layout,
+      pptxPackage,
+      assets,
+      warnings,
+      deck.width,
+      deck.height,
+    );
     if (mappedLayout) slideLayouts[mappedLayout.id] = mappedLayout;
   }
   const pages: Page[] = deck.slides.map((slide) => {
     const elementIds: string[] = [];
-    const layout = slide.layoutId && slideLayouts[slide.layoutId]
-      ? undefined
-      : createSlideFallbackLayout(slide, pptxPackage, assets, warnings, deck.width, deck.height);
+    const layout =
+      slide.layoutId && slideLayouts[slide.layoutId]
+        ? undefined
+        : createSlideFallbackLayout(slide, pptxPackage, assets, warnings, deck.width, deck.height);
     if (layout) slideLayouts[layout.id] = layout;
     const backgroundImage = mapBackgroundImage(
       slide.backgroundAssetPath,
@@ -541,6 +567,23 @@ function map(deck: PptxDeck, pptxPackage: PptxPackage): ProjectDocument {
     if (backgroundImage) {
       elements[backgroundImage.id] = backgroundImage;
       elementIds.push(backgroundImage.id);
+    }
+    const importedLayoutObjects = slide.layoutObjects
+      .filter((object) => !hasMatchingSlidePlaceholder(object, slide.objects))
+      .sort((left, right) => left.zIndex - right.zIndex);
+    for (const object of importedLayoutObjects) {
+      const element = mapObject(
+        { ...object, id: getImportedLayoutElementId(slide.id, object.id) },
+        pptxPackage,
+        assets,
+        warnings,
+        slide.id,
+        deck.width,
+        deck.height,
+      );
+      if (!element) continue;
+      elements[element.id] = element;
+      elementIds.push(element.id);
     }
     for (const object of slide.objects.sort((left, right) => left.zIndex - right.zIndex)) {
       const element = mapObject(

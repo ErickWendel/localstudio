@@ -1,5 +1,52 @@
-import type { ProjectDocument } from '../../../domain/documents/model';
+import type { DesignElement, ProjectDocument } from '../../../domain/documents/model';
 import { sampleProject } from '../../../domain/projects/sampleProject';
+
+function getMaterializedLayoutElementId(pageId: string, elementId: string) {
+  return `${pageId}-layout-${elementId}`;
+}
+
+function materializeLayoutElements(
+  project: ProjectDocument,
+  elements: ProjectDocument['elements'],
+) {
+  return project.pages.map((page) => {
+    const layout = page.layoutId ? project.slideLayouts?.[page.layoutId] : undefined;
+    if (!layout) return page;
+
+    const pageElements = page.elementIds
+      .map((elementId) => elements[elementId])
+      .filter((element): element is DesignElement => Boolean(element));
+    const layoutElementIds = layout.elementIds.flatMap((layoutElementId) => {
+      const layoutElement = layout.elements[layoutElementId];
+      if (!layoutElement || layoutElement.visible === false) return [];
+      if (
+        layoutElement.placeholderRole &&
+        pageElements.some((element) => element.placeholderRole === layoutElement.placeholderRole)
+      ) {
+        return [];
+      }
+
+      const materializedId = getMaterializedLayoutElementId(page.id, layoutElement.id);
+      if (!elements[materializedId]) {
+        const { templateSource, ...editableLayoutElement } = layoutElement;
+        void templateSource;
+        elements[materializedId] = {
+          ...editableLayoutElement,
+          id: materializedId,
+          locked: false,
+        };
+      }
+      return [materializedId];
+    });
+
+    const newLayoutElementIds = layoutElementIds.filter(
+      (elementId) => !page.elementIds.includes(elementId),
+    );
+    if (newLayoutElementIds.length === 0) return page;
+    const elementIds = [...newLayoutElementIds, ...page.elementIds];
+    return { ...page, elementIds };
+  });
+}
 
 function writeProjectNameToUrl(projectName: string) {
   if (typeof window === 'undefined') return;
@@ -48,6 +95,27 @@ function normalizeProjectDocument(project: ProjectDocument): ProjectDocument {
     };
   }
 
+  const pages = (
+    shouldRestoreHeroImage
+      ? project.pages.map((page) =>
+          page.id === pageId
+            ? {
+                ...page,
+                elementIds: (() => {
+                  const nextElementIds = page.elementIds.filter((id) => id !== 'image-hero');
+                  nextElementIds.splice(0, 0, 'image-hero');
+                  return nextElementIds;
+                })(),
+              }
+            : page,
+        )
+      : project.pages
+  ).map((page) => ({
+    ...page,
+    animationBuilds: page.animationBuilds ?? [],
+    visible: page.visible ?? true,
+  }));
+
   return {
     ...project,
     assets: {
@@ -63,25 +131,7 @@ function normalizeProjectDocument(project: ProjectDocument): ProjectDocument {
         : {}),
     },
     elements,
-    pages: (shouldRestoreHeroImage
-      ? project.pages.map((page) =>
-          page.id === pageId
-            ? {
-                ...page,
-                elementIds: (() => {
-                  const nextElementIds = page.elementIds.filter((id) => id !== 'image-hero');
-                  nextElementIds.splice(0, 0, 'image-hero');
-                  return nextElementIds;
-                })(),
-              }
-            : page,
-        )
-      : project.pages
-    ).map((page) => ({
-      ...page,
-      animationBuilds: page.animationBuilds ?? [],
-      visible: page.visible ?? true,
-    })),
+    pages: materializeLayoutElements({ ...project, pages }, elements),
   };
 }
 

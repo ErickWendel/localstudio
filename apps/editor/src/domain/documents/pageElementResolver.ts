@@ -8,6 +8,7 @@ function getLayoutElements(project: ProjectDocument, page: Page) {
   const layout = page.layoutId ? project.slideLayouts?.[page.layoutId] : undefined;
   return (
     layout?.elementIds
+      .filter((elementId) => !page.elementIds.includes(`${page.id}-layout-${elementId}`))
       .map((elementId) => layout.elements[elementId])
       .filter(isVisibleElement)
       .filter((element) => !element.placeholderRole) ?? []

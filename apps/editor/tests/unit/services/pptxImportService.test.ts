@@ -422,22 +422,29 @@ const standardSlideXml = `<?xml version="1.0" encoding="UTF-8"?>
 </p:sld>`;
 
 function createStandardsFixture() {
-  return createStoredPptxFile([
-    { path: '[Content_Types].xml', contents: contentTypesXml },
-    { path: '_rels/.rels', contents: packageRels },
-    { path: 'deck/main.xml', contents: standardPresentationXml },
-    { path: 'deck/_rels/main.xml.rels', contents: standardPresentationRels },
-    { path: 'deck/slides/slideA.xml', contents: standardSlideXml },
-    { path: 'deck/slides/_rels/slideA.xml.rels', contents: standardSlideRels },
-    { path: 'deck/layouts/layoutA.xml', contents: standardLayoutXml },
-    { path: 'deck/layouts/_rels/layoutA.xml.rels', contents: standardLayoutRels },
-    { path: 'deck/masters/masterA.xml', contents: standardMasterXml },
-    { path: 'deck/masters/_rels/masterA.xml.rels', contents: standardMasterRels },
-    { path: 'deck/theme/themeA.xml', contents: standardThemeXml },
-    { path: 'deck/media/photo.dat', contents: new Uint8Array([137, 80, 78, 71]) },
-    { path: 'deck/media/decor.svg', contents: '<svg xmlns="http://www.w3.org/2000/svg"/>' },
-    { path: 'deck/charts/chart1.xml', contents: '<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>' },
-  ], 'standards.pptx');
+  return createStoredPptxFile(
+    [
+      { path: '[Content_Types].xml', contents: contentTypesXml },
+      { path: '_rels/.rels', contents: packageRels },
+      { path: 'deck/main.xml', contents: standardPresentationXml },
+      { path: 'deck/_rels/main.xml.rels', contents: standardPresentationRels },
+      { path: 'deck/slides/slideA.xml', contents: standardSlideXml },
+      { path: 'deck/slides/_rels/slideA.xml.rels', contents: standardSlideRels },
+      { path: 'deck/layouts/layoutA.xml', contents: standardLayoutXml },
+      { path: 'deck/layouts/_rels/layoutA.xml.rels', contents: standardLayoutRels },
+      { path: 'deck/masters/masterA.xml', contents: standardMasterXml },
+      { path: 'deck/masters/_rels/masterA.xml.rels', contents: standardMasterRels },
+      { path: 'deck/theme/themeA.xml', contents: standardThemeXml },
+      { path: 'deck/media/photo.dat', contents: new Uint8Array([137, 80, 78, 71]) },
+      { path: 'deck/media/decor.svg', contents: '<svg xmlns="http://www.w3.org/2000/svg"/>' },
+      {
+        path: 'deck/charts/chart1.xml',
+        contents:
+          '<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>',
+      },
+    ],
+    'standards.pptx',
+  );
 }
 
 describe('BrowserPptxImportService', () => {
@@ -578,7 +585,9 @@ describe('BrowserPptxImportService', () => {
 </p:spTree></p:cSld></p:sld>`;
     const service = new BrowserPptxImportService();
     const project = await service.importPowerPoint({ file: createPptxFixture(fidelitySlideXml) });
-    const pageElements = project.pages[0]?.elementIds.map((elementId) => project.elements[elementId]);
+    const pageElements = project.pages[0]?.elementIds.map(
+      (elementId) => project.elements[elementId],
+    );
     const maskShape = pageElements?.find(
       (element) => element?.type === 'shape' && element.importSource?.shapeId === '40',
     );
@@ -621,7 +630,9 @@ describe('BrowserPptxImportService', () => {
         '<a:r><a:rPr sz="2400" b="1"><a:solidFill><a:srgbClr val="00aa00"/></a:solidFill><a:latin typeface="Arial"/></a:rPr><a:t>&lt;/ </a:t></a:r><a:r><a:rPr sz="2400" b="1"><a:solidFill><a:srgbClr val="ffffff"/></a:solidFill><a:latin typeface="Roboto"/></a:rPr><a:t>Editable title</a:t></a:r>',
       );
     const service = new BrowserPptxImportService();
-    const project = await service.importPowerPoint({ file: createPptxFixture(imageBackgroundSlideXml) });
+    const project = await service.importPowerPoint({
+      file: createPptxFixture(imageBackgroundSlideXml),
+    });
     const page = project.pages[0];
     const title = Object.values(project.elements).find(
       (element) => element.type === 'text' && element.text === '</ Editable title',
@@ -667,7 +678,9 @@ describe('BrowserPptxImportService', () => {
     const project = await service.importPowerPoint({
       file: createPptxFixture(imageFilledShapeSlideXml),
     });
-    const pageElements = project.pages[0]?.elementIds.map((elementId) => project.elements[elementId]);
+    const pageElements = project.pages[0]?.elementIds.map(
+      (elementId) => project.elements[elementId],
+    );
     const image = pageElements?.find(
       (element) => element?.type === 'image' && element.importSource?.shapeId === '50',
     );
@@ -706,7 +719,9 @@ describe('BrowserPptxImportService', () => {
     const project = await service.importPowerPoint({
       file: createPptxFixture(imageFilledShapeSlideXml),
     });
-    const pageElements = project.pages[0]?.elementIds.map((elementId) => project.elements[elementId]);
+    const pageElements = project.pages[0]?.elementIds.map(
+      (elementId) => project.elements[elementId],
+    );
     const image = pageElements?.find(
       (element) => element?.type === 'image' && element.importSource?.shapeId === '51',
     );
@@ -778,11 +793,19 @@ describe('BrowserPptxImportService', () => {
     );
     const imageElements = elements.filter((element) => element.type === 'image');
     const videoElement = elements.find((element) => element.type === 'video');
-    const imageAsset = Object.values(project.assets).find((asset) => asset.fileName === 'image1.png');
-    const wideImageAsset = Object.values(project.assets).find((asset) => asset.fileName === 'wide.png');
-    const layoutImageAsset = Object.values(project.assets).find((asset) => asset.fileName === 'layout-icon.png');
+    const imageAsset = Object.values(project.assets).find(
+      (asset) => asset.fileName === 'image1.png',
+    );
+    const wideImageAsset = Object.values(project.assets).find(
+      (asset) => asset.fileName === 'wide.png',
+    );
+    const layoutImageAsset = Object.values(project.assets).find(
+      (asset) => asset.fileName === 'layout-icon.png',
+    );
     const imageElement = imageElements.find((element) => element.assetId === imageAsset?.id);
-    const wideImageElement = imageElements.find((element) => element.assetId === wideImageAsset?.id);
+    const wideImageElement = imageElements.find(
+      (element) => element.assetId === wideImageAsset?.id,
+    );
 
     expect(textElement).toMatchObject({
       locked: false,
@@ -804,7 +827,19 @@ describe('BrowserPptxImportService', () => {
         source: 'slide',
       },
     });
-    expect(authorElement).toBeUndefined();
+    expect(authorElement).toMatchObject({
+      id: 'pptx-page-1-layout-pptx-layout-slideLayout1-layout-text-22',
+      importSource: {
+        format: 'pptx',
+        pageId: 'pptx-page-1',
+        shapeId: '22',
+        source: 'layout',
+      },
+      locked: false,
+      text: 'Erick Wendel',
+      type: 'text',
+    });
+    expect(authorElement).not.toHaveProperty('templateSource');
     expect(project.pages[0]?.layoutId).toBe('pptx-layout-slideLayout1');
     const importedLayout = project.slideLayouts?.['pptx-layout-slideLayout1'];
     expect(importedLayout).toMatchObject({
@@ -852,7 +887,8 @@ describe('BrowserPptxImportService', () => {
       text: 'Default sized',
       type: 'text',
     });
-    if (!centeredElement || centeredElement.type !== 'text') throw new Error('Expected centered text.');
+    if (!centeredElement || centeredElement.type !== 'text')
+      throw new Error('Expected centered text.');
     expect(centeredElement.align).toBe('center');
     expect(centeredElement.x + centeredElement.width / 2).toBeCloseTo(672, 0);
     expect(centeredElement.y + centeredElement.height / 2).toBeCloseTo(864, 0);
@@ -867,9 +903,16 @@ describe('BrowserPptxImportService', () => {
     expect(autoFitElement.height).toBe(108);
     expect(autoFitElement.width).toBe(396);
     expect(autoFitElement.align).toBe('center');
-    expect(project.pages[0]?.elementIds.some((elementId) => elementId.includes('placeholder'))).toBe(false);
-    expect(imageElements).toHaveLength(2);
-    expect(imageElement).toMatchObject({ locked: false, mask: 'ellipse', opacity: 1, type: 'image' });
+    expect(
+      project.pages[0]?.elementIds.some((elementId) => elementId.includes('placeholder')),
+    ).toBe(false);
+    expect(imageElements).toHaveLength(3);
+    expect(imageElement).toMatchObject({
+      locked: false,
+      mask: 'ellipse',
+      opacity: 1,
+      type: 'image',
+    });
     expect(wideImageElement).toMatchObject({
       crop: { x: 0.25, y: 0, width: 0.5, height: 1 },
       locked: false,
@@ -883,7 +926,9 @@ describe('BrowserPptxImportService', () => {
       type: 'video',
     });
 
-    const videoAsset = Object.values(project.assets).find((asset) => asset.fileName === 'media1.mp4');
+    const videoAsset = Object.values(project.assets).find(
+      (asset) => asset.fileName === 'media1.mp4',
+    );
     expect(imageAsset?.mimeType).toBe('image/png');
     expect(layoutImageAsset?.mimeType).toBe('image/png');
     expect(videoAsset?.mimeType).toBe('video/mp4');
@@ -951,7 +996,9 @@ describe('BrowserPptxImportService', () => {
   </p:cSld>
 </p:sld>`;
     const service = new BrowserPptxImportService();
-    const project = await service.importPowerPoint({ file: createPptxFixture(placeholderSlideXml) });
+    const project = await service.importPowerPoint({
+      file: createPptxFixture(placeholderSlideXml),
+    });
     const placeholderElement = Object.values(project.elements).find(
       (element) => element.type === 'text' && element.placeholderRole === 'body',
     );
@@ -1019,7 +1066,8 @@ describe('BrowserPptxImportService', () => {
       fontFamily: 'American Typewriter',
       fontWeight: 700,
     });
-    if (!placeholderElement || placeholderElement.type !== 'text') throw new Error('Expected styled placeholder.');
+    if (!placeholderElement || placeholderElement.type !== 'text')
+      throw new Error('Expected styled placeholder.');
     expect(placeholderElement.fontSize).toBeGreaterThan(100);
   });
 
@@ -1091,7 +1139,9 @@ describe('BrowserPptxImportService', () => {
   </p:cSld>
 </p:sld>`;
     const service = new BrowserPptxImportService();
-    const project = await service.importPowerPoint({ file: createPptxFixture(oversizedPlaceholderSlideXml) });
+    const project = await service.importPowerPoint({
+      file: createPptxFixture(oversizedPlaceholderSlideXml),
+    });
     const titleElement = Object.values(project.elements).find(
       (element) => element.type === 'text' && element.text === 'Web Streams',
     );
@@ -1128,9 +1178,12 @@ describe('BrowserPptxImportService', () => {
   </p:cSld>
 </p:sld>`;
     const service = new BrowserPptxImportService();
-    const project = await service.importPowerPoint({ file: createPptxFixture(overlappingTextSlideXml) });
+    const project = await service.importPowerPoint({
+      file: createPptxFixture(overlappingTextSlideXml),
+    });
     const largeTextElement = Object.values(project.elements).find(
-      (element) => element.type === 'text' && element.text === 'Without the data coming out of the device.',
+      (element) =>
+        element.type === 'text' && element.text === 'Without the data coming out of the device.',
     );
     const smallTextElement = Object.values(project.elements).find(
       (element) => element.type === 'text' && element.text === 'models offline',
@@ -1175,11 +1228,15 @@ describe('BrowserPptxImportService', () => {
   </p:cSld>
 </p:sld>`;
     const service = new BrowserPptxImportService();
-    const project = await service.importPowerPoint({ file: createPptxFixture(inheritedFrameSlideXml) });
+    const project = await service.importPowerPoint({
+      file: createPptxFixture(inheritedFrameSlideXml),
+    });
     const titleElement = Object.values(project.elements).find(
       (element) => element.type === 'text' && element.text === 'Inherited frame title',
     );
-    const imageAsset = Object.values(project.assets).find((asset) => asset.fileName === 'image1.png');
+    const imageAsset = Object.values(project.assets).find(
+      (asset) => asset.fileName === 'image1.png',
+    );
     const imageElement = Object.values(project.elements).find(
       (element) => element.type === 'image' && element.assetId === imageAsset?.id,
     );
@@ -1221,12 +1278,24 @@ describe('BrowserPptxImportService', () => {
     expect(project.pages[0]?.background).toEqual({ type: 'color', color: '#FF9900' });
 
     const elements = Object.values(project.elements);
-    const themeShape = elements.find((element) => element.type === 'shape' && element.id.includes('shape-10'));
-    const allCapsText = elements.find((element) => element.type === 'text' && element.id.includes('text-11'));
-    const inheritedTitle = elements.find((element) => element.type === 'text' && element.id.includes('text-12'));
-    const groupedShape = elements.find((element) => element.type === 'shape' && element.id.includes('shape-21'));
-    const scaledGroupedShape = elements.find((element) => element.type === 'shape' && element.id.includes('shape-23'));
-    const imageAsset = Object.values(project.assets).find((asset) => asset.fileName === 'photo.dat');
+    const themeShape = elements.find(
+      (element) => element.type === 'shape' && element.id.includes('shape-10'),
+    );
+    const allCapsText = elements.find(
+      (element) => element.type === 'text' && element.id.includes('text-11'),
+    );
+    const inheritedTitle = elements.find(
+      (element) => element.type === 'text' && element.id.includes('text-12'),
+    );
+    const groupedShape = elements.find(
+      (element) => element.type === 'shape' && element.id.includes('shape-21'),
+    );
+    const scaledGroupedShape = elements.find(
+      (element) => element.type === 'shape' && element.id.includes('shape-23'),
+    );
+    const imageAsset = Object.values(project.assets).find(
+      (asset) => asset.fileName === 'photo.dat',
+    );
     const svgAsset = Object.values(project.assets).find((asset) => asset.fileName === 'decor.svg');
     const tableTexts = elements
       .filter((element) => element.type === 'text')
@@ -1284,8 +1353,16 @@ describe('BrowserPptxImportService', () => {
       fontFamily: 'Tenorite',
     });
     expect(tableTexts).toEqual(['Cell A', 'Cell B']);
-    expect(imageAsset).toMatchObject({ fileName: 'photo.dat', mimeType: 'image/png', type: 'image' });
-    expect(svgAsset).toMatchObject({ fileName: 'decor.svg', mimeType: 'image/svg+xml', type: 'image' });
+    expect(imageAsset).toMatchObject({
+      fileName: 'photo.dat',
+      mimeType: 'image/png',
+      type: 'image',
+    });
+    expect(svgAsset).toMatchObject({
+      fileName: 'decor.svg',
+      mimeType: 'image/svg+xml',
+      type: 'image',
+    });
     expect(project.importWarnings).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ code: 'pptx-external-relationship', severity: 'warning' }),

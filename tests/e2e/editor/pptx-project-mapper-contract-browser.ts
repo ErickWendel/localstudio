@@ -1,9 +1,13 @@
-import type { PptxDeck, PptxSlideObject } from '../../../apps/editor/src/services/importing/pptx/pptx-parser-model';
+import type {
+  PptxDeck,
+  PptxSlideObject,
+} from '../../../apps/editor/src/services/importing/pptx/pptx-parser-model';
 import type { PptxPackage } from '../../../apps/editor/src/services/importing/pptx/pptxPackage';
 
 export type PptxProjectMapperContractResult = {
   assetIds: string[];
   cropSummary: Array<string | undefined>;
+  editableLayoutElementIds: string[];
   fallbackLayoutElementIds: string[];
   layoutPlaceholderRoles: string[];
   missingAssetWarning: string | undefined;
@@ -12,9 +16,8 @@ export type PptxProjectMapperContractResult = {
 };
 
 export async function evaluatePptxProjectMapperContract(): Promise<PptxProjectMapperContractResult> {
-  const { pptxProjectMapper } = (await import(
-    '/editor/src/services/importing/pptx/pptxProjectMapper.ts'
-  )) as typeof import('../../../apps/editor/src/services/importing/pptx/pptxProjectMapper');
+  const { pptxProjectMapper } =
+    (await import('/editor/src/services/importing/pptx/pptxProjectMapper.ts')) as typeof import('../../../apps/editor/src/services/importing/pptx/pptxProjectMapper');
 
   function createTextObject(
     id: string,
@@ -202,6 +205,8 @@ export async function evaluatePptxProjectMapperContract(): Promise<PptxProjectMa
   return {
     assetIds: Object.keys(project.assets).sort(),
     cropSummary: crops,
+    editableLayoutElementIds:
+      project.pages[0]?.elementIds.filter((id) => id.includes('-layout-')) ?? [],
     fallbackLayoutElementIds: layout?.elementIds ?? [],
     layoutPlaceholderRoles: layout?.placeholderRoles ?? [],
     missingAssetWarning: project.importWarnings?.find(
