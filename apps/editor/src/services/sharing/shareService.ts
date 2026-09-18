@@ -113,7 +113,7 @@ function createShareProgressReporter(total: number, options?: SharePublishOption
 
 function shouldUseMirroredObjectUrl(storage: 'inline' | 'file' | 'remote' | undefined, objectUrl: string | undefined) {
   if (storage === 'remote') return false;
-  return storage === 'file' || assetFileUtils.isReadableObjectUrl(objectUrl);
+  return assetFileUtils.isReadableObjectUrl(objectUrl);
 }
 
 export class BrowserShareService implements ShareService {
@@ -230,6 +230,13 @@ export class BrowserShareService implements ShareService {
     config: MinioMirrorConfig,
   ): ProjectDocument {
     const projectForShare = cloneProject(project);
+    if (projectForShare.recordings) {
+      projectForShare.recordings = Object.fromEntries(
+        Object.entries(projectForShare.recordings).filter(([, recording]) =>
+          assetFileUtils.isReadableObjectUrl(recording.audio.objectUrl),
+        ),
+      );
+    }
     const referencedAssetIds = collectReferencedAssetIds(projectForShare);
 
     for (const [assetId, asset] of Object.entries(projectForShare.assets)) {

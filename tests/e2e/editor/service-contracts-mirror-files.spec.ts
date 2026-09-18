@@ -14,6 +14,7 @@ test('executes mirror file generation contracts in the browser runtime', async (
     mirroredFontStorage: 'file',
     mirroredProjectAssetStorage: 'file',
     mirroredRecordingObjectUrl: undefined,
+    mirroredUnavailableRecordingPresent: false,
     mirroredRecordingStorage: 'file',
     mirroredProjectUnreadableObjectUrl: 'https://example.test/unreadable.png',
   });

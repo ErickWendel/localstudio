@@ -731,7 +731,6 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
       } catch (error) {
         if (!isNotFoundError(error) || !options.allowMissingAssetFiles) throw error;
         missingFileWarnings.push(createMissingFileWarning('recording', audio.fileName));
-        recordings[recordingId] = recording;
       }
     }
 

@@ -658,7 +658,6 @@ export class OpfsProjectRepository implements ProjectRepository {
         };
       } catch (error) {
         if (!isNotFoundError(error) || !options.allowMissingAssetFiles) throw error;
-        recordings[recordingId] = recording;
       }
     }
 
