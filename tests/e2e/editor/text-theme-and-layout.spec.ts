@@ -1,6 +1,6 @@
 import { EditorAppPage } from '../pages/editor-app.page';
 import { expect, test, withIsolatedDevServer } from '../support/journey-test';
-import { getCanvasPoint } from './canvas-design-point';
+import { canvasTransformerPoint } from './canvas-transformer-point';
 
 const getServer = withIsolatedDevServer(test);
 
@@ -109,7 +109,7 @@ test.describe('editor text theme and layout journey', () => {
     const frame = page.getByTestId('slide-canvas-frame');
     const canvas = frame.locator('canvas').first();
     await expect(frame).toHaveAttribute('data-selected-elements', /text-/);
-    const editPoint = await getCanvasPoint(page, { x: 960, y: 540 });
+    const editPoint = await canvasTransformerPoint.get(page, 'center');
     await page.mouse.dblclick(editPoint.x, editPoint.y);
 
     const editorText = page.getByRole('textbox', { name: 'Edit text' });

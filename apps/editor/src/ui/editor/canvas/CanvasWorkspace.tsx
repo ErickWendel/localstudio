@@ -1249,6 +1249,7 @@ export function CanvasWorkspace({
     }
     if (backgroundSelectionMode || editingTextId) return;
     if (event.target !== event.target.getStage()) {
+      suppressNextArtboardClickRef.current = true;
       if (isCropModeActive) finishCropMode();
       return;
     }
