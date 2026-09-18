@@ -880,7 +880,9 @@ export function CanvasWorkspace({
     onSelectElement?.(element.id);
     setEditingTextId(element.id);
     setEditingTextValue(element.text);
-    setEditingTextHeight(element.height);
+    setEditingTextHeight(
+      Math.max(element.height, textTranslationLayout.getMinimumTextFrameHeight(element)),
+    );
   }
 
   function commitTextEditing() {

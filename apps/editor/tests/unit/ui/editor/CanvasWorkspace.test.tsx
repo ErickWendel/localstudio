@@ -702,6 +702,54 @@ describe('CanvasWorkspace', () => {
     expect(onSelectSlide).not.toHaveBeenCalled();
   });
 
+  it('extends the live text editor over imported text that overflows its authored frame', () => {
+    const stageRef = createRef<Konva.Stage>();
+    const baseProject = sampleProject.createSampleProject();
+    const titleElement = baseProject.elements['text-title'];
+    if (!titleElement || titleElement.type !== 'text') {
+      throw new Error('Expected the sample project title to be a text element');
+    }
+    const project: ProjectDocument = {
+      ...baseProject,
+      elements: {
+        ...baseProject.elements,
+        'text-title': {
+          ...titleElement,
+          fontSize: 40,
+          height: 20,
+          text: 'A long imported title that wraps onto multiple lines',
+          width: 180,
+        },
+      },
+    };
+
+    render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['text-title'] }}
+        stageRef={stageRef}
+      />,
+    );
+
+    const textNode = stageRef.current
+      ?.find('Text')
+      .find(
+        (node) =>
+          (node as Konva.Text).text() === 'A long imported title that wraps onto multiple lines',
+      ) as Konva.Text | undefined;
+    expect(textNode).toBeDefined();
+
+    act(() => {
+      textNode!.fire('dblclick', { target: textNode });
+    });
+
+    const editor = screen.getByLabelText('Edit text');
+    expect(
+      parseFloat(editor.getAttribute('style')?.match(/height: ([\d.]+)px/)?.[1] ?? '0'),
+    ).toBeGreaterThan(20 * 0.4);
+  });
+
   it('keeps text editing active when focus moves to the text toolbar', () => {
     const onTextEditSelectionChange = vi.fn();
     const stageRef = createRef<Konva.Stage>();
