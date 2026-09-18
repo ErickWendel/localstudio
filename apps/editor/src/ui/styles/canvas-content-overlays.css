@@ -3,12 +3,12 @@
   z-index: 8;
   margin: 0;
   overflow: hidden;
-  border: 1px solid var(--ew-green);
+  border: 1px solid transparent;
   border-radius: 2px;
   outline: 0;
-  background: rgba(5, 13, 16, 0.72);
+  background: transparent;
   box-sizing: border-box;
-  box-shadow: 0 0 18px rgba(55, 253, 118, 0.18);
+  box-shadow: none;
   line-height: 1.08;
   pointer-events: auto;
   resize: none;

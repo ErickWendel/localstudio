@@ -10,7 +10,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react';
-import type Konva from 'konva';
+import Konva from 'konva';
 import { Circle, Group, Image as KonvaImage, Layer, Rect, Stage, Transformer } from 'react-konva';
 import type {
   AlignMode,
@@ -63,6 +63,30 @@ function getRenderedTextContentHeight(textNode: Konva.Text): number {
   const height = measurementNode.height();
   measurementNode.destroy();
   return height;
+}
+
+function getEditingTextVisualBounds(
+  node: Konva.Node | null | undefined,
+  element: Extract<DesignElement, { type: 'text' }>,
+) {
+  if (!node) return undefined;
+
+  if (node instanceof Konva.Text) {
+    const height = getRenderedTextContentHeight(node);
+    const freeHeight = node.height() - height;
+    const top =
+      element.verticalAlign === 'middle'
+        ? node.y() + freeHeight / 2
+        : element.verticalAlign === 'bottom'
+          ? node.y() + freeHeight
+          : node.y();
+    return { height, top };
+  }
+
+  const stage = node.getStage();
+  if (!stage) return undefined;
+  const bounds = node.getClientRect({ relativeTo: stage });
+  return { height: bounds.height, top: bounds.y };
 }
 
 interface CanvasWorkspaceProps {
@@ -246,6 +270,9 @@ export function CanvasWorkspace({
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [editingTextValue, setEditingTextValue] = useState('');
   const [editingTextHeight, setEditingTextHeight] = useState<number | undefined>(undefined);
+  const [editingTextVisualBounds, setEditingTextVisualBounds] = useState<
+    { height: number; top: number } | undefined
+  >(undefined);
   const [fontRenderVersion, setFontRenderVersion] = useState(0);
   const [processingBlinkOn, setProcessingBlinkOn] = useState(false);
   const [backgroundPreviewPoint, setBackgroundPreviewPoint] = useState<{
@@ -443,6 +470,7 @@ export function CanvasWorkspace({
       setEditingTextId(null);
       setEditingTextValue('');
       setEditingTextHeight(undefined);
+      setEditingTextVisualBounds(undefined);
       onSelectSlide?.();
     }
 
@@ -877,11 +905,17 @@ export function CanvasWorkspace({
   function startTextEditing(element: DesignElement) {
     if (readOnly) return;
     if (element.type !== 'text') return;
+    const visualBounds = getEditingTextVisualBounds(nodeRefs.current[element.id], element);
     onSelectElement?.(element.id);
     setEditingTextId(element.id);
     setEditingTextValue(element.text);
     setEditingTextHeight(
       Math.max(element.height, textTranslationLayout.getMinimumTextFrameHeight(element)),
+    );
+    setEditingTextVisualBounds(
+      visualBounds
+        ? { height: visualBounds.height, top: visualBounds.top }
+        : undefined,
     );
   }
 
@@ -890,6 +924,7 @@ export function CanvasWorkspace({
     onUpdateTextContent?.(editingTextId, editingTextValue);
     setEditingTextId(null);
     setEditingTextHeight(undefined);
+    setEditingTextVisualBounds(undefined);
   }
 
   function handleTextEditorBlur(event: ReactFocusEvent<HTMLTextAreaElement>) {
@@ -910,6 +945,7 @@ export function CanvasWorkspace({
     setEditingTextId(null);
     setEditingTextValue('');
     setEditingTextHeight(undefined);
+    setEditingTextVisualBounds(undefined);
   }
 
   function updateTextEditing(
@@ -1635,6 +1671,18 @@ export function CanvasWorkspace({
             ? visibleElements.map((element) => {
                 if (element.type !== 'text' || editingTextId !== element.id) return null;
 
+                const editorHeight = Math.max(
+                  element.height,
+                  editingTextHeight ?? element.height,
+                );
+                const editorPadding = TEXT_FRAME_PADDING * scaleY;
+                const visualEditorHeight = editingTextVisualBounds
+                  ? editingTextVisualBounds.height + editorPadding * 2
+                  : editorHeight * scaleY;
+                const visualEditorTop = editingTextVisualBounds
+                  ? editingTextVisualBounds.top - editorPadding
+                  : element.y * scaleY;
+
                 return (
                   <textarea
                     aria-label="Edit text"
@@ -1643,20 +1691,20 @@ export function CanvasWorkspace({
                     ref={textInputRef}
                     value={editingTextValue}
                     style={{
-                      background: 'rgba(5, 13, 16, 0.08)',
+                      background: 'transparent',
                       caretColor: element.fill,
                       color: 'transparent',
                       cursor: 'text',
                       fontFamily: element.fontFamily,
                       fontSize: `${element.fontSize * scaleY}px`,
                       fontWeight: element.fontWeight,
-                      height: `${Math.max(element.height, editingTextHeight ?? element.height) * scaleY}px`,
+                      height: `${visualEditorHeight}px`,
                       left: `${element.x * scaleX}px`,
                       lineHeight: element.lineHeight ?? 1.05,
-                      padding: `${TEXT_FRAME_PADDING * scaleY}px`,
+                      padding: `${editorPadding}px`,
                       pointerEvents: 'auto',
                       textAlign: element.align,
-                      top: `${element.y * scaleY}px`,
+                      top: `${visualEditorTop}px`,
                       transform: `rotate(${element.rotation}deg)`,
                       userSelect: 'text',
                       width: `${element.width * scaleX}px`,
