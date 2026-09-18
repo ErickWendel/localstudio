@@ -393,6 +393,46 @@ describe('editor commands', () => {
     expect(project.elements['text-title']).toMatchObject({ text: 'AI Design Revolution' });
   });
 
+  it('preserves imported paragraph runs when an unchanged text editor commits', () => {
+    const baseProject = sampleProject.createSampleProject();
+    const titleElement = baseProject.elements['text-title'];
+    if (!titleElement || titleElement.type !== 'text') {
+      throw new Error('Expected the sample project title to be text');
+    }
+    const project = {
+      ...baseProject,
+      elements: {
+        ...baseProject.elements,
+        'text-title': {
+          ...titleElement,
+          paragraphs: [
+            {
+              align: titleElement.align,
+              fill: titleElement.fill,
+              fontFamily: titleElement.fontFamily,
+              fontSize: titleElement.fontSize,
+              fontStyle: 'normal' as const,
+              fontWeight: titleElement.fontWeight,
+              indent: 0,
+              lineHeight: titleElement.lineHeight ?? 1.05,
+              marginLeft: 0,
+              spaceAfter: 0,
+              spaceBefore: 0,
+              text: titleElement.text,
+            },
+          ],
+        },
+      },
+    };
+
+    const next = new basicCommands.UpdateTextContentCommand('text-title', titleElement.text).execute(
+      project,
+    );
+
+    expect(next).toBe(project);
+    expect(next.elements['text-title']).toMatchObject({ paragraphs: project.elements['text-title'].paragraphs });
+  });
+
   it('updates text style immutably', () => {
     const project = sampleProject.createSampleProject();
     const next = new basicCommands.UpdateElementStyleCommand('text-title', {

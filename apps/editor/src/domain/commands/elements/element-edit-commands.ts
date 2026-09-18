@@ -109,6 +109,7 @@ class UpdateTextContentCommand implements EditorCommand {
   execute(project: ProjectDocument): ProjectDocument {
     const element = project.elements[this.elementId];
     if (!element || element.type !== 'text' || element.locked) return project;
+    if (element.text === this.text) return project;
     const { paragraphs, ...elementWithoutParagraphs } = element;
     void paragraphs;
     const colorRanges = textColorRanges.trimTextColorRanges(

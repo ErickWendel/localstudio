@@ -165,7 +165,7 @@ describe('CanvasWorkspace', () => {
     });
 
     const editor = screen.getByLabelText('Edit text');
-    expect(editor).toHaveStyle({ background: 'rgba(5, 13, 16, 0.08)' });
+    expect(editor).toHaveStyle({ background: 'transparent' });
     expect(getComputedStyle(editor).color).toBe('rgba(0, 0, 0, 0)');
     expect(hitRect!.visible()).toBe(true);
 
@@ -700,6 +700,174 @@ describe('CanvasWorkspace', () => {
       end: 9,
     });
     expect(onSelectSlide).not.toHaveBeenCalled();
+  });
+
+  it('extends the live text editor over imported text that overflows its authored frame', () => {
+    const stageRef = createRef<Konva.Stage>();
+    const baseProject = sampleProject.createSampleProject();
+    const titleElement = baseProject.elements['text-title'];
+    if (!titleElement || titleElement.type !== 'text') {
+      throw new Error('Expected the sample project title to be a text element');
+    }
+    const project: ProjectDocument = {
+      ...baseProject,
+      elements: {
+        ...baseProject.elements,
+        'text-title': {
+          ...titleElement,
+          fontSize: 40,
+          height: 20,
+          text: 'A long imported title that wraps onto multiple lines',
+          width: 180,
+        },
+      },
+    };
+
+    render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['text-title'] }}
+        stageRef={stageRef}
+      />,
+    );
+
+    const textNode = stageRef.current
+      ?.find('Text')
+      .find(
+        (node) =>
+          (node as Konva.Text).text() === 'A long imported title that wraps onto multiple lines',
+      ) as Konva.Text | undefined;
+    expect(textNode).toBeDefined();
+
+    act(() => {
+      textNode!.fire('dblclick', { target: textNode });
+    });
+
+    const editor = screen.getByLabelText('Edit text');
+    expect(
+      parseFloat(editor.getAttribute('style')?.match(/height: ([\d.]+)px/)?.[1] ?? '0'),
+    ).toBeGreaterThan(20 * 0.4);
+  });
+
+  it('aligns native selection with vertically centered imported text', () => {
+    const stageRef = createRef<Konva.Stage>();
+    const baseProject = sampleProject.createSampleProject();
+    const titleElement = baseProject.elements['text-title'];
+    if (!titleElement || titleElement.type !== 'text') {
+      throw new Error('Expected the sample project title to be a text element');
+    }
+    const project: ProjectDocument = {
+      ...baseProject,
+      elements: {
+        ...baseProject.elements,
+        'text-title': {
+          ...titleElement,
+          fontFamily: 'Alfa Slab One',
+          fontSize: 128,
+          height: 833,
+          lineHeight: 1,
+          paragraphs: [
+            {
+              align: 'left',
+              fill: titleElement.fill,
+              fontFamily: 'Alfa Slab One',
+              fontSize: 128,
+              fontStyle: 'normal',
+              fontWeight: titleElement.fontWeight,
+              indent: 0,
+              lineHeight: 1.05,
+              marginLeft: 0,
+              spaceAfter: 0,
+              spaceBefore: 0,
+              text: 'A forma como navegamos na Web está mudando!',
+            },
+          ],
+          text: 'A forma como navegamos na Web está mudando!',
+          verticalAlign: 'middle',
+          verticalOverflow: 'overflow',
+          width: 1751,
+          x: 116,
+          y: 124,
+        },
+      },
+    };
+
+    render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['text-title'] }}
+        stageRef={stageRef}
+      />,
+    );
+
+    const textNode = stageRef.current
+      ?.find('Group')
+      .find(
+        (node) =>
+          node.x() === project.elements['text-title']!.x * 0.4 &&
+          node.y() === project.elements['text-title']!.y * 0.4,
+      );
+    expect(textNode).toBeDefined();
+
+    act(() => {
+      textNode!.fire('dblclick', { target: textNode });
+    });
+
+    const editor = screen.getByLabelText('Edit text');
+    expect(parseFloat(editor.style.top)).toBeGreaterThan(project.elements['text-title']!.y * 0.4);
+  });
+
+  it('keeps native selection aligned after editing removes imported paragraph runs', () => {
+    const stageRef = createRef<Konva.Stage>();
+    const baseProject = sampleProject.createSampleProject();
+    const titleElement = baseProject.elements['text-title'];
+    if (!titleElement || titleElement.type !== 'text') {
+      throw new Error('Expected the sample project title to be a text element');
+    }
+    const project: ProjectDocument = {
+      ...baseProject,
+      elements: {
+        ...baseProject.elements,
+        'text-title': {
+          ...titleElement,
+          fontFamily: 'Alfa Slab One',
+          fontSize: 128,
+          height: 833,
+          lineHeight: 1,
+          text: 'A forma como navegamos na Web está mudando!',
+          verticalAlign: 'middle',
+          verticalOverflow: 'overflow',
+          width: 1751,
+          x: 116,
+          y: 124,
+        },
+      },
+    };
+
+    render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['text-title'] }}
+        stageRef={stageRef}
+      />,
+    );
+
+    const textNode = stageRef.current
+      ?.find('Text')
+      .find((node) => (node as Konva.Text).text() === 'A forma como navegamos na Web está mudando!') as
+      | Konva.Text
+      | undefined;
+    expect(textNode).toBeDefined();
+
+    act(() => {
+      textNode!.fire('dblclick', { target: textNode });
+    });
+
+    const editor = screen.getByLabelText('Edit text');
+    expect(parseFloat(editor.style.top)).toBeGreaterThan(project.elements['text-title']!.y * 0.4);
   });
 
   it('keeps text editing active when focus moves to the text toolbar', () => {
