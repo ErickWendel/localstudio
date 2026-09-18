@@ -423,6 +423,27 @@ describe('editor commands', () => {
     });
   });
 
+  it('applies text color to selected character ranges without changing the whole text fill', () => {
+    const project = sampleProject.createSampleProject();
+    const first = new basicCommands.UpdateElementStyleCommand('text-title', {
+      fill: '#FF0000',
+      textColorRange: { start: 0, end: 2 },
+    }).execute(project);
+    const next = new basicCommands.UpdateElementStyleCommand('text-title', {
+      fill: '#0000FF',
+      textColorRange: { start: 1, end: 4 },
+    }).execute(first);
+
+    expect(next.elements['text-title']).toMatchObject({
+      fill: '#37FD76',
+      colorRanges: [
+        { start: 0, end: 1, fill: '#FF0000' },
+        { start: 1, end: 4, fill: '#0000FF' },
+      ],
+    });
+    expect(project.elements['text-title']).not.toHaveProperty('colorRanges');
+  });
+
   it('clears shape fill and border style immutably', () => {
     const project = createShapeFixture();
     const next = new basicCommands.UpdateElementStyleCommand('shape-test', {

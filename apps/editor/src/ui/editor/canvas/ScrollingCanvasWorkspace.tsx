@@ -149,6 +149,7 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
           <div className="scrolling-text-toolbar-shell" data-testid="sticky-text-selection-toolbar">
             <TextSelectionToolbar
               element={selectedElement}
+              activeTextSelection={canvasProps.activeTextSelection}
               canTranslateSelection={Boolean(canvasProps.canTranslateSelection)}
               disabled={textToolbarDisabled}
               {...(canvasProps.onOpenAnimations

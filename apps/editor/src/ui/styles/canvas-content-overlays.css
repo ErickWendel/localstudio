@@ -10,8 +10,12 @@
   box-sizing: border-box;
   box-shadow: 0 0 18px rgba(55, 253, 118, 0.18);
   line-height: 1.08;
+  pointer-events: auto;
   resize: none;
   transform-origin: top left;
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .animation-build-badges {

@@ -157,6 +157,27 @@ describe('editor view model text helpers', () => {
     });
   });
 
+  it('adds a text color range only for selected text fill changes', () => {
+    const project = sampleProject.createSampleProject();
+    const element = project.elements['text-title'];
+
+    const rangePatch = editorViewModelText.getSupportedStylePatch({
+      element,
+      patch: { fill: '#ff0000' },
+      textSelection: { start: 1, end: 4 },
+    });
+    const wholeElementPatch = editorViewModelText.getSupportedStylePatch({
+      element,
+      patch: { fill: '#00ff00' },
+    });
+
+    expect(rangePatch).toEqual({
+      fill: '#ff0000',
+      textColorRange: { start: 1, end: 4 },
+    });
+    expect(wholeElementPatch).toEqual({ fill: '#00ff00' });
+  });
+
   it('merges downloaded fonts before applying the selected family', () => {
     const project = sampleProject.createSampleProject();
     const font: ProjectFont = {

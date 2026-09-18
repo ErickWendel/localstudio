@@ -292,6 +292,7 @@ export interface TextElement extends BaseElement {
   fontSize: number;
   fontWeight: number;
   fill: string;
+  colorRanges?: TextColorRange[];
   highlight?: string;
   stroke?: string;
   strokeWidth?: number;
@@ -301,6 +302,12 @@ export interface TextElement extends BaseElement {
   paragraphs?: TextParagraph[];
   verticalAlign?: 'bottom' | 'middle' | 'top';
   verticalOverflow?: 'clip' | 'overflow';
+}
+
+export interface TextColorRange {
+  start: number;
+  end: number;
+  fill: string;
 }
 
 export interface TextParagraph {
