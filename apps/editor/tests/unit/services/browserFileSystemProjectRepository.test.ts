@@ -1,3 +1,4 @@
+import type { ProjectDocument } from '../../../src/domain/documents/model';
 import { sampleProject } from '../../../src/domain/projects/sampleProject';
 import {
   BrowserFileSystemProjectRepository,
@@ -147,6 +148,51 @@ describe('BrowserFileSystemProjectRepository', () => {
 
     expect(loaded?.id).toBe(project.id);
     expect(loaded?.pages).toHaveLength(1);
+  });
+
+  it('stores each recording transcript in its own sidecar file', async () => {
+    const directory = new MockDirectoryHandle();
+    const repository = new BrowserFileSystemProjectRepository({
+      pickDirectory: () => Promise.resolve(directory as unknown as FileSystemDirectoryHandle),
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
+    });
+    const project: ProjectDocument = {
+      ...sampleProject.createSampleProject(),
+      recordings: {
+        recording1: {
+          id: 'recording1',
+          name: 'Presenter recording',
+          createdAt: '2026-09-19T12:00:00.000Z',
+          updatedAt: '2026-09-19T12:00:00.000Z',
+          durationMs: 1_000,
+          modelPresetId: 'web-speech-api',
+          audio: { mimeType: 'audio/webm', storage: 'inline' },
+          segments: [
+            { id: 'segment1', text: 'Welcome to the talk', startMs: 0, endMs: 1_000, final: true },
+          ],
+        },
+      },
+    };
+
+    await repository.saveProject(project);
+
+    const savedProject = JSON.parse(await readMockText(directory.files.get('project.json')!));
+    expect(savedProject.recordings.recording1).toMatchObject({
+      transcriptFileName: 'recording1.transcript.json',
+      segments: [],
+    });
+    expect(
+      JSON.parse(
+        await readMockText(
+          directory.directories.get('recordings')!.files.get('recording1.transcript.json')!,
+        ),
+      ),
+    ).toMatchObject({ segments: [{ text: 'Welcome to the talk' }] });
+
+    const loaded = await repository.loadProject();
+    expect(loaded?.recordings?.recording1?.segments).toMatchObject([
+      { text: 'Welcome to the talk' },
+    ]);
   });
 
   it('creates a named child project folder during initial persistence setup', async () => {

@@ -196,6 +196,8 @@ export interface TranscriptRecording {
   language?: string;
   modelPresetId: string;
   audio: TranscriptRecordingAudio;
+  /** Stored beside the audio under recordings/, keeping project.json small for multiple recordings. */
+  transcriptFileName?: string;
   segments: TranscriptSegment[];
 }
 

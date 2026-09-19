@@ -1,4 +1,4 @@
-import type { ProjectDocument } from '../../domain/documents/model';
+import type { ProjectDocument, TranscriptRecording } from '../../domain/documents/model';
 import type {
   MirrorFile,
   ProjectRepository,
@@ -33,6 +33,21 @@ const VERSION_HISTORY_FILE_NAME = 'manifest.json';
 const VERSION_HISTORY_LIMIT = 100;
 const LAST_PROJECT_NAME_KEY = 'localstudio.ai.opfs.last-project-name';
 const MIRROR_IMPORT_WRITE_CONCURRENCY = 6;
+
+function getTranscriptFileName(recordingId: string, recording: TranscriptRecording) {
+  return recording.transcriptFileName ?? `${recordingId}.transcript.json`;
+}
+
+async function writeJsonFileToDirectory(
+  directoryHandle: FileSystemDirectoryHandle,
+  fileName: string,
+  value: unknown,
+) {
+  const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
+  const writable = await fileHandle.createWritable();
+  await writable.write(JSON.stringify(value, null, 2));
+  await writable.close();
+}
 
 function addRetainedFileName(fileNames: Set<string>, fileName: string | undefined) {
   if (fileName) fileNames.add(fileName);
@@ -109,27 +124,39 @@ async function createFileBackedProjectSnapshot(
         ...recording,
         audio: audioForDisk,
       };
-      continue;
+    } else if (assetFileUtils.isReadableObjectUrl(audio.objectUrl)) {
+      const fileName =
+        audio.fileName ??
+        `${recordingId}.${assetFileUtils.getAssetFileExtension(audio.mimeType)}`;
+      await writeBlobFileToDirectory(
+        recordingsDirectory,
+        fileName,
+        await assetFileUtils.objectUrlToBlob(audio.objectUrl),
+      );
+      const audioForDisk = { ...audio };
+      delete audioForDisk.objectUrl;
+      projectForDisk.recordings![recordingId] = {
+        ...recording,
+        audio: {
+          ...audioForDisk,
+          fileName,
+          storage: 'file',
+        },
+      };
     }
 
-    if (!assetFileUtils.isReadableObjectUrl(audio.objectUrl)) continue;
-    const fileName =
-      audio.fileName ??
-      `${recordingId}.${assetFileUtils.getAssetFileExtension(audio.mimeType)}`;
-    await writeBlobFileToDirectory(
-      recordingsDirectory,
-      fileName,
-      await assetFileUtils.objectUrlToBlob(audio.objectUrl),
-    );
-    const audioForDisk = { ...audio };
-    delete audioForDisk.objectUrl;
+    const diskRecording = projectForDisk.recordings![recordingId];
+    if (!diskRecording || recording.segments.length === 0) continue;
+    const transcriptFileName = getTranscriptFileName(recordingId, recording);
+    await writeJsonFileToDirectory(recordingsDirectory, transcriptFileName, {
+      schemaVersion: 1,
+      recordingId,
+      segments: recording.segments,
+    });
     projectForDisk.recordings![recordingId] = {
-      ...recording,
-      audio: {
-        ...audioForDisk,
-        fileName,
-        storage: 'file',
-      },
+      ...diskRecording,
+      transcriptFileName,
+      segments: [],
     };
   }
 
@@ -272,6 +299,7 @@ export class OpfsProjectRepository implements ProjectRepository {
     const retainedRecordingFileNames = new Set<string>();
     for (const recording of Object.values(projectForDisk.recordings ?? {})) {
       addRetainedFileName(retainedRecordingFileNames, recording.audio.fileName);
+      addRetainedFileName(retainedRecordingFileNames, recording.transcriptFileName);
     }
     await this.addVersionRecordingFileNames(directoryHandle, retainedRecordingFileNames);
     await this.removeUnretainedAssetFiles(recordingsDirectory, retainedRecordingFileNames);
@@ -641,8 +669,21 @@ export class OpfsProjectRepository implements ProjectRepository {
 
     for (const [recordingId, recording] of Object.entries(project.recordings ?? {})) {
       const audio = recording.audio;
+      let segments = recording.segments;
+      if (recording.transcriptFileName) {
+        try {
+          recordingsDirectory ??= await this.directoryHandle.getDirectoryHandle('recordings');
+          const transcriptFile = await recordingsDirectory
+            .getFileHandle(recording.transcriptFileName)
+            .then((handle) => handle.getFile());
+          const parsed = JSON.parse(await transcriptFile.text()) as { segments?: unknown };
+          if (Array.isArray(parsed.segments)) segments = parsed.segments as typeof segments;
+        } catch (error) {
+          if (!isNotFoundError(error) || !options.allowMissingAssetFiles) throw error;
+        }
+      }
       if (audio.storage !== 'file' || !audio.fileName) {
-        recordings[recordingId] = recording;
+        recordings[recordingId] = { ...recording, segments };
         continue;
       }
       try {
@@ -651,6 +692,7 @@ export class OpfsProjectRepository implements ProjectRepository {
         const file = await fileHandle.getFile();
         recordings[recordingId] = {
           ...recording,
+          segments,
           audio: {
             ...audio,
             objectUrl: URL.createObjectURL(file),

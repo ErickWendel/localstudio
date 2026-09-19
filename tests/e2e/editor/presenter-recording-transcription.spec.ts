@@ -8,11 +8,19 @@ test.describe('editor presenter recording transcription journey', () => {
 
   test('shows microphone permission errors from presenter recording controls', async ({ page }) => {
     await page.addInitScript(() => {
+      let microphoneRequestCount = 0;
       Object.defineProperty(navigator, 'mediaDevices', {
         configurable: true,
         value: {
-          getUserMedia: () => Promise.reject(new Error('Microphone blocked for e2e')),
+          getUserMedia: () => {
+            microphoneRequestCount += 1;
+            return Promise.reject(new Error('Microphone blocked for e2e'));
+          },
         },
+      });
+      Object.defineProperty(window, '__LOCALSTUDIO_E2E_MICROPHONE_REQUEST_COUNT__', {
+        configurable: true,
+        get: () => microphoneRequestCount,
       });
     });
 
@@ -24,9 +32,6 @@ test.describe('editor presenter recording transcription journey', () => {
     });
     await expect(page.getByRole('button', { name: 'Start recording' })).toBeEnabled();
 
-    const transientPopup = page
-      .waitForEvent('popup', { timeout: 500 })
-      .catch(() => undefined);
     const liveTranscriptionButton = page.getByRole('button', {
       name: 'Open live transcription window',
     });
@@ -36,10 +41,13 @@ test.describe('editor presenter recording transcription journey', () => {
     await expect(page.getByLabel('Presenter status')).toContainText('Microphone blocked for e2e', {
       timeout: 10_000,
     });
-    const popup = await transientPopup;
-    if (popup) {
-      await expect.poll(() => popup.isClosed()).toBe(true);
-    }
+    await expect.poll(() =>
+      page.evaluate(
+        () =>
+          (window as Window & { __LOCALSTUDIO_E2E_MICROPHONE_REQUEST_COUNT__?: number })
+            .__LOCALSTUDIO_E2E_MICROPHONE_REQUEST_COUNT__ ?? 0,
+      ),
+    ).toBe(1);
   });
 
   test('records presenter audio, streams transcript updates, and exposes saved audio playback', async ({
@@ -159,18 +167,22 @@ test.describe('editor presenter recording transcription journey', () => {
     await expect(page.getByRole('combobox', { name: 'Transcription language' })).toHaveValue('pt');
     await page.getByRole('combobox', { name: 'Transcription language' }).selectOption('en');
 
+    await page.getByRole('button', { name: 'Start recording' }).click();
+    await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect.poll(() =>
+      page.evaluate(() =>
+        (
+          window as Window & { __LOCALSTUDIO_E2E_TRANSCRIPTION_LANGUAGES?: string[] }
+        ).__LOCALSTUDIO_E2E_TRANSCRIPTION_LANGUAGES?.length ?? 0,
+      ),
+    ).toBe(1);
     const liveTranscriptionButton = page.getByRole('button', {
       name: 'Open live transcription window',
     });
     await liveTranscriptionButton.evaluate((button) => {
       (button as HTMLButtonElement).click();
-    });
-    await expect(page.getByLabel('Presenter status')).toContainText(/choose your microphone first/i, {
-      timeout: 10_000,
-    });
-    await expect(page.getByRole('alert')).toContainText(/choose your microphone first/i);
-    await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible({
-      timeout: 10_000,
     });
     const transcriptPage = await context.newPage();
     const transcriptUrl = new URL('/editor/', getServer().baseURL);
@@ -269,6 +281,7 @@ test.describe('editor presenter recording transcription journey', () => {
         ).__LOCALSTUDIO_E2E_TRANSCRIPTION_LANGUAGES ?? [],
     );
     expect(transcriptionLanguages).toContain('en-US');
+    expect(transcriptionLanguages).toHaveLength(1);
 
     await page.getByRole('button', { name: 'Start recording' }).click();
     await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible();

@@ -100,6 +100,23 @@ describe('PresenterSpeechTranscriber', () => {
     expect(updates).toEqual(['Ola mundo', 'Ola mundo hello again']);
   });
 
+  it('accepts final results whose indexes restart after the browser restarts recognition', async () => {
+    const transcriber = new PresenterSpeechTranscriber({
+      onTranscript: vi.fn(),
+      recognitionConstructor: FakeSpeechRecognition,
+    });
+
+    transcriber.start('pt-BR');
+    const recognition = FakeSpeechRecognition.instances[0]!;
+    recognition.emitResult(0, [result('primeira frase', true)]);
+    recognition.onend?.();
+    await new Promise((resolve) => window.setTimeout(resolve, 300));
+    recognition.emitResult(0, [result('segunda frase', true)]);
+
+    expect(transcriber.getText()).toBe('primeira frase segunda frase');
+    await transcriber.stop();
+  });
+
   it('reports unsupported browsers before recording depends on a model download', () => {
     const transcriber = new PresenterSpeechTranscriber({
       onTranscript: vi.fn(),

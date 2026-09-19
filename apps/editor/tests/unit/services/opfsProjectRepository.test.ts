@@ -225,6 +225,20 @@ describe('OpfsProjectRepository', () => {
       fileName: 'recording1.webm',
       storage: 'file',
     });
+    expect(savedProject.recordings?.recording1?.segments).toEqual([]);
+    expect(savedProject.recordings?.recording1?.transcriptFileName).toBe(
+      'recording1.transcript.json',
+    );
+    expect(
+      JSON.parse(
+        await readMockText(
+          projectDirectory.directories.get('recordings')!.files.get('recording1.transcript.json')!,
+        ),
+      ),
+    ).toMatchObject({
+      recordingId: 'recording1',
+      segments: [{ text: 'Welcome to the talk' }],
+    });
 
     const loaded = await new OpfsProjectRepository({
       getRootDirectory: () => Promise.resolve(root as unknown as FileSystemDirectoryHandle),
@@ -232,6 +246,9 @@ describe('OpfsProjectRepository', () => {
     }).loadProject();
 
     expect(loaded?.recordings?.recording1?.audio.objectUrl).toBe('blob:recording');
+    expect(loaded?.recordings?.recording1?.segments).toMatchObject([
+      { text: 'Welcome to the talk' },
+    ]);
     expect(createObjectUrl).toHaveBeenCalled();
   });
 

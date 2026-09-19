@@ -147,6 +147,9 @@ export class PresenterSpeechTranscriber {
     recognition.onend = () => {
       this.stopResolver?.();
       if (!this.shouldRestart) return;
+      // Chrome resets result indexes for each recognition session. A restarted
+      // session can therefore deliver its first final result at index zero again.
+      this.processedFinalResultIndexes = new Set<number>();
       this.restartTimeoutId = window.setTimeout(() => this.restartRecognition(), 250);
     };
 

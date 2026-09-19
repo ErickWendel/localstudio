@@ -794,13 +794,9 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     };
   }, [publishTranscriptState, recordingStatus, resolvedSessionId, stopRecording]);
 
-  const openTranscriptWindow = useCallback(async () => {
+  const openTranscriptWindow = useCallback(() => {
     if (recordingStatus !== 'recording') {
-      setRecordingError('You should choose your microphone first.');
-      const started = await startRecording();
-      if (started) {
-        setRecordingError('You should choose your microphone first. Click live transcription again after choosing your microphone.');
-      }
+      setRecordingError('Start recording before opening the live transcription window.');
       return;
     }
     setRecordingError(undefined);
@@ -819,7 +815,7 @@ export function PresenterView({ sessionId = getRouteSessionId() }: PresenterView
     url.searchParams.set('presenterSession', resolvedSessionId);
     transcriptWindow.location.href = url.toString();
     publishTranscriptState();
-  }, [publishTranscriptState, recordingStatus, resolvedSessionId, startRecording]);
+  }, [publishTranscriptState, recordingStatus, resolvedSessionId]);
 
   const handleTranscriptionLanguageChange = useCallback(
     (event: ReactChangeEvent<HTMLSelectElement>) => {

@@ -1,5 +1,10 @@
 import { collectReferencedAssetIds } from '../../domain/assets/assetUsage';
-import type { Asset, ProjectDocument, TranscriptRecordingAudio } from '../../domain/documents/model';
+import type {
+  Asset,
+  ProjectDocument,
+  TranscriptRecording,
+  TranscriptRecordingAudio,
+} from '../../domain/documents/model';
 import { assetFileUtils } from '../storage/assetFileUtils';
 import type { MirrorFile, ProjectRepository } from '../contracts/interfaces';
 import type { MinioMirrorConfig } from './minioMirrorService';
@@ -28,6 +33,10 @@ export interface MirrorFileCache {
 
 const MIRROR_MANIFEST_FILE_NAME = 'localstudio-mirror.json';
 const PROJECT_FILE_NAME = 'project.json';
+
+function getTranscriptFileName(recordingId: string, recording: TranscriptRecording) {
+  return recording.transcriptFileName ?? `${recordingId}.transcript.json`;
+}
 
 function getDefaultFetch() {
   if (typeof window !== 'undefined') return window.fetch.bind(window);
@@ -169,6 +178,24 @@ async function createMirrorFiles(
         ...recording,
         audio: audioForMirror,
       };
+      if (recording.segments.length > 0) {
+        const transcriptFileName = getTranscriptFileName(recordingId, recording);
+        files.push(
+          await createFileEntry(
+            `recordings/${transcriptFileName}`,
+            storageObjectUtils.jsonBlob({
+              schemaVersion: 1,
+              recordingId,
+              segments: recording.segments,
+            }),
+          ),
+        );
+        projectForMirror.recordings![recordingId] = {
+          ...projectForMirror.recordings![recordingId],
+          transcriptFileName,
+          segments: [],
+        };
+      }
       files.push(entry);
     }
   }
