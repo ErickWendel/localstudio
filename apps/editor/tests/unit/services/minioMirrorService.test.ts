@@ -292,6 +292,7 @@ describe('minioMirrorService.createMirrorFiles', () => {
     );
 
     expect(files.map((file) => file.path)).toContain('recordings/recording1.webm');
+    expect(files.map((file) => file.path)).toContain('recordings/recording1.transcript.json');
     const projectJson = JSON.parse(
       await files.find((file) => file.path === 'project.json')!.blob.text(),
     ) as ProjectDocument;
@@ -300,12 +301,14 @@ describe('minioMirrorService.createMirrorFiles', () => {
         fileName: 'recording1.webm',
         storage: 'file',
       },
-      segments: [
-        {
-          text: 'Mirrored transcript audio.',
-        },
-      ],
+      transcriptFileName: 'recording1.transcript.json',
+      segments: [],
     });
+    expect(
+      JSON.parse(
+        await files.find((file) => file.path === 'recordings/recording1.transcript.json')!.blob.text(),
+      ),
+    ).toMatchObject({ segments: [{ text: 'Mirrored transcript audio.' }] });
     expect(projectJson.recordings?.recording1?.audio.objectUrl).toBeUndefined();
   });
 });
