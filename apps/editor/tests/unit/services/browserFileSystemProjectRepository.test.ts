@@ -176,8 +176,10 @@ describe('BrowserFileSystemProjectRepository', () => {
 
     await repository.saveProject(project);
 
-    const savedProject = JSON.parse(await readMockText(directory.files.get('project.json')!));
-    expect(savedProject.recordings.recording1).toMatchObject({
+    const savedProject = JSON.parse(
+      await readMockText(directory.files.get('project.json')!),
+    ) as ProjectDocument;
+    expect(savedProject.recordings?.recording1).toMatchObject({
       transcriptFileName: 'recording1.transcript.json',
       segments: [],
     });
