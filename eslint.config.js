@@ -13,6 +13,7 @@ export default tseslint.config(
       'docs/design/stitch/**/*.html',
       'apps/*/dist',
       'packages/*/dist',
+      'packages/mcp-server/**',
       '**/*.js',
       '**/*.mjs',
       '**/*.d.ts',
