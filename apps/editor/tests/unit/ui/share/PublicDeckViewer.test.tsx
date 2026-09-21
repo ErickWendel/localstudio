@@ -661,7 +661,7 @@ describe('PublicDeckViewer', () => {
     expect(screen.queryByRole('complementary', { name: 'Slide list' })).not.toBeInTheDocument();
   });
 
-  it('waits for target slide videos and GIFs before changing public deck slides', async () => {
+  it('changes public deck slides immediately while target videos and GIFs preload', async () => {
     const user = userEvent.setup();
     const project = sampleProject.createSampleProject();
     project.assets['remote-slide-video'] = {
@@ -774,20 +774,19 @@ describe('PublicDeckViewer', () => {
     });
 
     await user.click(screen.getByRole('button', { name: 'Next slide' }));
-    expect(screen.getByText('1 / 2')).toBeInTheDocument();
-    expect(screen.queryByText('2 / 2')).not.toBeInTheDocument();
+    expect(screen.getByText('2 / 2')).toBeInTheDocument();
+    expect(screen.queryByText('1 / 2')).not.toBeInTheDocument();
 
     act(() => {
       releaseTargetSlideVideo?.();
     });
-    expect(screen.getByText('1 / 2')).toBeInTheDocument();
-    expect(screen.queryByText('2 / 2')).not.toBeInTheDocument();
+    expect(screen.getByText('2 / 2')).toBeInTheDocument();
 
     act(() => {
       releaseTargetSlideGif?.();
     });
 
-    expect(await screen.findByText('2 / 2')).toBeInTheDocument();
+    expect(screen.getByText('2 / 2')).toBeInTheDocument();
 
     const presentedVideo = screen.getByLabelText<HTMLVideoElement>('Slide video');
     const preloadedVideo = document.querySelector<HTMLVideoElement>(

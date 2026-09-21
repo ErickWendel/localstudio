@@ -5,7 +5,7 @@ import { expect, test, withIsolatedDevServer } from '../support/journey-test';
 const getServer = withIsolatedDevServer(test);
 
 test.describe('public deck chapter audio sync', () => {
-  test('plays a clicked chapter and keeps slide navigation and audio time aligned', async ({ page }) => {
+  test('keeps timeline seeks, slide choices, and transcript clicks aligned with audio', async ({ page }) => {
     await page.addInitScript(() => {
       Object.defineProperty(HTMLMediaElement.prototype, 'duration', {
         configurable: true,
@@ -69,9 +69,25 @@ test.describe('public deck chapter audio sync', () => {
       element.dispatchEvent(new Event('timeupdate'));
     });
     await expect(page.getByText('1 / 2')).toBeVisible();
-    await page.getByRole('button', { name: 'Next slide' }).click();
+
+    await page.getByLabel('Seek presentation audio').fill('10');
     await expect(page.getByText('2 / 2')).toBeVisible();
     await expect.poll(() => audio.evaluate((element: HTMLAudioElement) => element.currentTime)).toBe(10);
-    await expect.poll(() => audio.evaluate((element: HTMLAudioElement) => element.paused)).toBe(false);
+
+    await page.getByRole('button', { name: 'Open transcript chat' }).click();
+    const transcriptPanel = page.getByRole('complementary', { name: 'Transcript chat' });
+    const podcastAudio = page.locator('audio').nth(1);
+    await transcriptPanel
+      .getByRole('button', { name: 'Play transcript segment for slide 1 at 0:00' })
+      .click();
+    await expect(page.getByText('1 / 2')).toBeVisible();
+    await expect.poll(() => audio.evaluate((element: HTMLAudioElement) => element.currentTime)).toBe(0);
+    await expect.poll(() => podcastAudio.evaluate((element: HTMLAudioElement) => element.paused)).toBe(false);
+
+    await transcriptPanel.getByRole('button', { name: 'Open slide 2: Closing' }).click();
+    await expect(page.getByText('2 / 2')).toBeVisible();
+    await expect.poll(() => podcastAudio.evaluate((element: HTMLAudioElement) => element.currentTime)).toBe(10);
+    await expect.poll(() => podcastAudio.evaluate((element: HTMLAudioElement) => element.paused)).toBe(false);
+
   });
 });

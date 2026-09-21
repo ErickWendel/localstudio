@@ -1013,8 +1013,14 @@ function PublicTranscriptPodcastPlayer({
             const nextSeconds = Number(event.target.value);
             const audio = audioRef.current;
             if (audio) audio.currentTime = nextSeconds;
-            setCurrentTimeMs(nextSeconds * 1000);
-            publishPlaybackSync(nextSeconds * 1000, playing);
+            const nextCurrentTimeMs = nextSeconds * 1000;
+            const nextChapter = getActivePodcastChapter(chapters, nextCurrentTimeMs);
+            setCurrentTimeMs(nextCurrentTimeMs);
+            if (nextChapter) {
+              lastSyncedChapterIdRef.current = nextChapter.id;
+              onSelectPage(nextChapter.pageIndex);
+            }
+            publishPlaybackSync(nextCurrentTimeMs, playing);
           }}
         />
       </div>
@@ -1258,8 +1264,14 @@ function PublicDeckPlaybackOverlay({
     const nextSeconds = Math.max(0, nextTimeMs) / 1000;
     const audio = audioRef.current;
     if (audio) audio.currentTime = nextSeconds;
-    setCurrentTimeMs(Math.round(nextSeconds * 1000));
-    publishPlaybackSync(Math.round(nextSeconds * 1000), playing);
+    const nextCurrentTimeMs = Math.round(nextSeconds * 1000);
+    const nextChapter = getActivePodcastChapter(chapters, nextCurrentTimeMs);
+    setCurrentTimeMs(nextCurrentTimeMs);
+    if (nextChapter) {
+      lastSyncedChapterIdRef.current = nextChapter.id;
+      onSelectPage(nextChapter.pageIndex);
+    }
+    publishPlaybackSync(nextCurrentTimeMs, playing);
   }
 
   function seekToChapter(chapter: PublicPodcastChapter) {
@@ -1806,8 +1818,8 @@ export function PublicDeckViewer({
     (project: ProjectDocument, pageIndex: number) => {
       const mediaEntries = getPageMediaPreloadEntries(project, pageIndex);
       pagePreloadAbortRef.current?.abort();
+      showPresentationPage(project, pageIndex);
       if (mediaEntries.length === 0) {
-        showPresentationPage(project, pageIndex);
         return;
       }
 
@@ -1818,7 +1830,6 @@ export function PublicDeckViewer({
         if (pagePreloadAbortRef.current === preloadController) {
           pagePreloadAbortRef.current = undefined;
         }
-        showPresentationPage(project, pageIndex);
       });
     },
     [showPresentationPage],
