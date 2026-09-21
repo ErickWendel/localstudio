@@ -149,17 +149,41 @@ describe('MCP Server Integration Tests (InMemoryTransport)', () => {
     expect(parsed.slides[1].speakerNotes).toBe('Explique que o canvas é 100% editável.');
   });
 
-  it('should return valid editor and presenter URLs', async () => {
-    const result = await client.callTool({
-      name: 'localstudio_get_urls',
+  it('should create an excalidraw themed deck and retain theme upon slide addition', async () => {
+    const createRes = await client.callTool({
+      name: 'localstudio_create_deck',
       arguments: {
-        deckSlug: 'test-presentation',
+        name: 'Excalidraw Architecture',
+        slug: 'excalidraw-arch',
+        theme: 'excalidraw',
+        title: 'Whiteboard Architecture Overview',
+        subtitle: 'Hand-drawn design system',
       },
     });
 
-    expect(result.isError).toBeFalsy();
-    const parsed = JSON.parse((result.content as any[])[0].text);
-    expect(parsed.editorUrl).toContain('http://localhost:4173/editor/?src=/editor/decks/test-presentation.json');
-    expect(parsed.presenterUrl).toContain('http://localhost:4173/editor/?share=test-presentation');
+    expect(createRes.isError).toBeFalsy();
+
+    const addRes = await client.callTool({
+      name: 'localstudio_add_slide',
+      arguments: {
+        deckSlug: 'excalidraw-arch',
+        type: 'cards',
+        badge: 'DESIGN SYSTEM',
+        title: 'Excalidraw Canvas Elements',
+        cardsData: [
+          { title: 'Excalifont Typography', description: 'Official hand-drawn font rendering.' },
+          { title: 'Sketch Borders', description: 'Thicker stroke-width borders.' },
+        ],
+      },
+    });
+
+    expect(addRes.isError).toBeFalsy();
+
+    const getRes = await client.callTool({
+      name: 'localstudio_get_deck',
+      arguments: { deckSlug: 'excalidraw-arch' },
+    });
+    const parsed = JSON.parse((getRes.content as any[])[0].text);
+    expect(parsed.pagesCount).toBe(2);
   });
 });

@@ -24,6 +24,32 @@ describe('DeckBuilder Unit Tests', () => {
     expect(navyBuilder.theme.accent).toBe(navyTheme.accent);
   });
 
+  it('should support design system themes: excalidraw, apple-keynote, and figma-canvas', () => {
+    // Excalidraw: hand-drawn whiteboard with Excalifont
+    const excaliBuilder = new DeckBuilder('Excalidraw Deck', 'excalidraw');
+    expect(excaliBuilder.theme.id).toBe('excalidraw');
+    expect(excaliBuilder.theme.fontHeading).toContain('Excalifont');
+    expect(excaliBuilder.theme.cardStrokeWidth).toBe(2.5);
+    const excaliDoc = excaliBuilder.build();
+    expect(excaliDoc.themeId).toBe('excalidraw');
+    expect(excaliDoc.fonts?.['font-excalifont']).toBeDefined();
+    expect(excaliDoc.fonts?.['font-excalifont']?.sourceUrl).toContain('Excalifont-Regular.woff2');
+
+    // Apple Keynote: ultra-clean minimalist black
+    const appleBuilder = new DeckBuilder('Apple Deck', 'apple-keynote');
+    expect(appleBuilder.theme.id).toBe('apple-keynote');
+    expect(appleBuilder.theme.background).toBe('#000000');
+    expect(appleBuilder.theme.accent).toBe('#2997FF');
+    expect(appleBuilder.theme.fontHeading).toContain('SF Pro');
+
+    // Figma Canvas: dark workspace palette
+    const figmaBuilder = new DeckBuilder('Figma Deck', 'figma-canvas');
+    expect(figmaBuilder.theme.id).toBe('figma-canvas');
+    expect(figmaBuilder.theme.background).toBe('#1E1E1E');
+    expect(figmaBuilder.theme.accent).toBe('#A259FF');
+    expect(figmaBuilder.theme.cardStrokeWidth).toBe(1);
+  });
+
   it('should create title slide with metadata, badge, tags, and speaker notes', () => {
     const builder = new DeckBuilder('Title Test');
     builder.addTitleSlide({

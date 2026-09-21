@@ -53,17 +53,12 @@ async function exportDeckForWeb(targetDir: string, deckSlug: string, project: Pr
 
 export function registerDeckTools(server: McpServer, options: DeckToolsOptions = {}) {
   const decksDir =
-    options.decksDir ||
-    process.env.LOCALSTUDIO_DECKS_DIR ||
-    path.resolve(process.cwd(), 'decks');
+    options.decksDir || process.env.LOCALSTUDIO_DECKS_DIR || path.resolve(process.cwd(), 'decks');
   const publicDecksDir =
     options.publicDecksDir ||
     process.env.LOCALSTUDIO_PUBLIC_DIR ||
     path.resolve(process.cwd(), 'apps/editor/public/decks');
-  const defaultHost =
-    options.host ||
-    process.env.LOCALSTUDIO_HOST ||
-    'http://localhost:4173';
+  const defaultHost = options.host || process.env.LOCALSTUDIO_HOST || 'http://localhost:4173';
   // 1. localstudio_create_deck
   server.tool(
     'localstudio_create_deck',
@@ -72,9 +67,18 @@ export function registerDeckTools(server: McpServer, options: DeckToolsOptions =
       name: z.string().describe('Nome da apresentação / projeto'),
       slug: z.string().describe('Identificador único em kebab-case (ex: my-first-deck)'),
       theme: z
-        .enum(['dark-neon', 'cyber-matrix', 'royal-navy'])
+        .enum([
+          'dark-neon',
+          'cyber-matrix',
+          'royal-navy',
+          'excalidraw',
+          'apple-keynote',
+          'figma-canvas',
+        ])
         .default('dark-neon')
-        .describe('Tema visual dos slides'),
+        .describe(
+          'Tema visual dos slides: dark-neon, cyber-matrix, royal-navy, excalidraw, apple-keynote, figma-canvas',
+        ),
       title: z.string().describe('Título principal do slide de capa'),
       subtitle: z.string().describe('Subtítulo do slide de capa'),
       badge: z.string().optional().describe('Badge de categoria (ex: ARQUITETURA & DESIGN)'),
@@ -213,7 +217,8 @@ export function registerDeckTools(server: McpServer, options: DeckToolsOptions =
         const project: ProjectDocument = JSON.parse(raw);
 
         // Usamos o DeckBuilder para reconstruir e injetar o novo slide
-        const builder = new DeckBuilder(project.name);
+        const themeToUse = project.themeId || 'dark-neon';
+        const builder = new DeckBuilder(project.name, themeToUse);
         // Restaura projeto existente
         (builder as any).project = project;
         (builder as any).pageCounter = project.pages.length;

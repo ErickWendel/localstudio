@@ -12,6 +12,12 @@ export interface DeckTheme {
   fontHeading: string;
   fontBody: string;
   fontCode: string;
+  cardStrokeWidth?: number;
+  customFont?: {
+    id: string;
+    family: string;
+    sourceUrl: string;
+  };
 }
 
 export const THEMES: Record<string, DeckTheme> = {
@@ -29,6 +35,7 @@ export const THEMES: Record<string, DeckTheme> = {
     fontHeading: 'Inter, system-ui, sans-serif',
     fontBody: 'Inter, system-ui, sans-serif',
     fontCode: 'JetBrains Mono, Fira Code, monospace',
+    cardStrokeWidth: 1.5,
   },
   'cyber-matrix': {
     id: 'cyber-matrix',
@@ -44,6 +51,7 @@ export const THEMES: Record<string, DeckTheme> = {
     fontHeading: 'Inter, system-ui, sans-serif',
     fontBody: 'Inter, system-ui, sans-serif',
     fontCode: 'JetBrains Mono, monospace',
+    cardStrokeWidth: 1.5,
   },
   'royal-navy': {
     id: 'royal-navy',
@@ -59,6 +67,61 @@ export const THEMES: Record<string, DeckTheme> = {
     fontHeading: 'Inter, system-ui, sans-serif',
     fontBody: 'Inter, system-ui, sans-serif',
     fontCode: 'JetBrains Mono, monospace',
+    cardStrokeWidth: 1.5,
+  },
+  excalidraw: {
+    id: 'excalidraw',
+    name: 'Excalidraw Whiteboard',
+    background: '#121212',
+    cardBackground: '#1E1E24',
+    cardBorder: '#6965DB',
+    textPrimary: '#ECECF1',
+    textMuted: '#A1A1AA',
+    accent: '#6965DB', // Excalidraw Violet
+    accentAlt: '#38D9A9', // Excalidraw Mint/Teal
+    codeBackground: '#18181B',
+    fontHeading: "'Excalifont', 'Virgil', cursive, sans-serif",
+    fontBody: "'Excalifont', 'Virgil', cursive, sans-serif",
+    fontCode: 'JetBrains Mono, monospace',
+    cardStrokeWidth: 2.5,
+    customFont: {
+      id: 'font-excalifont',
+      family: 'Excalifont',
+      sourceUrl:
+        'https://excalidraw.nyc3.cdn.digitaloceanspaces.com/fonts/Excalifont-Regular.woff2',
+    },
+  },
+  'apple-keynote': {
+    id: 'apple-keynote',
+    name: 'Apple Keynote Minimalist',
+    background: '#000000',
+    cardBackground: '#161617',
+    cardBorder: '#2C2C2E',
+    textPrimary: '#F5F5F7',
+    textMuted: '#86868B',
+    accent: '#2997FF', // Apple Blue
+    accentAlt: '#BF5AF2', // Apple Purple
+    codeBackground: '#1C1C1E',
+    fontHeading: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif',
+    fontBody: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif',
+    fontCode: 'SF Mono, Menlo, Monaco, monospace',
+    cardStrokeWidth: 1,
+  },
+  'figma-canvas': {
+    id: 'figma-canvas',
+    name: 'Figma Canvas Modern',
+    background: '#1E1E1E',
+    cardBackground: '#2C2C2C',
+    cardBorder: '#383838',
+    textPrimary: '#FFFFFF',
+    textMuted: '#B3B3B3',
+    accent: '#A259FF', // Figma Purple
+    accentAlt: '#0ACF83', // Figma Green
+    codeBackground: '#181818',
+    fontHeading: 'Inter, system-ui, sans-serif',
+    fontBody: 'Inter, system-ui, sans-serif',
+    fontCode: 'JetBrains Mono, Fira Code, monospace',
+    cardStrokeWidth: 1,
   },
 };
 
@@ -97,14 +160,30 @@ export interface SlidePage {
   speakerNotes?: string;
 }
 
+export interface ProjectFontDefinition {
+  id: string;
+  family: string;
+  source: 'google-fonts' | 'uploaded';
+  requestedFamily: string;
+  fontStyle: 'normal' | 'italic';
+  fontWeight: number;
+  mimeType: 'font/woff2' | 'font/woff' | 'font/ttf' | 'font/otf';
+  fileName: string;
+  storage: 'inline' | 'file' | 'remote';
+  sourceUrl?: string;
+  objectUrl?: string;
+}
+
 export interface ProjectDocument {
   id: string;
   name: string;
+  themeId?: string;
   createdAt: string;
   updatedAt: string;
   pages: SlidePage[];
   elements: Record<string, DesignElement>;
   assets: Record<string, unknown>;
+  fonts?: Record<string, ProjectFontDefinition>;
 }
 
 export class DeckBuilder {
@@ -119,11 +198,28 @@ export class DeckBuilder {
     this.project = {
       id: `proj-${Date.now().toString(36)}`,
       name,
+      themeId: this.theme.id,
       createdAt: now,
       updatedAt: now,
       pages: [],
       elements: {},
       assets: {},
+      fonts: this.theme.customFont
+        ? {
+            [this.theme.customFont.id]: {
+              id: this.theme.customFont.id,
+              family: this.theme.customFont.family,
+              source: 'uploaded',
+              requestedFamily: this.theme.customFont.family,
+              fontStyle: 'normal',
+              fontWeight: 400,
+              mimeType: 'font/woff2',
+              fileName: `${this.theme.customFont.family}.woff2`,
+              storage: 'remote',
+              sourceUrl: this.theme.customFont.sourceUrl,
+            },
+          }
+        : {},
     };
   }
 
@@ -169,7 +265,7 @@ export class DeckBuilder {
       opacity: 0.9,
       fill: this.theme.cardBackground,
       stroke: this.theme.accent,
-      strokeWidth: 1.5,
+      strokeWidth: this.theme.cardStrokeWidth ? Math.min(this.theme.cardStrokeWidth, 2) : 1.5,
     });
 
     // Badge text
@@ -299,7 +395,7 @@ export class DeckBuilder {
         opacity: 1,
         fill: this.theme.cardBackground,
         stroke: this.theme.accent,
-        strokeWidth: 2,
+        strokeWidth: this.theme.cardStrokeWidth ? Math.min(this.theme.cardStrokeWidth, 2.5) : 2,
       });
 
       const bText = this.nextId('badge-text');
@@ -384,7 +480,7 @@ export class DeckBuilder {
         opacity: 0.8,
         fill: this.theme.cardBackground,
         stroke: this.theme.cardBorder,
-        strokeWidth: 1,
+        strokeWidth: this.theme.cardStrokeWidth ?? 1,
       });
 
       const authorTextId = this.nextId('author-text');
@@ -476,7 +572,7 @@ export class DeckBuilder {
         opacity: 0.95,
         fill: this.theme.cardBackground,
         stroke: this.theme.cardBorder,
-        strokeWidth: 1.5,
+        strokeWidth: this.theme.cardStrokeWidth ?? 1.5,
       });
 
       // Card Accent Top Bar
@@ -615,7 +711,7 @@ export class DeckBuilder {
         opacity: 0.95,
         fill: this.theme.cardBackground,
         stroke: this.theme.cardBorder,
-        strokeWidth: 2,
+        strokeWidth: this.theme.cardStrokeWidth ? this.theme.cardStrokeWidth + 0.5 : 2,
       });
 
       // Card Title
@@ -697,7 +793,7 @@ export class DeckBuilder {
       opacity: 0.95,
       fill: this.theme.cardBackground,
       stroke: this.theme.cardBorder,
-      strokeWidth: 1.5,
+      strokeWidth: this.theme.cardStrokeWidth ?? 1.5,
     });
 
     const expTitleId = this.nextId('exp-title');
@@ -758,7 +854,7 @@ export class DeckBuilder {
       opacity: 1,
       fill: this.theme.codeBackground,
       stroke: this.theme.accent,
-      strokeWidth: 2,
+      strokeWidth: this.theme.cardStrokeWidth ? this.theme.cardStrokeWidth + 0.5 : 2,
     });
 
     // Header bar of code window
@@ -996,7 +1092,7 @@ export class DeckBuilder {
         opacity: 0.95,
         fill: this.theme.cardBackground,
         stroke: this.theme.cardBorder,
-        strokeWidth: 1.5,
+        strokeWidth: this.theme.cardStrokeWidth ?? 1.5,
       });
 
       // Number badge
