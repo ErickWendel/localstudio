@@ -1,0 +1,21 @@
+{
+  "name": "@localstudio/mcp-server",
+  "version": "0.1.0",
+  "description": "Antigravity Model Context Protocol (MCP) Server for LocalStudio slide generation and deck management",
+  "type": "module",
+  "main": "src/index.ts",
+  "bin": {
+    "localstudio-mcp": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "node src/index.ts",
+    "test": "vitest run tests"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1"
+  }
+}

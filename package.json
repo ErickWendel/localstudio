@@ -9,6 +9,8 @@
   ],
   "scripts": {
     "dev": "node scripts/dev.mjs",
+    "mcp": "node packages/mcp-server/src/index.ts",
+    "test:mcp": "npm run test --workspace @localstudio/mcp-server",
     "build": "npm run build --workspace @localstudio/landing && npm run build --workspace @localstudio/editor && npm run build --workspace @localstudio/joystick && npm run build --workspace @localstudio/docs && node scripts/prepare-pages-artifacts.mjs",
     "build:docs": "npm run build --workspace @localstudio/docs",
     "build:landing": "npm run build --workspace @localstudio/landing",

@@ -17,6 +17,7 @@
     { "path": "./packages/app-routes" },
     { "path": "./packages/brand" },
     { "path": "./packages/presenter-remote" },
+    { "path": "./packages/mcp-server" },
     { "path": "./apps/landing" },
     { "path": "./apps/editor" },
     { "path": "./apps/joystick" }
