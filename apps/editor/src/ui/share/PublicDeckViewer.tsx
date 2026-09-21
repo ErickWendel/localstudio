@@ -1266,6 +1266,14 @@ function PublicDeckPlaybackOverlay({
     seekToTime(chapter.startMs);
     lastSyncedChapterIdRef.current = chapter.id;
     onSelectPage(chapter.pageIndex);
+    const audio = audioRef.current;
+    if (!audio) return;
+    void audio.play()
+      .then(() => {
+        setPlaying(true);
+        publishPlaybackSync(chapter.startMs, true);
+      })
+      .catch(() => setPlaying(false));
   }
 
   function goToSlide(pageIndex: number) {
