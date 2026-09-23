@@ -1,5 +1,6 @@
 import { EditorAppPage } from '../pages/editor-app.page';
 import { installFakeOpfs } from '../support/fake-opfs';
+import { createTinyPngFixture } from '../support/test-assets';
 import { expect, test, withIsolatedDevServer } from '../support/journey-test';
 
 const getServer = withIsolatedDevServer(test);
@@ -270,5 +271,78 @@ test.describe('editor local persistence journey', () => {
     });
     expect(duplicate?.id).not.toBe('project-1');
     expect(duplicate).not.toHaveProperty('recordings');
+  });
+
+  test('copies file-backed assets into a duplicated deck folder', async ({ page }, testInfo) => {
+    await installFakeOpfs(page, { directoryPicker: true });
+
+    const editor = new EditorAppPage(page, getServer().baseURL);
+    await editor.gotoNewProject();
+    await page.getByRole('button', { name: 'Persistence disabled' }).focus();
+    await page.keyboard.press('Enter');
+    const setupPanel = page.getByRole('dialog', { name: 'Save local project' });
+    await setupPanel.getByLabel('Project folder name').fill('E2E Asset Source');
+    await setupPanel.getByLabel('Project folder name').press('Enter');
+    await expect(page.getByRole('button', { name: 'Persistence enabled' })).toBeVisible();
+
+    await editor.openTool('Assets');
+    await page.getByLabel('Import media file').setInputFiles(await createTinyPngFixture(testInfo));
+    await expect(page.getByText('localstudio-e2e-pixel.png')).toBeVisible();
+
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          Array.from({ length: window.localStorage.length }, (_, index) =>
+            window.localStorage.key(index),
+          ).find((key) => key?.includes('E2E Asset Source/assets/')),
+        ),
+      )
+      .toBeTruthy();
+    const sourceAssetBytes = await page.evaluate(() => {
+      const key = Array.from({ length: window.localStorage.length }, (_, index) =>
+        window.localStorage.key(index),
+      ).find((item) => item?.includes('E2E Asset Source/assets/'));
+      if (!key) return null;
+      const projectPrefix = key.slice(0, key.indexOf('E2E Asset Source/')) + 'E2E Asset Source/';
+      window.localStorage.setItem(`${projectPrefix}recordings/talk.webm`, 'private-audio');
+      window.localStorage.setItem(
+        `${projectPrefix}recordings/talk.transcript.json`,
+        '{"segments":["private"]}',
+      );
+      window.localStorage.setItem(`${projectPrefix}history/manifest.json`, '{"versions":["old"]}');
+      window.localStorage.setItem(`${projectPrefix}history/versions/old.json`, '{}');
+      return window.localStorage.getItem(key);
+    });
+    expect(sourceAssetBytes).toBeTruthy();
+
+    await editor.openMenu('File');
+    await page.getByRole('menuitem', { name: 'Duplicate' }).click();
+    const duplicatePanel = page.getByRole('dialog', { name: 'Duplicate project' });
+    await duplicatePanel.getByLabel('Project folder name').fill('E2E Asset Copy');
+    await duplicatePanel.getByRole('button', { name: 'Choose folder' }).click();
+    await expect(
+      page.getByRole('button', { name: 'Edit project name E2E Asset Copy' }),
+    ).toBeVisible();
+
+    await expect
+      .poll(() =>
+        page.evaluate((expectedBytes) => {
+          const copiedKey = Array.from({ length: window.localStorage.length }, (_, index) =>
+            window.localStorage.key(index),
+          ).find((key) => key?.includes('E2E Asset Copy/assets/'));
+          if (!copiedKey) return undefined;
+          return window.localStorage.getItem(copiedKey) === expectedBytes;
+        }, sourceAssetBytes),
+      )
+      .toBe(true);
+    const copiedSessionFiles = await page.evaluate(() =>
+      Array.from({ length: window.localStorage.length }, (_, index) =>
+        window.localStorage.key(index),
+      ).filter(
+        (key) =>
+          key?.includes('E2E Asset Copy/recordings/') || key?.includes('E2E Asset Copy/history/'),
+      ),
+    );
+    expect(copiedSessionFiles).toEqual([]);
   });
 });

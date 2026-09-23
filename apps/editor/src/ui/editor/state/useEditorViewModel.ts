@@ -1616,6 +1616,7 @@ export function useEditorViewModel(services: AppServices) {
       ) {
         await services.projectRepository.saveProjectAs(nextProject, {
           projectDirectoryName: nextName,
+          ...(isDuplicate ? { duplicate: true } : {}),
         });
       } else {
         await services.projectRepository.saveProject(nextProject, {
