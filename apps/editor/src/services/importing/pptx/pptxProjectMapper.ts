@@ -398,9 +398,13 @@ function mapObject(
     importSource: getImportSource(object, pageId, layoutId),
   };
   if (object.kind === 'video') {
+    const posterAsset = object.posterAssetPath
+      ? getOrCreateAsset(object.posterAssetPath, pptxPackage, assets)
+      : undefined;
     return {
       ...base,
       type: 'video',
+      ...(posterAsset ? { posterAssetId: posterAsset.id } : {}),
       loop: false,
       controls: true,
       muted: false,
@@ -414,6 +418,7 @@ function mapObject(
   return {
     ...base,
     type: 'image',
+    ...(object.clipPath ? { clipPath: object.clipPath } : {}),
     ...(crop ? { crop } : {}),
     ...(object.mask ? { mask: object.mask } : {}),
   };

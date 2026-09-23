@@ -335,7 +335,9 @@ async function addImageElement(
     data: media.data,
     ...(element.type === 'image' && element.flipX ? { flipH: true } : {}),
     objectName: element.id,
-    ...(element.type === 'image' && element.mask === 'ellipse' ? { rounding: true } : {}),
+    ...(element.type === 'image' && element.mask === 'ellipse' && !element.clipPath
+      ? { rounding: true }
+      : {}),
     rotate: element.rotation,
     transparency: getTransparency(element.opacity),
   });
@@ -359,8 +361,12 @@ async function addVideoElement(
   });
   const media = await assetToData(asset, context.warnings, element, page);
   if (!media) return;
+  const poster = element.posterAssetId
+    ? await assetToData(project.assets[element.posterAssetId], context.warnings, element, page)
+    : undefined;
   slide.addMedia({
     ...toPosition(element, project, page),
+    ...(poster ? { cover: poster.data } : {}),
     data: media.data,
     extn: assetFileUtils.getAssetFileExtension(media.mimeType),
     objectName: element.id,
@@ -578,15 +584,22 @@ async function patchPackage(
 
 function collectPackagePatchPages(project: ProjectDocument, pages: Page[]): PptxPackagePatchPage[] {
   return pages.map((page) => ({
-    elements: pageElementResolver
-      .getVisibleElements(project, page)
-      .filter((element): element is Extract<DesignElement, { type: 'image' }> =>
-        Boolean(element && element.type === 'image' && element.crop),
-      )
-      .map((element) => ({
-        crop: element.crop,
-        id: element.id,
-      })),
+    elements: pageElementResolver.getVisibleElements(project, page).flatMap((element) => {
+      if (!element) return [];
+      if (element.type === 'image' && (element.crop || element.clipPath)) {
+        return [
+          {
+            ...(element.clipPath ? { clipPath: element.clipPath } : {}),
+            ...(element.crop ? { crop: element.crop } : {}),
+            id: element.id,
+          },
+        ];
+      }
+      if (element.type === 'shape' && element.path && !element.connectorPreset) {
+        return [{ customPath: element.path, id: element.id }];
+      }
+      return [];
+    }),
     pageId: page.id,
   }));
 }

@@ -5,13 +5,17 @@ import type {
   CropRect,
   ElementAnimationBuild,
   Page,
+  ShapePath,
+  VectorPathCommand,
 } from '../../domain/documents/model';
 import type { PresentationExportWarning } from '../contracts/interfaces';
 
 type PptxZipFiles = Record<string, Uint8Array>;
 
 interface PptxPackagePatchElement {
+  clipPath?: VectorPathCommand[] | undefined;
   crop?: CropRect | undefined;
+  customPath?: ShapePath | undefined;
   id: string;
 }
 
@@ -214,6 +218,60 @@ function cropToSrcRect(crop: CropRect) {
   return `<a:srcRect l="${left}" t="${top}" r="${right}" b="${bottom}"/>`;
 }
 
+function pointXml(x = 0, y = 0) {
+  return `<a:pt x="${Math.round(x * 100000)}" y="${Math.round(y * 100000)}"/>`;
+}
+
+function commandsToCustGeom(commands: VectorPathCommand[]) {
+  const body = commands
+    .map((command) => {
+      if (command.type === 'move') return `<a:moveTo>${pointXml(command.x, command.y)}</a:moveTo>`;
+      if (command.type === 'line') return `<a:lnTo>${pointXml(command.x, command.y)}</a:lnTo>`;
+      if (command.type === 'cubic') {
+        return `<a:cubicBezTo>${pointXml(command.cx1, command.cy1)}${pointXml(command.cx2, command.cy2)}${pointXml(command.x, command.y)}</a:cubicBezTo>`;
+      }
+      return '<a:close/>';
+    })
+    .join('');
+  return `<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect l="l" t="t" r="r" b="b"/><a:pathLst><a:path w="100000" h="100000">${body}</a:path></a:pathLst></a:custGeom>`;
+}
+
+function shapePathToCommands(path: ShapePath): VectorPathCommand[] {
+  if (path.points.length < 2) return [];
+  const commands: VectorPathCommand[] = [
+    { type: 'move', x: path.points[0] ?? 0, y: path.points[1] ?? 0 },
+  ];
+  if (path.kind === 'polyline') {
+    for (let index = 2; index + 1 < path.points.length; index += 2) {
+      commands.push({ type: 'line', x: path.points[index] ?? 0, y: path.points[index + 1] ?? 0 });
+    }
+    return commands;
+  }
+  for (let index = 2; index + 5 < path.points.length; index += 6) {
+    commands.push({
+      type: 'cubic',
+      cx1: path.points[index] ?? 0,
+      cy1: path.points[index + 1] ?? 0,
+      cx2: path.points[index + 2] ?? 0,
+      cy2: path.points[index + 3] ?? 0,
+      x: path.points[index + 4] ?? 0,
+      y: path.points[index + 5] ?? 0,
+    });
+  }
+  return commands;
+}
+
+function patchCustomGeometry(xml: string, element: PptxPackagePatchElement) {
+  const commands = element.clipPath ?? (element.customPath ? shapePathToCommands(element.customPath) : undefined);
+  if (!commands || commands.length === 0) return xml;
+  const geometry = commandsToCustGeom(commands);
+  const escapedId = xmlEscape(element.id);
+  const pattern = new RegExp(
+    `(<p:(?:pic|sp|cxnSp)\\b[\\s\\S]*?<p:cNvPr\\b[^>]*\\bname="${escapedId}"[\\s\\S]*?)(?:<a:prstGeom\\b[^>]*>[\\s\\S]*?</a:prstGeom>|<a:prstGeom\\b[^>]*/>)`,
+  );
+  return xml.replace(pattern, `$1${geometry}`);
+}
+
 function patchPictureCrop(xml: string, element: PptxPackagePatchElement) {
   if (!element.crop) return xml;
   const escapedId = xmlEscape(element.id);
@@ -239,6 +297,7 @@ function patchSlideXml(
   const elementNameToShapeId = getElementNameToShapeId(patchedXml);
   for (const element of patchPage?.elements ?? []) {
     patchedXml = patchPictureCrop(patchedXml, element);
+    patchedXml = patchCustomGeometry(patchedXml, element);
   }
   const timingXml = buildTimingXml(page, elementNameToShapeId, warnings);
   return {
