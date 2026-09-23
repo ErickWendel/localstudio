@@ -48,6 +48,7 @@ interface TopToolbarProps {
   translationTargetLanguage?: string;
   onDelete?: (() => void) | undefined;
   onDuplicate?: (() => void) | undefined;
+  onDuplicateProject?: (() => void) | undefined;
   onExportImages?: (() => void) | undefined;
   onExportPdf?: (() => void) | undefined;
   onExportPowerPoint?: (() => void) | undefined;
@@ -135,6 +136,7 @@ export function TopToolbar({
   translationTargetLanguage = '',
   onDelete,
   onDuplicate,
+  onDuplicateProject,
   onExportImages,
   onExportPdf,
   onExportPowerPoint,
@@ -249,6 +251,11 @@ export function TopToolbar({
   const menuActions: Record<HeaderMenu, HeaderMenuAction[]> = {
     File: [
       { label: 'New Project', disabled: !onNewProject, onSelect: onNewProject },
+      {
+        label: 'Duplicate',
+        disabled: !onDuplicateProject,
+        onSelect: onDuplicateProject,
+      },
       {
         kind: 'submenu',
         label: 'Import',

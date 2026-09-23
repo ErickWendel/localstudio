@@ -229,4 +229,46 @@ test.describe('editor local persistence journey', () => {
       ]),
     );
   });
+
+  test('duplicates a deck into a newly named folder without recording metadata', async ({
+    page,
+  }) => {
+    await installFakeOpfs(page, { directoryPicker: true });
+
+    const editor = new EditorAppPage(page, getServer().baseURL);
+    await editor.gotoNewProject();
+    await editor.renameProject('E2E Source Deck');
+
+    await editor.openMenu('File');
+    await page.getByRole('menuitem', { name: 'Duplicate' }).click();
+
+    const setupPanel = page.getByRole('dialog', { name: 'Duplicate project' });
+    await expect(setupPanel).toBeVisible();
+    const projectFolderNameInput = setupPanel.getByLabel('Project folder name');
+    await expect(projectFolderNameInput).toHaveValue('E2E Source Deck Copy');
+    await projectFolderNameInput.fill('E2E Duplicated Deck');
+    await setupPanel.getByRole('button', { name: 'Choose folder' }).click();
+
+    await expect(
+      page.getByRole('button', { name: 'Edit project name E2E Duplicated Deck' }),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Persistence enabled' })).toBeVisible();
+
+    const duplicate = await page.evaluate(() => {
+      const projectKey = Array.from({ length: window.localStorage.length }, (_, index) =>
+        window.localStorage.key(index),
+      ).find((key) => key?.endsWith('E2E Duplicated Deck/project.json'));
+      if (!projectKey) return undefined;
+      return JSON.parse(window.localStorage.getItem(projectKey) ?? 'null') as {
+        id: string;
+        name: string;
+        recordings?: unknown;
+      };
+    });
+    expect(duplicate).toMatchObject({
+      name: 'E2E Duplicated Deck',
+    });
+    expect(duplicate?.id).not.toBe('project-1');
+    expect(duplicate).not.toHaveProperty('recordings');
+  });
 });

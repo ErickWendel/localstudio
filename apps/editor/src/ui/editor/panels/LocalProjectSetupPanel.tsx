@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 
 interface LocalProjectSetupPanelProps {
+  description?: string;
   initialName: string;
+  title?: string;
   onCancel: () => void;
   onConfirm: (projectName: string) => void;
 }
 
 export function LocalProjectSetupPanel({
+  description = 'Name the project folder before choosing where to create it.',
   initialName,
+  title = 'Save local project',
   onCancel,
   onConfirm,
 }: LocalProjectSetupPanelProps) {
@@ -26,12 +30,12 @@ export function LocalProjectSetupPanel({
       data-anchor="persistence"
       role="dialog"
       aria-modal="false"
-      aria-label="Save local project"
+      aria-label={title}
     >
       <div className="settings-panel-header ew-split-row-start">
         <div>
-          <h2>Save local project</h2>
-          <p>Name the project folder before choosing where to create it.</p>
+          <h2>{title}</h2>
+          <p>{description}</p>
         </div>
         <button
           className="stitch-icon-button"

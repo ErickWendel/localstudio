@@ -13,6 +13,7 @@ import type {
 } from '../../../domain/commands/elements/basicCommands';
 import type { GeneratedSlideElement } from '../../../domain/generated-slides/generatedSlide';
 import { fitImageWithinPage } from '../../../domain/images/imageSizing';
+import { duplicateProjectDocument } from '../../../domain/projects/duplicateProjectDocument';
 import type {
   ImageElement,
   PageBackground,
@@ -322,7 +323,9 @@ export function useEditorViewModel(services: AppServices) {
   const [mediaSettingsOpen, setMediaSettingsOpen] = useState(false);
   const [mirrorDisabledBySettings, setMirrorDisabledBySettings] = useState(false);
   const [remoteImportOpen, setRemoteImportOpen] = useState(false);
-  const [localProjectSetupOpen, setLocalProjectSetupOpen] = useState(false);
+  const [localProjectSetupMode, setLocalProjectSetupMode] = useState<
+    'duplicate' | 'save' | undefined
+  >();
   const [persistenceAttention, setPersistenceAttention] = useState(false);
   const [persistenceError, setPersistenceError] = useState(false);
   const { operationNotice, showOperationNotice } = useOperationNotice();
@@ -1452,7 +1455,7 @@ export function useEditorViewModel(services: AppServices) {
         autosaveRetryTimeoutRef.current = undefined;
       }
       setPersistenceEnabled(false);
-      setLocalProjectSetupOpen(false);
+      setLocalProjectSetupMode(undefined);
       setPersistenceAttention(false);
       setPersistenceError(false);
       showOperationNotice(undefined);
@@ -1470,7 +1473,7 @@ export function useEditorViewModel(services: AppServices) {
       return reenablePersistence();
     }
 
-    setLocalProjectSetupOpen(true);
+    setLocalProjectSetupMode('save');
     return false;
   }
 
@@ -1494,7 +1497,7 @@ export function useEditorViewModel(services: AppServices) {
       setPersistenceAttention(false);
       setPersistenceError(false);
       showOperationNotice(undefined);
-      setLocalProjectSetupOpen(false);
+      setLocalProjectSetupMode(undefined);
       editorViewModelProject.writeProjectNameToUrl(projectToSave.name);
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(true);
@@ -1566,7 +1569,7 @@ export function useEditorViewModel(services: AppServices) {
       setPersistenceAttention(false);
       setPersistenceError(false);
       showOperationNotice(undefined);
-      setLocalProjectSetupOpen(false);
+      setLocalProjectSetupMode(undefined);
       setLastEditedAt(projectToSave.updatedAt);
       setSaveAnimationKey((current) => current + 1);
       skipNextProjectSaveRef.current = true;
@@ -1584,19 +1587,33 @@ export function useEditorViewModel(services: AppServices) {
   }
 
   function closeLocalProjectSetup() {
-    setLocalProjectSetupOpen(false);
+    setLocalProjectSetupMode(undefined);
+  }
+
+  function openDuplicateProjectSetup() {
+    setLocalProjectSetupMode('duplicate');
   }
 
   async function confirmLocalProjectSetup(projectName: string) {
     const nextName = projectName.trim();
     if (!nextName) return false;
-    const nextProject = {
-      ...projectRef.current,
-      name: nextName,
-      updatedAt: new Date().toISOString(),
-    };
+    const isDuplicate = localProjectSetupMode === 'duplicate';
+    const nextProject = isDuplicate
+      ? duplicateProjectDocument(projectRef.current, {
+          createId: () => createPrefixedId('project'),
+          name: nextName,
+          now: () => new Date().toISOString(),
+        })
+      : {
+          ...projectRef.current,
+          name: nextName,
+          updatedAt: new Date().toISOString(),
+        };
     try {
-      if (needsFreshPersistenceTargetRef.current && services.projectRepository.saveProjectAs) {
+      if (
+        (isDuplicate || needsFreshPersistenceTargetRef.current) &&
+        services.projectRepository.saveProjectAs
+      ) {
         await services.projectRepository.saveProjectAs(nextProject, {
           projectDirectoryName: nextName,
         });
@@ -1606,6 +1623,14 @@ export function useEditorViewModel(services: AppServices) {
         });
       }
       setProject(nextProject);
+      if (isDuplicate) {
+        setHistory({ past: [], future: [] });
+        setSelectedElementIds([]);
+        setVersionHistoryEntries([]);
+        setSelectedVersionId(undefined);
+        setPreviewProject(undefined);
+        lastMirroredProjectNameRef.current = undefined;
+      }
       lastVersionProjectRef.current = nextProject;
       needsFreshPersistenceTargetRef.current = false;
       setLastEditedAt(nextProject.updatedAt);
@@ -1616,10 +1641,13 @@ export function useEditorViewModel(services: AppServices) {
       setPersistenceAttention(false);
       setPersistenceError(false);
       showOperationNotice(undefined);
-      setLocalProjectSetupOpen(false);
+      setLocalProjectSetupMode(undefined);
       editorViewModelProject.writeProjectNameToUrl(nextProject.name);
       if (typeof window !== 'undefined') {
         editorPreferences.writePersistencePreference(true);
+      }
+      if (isDuplicate && mirrorState.enabled && mirrorConfigRef.current) {
+        void syncMirrorNow(nextProject);
       }
       return true;
     } catch {
@@ -3700,7 +3728,8 @@ export function useEditorViewModel(services: AppServices) {
     stockMediaRecentItems,
     stockMediaSearching,
     stockMediaError,
-    localProjectSetupOpen,
+    localProjectSetupMode,
+    localProjectSetupOpen: localProjectSetupMode !== undefined,
     remoteImportOpen,
     remoteImportStatus,
     remoteImportProjects,
@@ -3734,6 +3763,7 @@ export function useEditorViewModel(services: AppServices) {
     saveLocalNow,
     saveLocalAs,
     closeLocalProjectSetup,
+    openDuplicateProjectSetup,
     confirmLocalProjectSetup,
     openSettings,
     closeSettings,

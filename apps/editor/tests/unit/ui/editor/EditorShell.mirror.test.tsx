@@ -129,6 +129,49 @@ describe('EditorShell mirror workflows', () => {
     });
   });
 
+  it('mirrors a duplicated project as new without deleting the source mirror', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const repository = new SavingProjectRepository();
+    const mirrorService = new RecordingMirrorService(null);
+    services.projectRepository = repository;
+    services.mirrorService = mirrorService;
+    render(<EditorShell services={services} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mirror settings' }));
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('button', {
+        name: 'Mirror settings',
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Mirror up to date' })).toBeInTheDocument();
+    });
+    mirrorService.syncProject.mockClear();
+    mirrorService.deleteProject.mockClear();
+
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Duplicate' }));
+    const duplicateDialog = screen.getByRole('dialog', { name: 'Duplicate project' });
+    const folderNameInput = within(duplicateDialog).getByLabelText('Project folder name');
+    await user.clear(folderNameInput);
+    await user.type(folderNameInput, 'Cloud Copy');
+    await user.click(within(duplicateDialog).getByRole('button', { name: 'Choose folder' }));
+
+    await waitFor(() => {
+      expect(mirrorService.syncProject).toHaveBeenCalledTimes(1);
+    });
+    const duplicatedProject = mirrorService.syncProject.mock.calls[0]?.[0];
+    expect(duplicatedProject).toMatchObject({
+      name: 'Cloud Copy',
+    });
+    expect(duplicatedProject?.id).not.toBe(services.initialProject.id);
+    expect(mirrorService.deleteProject).not.toHaveBeenCalled();
+  });
+
   it('toggles mirroring from the mirror status icon when a saved config is available', async () => {
     const services = createAppServices();
     const mirrorService = new RecordingMirrorService();
