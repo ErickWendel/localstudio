@@ -19,6 +19,7 @@ import { mediaElementCommands } from './media-element-commands';
 import { pageCommands } from './page-commands';
 import { slideLayoutCommands } from './slide-layout-commands';
 import { textThemeCommands } from './text-theme-commands';
+import { templateInfoCommands } from './template-info-commands';
 
 const elementAnimationCommandConstructors = {
   ClearElementAnimationBuildCommand: elementAnimationCommands.ClearElementAnimationBuildCommand,
@@ -109,5 +110,6 @@ export const basicCommands = {
   ...elementEditCommands,
   ...elementAnimationCommandConstructors,
   ...textThemeCommands,
+  ...templateInfoCommands,
   ...slideLayoutCommands,
 };

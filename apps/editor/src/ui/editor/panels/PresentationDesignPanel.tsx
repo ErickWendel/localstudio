@@ -2,6 +2,7 @@ import { ChevronDown } from 'lucide-react';
 import { useState, type CSSProperties } from 'react';
 import type { PresentationTheme, ProjectDocument } from '../../../domain/documents/model';
 import { PanelSection } from '../../components/PanelSection';
+import { TemplateInfoVisibilityControl } from './design-controls/TemplateInfoVisibilityControl';
 
 const defaultPresentationTheme: PresentationTheme = {
   id: 'theme-default',
@@ -85,12 +86,14 @@ export function PresentationDesignPanel({
   onApplyTheme,
   onChangeTheme,
   onEditTheme,
+  onSetDeckTemplateInfoVisibility,
 }: {
   page?: ProjectDocument['pages'][number] | undefined;
   project: ProjectDocument;
   onApplyTheme: ((themeId: string) => void) | undefined;
   onChangeTheme: (() => void) | undefined;
   onEditTheme: ((themeId: string) => void) | undefined;
+  onSetDeckTemplateInfoVisibility: ((visible: boolean) => void) | undefined;
 }) {
   const [themePickerOpen, setThemePickerOpen] = useState(false);
   const themeOptions = getThemeOptions(project);
@@ -151,6 +154,13 @@ export function PresentationDesignPanel({
             Apply theme
           </button>
         </div>
+      </PanelSection>
+
+      <PanelSection title="Template Info">
+        <TemplateInfoVisibilityControl
+          project={project}
+          onSetVisibility={onSetDeckTemplateInfoVisibility}
+        />
       </PanelSection>
 
       <PanelSection title="Slideshow Settings">

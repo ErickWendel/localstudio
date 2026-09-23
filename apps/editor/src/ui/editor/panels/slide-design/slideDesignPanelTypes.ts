@@ -21,6 +21,7 @@ export interface SlideDesignPanelProps {
   project: ProjectDocument;
   onApplySlideLayout: ((pageId: string, layoutId: string) => void) | undefined;
   onEditSlideLayout: ((layoutId: string) => void) | undefined;
+  onSetDeckTemplateInfoVisibility: ((visible: boolean) => void) | undefined;
   onToggleSlideLayoutPlaceholder:
     | ((
         layoutId: string,

@@ -1,6 +1,7 @@
 import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { PanelSection } from '../../components/PanelSection';
+import { TemplateInfoVisibilityControl } from './design-controls/TemplateInfoVisibilityControl';
 import { SlideDesignBackgroundControls } from './slide-design/slideDesignBackgroundControls';
 import { SlideLayoutChooser } from './slide-design/SlideLayoutChooser';
 import { getSlideDesignLayoutOptions } from './slide-design/slideDesignLayoutOptions';
@@ -11,6 +12,7 @@ export function SlideDesignPanel({
   project,
   onApplySlideLayout,
   onEditSlideLayout,
+  onSetDeckTemplateInfoVisibility,
   onToggleSlideLayoutPlaceholder,
   onUpdatePageBackground,
 }: SlideDesignPanelProps) {
@@ -76,6 +78,10 @@ export function SlideDesignPanel({
       </PanelSection>
 
       <PanelSection title="Appearance">
+        <TemplateInfoVisibilityControl
+          project={project}
+          onSetVisibility={onSetDeckTemplateInfoVisibility}
+        />
         {(
           [
             ['title', 'Title'],

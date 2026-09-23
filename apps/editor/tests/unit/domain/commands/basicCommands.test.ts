@@ -550,6 +550,91 @@ describe('editor commands', () => {
     expect(project.pages[0]?.background).toEqual({ type: 'color', color: '#050D10' });
   });
 
+  it('toggles imported layout and master placeholder information across the deck', () => {
+    const project = sampleProject.createSampleProject();
+    const templateTitle = {
+      ...project.elements['text-title']!,
+      id: 'template-title',
+      text: 'Slide title',
+      placeholderRole: 'title' as const,
+      importSource: {
+        format: 'pptx' as const,
+        pageId: 'page-1',
+        shapeId: '21',
+        source: 'layout' as const,
+      },
+    };
+    const slideTitle = {
+      ...templateTitle,
+      id: 'slide-title',
+      text: 'Real presentation title',
+      importSource: { ...templateTitle.importSource, shapeId: '3', source: 'slide' as const },
+    };
+    const templateBody = {
+      ...templateTitle,
+      id: 'template-body',
+      text: 'Slide body',
+      placeholderRole: 'body' as const,
+      importSource: {
+        ...templateTitle.importSource,
+        pageId: 'page-2',
+        shapeId: '22',
+        source: 'master' as const,
+      },
+    };
+    const { placeholderRole, ...templateArtworkBase } = templateTitle;
+    void placeholderRole;
+    const layoutArtwork = {
+      ...templateArtworkBase,
+      id: 'layout-artwork',
+      text: 'Company name',
+    };
+    const withImportedElements: ProjectDocument = {
+      ...project,
+      elements: {
+        ...project.elements,
+        [templateTitle.id]: templateTitle,
+        [templateBody.id]: templateBody,
+        [slideTitle.id]: slideTitle,
+        [layoutArtwork.id]: layoutArtwork,
+      },
+      pages: [
+        ...project.pages.map((page) =>
+          page.id === 'page-1'
+            ? {
+                ...page,
+                elementIds: [
+                  ...page.elementIds,
+                  templateTitle.id,
+                  slideTitle.id,
+                  layoutArtwork.id,
+                ],
+              }
+            : page,
+        ),
+        {
+          ...project.pages[0]!,
+          id: 'page-2',
+          name: 'Slide 2',
+          elementIds: [templateBody.id],
+        },
+      ],
+    };
+
+    const hidden = new basicCommands.SetDeckTemplateInfoVisibilityCommand(false).execute(
+      withImportedElements,
+    );
+    const shown = new basicCommands.SetDeckTemplateInfoVisibilityCommand(true).execute(hidden);
+
+    expect(hidden.elements[templateTitle.id]?.visible).toBe(false);
+    expect(hidden.elements[templateBody.id]?.visible).toBe(false);
+    expect(hidden.elements[slideTitle.id]?.visible).toBe(true);
+    expect(hidden.elements[layoutArtwork.id]?.visible).toBe(true);
+    expect(shown.elements[templateTitle.id]?.visible).toBe(true);
+    expect(shown.elements[templateBody.id]?.visible).toBe(true);
+    expect(withImportedElements.elements[templateTitle.id]?.visible).toBe(true);
+  });
+
   it('sets the active page reveal transition immutably', () => {
     const project = sampleProject.createSampleProject();
     const next = new basicCommands.SetPageTransitionCommand('page-1', {
