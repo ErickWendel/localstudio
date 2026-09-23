@@ -112,6 +112,30 @@
   gap: 8px;
 }
 
+.asset-usage-item {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.asset-usage-split {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  color: var(--ew-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.asset-usage-split::after {
+  content: '';
+  height: 1px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .asset-group-toggle {
   border: 0;
   background: transparent;

@@ -20,6 +20,8 @@ test.describe('editor asset library journey', () => {
     const unusedLink = page.getByRole('link', { name: 'Open Unused fixture.png in a new tab' });
     await expect(unusedLink).toHaveAttribute('target', '_blank');
     await expect(unusedLink).toHaveAttribute('rel', /noopener/);
+    await expect(page.getByRole('separator', { name: 'Unused media' })).toBeVisible();
+    await expect(page.getByText('Unused fixture.png')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Remove Used fixture.png' })).toBeDisabled();
 
     await page.getByRole('button', { name: 'Remove Unused fixture.png' }).click();
@@ -27,6 +29,7 @@ test.describe('editor asset library journey', () => {
     await expect(page.getByText('Used fixture.png')).toBeVisible();
 
     await recordingsSection.click();
+    await expect(page.getByRole('separator', { name: 'Unused recordings' })).toBeVisible();
     await page.getByRole('button', { name: 'Remove Rehearsal recording and transcript' }).click();
     await expect(page.getByText('Rehearsal')).toBeHidden();
     await page.getByRole('button', { name: 'Launch talk, 1:05' }).click();

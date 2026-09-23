@@ -69,6 +69,7 @@ export function createE2eAssetFixtureProject(): ProjectDocument {
             startMs: 0,
             endMs: 1_000,
             final: true,
+            ...(project.pages[0] ? { pageId: project.pages[0].id } : {}),
           },
         ],
       },

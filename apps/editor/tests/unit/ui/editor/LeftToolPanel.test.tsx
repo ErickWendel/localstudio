@@ -124,8 +124,10 @@ describe('LeftToolPanel', () => {
     expect(screen.queryByText('Futuristic landscape')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /^Media/ }));
 
-    expect(screen.getByText('Futuristic landscape')).toBeInTheDocument();
-    expect(screen.getByText('Unused Logo.png')).toBeInTheDocument();
+    expect(screen.getByRole('separator', { name: 'Unused media' })).toBeInTheDocument();
+    expect(screen.getByText('Unused Logo.png').compareDocumentPosition(screen.getByText('Futuristic landscape'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
     expect(screen.getByText('Used')).toBeInTheDocument();
     expect(screen.getByText('Unused')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Remove Unused Logo.png' })).toBeEnabled();
@@ -159,7 +161,9 @@ describe('LeftToolPanel', () => {
           storage: 'file',
         },
         transcriptFileName: 'recording-1.transcript.json',
-        segments: [{ id: 'segment-1', text: 'Hello', startMs: 0, endMs: 1_000, final: true }],
+        segments: [
+          { id: 'segment-1', text: 'Hello', startMs: 0, endMs: 1_000, pageId: 'page-1', final: true },
+        ],
       },
       'recording-unsafe': {
         id: 'recording-unsafe',
@@ -213,7 +217,10 @@ describe('LeftToolPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Launch talk, 1:05' }));
     await user.click(screen.getByRole('button', { name: 'Unsafe talk, 0:01' }));
 
-    expect(screen.getByText('Launch talk')).toBeInTheDocument();
+    expect(screen.getByRole('separator', { name: 'Unused recordings' })).toBeInTheDocument();
+    expect(screen.getByText('Unsafe talk').compareDocumentPosition(screen.getByText('Launch talk'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
     expect(screen.getByText('1:05')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open Launch talk recording in a new tab' })).toHaveAttribute(
       'href',

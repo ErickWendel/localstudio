@@ -37,13 +37,19 @@ export function AssetsPanel({
       }))
       .sort((a, b) => a.asset.name.localeCompare(b.asset.name, undefined, { sensitivity: 'base' }));
   }, [project]);
-  const recordings = useMemo(
-    () =>
-      Object.values(project.recordings ?? {}).sort(
-        (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
-      ),
-    [project.recordings],
-  );
+  const recordings = useMemo(() => {
+    const pageIds = new Set(project.pages.map((page) => page.id));
+    return Object.values(project.recordings ?? {})
+      .map((recording) => ({
+        recording,
+        used: isRecordingUsed(recording, pageIds),
+      }))
+      .sort((a, b) => Date.parse(b.recording.createdAt) - Date.parse(a.recording.createdAt));
+  }, [project.pages, project.recordings]);
+  const unusedAssets = assetRows.filter((row) => !row.used);
+  const usedAssets = assetRows.filter((row) => row.used);
+  const unusedRecordings = recordings.filter((row) => !row.used);
+  const usedRecordings = recordings.filter((row) => row.used);
 
   return (
     <section className="panel-stack" aria-label="Project assets">
@@ -90,8 +96,11 @@ export function AssetsPanel({
         }}
       >
         {assetRows.length > 0 ? (
-          assetRows.map(({ asset, used }) => (
-            <AssetRow asset={asset} key={asset.id} used={used} onRemoveAsset={onRemoveAsset} />
+          [...unusedAssets, ...usedAssets].map(({ asset, used }, index) => (
+            <div className="asset-usage-item" key={asset.id}>
+              {index === 0 && unusedAssets.length > 0 ? <UsageSplit label="Unused media" /> : null}
+              <AssetRow asset={asset} used={used} onRemoveAsset={onRemoveAsset} />
+            </div>
           ))
         ) : (
           <p className="panel-muted">No assets imported yet.</p>
@@ -106,14 +115,18 @@ export function AssetsPanel({
         }}
       >
         {recordings.length > 0 ? (
-          recordings.map((recording) => (
-            <RecordingGroup
-              key={recording.id}
-              recording={recording}
-              onRemoveRecording={onRemoveRecording}
-              onRemoveRecordingAudio={onRemoveRecordingAudio}
-              onRemoveTranscript={onRemoveTranscript}
-            />
+          [...unusedRecordings, ...usedRecordings].map(({ recording }, index) => (
+            <div className="asset-usage-item" key={recording.id}>
+              {index === 0 && unusedRecordings.length > 0 ? (
+                <UsageSplit label="Unused recordings" />
+              ) : null}
+              <RecordingGroup
+                recording={recording}
+                onRemoveRecording={onRemoveRecording}
+                onRemoveRecordingAudio={onRemoveRecordingAudio}
+                onRemoveTranscript={onRemoveTranscript}
+              />
+            </div>
           ))
         ) : (
           <p className="panel-muted">No recordings yet.</p>
@@ -160,6 +173,21 @@ function AssetDisclosure({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function UsageSplit({ label }: { label: string }) {
+  return (
+    <div className="asset-usage-split" role="separator" aria-label={label}>
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function isRecordingUsed(recording: TranscriptRecording, pageIds: Set<string>) {
+  if (recording.audio.publicShareAuthorized) return true;
+  return recording.segments.some((segment) =>
+    Boolean(segment.pageId && pageIds.has(segment.pageId)),
   );
 }
 
