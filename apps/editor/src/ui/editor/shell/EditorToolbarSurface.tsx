@@ -69,7 +69,18 @@ export function EditorToolbarSurface({
       localProjectSetupPanel={
         vm.localProjectSetupOpen ? (
           <LocalProjectSetupPanel
-            initialName={vm.project.name}
+            {...(vm.localProjectSetupMode === 'duplicate'
+              ? {
+                  description:
+                    'Name the duplicate before choosing where to create its folder.',
+                  title: 'Duplicate project',
+                }
+              : {})}
+            initialName={
+              vm.localProjectSetupMode === 'duplicate'
+                ? `${vm.project.name} Copy`
+                : vm.project.name
+            }
             onCancel={() => {
               vm.closeLocalProjectSetup();
               onLocalProjectSetupCancel?.();
@@ -97,6 +108,11 @@ export function EditorToolbarSurface({
       persistenceMode={services.persistenceMode}
       onDelete={isHistoryReadOnly ? undefined : vm.deleteSelectedElement}
       onDuplicate={isHistoryReadOnly ? undefined : vm.duplicateSelectedElement}
+      onDuplicateProject={
+        !isHistoryReadOnly && services.projectRepository.saveProjectAs
+          ? vm.openDuplicateProjectSetup
+          : undefined
+      }
       onImportRemoteMirror={() => {
         void vm.importRemoteMirror();
       }}

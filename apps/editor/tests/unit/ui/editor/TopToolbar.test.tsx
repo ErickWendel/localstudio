@@ -13,6 +13,7 @@ describe('TopToolbar', () => {
     const onImportRemoteMirror = vi.fn();
     const onMirrorNow = vi.fn();
     const onNewProject = vi.fn();
+    const onDuplicateProject = vi.fn();
     const onSaveLocalAs = vi.fn();
     const onSaveLocal = vi.fn();
     const onResetZoom = vi.fn();
@@ -29,6 +30,7 @@ describe('TopToolbar', () => {
         onImportRemoteMirror={onImportRemoteMirror}
         onMirrorNow={onMirrorNow}
         onNewProject={onNewProject}
+        onDuplicateProject={onDuplicateProject}
         onSaveLocal={onSaveLocal}
         onSaveLocalAs={onSaveLocalAs}
         onResetZoom={onResetZoom}
@@ -40,6 +42,9 @@ describe('TopToolbar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'File' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'New Project' }));
     expect(onNewProject).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Duplicate' }));
+    expect(onDuplicateProject).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: 'File' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Import' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Project' }));
