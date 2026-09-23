@@ -1075,7 +1075,7 @@ describe('editor commands', () => {
     expect(next.pages).toHaveLength(2);
     expect(next.pages[1]).toMatchObject({
       id: 'page-copy',
-      name: 'Slide 1 copy',
+      name: 'Slide 2',
       visible: true,
     });
     expect(next.pages[1]?.elementIds).toEqual([

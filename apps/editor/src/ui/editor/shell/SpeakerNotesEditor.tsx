@@ -5,6 +5,7 @@ import type {
   PointerEvent as ReactPointerEvent,
 } from 'react';
 import type { Page } from '../../../domain/documents/model';
+import { slideNameAlignment } from '../../../domain/documents/slideNameAlignment';
 
 const notesWidthStorageKey = 'localstudio.editorSpeakerNotesWidth';
 const notesHeightStorageKey = 'localstudio.editorSpeakerNotesHeight';
@@ -51,6 +52,7 @@ function getInitialNotesHeight() {
 interface SpeakerNotesEditorProps {
   page: Page;
   pageIndex: number;
+  pages?: Page[] | undefined;
   open: boolean;
   onClose: () => void;
   onUpdateNotes: (pageId: string, notes: string) => void;
@@ -59,12 +61,14 @@ interface SpeakerNotesEditorProps {
 export function SpeakerNotesEditor({
   page,
   pageIndex,
+  pages,
   open,
   onClose,
   onUpdateNotes,
 }: SpeakerNotesEditorProps) {
   const [notesWidth, setNotesWidth] = useState(getInitialNotesWidth);
   const [notesHeight, setNotesHeight] = useState(getInitialNotesHeight);
+  const slideName = pages ? slideNameAlignment.getAlignedSlideName(pages, pageIndex) : page.name;
   const notesEditorStyle = useMemo(
     () =>
       ({
@@ -176,7 +180,7 @@ export function SpeakerNotesEditor({
         <div className="speaker-notes-card">
           <header className="speaker-notes-header">
             <h2>
-              Page {pageIndex + 1} - {page.name}
+              Page {pageIndex + 1} - {slideName}
             </h2>
             <div className="speaker-notes-actions ew-compact-row">
               <button type="button" aria-label="Change notes text size">

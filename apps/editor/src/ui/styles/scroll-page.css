@@ -70,6 +70,20 @@
   color: var(--ew-muted);
 }
 
+.scroll-page-title-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.scroll-page-index {
+  color: var(--ew-muted);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .scroll-page-title,
 .page-title-button {
   border: 0;
@@ -79,6 +93,19 @@
   font-size: 12px;
   font-weight: 800;
   text-align: left;
+}
+
+.scroll-page-title-input {
+  width: 16ch;
+  max-width: 100%;
+  border: 1px solid var(--ew-green);
+  border-radius: 4px;
+  background: #050d10;
+  color: var(--ew-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 2px 6px;
 }
 
 .scroll-page-title:hover,

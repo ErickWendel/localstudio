@@ -1,4 +1,5 @@
 import type { Page, ProjectDocument } from '../../../domain/documents/model';
+import { slideNameAlignment } from '../../../domain/documents/slideNameAlignment';
 
 function getSourcePage(input: {
   activePageId: string;
@@ -37,7 +38,7 @@ function insertPageAfter(project: ProjectDocument, afterPageId: string, page: Pa
   pages.splice(insertIndex, 0, page);
   return {
     ...project,
-    pages,
+    pages: slideNameAlignment.alignDefaultSlideNames(pages),
     updatedAt: new Date().toISOString(),
   };
 }

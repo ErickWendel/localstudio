@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import type { Page, ProjectDocument } from '../../../domain/documents/model';
 import { pageVisibility } from '../../../domain/documents/pageVisibility';
+import { slideNameAlignment } from '../../../domain/documents/slideNameAlignment';
 import { SlideCopyControl } from '../persistence/SlideCopyControl';
 import { MiniPagePreview } from './PageMiniPreview';
 
@@ -24,8 +25,11 @@ interface PagesPanelProps {
   onTranslatePage?: ((pageId: string) => void) | undefined;
 }
 
-function getPageDisplayName(page: Page) {
-  return page.visible === false ? `${page.name} (skipped)` : page.name;
+function getPageDisplayName(pages: Page[], index: number) {
+  const page = pages[index];
+  if (!page) return '';
+  const name = slideNameAlignment.getAlignedSlideName(pages, index);
+  return page.visible === false ? `${name} (skipped)` : name;
 }
 
 function formatActivePageCount(count: number) {
@@ -77,7 +81,9 @@ export function PagesPanel({
 
   function commitRename() {
     if (!editingPageId) return;
-    onRenamePage?.(editingPageId, draftName);
+    const index = project.pages.findIndex((page) => page.id === editingPageId);
+    const nextName = slideNameAlignment.normalizeSlideName(project.pages, index, draftName);
+    if (nextName) onRenamePage?.(editingPageId, nextName);
     setEditingPageId(undefined);
   }
 
@@ -136,7 +142,8 @@ export function PagesPanel({
       <div className="pages-list">
         {project.pages.map((page, index) => {
           const visible = page.visible ?? true;
-          const pageDisplayName = getPageDisplayName(page);
+          const pageDisplayName = getPageDisplayName(project.pages, index);
+          const editableName = slideNameAlignment.getAlignedSlideName(project.pages, index);
           const isActive = page.id === activePageId;
           const dropPosition = dropIndicator?.pageId === page.id ? dropIndicator.position : undefined;
           const className = [
@@ -219,7 +226,7 @@ export function PagesPanel({
                     type="button"
                     aria-label={`Rename ${pageDisplayName}`}
                     onClick={() => {
-                      startRename(page.id, page.name);
+                      startRename(page.id, editableName);
                     }}
                   >
                     {pageDisplayName}
