@@ -933,6 +933,8 @@ describe('BrowserPptxImportService', () => {
       startOnClick: true,
       type: 'video',
     });
+    if (!videoElement || videoElement.type !== 'video') throw new Error('Expected a video element.');
+    expect(project.assets[videoElement.posterAssetId ?? '']?.fileName).toBe('poster1.png');
 
     const videoAsset = Object.values(project.assets).find(
       (asset) => asset.fileName === 'media1.mp4',

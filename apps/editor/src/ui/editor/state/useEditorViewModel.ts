@@ -1587,6 +1587,14 @@ export function useEditorViewModel(services: AppServices) {
     }
   }
 
+  function openLocalProjectSave() {
+    if (hasPersistedLocalProjectRef.current) {
+      void saveLocalNow();
+      return;
+    }
+    setLocalProjectSetupMode('save');
+  }
+
   function closeLocalProjectSetup() {
     setLocalProjectSetupMode(undefined);
   }
@@ -1617,6 +1625,7 @@ export function useEditorViewModel(services: AppServices) {
       ) {
         await services.projectRepository.saveProjectAs(nextProject, {
           projectDirectoryName: nextName,
+          ...(isDuplicate ? { duplicate: true } : {}),
         });
       } else {
         await services.projectRepository.saveProject(nextProject, {
@@ -3486,12 +3495,6 @@ export function useEditorViewModel(services: AppServices) {
       Object.entries(resolvedClipboard.assets).map(([assetId, asset]) => {
         const nextAssetId = createPrefixedId(`${assetId}-slide`);
         assetIds.set(assetId, nextAssetId);
-        if (asset.storage === 'file' && /^(?:blob|data):/.test(asset.objectUrl ?? '')) {
-          const { fileName, storage, ...transferableAsset } = asset;
-          void fileName;
-          void storage;
-          return [nextAssetId, { ...transferableAsset, id: nextAssetId }];
-        }
         return [nextAssetId, { ...asset, id: nextAssetId }];
       }),
     );
@@ -3707,6 +3710,7 @@ export function useEditorViewModel(services: AppServices) {
     pagesPanelOpen,
     isFullscreen,
     persistenceEnabled,
+    hasPersistedLocalProject,
     presentationImportProgress,
     missingPowerPointFonts,
     mediaImportProgress,
@@ -3763,6 +3767,7 @@ export function useEditorViewModel(services: AppServices) {
     setProjectName,
     setPersistence,
     saveLocalNow,
+    openLocalProjectSave,
     saveLocalAs,
     closeLocalProjectSetup,
     openDuplicateProjectSetup,

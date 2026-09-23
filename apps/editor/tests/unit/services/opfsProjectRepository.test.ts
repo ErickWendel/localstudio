@@ -456,6 +456,45 @@ describe('OpfsProjectRepository', () => {
     expect(createObjectUrl).toHaveBeenCalled();
   });
 
+  it('copies file-backed assets when saving a project as a new OPFS folder', async () => {
+    const root = new MockDirectoryHandle();
+    const repository = new OpfsProjectRepository({
+      getRootDirectory: () => Promise.resolve(root as unknown as FileSystemDirectoryHandle),
+      storage: new MemoryStorage(),
+    });
+    const project: ProjectDocument = {
+      ...sampleProject.createSampleProject(),
+      name: 'Source Deck',
+      assets: {
+        'asset-hero': {
+          id: 'asset-hero',
+          type: 'image',
+          name: 'Hero',
+          mimeType: 'image/png',
+          storage: 'file',
+          fileName: 'asset-hero.png',
+        },
+      },
+    };
+
+    await repository.saveProject(project);
+    const sourceDirectory = await getProjectDirectory(root, project.name);
+    sourceDirectory.directories
+      .get('assets')!
+      .files.set('asset-hero.png', new Blob(['source-bytes'], { type: 'image/png' }));
+
+    await repository.saveProjectAs(
+      { ...project, id: 'project-copy', name: 'Copied Deck' },
+      { projectDirectoryName: 'Copied Deck' },
+    );
+
+    const copiedDirectory = await getProjectDirectory(root, 'Copied Deck');
+    expect(
+      await (copiedDirectory.directories.get('assets')!.files.get('asset-hero.png') as Blob).text(),
+    ).toBe('source-bytes');
+    expect(sourceDirectory.directories.get('assets')!.files.has('asset-hero.png')).toBe(true);
+  });
+
   it('surfaces unavailable OPFS errors without creating fallback state', async () => {
     const repository = new OpfsProjectRepository({
       getRootDirectory: () => Promise.reject(new DOMException('Private browsing', 'SecurityError')),

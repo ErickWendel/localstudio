@@ -58,6 +58,7 @@ import {
 } from '../../components/KeyboardShortcutsDialog';
 import { editorShellBrowserUtils } from '../browser/editorShellBrowserUtils';
 import { slideClipboardMedia } from '../browser/slideClipboardMedia';
+import { materializeSlideClipboardAssets } from '../persistence/slideClipboardLocalAssets';
 import { BrowserPresenterSessionService } from '../../../services/presenter/presenterSessionService';
 import type {
   PresenterRemoteSessionMetadata,
@@ -198,6 +199,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const stageRef = useRef<Konva.Stage>(null);
   const imageExportStageRef = useRef<Konva.Stage>(null);
   const renderedExportInProgressRef = useRef(false);
+  const slideClipboardWriteRef = useRef(false);
   const workspaceRef = useRef<HTMLElement>(null);
   const slideFrameRef = useRef<HTMLDivElement>(null);
   const windowedExitHintTimerRef = useRef<number | undefined>(undefined);
@@ -1562,6 +1564,12 @@ function EditorDesktopShell({ services }: EditorShellProps) {
 
   useEffect(() => {
     function handleCopy(event: ClipboardEvent) {
+      const pendingSlideText = editorShellBrowserUtils.readPendingSlideClipboardText();
+      if (pendingSlideText) {
+        event.preventDefault();
+        event.clipboardData?.setData('text/plain', pendingSlideText);
+        return;
+      }
       if (isHistoryReadOnly) return;
       if (
         editorShellBrowserUtils.isEditableInteractionTarget(event.target) ||
@@ -1596,7 +1604,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       );
     }
 
-    function handlePaste(event: ClipboardEvent) {
+    async function handlePaste(event: ClipboardEvent) {
       if (isHistoryReadOnly) return;
       if (editorShellBrowserUtils.isEditableInteractionTarget(event.target)) return;
       event.preventDefault();
@@ -1605,12 +1613,10 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         try {
           const parsedSlide = JSON.parse(slidePayload) as unknown;
           if (slideClipboardMedia.hasExternalReference(parsedSlide)) {
-            void slideClipboardMedia.hydrate(parsedSlide).then((resolved) => {
-              authoringVmRef.current.pasteSlideClipboardPayload(resolved);
-            });
+            void pastePreparedSlide(parsedSlide);
             return;
           }
-          if (vm.pasteSlideClipboardPayload(parsedSlide)) return;
+          if (await pastePreparedSlide(parsedSlide)) return;
         } catch {
           // Continue to the object and image clipboard paths.
         }
@@ -1630,31 +1636,79 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         return;
       const imageFile = editorShellBrowserUtils.getClipboardImageFile(event.clipboardData);
       if (imageFile) {
-        void vm.importImageFile(imageFile);
+        void pasteImageUnlessSlideIsPrimary(imageFile);
         return;
       }
       vm.pasteCopiedElements();
     }
 
+    async function pasteImageUnlessSlideIsPrimary(imageFile: File) {
+      const slidePayload = slideClipboardWriteRef.current
+        ? await editorShellBrowserUtils.readPrimarySlideClipboardPayload()
+        : undefined;
+      if (slidePayload) {
+        try {
+          if (await pastePreparedSlide(JSON.parse(slidePayload) as unknown)) return;
+        } catch {
+          // The system clipboard text is not a slide, so the image is the paste target.
+        }
+      }
+      await vm.importImageFile(imageFile);
+    }
+
+    async function pastePreparedSlide(payload: unknown) {
+      const hydrated = slideClipboardMedia.hasExternalReference(payload)
+        ? await slideClipboardMedia.hydrate(payload)
+        : payload;
+      const localPayload = await materializeSlideClipboardAssets(hydrated, async (fileName, blob) =>
+        services.projectRepository.materializeLocalAsset?.(fileName, blob),
+      );
+      return authoringVmRef.current.pasteSlideClipboardPayload(localPayload);
+    }
+
+    const handlePasteEvent = (event: ClipboardEvent) => {
+      void handlePaste(event);
+    };
     window.addEventListener('copy', handleCopy);
     window.addEventListener('cut', handleCut);
-    window.addEventListener('paste', handlePaste);
+    window.addEventListener('paste', handlePasteEvent);
     return () => {
       window.removeEventListener('copy', handleCopy);
       window.removeEventListener('cut', handleCut);
-      window.removeEventListener('paste', handlePaste);
+      window.removeEventListener('paste', handlePasteEvent);
     };
-  }, [hasSelection, isHistoryReadOnly, vm]);
+  }, [hasSelection, isHistoryReadOnly, services.projectRepository, vm]);
 
   async function copyPageToClipboard(pageId: string) {
+    if (!vm.hasPersistedLocalProject) return;
     const payload = vm.getSlideClipboardPayload(pageId);
     if (!payload) return;
-    const result = await editorShellBrowserUtils.copySlideToClipboard(payload);
-    if (result !== 'copied-without-media') return;
+    const immediatePayload = JSON.stringify(payload);
+    slideClipboardWriteRef.current = true;
+    // Replace a screenshot before asset inlining. Otherwise the image stays first
+    // on the clipboard until the transferable write resolves.
+    editorShellBrowserUtils.writeSlideClipboardTextSynchronously(immediatePayload);
+    const prepared = await editorShellBrowserUtils.makeSlideClipboardPayloadTransferable(payload);
+    const wroteTransferable = await editorShellBrowserUtils.writeSlideClipboardPayload(
+      JSON.stringify(prepared.payload),
+    );
+    if (!wroteTransferable) {
+      editorShellBrowserUtils.writeSlideClipboardTextSynchronously(immediatePayload);
+    }
+    if (!prepared.omittedMedia) return;
     showImageExportNotice({
       message: 'Slide copied without media: file too large for the clipboard',
       tone: 'warning',
     });
+  }
+
+  function requestLocalSaveForSlideCopy() {
+    services.analyticsService.capture(postHogEvents.projectSavedLocal, {
+      project_name: vm.project.name,
+      page_count: vm.project.pages.length,
+      persistence_mode: services.persistenceMode,
+    });
+    vm.openLocalProjectSave();
   }
 
   useEffect(() => {
@@ -2029,7 +2083,13 @@ function EditorDesktopShell({ services }: EditorShellProps) {
             onAddPage={isHistoryReadOnly ? undefined : vm.addPage}
             onDeletePage={isHistoryReadOnly ? undefined : vm.deletePage}
             onDuplicatePage={isHistoryReadOnly ? undefined : vm.duplicatePage}
+            canCopyPages={vm.hasPersistedLocalProject}
             onCopyPage={isHistoryReadOnly ? undefined : (pageId) => void copyPageToClipboard(pageId)}
+            onSaveLocalProject={
+              isHistoryReadOnly || !services.persistenceAvailable || vm.hasPersistedLocalProject
+                ? undefined
+                : requestLocalSaveForSlideCopy
+            }
             onRenamePage={isHistoryReadOnly ? undefined : vm.renamePage}
             onReorderPage={isHistoryReadOnly ? undefined : vm.reorderPage}
             onSetPageVisibility={isHistoryReadOnly ? undefined : vm.setPageVisibility}
@@ -2132,7 +2192,13 @@ function EditorDesktopShell({ services }: EditorShellProps) {
             onClose={togglePagesPanel}
             onDeletePage={isHistoryReadOnly ? undefined : vm.deletePage}
             onDuplicatePage={isHistoryReadOnly ? undefined : vm.duplicatePage}
+            canCopyPages={vm.hasPersistedLocalProject}
             onCopyPage={isHistoryReadOnly ? undefined : (pageId) => void copyPageToClipboard(pageId)}
+            onSaveLocalProject={
+              isHistoryReadOnly || !services.persistenceAvailable || vm.hasPersistedLocalProject
+                ? undefined
+                : requestLocalSaveForSlideCopy
+            }
             onRenamePage={isHistoryReadOnly ? undefined : vm.renamePage}
             onReorderPage={isHistoryReadOnly ? undefined : vm.reorderPage}
             onSelectPage={vm.selectPage}

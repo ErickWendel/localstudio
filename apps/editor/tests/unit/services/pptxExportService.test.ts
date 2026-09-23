@@ -440,6 +440,61 @@ describe('BrowserPptxExportService', () => {
     );
   });
 
+  it('exports custom geometry and video poster covers in the OPC package', async () => {
+    const project = createExportProject();
+    project.assets.posterAsset = {
+      id: 'posterAsset',
+      type: 'image',
+      name: 'poster.png',
+      mimeType: 'image/png',
+      objectUrl: tinyPngDataUrl,
+      storage: 'inline',
+    };
+    const video = project.elements.video;
+    const image = project.elements.image;
+    if (video?.type !== 'video' || image?.type !== 'image') throw new Error('Expected media elements.');
+    video.posterAssetId = 'posterAsset';
+    image.clipPath = [
+      { type: 'move', x: 0.5, y: 0 },
+      { type: 'cubic', cx1: 0.8, cy1: 0, cx2: 1, cy2: 0.2, x: 1, y: 0.5 },
+      { type: 'close' },
+    ];
+    project.elements.connector = {
+      id: 'connector',
+      type: 'shape',
+      shape: 'line',
+      x: 40,
+      y: 40,
+      width: 200,
+      height: 80,
+      rotation: 0,
+      locked: false,
+      visible: true,
+      opacity: 1,
+      stroke: '#111111',
+      strokeWidth: 2,
+      path: { kind: 'bezier', points: [0, 0, 0.3, 0, 0.7, 1, 1, 1] },
+    };
+    project.pages[0]?.elementIds.push('connector');
+
+    const result = await new BrowserPptxExportService().exportPowerPoint(project);
+    const entries = await readPptxEntries(result.blob);
+    const slide = readEntry(entries, 'ppt/slides/slide1.xml');
+    const rels = readEntry(entries, 'ppt/slides/_rels/slide1.xml.rels');
+    const contentTypes = readEntry(entries, '[Content_Types].xml');
+
+    expect(slide).toContain('<a:custGeom>');
+    expect(slide).toContain('<a:cubicBezTo>');
+    expect(slide).toContain('<a:videoFile');
+    expect(rels).toContain('relationships/image');
+    expect(contentTypes).toContain('Extension="png"');
+    expect(contentTypes).toContain('Extension="mp4"');
+    for (const target of readRelationshipTargets(rels, 'ppt/slides/slide1.xml')) {
+      if (target.startsWith('http')) continue;
+      expect(entries[target], target).toBeDefined();
+    }
+  });
+
   it('infers GIF and video package types when Blob and stored MIME metadata are generic', async () => {
     const project = createExportProject();
     project.assets.gifAsset!.mimeType = 'application/octet-stream';

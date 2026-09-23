@@ -59,10 +59,13 @@ export interface ProjectRepository {
   importProject?(): Promise<ProjectDocument | null>;
   importMirrorFiles?(files: MirrorFile[]): Promise<ProjectDocument>;
   loadProject(options?: { projectName?: string }): Promise<ProjectDocument | null>;
-  saveProject(project: ProjectDocument, options?: { projectDirectoryName?: string }): Promise<void>;
+  saveProject(
+    project: ProjectDocument,
+    options?: { duplicate?: boolean; projectDirectoryName?: string },
+  ): Promise<void>;
   saveProjectAs?(
     project: ProjectDocument,
-    options?: { projectDirectoryName?: string },
+    options?: { duplicate?: boolean; projectDirectoryName?: string },
   ): Promise<void>;
   getVersionHistory?(): Promise<VersionHistoryEntry[]>;
   prepareImportMirrorFiles?(): Promise<void>;
@@ -71,6 +74,10 @@ export interface ProjectRepository {
     metadata: VersionSnapshotMetadata,
   ): Promise<VersionHistoryEntry>;
   loadVersion?(versionId: string): Promise<ProjectDocument | null>;
+  materializeLocalAsset?(
+    fileName: string,
+    blob: Blob,
+  ): Promise<{ fileName: string; objectUrl: string } | undefined>;
 }
 
 export interface MirrorFile {

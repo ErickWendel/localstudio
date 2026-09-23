@@ -87,13 +87,13 @@ async function persist() {
   }
 }
 
-function readBlob(objectUrl: string | undefined) {
+function readRememberedBlob(objectUrl: string | undefined) {
   if (!objectUrl || !isClipboardMediaReference(objectUrl)) return undefined;
   return rememberedBlobs.get(referenceId(objectUrl));
 }
 
 function resolveObjectUrl(objectUrl: string | undefined) {
-  const blob = readBlob(objectUrl);
+  const blob = readRememberedBlob(objectUrl);
   if (!blob) return objectUrl;
   return createObjectUrl(blob) ?? objectUrl;
 }
@@ -122,7 +122,7 @@ function hasExternalReference(payload: unknown) {
   const assets = readPayloadAssets(payload);
   if (!assets) return false;
   return Object.values(assets).some(
-    (asset) => isClipboardMediaReference(asset.objectUrl) && !readBlob(asset.objectUrl),
+    (asset) => isClipboardMediaReference(asset.objectUrl) && !readRememberedBlob(asset.objectUrl),
   );
 }
 
@@ -132,7 +132,7 @@ async function hydrate(payload: unknown) {
   const slide = payload as SlideClipboardState;
   const missingIds = Object.values(assets).flatMap((asset) => {
     const objectUrl = asset.objectUrl;
-    if (!objectUrl || !isClipboardMediaReference(objectUrl) || readBlob(objectUrl)) return [];
+    if (!objectUrl || !isClipboardMediaReference(objectUrl) || readRememberedBlob(objectUrl)) return [];
     return [referenceId(objectUrl)];
   });
   const factory = getIndexedDB();
@@ -172,6 +172,7 @@ export const slideClipboardMedia = {
   hydrate,
   isClipboardMediaReference,
   persist,
+  readRememberedBlob,
   remember,
   resolveSlidePayload,
 };

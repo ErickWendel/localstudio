@@ -1382,6 +1382,11 @@ export function CanvasWorkspace({
           asset?.name ?? (element.type === 'video' ? 'Imported video' : 'Imported GIF')
         }
         assetUrl={asset?.objectUrl}
+        posterUrl={
+          element.type === 'video' && element.posterAssetId
+            ? project.assets[element.posterAssetId]?.objectUrl
+            : undefined
+        }
         element={element}
         interactive={presentationMode || readOnly}
         opacity={getAnimationOpacity(element.opacity, animationState)}

@@ -1,4 +1,5 @@
 import type { ProjectDocument, TranscriptRecording } from '../../domain/documents/model';
+import { duplicateProjectDocument } from '../../domain/projects/duplicateProjectDocument';
 import type {
   MirrorFile,
   ProjectRepository,
@@ -8,6 +9,8 @@ import type {
 } from '../contracts/interfaces';
 import { browserStorage, type BrowserKeyValueStorage } from '../browser/browserStorage';
 import { assetFileUtils } from './assetFileUtils';
+import { copyMissingFileBackedProjectFiles } from './copyMissingFileBackedProjectFiles';
+import { materializeLocalAssetFile } from './materializeLocalAssetFile';
 import { projectVersionHistoryUtils } from './projectVersionHistoryUtils';
 
 interface OpfsProjectRepositoryOptions {
@@ -217,6 +220,7 @@ function normalizeProjectDirectoryName(projectName: string | undefined) {
 export class OpfsProjectRepository implements ProjectRepository {
   private directoryHandle: FileSystemDirectoryHandle | null = null;
   private projectDirectoryName: string | null = null;
+  private sourceDirectoryForNextSave: FileSystemDirectoryHandle | null = null;
   private readonly storage: BrowserKeyValueStorage | undefined;
 
   constructor(private readonly options: OpfsProjectRepositoryOptions = {}) {
@@ -259,14 +263,34 @@ export class OpfsProjectRepository implements ProjectRepository {
     return this.readProjectFromDirectory(this.directoryHandle);
   }
 
+  async materializeLocalAsset(fileName: string, blob: Blob) {
+    if (!this.directoryHandle) return undefined;
+    const assetsDirectory = await this.directoryHandle.getDirectoryHandle('assets', { create: true });
+    return materializeLocalAssetFile(assetsDirectory, fileName, blob);
+  }
+
   async saveProject(
     project: ProjectDocument,
-    options?: { projectDirectoryName?: string },
+    options?: { duplicate?: boolean; projectDirectoryName?: string },
   ): Promise<void> {
     const previousProjectDirectoryName = this.projectDirectoryName;
+    const sourceDirectory = this.sourceDirectoryForNextSave ?? this.directoryHandle;
+    this.sourceDirectoryForNextSave = null;
+    const projectToSave = options?.duplicate
+      ? duplicateProjectDocument(project, {
+          createId: () => project.id,
+          name: project.name,
+          now: () => project.updatedAt,
+        })
+      : project;
     const directoryHandle = await this.ensureProjectDirectory(
-      options?.projectDirectoryName ?? project.name,
+      options?.projectDirectoryName ?? projectToSave.name,
     );
+    if (sourceDirectory && sourceDirectory !== directoryHandle) {
+      await copyMissingFileBackedProjectFiles(sourceDirectory, directoryHandle, projectToSave, {
+        includeRecordings: options?.duplicate !== true,
+      });
+    }
     const assetsDirectory = await directoryHandle.getDirectoryHandle('assets', { create: true });
     const fontsDirectory = await directoryHandle.getDirectoryHandle('fonts', { create: true });
     const recordingsDirectory = await directoryHandle.getDirectoryHandle('recordings', {
@@ -278,7 +302,7 @@ export class OpfsProjectRepository implements ProjectRepository {
     ]);
 
     const projectForDisk = await createFileBackedProjectSnapshot(
-      project,
+      projectToSave,
       assetsDirectory,
       fontsDirectory,
       recordingsDirectory,
@@ -326,8 +350,9 @@ export class OpfsProjectRepository implements ProjectRepository {
 
   async saveProjectAs(
     project: ProjectDocument,
-    options?: { projectDirectoryName?: string },
+    options?: { duplicate?: boolean; projectDirectoryName?: string },
   ): Promise<void> {
+    this.sourceDirectoryForNextSave = this.directoryHandle;
     this.directoryHandle = null;
     this.projectDirectoryName = null;
     await this.saveProject(project, options);

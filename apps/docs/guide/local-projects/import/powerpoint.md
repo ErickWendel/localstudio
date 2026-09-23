@@ -12,3 +12,5 @@ Use PowerPoint import when an existing deck should become a LocalStudio project.
 ## Result
 
 Imported content becomes a LocalStudio document where supported text, image, shape, and media layers can keep moving through the editor workflow.
+
+The importer keeps video poster frames, converts uncompressed TIFF images to PNG for browser display, and preserves custom DrawingML clip paths and freeform lines. Inherited title capitalization is applied without dropping the slide text.

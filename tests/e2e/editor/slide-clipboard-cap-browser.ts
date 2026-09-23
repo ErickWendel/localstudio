@@ -20,6 +20,18 @@ export function readClipboardText() {
   return navigator.clipboard.readText();
 }
 
+export function listLocalAssetFiles(projectFolderName: string) {
+  const marker = `/${projectFolderName}/assets/`;
+  const names: string[] = [];
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+    const markerIndex = key?.indexOf(marker) ?? -1;
+    if (!key || markerIndex < 0) continue;
+    names.push(key.slice(markerIndex + marker.length));
+  }
+  return names;
+}
+
 export function readCanvasMediaSrc() {
   const media = document.querySelector(
     '[aria-label="Canvas workspace"] img, [aria-label="Canvas workspace"] video',

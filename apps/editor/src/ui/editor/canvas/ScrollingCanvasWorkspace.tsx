@@ -9,6 +9,7 @@ import {
   useRef,
 } from 'react';
 import type { ElementStylePatch } from '../../../domain/commands/elements/basicCommands';
+import { SlideCopyControl } from '../persistence/SlideCopyControl';
 import { CanvasWorkspace } from './CanvasWorkspace';
 import { TextSelectionToolbar } from '../toolbars/TextSelectionToolbar';
 
@@ -22,7 +23,9 @@ interface ScrollingCanvasWorkspaceProps extends CanvasWorkspaceProps {
   onActivePageFromScroll?: ((pageId: string) => void) | undefined;
   onDeletePage?: ((pageId: string) => void) | undefined;
   onDuplicatePage?: ((pageId: string) => void) | undefined;
+  canCopyPages?: boolean;
   onCopyPage?: ((pageId: string) => void) | undefined;
+  onSaveLocalProject?: (() => void) | undefined;
   onRenamePage?: ((pageId: string, name: string) => void) | undefined;
   onReorderPage?: ((pageId: string, targetIndex: number) => void) | undefined;
   onSetPageVisibility?: ((pageId: string, visible: boolean) => void) | undefined;
@@ -49,7 +52,9 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
       onAddPage,
       onDeletePage,
       onDuplicatePage,
+      canCopyPages = true,
       onCopyPage,
+      onSaveLocalProject,
       onRenamePage,
       onReorderPage,
       onSetPageVisibility,
@@ -208,7 +213,9 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
                 {...(onAddPage ? { onAddPage } : {})}
                 {...(onDeletePage ? { onDeletePage } : {})}
                 {...(onDuplicatePage ? { onDuplicatePage } : {})}
+                canCopyPage={canCopyPages}
                 {...(onCopyPage ? { onCopyPage } : {})}
+                {...(onSaveLocalProject ? { onSaveLocalProject } : {})}
                 {...(onRenamePage ? { onRenamePage } : {})}
                 {...(onReorderPage ? { onReorderPage } : {})}
                 {...(onSetPageVisibility ? { onSetPageVisibility } : {})}
@@ -284,7 +291,9 @@ interface PageHeaderProps {
   onAddPage?: (afterPageId?: string) => void;
   onDeletePage?: (pageId: string) => void;
   onDuplicatePage?: (pageId: string) => void;
+  canCopyPage?: boolean;
   onCopyPage?: (pageId: string) => void;
+  onSaveLocalProject?: () => void;
   onRenamePage?: (pageId: string, name: string) => void;
   onReorderPage?: (pageId: string, targetIndex: number) => void;
   onSetPageVisibility?: (pageId: string, visible: boolean) => void;
@@ -304,7 +313,9 @@ function PageHeader({
   onAddPage,
   onDeletePage,
   onDuplicatePage,
+  canCopyPage = true,
   onCopyPage,
+  onSaveLocalProject,
   onRenamePage,
   onReorderPage,
   onSetPageVisibility,
@@ -346,10 +357,11 @@ function PageHeader({
           icon="library_add"
           onClick={() => onDuplicatePage?.(pageId)}
         />
-        <IconAction
+        <SlideCopyControl
+          canCopy={canCopyPage}
           label={`Copy ${name} to clipboard`}
-          icon="file_copy"
-          onClick={() => onCopyPage?.(pageId)}
+          {...(onCopyPage ? { onCopy: () => onCopyPage(pageId) } : {})}
+          {...(onSaveLocalProject ? { onSaveLocal: onSaveLocalProject } : {})}
         />
         <IconAction
           disabled={!canTranslate}

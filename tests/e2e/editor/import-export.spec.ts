@@ -1,6 +1,7 @@
 import { buffer } from 'node:stream/consumers';
 import { strFromU8, unzipSync } from 'fflate';
 import { EditorAppPage } from '../pages/editor-app.page';
+import { fakeOpfsInitScript } from '../support/fake-opfs-init-script';
 import { installPptxFilePicker } from '../support/pptx-file-picker';
 import { createLayoutPptxFixture } from '../support/pptx-layout-fixture';
 import { createTinyPngFixture } from '../support/test-assets';
@@ -80,9 +81,16 @@ test.describe('editor import and export journey', () => {
       origin: getServer().baseURL,
     });
     await page.evaluate(() => navigator.clipboard.writeText('clipboard sentinel'));
-    await page
-      .getByRole('button', { name: 'Copy Slide 1 to clipboard' })
-      .evaluate((button: HTMLButtonElement) => button.click());
+    await page.evaluate((script) => {
+      (0, eval)(script);
+    }, fakeOpfsInitScript.build({ directoryPicker: true }));
+    const copyButton = page.getByRole('button', { name: 'Copy Slide 1 to clipboard' });
+    await expect(copyButton).toBeDisabled();
+    await page.getByRole('button', { name: 'Save now' }).first().click();
+    const localSave = page.getByRole('dialog', { name: 'Save local project' });
+    await localSave.getByRole('button', { name: 'Choose folder' }).click();
+    await expect(copyButton).toBeEnabled();
+    await copyButton.evaluate((button: HTMLButtonElement) => button.click());
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
       .toContain('"objectUrl":"data:image/');
