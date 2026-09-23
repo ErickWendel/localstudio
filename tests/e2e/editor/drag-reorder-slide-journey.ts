@@ -22,9 +22,9 @@ export async function reorderSlides(editor: EditorAppPage, page: Page) {
     targetPosition: { x: 40, y: 5 },
   });
   await expect(pageCards.nth(0)).toHaveAttribute('aria-label', 'Page 1: Agenda');
-  await expect(pageCards.nth(1)).toHaveAttribute('aria-label', 'Page 2: Slide 1');
+  await expect(pageCards.nth(1)).toHaveAttribute('aria-label', 'Page 2: Slide 2');
   await expect(pageCards.nth(2)).toHaveAttribute('aria-label', 'Page 3: Appendix');
 
-  await pagesPanel.getByRole('button', { name: 'Select Slide 1' }).click();
+  await pagesPanel.getByRole('button', { name: 'Select Slide 2' }).click();
   await expect(page.getByText('2 / 3')).toBeVisible();
 }

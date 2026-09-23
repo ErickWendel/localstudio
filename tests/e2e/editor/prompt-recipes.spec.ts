@@ -31,7 +31,10 @@ test.describe('editor prompt recipe journey with mocked browser AI providers', (
     );
     await page.getByRole('button', { name: 'Submit prompt' }).click();
 
-    await expect(page.getByText('Page 1 - AI generated slide')).toBeVisible({
+    const pageOne = page.locator('.scroll-page').filter({
+      has: page.getByText('Page 1 -', { exact: true }),
+    });
+    await expect(pageOne.getByRole('button', { name: 'Rename AI generated slide' })).toBeVisible({
       timeout: 30_000,
     });
     await editor.openTool('Layout');
