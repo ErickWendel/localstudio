@@ -25,6 +25,7 @@ function CanvasVideoElement({
   assetName,
   assetUrl,
   element,
+  posterUrl,
   interactive,
   opacity,
   previewMode,
@@ -35,6 +36,7 @@ function CanvasVideoElement({
   assetName: string;
   assetUrl: string | undefined;
   element: VideoElement;
+  posterUrl?: string | undefined;
   interactive: boolean;
   opacity: number;
   previewMode: boolean;
@@ -257,6 +259,7 @@ function CanvasVideoElement({
       loop={repeatMode === 'loop' && element.trimEndSeconds === undefined}
       muted={element.muted}
       playsInline
+      {...(posterUrl ? { poster: posterUrl } : {})}
       preload="auto"
       ref={videoRef}
       src={assetUrl}
@@ -328,6 +331,7 @@ export function CanvasMediaElement({
   assetName,
   assetUrl,
   element,
+  posterUrl,
   interactive,
   opacity,
   previewMode,
@@ -338,6 +342,7 @@ export function CanvasMediaElement({
   assetName: string;
   assetUrl: string | undefined;
   element: GifElement | VideoElement;
+  posterUrl?: string | undefined;
   interactive: boolean;
   opacity: number;
   previewMode: boolean;
@@ -368,6 +373,7 @@ export function CanvasMediaElement({
       assetName={assetName}
       assetUrl={assetUrl}
       element={element}
+      posterUrl={posterUrl}
       animationState={animationState}
       interactive={interactive}
       opacity={opacity}

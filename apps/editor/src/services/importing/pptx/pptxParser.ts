@@ -20,6 +20,7 @@ import type {
 import { pptxParserDefaults } from './pptx-parser-model';
 import { pptxTextParser } from './pptxTextParser';
 import { pptxVisualStyle } from './pptx-visual-style';
+import { pptxCustomGeometry } from './pptxCustomGeometry';
 import { pptxFileUtils } from './pptxFileUtils';
 import type { PptxRelationship } from './pptxPackage';
 import { pptxXml } from './pptxXml';
@@ -219,9 +220,11 @@ function parsePictureObject(
   const imageRelId =
     pptxXml.getRelationshipAttr(pptxXml.firstDescendant(picture, 'blip'), 'embed') ??
     pptxXml.getRelationshipAttr(pptxXml.firstDescendant(picture, 'svgBlip'), 'embed');
-  const assetPath =
-    getRelationshipTarget(context, relationships, videoRelId, slideId) ??
-    getRelationshipTarget(context, relationships, imageRelId, slideId);
+  const videoAssetPath = getRelationshipTarget(context, relationships, videoRelId, slideId);
+  const imageAssetPath = getRelationshipTarget(context, relationships, imageRelId, slideId);
+  const assetPath = videoAssetPath ?? imageAssetPath;
+  const posterAssetPath = videoAssetPath && imageAssetPath !== videoAssetPath ? imageAssetPath : undefined;
+  const clipPath = pptxCustomGeometry.parse(picture);
   if (!assetPath && idScope !== 'slide' && placeholderIndex) {
     const shapeId = localShapeId(picture, String(zIndex));
     return {
@@ -260,6 +263,7 @@ function parsePictureObject(
   const resolvedFrame = frame ?? { height: 1, width: 1, x: 0, y: 0, rotation: 0 };
   return {
     assetPath,
+    ...(clipPath ? { clipPath } : {}),
     ...(crop ? { crop } : {}),
     frame: resolvedFrame,
     frameSource: frame ? 'self' : 'inherited',
@@ -268,6 +272,7 @@ function parsePictureObject(
     ...(mask && assetType === 'image' ? { mask } : {}),
     ...(opacity !== undefined ? { opacity } : {}),
     ...(placeholderIndex ? { placeholderIndex } : {}),
+    ...(posterAssetPath ? { posterAssetPath } : {}),
     rotation: resolvedFrame.rotation,
     source: idScope,
     sourceShapeId: shapeId,
@@ -312,6 +317,7 @@ function parseShapeImageFillObject(
   const shapeId = localShapeId(shape, String(zIndex));
   const opacity = pptxVisualStyle.getOpacity(shapeProperties);
   const crop = parsePictureCrop(blipFill);
+  const clipPath = pptxCustomGeometry.parse(shape);
   const mask =
     shapeProperties &&
     pptxXml.firstDescendant(shapeProperties, 'prstGeom')?.getAttribute('prst') === 'ellipse'
@@ -319,6 +325,7 @@ function parseShapeImageFillObject(
       : undefined;
   return {
     assetPath,
+    ...(clipPath ? { clipPath } : {}),
     ...(crop ? { crop } : {}),
     frame,
     frameSource: 'self',
@@ -476,7 +483,8 @@ function parseShapeObject(
   idScope: 'layout' | 'master' | 'slide' = 'slide',
 ): PptxSlideObject | undefined {
   const preset = pptxXml.firstDescendant(shape, 'prstGeom')?.getAttribute('prst');
-  const shapeKind = shapeKindForPreset(preset);
+  const customPath = preset ? undefined : pptxCustomGeometry.toShapePath(shape);
+  const shapeKind = shapeKindForPreset(preset) ?? (customPath ? 'line' : undefined);
   if (!shapeKind) return undefined;
   const frame = parseFrame(shape, scaleX, scaleY, scope.groupTransform);
   if (!frame) return undefined;
@@ -491,7 +499,7 @@ function parseShapeObject(
   const endEndpoint = getLineEndpoint(pptxXml.firstDescendant(line ?? shape, 'tailEnd')?.getAttribute('type'));
   const strokeWidth = getStrokeWidth(line, scaleY);
   const lineDash = getLineDash(line);
-  const path = pptxConnectorGeometry.getPath(shape, preset, frame);
+  const path = customPath ?? pptxConnectorGeometry.getPath(shape, preset, frame);
   const connectorPreset = isConnectorPreset(preset) ? preset : undefined;
   return {
     frame,

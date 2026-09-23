@@ -10,6 +10,7 @@ import type {
   ShapeLineDash,
   ShapeLineEndpoint,
   ShapePath,
+  VectorPathCommand,
 } from '../../../domain/documents/model';
 import type { PptxPackage } from './pptxPackage';
 
@@ -118,7 +119,9 @@ export type PptxSlideObject =
       frameSource?: 'inherited' | 'self';
       id: string;
       kind: 'image' | 'gif' | 'video';
+      clipPath?: VectorPathCommand[];
       mask?: 'ellipse';
+      posterAssetPath?: string;
       opacity?: number;
       placeholderIndex?: string;
       placeholderOnly?: boolean;

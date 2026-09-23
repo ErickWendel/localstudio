@@ -1,7 +1,7 @@
 import type Konva from 'konva';
 import { Group, Image as KonvaImage, Rect } from 'react-konva';
 import { placeholderImage } from '../../../domain/assets/placeholderImage';
-import type { DesignElement } from '../../../domain/documents/model';
+import type { DesignElement, VectorPathCommand } from '../../../domain/documents/model';
 import { canvasWorkspaceUtils } from './canvasWorkspaceUtils';
 import type { CommonElementProps } from './canvas-element-props';
 
@@ -70,22 +70,12 @@ export function CanvasImageElement({
     );
   }
 
-  if (element.mask === 'ellipse') {
+  if (element.clipPath || element.mask === 'ellipse') {
     return (
       <Group
         {...imageProps}
         clipFunc={(context) => {
-          context.beginPath();
-          context.ellipse(
-            imageProps.width / 2,
-            imageProps.height / 2,
-            imageProps.width / 2,
-            imageProps.height / 2,
-            0,
-            0,
-            Math.PI * 2,
-          );
-          context.closePath();
+          clipImage(context, imageProps.width, imageProps.height, element.clipPath);
         }}
         ref={nodeRef}
       >
@@ -109,6 +99,39 @@ export function CanvasImageElement({
       ref={nodeRef}
     />
   );
+}
+
+function clipImage(
+  context: Pick<
+    CanvasRenderingContext2D,
+    'beginPath' | 'bezierCurveTo' | 'closePath' | 'ellipse' | 'lineTo' | 'moveTo'
+  >,
+  width: number,
+  height: number,
+  clipPath: VectorPathCommand[] | undefined,
+) {
+  context.beginPath();
+  if (!clipPath) {
+    context.ellipse(width / 2, height / 2, width / 2, height / 2, 0, 0, Math.PI * 2);
+    context.closePath();
+    return;
+  }
+  for (const command of clipPath) {
+    if (command.type === 'move') context.moveTo((command.x ?? 0) * width, (command.y ?? 0) * height);
+    if (command.type === 'line') context.lineTo((command.x ?? 0) * width, (command.y ?? 0) * height);
+    if (command.type === 'cubic') {
+      context.bezierCurveTo(
+        (command.cx1 ?? 0) * width,
+        (command.cy1 ?? 0) * height,
+        (command.cx2 ?? 0) * width,
+        (command.cy2 ?? 0) * height,
+        (command.x ?? 0) * width,
+        (command.y ?? 0) * height,
+      );
+    }
+    if (command.type === 'close') context.closePath();
+  }
+  context.closePath();
 }
 
 function fitPlaceholderVisualFrame(input: {

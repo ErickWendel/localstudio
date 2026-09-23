@@ -341,9 +341,20 @@ export interface TextRun {
   textDecoration?: 'line-through' | 'underline';
 }
 
+export interface VectorPathCommand {
+  type: 'close' | 'cubic' | 'line' | 'move';
+  cx1?: number;
+  cy1?: number;
+  cx2?: number;
+  cy2?: number;
+  x?: number;
+  y?: number;
+}
+
 export interface ImageElement extends BaseElement {
   type: 'image';
   assetId: string;
+  clipPath?: VectorPathCommand[];
   crop?: CropRect;
   flipX?: boolean;
   mask?: 'ellipse';
@@ -360,6 +371,7 @@ export type VideoRepeatMode = 'loop' | 'loop-back-and-forth' | 'none';
 export interface VideoElement extends BaseElement {
   type: 'video';
   assetId: string;
+  posterAssetId?: string;
   loop: boolean;
   controls: boolean;
   muted: boolean;

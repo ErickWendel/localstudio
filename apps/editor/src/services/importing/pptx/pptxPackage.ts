@@ -2,6 +2,7 @@ import type { ImportWarning } from '../../../domain/documents/model';
 import type { PptxPackageFile } from './pptxPackageTypes';
 import { pptxFileUtils } from './pptxFileUtils';
 import { pptxImageDimensions } from './pptxImageDimensions';
+import { pptxTiffRaster } from './pptxTiffRaster';
 import { pptxXml } from './pptxXml';
 
 export interface PptxRelationship {
@@ -93,20 +94,61 @@ function parseRelationships(xml: string | undefined, sourcePath: string) {
   return relationships;
 }
 
+async function rasterizeBrowserImage(file: PptxPackageFile, mimeType: string | undefined) {
+  const lowerPath = file.path.toLowerCase();
+  if (mimeType !== 'image/tiff' && mimeType !== 'image/tif' && !lowerPath.endsWith('.tif') && !lowerPath.endsWith('.tiff')) {
+    return file;
+  }
+  const png = pptxTiffRaster.toPng(new Uint8Array(await file.blob.arrayBuffer()));
+  if (!png) return file;
+  return {
+    ...file,
+    blob: new Blob([png], { type: 'image/png' }),
+  };
+}
+
 async function create(files: PptxPackageFile[]): Promise<PptxPackage> {
   const filesByPath = new Map(files.map((file) => [file.path, file]));
   const { defaults, overrides } = parseContentTypes(await readText(filesByPath.get(CONTENT_TYPES_PATH)));
-  const enrichedFiles = await Promise.all(
+  const warnings: ImportWarning[] = [];
+  const convertedMimeTypes = new Map<string, string>();
+  const displayFiles = await Promise.all(
     files.map(async (file) => {
-      const imageSize = await pptxImageDimensions.getSize(file, getContentTypeForPath(file.path, defaults, overrides));
+      const sourceMimeType = getContentTypeForPath(file.path, defaults, overrides);
+      const rasterized = await rasterizeBrowserImage(file, sourceMimeType);
+      if (rasterized.blob !== file.blob) {
+        convertedMimeTypes.set(file.path, 'image/png');
+        return rasterized;
+      }
+      if (
+        sourceMimeType === 'image/tiff' ||
+        sourceMimeType === 'image/tif' ||
+        file.path.toLowerCase().endsWith('.tif') ||
+        file.path.toLowerCase().endsWith('.tiff')
+      ) {
+        warnings.push({
+          code: 'pptx-unsupported-tiff',
+          message: `PowerPoint TIFF ${file.path} could not be converted for browser display.`,
+          severity: 'warning',
+        });
+      }
+      return file;
+    }),
+  );
+  const enrichedFiles = await Promise.all(
+    displayFiles.map(async (file) => {
+      const imageSize = await pptxImageDimensions.getSize(
+        file,
+        convertedMimeTypes.get(file.path) ?? getContentTypeForPath(file.path, defaults, overrides),
+      );
       return imageSize ? { ...file, imageSize } : file;
     }),
   );
   const enrichedFilesByPath = new Map(enrichedFiles.map((file) => [file.path, file]));
   const relationshipCache = new Map<string, Map<string, PptxRelationship>>();
-  const warnings: ImportWarning[] = [];
 
   const getContentType = (path: string) =>
+    convertedMimeTypes.get(pptxFileUtils.normalizePath(path)) ??
     getContentTypeForPath(path, defaults, overrides);
 
   const getRelationships = (sourcePath: string) => {
