@@ -21,8 +21,15 @@ function preferredFileName(assetId: string, asset: Asset) {
   return asset.fileName ?? `${assetId}.${assetFileUtils.getAssetFileExtension(asset.mimeType)}`;
 }
 
-function blobForAsset(asset: Asset) {
-  return slideClipboardMedia.readRememberedBlob(asset.objectUrl);
+async function readAssetBlob(asset: Asset) {
+  const remembered = slideClipboardMedia.readRememberedBlob(asset.objectUrl);
+  if (remembered) return remembered;
+  if (!assetFileUtils.isDataUrl(asset.objectUrl)) return undefined;
+  try {
+    return await assetFileUtils.objectUrlToBlob(asset.objectUrl);
+  } catch {
+    return undefined;
+  }
 }
 
 export async function materializeSlideClipboardAssets(
@@ -35,12 +42,7 @@ export async function materializeSlideClipboardAssets(
 
   const assets: SlideClipboardState['assets'] = {};
   for (const [assetId, asset] of Object.entries(slide.assets)) {
-    let blob: Blob | undefined;
-    try {
-      blob = blobForAsset(asset);
-    } catch {
-      blob = undefined;
-    }
+    const blob = await readAssetBlob(asset);
     if (!blob || !materialize) {
       assets[assetId] = withoutSourceFileClaim(asset);
       continue;

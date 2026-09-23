@@ -45,6 +45,7 @@ import type { PptxImportInput } from '../../../services/importing/pptx/pptxImpor
 import { pptxFontRequests } from '../../../services/importing/pptx/pptxFontRequests';
 import { pptxImportLogger } from '../../../services/importing/pptx/pptxImportLogger';
 import { minioMirrorService } from '../../../services/mirror/minioMirrorService';
+import { projectForCloudMirror } from '../../../services/mirror/projectForCloudMirror';
 import type { MinioMirrorConfig } from '../../../services/mirror/minioMirrorService';
 import { aiModelCatalog } from '../../../services/model-setup/aiModelCatalog';
 import { imageGenerationModel } from '../../../services/image-generation/imageGenerationModel';
@@ -2141,15 +2142,22 @@ export function useEditorViewModel(services: AppServices) {
       return;
     }
     mirrorSyncInFlightRef.current = true;
+    let syncFailed = false;
     setMirrorSyncProgress({ current: 0, label: 'Preparing mirror', total: 1 });
     setMirrorState((current) => {
       const { error, ...rest } = current;
       void error;
       return { ...rest, enabled: true, status: 'syncing' };
     });
+    let releaseMirrorProject: () => void = () => undefined;
     try {
+      const persistedProject = services.projectRepository.readPersistedProject
+        ? await services.projectRepository.readPersistedProject().catch(() => null)
+        : null;
+      const mirrorProject = projectForCloudMirror(projectToSync, persistedProject);
+      releaseMirrorProject = mirrorProject.release;
       const nextState = await services.mirrorService.syncProject(
-        projectToSync,
+        mirrorProject.project,
         services.projectRepository,
         mirrorConfigRef.current!,
         {
@@ -2163,29 +2171,31 @@ export function useEditorViewModel(services: AppServices) {
       const previousMirroredProjectName = lastMirroredProjectNameRef.current;
       if (
         previousMirroredProjectName &&
-        previousMirroredProjectName !== projectToSync.name &&
+        previousMirroredProjectName !== mirrorProject.project.name &&
         services.mirrorService.deleteProject
       ) {
         await services.mirrorService.deleteProject(previousMirroredProjectName, config);
       }
-      lastMirroredProjectNameRef.current = projectToSync.name;
+      lastMirroredProjectNameRef.current = mirrorProject.project.name;
       setMirrorState(nextState);
       if (nextState.status === 'synced') {
         services.analyticsService.capture(postHogEvents.projectSyncedRemoteMirror, {
-          pageCount: projectToSync.pages.length,
+          pageCount: mirrorProject.project.pages.length,
         });
       }
     } catch (error: unknown) {
+      syncFailed = true;
       setMirrorState({
         enabled: true,
         status: 'failed',
         error: error instanceof Error ? error.message : 'Remote storage sync failed.',
       });
     } finally {
+      releaseMirrorProject();
       mirrorSyncInFlightRef.current = false;
       setMirrorSyncProgress(undefined);
       if (mirrorSyncQueuedRef.current) {
-        const shouldSyncLatestProject = projectRef.current !== projectToSync;
+        const shouldSyncLatestProject = syncFailed || projectRef.current !== projectToSync;
         mirrorSyncQueuedRef.current = false;
         if (shouldSyncLatestProject) {
           void syncMirrorNow();

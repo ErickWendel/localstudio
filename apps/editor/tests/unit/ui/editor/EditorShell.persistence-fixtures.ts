@@ -45,6 +45,10 @@ class SavingProjectRepository implements ProjectRepository {
     return Promise.resolve(null);
   }
 
+  readPersistedProject(): Promise<ProjectDocument | null> {
+    return Promise.resolve(null);
+  }
+
   saveProject(project: ProjectDocument): Promise<void> {
     this.savedProjects.push(project);
     return Promise.resolve();

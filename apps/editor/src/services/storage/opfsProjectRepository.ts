@@ -263,6 +263,17 @@ export class OpfsProjectRepository implements ProjectRepository {
     return this.readProjectFromDirectory(this.directoryHandle);
   }
 
+  async readPersistedProject() {
+    if (!this.directoryHandle) return null;
+    try {
+      return await this.readProjectFromDirectory(this.directoryHandle, {
+        allowMissingAssetFiles: true,
+      });
+    } catch {
+      return null;
+    }
+  }
+
   async materializeLocalAsset(fileName: string, blob: Blob) {
     if (!this.directoryHandle) return undefined;
     const assetsDirectory = await this.directoryHandle.getDirectoryHandle('assets', { create: true });
