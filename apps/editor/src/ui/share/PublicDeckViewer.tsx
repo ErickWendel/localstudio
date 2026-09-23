@@ -758,17 +758,22 @@ function PublicTranscriptPodcastPlayer({
     }
     previousRecordingIdRef.current = selectedRecording?.id;
     if (audio) {
+      suppressMediaSyncRef.current = true;
       audio.pause();
       audio.load();
       audio.currentTime = 0;
     }
     lastSyncedChapterIdRef.current = undefined;
     const timeoutId = window.setTimeout(() => {
+      suppressMediaSyncRef.current = false;
       setCurrentTimeMs(0);
       setDurationMs(selectedRecording?.durationMs ?? 0);
       setPlaying(false);
     }, 0);
-    return () => window.clearTimeout(timeoutId);
+    return () => {
+      window.clearTimeout(timeoutId);
+      suppressMediaSyncRef.current = false;
+    };
   }, [selectedRecording?.durationMs, selectedRecording?.id]);
 
   useEffect(() => {
@@ -965,14 +970,14 @@ function PublicTranscriptPodcastPlayer({
         onLoadedMetadata={(event) => {
           if (!syncIdleAudioToActivePageChapter(event.currentTarget)) updateProgress();
         }}
-        onPause={() => {
+        onPause={(event) => {
           if (suppressMediaSyncRef.current) return;
           setPlaying(false);
-          publishPlaybackSync(currentTimeMs, false);
+          publishPlaybackSync(Math.round(event.currentTarget.currentTime * 1000), false);
         }}
-        onPlay={() => {
+        onPlay={(event) => {
           setPlaying(true);
-          publishPlaybackSync(currentTimeMs, true);
+          publishPlaybackSync(Math.round(event.currentTarget.currentTime * 1000), true);
         }}
         onTimeUpdate={updateProgress}
       >
@@ -1195,17 +1200,22 @@ function PublicDeckPlaybackOverlay({
     }
     previousRecordingIdRef.current = selectedRecording?.id;
     if (audio) {
+      suppressMediaSyncRef.current = true;
       audio.pause();
       audio.currentTime = 0;
       audio.load();
     }
     lastSyncedChapterIdRef.current = undefined;
     const timeoutId = window.setTimeout(() => {
+      suppressMediaSyncRef.current = false;
       setCurrentTimeMs(0);
       setDurationMs(selectedRecording?.durationMs ?? 0);
       setPlaying(false);
     }, 0);
-    return () => window.clearTimeout(timeoutId);
+    return () => {
+      window.clearTimeout(timeoutId);
+      suppressMediaSyncRef.current = false;
+    };
   }, [selectedRecording?.durationMs, selectedRecording?.id]);
 
   useEffect(() => {
@@ -1351,14 +1361,14 @@ function PublicDeckPlaybackOverlay({
             }
             updateProgress();
           }}
-          onPause={() => {
+          onPause={(event) => {
             setPlaying(false);
             if (suppressMediaSyncRef.current) return;
-            publishPlaybackSync(currentTimeMs, false);
+            publishPlaybackSync(Math.round(event.currentTarget.currentTime * 1000), false);
           }}
-          onPlay={() => {
+          onPlay={(event) => {
             setPlaying(true);
-            publishPlaybackSync(currentTimeMs, true);
+            publishPlaybackSync(Math.round(event.currentTarget.currentTime * 1000), true);
           }}
           onTimeUpdate={updateProgress}
         >

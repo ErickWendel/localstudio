@@ -379,7 +379,7 @@ describe('PublicDeckViewer', () => {
       panelAudio.dispatchEvent(new Event('timeupdate'));
     });
     await waitFor(() => {
-      expect(screen.getByText('0:02 / 0:02')).toBeInTheDocument();
+      expect(screen.getByLabelText('Podcast audio time')).toHaveTextContent('0:020:02');
     });
     await user.click(
       screen.getByRole('button', { name: 'Play transcript segment for slide 2 at 0:01' }),
