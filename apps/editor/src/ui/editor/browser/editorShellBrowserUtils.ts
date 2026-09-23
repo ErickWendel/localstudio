@@ -7,6 +7,7 @@ const EDITOR_OBJECT_CLIPBOARD_MARKER = '1';
 const MAX_EDITOR_OBJECT_CLIPBOARD_BYTES = 1024 * 1024;
 const MAX_SLIDE_CLIPBOARD_BYTES = 16 * 1024 * 1024;
 const SLIDE_CLIPBOARD_PREFIX = 'LocalStudio.dev slide: ';
+let pendingSlideClipboardText: string | undefined;
 
 function isEditableElement(target: EventTarget | null) {
   return (
@@ -77,11 +78,56 @@ async function resolveSlideClipboardPayload(payload: string | Promise<string>) {
   return `${SLIDE_CLIPBOARD_PREFIX}${resolvedPayload}`;
 }
 
+function slidePayloadFromClipboardText(text: string) {
+  if (!text.startsWith(SLIDE_CLIPBOARD_PREFIX)) return undefined;
+  const payload = text.slice(SLIDE_CLIPBOARD_PREFIX.length);
+  return payload.length <= MAX_SLIDE_CLIPBOARD_BYTES ? payload : undefined;
+}
+
+function isImageClipboardType(type: string) {
+  return type === 'Files' || type.startsWith('image/');
+}
+
+function textPrecedesImage(types: readonly string[]) {
+  const textIndex = types.indexOf('text/plain');
+  if (textIndex === -1) return false;
+  const imageIndex = types.findIndex(isImageClipboardType);
+  return imageIndex === -1 || textIndex < imageIndex;
+}
+
+function readPendingSlideClipboardText() {
+  return pendingSlideClipboardText;
+}
+
+function writeSlideClipboardTextSynchronously(payload: string) {
+  if (payload.length > MAX_SLIDE_CLIPBOARD_BYTES || typeof document === 'undefined') return false;
+  const text = `${SLIDE_CLIPBOARD_PREFIX}${payload}`;
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  pendingSlideClipboardText = text;
+  document.body.append(textarea);
+  try {
+    textarea.focus();
+    textarea.select();
+    return document.execCommand('copy');
+  } catch {
+    return false;
+  } finally {
+    textarea.remove();
+    pendingSlideClipboardText = undefined;
+  }
+}
+
 async function writeSlideClipboardPayload(payload: string | Promise<string>) {
   if (!navigator.clipboard) return false;
-  try {
-    if (navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
-      const clipboardText = resolveSlideClipboardPayload(payload);
+  const clipboardText = resolveSlideClipboardPayload(payload);
+  if (navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
+    try {
+      // text/plain is the only representation so it replaces a screenshot image
+      // instead of remaining behind it in clipboard type order.
       await navigator.clipboard.write([
         new ClipboardItem({
           'text/plain': clipboardText.then(
@@ -90,12 +136,29 @@ async function writeSlideClipboardPayload(payload: string | Promise<string>) {
         }),
       ]);
       return true;
+    } catch {
+      // A rejected ClipboardItem write must not leave the previous screenshot in place.
     }
-    if (!navigator.clipboard.writeText) return false;
-    await navigator.clipboard.writeText(await resolveSlideClipboardPayload(payload));
+  }
+  if (!navigator.clipboard.writeText) return false;
+  try {
+    await navigator.clipboard.writeText(await clipboardText);
     return true;
   } catch {
     return false;
+  }
+}
+
+async function readPrimarySlideClipboardPayload() {
+  if (!navigator.clipboard?.read) return undefined;
+  try {
+    const items = await navigator.clipboard.read();
+    const item = items[0];
+    if (!item || !textPrecedesImage(Array.from(item.types))) return undefined;
+    const blob = await item.getType('text/plain');
+    return slidePayloadFromClipboardText(await blob.text());
+  } catch {
+    return undefined;
   }
 }
 
@@ -123,10 +186,7 @@ async function makeSlideClipboardPayloadTransferable(
 }
 
 function readSlideClipboardPayload(clipboardData: DataTransfer | null) {
-  const text = clipboardData?.getData?.('text/plain') ?? '';
-  if (!text.startsWith(SLIDE_CLIPBOARD_PREFIX)) return undefined;
-  const payload = text.slice(SLIDE_CLIPBOARD_PREFIX.length);
-  return payload.length <= MAX_SLIDE_CLIPBOARD_BYTES ? payload : undefined;
+  return slidePayloadFromClipboardText(clipboardData?.getData?.('text/plain') ?? '');
 }
 
 function isWebMcpEnabled() {
@@ -152,7 +212,10 @@ export const editorShellBrowserUtils = {
   writeEditorObjectClipboardMarker,
   writeEditorObjectClipboardPayload,
   readEditorObjectClipboardPayload,
+  readPendingSlideClipboardText,
+  writeSlideClipboardTextSynchronously,
   writeSlideClipboardPayload,
+  readPrimarySlideClipboardPayload,
   makeSlideClipboardPayloadTransferable,
   readSlideClipboardPayload,
   isWebMcpEnabled,
