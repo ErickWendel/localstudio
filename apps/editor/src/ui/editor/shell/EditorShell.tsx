@@ -197,6 +197,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   const stageRef = useRef<Konva.Stage>(null);
   const imageExportStageRef = useRef<Konva.Stage>(null);
   const renderedExportInProgressRef = useRef(false);
+  const slideClipboardWriteRef = useRef(false);
   const workspaceRef = useRef<HTMLElement>(null);
   const slideFrameRef = useRef<HTMLDivElement>(null);
   const windowedExitHintTimerRef = useRef<number | undefined>(undefined);
@@ -1561,6 +1562,12 @@ function EditorDesktopShell({ services }: EditorShellProps) {
 
   useEffect(() => {
     function handleCopy(event: ClipboardEvent) {
+      const pendingSlideText = editorShellBrowserUtils.readPendingSlideClipboardText();
+      if (pendingSlideText) {
+        event.preventDefault();
+        event.clipboardData?.setData('text/plain', pendingSlideText);
+        return;
+      }
       if (isHistoryReadOnly) return;
       if (
         editorShellBrowserUtils.isEditableInteractionTarget(event.target) ||
@@ -1622,10 +1629,24 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         return;
       const imageFile = editorShellBrowserUtils.getClipboardImageFile(event.clipboardData);
       if (imageFile) {
-        void vm.importImageFile(imageFile);
+        void pasteImageUnlessSlideIsPrimary(imageFile);
         return;
       }
       vm.pasteCopiedElements();
+    }
+
+    async function pasteImageUnlessSlideIsPrimary(imageFile: File) {
+      const slidePayload = slideClipboardWriteRef.current
+        ? await editorShellBrowserUtils.readPrimarySlideClipboardPayload()
+        : undefined;
+      if (slidePayload) {
+        try {
+          if (vm.pasteSlideClipboardPayload(JSON.parse(slidePayload) as unknown)) return;
+        } catch {
+          // The system clipboard text is not a slide, so the image is the paste target.
+        }
+      }
+      await vm.importImageFile(imageFile);
     }
 
     window.addEventListener('copy', handleCopy);
@@ -1642,10 +1663,19 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     if (!vm.hasPersistedLocalProject) return;
     const payload = vm.getSlideClipboardPayload(pageId);
     if (!payload) return;
+    const immediatePayload = JSON.stringify(payload);
+    slideClipboardWriteRef.current = true;
+    // Replace a screenshot before asset inlining. Otherwise the image stays first
+    // on the clipboard until the transferable write resolves.
+    editorShellBrowserUtils.writeSlideClipboardTextSynchronously(immediatePayload);
     const transferablePayload = editorShellBrowserUtils
       .makeSlideClipboardPayloadTransferable(payload)
       .then((nextPayload) => JSON.stringify(nextPayload));
-    await editorShellBrowserUtils.writeSlideClipboardPayload(transferablePayload);
+    const wroteTransferable =
+      await editorShellBrowserUtils.writeSlideClipboardPayload(transferablePayload);
+    if (!wroteTransferable) {
+      editorShellBrowserUtils.writeSlideClipboardTextSynchronously(immediatePayload);
+    }
   }
 
   function requestLocalSaveForSlideCopy() {
