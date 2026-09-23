@@ -203,24 +203,29 @@ describe('EditorShell clipboard workflows', () => {
     expect(syncedProject?.pages).toHaveLength(2);
   });
 
-  it('warns and keeps the asset reference when a copied slide exceeds the clipboard cap', async () => {
+  it('copies a video over 200MB by reference and pastes a playable object URL', async () => {
     const user = userEvent.setup();
     const initialProject = sampleProject.createSampleProject();
     initialProject.assets['asset-hero'] = {
       ...initialProject.assets['asset-hero']!,
-      fileName: 'hero.png',
+      fileName: 'hero.mp4',
+      mimeType: 'video/mp4',
+      name: 'Hero video',
       objectUrl: 'blob:https://localstudio.dev/hero',
       storage: 'file',
+      type: 'video',
     };
     const services = createAppServices({ initialProject, skipStoredProjectLoad: true });
     const repository = new SavingProjectRepository();
     services.projectRepository = repository;
     const writeText = vi.fn<(text: string) => Promise<void>>(() => Promise.resolve());
-    const oversizedDataUrl = `data:image/png;base64,${'a'.repeat(16 * 1024 * 1024)}`;
+    const video = new Blob(['video-bytes'], { type: 'video/mp4' });
+    Object.defineProperty(video, 'size', { value: 200 * 1024 * 1024 });
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      blob: () => Promise.resolve(new Blob(['hero-bytes'], { type: 'image/png' })),
+      blob: () => Promise.resolve(video),
     } as Response);
-    vi.spyOn(assetFileUtils, 'blobToDataUrl').mockResolvedValue(oversizedDataUrl);
+    const blobToDataUrl = vi.spyOn(assetFileUtils, 'blobToDataUrl');
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:https://localstudio.dev/retained-video');
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: { writeText },
@@ -231,13 +236,14 @@ describe('EditorShell clipboard workflows', () => {
     await user.click(screen.getByRole('button', { name: 'Choose folder' }));
     await user.click(screen.getByRole('button', { name: 'Copy Slide 1 to clipboard' }));
 
-    expect(
-      await screen.findByText('Slide copied without media: file too large for the clipboard'),
-    ).toBeInTheDocument();
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(
+      screen.queryByText('Slide copied without media: file too large for the clipboard'),
+    ).not.toBeInTheDocument();
+    expect(blobToDataUrl).not.toHaveBeenCalled();
     const copiedText = writeText.mock.calls[0]?.[0] ?? '';
-    expect(copiedText).toContain('blob:https://localstudio.dev/hero');
-    expect(copiedText).not.toContain(oversizedDataUrl);
+    expect(copiedText).toContain('localstudio-clipboard:');
+    expect(copiedText).not.toContain('data:');
 
     fireEvent.paste(window, {
       clipboardData: {
@@ -246,12 +252,11 @@ describe('EditorShell clipboard workflows', () => {
     });
 
     await waitFor(() => {
-      const pastedPage = repository.savedProjects.at(-1)?.pages[1];
       const pastedAsset = Object.values(repository.savedProjects.at(-1)?.assets ?? {}).find(
-        (asset) => asset.objectUrl === 'blob:https://localstudio.dev/hero' && asset.id !== 'asset-hero',
+        (asset) => asset.id !== 'asset-hero' && asset.name === 'Hero video',
       );
-      expect(pastedPage).toBeDefined();
-      expect(pastedAsset).toBeDefined();
+      expect(pastedAsset?.objectUrl).toBe('blob:https://localstudio.dev/retained-video');
+      expect(pastedAsset).not.toHaveProperty('storage');
     });
   });
 

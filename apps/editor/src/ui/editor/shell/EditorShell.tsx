@@ -57,6 +57,7 @@ import {
   type KeyboardShortcutAction,
 } from '../../components/KeyboardShortcutsDialog';
 import { editorShellBrowserUtils } from '../browser/editorShellBrowserUtils';
+import { slideClipboardMedia } from '../browser/slideClipboardMedia';
 import { BrowserPresenterSessionService } from '../../../services/presenter/presenterSessionService';
 import type {
   PresenterRemoteSessionMetadata,
@@ -1602,7 +1603,14 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       const slidePayload = editorShellBrowserUtils.readSlideClipboardPayload(event.clipboardData);
       if (slidePayload) {
         try {
-          if (vm.pasteSlideClipboardPayload(JSON.parse(slidePayload) as unknown)) return;
+          const parsedSlide = JSON.parse(slidePayload) as unknown;
+          if (slideClipboardMedia.hasExternalReference(parsedSlide)) {
+            void slideClipboardMedia.hydrate(parsedSlide).then((resolved) => {
+              authoringVmRef.current.pasteSlideClipboardPayload(resolved);
+            });
+            return;
+          }
+          if (vm.pasteSlideClipboardPayload(parsedSlide)) return;
         } catch {
           // Continue to the object and image clipboard paths.
         }
