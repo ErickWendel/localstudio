@@ -47,6 +47,7 @@ interface DesignPanelProps {
   onChangeTheme?: () => void;
   onApplySlideLayout?: (pageId: string, layoutId: string) => void;
   onEditSlideLayout?: (layoutId: string) => void;
+  onSetDeckTemplateInfoVisibility?: (visible: boolean) => void;
   onToggleSlideLayoutPlaceholder?: (
     layoutId: string,
     role: 'body' | 'footer' | 'slideNumber' | 'title',
@@ -101,6 +102,7 @@ export function DesignPanel({
   onChangeTheme,
   onApplySlideLayout,
   onEditSlideLayout,
+  onSetDeckTemplateInfoVisibility,
   onToggleSlideLayoutPlaceholder,
   onAlignSelectedElement,
   onEditSelectionGrid,
@@ -243,6 +245,7 @@ export function DesignPanel({
         onApplyTheme={onApplyTheme}
         onChangeTheme={onChangeTheme}
         onEditTheme={onEditTheme}
+        onSetDeckTemplateInfoVisibility={onSetDeckTemplateInfoVisibility}
       />
     );
   }
@@ -254,6 +257,7 @@ export function DesignPanel({
         project={project}
         onApplySlideLayout={onApplySlideLayout}
         onEditSlideLayout={onEditSlideLayout}
+        onSetDeckTemplateInfoVisibility={onSetDeckTemplateInfoVisibility}
         onToggleSlideLayoutPlaceholder={onToggleSlideLayoutPlaceholder}
         onUpdatePageBackground={onUpdatePageBackground}
       />

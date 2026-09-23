@@ -779,6 +779,9 @@ describe('BrowserPptxImportService', () => {
     const authorElement = elements.find(
       (element) => element.type === 'text' && element.text === 'Erick Wendel',
     );
+    const templateTitleElement = elements.find(
+      (element) => element.type === 'text' && element.text === 'Title Text',
+    );
     const defaultSizedElement = elements.find(
       (element) => element.type === 'text' && element.text === 'Default sized',
     );
@@ -840,6 +843,11 @@ describe('BrowserPptxImportService', () => {
       type: 'text',
     });
     expect(authorElement).not.toHaveProperty('templateSource');
+    expect(templateTitleElement).toMatchObject({
+      importSource: { source: 'layout' },
+      placeholderRole: 'title',
+      visible: false,
+    });
     expect(project.pages[0]?.layoutId).toBe('pptx-layout-slideLayout1');
     const importedLayout = project.slideLayouts?.['pptx-layout-slideLayout1'];
     expect(importedLayout).toMatchObject({

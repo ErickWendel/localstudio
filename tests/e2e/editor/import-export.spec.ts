@@ -138,7 +138,18 @@ test.describe('editor import and export journey', () => {
     await expect
       .poll(() => canvas.evaluate(readCanvasPixel, { x: 5, y: 5 }))
       .toEqual([255, 255, 255, 255]);
+    const templateInfoToggle = page.getByLabel('Show template info across deck');
+    await expect(templateInfoToggle).not.toBeChecked();
     await editor.openTool('Layout');
+    await expect(page.getByRole('button', { name: 'Show Title Text' })).toBeVisible();
+    await editor.openTool('Design');
+    await templateInfoToggle.check();
+    await editor.openTool('Layout');
+    await expect(page.getByRole('button', { name: 'Hide Title Text' })).toBeVisible();
+    await editor.openTool('Design');
+    await templateInfoToggle.uncheck();
+    await editor.openTool('Layout');
+    await expect(page.getByRole('button', { name: 'Show Title Text' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'shape-image.png', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Layout author', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'shape-image.png', exact: true }).click();

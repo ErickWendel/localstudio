@@ -8,6 +8,7 @@ import type {
   ProjectDocument,
   SlideLayout,
 } from '../../../domain/documents/model';
+import { pptxTemplateInfo } from '../../../domain/documents/pptxTemplateInfo';
 import { pptxFileUtils } from './pptxFileUtils';
 import type { PptxPackage } from './pptxPackage';
 import type { PptxDeck, PptxLayout, PptxSlideObject, PptxTextRun } from './pptx-parser-model';
@@ -582,7 +583,9 @@ function map(deck: PptxDeck, pptxPackage: PptxPackage): ProjectDocument {
         deck.height,
       );
       if (!element) continue;
-      elements[element.id] = element;
+      elements[element.id] = pptxTemplateInfo.isElement(element)
+        ? { ...element, visible: false }
+        : element;
       elementIds.push(element.id);
     }
     for (const object of slide.objects.sort((left, right) => left.zIndex - right.zIndex)) {

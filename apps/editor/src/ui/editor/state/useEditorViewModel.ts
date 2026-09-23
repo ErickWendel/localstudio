@@ -2603,6 +2603,12 @@ export function useEditorViewModel(services: AppServices) {
     );
   }
 
+  function setDeckTemplateInfoVisibility(visible: boolean) {
+    commitProject((currentProject) =>
+      new basicCommands.SetDeckTemplateInfoVisibilityCommand(visible).execute(currentProject),
+    );
+  }
+
   function setPageTransition(transition: SlideTransition) {
     commitProject((currentProject) =>
       new basicCommands.SetPageTransitionCommand(activePageId, transition).execute(currentProject),
@@ -3874,6 +3880,7 @@ export function useEditorViewModel(services: AppServices) {
     applySlideLayout,
     editSlideLayout,
     toggleSlideLayoutPlaceholder,
+    setDeckTemplateInfoVisibility,
     clearPageTransition,
     setPageTransition,
     setElementAnimationBuilds,

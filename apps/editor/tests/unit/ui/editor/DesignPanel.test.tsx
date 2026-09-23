@@ -124,8 +124,37 @@ function createProjectWithImportedTextFont(): ProjectDocument {
 }
 
 function createProjectWithTemplates(): ProjectDocument {
+  const project = sampleProject.createSampleProject();
   return {
-    ...sampleProject.createSampleProject(),
+    ...project,
+    elements: {
+      ...project.elements,
+      'imported-template-title': {
+        align: 'left',
+        fill: '#050D10',
+        fontFamily: 'Inter',
+        fontSize: 44,
+        fontWeight: 800,
+        height: 120,
+        id: 'imported-template-title',
+        importSource: {
+          format: 'pptx',
+          pageId: 'page-1',
+          shapeId: '21',
+          source: 'layout',
+        },
+        locked: false,
+        opacity: 1,
+        placeholderRole: 'title',
+        rotation: 0,
+        text: 'Slide title',
+        type: 'text',
+        visible: true,
+        width: 720,
+        x: 120,
+        y: 140,
+      },
+    },
     themeId: 'theme-studio',
     themeGallery: ['theme-studio'],
     themes: {
@@ -232,8 +261,14 @@ function createProjectWithTemplates(): ProjectDocument {
         },
       },
     },
-    pages: sampleProject.createSampleProject().pages.map((page) =>
-      page.id === 'page-1' ? { ...page, layoutId: 'layout-statement' } : page,
+    pages: project.pages.map((page) =>
+      page.id === 'page-1'
+        ? {
+            ...page,
+            elementIds: [...page.elementIds, 'imported-template-title'],
+            layoutId: 'layout-statement',
+          }
+        : page,
     ),
   };
 }
@@ -243,6 +278,7 @@ describe('DesignPanel', () => {
     const onApplyTheme = vi.fn();
     const onChangeTheme = vi.fn();
     const onEditTheme = vi.fn();
+    const onSetDeckTemplateInfoVisibility = vi.fn();
 
     render(
       <DesignPanel
@@ -252,6 +288,7 @@ describe('DesignPanel', () => {
         onApplyTheme={onApplyTheme}
         onChangeTheme={onChangeTheme}
         onEditTheme={onEditTheme}
+        onSetDeckTemplateInfoVisibility={onSetDeckTemplateInfoVisibility}
       />,
     );
 
@@ -263,6 +300,8 @@ describe('DesignPanel', () => {
     expect(onChangeTheme).toHaveBeenCalledOnce();
     expect(onEditTheme).toHaveBeenCalledWith('theme-studio');
     expect(onApplyTheme).toHaveBeenCalledWith('theme-studio');
+    fireEvent.click(screen.getByLabelText('Show template info across deck'));
+    expect(onSetDeckTemplateInfoVisibility).toHaveBeenCalledWith(false);
 
     fireEvent.click(screen.getByLabelText('Open theme picker, current theme Studio theme'));
 
@@ -275,6 +314,7 @@ describe('DesignPanel', () => {
     const onApplySlideLayout = vi.fn();
     const onEditSlideLayout = vi.fn();
     const onToggleSlideLayoutPlaceholder = vi.fn();
+    const onSetDeckTemplateInfoVisibility = vi.fn();
     const onUpdatePageBackground = vi.fn();
 
     render(
@@ -285,6 +325,7 @@ describe('DesignPanel', () => {
         onApplySlideLayout={onApplySlideLayout}
         onEditSlideLayout={onEditSlideLayout}
         onToggleSlideLayoutPlaceholder={onToggleSlideLayoutPlaceholder}
+        onSetDeckTemplateInfoVisibility={onSetDeckTemplateInfoVisibility}
         onUpdatePageBackground={onUpdatePageBackground}
       />,
     );
@@ -293,6 +334,7 @@ describe('DesignPanel', () => {
     fireEvent.click(screen.getByText('Edit layout'));
     fireEvent.click(screen.getByText('Apply layout'));
     fireEvent.click(screen.getByLabelText('Title'));
+    fireEvent.click(screen.getByLabelText('Show template info across deck'));
     fireEvent.change(screen.getByLabelText('Slide background color'), {
       target: { value: '#112233' },
     });
@@ -304,6 +346,7 @@ describe('DesignPanel', () => {
       'title',
       false,
     );
+    expect(onSetDeckTemplateInfoVisibility).toHaveBeenCalledWith(false);
     expect(onUpdatePageBackground).toHaveBeenCalledWith({ type: 'color', color: '#112233' });
 
     fireEvent.click(screen.getByLabelText('Open layout picker, current layout Statement'));

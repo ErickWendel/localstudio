@@ -59,6 +59,9 @@ export function EditorLeftPanelSurface({
       onChangeTheme={isHistoryReadOnly ? undefined : vm.changeTheme}
       onApplySlideLayout={isHistoryReadOnly ? undefined : vm.applySlideLayout}
       onEditSlideLayout={isHistoryReadOnly ? undefined : vm.editSlideLayout}
+      onSetDeckTemplateInfoVisibility={
+        isHistoryReadOnly ? undefined : vm.setDeckTemplateInfoVisibility
+      }
       onToggleSlideLayoutPlaceholder={
         isHistoryReadOnly ? undefined : vm.toggleSlideLayoutPlaceholder
       }

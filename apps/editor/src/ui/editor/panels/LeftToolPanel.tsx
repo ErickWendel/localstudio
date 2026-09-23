@@ -138,6 +138,7 @@ interface LeftToolPanelProps {
   onChangeTheme?: (() => void) | undefined;
   onApplySlideLayout?: ((pageId: string, layoutId: string) => void) | undefined;
   onEditSlideLayout?: ((layoutId: string) => void) | undefined;
+  onSetDeckTemplateInfoVisibility?: ((visible: boolean) => void) | undefined;
   onToggleSlideLayoutPlaceholder?:
     | ((
         layoutId: string,
@@ -243,6 +244,7 @@ export function LeftToolPanel({
   onChangeTheme,
   onApplySlideLayout,
   onEditSlideLayout,
+  onSetDeckTemplateInfoVisibility,
   onToggleSlideLayoutPlaceholder,
   onReplaceVideoAsset,
   onClearPageTransition,
@@ -383,6 +385,7 @@ export function LeftToolPanel({
             {...(onChangeTheme ? { onChangeTheme } : {})}
             {...(onApplySlideLayout ? { onApplySlideLayout } : {})}
             {...(onEditSlideLayout ? { onEditSlideLayout } : {})}
+            {...(onSetDeckTemplateInfoVisibility ? { onSetDeckTemplateInfoVisibility } : {})}
             {...(onToggleSlideLayoutPlaceholder ? { onToggleSlideLayoutPlaceholder } : {})}
             {...(onReplaceVideoAsset ? { onReplaceVideoAsset } : {})}
             {...(onSetElementAnimationBuilds ? { onSetElementAnimationBuilds } : {})}
