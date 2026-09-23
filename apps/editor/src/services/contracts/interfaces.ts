@@ -74,6 +74,10 @@ export interface ProjectRepository {
     metadata: VersionSnapshotMetadata,
   ): Promise<VersionHistoryEntry>;
   loadVersion?(versionId: string): Promise<ProjectDocument | null>;
+  materializeLocalAsset?(
+    fileName: string,
+    blob: Blob,
+  ): Promise<{ fileName: string; objectUrl: string } | undefined>;
 }
 
 export interface MirrorFile {

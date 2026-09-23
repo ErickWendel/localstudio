@@ -57,6 +57,8 @@ import {
   type KeyboardShortcutAction,
 } from '../../components/KeyboardShortcutsDialog';
 import { editorShellBrowserUtils } from '../browser/editorShellBrowserUtils';
+import { slideClipboardMedia } from '../browser/slideClipboardMedia';
+import { materializeSlideClipboardAssets } from '../persistence/slideClipboardLocalAssets';
 import { BrowserPresenterSessionService } from '../../../services/presenter/presenterSessionService';
 import type {
   PresenterRemoteSessionMetadata,
@@ -1602,14 +1604,19 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       );
     }
 
-    function handlePaste(event: ClipboardEvent) {
+    async function handlePaste(event: ClipboardEvent) {
       if (isHistoryReadOnly) return;
       if (editorShellBrowserUtils.isEditableInteractionTarget(event.target)) return;
       event.preventDefault();
       const slidePayload = editorShellBrowserUtils.readSlideClipboardPayload(event.clipboardData);
       if (slidePayload) {
         try {
-          if (vm.pasteSlideClipboardPayload(JSON.parse(slidePayload) as unknown)) return;
+          const parsedSlide = JSON.parse(slidePayload) as unknown;
+          if (slideClipboardMedia.hasExternalReference(parsedSlide)) {
+            void pastePreparedSlide(parsedSlide);
+            return;
+          }
+          if (await pastePreparedSlide(parsedSlide)) return;
         } catch {
           // Continue to the object and image clipboard paths.
         }
@@ -1641,7 +1648,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
         : undefined;
       if (slidePayload) {
         try {
-          if (vm.pasteSlideClipboardPayload(JSON.parse(slidePayload) as unknown)) return;
+          if (await pastePreparedSlide(JSON.parse(slidePayload) as unknown)) return;
         } catch {
           // The system clipboard text is not a slide, so the image is the paste target.
         }
@@ -1649,15 +1656,28 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       await vm.importImageFile(imageFile);
     }
 
+    async function pastePreparedSlide(payload: unknown) {
+      const hydrated = slideClipboardMedia.hasExternalReference(payload)
+        ? await slideClipboardMedia.hydrate(payload)
+        : payload;
+      const localPayload = await materializeSlideClipboardAssets(hydrated, async (fileName, blob) =>
+        services.projectRepository.materializeLocalAsset?.(fileName, blob),
+      );
+      return authoringVmRef.current.pasteSlideClipboardPayload(localPayload);
+    }
+
+    const handlePasteEvent = (event: ClipboardEvent) => {
+      void handlePaste(event);
+    };
     window.addEventListener('copy', handleCopy);
     window.addEventListener('cut', handleCut);
-    window.addEventListener('paste', handlePaste);
+    window.addEventListener('paste', handlePasteEvent);
     return () => {
       window.removeEventListener('copy', handleCopy);
       window.removeEventListener('cut', handleCut);
-      window.removeEventListener('paste', handlePaste);
+      window.removeEventListener('paste', handlePasteEvent);
     };
-  }, [hasSelection, isHistoryReadOnly, vm]);
+  }, [hasSelection, isHistoryReadOnly, services.projectRepository, vm]);
 
   async function copyPageToClipboard(pageId: string) {
     if (!vm.hasPersistedLocalProject) return;
@@ -1668,14 +1688,18 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     // Replace a screenshot before asset inlining. Otherwise the image stays first
     // on the clipboard until the transferable write resolves.
     editorShellBrowserUtils.writeSlideClipboardTextSynchronously(immediatePayload);
-    const transferablePayload = editorShellBrowserUtils
-      .makeSlideClipboardPayloadTransferable(payload)
-      .then((nextPayload) => JSON.stringify(nextPayload));
-    const wroteTransferable =
-      await editorShellBrowserUtils.writeSlideClipboardPayload(transferablePayload);
+    const prepared = await editorShellBrowserUtils.makeSlideClipboardPayloadTransferable(payload);
+    const wroteTransferable = await editorShellBrowserUtils.writeSlideClipboardPayload(
+      JSON.stringify(prepared.payload),
+    );
     if (!wroteTransferable) {
       editorShellBrowserUtils.writeSlideClipboardTextSynchronously(immediatePayload);
     }
+    if (!prepared.omittedMedia) return;
+    showImageExportNotice({
+      message: 'Slide copied without media: file too large for the clipboard',
+      tone: 'warning',
+    });
   }
 
   function requestLocalSaveForSlideCopy() {

@@ -11,6 +11,7 @@ import { browserStorage } from '../browser/browserStorage';
 import type { BrowserKeyValueStorage } from '../browser/browserStorage';
 import { assetFileUtils } from './assetFileUtils';
 import { copyMissingFileBackedProjectFiles } from './copyMissingFileBackedProjectFiles';
+import { materializeLocalAssetFile } from './materializeLocalAssetFile';
 import { projectVersionHistoryUtils } from './projectVersionHistoryUtils';
 
 interface FileSystemProjectRepositoryOptions {
@@ -309,6 +310,12 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
 
     const project = JSON.parse(await file.text()) as ProjectDocument;
     return this.hydrateProjectFiles(project, options);
+  }
+
+  async materializeLocalAsset(fileName: string, blob: Blob) {
+    if (!this.directoryHandle) return undefined;
+    const assetsDirectory = await this.directoryHandle.getDirectoryHandle('assets', { create: true });
+    return materializeLocalAssetFile(assetsDirectory, fileName, blob);
   }
 
   async saveProject(

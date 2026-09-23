@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
+import { assetFileUtils } from '../../../../src/services/storage/assetFileUtils';
 import { EditorShell } from '../../../../src/ui/editor/shell/EditorShell';
 import { editorShellTestHarness } from './EditorShell.test-harness';
 
@@ -196,6 +197,9 @@ describe('EditorShell clipboard workflows', () => {
     const copiedText = writeText.mock.calls[0]?.[0];
     expect(copiedText).toContain('asset-background');
     expect(copiedText).toContain('data:image/png;base64,aGVyby1ieXRlcw==');
+    expect(
+      screen.queryByText('Slide copied without media: file too large for the clipboard'),
+    ).not.toBeInTheDocument();
 
     fireEvent.paste(window, {
       clipboardData: {
@@ -223,6 +227,86 @@ describe('EditorShell clipboard workflows', () => {
     });
     const syncedProject = mirrorService.syncProject.mock.calls[0]?.[0];
     expect(syncedProject?.pages).toHaveLength(2);
+  });
+
+  it('copies a video over 200MB by reference and pastes a playable object URL', async () => {
+    const user = userEvent.setup();
+    const initialProject = sampleProject.createSampleProject();
+    initialProject.assets['asset-hero'] = {
+      ...initialProject.assets['asset-hero']!,
+      fileName: 'hero.mp4',
+      mimeType: 'video/mp4',
+      name: 'Hero video',
+      objectUrl: 'blob:https://localstudio.dev/hero',
+      storage: 'file',
+      type: 'video',
+    };
+    const services = createAppServices({ initialProject, skipStoredProjectLoad: true });
+    const repository = new SavingProjectRepository();
+    const materializeLocalAsset = vi.fn((fileName: string, blob: Blob) => {
+      expect(blob.size).toBe(200 * 1024 * 1024);
+      return Promise.resolve({
+        fileName: `local-${fileName}`,
+        objectUrl: 'blob:https://localstudio.dev/local-hero.mp4',
+      });
+    });
+    services.projectRepository = Object.assign(repository, { materializeLocalAsset });
+    const video = new Blob(['video-bytes'], { type: 'video/mp4' });
+    Object.defineProperty(video, 'size', { value: 200 * 1024 * 1024 });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      blob: () => Promise.resolve(video),
+    } as Response);
+    const blobToDataUrl = vi.spyOn(assetFileUtils, 'blobToDataUrl');
+    let copiedText = '';
+    document.execCommand = () => true;
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        write: async (items: ClipboardItem[]) => {
+          copiedText = (await (await items[0]?.getType('text/plain'))?.text()) ?? '';
+        },
+        writeText: (text: string) => {
+          copiedText = text;
+          return Promise.resolve();
+        },
+      },
+    });
+
+    render(<EditorShell services={services} />);
+    await user.click(screen.getByRole('button', { name: 'Save now' }));
+    const nameInput = screen.getByRole('textbox', { name: 'Project folder name' });
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Stored Deck');
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Copy Slide 1 to clipboard' })).toBeEnabled();
+    });
+    await user.click(screen.getByRole('button', { name: 'Copy Slide 1 to clipboard' }));
+
+    await waitFor(() => expect(copiedText).toContain('localstudio-clipboard:'));
+    expect(
+      screen.queryByText('Slide copied without media: file too large for the clipboard'),
+    ).not.toBeInTheDocument();
+    expect(blobToDataUrl).not.toHaveBeenCalled();
+    expect(copiedText).not.toContain('data:');
+
+    fireEvent.paste(window, {
+      clipboardData: {
+        getData: (type: string) => (type === 'text/plain' ? copiedText : ''),
+      },
+    });
+
+    await waitFor(() => {
+      const pastedAsset = Object.values(repository.savedProjects.at(-1)?.assets ?? {}).find(
+        (asset) => asset.id !== 'asset-hero' && asset.name === 'Hero video',
+      );
+      expect(materializeLocalAsset).toHaveBeenCalled();
+      expect(pastedAsset).toMatchObject({
+        objectUrl: 'blob:https://localstudio.dev/local-hero.mp4',
+        storage: 'file',
+      });
+      expect(pastedAsset?.fileName).toMatch(/^local-/);
+    });
   });
 
   it('does not overwrite copied text when an editable field is active with a selected object', async () => {

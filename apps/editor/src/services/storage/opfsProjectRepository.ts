@@ -10,6 +10,7 @@ import type {
 import { browserStorage, type BrowserKeyValueStorage } from '../browser/browserStorage';
 import { assetFileUtils } from './assetFileUtils';
 import { copyMissingFileBackedProjectFiles } from './copyMissingFileBackedProjectFiles';
+import { materializeLocalAssetFile } from './materializeLocalAssetFile';
 import { projectVersionHistoryUtils } from './projectVersionHistoryUtils';
 
 interface OpfsProjectRepositoryOptions {
@@ -260,6 +261,12 @@ export class OpfsProjectRepository implements ProjectRepository {
       throw error;
     }
     return this.readProjectFromDirectory(this.directoryHandle);
+  }
+
+  async materializeLocalAsset(fileName: string, blob: Blob) {
+    if (!this.directoryHandle) return undefined;
+    const assetsDirectory = await this.directoryHandle.getDirectoryHandle('assets', { create: true });
+    return materializeLocalAssetFile(assetsDirectory, fileName, blob);
   }
 
   async saveProject(

@@ -1,6 +1,7 @@
 import type { WebMcpModelContext } from '../../../services/webmcp/webMcpToolAdapter';
 import { assetFileUtils } from '../../../services/storage/assetFileUtils';
 import type { SlideClipboardState } from '../state/editorViewModelElements';
+import { slideClipboardMedia } from './slideClipboardMedia';
 
 const EDITOR_OBJECT_CLIPBOARD_TYPE = 'application/x-localstudio-editor-elements';
 const EDITOR_OBJECT_CLIPBOARD_MARKER = '1';
@@ -149,6 +150,51 @@ async function writeSlideClipboardPayload(payload: string | Promise<string>) {
   }
 }
 
+function estimateDataUrlLength(blob: Blob) {
+  const mimeType = blob.type || 'application/octet-stream';
+  return `data:${mimeType};base64,`.length + Math.ceil(blob.size / 3) * 4;
+}
+
+function payloadLengthWithObjectUrl(
+  payload: SlideClipboardState,
+  assetId: string,
+  nextObjectUrlLength: number,
+) {
+  const currentLength = payload.assets[assetId]?.objectUrl?.length ?? 0;
+  return JSON.stringify(payload).length - currentLength + nextObjectUrlLength;
+}
+
+function withAssetObjectUrl(payload: SlideClipboardState, assetId: string, objectUrl: string) {
+  const asset = payload.assets[assetId];
+  if (!asset) return payload;
+  return {
+    ...payload,
+    assets: {
+      ...payload.assets,
+      [assetId]: { ...asset, objectUrl },
+    },
+  };
+}
+
+function retainBlobReference(payload: SlideClipboardState, assetId: string, blob: Blob) {
+  return withAssetObjectUrl(payload, assetId, slideClipboardMedia.remember(blob));
+}
+
+function omitOversizedClipboardMedia(payload: SlideClipboardState): SlideClipboardState {
+  const assets = Object.fromEntries(
+    Object.entries(payload.assets).map(([assetId, asset]) => {
+      const objectUrl = asset.objectUrl ?? '';
+      const keepReference =
+        objectUrl.startsWith('blob:') ||
+        slideClipboardMedia.isClipboardMediaReference(objectUrl) ||
+        (objectUrl.length < 2048 && !objectUrl.startsWith('data:'));
+      if (keepReference) return [assetId, asset] as const;
+      return [assetId, { ...asset, objectUrl: '' }] as const;
+    }),
+  );
+  return { ...payload, assets };
+}
+
 async function readPrimarySlideClipboardPayload() {
   if (!navigator.clipboard?.read) return undefined;
   try {
@@ -166,23 +212,54 @@ async function makeSlideClipboardPayloadTransferable(
   payload: SlideClipboardState,
   requestFetch: typeof fetch = globalThis.fetch.bind(globalThis),
 ) {
-  const assets = Object.fromEntries(
-    await Promise.all(
-      Object.entries(payload.assets).map(async ([assetId, asset]) => {
-        if (!assetFileUtils.isBlobUrl(asset.objectUrl)) return [assetId, asset] as const;
-        try {
-          const blob = await assetFileUtils.objectUrlToBlob(asset.objectUrl, requestFetch);
-          return [
-            assetId,
-            { ...asset, objectUrl: await assetFileUtils.blobToDataUrl(blob) },
-          ] as const;
-        } catch {
-          return [assetId, asset] as const;
-        }
-      }),
-    ),
-  );
-  return { ...payload, assets };
+  await slideClipboardMedia.beginCopy();
+  let nextPayload = payload;
+  let omittedMedia = false;
+  let retainedOversizedMedia = false;
+  for (const [assetId, asset] of Object.entries(payload.assets)) {
+    if (!assetFileUtils.isBlobUrl(asset.objectUrl)) continue;
+    try {
+      const blob = await assetFileUtils.objectUrlToBlob(asset.objectUrl, requestFetch);
+      if (
+        payloadLengthWithObjectUrl(nextPayload, assetId, estimateDataUrlLength(blob)) >
+        MAX_SLIDE_CLIPBOARD_BYTES
+      ) {
+        nextPayload = retainBlobReference(nextPayload, assetId, blob);
+        retainedOversizedMedia = true;
+        continue;
+      }
+      const dataUrl = await assetFileUtils.blobToDataUrl(blob);
+      if (payloadLengthWithObjectUrl(nextPayload, assetId, dataUrl.length) > MAX_SLIDE_CLIPBOARD_BYTES) {
+        nextPayload = retainBlobReference(nextPayload, assetId, blob);
+        retainedOversizedMedia = true;
+        continue;
+      }
+      nextPayload = withAssetObjectUrl(nextPayload, assetId, dataUrl);
+    } catch {
+      // Keep the original object URL so a same-session paste can still resolve it.
+    }
+  }
+
+  if (JSON.stringify(nextPayload).length > MAX_SLIDE_CLIPBOARD_BYTES) {
+    const stripped = omitOversizedClipboardMedia(nextPayload);
+    omittedMedia = JSON.stringify(stripped) !== JSON.stringify(nextPayload);
+    nextPayload = stripped;
+  }
+  if (retainedOversizedMedia) {
+    await slideClipboardMedia.persist().catch(() => undefined);
+  }
+
+  return { omittedMedia, payload: nextPayload, retainedOversizedMedia };
+}
+
+async function copySlideToClipboard(
+  payload: SlideClipboardState,
+  requestFetch: typeof fetch = globalThis.fetch.bind(globalThis),
+) {
+  const prepared = await makeSlideClipboardPayloadTransferable(payload, requestFetch);
+  const wrote = await writeSlideClipboardPayload(JSON.stringify(prepared.payload));
+  if (!wrote) return prepared.omittedMedia ? 'copied-without-media' : 'unavailable';
+  return prepared.omittedMedia ? 'copied-without-media' : 'copied';
 }
 
 function readSlideClipboardPayload(clipboardData: DataTransfer | null) {
@@ -217,6 +294,7 @@ export const editorShellBrowserUtils = {
   writeSlideClipboardPayload,
   readPrimarySlideClipboardPayload,
   makeSlideClipboardPayloadTransferable,
+  copySlideToClipboard,
   readSlideClipboardPayload,
   isWebMcpEnabled,
   isWebMcpProtocolEnabled,

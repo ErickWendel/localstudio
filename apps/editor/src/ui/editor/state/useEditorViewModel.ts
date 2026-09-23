@@ -69,6 +69,7 @@ import {
 import { useStockMediaLibrary } from './use-stock-media-library';
 import { editorViewModelProgress } from './editorViewModelProgress';
 import { editorViewModelProject } from './editorViewModelProject';
+import { slideClipboardMedia } from '../browser/slideClipboardMedia';
 import { editorViewModelRuntime } from './editorViewModelRuntime';
 import { editorViewModelElements } from './editorViewModelElements';
 import type {
@@ -3487,23 +3488,18 @@ export function useEditorViewModel(services: AppServices) {
 
   function pasteSlideClipboardPayload(clipboard: unknown) {
     if (!editorViewModelElements.isSlideClipboardState(clipboard)) return false;
+    const resolvedClipboard = slideClipboardMedia.resolveSlidePayload(clipboard);
     const pageId = createPrefixedId('page');
     const assetIds = new Map<string, string>();
     const assets = Object.fromEntries(
-      Object.entries(clipboard.assets).map(([assetId, asset]) => {
+      Object.entries(resolvedClipboard.assets).map(([assetId, asset]) => {
         const nextAssetId = createPrefixedId(`${assetId}-slide`);
         assetIds.set(assetId, nextAssetId);
-        if (asset.storage === 'file' && /^(?:blob|data):/.test(asset.objectUrl ?? '')) {
-          const { fileName, storage, ...transferableAsset } = asset;
-          void fileName;
-          void storage;
-          return [nextAssetId, { ...transferableAsset, id: nextAssetId }];
-        }
         return [nextAssetId, { ...asset, id: nextAssetId }];
       }),
     );
     const elementIds = new Map<string, string>();
-    const elements = clipboard.elements.map((element) => {
+    const elements = resolvedClipboard.elements.map((element) => {
       const nextElementId = createPrefixedId(`${element.id}-slide`);
       elementIds.set(element.id, nextElementId);
       const nextElement = { ...element, id: nextElementId };
@@ -3512,7 +3508,7 @@ export function useEditorViewModel(services: AppServices) {
       }
       return nextElement;
     });
-    const animationBuilds = clipboard.page.animationBuilds?.flatMap((build) => {
+    const animationBuilds = resolvedClipboard.page.animationBuilds?.flatMap((build) => {
       const nextElementId = elementIds.get(build.elementId);
       if (!nextElementId) return [];
       return [
@@ -3524,18 +3520,18 @@ export function useEditorViewModel(services: AppServices) {
       ];
     });
     const page = {
-      ...clipboard.page,
+      ...resolvedClipboard.page,
       id: pageId,
       elementIds: elements.map((element) => element.id),
       background:
-        clipboard.page.background.type === 'asset'
+        resolvedClipboard.page.background.type === 'asset'
           ? {
-              ...clipboard.page.background,
+              ...resolvedClipboard.page.background,
               assetId:
-                assetIds.get(clipboard.page.background.assetId) ??
-                clipboard.page.background.assetId,
+                assetIds.get(resolvedClipboard.page.background.assetId) ??
+                resolvedClipboard.page.background.assetId,
             }
-          : clipboard.page.background,
+          : resolvedClipboard.page.background,
       ...(animationBuilds ? { animationBuilds } : {}),
     };
     commitProject(
