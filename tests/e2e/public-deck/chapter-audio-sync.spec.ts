@@ -18,6 +18,9 @@ test.describe('public deck chapter audio sync', () => {
         },
       });
       HTMLMediaElement.prototype.play = function play() {
+        if (this.hasAttribute('data-dispatch-loadedmetadata-on-play')) {
+          this.dispatchEvent(new Event('loadedmetadata'));
+        }
         this.setAttribute('data-playing', 'true');
         this.dispatchEvent(new Event('play'));
         return Promise.resolve();
@@ -76,18 +79,27 @@ test.describe('public deck chapter audio sync', () => {
 
     await page.getByRole('button', { name: 'Open transcript chat' }).click();
     const transcriptPanel = page.getByRole('complementary', { name: 'Transcript chat' });
-    const podcastAudio = page.locator('audio').nth(1);
     await transcriptPanel
-      .getByRole('button', { name: 'Play transcript segment for slide 1 at 0:00' })
+      .getByRole('button', { name: 'Play transcript segment for slide 2 at 0:10' })
       .click();
-    await expect(page.getByText('1 / 2')).toBeVisible();
-    await expect.poll(() => audio.evaluate((element: HTMLAudioElement) => element.currentTime)).toBe(0);
-    await expect.poll(() => podcastAudio.evaluate((element: HTMLAudioElement) => element.paused)).toBe(false);
+    await expect(page.getByText('2 / 2')).toBeVisible();
+    await expect.poll(() => audio.evaluate((element: HTMLAudioElement) => element.currentTime)).toBe(10);
+    await expect.poll(() => audio.evaluate((element: HTMLAudioElement) => element.paused)).toBe(false);
 
     await transcriptPanel.getByRole('button', { name: 'Open slide 2: Closing' }).click();
     await expect(page.getByText('2 / 2')).toBeVisible();
-    await expect.poll(() => podcastAudio.evaluate((element: HTMLAudioElement) => element.currentTime)).toBe(10);
-    await expect.poll(() => podcastAudio.evaluate((element: HTMLAudioElement) => element.paused)).toBe(false);
+    await expect.poll(() => audio.evaluate((element: HTMLAudioElement) => element.currentTime)).toBe(10);
+    await expect.poll(() => audio.evaluate((element: HTMLAudioElement) => element.paused)).toBe(false);
+
+    await page.locator('audio').evaluateAll((elements) => {
+      elements.forEach((element) => element.setAttribute('data-dispatch-loadedmetadata-on-play', 'true'));
+    });
+    await transcriptPanel
+      .getByRole('button', { name: 'Play transcript segment for slide 2 at 0:10' })
+      .click();
+    await expect(page.getByText('2 / 2')).toBeVisible();
+    await expect.poll(() => audio.evaluate((element: HTMLAudioElement) => element.currentTime)).toBe(10);
+    await expect.poll(() => audio.evaluate((element: HTMLAudioElement) => element.paused)).toBe(false);
 
   });
 });

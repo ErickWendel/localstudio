@@ -706,6 +706,8 @@ function PublicTranscriptPodcastPlayer({
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const suppressMediaSyncRef = useRef(false);
+  const requestedTimeMsRef = useRef<number | undefined>(undefined);
+  const previousRecordingIdRef = useRef<string | undefined>(undefined);
   const transcriptSegmentRefs = useRef(new Map<string, HTMLButtonElement>());
   const lastSyncedChapterIdRef = useRef<string | undefined>(undefined);
   const selectedRecording = useMemo(
@@ -751,6 +753,10 @@ function PublicTranscriptPodcastPlayer({
 
   useEffect(() => {
     const audio = audioRef.current;
+    if (previousRecordingIdRef.current && previousRecordingIdRef.current !== selectedRecording?.id) {
+      requestedTimeMsRef.current = undefined;
+    }
+    previousRecordingIdRef.current = selectedRecording?.id;
     if (audio) {
       audio.pause();
       audio.load();
@@ -770,9 +776,17 @@ function PublicTranscriptPodcastPlayer({
     if (playbackSync.recordingId !== selectedRecording?.id) return;
     const audio = audioRef.current;
     if (audio && Math.abs(audio.currentTime * 1000 - playbackSync.currentTimeMs) > 250) {
+      requestedTimeMsRef.current = playbackSync.currentTimeMs;
       audio.currentTime = playbackSync.currentTimeMs / 1000;
     }
     if (!playbackSync.playing && audio) {
+      suppressMediaSyncRef.current = true;
+      audio.pause();
+      window.setTimeout(() => {
+        suppressMediaSyncRef.current = false;
+      }, 0);
+    }
+    if (playbackSync.playing && audio && !audio.paused) {
       suppressMediaSyncRef.current = true;
       audio.pause();
       window.setTimeout(() => {
@@ -790,6 +804,7 @@ function PublicTranscriptPodcastPlayer({
   useEffect(() => {
     if (playing || !activePageChapter) return;
     const audio = audioRef.current;
+    requestedTimeMsRef.current = activePageChapter.startMs;
     if (audio) audio.currentTime = activePageChapter.startMs / 1000;
     lastSyncedChapterIdRef.current = activePageChapter.id;
     const timeoutId = window.setTimeout(() => {
@@ -830,7 +845,14 @@ function PublicTranscriptPodcastPlayer({
   }
 
   function syncIdleAudioToActivePageChapter(audio: HTMLAudioElement) {
+    const requestedTimeMs = requestedTimeMsRef.current;
+    if (requestedTimeMs !== undefined) {
+      audio.currentTime = requestedTimeMs / 1000;
+      setCurrentTimeMs(requestedTimeMs);
+      return true;
+    }
     if (playing || !activePageChapter) return false;
+    requestedTimeMsRef.current = activePageChapter.startMs;
     audio.currentTime = activePageChapter.startMs / 1000;
     setCurrentTimeMs(activePageChapter.startMs);
     lastSyncedChapterIdRef.current = activePageChapter.id;
@@ -853,6 +875,7 @@ function PublicTranscriptPodcastPlayer({
         currentTimeMs < activePageChapter.startMs ||
         currentTimeMs >= Math.max(activePageChapter.startMs, activePageChapterEndMs - 120);
       if (shouldRestartSlideClip) {
+        requestedTimeMsRef.current = activePageChapter.startMs;
         audio.currentTime = activePageChapter.startMs / 1000;
         setCurrentTimeMs(activePageChapter.startMs);
         lastSyncedChapterIdRef.current = activePageChapter.id;
@@ -872,6 +895,7 @@ function PublicTranscriptPodcastPlayer({
 
   function seekToChapter(chapter: PublicPodcastChapter) {
     const audio = audioRef.current;
+    requestedTimeMsRef.current = chapter.startMs;
     if (audio) audio.currentTime = chapter.startMs / 1000;
     setCurrentTimeMs(chapter.startMs);
     lastSyncedChapterIdRef.current = chapter.id;
@@ -903,6 +927,7 @@ function PublicTranscriptPodcastPlayer({
     if (!audio) return;
     const pageIndex = getTranscriptSegmentPageIndex(segment, pages, segmentIndex);
     const nextTimeMs = Math.max(0, segment.startMs);
+    requestedTimeMsRef.current = nextTimeMs;
     audio.currentTime = nextTimeMs / 1000;
     setCurrentTimeMs(nextTimeMs);
     const nextChapter = getPodcastChapterForPage(chapters, pageIndex);
@@ -941,8 +966,8 @@ function PublicTranscriptPodcastPlayer({
           if (!syncIdleAudioToActivePageChapter(event.currentTarget)) updateProgress();
         }}
         onPause={() => {
-          setPlaying(false);
           if (suppressMediaSyncRef.current) return;
+          setPlaying(false);
           publishPlaybackSync(currentTimeMs, false);
         }}
         onPlay={() => {
@@ -1110,6 +1135,8 @@ function PublicDeckPlaybackOverlay({
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const suppressMediaSyncRef = useRef(false);
+  const requestedTimeMsRef = useRef<number | undefined>(undefined);
+  const previousRecordingIdRef = useRef<string | undefined>(undefined);
   const lastSyncedChapterIdRef = useRef<string | undefined>(undefined);
   const selectedRecording = useMemo(
     () =>
@@ -1163,6 +1190,10 @@ function PublicDeckPlaybackOverlay({
 
   useEffect(() => {
     const audio = audioRef.current;
+    if (previousRecordingIdRef.current && previousRecordingIdRef.current !== selectedRecording?.id) {
+      requestedTimeMsRef.current = undefined;
+    }
+    previousRecordingIdRef.current = selectedRecording?.id;
     if (audio) {
       audio.pause();
       audio.currentTime = 0;
@@ -1182,6 +1213,7 @@ function PublicDeckPlaybackOverlay({
     if (playbackSync.recordingId !== selectedRecording?.id) return;
     const audio = audioRef.current;
     if (audio && Math.abs(audio.currentTime * 1000 - playbackSync.currentTimeMs) > 250) {
+      requestedTimeMsRef.current = playbackSync.currentTimeMs;
       audio.currentTime = playbackSync.currentTimeMs / 1000;
     }
     if (!playbackSync.playing && audio) {
@@ -1190,6 +1222,9 @@ function PublicDeckPlaybackOverlay({
       window.setTimeout(() => {
         suppressMediaSyncRef.current = false;
       }, 0);
+    }
+    if (playbackSync.playing && audio && audio.paused) {
+      void audio.play().catch(() => setPlaying(false));
     }
     const timeoutId = window.setTimeout(() => {
       setCurrentTimeMs(playbackSync.currentTimeMs);
@@ -1211,6 +1246,7 @@ function PublicDeckPlaybackOverlay({
     const activePageChapter = getPodcastChapterForPage(chapters, activePageIndex);
     if (!activePageChapter) return;
     const audio = audioRef.current;
+    requestedTimeMsRef.current = activePageChapter.startMs;
     if (audio) audio.currentTime = activePageChapter.startMs / 1000;
     lastSyncedChapterIdRef.current = activePageChapter.id;
     const timeoutId = window.setTimeout(() => {
@@ -1247,6 +1283,7 @@ function PublicDeckPlaybackOverlay({
         currentTimeMs < activePageChapter.startMs ||
         currentTimeMs >= Math.max(activePageChapter.startMs, activePageChapterEndMs - 120);
       if (shouldRestartSlideClip) {
+        requestedTimeMsRef.current = activePageChapter.startMs;
         audio.currentTime = activePageChapter.startMs / 1000;
         setCurrentTimeMs(activePageChapter.startMs);
         lastSyncedChapterIdRef.current = activePageChapter.id;
@@ -1263,6 +1300,7 @@ function PublicDeckPlaybackOverlay({
   function seekToTime(nextTimeMs: number) {
     const nextSeconds = Math.max(0, nextTimeMs) / 1000;
     const audio = audioRef.current;
+    requestedTimeMsRef.current = Math.round(nextSeconds * 1000);
     if (audio) audio.currentTime = nextSeconds;
     const nextCurrentTimeMs = Math.round(nextSeconds * 1000);
     const nextChapter = getActivePodcastChapter(chapters, nextCurrentTimeMs);
@@ -1306,7 +1344,13 @@ function PublicDeckPlaybackOverlay({
           src={selectedRecording.audio.objectUrl}
           onDurationChange={updateProgress}
           onEnded={() => setPlaying(false)}
-          onLoadedMetadata={updateProgress}
+          onLoadedMetadata={(event) => {
+            const requestedTimeMs = requestedTimeMsRef.current;
+            if (requestedTimeMs !== undefined) {
+              event.currentTarget.currentTime = requestedTimeMs / 1000;
+            }
+            updateProgress();
+          }}
           onPause={() => {
             setPlaying(false);
             if (suppressMediaSyncRef.current) return;
@@ -1357,7 +1401,18 @@ function PublicDeckPlaybackOverlay({
                 }
                 onClick={() => goToSlide(pageIndex)}
               >
-                <span className="public-deck-playback-chapter-preview" aria-hidden="true">
+                <span
+                  className="public-deck-playback-chapter-preview"
+                  aria-hidden="true"
+                  onPointerDown={(event) => {
+                    // The card extends beyond the small chapter-dot button. Handle its
+                    // direct pointer hit so the browser never falls through to the
+                    // timeline scrubber underneath it.
+                    event.preventDefault();
+                    event.stopPropagation();
+                    goToSlide(pageIndex);
+                  }}
+                >
                   <MiniPagePreview page={page} project={project} visible={page.visible ?? true} />
                   <strong>Slide {pageIndex + 1}</strong>
                   <em>{chapter ? formatTranscriptTimestamp(chapter.startMs) : 'No audio'}</em>
