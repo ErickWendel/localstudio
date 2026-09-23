@@ -22,6 +22,7 @@ export const aiBrowserProvidersFlow = {
     await page.getByLabel('Create image prompt').fill('neon product dashboard');
     await page.getByRole('button', { name: 'Submit prompt' }).click();
     await editor.openTool('Assets');
+    await editor.openAssetSection('Media');
     await expect(page.getByText('neon product dashboard.png')).toBeVisible({ timeout: 30_000 });
 
     await editor.openTool('Layout');

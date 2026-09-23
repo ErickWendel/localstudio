@@ -8,6 +8,15 @@ export class EditorAppPage extends BasePage {
 
   async gotoNewProject() {
     await this.goto('/editor/?newProject=1');
+    await this.waitForEditor();
+  }
+
+  async gotoAssetFixtures() {
+    await this.goto('/editor/?newProject=1&e2eAssetFixtures=1');
+    await this.waitForEditor();
+  }
+
+  private async waitForEditor() {
     await expect(this.page.getByRole('heading', { name: 'LocalStudio.dev' })).toBeVisible({
       timeout: 30_000,
     });
@@ -40,6 +49,14 @@ export class EditorAppPage extends BasePage {
       await this.page.keyboard.press('Escape').catch(() => undefined);
     }
     await expect(menu).toBeVisible({ timeout: 10_000 });
+  }
+
+  async openAssetSection(name: 'Media' | 'Recordings') {
+    const section = this.page.getByRole('button', { name: new RegExp(`^${name}`) });
+    if ((await section.getAttribute('aria-expanded')) !== 'true') {
+      await section.click();
+    }
+    await expect(section).toHaveAttribute('aria-expanded', 'true');
   }
 
   async openTool(tab: 'AI Tools' | 'Animate' | 'Assets' | 'Design' | 'Elements' | 'Layout' | 'Text') {

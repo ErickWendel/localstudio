@@ -97,6 +97,9 @@ export function EditorLeftPanelSurface({
       stockMediaSearchingImages={vm.stockMediaSearching.images}
       onConfigureStockMedia={vm.openMediaSettings}
       onRemoveAsset={isHistoryReadOnly ? undefined : vm.removeAsset}
+      onRemoveRecording={isHistoryReadOnly ? undefined : vm.removeRecording}
+      onRemoveRecordingAudio={isHistoryReadOnly ? undefined : vm.removeRecordingAudio}
+      onRemoveTranscript={isHistoryReadOnly ? undefined : vm.removeTranscript}
       onImportMedia={isHistoryReadOnly ? undefined : onImportMedia}
       onInsertStockMedia={isHistoryReadOnly ? undefined : vm.insertStockMedia}
       onInsertText={isHistoryReadOnly ? undefined : vm.insertTextElement}
