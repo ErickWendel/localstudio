@@ -1641,10 +1641,12 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   async function copyPageToClipboard(pageId: string) {
     const payload = vm.getSlideClipboardPayload(pageId);
     if (!payload) return;
-    const transferablePayload = editorShellBrowserUtils
-      .makeSlideClipboardPayloadTransferable(payload)
-      .then((nextPayload) => JSON.stringify(nextPayload));
-    await editorShellBrowserUtils.writeSlideClipboardPayload(transferablePayload);
+    const result = await editorShellBrowserUtils.copySlideToClipboard(payload);
+    if (result !== 'copied-without-media') return;
+    showImageExportNotice({
+      message: 'Slide copied without media: file too large for the clipboard',
+      tone: 'warning',
+    });
   }
 
   useEffect(() => {

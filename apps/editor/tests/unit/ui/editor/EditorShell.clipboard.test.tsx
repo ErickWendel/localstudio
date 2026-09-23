@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { sampleProject } from '../../../../src/domain/projects/sampleProject';
+import { assetFileUtils } from '../../../../src/services/storage/assetFileUtils';
 import { EditorShell } from '../../../../src/ui/editor/shell/EditorShell';
 import { editorShellTestHarness } from './EditorShell.test-harness';
 
@@ -170,6 +171,9 @@ describe('EditorShell clipboard workflows', () => {
     const copiedText = writeText.mock.calls[0]?.[0];
     expect(copiedText).toContain('asset-background');
     expect(copiedText).toContain('data:image/png;base64,aGVyby1ieXRlcw==');
+    expect(
+      screen.queryByText('Slide copied without media: file too large for the clipboard'),
+    ).not.toBeInTheDocument();
 
     fireEvent.paste(window, {
       clipboardData: {
@@ -197,6 +201,58 @@ describe('EditorShell clipboard workflows', () => {
     });
     const syncedProject = mirrorService.syncProject.mock.calls[0]?.[0];
     expect(syncedProject?.pages).toHaveLength(2);
+  });
+
+  it('warns and keeps the asset reference when a copied slide exceeds the clipboard cap', async () => {
+    const user = userEvent.setup();
+    const initialProject = sampleProject.createSampleProject();
+    initialProject.assets['asset-hero'] = {
+      ...initialProject.assets['asset-hero']!,
+      fileName: 'hero.png',
+      objectUrl: 'blob:https://localstudio.dev/hero',
+      storage: 'file',
+    };
+    const services = createAppServices({ initialProject, skipStoredProjectLoad: true });
+    const repository = new SavingProjectRepository();
+    services.projectRepository = repository;
+    const writeText = vi.fn<(text: string) => Promise<void>>(() => Promise.resolve());
+    const oversizedDataUrl = `data:image/png;base64,${'a'.repeat(16 * 1024 * 1024)}`;
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      blob: () => Promise.resolve(new Blob(['hero-bytes'], { type: 'image/png' })),
+    } as Response);
+    vi.spyOn(assetFileUtils, 'blobToDataUrl').mockResolvedValue(oversizedDataUrl);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<EditorShell services={services} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+    await user.click(screen.getByRole('button', { name: 'Copy Slide 1 to clipboard' }));
+
+    expect(
+      await screen.findByText('Slide copied without media: file too large for the clipboard'),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    const copiedText = writeText.mock.calls[0]?.[0] ?? '';
+    expect(copiedText).toContain('blob:https://localstudio.dev/hero');
+    expect(copiedText).not.toContain(oversizedDataUrl);
+
+    fireEvent.paste(window, {
+      clipboardData: {
+        getData: (type: string) => (type === 'text/plain' ? copiedText : ''),
+      },
+    });
+
+    await waitFor(() => {
+      const pastedPage = repository.savedProjects.at(-1)?.pages[1];
+      const pastedAsset = Object.values(repository.savedProjects.at(-1)?.assets ?? {}).find(
+        (asset) => asset.objectUrl === 'blob:https://localstudio.dev/hero' && asset.id !== 'asset-hero',
+      );
+      expect(pastedPage).toBeDefined();
+      expect(pastedAsset).toBeDefined();
+    });
   });
 
   it('does not overwrite copied text when an editable field is active with a selected object', async () => {

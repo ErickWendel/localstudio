@@ -99,27 +99,64 @@ async function writeSlideClipboardPayload(payload: string | Promise<string>) {
   }
 }
 
+function omitOversizedClipboardMedia(payload: SlideClipboardState): SlideClipboardState {
+  const assets = Object.fromEntries(
+    Object.entries(payload.assets).map(([assetId, asset]) => {
+      const objectUrl = asset.objectUrl ?? '';
+      const keepReference =
+        objectUrl.startsWith('blob:') ||
+        (objectUrl.length < 2048 && !objectUrl.startsWith('data:'));
+      if (keepReference) return [assetId, asset] as const;
+      return [assetId, { ...asset, objectUrl: '' }] as const;
+    }),
+  );
+  return { ...payload, assets };
+}
+
 async function makeSlideClipboardPayloadTransferable(
   payload: SlideClipboardState,
   requestFetch: typeof fetch = globalThis.fetch.bind(globalThis),
 ) {
-  const assets = Object.fromEntries(
-    await Promise.all(
-      Object.entries(payload.assets).map(async ([assetId, asset]) => {
-        if (!assetFileUtils.isBlobUrl(asset.objectUrl)) return [assetId, asset] as const;
-        try {
-          const blob = await assetFileUtils.objectUrlToBlob(asset.objectUrl, requestFetch);
-          return [
-            assetId,
-            { ...asset, objectUrl: await assetFileUtils.blobToDataUrl(blob) },
-          ] as const;
-        } catch {
-          return [assetId, asset] as const;
-        }
-      }),
-    ),
-  );
-  return { ...payload, assets };
+  let nextPayload = payload;
+  let omittedMedia = false;
+  for (const [assetId, asset] of Object.entries(payload.assets)) {
+    if (!assetFileUtils.isBlobUrl(asset.objectUrl)) continue;
+    try {
+      const blob = await assetFileUtils.objectUrlToBlob(asset.objectUrl, requestFetch);
+      const dataUrl = await assetFileUtils.blobToDataUrl(blob);
+      const candidate = {
+        ...nextPayload,
+        assets: {
+          ...nextPayload.assets,
+          [assetId]: { ...asset, objectUrl: dataUrl },
+        },
+      };
+      if (JSON.stringify(candidate).length > MAX_SLIDE_CLIPBOARD_BYTES) {
+        omittedMedia = true;
+        continue;
+      }
+      nextPayload = candidate;
+    } catch {
+      // Keep the original object URL so a same-session paste can still resolve it.
+    }
+  }
+
+  if (JSON.stringify(nextPayload).length > MAX_SLIDE_CLIPBOARD_BYTES) {
+    omittedMedia = true;
+    nextPayload = omitOversizedClipboardMedia(nextPayload);
+  }
+
+  return { omittedMedia, payload: nextPayload };
+}
+
+async function copySlideToClipboard(
+  payload: SlideClipboardState,
+  requestFetch: typeof fetch = globalThis.fetch.bind(globalThis),
+) {
+  const prepared = await makeSlideClipboardPayloadTransferable(payload, requestFetch);
+  const wrote = await writeSlideClipboardPayload(JSON.stringify(prepared.payload));
+  if (!wrote) return prepared.omittedMedia ? 'copied-without-media' : 'unavailable';
+  return prepared.omittedMedia ? 'copied-without-media' : 'copied';
 }
 
 function readSlideClipboardPayload(clipboardData: DataTransfer | null) {
@@ -154,6 +191,7 @@ export const editorShellBrowserUtils = {
   readEditorObjectClipboardPayload,
   writeSlideClipboardPayload,
   makeSlideClipboardPayloadTransferable,
+  copySlideToClipboard,
   readSlideClipboardPayload,
   isWebMcpEnabled,
   isWebMcpProtocolEnabled,
