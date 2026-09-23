@@ -116,7 +116,12 @@ async function createMirrorFiles(
     const cacheKey = `${path}\n${objectUrl}`;
     const cachedEntry = options.cache?.objectFiles.get(cacheKey);
     if (cachedEntry) return cachedEntry;
-    const blob = await objectUrlToBlob({ objectUrl }, requestFetch);
+    let blob: Blob | undefined;
+    try {
+      blob = await objectUrlToBlob({ objectUrl }, requestFetch);
+    } catch {
+      return undefined;
+    }
     if (!blob) return undefined;
     const entry = await createFileEntry(path, blob);
     options.cache?.objectFiles.set(cacheKey, entry);
@@ -140,7 +145,11 @@ async function createMirrorFiles(
       projectForMirror.assets[assetId] = assetForMirror;
       files.push(entry);
     } else {
-      projectForMirror.assets[assetId] = { ...asset };
+      const assetForMirror = { ...asset };
+      if (asset.storage === 'file' || assetFileUtils.isReadableObjectUrl(asset.objectUrl)) {
+        delete assetForMirror.objectUrl;
+      }
+      projectForMirror.assets[assetId] = assetForMirror;
     }
   }
 
@@ -155,7 +164,11 @@ async function createMirrorFiles(
       projectForMirror.fonts![fontId] = fontForMirror;
       files.push(entry);
     } else {
-      projectForMirror.fonts![fontId] = { ...font };
+      const fontForMirror = { ...font };
+      if (font.storage === 'file' || assetFileUtils.isReadableObjectUrl(font.objectUrl)) {
+        delete fontForMirror.objectUrl;
+      }
+      projectForMirror.fonts![fontId] = fontForMirror;
     }
   }
 

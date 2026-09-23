@@ -78,6 +78,7 @@ export interface ProjectRepository {
     fileName: string,
     blob: Blob,
   ): Promise<{ fileName: string; objectUrl: string } | undefined>;
+  readPersistedProject?(): Promise<ProjectDocument | null>;
 }
 
 export interface MirrorFile {

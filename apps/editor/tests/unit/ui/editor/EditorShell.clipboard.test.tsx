@@ -229,6 +229,83 @@ describe('EditorShell clipboard workflows', () => {
     expect(syncedProject?.pages).toHaveLength(2);
   });
 
+  it('mirrors the saved slide paste instead of inline clipboard URLs', async () => {
+    const user = userEvent.setup();
+    const initialProject = sampleProject.createSampleProject();
+    initialProject.assets['asset-hero'] = {
+      ...initialProject.assets['asset-hero']!,
+      fileName: 'hero.png',
+      objectUrl: 'blob:https://localstudio.dev/hero',
+      storage: 'file',
+    };
+    const services = createAppServices({ initialProject, skipStoredProjectLoad: true });
+    const repository = new SavingProjectRepository();
+    const materializeLocalAsset = vi.fn((fileName: string) =>
+      Promise.resolve({
+        fileName: `stored-${fileName}`,
+        objectUrl: `blob:stored-${fileName}`,
+      }),
+    );
+    repository.readPersistedProject = () => {
+      const saved = repository.savedProjects.at(-1);
+      if (!saved) return Promise.resolve(null);
+      return Promise.resolve({
+        ...saved,
+        assets: Object.fromEntries(
+          Object.entries(saved.assets).map(([assetId, asset]) => [
+            assetId,
+            {
+              ...asset,
+              fileName: asset.fileName ?? `${assetId}.png`,
+              objectUrl: `blob:persisted-${assetId}`,
+              storage: 'file' as const,
+            },
+          ]),
+        ),
+      });
+    };
+    services.projectRepository = Object.assign(repository, { materializeLocalAsset });
+    const mirrorService = new RecordingMirrorService();
+    services.mirrorService = mirrorService;
+    const writeText = vi.fn<(text: string) => Promise<void>>(() => Promise.resolve());
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      blob: () => Promise.resolve(new Blob(['hero-bytes'], { type: 'image/png' })),
+    } as Response);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<EditorShell services={services} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Mirror Now' }));
+    await waitFor(() => expect(mirrorService.syncProject).toHaveBeenCalled());
+    mirrorService.syncProject.mockClear();
+
+    await user.click(screen.getByRole('button', { name: 'Copy Slide 1 to clipboard' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalled());
+    const copiedText = writeText.mock.calls.at(-1)?.[0] ?? '';
+    fireEvent.paste(window, {
+      clipboardData: {
+        getData: (type: string) => (type === 'text/plain' ? copiedText : ''),
+      },
+    });
+
+    await waitFor(() => {
+      expect(materializeLocalAsset).toHaveBeenCalled();
+      expect(mirrorService.syncProject).toHaveBeenCalled();
+    });
+    const syncedProject = mirrorService.syncProject.mock.calls.at(-1)?.[0];
+    const pastedAsset = Object.values(syncedProject?.assets ?? {}).find(
+      (asset) => asset.id !== 'asset-hero' && asset.name === initialProject.assets['asset-hero']?.name,
+    );
+    expect(pastedAsset?.objectUrl).toMatch(/^blob:persisted-/);
+    expect(pastedAsset?.storage).toBe('file');
+    expect(syncedProject?.pages).toHaveLength(2);
+  });
+
   it('copies a video over 200MB by reference and pastes a playable object URL', async () => {
     const user = userEvent.setup();
     const initialProject = sampleProject.createSampleProject();
