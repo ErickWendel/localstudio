@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { createAppServices } from './app/composition';
 import { sampleProject } from './domain/projects/sampleProject';
+import { createE2eAssetFixtureProject } from './ui/e2e/createE2eAssetFixtureProject';
 import { EditorShell } from './ui/editor/shell/EditorShell';
 
 export function EditorApp() {
@@ -9,16 +10,20 @@ export function EditorApp() {
     const storedProjectName = url.searchParams.get('project');
     const shouldStartBlankProject =
       url.searchParams.get('newProject') === '1' || !storedProjectName;
-    if (shouldStartBlankProject) {
+    const useAssetFixtures = url.searchParams.get('e2eAssetFixtures') === '1';
+    if (shouldStartBlankProject || useAssetFixtures) {
       url.searchParams.delete('newProject');
       url.searchParams.delete('project');
+      url.searchParams.delete('e2eAssetFixtures');
       window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
     }
 
     return createAppServices(
-      shouldStartBlankProject
+      shouldStartBlankProject || useAssetFixtures
         ? {
-            initialProject: sampleProject.createBlankProject(),
+            initialProject: useAssetFixtures
+              ? createE2eAssetFixtureProject()
+              : sampleProject.createBlankProject(),
             skipStoredProjectLoad: true,
           }
         : { storedProjectName },

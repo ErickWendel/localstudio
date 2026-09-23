@@ -1,8 +1,6 @@
 import { Brush, Clapperboard, ImagePlus, Layers3, Shapes, Sparkles, Type } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { collectReferencedAssetIds } from '../../../domain/assets/assetUsage';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type {
-  Asset,
   ElementAnimationBuild,
   PageBackground,
   ProjectDocument,
@@ -26,10 +24,10 @@ import type {
 } from '../../../services/contracts/interfaces';
 import { AiToolsPanel } from './AiToolsPanel';
 import { AnimationPanel } from './AnimationPanel';
+import { AssetsPanel } from './AssetsPanel';
 import { DesignPanel } from './DesignPanel';
 import { ElementsPanel } from './ElementsPanel';
 import type { CreateImagePromptOptions } from '../media/imagePromptOptions';
-import { localMediaImportConfig } from '../media/localMediaImportConfig';
 import { LayersPanel } from './LayersPanel';
 import { TextPanel } from './TextPanel';
 import type { RightPanelTab, TextPreset } from '../state/useEditorViewModel';
@@ -98,6 +96,9 @@ interface LeftToolPanelProps {
   onConfigureStockMedia?: (() => void) | undefined;
   onImportImage?: ((file: File) => void) | undefined;
   onRemoveAsset?: ((assetId: string) => void) | undefined;
+  onRemoveRecording?: ((recordingId: string) => void) | undefined;
+  onRemoveRecordingAudio?: ((recordingId: string) => void) | undefined;
+  onRemoveTranscript?: ((recordingId: string) => void) | undefined;
   onImportMedia?: ((file: File) => void) | undefined;
   onInsertStockMedia?: ((item: StockMediaItem) => void) | undefined;
   onInsertText?: ((preset: TextPreset) => void) | undefined;
@@ -206,6 +207,9 @@ export function LeftToolPanel({
   onConfigureStockMedia,
   onImportImage,
   onRemoveAsset,
+  onRemoveRecording,
+  onRemoveRecordingAudio,
+  onRemoveTranscript,
   onImportMedia,
   onInsertStockMedia,
   onInsertText,
@@ -254,7 +258,6 @@ export function LeftToolPanel({
   onReorderElementAnimationBuild,
   onPlayAnimationPreview,
 }: LeftToolPanelProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const resizeStartRef = useRef<{ pointerX: number; width: number } | undefined>(undefined);
   const [contentWidth, setContentWidth] = useState(266);
   const [resizing, setResizing] = useState(false);
@@ -262,16 +265,6 @@ export function LeftToolPanel({
     attentionModelId || promptApiAttention || translationTargetAttention,
   );
   const panelOpen = open || isAttentionOpen;
-  const assetRows = useMemo(() => {
-    if (!panelOpen || activeTab !== 'assets') return [];
-    const referencedAssetIds = collectReferencedAssetIds(project);
-    return Object.values(project.assets)
-      .map((asset) => ({
-        asset,
-        used: referencedAssetIds.has(asset.id),
-      }))
-      .sort((a, b) => a.asset.name.localeCompare(b.asset.name, undefined, { sensitivity: 'base' }));
-  }, [activeTab, panelOpen, project]);
 
   useEffect(() => {
     if (!resizing) return undefined;
@@ -455,55 +448,15 @@ export function LeftToolPanel({
           />
         ) : null}
         {panelOpen && activeTab === 'assets' ? (
-          <section className="panel-stack">
-            <div className="panel-section ew-panel-card">
-              <h2 className="panel-heading">Assets</h2>
-              <p className="panel-muted">Imported assets in this project.</p>
-            </div>
-            <button
-              className="compact-action compact-action-full ew-surface ew-surface-hover ew-compact-row"
-              type="button"
-              onClick={() => {
-                fileInputRef.current?.click();
-              }}
-            >
-              <span className="material-symbols-outlined" aria-hidden="true">
-                add_photo_alternate
-              </span>
-              Import Media
-            </button>
-            <input
-              ref={fileInputRef}
-              aria-label="Import media file"
-              className="visually-hidden-input"
-              type="file"
-              accept={localMediaImportConfig.accept}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (!file) return;
-                if (onImportMedia) {
-                  onImportMedia(file);
-                } else {
-                  onImportImage?.(file);
-                }
-                event.target.value = '';
-              }}
-            />
-            <div className="asset-list ew-panel-card" aria-label="Project assets">
-              {assetRows.length > 0 ? (
-                assetRows.map(({ asset, used }) => (
-                  <AssetRow
-                    asset={asset}
-                    key={asset.id}
-                    used={used}
-                    onRemoveAsset={onRemoveAsset}
-                  />
-                ))
-              ) : (
-                <p className="panel-muted">No assets imported yet.</p>
-              )}
-            </div>
-          </section>
+          <AssetsPanel
+            project={project}
+            onImportImage={onImportImage}
+            onImportMedia={onImportMedia}
+            onRemoveAsset={onRemoveAsset}
+            onRemoveRecording={onRemoveRecording}
+            onRemoveRecordingAudio={onRemoveRecordingAudio}
+            onRemoveTranscript={onRemoveTranscript}
+          />
         ) : null}
       </div>
       {panelOpen ? (
@@ -525,55 +478,3 @@ export function LeftToolPanel({
   );
 }
 
-function AssetRow({
-  asset,
-  onRemoveAsset,
-  used,
-}: {
-  asset: Asset;
-  onRemoveAsset: ((assetId: string) => void) | undefined;
-  used: boolean;
-}) {
-  const detail = asset.fileName ?? asset.id;
-  const storageLabel =
-    asset.storage === 'file' ? 'Saved file' : asset.storage === 'remote' ? 'Remote' : 'Inline';
-  return (
-    <div className="asset-row ew-surface ew-surface-hover">
-      <div className="asset-thumb" aria-hidden="true">
-        {asset.objectUrl ? (
-          <img alt="" src={asset.objectUrl} />
-        ) : (
-          <span className="material-symbols-outlined">image</span>
-        )}
-      </div>
-      <div className="asset-row-body">
-        <div className="asset-row-title-line ew-compact-row">
-          <h3 className="asset-row-title ew-ellipsis">{asset.name}</h3>
-          <span
-            className={used ? 'asset-status asset-status-used' : 'asset-status asset-status-unused'}
-          >
-            {used ? 'Used' : 'Unused'}
-          </span>
-        </div>
-        <p className="asset-row-meta ew-ellipsis">
-          {asset.mimeType} · {storageLabel}
-        </p>
-        <p className="asset-row-meta ew-ellipsis">{detail}</p>
-      </div>
-      <button
-        aria-label={`Remove ${asset.name}`}
-        className="asset-remove-button"
-        disabled={used || !onRemoveAsset}
-        title={used ? 'This asset is still used in the project' : 'Remove unused asset'}
-        type="button"
-        onClick={() => {
-          onRemoveAsset?.(asset.id);
-        }}
-      >
-        <span className="material-symbols-outlined" aria-hidden="true">
-          delete
-        </span>
-      </button>
-    </div>
-  );
-}

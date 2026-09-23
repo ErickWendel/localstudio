@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { localStudioAnalyticsConfig } from '@localstudio/analytics-config/config';
 import type { AppServices } from '../../../app/composition';
 import { basicCommands } from '../../../domain/commands/elements/basicCommands';
+import { recordingRemovalCommands } from '../../../domain/commands/recordings/recording-removal-commands';
 import type {
   AlignMode,
   ElementAnimationPatch,
@@ -3249,6 +3250,24 @@ export function useEditorViewModel(services: AppServices) {
     );
   }
 
+  function removeRecording(recordingId: string) {
+    commitProject((currentProject) =>
+      new recordingRemovalCommands.RemoveRecordingCommand(recordingId).execute(currentProject),
+    );
+  }
+
+  function removeRecordingAudio(recordingId: string) {
+    commitProject((currentProject) =>
+      new recordingRemovalCommands.RemoveRecordingAudioCommand(recordingId).execute(currentProject),
+    );
+  }
+
+  function removeTranscript(recordingId: string) {
+    commitProject((currentProject) =>
+      new recordingRemovalCommands.RemoveTranscriptCommand(recordingId).execute(currentProject),
+    );
+  }
+
   function deleteSelectedElement() {
     const deletableElementIds = selectedElementIds.filter(
       (elementId) => !processingElementIds.includes(elementId),
@@ -3938,6 +3957,9 @@ export function useEditorViewModel(services: AppServices) {
     deleteElement,
     reorderElement,
     removeAsset,
+    removeRecording,
+    removeRecordingAudio,
+    removeTranscript,
     importImageFile,
     importMediaFile: importImageFile,
     clearMediaImportProgress,

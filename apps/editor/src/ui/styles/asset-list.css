@@ -1,6 +1,6 @@
 .asset-row {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) 32px;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   min-width: 0;
@@ -67,7 +67,99 @@
   font-size: 10px;
 }
 
-.asset-remove-button {
+.asset-row-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.asset-disclosure-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ew-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.asset-disclosure-toggle:hover {
+  border-color: rgba(55, 253, 118, 0.3);
+}
+
+.asset-disclosure-toggle:focus-visible {
+  outline: 2px solid var(--ew-green);
+  outline-offset: 2px;
+}
+
+.asset-disclosure-toggle .panel-section-title,
+.asset-group-toggle .asset-row-title {
+  flex: 1;
+}
+
+.asset-disclosure-count {
+  color: var(--ew-muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.asset-disclosure-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.asset-group-toggle {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.asset-group {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.asset-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.asset-group-header .asset-group-toggle {
+  flex: 1;
+  width: auto;
+}
+
+.asset-sublist {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0 0 0 12px;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  list-style: none;
+}
+
+.asset-subrow {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.asset-subrow-icon {
+  color: var(--ew-muted);
+  font-size: 18px;
+}
+
+.asset-icon-button {
   display: grid;
   place-items: center;
   width: 32px;
@@ -77,6 +169,22 @@
   background: rgba(255, 255, 255, 0.04);
   color: var(--ew-text);
   cursor: pointer;
+  text-decoration: none;
+}
+
+.asset-icon-button:focus-visible {
+  outline: 2px solid var(--ew-green);
+  outline-offset: 2px;
+}
+
+.asset-icon-button:disabled {
+  color: rgba(255, 255, 255, 0.26);
+  cursor: not-allowed;
+}
+
+.asset-link-button:hover:not(:disabled) {
+  border-color: rgba(55, 253, 118, 0.45);
+  color: var(--ew-green);
 }
 
 .asset-remove-button:hover:not(:disabled) {

@@ -37,6 +37,7 @@ test.describe('editor AI image generation options journey', () => {
     await page.getByRole('button', { name: 'Submit prompt' }).click();
 
     await editor.openTool('Assets');
+    await editor.openAssetSection('Media');
     await expect(page.getByText(/\.png$/)).toBeVisible({ timeout: 30_000 });
 
     await editor.openTool('AI Tools');
@@ -69,6 +70,7 @@ test.describe('editor AI image generation options journey', () => {
     await page.getByLabel('Create image prompt').fill('retryable neon image after failure');
     await page.getByRole('button', { name: 'Submit prompt' }).click();
     await editor.openTool('Assets');
+    await editor.openAssetSection('Media');
     await expect(page.getByText(/\.png$/)).toBeVisible({ timeout: 30_000 });
   });
 });
