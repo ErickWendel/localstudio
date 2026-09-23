@@ -109,6 +109,32 @@ describe('EditorShell clipboard workflows', () => {
     );
   });
 
+  it('asks for a project name before copying a slide that is not stored locally', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const repository = new SavingProjectRepository();
+    services.projectRepository = repository;
+    render(<EditorShell services={services} />);
+
+    const copyButton = screen.getByRole('button', { name: 'Copy Slide 1 to clipboard' });
+    const hint =
+      'Store this project locally before copying slides. Unsaved assets can paste empty in another tab.';
+    expect(copyButton).toBeDisabled();
+    expect(copyButton).toHaveAttribute('title', hint);
+
+    await user.click(screen.getByRole('button', { name: 'Save now' }));
+    const nameInput = screen.getByRole('textbox', { name: 'Project folder name' });
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Stored Deck');
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Copy Slide 1 to clipboard' })).toBeEnabled();
+    });
+    expect(screen.queryByRole('button', { name: 'Save now' })).not.toBeInTheDocument();
+    expect(repository.savedProjects.at(-1)?.name).toBe('Stored Deck');
+  });
+
   it('persists and mirrors a whole slide pasted from the system clipboard', async () => {
     const user = userEvent.setup();
     const initialProject = sampleProject.createSampleProject();

@@ -149,3 +149,54 @@
     transform: rotate(360deg) scale(1);
   }
 }
+
+.slide-copy-control {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.slide-copy-control-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  display: none;
+  width: max-content;
+  max-width: 240px;
+  border: 1px solid rgba(55, 253, 118, 0.28);
+  border-radius: 6px;
+  background: rgba(8, 17, 11, 0.98);
+  color: var(--ew-text);
+  font-size: 12px;
+  line-height: 1.35;
+  padding: 8px 10px;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.42);
+  pointer-events: none;
+}
+
+.slide-copy-control:hover .slide-copy-control-tooltip,
+.slide-copy-control:focus-within .slide-copy-control-tooltip {
+  display: block;
+}
+
+.slide-copy-save-now {
+  height: 28px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(55, 253, 118, 0.45);
+  border-radius: 4px;
+  background: rgba(55, 253, 118, 0.12);
+  color: var(--ew-green);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 8px;
+  white-space: nowrap;
+}
+
+.slide-copy-save-now:hover,
+.slide-copy-save-now:focus-visible {
+  border-color: var(--ew-green);
+  background: rgba(55, 253, 118, 0.2);
+}
