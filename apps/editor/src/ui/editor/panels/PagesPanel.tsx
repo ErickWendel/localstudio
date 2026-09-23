@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import type { Page, ProjectDocument } from '../../../domain/documents/model';
 import { pageVisibility } from '../../../domain/documents/pageVisibility';
+import { SlideCopyControl } from '../persistence/SlideCopyControl';
 import { MiniPagePreview } from './PageMiniPreview';
 
 type DropPosition = 'before' | 'after';
@@ -13,7 +14,9 @@ interface PagesPanelProps {
   onClose?: (() => void) | undefined;
   onDeletePage?: ((pageId: string) => void) | undefined;
   onDuplicatePage?: ((pageId: string) => void) | undefined;
+  canCopyPages?: boolean;
   onCopyPage?: ((pageId: string) => void) | undefined;
+  onSaveLocalProject?: (() => void) | undefined;
   onRenamePage?: ((pageId: string, name: string) => void) | undefined;
   onReorderPage?: ((pageId: string, targetIndex: number) => void) | undefined;
   onSelectPage?: ((pageId: string) => void) | undefined;
@@ -37,7 +40,9 @@ export function PagesPanel({
   onClose,
   onDeletePage,
   onDuplicatePage,
+  canCopyPages = true,
   onCopyPage,
+  onSaveLocalProject,
   onRenamePage,
   onReorderPage,
   onSelectPage,
@@ -274,16 +279,12 @@ export function PagesPanel({
                       library_add
                     </span>
                   </button>
-                  <button
-                    className="icon-button"
-                    type="button"
-                    aria-label={`Copy ${page.name}`}
-                    onClick={() => onCopyPage?.(page.id)}
-                  >
-                    <span className="material-symbols-outlined" aria-hidden="true">
-                      file_copy
-                    </span>
-                  </button>
+                  <SlideCopyControl
+                    canCopy={canCopyPages}
+                    label={`Copy ${page.name}`}
+                    {...(onCopyPage ? { onCopy: () => onCopyPage(page.id) } : {})}
+                    {...(onSaveLocalProject ? { onSaveLocal: onSaveLocalProject } : {})}
+                  />
                   <button
                     className="icon-button"
                     type="button"

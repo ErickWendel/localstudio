@@ -109,6 +109,32 @@ describe('EditorShell clipboard workflows', () => {
     );
   });
 
+  it('asks for a project name before copying a slide that is not stored locally', async () => {
+    const user = userEvent.setup();
+    const services = createAppServices();
+    const repository = new SavingProjectRepository();
+    services.projectRepository = repository;
+    render(<EditorShell services={services} />);
+
+    const copyButton = screen.getByRole('button', { name: 'Copy Slide 1 to clipboard' });
+    const hint =
+      'Store this project locally before copying slides. Unsaved assets can paste empty in another tab.';
+    expect(copyButton).toBeDisabled();
+    expect(copyButton).toHaveAttribute('title', hint);
+
+    await user.click(screen.getByRole('button', { name: 'Save now' }));
+    const nameInput = screen.getByRole('textbox', { name: 'Project folder name' });
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Stored Deck');
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Copy Slide 1 to clipboard' })).toBeEnabled();
+    });
+    expect(screen.queryByRole('button', { name: 'Save now' })).not.toBeInTheDocument();
+    expect(repository.savedProjects.at(-1)?.name).toBe('Stored Deck');
+  });
+
   it('persists and mirrors a whole slide pasted from the system clipboard', async () => {
     const user = userEvent.setup();
     const initialProject = sampleProject.createSampleProject();
@@ -290,5 +316,117 @@ describe('EditorShell clipboard workflows', () => {
       'aria-pressed',
       'true',
     );
+  });
+
+  it('replaces a screenshot with a copied slide before asset conversion finishes', async () => {
+    const user = userEvent.setup();
+    const initialProject = sampleProject.createSampleProject();
+    initialProject.assets['asset-hero'] = {
+      ...initialProject.assets['asset-hero']!,
+      objectUrl: 'blob:https://localstudio.dev/hero',
+    };
+    const screenshot = new File(['screenshot'], 'Screenshot.png', { type: 'image/png' });
+    const clipboardStore = {
+      files: [screenshot] as File[],
+      text: '',
+      types: ['image/png', 'Files'],
+    };
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise(() => undefined));
+    document.execCommand = () => false;
+    vi.spyOn(document, 'execCommand').mockImplementation((command) => {
+      if (command !== 'copy') return false;
+      const clipboardData = createClipboardData();
+      fireEvent.copy(window, { clipboardData });
+      const text = clipboardData.getData('text/plain');
+      if (text.startsWith('LocalStudio.dev slide:')) {
+        clipboardStore.files = [];
+        clipboardStore.text = text;
+        clipboardStore.types = ['text/plain'];
+      }
+      return true;
+    });
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        read: () =>
+          Promise.resolve([
+            {
+              types: clipboardStore.types,
+              getType: (type: string) =>
+                Promise.resolve(
+                  new Blob([type === 'text/plain' ? clipboardStore.text : 'image'], { type }),
+                ),
+            },
+          ]),
+        write: vi.fn(() => new Promise(() => undefined)),
+      },
+    });
+
+    render(<EditorShell services={createAppServices({ initialProject, skipStoredProjectLoad: true })} />);
+    await selectTitleLayer(user);
+    await user.click(screen.getByRole('button', { name: 'Copy Slide 1 to clipboard' }));
+
+    expect(clipboardStore.types).toEqual(['text/plain']);
+    expect(clipboardStore.text).toContain('"name":"Slide 1"');
+    expect(clipboardStore.text).not.toContain('LocalStudio.dev editor elements');
+
+    fireEvent.paste(window, {
+      clipboardData: {
+        files: [screenshot],
+        getData: () => '',
+        items: [{ kind: 'file', type: 'image/png', getAsFile: () => screenshot }],
+        types: ['image/png', 'Files'],
+      },
+    });
+
+    expect(await screen.findByText('2 / 2')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Screenshot.png' })).not.toBeInTheDocument();
+  });
+
+  it('imports a newer screenshot when its image type precedes stale slide text', async () => {
+    const user = userEvent.setup();
+    const screenshot = new File(['screenshot'], 'Newer Screenshot.png', { type: 'image/png' });
+    document.execCommand = () => true;
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        read: () =>
+          Promise.resolve([
+            {
+              types: ['image/png', 'text/plain'],
+              getType: (type: string) =>
+                Promise.resolve(
+                  new Blob(
+                    [
+                      type === 'text/plain'
+                        ? 'LocalStudio.dev slide: {"page":{"id":"old"}}'
+                        : 'image',
+                    ],
+                    { type },
+                  ),
+                ),
+            },
+          ]),
+        write: () => Promise.resolve(),
+        writeText: () => Promise.resolve(),
+      },
+    });
+
+    render(<EditorShell services={createAppServices()} />);
+    await user.click(screen.getByRole('button', { name: 'Copy Slide 1 to clipboard' }));
+    await openLeftTab(user, 'Layout');
+    fireEvent.paste(window, {
+      clipboardData: {
+        files: [screenshot],
+        getData: () => '',
+        items: [{ kind: 'file', type: 'image/png', getAsFile: () => screenshot }],
+        types: ['image/png', 'Files'],
+      },
+    });
+
+    expect(
+      await screen.findByRole('button', { name: 'Newer Screenshot.png' }, { timeout: 5_000 }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('1 / 1')).toBeInTheDocument();
   });
 });
