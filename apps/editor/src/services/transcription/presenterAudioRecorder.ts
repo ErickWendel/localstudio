@@ -116,13 +116,17 @@ export class PresenterAudioRecorder {
         'stop',
         () => {
           this.stopStream();
-          const blob = new Blob(this.chunks, { type: mimeType });
-          this.objectUrl = createObjectUrl(blob);
-          resolve({
-            blob,
-            durationMs: Date.now() - this.startedAtMs,
-            mimeType,
-          });
+          const durationMs = Date.now() - this.startedAtMs;
+          const recordedBlob = new Blob(this.chunks, { type: mimeType });
+          const finalBlob = mimeType.includes('webm')
+            ? fixWebmDuration(recordedBlob, durationMs, { logger: false })
+            : Promise.resolve(recordedBlob);
+          void finalBlob
+            .then((blob) => {
+              this.objectUrl = createObjectUrl(blob);
+              resolve({ blob, durationMs, mimeType });
+            })
+            .catch(reject);
         },
         { once: true },
       );
@@ -167,3 +171,4 @@ export class PresenterAudioRecorder {
     this.recorder = undefined;
   }
 }
+import fixWebmDuration from 'fix-webm-duration';

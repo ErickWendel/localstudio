@@ -1,12 +1,59 @@
 import { readFile } from 'node:fs/promises';
 import { PublicDeckPage } from '../pages/public-deck.page';
 import { createSharePayload } from '../support/share-payload';
-import { createTinyPngFixture, getBigBuckBunnyMp4Fixture } from '../support/test-assets';
+import { createTinyGifFixture, createTinyPngFixture, getBigBuckBunnyMp4Fixture } from '../support/test-assets';
 import { expect, test, withIsolatedDevServer } from '../support/journey-test';
 
 const getServer = withIsolatedDevServer(test);
 
 test.describe('public deck media playback journey', () => {
+  test('plays an autoplay video and animated GIF after selecting a recorded slide', async ({ page }, testInfo) => {
+    const payload = createSharePayload();
+    payload.project.assets['chapter-video'] = {
+      id: 'chapter-video', type: 'video', mimeType: 'video/mp4', name: 'Chapter video',
+      objectUrl: 'http://localhost/chapter-video.mp4', storage: 'remote',
+    };
+    payload.project.assets['chapter-gif'] = {
+      id: 'chapter-gif', type: 'gif', mimeType: 'image/gif', name: 'Chapter GIF',
+      objectUrl: 'http://localhost/chapter-gif.gif', storage: 'remote',
+    };
+    payload.project.elements['chapter-video'] = {
+      id: 'chapter-video', type: 'video', assetId: 'chapter-video', x: 0, y: 0,
+      width: 720, height: 405, rotation: 0, opacity: 1, locked: false, visible: true,
+      autoplayInPreview: true, controls: false, muted: true, loop: true,
+      playAcrossSlides: false, playbackPositionSeconds: 0, playing: false,
+      posterFrameSeconds: 0, repeatMode: 'loop', startOnClick: false,
+      trimStartSeconds: 0, volume: 0,
+    };
+    payload.project.elements['chapter-gif'] = {
+      id: 'chapter-gif', type: 'gif', assetId: 'chapter-gif', x: 800, y: 0,
+      width: 400, height: 300, rotation: 0, opacity: 1, locked: false, visible: true,
+      playing: true,
+    };
+    payload.project.pages[1].elementIds.push('chapter-video', 'chapter-gif');
+    await page.route('**/chapter-media-share.json', (route) =>
+      route.fulfill({ contentType: 'application/json', json: payload }),
+    );
+    await page.route('**/chapter-video.mp4', async (route) =>
+      route.fulfill({ body: await readFile(getBigBuckBunnyMp4Fixture()), contentType: 'video/mp4' }),
+    );
+    await page.route('**/chapter-gif.gif', async (route) =>
+      route.fulfill({ body: await readFile(await createTinyGifFixture(testInfo)), contentType: 'image/gif' }),
+    );
+
+    const publicDeck = new PublicDeckPage(page, getServer().baseURL);
+    await publicDeck.goto(`/editor/?share=e2e-share&src=${encodeURIComponent('http://localhost/chapter-media-share.json')}`);
+    await publicDeck.expectReady(false);
+    await page.getByRole('button', { name: 'Next slide' }).click();
+    await expect(page.getByText('2 / 2')).toBeVisible();
+    const video = page.locator('video[aria-label="Chapter video"]');
+    const gif = page.locator('img[aria-label="Chapter GIF"]');
+    await expect(video).toBeVisible();
+    await expect(gif).toBeVisible();
+    await expect.poll(() => gif.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+    await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.paused)).toBe(false);
+  });
+
   test('renders and plays a shared deck video asset from the public viewer', async ({
     page,
   }, testInfo) => {

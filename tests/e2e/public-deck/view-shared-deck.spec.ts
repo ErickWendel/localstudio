@@ -32,11 +32,19 @@ test.describe('public deck view journey', () => {
           return 2.2;
         },
       });
+      Object.defineProperty(HTMLMediaElement.prototype, 'paused', {
+        configurable: true,
+        get(this: HTMLMediaElement) {
+          return !this.hasAttribute('data-playing');
+        },
+      });
       HTMLMediaElement.prototype.play = function play() {
+        this.setAttribute('data-playing', 'true');
         this.dispatchEvent(new Event('play'));
         return Promise.resolve();
       };
       HTMLMediaElement.prototype.pause = function pause() {
+        this.removeAttribute('data-playing');
         this.dispatchEvent(new Event('pause'));
       };
     });
@@ -256,7 +264,7 @@ test.describe('public deck view journey', () => {
       audio.currentTime = 2.2;
       audio.dispatchEvent(new Event('timeupdate'));
     });
-    await expect(page.getByText('0:02 / 0:02')).toBeVisible();
+    await expect(transcriptPanel.getByLabel('Podcast audio time')).toHaveText(/0:02\s*0:02/);
     await expect(page.getByText('2 / 3')).toBeVisible();
     await transcriptPanel.getByRole('button', { name: 'Open slide 1: Opening' }).click();
     await expect(page.getByText('1 / 3')).toBeVisible();

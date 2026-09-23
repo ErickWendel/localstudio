@@ -151,11 +151,12 @@ function CanvasVideoElement({
     if (!video || element.playing === undefined) return;
     stopReversePlayback();
     if (!element.playing) {
+      if (previewMode && element.autoplayInPreview && !element.startOnClick) return;
       video.pause();
       return;
     }
     playVideo(video);
-  }, [element.playing]);
+  }, [element.autoplayInPreview, element.playing, element.startOnClick, previewMode]);
 
   useEffect(() => {
     const video = videoRef.current;
