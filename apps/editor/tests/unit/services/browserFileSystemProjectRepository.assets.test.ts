@@ -568,4 +568,226 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
     expect(loadedVersion?.assets['asset-history-image']?.objectUrl).toBe('blob:history-image');
     expect(createObjectUrl).toHaveBeenCalled();
   });
+
+  it('copies file-backed assets into a new folder without overwriting local edits', async () => {
+    const sourceParent = new MockDirectoryHandle();
+    const destinationParent = new MockDirectoryHandle();
+    const copiedDeck = new MockDirectoryHandle();
+    const copiedAssets = new MockDirectoryHandle();
+    destinationParent.directories.set('Copied Deck', copiedDeck);
+    copiedDeck.directories.set('assets', copiedAssets);
+    copiedAssets.files.set('asset-edited.png', new Blob(['local-edit'], { type: 'image/png' }));
+    const repository = new BrowserFileSystemProjectRepository({
+      pickDirectory: vi
+        .fn()
+        .mockResolvedValueOnce(sourceParent)
+        .mockResolvedValueOnce(destinationParent),
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
+    });
+    const project = {
+      ...sampleProject.createSampleProject(),
+      name: 'Source Deck',
+      assets: {
+        'asset-hero': {
+          id: 'asset-hero',
+          type: 'image' as const,
+          name: 'Hero',
+          mimeType: 'image/png',
+          storage: 'file' as const,
+          fileName: 'asset-hero.png',
+        },
+        'asset-edited': {
+          id: 'asset-edited',
+          type: 'image' as const,
+          name: 'Edited',
+          mimeType: 'image/png',
+          storage: 'file' as const,
+          fileName: 'asset-edited.png',
+        },
+        'asset-missing': {
+          id: 'asset-missing',
+          type: 'image' as const,
+          name: 'Missing',
+          mimeType: 'image/png',
+          storage: 'file' as const,
+          fileName: 'asset-missing.png',
+        },
+      },
+      fonts: {
+        'font-body': {
+          id: 'font-body',
+          family: 'Body',
+          requestedFamily: 'Body',
+          source: 'uploaded' as const,
+          fontStyle: 'normal' as const,
+          fontWeight: 400,
+          mimeType: 'font/ttf' as const,
+          fileName: 'body.ttf',
+          storage: 'file' as const,
+        },
+      },
+      recordings: {
+        recording1: {
+          id: 'recording1',
+          name: 'Talk',
+          createdAt: '2026-09-23T12:00:00.000Z',
+          updatedAt: '2026-09-23T12:00:00.000Z',
+          durationMs: 1000,
+          modelPresetId: 'web-speech-api',
+          audio: {
+            mimeType: 'audio/webm',
+            fileName: 'recording1.webm',
+            storage: 'file' as const,
+          },
+          transcriptFileName: 'recording1.transcript.json',
+          segments: [],
+        },
+      },
+    };
+
+    await repository.saveProject(project, { projectDirectoryName: 'Source Deck' });
+    const sourceDeck = sourceParent.directories.get('Source Deck')!;
+    const sourceAssets = sourceDeck.directories.get('assets')!;
+    sourceAssets.files.set('asset-hero.png', new Blob(['source-bytes'], { type: 'image/png' }));
+    sourceAssets.files.set('asset-edited.png', new Blob(['old-bytes'], { type: 'image/png' }));
+    sourceDeck.directories.get('fonts')!.files.set('body.ttf', new Blob(['font-bytes']));
+    sourceDeck.directories
+      .get('recordings')!
+      .files.set('recording1.webm', new Blob(['audio-bytes']));
+    sourceDeck.directories
+      .get('recordings')!
+      .files.set('recording1.transcript.json', new Blob(['{"segments":[]}']));
+
+    await repository.saveProjectAs(
+      { ...project, id: 'project-copy', name: 'Copied Deck' },
+      { projectDirectoryName: 'Copied Deck' },
+    );
+
+    expect(await (copiedAssets.files.get('asset-hero.png') as Blob).text()).toBe('source-bytes');
+    expect(await (copiedAssets.files.get('asset-edited.png') as Blob).text()).toBe('local-edit');
+    expect(copiedAssets.files.has('asset-missing.png')).toBe(false);
+    expect(await (copiedDeck.directories.get('fonts')!.files.get('body.ttf') as Blob).text()).toBe(
+      'font-bytes',
+    );
+    expect(
+      await (copiedDeck.directories.get('recordings')!.files.get('recording1.webm') as Blob).text(),
+    ).toBe('audio-bytes');
+    expect(
+      await (
+        copiedDeck.directories.get('recordings')!.files.get('recording1.transcript.json') as Blob
+      ).text(),
+    ).toBe('{"segments":[]}');
+    expect(sourceAssets.files.has('asset-hero.png')).toBe(true);
+  });
+
+  it('copies file-backed assets before deleting a renamed project folder', async () => {
+    const parent = new MockDirectoryHandle();
+    const repository = new BrowserFileSystemProjectRepository({
+      pickDirectory: () => Promise.resolve(parent as unknown as FileSystemDirectoryHandle),
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
+    });
+    const project = {
+      ...sampleProject.createSampleProject(),
+      name: 'Source Deck',
+      assets: {
+        'asset-hero': {
+          id: 'asset-hero',
+          type: 'image' as const,
+          name: 'Hero',
+          mimeType: 'image/png',
+          storage: 'file' as const,
+          fileName: 'asset-hero.png',
+        },
+      },
+    };
+
+    await repository.saveProject(project, { projectDirectoryName: 'Source Deck' });
+    parent.directories
+      .get('Source Deck')!
+      .directories.get('assets')!
+      .files.set('asset-hero.png', new Blob(['source-bytes'], { type: 'image/png' }));
+
+    await repository.saveProject({ ...project, name: 'Renamed Deck' });
+
+    expect(parent.directories.has('Source Deck')).toBe(false);
+    const renamedAssets = parent.directories.get('Renamed Deck')!.directories.get('assets')!;
+    expect(await (renamedAssets.files.get('asset-hero.png') as Blob).text()).toBe('source-bytes');
+  });
+
+  it('does not copy recordings, transcripts, or history when duplicating a project folder', async () => {
+    const sourceParent = new MockDirectoryHandle();
+    const destinationParent = new MockDirectoryHandle();
+    const repository = new BrowserFileSystemProjectRepository({
+      pickDirectory: vi
+        .fn()
+        .mockResolvedValueOnce(sourceParent)
+        .mockResolvedValueOnce(destinationParent),
+      recentProjectStore: new MemoryRecentProjectHandleStore(),
+    });
+    const project = {
+      ...sampleProject.createSampleProject(),
+      name: 'Source Deck',
+      assets: {
+        'asset-hero': {
+          id: 'asset-hero',
+          type: 'image' as const,
+          name: 'Hero',
+          mimeType: 'image/png',
+          storage: 'file' as const,
+          fileName: 'asset-hero.png',
+        },
+      },
+      recordings: {
+        recording1: {
+          id: 'recording1',
+          name: 'Talk',
+          createdAt: '2026-09-23T12:00:00.000Z',
+          updatedAt: '2026-09-23T12:00:00.000Z',
+          durationMs: 1000,
+          modelPresetId: 'web-speech-api',
+          audio: {
+            mimeType: 'audio/webm',
+            fileName: 'recording1.webm',
+            storage: 'file' as const,
+          },
+          transcriptFileName: 'recording1.transcript.json',
+          segments: [],
+        },
+      },
+    };
+
+    await repository.saveProject(project, { projectDirectoryName: 'Source Deck' });
+    const sourceDeck = sourceParent.directories.get('Source Deck')!;
+    sourceDeck.directories
+      .get('assets')!
+      .files.set('asset-hero.png', new Blob(['source-bytes'], { type: 'image/png' }));
+    sourceDeck.directories
+      .get('recordings')!
+      .files.set('recording1.webm', new Blob(['audio-bytes']));
+    sourceDeck.directories
+      .get('recordings')!
+      .files.set('recording1.transcript.json', new Blob(['{"segments":[]}']));
+    const history = new MockDirectoryHandle();
+    sourceDeck.directories.set('history', history);
+    history.files.set('manifest.json', '{"versions":["old"]}');
+
+    await repository.saveProjectAs(
+      { ...project, id: 'project-copy', name: 'Copied Deck' },
+      { duplicate: true, projectDirectoryName: 'Copied Deck' },
+    );
+
+    const copiedDeck = destinationParent.directories.get('Copied Deck')!;
+    const savedProject = JSON.parse(copiedDeck.files.get('project.json') as string) as ProjectDocument;
+    expect(await (copiedDeck.directories.get('assets')!.files.get('asset-hero.png') as Blob).text()).toBe(
+      'source-bytes',
+    );
+    expect(savedProject).not.toHaveProperty('recordings');
+    expect(copiedDeck.directories.get('recordings')!.files.has('recording1.webm')).toBe(false);
+    expect(copiedDeck.directories.get('recordings')!.files.has('recording1.transcript.json')).toBe(
+      false,
+    );
+    expect(copiedDeck.directories.has('history')).toBe(false);
+    expect(sourceDeck.directories.get('recordings')!.files.has('recording1.webm')).toBe(true);
+    expect(history.files.has('manifest.json')).toBe(true);
+  });
 });

@@ -1,4 +1,5 @@
 import type { ImportWarning, ProjectDocument, TranscriptRecording } from '../../domain/documents/model';
+import { duplicateProjectDocument } from '../../domain/projects/duplicateProjectDocument';
 import type {
   MirrorFile,
   ProjectRepository,
@@ -9,6 +10,7 @@ import type {
 import { browserStorage } from '../browser/browserStorage';
 import type { BrowserKeyValueStorage } from '../browser/browserStorage';
 import { assetFileUtils } from './assetFileUtils';
+import { copyMissingFileBackedProjectFiles } from './copyMissingFileBackedProjectFiles';
 import { projectVersionHistoryUtils } from './projectVersionHistoryUtils';
 
 interface FileSystemProjectRepositoryOptions {
@@ -231,6 +233,7 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
   private parentDirectoryHandle: FileSystemDirectoryHandle | null = null;
   private pendingMirrorImportDirectoryHandle: FileSystemDirectoryHandle | null = null;
   private projectDirectoryName: string | null = null;
+  private sourceDirectoryForNextSave: FileSystemDirectoryHandle | null = null;
   private readonly recentProjectStore: RecentProjectHandleStore;
 
   constructor(private readonly options: FileSystemProjectRepositoryOptions = {}) {
@@ -310,10 +313,24 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
 
   async saveProject(
     project: ProjectDocument,
-    options?: { projectDirectoryName?: string },
+    options?: { duplicate?: boolean; projectDirectoryName?: string },
   ): Promise<void> {
     const previousProjectDirectoryName = this.projectDirectoryName;
-    const directoryHandle = await this.ensureProjectDirectory(project.name, options);
+    const sourceDirectory = this.sourceDirectoryForNextSave ?? this.directoryHandle;
+    this.sourceDirectoryForNextSave = null;
+    const projectToSave = options?.duplicate
+      ? duplicateProjectDocument(project, {
+          createId: () => project.id,
+          name: project.name,
+          now: () => project.updatedAt,
+        })
+      : project;
+    const directoryHandle = await this.ensureProjectDirectory(projectToSave.name, options);
+    if (sourceDirectory && sourceDirectory !== directoryHandle) {
+      await copyMissingFileBackedProjectFiles(sourceDirectory, directoryHandle, projectToSave, {
+        includeRecordings: options?.duplicate !== true,
+      });
+    }
     const assetsDirectory = await directoryHandle.getDirectoryHandle('assets', { create: true });
     const fontsDirectory = await directoryHandle.getDirectoryHandle('fonts', { create: true });
     const recordingsDirectory = await directoryHandle.getDirectoryHandle('recordings', {
@@ -325,7 +342,7 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
     ]);
 
     const projectForDisk = await createFileBackedProjectSnapshot(
-      project,
+      projectToSave,
       assetsDirectory,
       fontsDirectory,
       recordingsDirectory,
@@ -371,8 +388,9 @@ export class BrowserFileSystemProjectRepository implements ProjectRepository {
 
   async saveProjectAs(
     project: ProjectDocument,
-    options?: { projectDirectoryName?: string },
+    options?: { duplicate?: boolean; projectDirectoryName?: string },
   ): Promise<void> {
+    this.sourceDirectoryForNextSave = this.directoryHandle;
     this.directoryHandle = null;
     this.parentDirectoryHandle = null;
     this.projectDirectoryName = null;

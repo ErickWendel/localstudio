@@ -362,7 +362,17 @@ describe('EditorShell clipboard workflows', () => {
       },
     });
 
-    render(<EditorShell services={createAppServices({ initialProject, skipStoredProjectLoad: true })} />);
+    const services = createAppServices({ initialProject, skipStoredProjectLoad: true });
+    services.projectRepository = new SavingProjectRepository();
+    render(<EditorShell services={services} />);
+    await user.click(screen.getByRole('button', { name: 'Save now' }));
+    const nameInput = screen.getByRole('textbox', { name: 'Project folder name' });
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Stored Deck');
+    await user.click(screen.getByRole('button', { name: 'Choose folder' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Copy Slide 1 to clipboard' })).toBeEnabled();
+    });
     await selectTitleLayer(user);
     await user.click(screen.getByRole('button', { name: 'Copy Slide 1 to clipboard' }));
 
