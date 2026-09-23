@@ -129,6 +129,34 @@ describe('ScrollingCanvasWorkspace', () => {
     expect(handlers.onAddPage).toHaveBeenCalledWith('page-2');
   });
 
+  it('disables slide copy until the project is stored locally and offers save now', async () => {
+    const user = userEvent.setup();
+    const onCopyPage = vi.fn();
+    const onSaveLocalProject = vi.fn();
+    const hint =
+      'Store this project locally before copying slides. Unsaved assets can paste empty in another tab.';
+
+    render(
+      <ScrollingCanvasWorkspace
+        activePageId="page-1"
+        canCopyPages={false}
+        project={sampleProject.createSampleProject()}
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        onCopyPage={onCopyPage}
+        onSaveLocalProject={onSaveLocalProject}
+      />,
+    );
+
+    const copyButton = screen.getByRole('button', { name: 'Copy Slide 1 to clipboard' });
+    expect(copyButton).toBeDisabled();
+    expect(copyButton).toHaveAttribute('title', hint);
+    expect(screen.getByText(hint)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Save now' }));
+    expect(onSaveLocalProject).toHaveBeenCalledTimes(1);
+    expect(onCopyPage).not.toHaveBeenCalled();
+  });
+
   it('keeps text editing controls in the sticky slide toolbar and wires translation', async () => {
     const user = userEvent.setup();
     const onOpenAnimations = vi.fn();

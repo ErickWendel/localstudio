@@ -1586,6 +1586,14 @@ export function useEditorViewModel(services: AppServices) {
     }
   }
 
+  function openLocalProjectSave() {
+    if (hasPersistedLocalProjectRef.current) {
+      void saveLocalNow();
+      return;
+    }
+    setLocalProjectSetupMode('save');
+  }
+
   function closeLocalProjectSetup() {
     setLocalProjectSetupMode(undefined);
   }
@@ -3705,6 +3713,7 @@ export function useEditorViewModel(services: AppServices) {
     pagesPanelOpen,
     isFullscreen,
     persistenceEnabled,
+    hasPersistedLocalProject,
     presentationImportProgress,
     missingPowerPointFonts,
     mediaImportProgress,
@@ -3761,6 +3770,7 @@ export function useEditorViewModel(services: AppServices) {
     setProjectName,
     setPersistence,
     saveLocalNow,
+    openLocalProjectSave,
     saveLocalAs,
     closeLocalProjectSetup,
     openDuplicateProjectSetup,

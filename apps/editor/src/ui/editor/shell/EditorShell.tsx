@@ -1639,12 +1639,22 @@ function EditorDesktopShell({ services }: EditorShellProps) {
   }, [hasSelection, isHistoryReadOnly, vm]);
 
   async function copyPageToClipboard(pageId: string) {
+    if (!vm.hasPersistedLocalProject) return;
     const payload = vm.getSlideClipboardPayload(pageId);
     if (!payload) return;
     const transferablePayload = editorShellBrowserUtils
       .makeSlideClipboardPayloadTransferable(payload)
       .then((nextPayload) => JSON.stringify(nextPayload));
     await editorShellBrowserUtils.writeSlideClipboardPayload(transferablePayload);
+  }
+
+  function requestLocalSaveForSlideCopy() {
+    services.analyticsService.capture(postHogEvents.projectSavedLocal, {
+      project_name: vm.project.name,
+      page_count: vm.project.pages.length,
+      persistence_mode: services.persistenceMode,
+    });
+    vm.openLocalProjectSave();
   }
 
   useEffect(() => {
@@ -2019,7 +2029,13 @@ function EditorDesktopShell({ services }: EditorShellProps) {
             onAddPage={isHistoryReadOnly ? undefined : vm.addPage}
             onDeletePage={isHistoryReadOnly ? undefined : vm.deletePage}
             onDuplicatePage={isHistoryReadOnly ? undefined : vm.duplicatePage}
+            canCopyPages={vm.hasPersistedLocalProject}
             onCopyPage={isHistoryReadOnly ? undefined : (pageId) => void copyPageToClipboard(pageId)}
+            onSaveLocalProject={
+              isHistoryReadOnly || !services.persistenceAvailable || vm.hasPersistedLocalProject
+                ? undefined
+                : requestLocalSaveForSlideCopy
+            }
             onRenamePage={isHistoryReadOnly ? undefined : vm.renamePage}
             onReorderPage={isHistoryReadOnly ? undefined : vm.reorderPage}
             onSetPageVisibility={isHistoryReadOnly ? undefined : vm.setPageVisibility}
@@ -2122,7 +2138,13 @@ function EditorDesktopShell({ services }: EditorShellProps) {
             onClose={togglePagesPanel}
             onDeletePage={isHistoryReadOnly ? undefined : vm.deletePage}
             onDuplicatePage={isHistoryReadOnly ? undefined : vm.duplicatePage}
+            canCopyPages={vm.hasPersistedLocalProject}
             onCopyPage={isHistoryReadOnly ? undefined : (pageId) => void copyPageToClipboard(pageId)}
+            onSaveLocalProject={
+              isHistoryReadOnly || !services.persistenceAvailable || vm.hasPersistedLocalProject
+                ? undefined
+                : requestLocalSaveForSlideCopy
+            }
             onRenamePage={isHistoryReadOnly ? undefined : vm.renamePage}
             onReorderPage={isHistoryReadOnly ? undefined : vm.reorderPage}
             onSelectPage={vm.selectPage}
