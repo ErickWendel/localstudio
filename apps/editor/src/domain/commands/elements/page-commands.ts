@@ -6,6 +6,7 @@ import type {
   ProjectDocument,
   SlideTransition,
 } from '../../documents/model';
+import { slideNameAlignment } from '../../documents/slideNameAlignment';
 import { projectMutationUtils } from '../shared/projectMutationUtils';
 import type { EditorCommand } from '../shared/types';
 
@@ -44,7 +45,9 @@ class DuplicatePageCommand implements EditorCommand {
     const duplicatedPage: Page = {
       ...page,
       id: this.nextPageId,
-      name: `${page.name} copy`,
+      name: slideNameAlignment.isDefaultSlideName(page.name)
+        ? `Slide ${project.pages.length + 1}`
+        : `${page.name} copy`,
       elementIds: page.elementIds
         .map((elementId) => elementIdMap.get(elementId))
         .filter((elementId): elementId is string => Boolean(elementId)),
@@ -71,7 +74,7 @@ class DuplicatePageCommand implements EditorCommand {
         ...project.elements,
         ...duplicatedElements,
       },
-      pages,
+      pages: slideNameAlignment.alignDefaultSlideNames(pages),
       updatedAt: projectMutationUtils.getProjectUpdatedAt(),
     };
   }
@@ -93,7 +96,9 @@ class DeletePageCommand implements EditorCommand {
     return {
       ...project,
       elements,
-      pages: project.pages.filter((item) => item.id !== this.pageId),
+      pages: slideNameAlignment.alignDefaultSlideNames(
+        project.pages.filter((item) => item.id !== this.pageId),
+      ),
       updatedAt: projectMutationUtils.getProjectUpdatedAt(),
     };
   }
@@ -118,7 +123,7 @@ class ReorderPageCommand implements EditorCommand {
     );
     return {
       ...project,
-      pages,
+      pages: slideNameAlignment.alignDefaultSlideNames(pages),
       updatedAt: projectMutationUtils.getProjectUpdatedAt(),
     };
   }
@@ -156,8 +161,10 @@ class SetPageVisibilityCommand implements EditorCommand {
   execute(project: ProjectDocument): ProjectDocument {
     return {
       ...project,
-      pages: project.pages.map((page) =>
-        page.id === this.pageId ? { ...page, visible: this.visible } : page,
+      pages: slideNameAlignment.alignDefaultSlideNames(
+        project.pages.map((page) =>
+          page.id === this.pageId ? { ...page, visible: this.visible } : page,
+        ),
       ),
       updatedAt: projectMutationUtils.getProjectUpdatedAt(),
     };

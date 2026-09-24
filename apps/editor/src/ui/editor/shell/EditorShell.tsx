@@ -2098,6 +2098,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
             <SpeakerNotesEditor
               page={activePage}
               pageIndex={activePageIndex}
+              pages={vm.project.pages}
               open={speakerNotesOpen}
               onClose={() => setSpeakerNotesOpen(false)}
               onUpdateNotes={vm.updatePageSpeakerNotes}

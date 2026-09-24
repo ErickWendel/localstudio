@@ -46,7 +46,7 @@ describe('EditorShell animation and presenter workflows', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Duplicate Slide 1' }));
 
-    expect(screen.getByRole('button', { name: 'Rename Slide 1 copy' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Rename Slide 2' })).toBeInTheDocument();
     expect(screen.getByLabelText('Animation build 1 for Image')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Insert Text' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Insert Media' })).toBeInTheDocument();

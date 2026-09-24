@@ -36,10 +36,21 @@ test.describe('editor manage slides journey', () => {
     await expect(page.getByText('3 active pages')).toBeVisible();
 
     await pagesPanel.getByRole('button', { name: 'Move Agenda up', exact: true }).click();
-    await pagesPanel.getByRole('button', { name: 'Select Slide 1' }).click();
+    await pagesPanel.getByRole('button', { name: 'Select Slide 2' }).click();
     await expect(page.getByText(/1 \/ 3|2 \/ 3/)).toBeVisible();
 
     await pagesPanel.getByRole('button', { name: 'Delete Agenda', exact: true }).click();
     await expect(page.getByText('2 active pages')).toBeVisible();
+
+    const canvas = page.getByLabel('Scrollable slide canvases');
+    page.once('dialog', () => {
+      throw new Error('Slide rename should use an inline editor, not a browser prompt.');
+    });
+    await canvas.getByRole('button', { name: 'Rename Slide 1' }).click();
+    const title = page.getByLabel('Page 1 title');
+    await expect(title).toBeVisible();
+    await title.fill('Opening');
+    await title.press('Enter');
+    await expect(canvas.getByRole('button', { name: 'Rename Opening' })).toBeVisible();
   });
 });

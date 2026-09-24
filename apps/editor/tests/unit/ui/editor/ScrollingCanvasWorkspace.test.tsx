@@ -129,6 +129,72 @@ describe('ScrollingCanvasWorkspace', () => {
     expect(handlers.onAddPage).toHaveBeenCalledWith('page-2');
   });
 
+  it('aligns default slide numbers with page numbers and renames inline', async () => {
+    const user = userEvent.setup();
+    const onRenamePage = vi.fn();
+    const project = sampleProject.createSampleProject();
+    const firstPage = project.pages[0];
+    if (!firstPage) throw new Error('Sample project is missing its first page.');
+    project.pages[0] = { ...firstPage, name: 'Slide 4' };
+    project.pages.push({
+      ...firstPage,
+      id: 'page-2',
+      name: 'Slide 9',
+      elementIds: [],
+    });
+    const prompt = vi.spyOn(window, 'prompt');
+
+    render(
+      <ScrollingCanvasWorkspace
+        activePageId="page-1"
+        project={project}
+        selection={{ pageId: 'page-1', elementIds: [] }}
+        onRenamePage={onRenamePage}
+      />,
+    );
+
+    expect(screen.getByText('Page 1 -')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Rename Slide 1' })).toHaveTextContent('Slide 1');
+    expect(screen.getByRole('button', { name: 'Rename Slide 2' })).toHaveTextContent('Slide 2');
+
+    await user.click(screen.getByRole('button', { name: 'Rename Slide 1' }));
+    const titleInput = screen.getByLabelText('Page 1 title');
+    expect(titleInput).toHaveValue('Slide 1');
+    await user.clear(titleInput);
+    await user.type(titleInput, 'Opening{Enter}');
+
+    expect(prompt).not.toHaveBeenCalled();
+    expect(onRenamePage).toHaveBeenCalledWith('page-1', 'Opening');
+    prompt.mockRestore();
+  });
+
+  it('keeps stored slide numbers when a slide is skipped', () => {
+    const project = sampleProject.createSampleProject();
+    const firstPage = project.pages[0];
+    if (!firstPage) throw new Error('Sample project is missing its first page.');
+    project.pages[0] = { ...firstPage, name: 'Slide 4', visible: false };
+    project.pages.push({
+      ...firstPage,
+      id: 'page-2',
+      name: 'Slide 2',
+      visible: true,
+      elementIds: [],
+    });
+
+    render(
+      <ScrollingCanvasWorkspace
+        activePageId="page-2"
+        project={project}
+        selection={{ pageId: 'page-2', elementIds: [] }}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Rename Slide 4 (skipped)' })).toHaveTextContent(
+      'Slide 4 (skipped)',
+    );
+    expect(screen.getByRole('button', { name: 'Rename Slide 2' })).toHaveTextContent('Slide 2');
+  });
+
   it('disables slide copy until the project is stored locally and offers save now', async () => {
     const user = userEvent.setup();
     const onCopyPage = vi.fn();

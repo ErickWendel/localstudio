@@ -7,8 +7,11 @@ import {
   useImperativeHandle,
   useLayoutEffect,
   useRef,
+  useState,
 } from 'react';
 import type { ElementStylePatch } from '../../../domain/commands/elements/basicCommands';
+import type { Page } from '../../../domain/documents/model';
+import { slideNameAlignment } from '../../../domain/documents/slideNameAlignment';
 import { SlideCopyControl } from '../persistence/SlideCopyControl';
 import { CanvasWorkspace } from './CanvasWorkspace';
 import { TextSelectionToolbar } from '../toolbars/TextSelectionToolbar';
@@ -179,7 +182,8 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
           const isTranslatingPage = translatingPageIds.includes(page.id);
           const shouldRenderCanvas = isActive || index === preloadedPageIndex;
           const visible = page.visible ?? true;
-          const pageDisplayName = getPageDisplayName(page.name, visible);
+          const alignedName = slideNameAlignment.getAlignedSlideName(project.pages, index);
+          const pageDisplayName = getPageDisplayName(alignedName, visible);
           const pageClassName = [
             'scroll-page',
             isActive ? 'scroll-page-active' : '',
@@ -205,9 +209,11 @@ export const ScrollingCanvasWorkspace = forwardRef<HTMLDivElement, ScrollingCanv
                 canMoveDown={index < project.pages.length - 1}
                 canMoveUp={index > 0}
                 canTranslate={Boolean(canTranslateCurrentSlide)}
+                editableName={alignedName}
                 index={index}
                 name={pageDisplayName}
                 pageId={page.id}
+                pages={project.pages}
                 rawName={page.name}
                 visible={visible}
                 {...(onAddPage ? { onAddPage } : {})}
@@ -283,9 +289,11 @@ interface PageHeaderProps {
   canMoveDown: boolean;
   canMoveUp: boolean;
   canTranslate: boolean;
+  editableName: string;
   index: number;
   name: string;
   pageId: string;
+  pages: Page[];
   rawName: string;
   visible: boolean;
   onAddPage?: (afterPageId?: string) => void;
@@ -305,9 +313,11 @@ function PageHeader({
   canMoveDown,
   canMoveUp,
   canTranslate,
+  editableName,
   index,
   name,
   pageId,
+  pages,
   rawName,
   visible,
   onAddPage,
@@ -321,19 +331,72 @@ function PageHeader({
   onSetPageVisibility,
   onTranslatePage,
 }: PageHeaderProps) {
+  const [draftName, setDraftName] = useState(editableName);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const commitLockRef = useRef(false);
+  const ignoreCommitRef = useRef(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isEditingName) return;
+    nameInputRef.current?.focus();
+    nameInputRef.current?.select();
+  }, [isEditingName]);
+
+  function startRename() {
+    commitLockRef.current = false;
+    ignoreCommitRef.current = false;
+    setDraftName(editableName);
+    setIsEditingName(true);
+  }
+
+  function commitName() {
+    if (ignoreCommitRef.current) {
+      ignoreCommitRef.current = false;
+      return;
+    }
+    if (commitLockRef.current) return;
+    commitLockRef.current = true;
+    setIsEditingName(false);
+    const nextName = slideNameAlignment.normalizeSlideName(pages, index, draftName);
+    if (!nextName || nextName === rawName) return;
+    onRenamePage?.(pageId, nextName);
+  }
+
+  function cancelRename() {
+    ignoreCommitRef.current = true;
+    setDraftName(editableName);
+    setIsEditingName(false);
+  }
+
   return (
     <header className="scroll-page-header">
-      <button
-        className="scroll-page-title"
-        type="button"
-        aria-label={`Rename ${name}`}
-        onClick={() => {
-          const nextName = window.prompt('Page title', rawName);
-          if (nextName) onRenamePage?.(pageId, nextName);
-        }}
-      >
-        Page {index + 1} - {name}
-      </button>
+      <div className="scroll-page-title-group">
+        <span className="scroll-page-index">Page {index + 1} -</span>
+        {isEditingName ? (
+          <input
+            ref={nameInputRef}
+            aria-label={`Page ${index + 1} title`}
+            className="scroll-page-title-input"
+            value={draftName}
+            onBlur={commitName}
+            onChange={(event) => {
+              setDraftName(event.target.value);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') cancelRename();
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                commitName();
+              }
+            }}
+          />
+        ) : (
+          <button className="scroll-page-title" type="button" aria-label={`Rename ${name}`} onClick={startRename}>
+            {name}
+          </button>
+        )}
+      </div>
       <div className="scroll-page-actions ew-inline-row-tight" aria-label={`${name} page actions`}>
         <IconAction
           disabled={!canMoveUp}
