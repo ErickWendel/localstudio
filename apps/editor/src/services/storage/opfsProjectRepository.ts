@@ -9,6 +9,7 @@ import type {
 } from '../contracts/interfaces';
 import { browserStorage, type BrowserKeyValueStorage } from '../browser/browserStorage';
 import { assetFileUtils } from './assetFileUtils';
+import { shouldReuseFileClaim } from './reuseFileClaim';
 import { copyMissingFileBackedProjectFiles } from './copyMissingFileBackedProjectFiles';
 import { materializeLocalAssetFile } from './materializeLocalAssetFile';
 import { projectVersionHistoryUtils } from './projectVersionHistoryUtils';
@@ -73,7 +74,7 @@ async function createFileBackedProjectSnapshot(
   };
 
   for (const [assetId, asset] of Object.entries(projectAssets)) {
-    if (asset.storage === 'file' && asset.fileName) {
+    if (await shouldReuseFileClaim(assetsDirectory, asset)) {
       const assetForDisk = { ...asset };
       delete assetForDisk.objectUrl;
       projectForDisk.assets[assetId] = assetForDisk;
@@ -97,7 +98,7 @@ async function createFileBackedProjectSnapshot(
   }
 
   for (const [fontId, font] of Object.entries(projectFonts)) {
-    if (font.storage === 'file' && font.fileName) {
+    if (await shouldReuseFileClaim(fontsDirectory, font)) {
       const fontForDisk = { ...font };
       delete fontForDisk.objectUrl;
       projectForDisk.fonts![fontId] = fontForDisk;
@@ -120,7 +121,7 @@ async function createFileBackedProjectSnapshot(
 
   for (const [recordingId, recording] of Object.entries(projectRecordings)) {
     const audio = recording.audio;
-    if (audio.storage === 'file' && audio.fileName) {
+    if (await shouldReuseFileClaim(recordingsDirectory, audio)) {
       const audioForDisk = { ...audio };
       delete audioForDisk.objectUrl;
       projectForDisk.recordings![recordingId] = {
@@ -221,6 +222,7 @@ export class OpfsProjectRepository implements ProjectRepository {
   private directoryHandle: FileSystemDirectoryHandle | null = null;
   private projectDirectoryName: string | null = null;
   private sourceDirectoryForNextSave: FileSystemDirectoryHandle | null = null;
+  private saveQueue: Promise<void> = Promise.resolve();
   private readonly storage: BrowserKeyValueStorage | undefined;
 
   constructor(private readonly options: OpfsProjectRepositoryOptions = {}) {
@@ -281,6 +283,18 @@ export class OpfsProjectRepository implements ProjectRepository {
   }
 
   async saveProject(
+    project: ProjectDocument,
+    options?: { duplicate?: boolean; projectDirectoryName?: string },
+  ): Promise<void> {
+    const run = this.saveQueue.then(() => this.persistProject(project, options));
+    this.saveQueue = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
+  private async persistProject(
     project: ProjectDocument,
     options?: { duplicate?: boolean; projectDirectoryName?: string },
   ): Promise<void> {

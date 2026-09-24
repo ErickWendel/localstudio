@@ -255,7 +255,7 @@ describe('OpfsProjectRepository', () => {
   it('downloads remote assets on OPFS load and saves them as local files', async () => {
     const root = new MockDirectoryHandle();
     const storage = new MemoryStorage();
-    const fetchRemoteAsset = vi.fn(() =>
+    const fetchRemoteAsset = vi.fn<typeof fetch>(() =>
       Promise.resolve(
         new Response('remote gif', { headers: { 'content-type': 'image/gif' } }),
       ),
@@ -294,7 +294,9 @@ describe('OpfsProjectRepository', () => {
     if (!loaded) throw new Error('Expected project to load');
     await repository.saveProject(loaded);
 
-    expect(fetchRemoteAsset).toHaveBeenCalledWith('https://media.giphy.com/media/legacy/giphy.gif');
+    expect(fetchRemoteAsset).toHaveBeenCalledTimes(1);
+    expect(fetchRemoteAsset.mock.calls[0]?.[0]).toBe('https://media.giphy.com/media/legacy/giphy.gif');
+    expect(fetchRemoteAsset.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
     expect(createObjectUrl).toHaveBeenCalled();
     expect(loaded.assets['asset-remote']).toMatchObject({
       objectUrl: 'blob:remote-gif',

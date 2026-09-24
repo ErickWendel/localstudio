@@ -21,12 +21,41 @@ function preferredFileName(assetId: string, asset: Asset) {
   return asset.fileName ?? `${assetId}.${assetFileUtils.getAssetFileExtension(asset.mimeType)}`;
 }
 
+const CLIPBOARD_ASSET_READ_TIMEOUT_MS = 100;
+
+function readAssetBlobWithTimeout(objectUrl: string) {
+  return new Promise<Blob>((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error('Clipboard asset read timed out.'));
+    }, CLIPBOARD_ASSET_READ_TIMEOUT_MS);
+    assetFileUtils.objectUrlToBlob(objectUrl).then(
+      (blob) => {
+        clearTimeout(timeoutId);
+        resolve(blob);
+      },
+      (error: unknown) => {
+        clearTimeout(timeoutId);
+        reject(error instanceof Error ? error : new Error('Clipboard asset could not be read.'));
+      },
+    );
+  });
+}
+
 async function readAssetBlob(asset: Asset) {
   const remembered = slideClipboardMedia.readRememberedBlob(asset.objectUrl);
   if (remembered) return remembered;
-  if (!assetFileUtils.isDataUrl(asset.objectUrl)) return undefined;
+  if (assetFileUtils.isDataUrl(asset.objectUrl)) {
+    try {
+      return await assetFileUtils.objectUrlToBlob(asset.objectUrl);
+    } catch {
+      return undefined;
+    }
+  }
+  if (!assetFileUtils.isBlobUrl(asset.objectUrl) && !assetFileUtils.isSafeRemoteUrl(asset.objectUrl)) {
+    return undefined;
+  }
   try {
-    return await assetFileUtils.objectUrlToBlob(asset.objectUrl);
+    return await readAssetBlobWithTimeout(asset.objectUrl);
   } catch {
     return undefined;
   }

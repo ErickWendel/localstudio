@@ -46,4 +46,52 @@ describe('materializeSlideClipboardAssets', () => {
       },
     });
   });
+
+  it('reads a same-tab blob URL before stripping the local file claim', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      blob: () => Promise.resolve(new Blob(['gif-bytes'], { type: 'image/gif' })),
+    } as Response);
+    const materialize = vi.fn((fileName: string) =>
+      Promise.resolve({
+        fileName: `stored-${fileName}`,
+        objectUrl: 'blob:stored-gif',
+      }),
+    );
+
+    const payload = await materializeSlideClipboardAssets(
+      {
+        assets: {
+          'asset-hero': {
+            ...imageAsset,
+            fileName: 'hero.gif',
+            mimeType: 'image/gif',
+            objectUrl: 'blob:https://localstudio.dev/hero.gif',
+            storage: 'file',
+          },
+        },
+        elements: [],
+        page: {
+          id: 'page-1',
+          name: 'Slide 1',
+          width: 1920,
+          height: 1080,
+          background: { type: 'color', color: '#000000' },
+          elementIds: [],
+        },
+      },
+      materialize,
+    );
+
+    expect(materialize).toHaveBeenCalledWith('hero.gif', expect.any(Blob));
+    expect(payload).toMatchObject({
+      assets: {
+        'asset-hero': {
+          fileName: 'stored-hero.gif',
+          objectUrl: 'blob:stored-gif',
+          storage: 'file',
+        },
+      },
+    });
+  });
 });
