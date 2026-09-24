@@ -1,3 +1,4 @@
+import { collectReferencedAssetIds } from '../../domain/assets/assetUsage';
 import type { ProjectDocument } from '../../domain/documents/model';
 
 function collectObjectUrls(project: ProjectDocument) {
@@ -34,21 +35,38 @@ function isCurrentPersistedProject(
   return persistedTime >= memoryTime;
 }
 
+function persistedCoversInMemoryProject(
+  inMemoryProject: ProjectDocument,
+  persistedProject: ProjectDocument,
+) {
+  if (!isCurrentPersistedProject(inMemoryProject, persistedProject)) return false;
+  const persistedPageIds = new Set(persistedProject.pages.map((page) => page.id));
+  if (inMemoryProject.pages.some((page) => !persistedPageIds.has(page.id))) return false;
+  for (const assetId of collectReferencedAssetIds(inMemoryProject)) {
+    if (!persistedProject.assets[assetId]) return false;
+  }
+  return true;
+}
+
+function releaseUnusedObjectUrls(source: ProjectDocument, liveProject: ProjectDocument) {
+  if (source === liveProject) return;
+  const liveObjectUrls = collectObjectUrls(liveProject);
+  for (const objectUrl of collectObjectUrls(source)) {
+    if (!liveObjectUrls.has(objectUrl)) revokeObjectUrl(objectUrl);
+  }
+}
+
 export function projectForCloudMirror(
   inMemoryProject: ProjectDocument,
   persistedProject: ProjectDocument | null,
 ) {
-  if (!persistedProject || !isCurrentPersistedProject(inMemoryProject, persistedProject)) {
-    return { project: inMemoryProject, release: () => undefined };
-  }
-  const liveObjectUrls = collectObjectUrls(inMemoryProject);
+  const usePersisted =
+    persistedProject !== null && persistedCoversInMemoryProject(inMemoryProject, persistedProject);
   return {
-    project: persistedProject,
+    project: usePersisted && persistedProject ? persistedProject : inMemoryProject,
     release: () => {
-      if (persistedProject === inMemoryProject) return;
-      for (const objectUrl of collectObjectUrls(persistedProject)) {
-        if (!liveObjectUrls.has(objectUrl)) revokeObjectUrl(objectUrl);
-      }
+      if (!persistedProject) return;
+      releaseUnusedObjectUrls(persistedProject, inMemoryProject);
     },
   };
 }

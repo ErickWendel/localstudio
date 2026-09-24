@@ -151,7 +151,7 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
 
   it('downloads remote image assets on import and saves them as local files', async () => {
     const directory = new MockDirectoryHandle();
-    const fetchRemoteAsset = vi.fn(() =>
+    const fetchRemoteAsset = vi.fn<typeof fetch>(() =>
       Promise.resolve(new Response('remote image', { headers: { 'content-type': 'image/png' } })),
     );
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
@@ -184,7 +184,9 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
     if (!loaded) throw new Error('Expected project to load');
     await repository.saveProject(loaded);
 
-    expect(fetchRemoteAsset).toHaveBeenCalledWith('https://images.unsplash.com/legacy-photo.png');
+    expect(fetchRemoteAsset).toHaveBeenCalledTimes(1);
+    expect(fetchRemoteAsset.mock.calls[0]?.[0]).toBe('https://images.unsplash.com/legacy-photo.png');
+    expect(fetchRemoteAsset.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
     expect(createObjectUrl).toHaveBeenCalled();
     expect(loaded.assets['asset-remote']).toMatchObject({
       objectUrl: 'blob:remote-image',
@@ -377,7 +379,9 @@ describe('BrowserFileSystemProjectRepository asset files', () => {
 
     await repository.saveProject(project);
 
-    expect(globalThis.fetch).toHaveBeenCalledWith('blob:generated-image');
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(globalThis.fetch).mock.calls[0]?.[0]).toBe('blob:generated-image');
+    expect(vi.mocked(globalThis.fetch).mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
     const assetsDirectory = directory.directories.get('assets')!;
     expect(assetsDirectory.files.has('asset-generated.png')).toBe(true);
     const savedAssetFile = assetsDirectory.files.get('asset-generated.png');

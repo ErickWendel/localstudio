@@ -38,7 +38,32 @@ describe('projectForCloudMirror', () => {
     const persistedProject = {
       ...inMemoryProject,
       updatedAt: '2026-09-23T19:00:00.000Z',
+      assets: {
+        ...inMemoryProject.assets,
+        'asset-hero': {
+          ...inMemoryProject.assets['asset-hero']!,
+          objectUrl: 'blob:stale-persisted-hero',
+        },
+      },
     };
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+
+    const mirrorProject = projectForCloudMirror(inMemoryProject, persistedProject);
+
+    expect(mirrorProject.project).toBe(inMemoryProject);
+    mirrorProject.release();
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:stale-persisted-hero');
+  });
+
+  it('keeps the in-memory paste when the persisted snapshot is missing that page', () => {
+    const inMemoryProject = sampleProject.createSampleProject();
+    const persistedProject = {
+      ...inMemoryProject,
+      pages: inMemoryProject.pages.slice(0, -1),
+    };
+    if (persistedProject.pages.length === inMemoryProject.pages.length) {
+      persistedProject.pages = [];
+    }
 
     expect(projectForCloudMirror(inMemoryProject, persistedProject).project).toBe(inMemoryProject);
   });

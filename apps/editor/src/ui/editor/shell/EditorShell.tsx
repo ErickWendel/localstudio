@@ -24,6 +24,7 @@ import { authoringRevision } from '../../../services/automation/getAuthoringSlid
 import { localSlideDescriptionGenerator } from '../../../services/automation/localSlideDescriptionGenerator';
 import { PowerPointUrlImportService } from '../../../services/automation/powerPointUrlImportService';
 import { imageGenerationModel } from '../../../services/image-generation/imageGenerationModel';
+import { projectForCloudMirror } from '../../../services/mirror/projectForCloudMirror';
 import {
   WebMcpToolAdapter,
   type WebMcpDemoWindow,
@@ -344,13 +345,21 @@ function EditorDesktopShell({ services }: EditorShellProps) {
 
       const publishPromise = (async () => {
         const fontResult = await prepareProjectFontsForPublicShareRef.current();
-        return services.shareService.updateShare(
-          shareId,
-          createProjectForSelectedShareRecording(fontResult.project, selectedRecordingId),
-          {
-            onProgress: setSharePublishProgress,
-          },
-        );
+        const persistedProject = services.projectRepository.readPersistedProject
+          ? await services.projectRepository.readPersistedProject().catch(() => null)
+          : null;
+        const shareProject = projectForCloudMirror(fontResult.project, persistedProject);
+        try {
+          return await services.shareService.updateShare(
+            shareId,
+            createProjectForSelectedShareRecording(shareProject.project, selectedRecordingId),
+            {
+              onProgress: setSharePublishProgress,
+            },
+          );
+        } finally {
+          shareProject.release();
+        }
       })();
       sharePublishPromiseRef.current = { promise: publishPromise, selectedRecordingId };
       try {
@@ -389,6 +398,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
     },
     [
       services.analyticsService,
+      services.projectRepository,
       services.shareService,
       shareMetadata?.shareId,
       persistTranscriptRecording,

@@ -397,6 +397,7 @@ export function useEditorViewModel(services: AppServices) {
   const mirrorConfigRef = useRef<MinioMirrorConfig | null>(storedMirrorConfig);
   const mirrorSyncInFlightRef = useRef(false);
   const mirrorSyncQueuedRef = useRef(false);
+  const mirrorFailureRetryRef = useRef(false);
   const lastMirroredProjectNameRef = useRef<string | undefined>(undefined);
   const mirrorDebounceRef = useRef<number | undefined>(undefined);
   const queueMirrorSyncRef = useRef<() => void>(() => undefined);
@@ -2194,12 +2195,20 @@ export function useEditorViewModel(services: AppServices) {
       releaseMirrorProject();
       mirrorSyncInFlightRef.current = false;
       setMirrorSyncProgress(undefined);
-      if (mirrorSyncQueuedRef.current) {
-        const shouldSyncLatestProject = syncFailed || projectRef.current !== projectToSync;
-        mirrorSyncQueuedRef.current = false;
-        if (shouldSyncLatestProject) {
-          void syncMirrorNow();
+      const queued = mirrorSyncQueuedRef.current;
+      mirrorSyncQueuedRef.current = false;
+      if (queued) {
+        mirrorFailureRetryRef.current = false;
+        void syncMirrorNow();
+      } else if (syncFailed) {
+        if (mirrorFailureRetryRef.current) {
+          mirrorFailureRetryRef.current = false;
+        } else {
+          mirrorFailureRetryRef.current = true;
+          queueMirrorSync();
         }
+      } else {
+        mirrorFailureRetryRef.current = false;
       }
     }
   }

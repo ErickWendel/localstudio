@@ -312,7 +312,7 @@ describe('minioMirrorService.createMirrorFiles', () => {
     expect(projectJson.recordings?.recording1?.audio.objectUrl).toBeUndefined();
   });
 
-  it('keeps mirroring when a saved file URL cannot be read', async () => {
+  it('fails the mirror when a referenced slide asset cannot be read', async () => {
     const project = sampleProject.createSampleProject();
     const asset = project.assets['asset-hero'];
     if (!asset) throw new Error('Sample project must contain the hero asset.');
@@ -321,18 +321,9 @@ describe('minioMirrorService.createMirrorFiles', () => {
     asset.storage = 'file';
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('blob expired'));
 
-    const files = await minioMirrorService.createMirrorFiles(
-      project,
-      new VersionedRepository([], project),
-      config,
-    );
-
-    expect(files.map((file) => file.path)).not.toContain('assets/hero.png');
-    const projectJson = JSON.parse(
-      await files.find((file) => file.path === 'project.json')!.blob.text(),
-    ) as ProjectDocument;
-    expect(projectJson.assets['asset-hero']?.objectUrl).toBeUndefined();
-    expect(projectJson.assets['asset-hero']?.storage).toBe('file');
+    await expect(
+      minioMirrorService.createMirrorFiles(project, new VersionedRepository([], project), config),
+    ).rejects.toThrow('Could not read slide asset hero.png');
   });
 });
 

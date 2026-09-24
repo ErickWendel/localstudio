@@ -58,13 +58,26 @@ function isReadableObjectUrl(value: string | undefined): value is string {
   return isDataUrl(value) || isBlobUrl(value);
 }
 
+const REMOTE_ASSET_FETCH_TIMEOUT_MS = 8_000;
+
 function getDefaultFetch() {
   return globalThis.fetch.bind(globalThis);
 }
 
+function remoteFetchSignal() {
+  return typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+    ? AbortSignal.timeout(REMOTE_ASSET_FETCH_TIMEOUT_MS)
+    : undefined;
+}
+
 async function objectUrlToBlob(objectUrl: string, requestFetch: typeof fetch = getDefaultFetch()) {
   if (isDataUrl(objectUrl)) return dataUrlToBlob(objectUrl);
-  return requestFetch(objectUrl).then((response) => response.blob());
+  const signal = remoteFetchSignal();
+  const response = await requestFetch(objectUrl, signal ? { signal } : undefined);
+  if (response.ok === false) {
+    throw new Error(`Could not read asset (${response.status}).`);
+  }
+  return response.blob();
 }
 
 function objectUrlToBlobIfReadable(
@@ -83,11 +96,16 @@ async function remoteObjectUrlToLocalObjectUrl(
   requestFetch: typeof fetch | undefined,
 ) {
   if (!isSafeRemoteUrl(objectUrl) || !requestFetch) return undefined;
-  const response = await requestFetch(objectUrl);
-  if (!response.ok) return undefined;
-  const blob = await response.blob();
-  const typedBlob = blob.type ? blob : new Blob([blob], { type: mimeType });
-  return URL.createObjectURL(typedBlob);
+  try {
+    const signal = remoteFetchSignal();
+    const response = await requestFetch(objectUrl, signal ? { signal } : undefined);
+    if (!response.ok) return undefined;
+    const blob = await response.blob();
+    const typedBlob = blob.type ? blob : new Blob([blob], { type: mimeType });
+    return URL.createObjectURL(typedBlob);
+  } catch {
+    return undefined;
+  }
 }
 
 export const assetFileUtils = {

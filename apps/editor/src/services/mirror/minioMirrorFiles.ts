@@ -144,12 +144,10 @@ async function createMirrorFiles(
       delete assetForMirror.objectUrl;
       projectForMirror.assets[assetId] = assetForMirror;
       files.push(entry);
+    } else if (asset.storage === 'file' || assetFileUtils.isReadableObjectUrl(asset.objectUrl)) {
+      throw new Error(`Could not read slide asset ${fileName} for remote sync.`);
     } else {
-      const assetForMirror = { ...asset };
-      if (asset.storage === 'file' || assetFileUtils.isReadableObjectUrl(asset.objectUrl)) {
-        delete assetForMirror.objectUrl;
-      }
-      projectForMirror.assets[assetId] = assetForMirror;
+      projectForMirror.assets[assetId] = { ...asset };
     }
   }
 

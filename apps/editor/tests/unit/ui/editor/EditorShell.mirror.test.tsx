@@ -480,4 +480,118 @@ describe('EditorShell mirror workflows', () => {
 
     expect(mirrorService.syncProject).not.toHaveBeenCalled();
   });
+
+  it('syncs the saved paste after an in-flight mirror misses the file-backed snapshot', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('blob unavailable'));
+    window.localStorage.clear();
+    const services = createAppServices();
+    const repository = new SavingProjectRepository();
+    const mirrorService = new RecordingMirrorService();
+    let persistedReady = false;
+    repository.readPersistedProject = () => {
+      if (!persistedReady) return Promise.resolve(null);
+      const saved = repository.savedProjects.at(-1);
+      if (!saved) return Promise.resolve(null);
+      return Promise.resolve({
+        ...saved,
+        assets: Object.fromEntries(
+          Object.entries(saved.assets).map(([assetId, asset]) => [
+            assetId,
+            {
+              ...asset,
+              fileName: asset.fileName ?? `${assetId}.gif`,
+              objectUrl: `blob:persisted-${assetId}`,
+              storage: 'file' as const,
+            },
+          ]),
+        ),
+      });
+    };
+    services.projectRepository = repository;
+    services.mirrorService = mirrorService;
+    render(<EditorShell services={services} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Persistence disabled' })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Persistence disabled' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Choose folder' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Persistence enabled' })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Mirror Now' }));
+    await waitFor(() => expect(mirrorService.syncProject).toHaveBeenCalledTimes(1));
+    mirrorService.syncProject.mockReset();
+    let releaseSync: (state: { enabled: true; status: 'synced'; lastSyncedAt: string }) => void =
+      () => undefined;
+    mirrorService.syncProject.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releaseSync = resolve;
+        }),
+    );
+
+    fireEvent.paste(window, {
+      clipboardData: {
+        files: [],
+        items: [],
+        types: ['text/plain'],
+        getData: (type: string) =>
+          type === 'text/plain'
+            ? `LocalStudio.dev slide: ${JSON.stringify({
+                assets: {
+                  'asset-gif': {
+                    id: 'asset-gif',
+                    type: 'image',
+                    name: 'Pasted gif',
+                    mimeType: 'image/gif',
+                    objectUrl: 'blob:https://localstudio.dev/pasted.gif',
+                    storage: 'file',
+                    fileName: 'pasted.gif',
+                  },
+                },
+                elements: [
+                  {
+                    id: 'gif-1',
+                    type: 'gif',
+                    assetId: 'asset-gif',
+                    name: 'Pasted gif',
+                    x: 10,
+                    y: 10,
+                    width: 200,
+                    height: 200,
+                    rotation: 0,
+                    opacity: 1,
+                  },
+                ],
+                page: {
+                  id: 'page-pasted',
+                  name: 'Pasted slide',
+                  width: 1920,
+                  height: 1080,
+                  background: { type: 'color', color: '#111111' },
+                  elementIds: ['gif-1'],
+                },
+              })}`
+            : '',
+      },
+    });
+    await waitFor(() => expect(repository.savedProjects.length).toBeGreaterThan(1));
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Mirror Now' }));
+    await waitFor(() => expect(mirrorService.syncProject).toHaveBeenCalledTimes(1));
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    persistedReady = true;
+    releaseSync({
+      enabled: true,
+      status: 'synced',
+      lastSyncedAt: new Date().toISOString(),
+    });
+
+    await waitFor(() => expect(mirrorService.syncProject).toHaveBeenCalledTimes(2));
+    const syncedProject = mirrorService.syncProject.mock.calls.at(-1)?.[0];
+    expect(JSON.stringify(syncedProject?.assets)).toContain('blob:persisted-');
+    expect(syncedProject?.pages).toHaveLength(2);
+  });
 });
