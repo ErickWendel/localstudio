@@ -14,6 +14,7 @@ import { storageObjectUtils } from '../storage/storageObjectUtils';
 import { minioObjectUtils } from './minioObjectUtils';
 import type { MirrorFileCache, MirrorManifest } from './minioMirrorFiles';
 import { minioMirrorFiles } from './minioMirrorFiles';
+import { describeMinioHttpFailure } from './minioHttpFailure';
 import { minioObjectUploader } from './minioObjectUploader';
 
 export interface MinioMirrorConfig {
@@ -325,12 +326,11 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
       });
       const response = await this.signedFetch(url, 'GET', config, getReaderCredentials(config));
       if (!response.ok) {
-        if (response.status === 403) {
-          throw new Error(
-            'Reader credentials cannot list the bucket or prefix (403). Grant read-only ListBucket on the bucket for Test/Import Remote, and GetObject on mirrored objects for public deck loading. Also verify the reader secret and region.',
-          );
-        }
-        throw new Error(`Could not list MinIO mirrors (${response.status}).`);
+        const fallback =
+          response.status === 403
+            ? 'Reader credentials cannot list the bucket or prefix (403). Grant read-only ListBucket on the bucket for Test/Import Remote, and GetObject on mirrored objects for public deck loading. Also verify the reader secret and region.'
+            : `Could not list MinIO mirrors (${response.status}).`;
+        throw new Error(await describeMinioHttpFailure(response, fallback));
       }
 
       const objectList = parseObjectList(await response.text());
@@ -381,8 +381,14 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
       config,
       getReaderCredentials(config),
     );
-    if (!manifestResponse.ok)
-      throw new Error(`Could not download MinIO mirror manifest (${manifestResponse.status}).`);
+    if (!manifestResponse.ok) {
+      throw new Error(
+        await describeMinioHttpFailure(
+          manifestResponse,
+          `Could not download MinIO mirror manifest (${manifestResponse.status}).`,
+        ),
+      );
+    }
     const manifest = (await manifestResponse.json()) as MirrorManifest;
     const manifestFiles = Object.entries(manifest.files).map(([path, file]) => ({
       ...file,
@@ -417,8 +423,14 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
           config,
           getReaderCredentials(config),
         );
-        if (!response.ok)
-          throw new Error(`Could not download mirrored file ${file.path} (${response.status}).`);
+        if (!response.ok) {
+          throw new Error(
+            await describeMinioHttpFailure(
+              response,
+              `Could not download mirrored file ${file.path} (${response.status}).`,
+            ),
+          );
+        }
         const expectedBytes = Math.max(0, file.size || 0);
         const blob = await response.blob();
         completedBytes += expectedBytes || blob.size;
@@ -445,8 +457,14 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
         prefix: projectPrefix,
       });
       const listResponse = await this.signedFetch(url, 'GET', config, getWriterCredentials(config));
-      if (!listResponse.ok)
-        throw new Error(`Could not list MinIO mirror objects (${listResponse.status}).`);
+      if (!listResponse.ok) {
+        throw new Error(
+          await describeMinioHttpFailure(
+            listResponse,
+            `Could not list MinIO mirror objects (${listResponse.status}).`,
+          ),
+        );
+      }
 
       const objectList = parseObjectList(await listResponse.text());
       for (const batch of chunkArray(objectList.keys, DELETE_BATCH_SIZE)) {
@@ -458,8 +476,14 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
               config,
               getWriterCredentials(config),
             );
-            if (!response.ok)
-              throw new Error(`Could not delete mirrored object ${key} (${response.status}).`);
+            if (!response.ok) {
+              throw new Error(
+                await describeMinioHttpFailure(
+                  response,
+                  `Could not delete mirrored object ${key} (${response.status}).`,
+                ),
+              );
+            }
           }),
         );
       }
@@ -486,7 +510,14 @@ class MinioMirrorService implements MirrorService<MinioMirrorConfig> {
       getWriterCredentials(config),
     );
     if (response.status === 404) return null;
-    if (!response.ok) throw new Error(`Could not read MinIO mirror manifest (${response.status}).`);
+    if (!response.ok) {
+      throw new Error(
+        await describeMinioHttpFailure(
+          response,
+          `Could not read MinIO mirror manifest (${response.status}).`,
+        ),
+      );
+    }
     return (await response.json()) as MirrorManifest;
   }
 
