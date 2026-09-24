@@ -1,4 +1,4 @@
-import type { DesignElement, ProjectDocument } from '../../documents/model';
+import type { DesignElement, ProjectDocument, TextElement } from '../../documents/model';
 import { projectMutationUtils } from '../shared/projectMutationUtils';
 import type { EditorCommand } from '../shared/types';
 import type { AlignMode, ZOrderMode } from './basicCommands';
@@ -22,15 +22,62 @@ class AlignElementCommand implements EditorCommand {
       x: getAlignedX({ element, mode: this.mode, pageWidth: page.width }),
       y: getAlignedY({ element, mode: this.mode, pageHeight: page.height }),
     };
+    const aligned = element.type === 'text' ? alignTextToPage(element, this.mode, patch) : { ...element, ...patch };
 
     return {
       ...project,
       elements: {
         ...project.elements,
-        [this.elementId]: { ...element, ...patch },
+        [this.elementId]: aligned,
       },
     };
   }
+}
+
+function alignTextToPage(
+  element: TextElement,
+  mode: AlignMode,
+  frame: { x: number; y: number },
+): TextElement {
+  const align = getTextAlignForMode(mode);
+  const verticalAlign = getVerticalAlignForMode(mode);
+  return {
+    ...element,
+    ...frame,
+    ...(align ? { align } : {}),
+    ...(verticalAlign ? { verticalAlign } : {}),
+    ...(align && element.paragraphs
+      ? { paragraphs: element.paragraphs.map((paragraph) => ({ ...paragraph, align })) }
+      : {}),
+  };
+}
+
+function getTextAlignForMode(mode: AlignMode) {
+  if (mode === 'page-left' || mode === 'page-left-center') return 'left' as const;
+  if (mode === 'page-right' || mode === 'page-right-center') return 'right' as const;
+  if (
+    mode === 'horizontal-center' ||
+    mode === 'page-center' ||
+    mode === 'page-top-center' ||
+    mode === 'page-bottom-center'
+  ) {
+    return 'center' as const;
+  }
+  return undefined;
+}
+
+function getVerticalAlignForMode(mode: AlignMode) {
+  if (mode === 'page-top' || mode === 'page-top-center') return 'top' as const;
+  if (mode === 'page-bottom' || mode === 'page-bottom-center') return 'bottom' as const;
+  if (
+    mode === 'vertical-center' ||
+    mode === 'page-center' ||
+    mode === 'page-left-center' ||
+    mode === 'page-right-center'
+  ) {
+    return 'middle' as const;
+  }
+  return undefined;
 }
 
 function getAlignedX(input: { element: DesignElement; mode: AlignMode; pageWidth: number }) {

@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -54,6 +55,8 @@ import { CropFrameOverlay } from './CropFrameOverlay';
 import type { CommonElementProps, ElementAnimationRenderState } from './canvas-element-props';
 import { shapeLineDraw } from './shape-line-draw';
 import { textTranslationLayout } from '../state/text-translation-layout';
+import { textGlyphMeasure } from './textGlyphMeasure';
+import { textSelectionFrame } from './textSelectionFrame';
 
 const TEXT_FRAME_PADDING = 6;
 
@@ -274,6 +277,8 @@ export function CanvasWorkspace({
     { height: number; top: number } | undefined
   >(undefined);
   const [fontRenderVersion, setFontRenderVersion] = useState(0);
+  const [liveTextFrames, setLiveTextFrames] = useState<Record<string, ElementFramePatch>>({});
+  const [textSelectionPadding, setTextSelectionPadding] = useState(textSelectionFrame.anchorClearance);
   const [processingBlinkOn, setProcessingBlinkOn] = useState(false);
   const [backgroundPreviewPoint, setBackgroundPreviewPoint] = useState<{
     x: number;
@@ -313,10 +318,13 @@ export function CanvasWorkspace({
   );
   const getDraftedElement = useCallback(
     (element: DesignElement | undefined): DesignElement | undefined => {
-      if (!element || element.type !== 'image' || cropDraft?.elementId !== element.id) return element;
+      if (!element) return element;
+      const liveTextFrame = element.type === 'text' ? liveTextFrames[element.id] : undefined;
+      if (liveTextFrame) return { ...element, ...liveTextFrame };
+      if (element.type !== 'image' || cropDraft?.elementId !== element.id) return element;
       return { ...element, ...cropDraft.frame, crop: cropDraft.crop };
     },
-    [cropDraft],
+    [cropDraft, liveTextFrames],
   );
   const pageVisibleElements = useMemo(
     () =>
@@ -510,6 +518,38 @@ export function CanvasWorkspace({
     };
   }, []);
 
+  useLayoutEffect(() => {
+    if (!editingTextId) return;
+    const element = project.elements[editingTextId];
+    if (!element || element.type !== 'text') return;
+    const measured = getEditingTextVisualBounds(nodeRefs.current[editingTextId], element);
+    if (!measured) return;
+
+    const input = textInputRef.current;
+    let height = measured.height;
+    if (input) {
+      const padding = TEXT_FRAME_PADDING * scaleY;
+      const expectedHeight = measured.height + padding * 2;
+      const renderedHeight = input.getBoundingClientRect().height;
+      if (Math.abs(renderedHeight - expectedHeight) < 2) {
+        const overflow = input.scrollHeight - input.clientHeight;
+        if (overflow > 1) height += overflow;
+      }
+      input.scrollTop = 0;
+    }
+
+    setEditingTextVisualBounds((current) => {
+      if (
+        current &&
+        Math.abs(current.height - height) < 0.5 &&
+        Math.abs(current.top - measured.top) < 0.5
+      ) {
+        return current;
+      }
+      return { height, top: measured.top };
+    });
+  }, [editingTextId, editingTextValue, fontRenderVersion, project, scaleY]);
+
   useEffect(() => {
     if (!editingTextId) return;
     textInputRef.current?.focus();
@@ -551,6 +591,7 @@ export function CanvasWorkspace({
       fontSet.ready,
     ]).then(() => {
       if (!isMounted) return;
+      textGlyphMeasure.clearCache();
       setFontRenderVersion((currentVersion) => currentVersion + 1);
       stageRef?.current?.batchDraw();
     });
@@ -573,7 +614,7 @@ export function CanvasWorkspace({
 
       const textNode = node as Konva.Text;
       const renderedHeight = getRenderedTextContentHeight(textNode);
-      if (renderedHeight >= 1 && renderedHeight !== textNode.height()) {
+      if (renderedHeight > textNode.height() + 0.5) {
         textNode.height(renderedHeight);
         didResizeSelection = true;
       }
@@ -584,6 +625,50 @@ export function CanvasWorkspace({
       transformerRef.current?.getLayer()?.batchDraw();
     }
   }, [fontRenderVersion, project, readOnly, selection.elementIds]);
+
+  useLayoutEffect(() => {
+    for (const [elementId, frame] of Object.entries(liveTextFrames)) {
+      const node = nodeRefs.current[elementId];
+      const element = project.elements[elementId];
+      if (!node || !element) continue;
+      const width = frame.width ?? element.width;
+      const height = frame.height ?? element.height;
+      node.width(width * scaleX);
+      node.height(height * scaleY);
+      node.x((frame.x ?? element.x) * scaleX);
+      node.y((frame.y ?? element.y) * scaleY);
+      node.rotation(frame.rotation ?? element.rotation);
+      node.scaleX(1);
+      node.scaleY(1);
+    }
+    if (Object.keys(liveTextFrames).length > 0) {
+      transformerRef.current?.forceUpdate();
+      transformerRef.current?.getLayer()?.batchDraw();
+    }
+  }, [liveTextFrames, project, scaleX, scaleY]);
+
+  useLayoutEffect(() => {
+    if (!showEditorOverlays) return;
+    const selectedTextNodes = selection.elementIds
+      .map((elementId) => {
+        const element = project.elements[elementId];
+        const node = nodeRefs.current[elementId];
+        return element?.type === 'text' && node ? node : undefined;
+      })
+      .filter((node): node is Konva.Node => Boolean(node));
+    const overflow = selectedTextNodes.reduce(
+      (edge, node) => Math.max(edge, textGlyphMeasure.getNodeInkOverflow(node)),
+      0,
+    );
+    const nextPadding =
+      selectedTextNodes.length > 0
+        ? textSelectionFrame.paddingForOverflow(overflow)
+        : 0;
+    setTextSelectionPadding((current) => (current === nextPadding ? current : nextPadding));
+    transformerRef.current?.padding(nextPadding);
+    transformerRef.current?.forceUpdate();
+    transformerRef.current?.getLayer()?.batchDraw();
+  }, [fontRenderVersion, liveTextFrames, project, selection.elementIds, showEditorOverlays]);
 
   useEffect(() => {
     if (backgroundSelectionMode || hasProcessingElements) return;
@@ -808,10 +893,39 @@ export function CanvasWorkspace({
     node.scaleY(1);
   }
 
+  function getTextResizeFrame(elementId: string, frame: ElementFramePatch) {
+    const element = project.elements[elementId];
+    if (!element || element.type !== 'text' || frame.width === undefined || frame.height === undefined) {
+      return frame;
+    }
+
+    const nextElement = { ...element, ...frame };
+    return textSelectionFrame.clampResize(
+      element,
+      {
+        height: frame.height,
+        rotation: frame.rotation ?? element.rotation,
+        width: frame.width,
+        x: frame.x ?? element.x,
+        y: frame.y ?? element.y,
+      },
+      {
+        height: textTranslationLayout.getMinimumTextFrameHeight(nextElement),
+        width: 8,
+      },
+    );
+  }
+
   function handleTransform(elementId: string, event: Konva.KonvaEventObject<Event>) {
     const node = event.target;
     const frame = getSnappedTransformFramePatch(elementId, node);
     if (!frame) return;
+    const element = project.elements[elementId];
+    if (element?.type === 'text') {
+      const nextFrame = getTextResizeFrame(elementId, frame);
+      setLiveTextFrames((current) => ({ ...current, [elementId]: nextFrame }));
+      return;
+    }
 
     applyTransformPatchToNode(elementId, node, frame);
   }
@@ -820,10 +934,20 @@ export function CanvasWorkspace({
     const node = event.target;
     const draft = getSnappedTransformFramePatch(elementId, node);
     if (!draft) return;
+    const element = project.elements[elementId];
+    const nextFrame = element?.type === 'text' ? getTextResizeFrame(elementId, draft) : draft;
 
-    applyTransformPatchToNode(elementId, node, draft);
+    applyTransformPatchToNode(elementId, node, nextFrame);
     setMagnetGuides([]);
-    onUpdateElementFrame?.(elementId, draft);
+    if (element?.type === 'text') {
+      setLiveTextFrames((current) => {
+        if (!(elementId in current)) return current;
+        const next = { ...current };
+        delete next[elementId];
+        return next;
+      });
+    }
+    onUpdateElementFrame?.(elementId, nextFrame);
   }
 
   function getSnappedTransformFramePatch(elementId: string, node: Konva.Node) {
@@ -1627,6 +1751,7 @@ export function CanvasWorkspace({
                   borderDash={[6, 4]}
                   borderStroke="#37FD76"
                   ignoreStroke
+                  padding={textSelectionPadding}
                   resizeEnabled={!selectedElement?.locked}
                   rotateEnabled={!selectedElement?.locked}
                   enabledAnchors={[...transformAnchors]}
