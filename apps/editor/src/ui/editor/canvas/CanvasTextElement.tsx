@@ -2,10 +2,10 @@ import Konva from 'konva';
 import { Group, Rect, Text } from 'react-konva';
 import type { TextElement, TextParagraph, TextRun } from '../../../domain/documents/model';
 import type { CommonElementProps } from './canvas-element-props';
+import { textGlyphMeasure } from './textGlyphMeasure';
+import type { GlyphMetrics } from './textGlyphMeasure';
 
 const TEXT_FRAME_PADDING = 6;
-const TEXT_MEASUREMENT_CACHE_LIMIT = 1600;
-const textMeasurementCache = new Map<string, number>();
 
 interface CanvasTextElementProps {
   commonProps: CommonElementProps;
@@ -23,35 +23,8 @@ function getFontStyle(text: Pick<TextRun, 'fontStyle' | 'fontWeight'>) {
   return text.fontStyle;
 }
 
-function measureTextRun(text: string, run: TextRun, scaleY: number) {
-  const cacheKey = [
-    text,
-    run.fontFamily,
-    run.fontSize,
-    run.fontStyle,
-    run.fontWeight,
-    scaleY,
-  ].join('\u0000');
-  const cachedWidth = textMeasurementCache.get(cacheKey);
-  if (cachedWidth !== undefined) return cachedWidth;
-
-  const measurementNode = new Konva.Text({
-    fontFamily: run.fontFamily,
-    fontSize: run.fontSize * scaleY,
-    fontStyle: getFontStyle(run),
-    padding: 0,
-    text,
-  });
-  const width = measurementNode.width();
-  measurementNode.destroy();
-  if (textMeasurementCache.size >= TEXT_MEASUREMENT_CACHE_LIMIT) {
-    textMeasurementCache.clear();
-  }
-  textMeasurementCache.set(cacheKey, width);
-  return width;
-}
-
 interface TextFragmentLayout {
+  metrics: GlyphMetrics;
   run: TextRun;
   text: string;
   width: number;
@@ -149,7 +122,14 @@ function layoutParagraph(paragraph: TextParagraph, width: number, scaleY: number
   const finishLine = () => {
     if (fragments.length === 0) return;
     const y = lines.reduce((height, line) => height + line.height, 0);
-    lines.push({ fragments, height: lineHeight, width: lineWidth, y });
+    const overflowLeft = fragments[0]?.metrics.overflowLeft ?? 0;
+    const overflowRight = fragments.at(-1)?.metrics.overflowRight ?? 0;
+    lines.push({
+      fragments,
+      height: lineHeight,
+      width: lineWidth + overflowLeft + overflowRight,
+      y,
+    });
     fragments = [];
     lineWidth = 0;
     lineHeight = 0;
@@ -158,13 +138,22 @@ function layoutParagraph(paragraph: TextParagraph, width: number, scaleY: number
   for (const run of getParagraphRuns(paragraph)) {
     const tokens = run.text.match(/\S+\s*|\s+/g) ?? [];
     for (const token of tokens) {
-      const tokenWidth = measureTextRun(token, run, scaleY);
-      if (fragments.length > 0 && lineWidth + tokenWidth > width) finishLine();
+      const tokenMetrics = textGlyphMeasure.measure(token, run, scaleY);
+      if (fragments.length > 0 && lineWidth + tokenMetrics.advance > width) finishLine();
       const fragmentText = fragments.length === 0 ? token.replace(/^\s+/, '') : token;
       if (!fragmentText) continue;
-      const fragmentWidth = fragmentText === token ? tokenWidth : measureTextRun(fragmentText, run, scaleY);
-      fragments.push({ run, text: fragmentText, width: fragmentWidth, x: lineWidth });
-      lineWidth += fragmentWidth;
+      const fragmentMetrics =
+        fragmentText === token
+          ? tokenMetrics
+          : textGlyphMeasure.measure(fragmentText, run, scaleY);
+      fragments.push({
+        metrics: fragmentMetrics,
+        run,
+        text: fragmentText,
+        width: fragmentMetrics.advance,
+        x: lineWidth,
+      });
+      lineWidth += fragmentMetrics.advance;
       lineHeight = Math.max(lineHeight, run.fontSize * scaleY * paragraph.lineHeight);
     }
   }
@@ -266,11 +255,12 @@ export function CanvasTextElement({
             : paragraph.align === 'right'
               ? Math.max(0, width - line.width)
               : 0;
+        const inkShift = line.fragments[0]?.metrics.overflowLeft ?? 0;
         return line.fragments.map((fragment, fragmentIndex) => (
           <Group
             key={`${paragraphIndex}-${lineIndex}-${fragmentIndex}-${fragment.text}`}
             listening={!hasInlineColorRanges}
-            x={x + alignOffset + fragment.x}
+            x={x + alignOffset + inkShift + fragment.x}
             y={y + line.y}
           >
             {fragment.run.highlight ? (
@@ -305,8 +295,6 @@ export function CanvasTextElement({
     return (
       <Group
         {...commonProps}
-        {...(!allowsVerticalOverflow ? { clipHeight: commonProps.height } : {})}
-        clipWidth={commonProps.width}
         ref={nodeRef}
         visible={visible}
       >
@@ -327,8 +315,6 @@ export function CanvasTextElement({
   return (
     <Group
       {...commonProps}
-      {...(!allowsVerticalOverflow ? { clipHeight: commonProps.height } : {})}
-      clipWidth={commonProps.width}
       ref={nodeRef}
       visible={visible}
     >

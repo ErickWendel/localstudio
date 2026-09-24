@@ -149,6 +149,56 @@ describe('editor commands', () => {
     expect(bottom.elements['image-hero']?.y).toBe(1080 - 735);
   });
 
+  it('centers text glyphs on the page instead of leaving them on the left of the frame', () => {
+    const project = sampleProject.createSampleProject();
+    const title = project.elements['text-title'];
+    if (!title || title.type !== 'text') throw new Error('Expected sample title text');
+    const leftAligned = {
+      ...project,
+      elements: {
+        ...project.elements,
+        'text-title': {
+          ...title,
+          align: 'left' as const,
+          paragraphs: [
+            {
+              align: 'left' as const,
+              fill: title.fill,
+              fontFamily: title.fontFamily,
+              fontSize: title.fontSize,
+              fontStyle: 'normal' as const,
+              fontWeight: title.fontWeight,
+              indent: 0,
+              lineHeight: 1,
+              marginLeft: 0,
+              spaceAfter: 0,
+              spaceBefore: 0,
+              text: title.text,
+            },
+          ],
+          verticalAlign: 'top' as const,
+          x: 40,
+          y: 80,
+        },
+      },
+    };
+    const centered = new basicCommands.AlignElementCommand(
+      'page-1',
+      'text-title',
+      'page-center',
+    ).execute(leftAligned);
+    const text = centered.elements['text-title'];
+
+    expect(text).toMatchObject({
+      align: 'center',
+      verticalAlign: 'middle',
+      x: (1920 - title.width) / 2,
+      y: (1080 - title.height) / 2,
+    });
+    expect(text?.type === 'text' ? text.paragraphs?.[0]?.align : undefined).toBe('center');
+    expect(leftAligned.elements['text-title']).toMatchObject({ align: 'left', x: 40 });
+  });
+
   it('brings an element to front by moving its id to the end', () => {
     const project = sampleProject.createSampleProject();
     const command = new basicCommands.SetZOrderCommand('page-1', 'image-hero', 'front');

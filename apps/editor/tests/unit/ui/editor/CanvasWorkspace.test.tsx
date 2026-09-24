@@ -74,6 +74,87 @@ describe('CanvasWorkspace', () => {
     expect(textNode?.textDecoration()).toBe('underline');
   });
 
+  it('keeps the text selection border outside the glyphs', () => {
+    const stageRef = createRef<Konva.Stage>();
+
+    render(
+      <CanvasWorkspace
+        project={sampleProject.createSampleProject()}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['text-title'] }}
+        stageRef={stageRef}
+      />,
+    );
+
+    const transformer = stageRef.current?.findOne<Konva.Transformer>('Transformer');
+    expect(transformer?.padding()).toBeGreaterThanOrEqual(10);
+  });
+
+  it('grows the text editor with new lines so the caret stays on the glyphs', () => {
+    const stageRef = createRef<Konva.Stage>();
+    const baseProject = sampleProject.createSampleProject();
+    const titleElement = baseProject.elements['text-title'];
+    if (!titleElement || titleElement.type !== 'text') {
+      throw new Error('Expected text-title to be a text element');
+    }
+    const project: ProjectDocument = {
+      ...baseProject,
+      elements: {
+        ...baseProject.elements,
+        'text-title': {
+          ...titleElement,
+          align: 'center',
+          text: 'test',
+          verticalAlign: 'middle',
+        },
+      },
+    };
+    const { rerender } = render(
+      <CanvasWorkspace
+        project={project}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['text-title'] }}
+        stageRef={stageRef}
+      />,
+    );
+    const textNode = stageRef.current
+      ?.find('Text')
+      .find((node) => (node as Konva.Text).text() === 'test') as Konva.Text | undefined;
+    expect(textNode).toBeDefined();
+    act(() => {
+      textNode!.fire('dblclick', { target: textNode });
+    });
+
+    const editor = screen.getByLabelText('Edit text');
+    const initialHeight = parseFloat(editor.style.height);
+    const grownText = 'testtesttest\ntesttest\ntesttest';
+    rerender(
+      <CanvasWorkspace
+        project={{
+          ...project,
+          elements: {
+            ...project.elements,
+            'text-title': {
+              ...titleElement,
+              align: 'center',
+              text: grownText,
+              verticalAlign: 'middle',
+            },
+          },
+        }}
+        activePageId="page-1"
+        selection={{ pageId: 'page-1', elementIds: ['text-title'] }}
+        stageRef={stageRef}
+      />,
+    );
+
+    expect(parseFloat(editor.style.height)).toBeGreaterThan(initialHeight + 8);
+    if (!(editor instanceof HTMLTextAreaElement)) {
+      throw new Error('Expected the canvas text editor to be a textarea');
+    }
+    expect(editor.scrollTop).toBe(0);
+  });
+
   it('renders inline text color ranges as colored canvas fragments', () => {
     const stageRef = createRef<Konva.Stage>();
     const onSelectElement = vi.fn();
@@ -124,6 +205,9 @@ describe('CanvasWorkspace', () => {
     });
 
     expect(onSelectElement).toHaveBeenCalledWith('text-title');
+
+    const transformer = stageRef.current?.findOne<Konva.Transformer>('Transformer');
+    expect(transformer?.padding()).toBeLessThan(40);
   });
 
   it('keeps inline text colors visible while editing selected text', () => {
