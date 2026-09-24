@@ -125,6 +125,28 @@ describe('TopToolbar storage and sharing actions', () => {
     expect(onMirrorNow).toHaveBeenCalledTimes(2);
   });
 
+  it('shows a storage-full tooltip when mirroring fails', () => {
+    const failure =
+      'Mirroring paused because the storage disk needs more free space (HTTP 507, XMinioStorageFull). Your file is fine, and this is not a bucket quota.';
+
+    render(
+      <TopToolbar
+        project={sampleProject.createSampleProject()}
+        language="PT-BR"
+        persistenceEnabled
+        mirrorState={{ enabled: true, status: 'failed', error: failure }}
+      />,
+    );
+
+    const mirrorButton = screen.getByRole('button', { name: 'Mirror failed' });
+    const tooltip = screen.getByRole('tooltip');
+    expect(mirrorButton).toHaveClass('mirror-failed');
+    expect(mirrorButton).toHaveAttribute('aria-describedby', 'mirror-failure-reason');
+    expect(tooltip).toHaveTextContent('not a bucket quota');
+    expect(tooltip).toHaveClass('is-visible');
+    expect(screen.getByText('Mirror failed')).toHaveAttribute('title', failure);
+  });
+
   it('opens mirror settings from the status icon when mirroring was disabled in settings', async () => {
     const user = userEvent.setup();
     const onMirrorNow = vi.fn();

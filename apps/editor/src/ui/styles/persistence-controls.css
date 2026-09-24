@@ -104,6 +104,35 @@
   color: #ffb4ab;
 }
 
+.mirror-failure-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 160;
+  display: none;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 24px));
+  border: 1px solid rgba(255, 180, 171, 0.4);
+  border-radius: 6px;
+  background: rgba(8, 17, 11, 0.98);
+  color: var(--ew-text);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  padding: 8px 10px;
+  text-align: left;
+  white-space: normal;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.42);
+  pointer-events: none;
+}
+
+.mirror-status-button:hover .mirror-failure-tooltip,
+.mirror-status-button:focus .mirror-failure-tooltip,
+.mirror-status-button:focus-visible .mirror-failure-tooltip,
+.mirror-failure-tooltip.is-visible {
+  display: block;
+}
+
 .mirror-disabled {
   color: var(--ew-dim);
 }

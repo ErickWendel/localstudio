@@ -850,6 +850,30 @@ describe('minioMirrorService.MinioMirrorService', () => {
     expect(retryDelays).toEqual([250]);
   });
 
+  it('explains a MinIO storage-full upload instead of treating it as a bad file', async () => {
+    const project = sampleProject.createSampleProject();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = getRequestUrl(input);
+      if (init?.method === 'GET' && url.endsWith('localstudio-mirror.json')) {
+        return Promise.resolve(new Response('', { status: 404 }));
+      }
+      if (init?.method === 'PUT') {
+        return Promise.resolve(
+          new Response(
+            '<Error><Code>XMinioStorageFull</Code><Message>Storage backend has reached its minimum free drive threshold.</Message></Error>',
+            { status: 507 },
+          ),
+        );
+      }
+      return Promise.resolve(new Response('', { status: 200 }));
+    });
+    const service = new minioMirrorService.MinioMirrorService({ fetch: fetchMock });
+
+    await expect(
+      service.syncProject(project, new VersionedRepository([], project), config),
+    ).rejects.toThrow(/storage disk needs more free space[\s\S]*HTTP 507, XMinioStorageFull[\s\S]*not a bucket quota/);
+  });
+
   it('reports the object key after network upload retries are exhausted', async () => {
     const project = sampleProject.createSampleProject();
     let projectUploadAttempts = 0;

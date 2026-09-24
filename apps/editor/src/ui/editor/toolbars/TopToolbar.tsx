@@ -549,7 +549,11 @@ export function TopToolbar({
             onOpenPresenterView={onOpenPresenterView}
             onStartPresenterMode={onStartPresenterMode}
           />
-          <span className="local-only-badge" title={mirrorState.error}>
+          <span
+            className="local-only-badge"
+            title={mirrorState.error}
+            aria-describedby={mirrorState.error ? 'mirror-failure-reason' : undefined}
+          >
             {mirrorLabel}
           </span>
         </div>

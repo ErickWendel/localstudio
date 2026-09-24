@@ -1,3 +1,5 @@
+import { describeMinioHttpFailure } from './minioHttpFailure';
+
 interface MinioObjectUploadOptions {
   blob: Blob;
   createUrl: (query?: Record<string, string>) => URL;
@@ -76,7 +78,12 @@ async function requestWithRetry(
       attempt === MINIO_UPLOAD_POLICY.attempts ||
       !MINIO_UPLOAD_POLICY.retryableStatuses.has(response.status)
     ) {
-      throw new Error(`Could not ${operation} to MinIO (${response.status}).`);
+      throw new Error(
+        await describeMinioHttpFailure(
+          response,
+          `Could not ${operation} to MinIO (${response.status}).`,
+        ),
+      );
     }
     await options.sleep(MINIO_UPLOAD_POLICY.initialDelayMs * 2 ** (attempt - 1));
   }

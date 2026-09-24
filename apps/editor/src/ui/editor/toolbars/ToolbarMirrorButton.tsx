@@ -41,12 +41,16 @@ export function ToolbarMirrorButton({
     .filter(Boolean)
     .join(' ');
 
+  const failureReason = mirrorState.error;
+  const failureTooltipId = failureReason ? 'mirror-failure-reason' : undefined;
+
   return (
     <button
       className={className}
-      title={mirrorState.error ?? label}
+      title={failureReason ? undefined : label}
       type="button"
       aria-label={label}
+      aria-describedby={failureTooltipId}
       data-tour-id="mirror-status"
       onClick={() => {
         if (needsLocalSave) {
@@ -67,6 +71,19 @@ export function ToolbarMirrorButton({
       <span className="material-symbols-outlined" aria-hidden="true">
         {mirrorState.status === 'syncing' ? 'sync' : 'cloud_sync'}
       </span>
+      {failureReason ? (
+        <span
+          id={failureTooltipId}
+          className={
+            mirrorState.status === 'failed'
+              ? 'mirror-failure-tooltip is-visible'
+              : 'mirror-failure-tooltip'
+          }
+          role="tooltip"
+        >
+          {failureReason}
+        </span>
+      ) : null}
     </button>
   );
 }
