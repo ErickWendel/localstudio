@@ -60,9 +60,18 @@ export const pptxAnimationMediaExportFlow = {
 
     expect(slideXml).toContain('<p:transition');
     expect(slideXml).toContain('<p:timing>');
+    expect(slideXml).toContain('nodeType="mainSeq"');
     expect(slideXml).toContain('presetClass="entr"');
+    expect(slideXml).toContain('presetID="9"');
     expect(slideXml).toContain('presetClass="mediacall"');
-    expect(slideXml).toContain('cmd="play"');
+    expect(slideXml).toContain('cmd="playFrom(0.0)"');
+    expect(slideXml).toContain('<p:stCondLst><p:cond');
+    expect(slideXml).toContain('<p:cBhvr><p:cTn');
+    expect(slideXml).not.toMatch(/<p:cTn\b[^>]*\sdelay="/);
+    const drawingIds = Array.from(slideXml.matchAll(/<p:cNvPr\b[^>]*\bid="([^"]+)"/g)).map(
+      (match) => match[1],
+    );
+    expect(new Set(drawingIds).size).toBe(drawingIds.length);
     expect(contentTypesXml).toContain('ContentType="image/gif"');
     expect(contentTypesXml).toContain('ContentType="video/mp4"');
     expect(slideRelsXml).toContain('/video');

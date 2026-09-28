@@ -18,8 +18,8 @@ test.describe('editor PowerPoint package patcher contracts', () => {
     expect(result.bufferBytes).toBeGreaterThan(0);
     expect(result.slideXml).toContain('<a:srcRect l="10000" t="20000" r="30000" b="10000"/>');
     expect(result.slideXml).toContain('<p:push dir="l"/>');
-    expect(result.slideXml).toContain('presetSubtype="fade"');
-    expect(result.slideXml).toContain('cmd="play"');
+    expect(result.slideXml).toContain('presetID="10"');
+    expect(result.slideXml).toContain('cmd="playFrom(0.0)"');
     expect(result.warningCodes).toEqual(
       expect.arrayContaining([
         'existing-warning',
@@ -66,9 +66,9 @@ test.describe('editor PowerPoint package patcher contracts', () => {
     expect(result.bufferBytes).toBeGreaterThan(0);
     expect(result.slideXml).toContain('<p:wipe dir="r"/>');
     expect(result.slideXml).toContain('<a:srcRect l="25000" t="10000" r="25000" b="50000"/>');
-    expect(result.slideXml).toContain('presetSubtype="push"');
-    expect(result.slideXml).toContain('presetSubtype="wipe"');
-    expect(result.slideXml).toContain('presetSubtype="fade"');
+    expect(result.slideXml).toContain('presetID="2"');
+    expect(result.slideXml).toContain('presetID="22"');
+    expect(result.slideXml).toContain('presetID="9"');
     expect(result.warningCodes).toEqual(
       expect.arrayContaining([
         'pptx-required-package-file-missing',
