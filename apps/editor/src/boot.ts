@@ -1,3 +1,5 @@
+import { installDeploymentChunkRecovery } from './services/browser/deploymentChunkRecovery';
+
 const editorMobileViewportQuery = '(max-width: 760px)';
 
 function isEditorMobileFallbackRoute() {
@@ -65,5 +67,6 @@ if (isEditorMobileFallbackRoute()) {
 } else {
   document.querySelector('[data-static-mobile-fallback]')?.remove();
   scheduleEditorFonts();
-  void import('./main');
+  const deploymentChunkRecovery = installDeploymentChunkRecovery();
+  void import('./main').then(() => deploymentChunkRecovery.markApplicationReady());
 }
