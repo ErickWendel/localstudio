@@ -124,26 +124,52 @@ function getPresetClass(build: ElementAnimationBuild) {
 
 function getNodeType(build: ElementAnimationBuild) {
   if (build.trigger === 'on-click') return 'clickEffect';
-  if (build.trigger === 'after-previous') return 'withEffect';
   return 'afterEffect';
 }
 
-function getPresetSubtype(build: ElementAnimationBuild) {
-  if (build.effect === 'fade' || build.effect === 'dissolve') return 'fade';
-  if (build.effect === 'push') return 'push';
-  if (build.effect === 'wipe') return 'wipe';
-  return 'appear';
+function getAnimationPreset(build: ElementAnimationBuild) {
+  if (build.effect === 'fade') return { filter: 'fade', presetId: 10 };
+  if (build.effect === 'dissolve') return { filter: 'dissolve', presetId: 9 };
+  if (build.effect === 'wipe') {
+    return {
+      filter: `wipe(${build.direction ?? 'left'})`,
+      presetId: 22,
+      presetSubtype: 8,
+    };
+  }
+  if (build.effect === 'push') {
+    return {
+      filter: `fly(${build.direction ?? 'left'})`,
+      presetId: 2,
+      presetSubtype: 8,
+    };
+  }
+  return { presetId: 1, presetSubtype: 0 };
 }
 
-function getAnimationCommand(build: ElementAnimationBuild, shapeId: string, timingId: number) {
+function getAnimationCommand(
+  build: ElementAnimationBuild,
+  shapeId: string,
+  groupId: number,
+  nextTimingId: () => number,
+) {
+  const nodeType = getNodeType(build);
+  const commandId = nextTimingId();
   if (build.mediaAction === 'play') {
-    return `<p:par><p:cTn id="${timingId}" nodeType="${getNodeType(build)}" presetClass="mediacall"><p:childTnLst><p:cmd type="call" cmd="play"><p:cBhvr><p:tgtEl><p:spTgt spid="${shapeId}"/></p:tgtEl></p:cBhvr></p:cmd></p:childTnLst></p:cTn></p:par>`;
+    const behaviorId = nextTimingId();
+    return `<p:par><p:cTn id="${commandId}" presetClass="mediacall" nodeType="${nodeType}" presetSubtype="0" presetID="1" grpId="${groupId}" fill="hold"><p:stCondLst><p:cond delay="0"/></p:stCondLst><p:childTnLst><p:cmd type="call" cmd="playFrom(0.0)"><p:cBhvr><p:cTn id="${behaviorId}" dur="1" fill="hold"/><p:tgtEl><p:spTgt spid="${shapeId}"/></p:tgtEl></p:cBhvr></p:cmd></p:childTnLst></p:cTn></p:par>`;
   }
   const duration = Math.max(0, build.durationMs ?? build.delayMs);
-  const delay = Math.max(0, build.delayMs);
-  const direction = mapDirection(build.direction);
-  const directionAttribute = direction ? ` dir="${direction}"` : '';
-  return `<p:par><p:cTn id="${timingId}" nodeType="${getNodeType(build)}" presetClass="${getPresetClass(build)}" presetSubtype="${getPresetSubtype(build)}" dur="${duration}" delay="${delay}"${directionAttribute}><p:childTnLst><p:animEffect transition="${build.kind === 'build-out' ? 'out' : 'in'}" filter="${getPresetSubtype(build)}"><p:cBhvr><p:tgtEl><p:spTgt spid="${shapeId}"/></p:tgtEl></p:cBhvr></p:animEffect></p:childTnLst></p:cTn></p:par>`;
+  const preset = getAnimationPreset(build);
+  const subtype = preset.presetSubtype === undefined ? '' : ` presetSubtype="${preset.presetSubtype}"`;
+  const visibility = build.kind === 'build-out' ? 'hidden' : 'visible';
+  const visibilityBehaviorId = nextTimingId();
+  const visibilityCommand = `<p:set><p:cBhvr><p:cTn id="${visibilityBehaviorId}" fill="hold"/><p:tgtEl><p:spTgt spid="${shapeId}"/></p:tgtEl><p:attrNameLst><p:attrName>style.visibility</p:attrName></p:attrNameLst></p:cBhvr><p:to><p:strVal val="${visibility}"/></p:to></p:set>`;
+  const effectBehaviorId = preset.filter ? nextTimingId() : undefined;
+  const effectCommand = preset.filter
+    ? `<p:animEffect filter="${preset.filter}" transition="${build.kind === 'build-out' ? 'out' : 'in'}"><p:cBhvr><p:cTn id="${effectBehaviorId}" dur="${duration}" fill="hold"/><p:tgtEl><p:spTgt spid="${shapeId}"/></p:tgtEl></p:cBhvr></p:animEffect>`
+    : '';
+  return `<p:par><p:cTn id="${commandId}" presetClass="${getPresetClass(build)}" nodeType="${nodeType}"${subtype} presetID="${preset.presetId}" grpId="${groupId}" fill="hold"><p:stCondLst><p:cond delay="0"/></p:stCondLst><p:childTnLst>${visibilityCommand}${effectCommand}</p:childTnLst></p:cTn></p:par>`;
 }
 
 function isExportableAnimationEffect(effect: AnimationEffect) {
@@ -165,9 +191,9 @@ function buildTimingXml(
     page.elementIds.includes(build.elementId),
   );
   if (builds.length === 0) return '';
-  const commands: string[] = [];
+  const entries: Array<{ build: ElementAnimationBuild; shapeId: string }> = [];
   const buildList: string[] = [];
-  builds.forEach((build, index) => {
+  builds.forEach((build) => {
     const shapeId = elementNameToShapeId.get(build.elementId);
     if (!shapeId) {
       warnings.push({
@@ -191,11 +217,72 @@ function buildTimingXml(
         pageId: page.id,
       });
     }
-    commands.push(getAnimationCommand(patchedBuild, shapeId, index + 2));
-    buildList.push(`<p:bldP spid="${shapeId}"/>`);
+    entries.push({ build: patchedBuild, shapeId });
   });
-  if (commands.length === 0) return '';
-  return `<p:timing><p:tnLst><p:par><p:cTn id="1" dur="indefinite" restart="never" nodeType="tmRoot"><p:childTnLst>${commands.join('')}</p:childTnLst></p:cTn></p:par></p:tnLst><p:bldLst>${buildList.join('')}</p:bldLst></p:timing>`;
+  if (entries.length === 0) return '';
+
+  const groups: Array<Array<{ build: ElementAnimationBuild; shapeId: string }>> = [];
+  for (const entry of entries) {
+    if (groups.length === 0 || entry.build.trigger !== 'after-previous') groups.push([]);
+    groups.at(-1)!.push(entry);
+  }
+
+  let timingId = 2;
+  const nextTimingId = () => {
+    timingId += 1;
+    return timingId;
+  };
+  const mediaShapeIds: string[] = [];
+  const commandGroups = groups.map((group, groupIndex) => {
+    const groupTimingId = nextTimingId();
+    const startsAfterTransition = groupIndex === 0 && group[0]?.build.trigger !== 'on-click';
+    const startConditions = startsAfterTransition
+      ? '<p:cond delay="indefinite"/><p:cond evt="onBegin"><p:tn val="2"/></p:cond>'
+      : '<p:cond delay="indefinite"/>';
+    let offset = 0;
+    const commands = group.map(({ build, shapeId }, buildIndex) => {
+      const wrapperTimingId = nextTimingId();
+      if (buildIndex === 0) offset = Math.max(0, build.delayMs);
+      else {
+        const previous = group[buildIndex - 1]!.build;
+        offset += Math.max(0, previous.durationMs ?? 0) + Math.max(0, build.delayMs);
+      }
+      if (build.mediaAction === 'play') mediaShapeIds.push(shapeId);
+      else {
+        buildList.push(
+          `<p:bldP build="whole" bldLvl="1" animBg="1" rev="0" advAuto="0" spid="${shapeId}" grpId="${groupIndex + 1}"/>`,
+        );
+      }
+      const command = getAnimationCommand(build, shapeId, groupIndex + 1, nextTimingId);
+      return `<p:par><p:cTn id="${wrapperTimingId}" fill="hold"><p:stCondLst><p:cond delay="${offset}"/></p:stCondLst><p:childTnLst>${command}</p:childTnLst></p:cTn></p:par>`;
+    });
+    return `<p:par><p:cTn id="${groupTimingId}" fill="hold"><p:stCondLst>${startConditions}</p:stCondLst><p:childTnLst>${commands.join('')}</p:childTnLst></p:cTn></p:par>`;
+  });
+  const mediaNodes = mediaShapeIds.map(
+    (shapeId) =>
+      `<p:video fullScrn="0"><p:cMediaNode mute="0" showWhenStopped="1" numSld="1" vol="100000"><p:cTn id="${nextTimingId()}" fill="hold" display="0"><p:stCondLst><p:cond delay="indefinite"/></p:stCondLst></p:cTn><p:tgtEl><p:spTgt spid="${shapeId}"/></p:tgtEl></p:cMediaNode></p:video>`,
+  );
+  const buildListXml = buildList.length > 0 ? `<p:bldLst>${buildList.join('')}</p:bldLst>` : '';
+  return `<p:timing><p:tnLst><p:par><p:cTn id="1" nodeType="tmRoot" restart="never" dur="indefinite" fill="hold"><p:childTnLst><p:seq concurrent="1" prevAc="none" nextAc="seek"><p:cTn id="2" nodeType="mainSeq" dur="indefinite" fill="hold"><p:childTnLst>${commandGroups.join('')}</p:childTnLst></p:cTn><p:prevCondLst><p:cond evt="onPrev"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:prevCondLst><p:nextCondLst><p:cond evt="onNext"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:nextCondLst></p:seq>${mediaNodes.join('')}</p:childTnLst></p:cTn></p:par></p:tnLst>${buildListXml}</p:timing>`;
+}
+
+function ensureUniqueNonVisualDrawingIds(xml: string) {
+  const ids = Array.from(xml.matchAll(/<p:cNvPr\b[^>]*\bid="(\d+)"/g)).map((match) =>
+    Number(match[1]),
+  );
+  let nextId = Math.max(1, ...ids) + 1;
+  const used = new Set<number>();
+  return xml.replace(/<p:cNvPr\b[^>]*>/g, (tag) => {
+    const id = Number(tag.match(/\bid="(\d+)"/)?.[1]);
+    if (!Number.isFinite(id) || !used.has(id)) {
+      if (Number.isFinite(id)) used.add(id);
+      return tag;
+    }
+    const replacement = nextId;
+    nextId += 1;
+    used.add(replacement);
+    return tag.replace(/\bid="\d+"/, `id="${replacement}"`);
+  });
 }
 
 function getElementNameToShapeId(xml: string) {
@@ -292,7 +379,7 @@ function patchSlideXml(
   patchPage: PptxPackagePatchPage | undefined,
   warnings: PresentationExportWarning[],
 ) {
-  let patchedXml = stripSlideGeneratedTiming(xml);
+  let patchedXml = ensureUniqueNonVisualDrawingIds(stripSlideGeneratedTiming(xml));
   const transitionXml = buildTransitionXml(page, warnings);
   const elementNameToShapeId = getElementNameToShapeId(patchedXml);
   for (const element of patchPage?.elements ?? []) {

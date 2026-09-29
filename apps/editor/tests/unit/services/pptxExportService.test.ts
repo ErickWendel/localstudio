@@ -296,9 +296,19 @@ describe('BrowserPptxExportService', () => {
     expect(slideXml).toContain('presetClass="entr"');
     expect(slideXml).toContain('presetClass="emph"');
     expect(slideXml).toContain('presetClass="mediacall"');
-    expect(slideXml).toContain('cmd="play"');
+    expect(slideXml).toContain('cmd="playFrom(0.0)"');
+    expect(slideXml).toContain('nodeType="mainSeq"');
     expect(slideXml).toContain('nodeType="clickEffect"');
     expect(slideXml).toContain('nodeType="afterEffect"');
+    expect(slideXml).toContain('presetID="10"');
+    expect(slideXml).toContain('<p:stCondLst><p:cond');
+    expect(slideXml).toContain('<p:cBhvr><p:cTn');
+    expect(slideXml).not.toMatch(/<p:cTn\b[^>]*\sdelay="/);
+
+    const drawingIds = Array.from(slideXml.matchAll(/<p:cNvPr\b[^>]*\bid="([^"]+)"/g)).map(
+      (match) => match[1],
+    );
+    expect(new Set(drawingIds).size).toBe(drawingIds.length);
 
     expect(result.warnings).toEqual(
       expect.arrayContaining([
@@ -402,6 +412,63 @@ describe('BrowserPptxExportService', () => {
     expect(slideXml).toContain('sz="1700"');
     expect(slideXml).not.toContain('sz="3400"');
     expect(slideXml).toContain('prst="bentConnector3"');
+  });
+
+  it('preserves mixed text color ranges as editable PowerPoint runs', async () => {
+    const project = createExportProject();
+    const title = project.elements.title;
+    if (!title || title.type !== 'text') throw new Error('Expected a title text element.');
+    project.elements.title = {
+      ...title,
+      colorRanges: [
+        { start: 0, end: 8, fill: '#04ff00' },
+        { start: 9, end: title.text.length, fill: '#ffffff' },
+      ],
+    };
+
+    const result = await new BrowserPptxExportService().exportPowerPoint(project);
+    const slideXml = readEntry(await readPptxEntries(result.blob), 'ppt/slides/slide1.xml');
+
+    expect(slideXml).toContain('<a:srgbClr val="04FF00"/>');
+    expect(slideXml).toContain('<a:srgbClr val="FFFFFF"/>');
+    expect(slideXml).toContain('<a:t>Editable</a:t>');
+    expect(slideXml).toContain('<a:t>title</a:t>');
+  });
+
+  it('assigns unique drawing ids when a video is the first slide element', async () => {
+    const project = createExportProject();
+    project.pages[0] = {
+      ...project.pages[0]!,
+      animationBuilds: [
+        {
+          id: 'build-video',
+          elementId: 'video',
+          effect: 'reveal',
+          trigger: 'on-click',
+          delayMs: 0,
+          mediaAction: 'play',
+        },
+        {
+          id: 'build-image',
+          elementId: 'image',
+          effect: 'fade',
+          trigger: 'after-previous',
+          delayMs: 0,
+          durationMs: 300,
+        },
+      ],
+      elementIds: ['video', 'image'],
+    };
+
+    const result = await new BrowserPptxExportService().exportPowerPoint(project);
+    const slideXml = readEntry(await readPptxEntries(result.blob), 'ppt/slides/slide1.xml');
+    const drawingIds = Array.from(slideXml.matchAll(/<p:cNvPr\b[^>]*\bid="([^"]+)"/g)).map(
+      (match) => match[1],
+    );
+
+    expect(new Set(drawingIds).size).toBe(drawingIds.length);
+    expect(slideXml).toContain('presetClass="mediacall"');
+    expect(slideXml).toContain('nodeType="afterEffect"');
   });
 
   it('preserves imported PowerPoint physical page and font units', async () => {
@@ -528,5 +595,23 @@ describe('BrowserPptxExportService', () => {
     expect(readEntry(entries, 'ppt/slides/_rels/slide1.xml.rels')).toContain(
       'relationships/video',
     );
+  });
+
+  it('uses MP4 package parts when imported video metadata says video/unknown and the file name is wrong', async () => {
+    const project = createExportProject();
+    project.assets.videoAsset!.fileName = 'imported-video.png';
+    project.assets.videoAsset!.mimeType = 'video/unknown';
+    project.assets.videoAsset!.objectUrl = tinyMp4DataUrl.replace('video/mp4', 'video/unknown');
+
+    const result = await new BrowserPptxExportService().exportPowerPoint(project);
+    const entries = await readPptxEntries(result.blob);
+    const mediaPaths = Object.keys(entries).filter((path) => path.startsWith('ppt/media/'));
+    const videoPath = mediaPaths.find((path) => path.endsWith('.mp4'));
+    const contentTypes = readEntry(entries, '[Content_Types].xml');
+
+    expect(videoPath).toBeDefined();
+    expect(mediaPaths).not.toContain(expect.stringMatching(/media-\d+-\d+\.png$/));
+    expect(contentTypes.match(/<Default\s+Extension="png"/g)).toHaveLength(1);
+    expect(contentTypes).not.toContain('ContentType="video/png"');
   });
 });

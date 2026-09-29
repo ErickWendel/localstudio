@@ -121,7 +121,9 @@ function normalizeMimeType(mimeType: string | undefined) {
 
 function getSpecificMimeType(mimeType: string | undefined) {
   const normalized = normalizeMimeType(mimeType);
-  return normalized === 'application/octet-stream' || normalized?.endsWith('/*')
+  return normalized === 'application/octet-stream' ||
+    normalized?.endsWith('/*') ||
+    normalized?.endsWith('/unknown')
     ? undefined
     : normalized;
 }
@@ -250,6 +252,38 @@ function getTextRuns(
   project: ProjectDocument,
   page: Page,
 ) {
+  if (element.colorRanges?.length) {
+    const runs: PptxGenJS.TextProps[] = [];
+    const ranges = element.colorRanges
+      .map((range) => ({
+        ...range,
+        end: Math.max(0, Math.min(element.text.length, Math.floor(range.end))),
+        start: Math.max(0, Math.min(element.text.length, Math.floor(range.start))),
+      }))
+      .filter((range) => range.start < range.end)
+      .sort((left, right) => left.start - right.start);
+    let cursor = 0;
+    const pushRun = (start: number, end: number, fill: string) => {
+      if (start >= end) return;
+      runs.push({
+        options: {
+          bold: element.fontWeight >= 600,
+          color: normalizeHexColor(fill, '111111'),
+          fontFace: element.fontFamily,
+          fontSize: toPoints(element.fontSize, project, page),
+        },
+        text: element.text.slice(start, end),
+      });
+    };
+    for (const range of ranges) {
+      if (range.start > cursor) pushRun(cursor, range.start, element.fill);
+      const start = Math.max(cursor, range.start);
+      if (start < range.end) pushRun(start, range.end, range.fill);
+      cursor = Math.max(cursor, range.end);
+    }
+    if (cursor < element.text.length) pushRun(cursor, element.text.length, element.fill);
+    if (runs.length > 0) return runs;
+  }
   if (!element.paragraphs?.length) return element.text;
   return element.paragraphs.flatMap((paragraph, paragraphIndex) => {
     const runs = paragraph.runs?.length
