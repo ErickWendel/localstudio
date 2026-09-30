@@ -111,7 +111,25 @@ describe('TopToolbar', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Export to' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Powerpoint (.pptx)' }));
 
-    expect(onExportPowerPoint).toHaveBeenCalledTimes(1);
+    expect(onExportPowerPoint).toHaveBeenCalledWith('powerpoint');
+  });
+
+  it('opens the Keynote and Google Slides compatibility export action', () => {
+    const onExportPowerPoint = vi.fn();
+
+    render(
+      <TopToolbar
+        project={sampleProject.createSampleProject()}
+        language="PT-BR"
+        onExportPowerPoint={onExportPowerPoint}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Export to' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Keynote / Google Slides (.pptx)' }));
+
+    expect(onExportPowerPoint).toHaveBeenCalledWith('keynote-google-slides');
   });
 
   it('opens the PDF export action from the File menu', () => {

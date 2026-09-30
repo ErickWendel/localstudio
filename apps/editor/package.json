@@ -20,6 +20,7 @@
     "driver.js": "^1.6.0",
     "fflate": "^0.8.3",
     "fix-webm-duration": "^1.0.6",
+    "gifenc": "^1.0.3",
     "jspdf": "^4.2.1",
     "konva": "^10.3.0",
     "lucide-react": "^1.21.0",

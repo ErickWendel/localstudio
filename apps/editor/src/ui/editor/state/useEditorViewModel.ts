@@ -38,6 +38,7 @@ import type {
   MirrorSyncProgress,
   ModelDownloadProgressDetails,
   ModelState,
+  PresentationExportCompatibilityTarget,
   PromptApiAvailability,
   VersionHistoryEntry,
 } from '../../../services/contracts/interfaces';
@@ -1944,7 +1945,9 @@ export function useEditorViewModel(services: AppServices) {
     );
   }
 
-  async function exportPowerPoint() {
+  async function exportPowerPoint(
+    compatibilityTarget: PresentationExportCompatibilityTarget = 'powerpoint',
+  ) {
     if (isExportingPowerPoint) return;
     setIsExportingPowerPoint(true);
     try {
@@ -1954,6 +1957,7 @@ export function useEditorViewModel(services: AppServices) {
       );
       await editorViewModelRuntime.waitForNextPaint();
       const result = await services.presentationExportService.exportPowerPoint(project, {
+        compatibilityTarget,
         onProgress: (progress) => {
           showOperationNotice(powerPointIo.formatExportProgress(progress), { persistent: true });
         },
@@ -1968,7 +1972,7 @@ export function useEditorViewModel(services: AppServices) {
       );
       services.exportService.downloadBlob(
         result.blob,
-        services.exportService.getPowerPointFileName(project),
+        services.exportService.getPowerPointFileName(project, compatibilityTarget),
       );
       showOperationNotice({
         message: powerPointIo.summarizeExport(result),

@@ -1,8 +1,12 @@
 import type { ProjectDocument } from '../../domain/documents/model';
-import type { ExportService } from '../contracts/interfaces';
+import type { ExportService, PresentationExportCompatibilityTarget } from '../contracts/interfaces';
 
 export class BrowserExportService implements ExportService {
-  getPageImageFileName(project: ProjectDocument, pageId: string, extension: 'png' | 'jpeg'): string {
+  getPageImageFileName(
+    project: ProjectDocument,
+    pageId: string,
+    extension: 'png' | 'jpeg',
+  ): string {
     const page = project.pages.find((item) => item.id === pageId);
     const pageName = page?.name ?? 'Page';
     return `${project.name}-${pageName}.${extension}`;
@@ -16,8 +20,12 @@ export class BrowserExportService implements ExportService {
     return `${project.name}.pdf`;
   }
 
-  getPowerPointFileName(project: ProjectDocument): string {
-    return `${project.name}.pptx`;
+  getPowerPointFileName(
+    project: ProjectDocument,
+    compatibilityTarget: PresentationExportCompatibilityTarget = 'powerpoint',
+  ): string {
+    const suffix = compatibilityTarget === 'keynote-google-slides' ? '-keynote-google-slides' : '';
+    return `${project.name}${suffix}.pptx`;
   }
 
   downloadBlob(blob: Blob, fileName: string): void {

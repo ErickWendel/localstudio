@@ -6,11 +6,16 @@ import { EditorAppPage } from '../pages/editor-app.page';
 import { expect } from '../support/journey-test';
 
 export const pptxExportReader = {
-  async downloadFiles(page: Page, editor: EditorAppPage, expectedFilename: string) {
+  async downloadFiles(
+    page: Page,
+    editor: EditorAppPage,
+    expectedFilename: string,
+    menuItemName = 'Powerpoint (.pptx)',
+  ) {
     const downloadPromise = page.waitForEvent('download');
     await editor.openMenu('File');
     await page.getByRole('menuitem', { name: 'Export to' }).click();
-    await page.getByRole('menuitem', { name: 'Powerpoint (.pptx)' }).click();
+    await page.getByRole('menuitem', { name: menuItemName }).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toBe(expectedFilename);
     const stream = await download.createReadStream();

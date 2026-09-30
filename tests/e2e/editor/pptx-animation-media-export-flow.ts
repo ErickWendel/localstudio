@@ -24,7 +24,9 @@ export const pptxAnimationMediaExportFlow = {
       .getByRole('tablist', { name: 'Movie inspector sections' })
       .getByRole('tab', { name: 'Text' })
       .click();
-    await page.getByRole('textbox', { name: 'Selected text content' }).fill('Animated export target');
+    await page
+      .getByRole('textbox', { name: 'Selected text content' })
+      .fill('Animated export target');
     await editor.openTool('Animate');
     await page.getByLabel('New object animation effect').selectOption('dissolve');
     await page.getByRole('button', { name: 'Add animation' }).click();
@@ -47,7 +49,11 @@ export const pptxAnimationMediaExportFlow = {
     await editor.openTool('Layout');
     await page.getByRole('button', { name: 'generic-animation.gif', exact: true }).click();
 
-    const files = await pptxExportReader.downloadFiles(page, editor, 'E2E Animation Media Export.pptx');
+    const files = await pptxExportReader.downloadFiles(
+      page,
+      editor,
+      'E2E Animation Media Export.pptx',
+    );
     const slideXml = strFromU8(files['ppt/slides/slide1.xml']);
     const contentTypesXml = strFromU8(files['[Content_Types].xml']);
     const slideRelsXml = strFromU8(files['ppt/slides/_rels/slide1.xml.rels']);
@@ -80,5 +86,27 @@ export const pptxAnimationMediaExportFlow = {
     if (!gifPath || !videoPath) throw new Error('Expected GIF and MP4 package parts.');
     expect(strFromU8(files[gifPath].subarray(0, 6))).toBe('GIF89a');
     expect(strFromU8(files[videoPath].subarray(4, 8))).toBe('ftyp');
+
+    const compatibilityFiles = await pptxExportReader.downloadFiles(
+      page,
+      editor,
+      'E2E Animation Media Export-keynote-google-slides.pptx',
+      'Keynote / Google Slides (.pptx)',
+    );
+    const compatibilitySlideXml = strFromU8(compatibilityFiles['ppt/slides/slide1.xml']);
+    const compatibilitySlideRelsXml = strFromU8(
+      compatibilityFiles['ppt/slides/_rels/slide1.xml.rels'],
+    );
+    const compatibilityMediaPaths = Object.keys(compatibilityFiles).filter((path) =>
+      path.startsWith('ppt/media/'),
+    );
+
+    expect(compatibilityMediaPaths.some((path) => path.endsWith('.mp4'))).toBe(false);
+    expect(compatibilityMediaPaths.filter((path) => path.endsWith('.gif'))).toHaveLength(2);
+    expect(compatibilitySlideXml).not.toContain('<a:videoFile');
+    expect(compatibilitySlideXml).not.toContain('<p:video');
+    expect(compatibilitySlideXml).not.toContain('presetClass="mediacall"');
+    expect(compatibilitySlideRelsXml).not.toContain('/video');
+    expect(compatibilitySlideRelsXml).not.toContain('office/2007/relationships/media');
   },
 };

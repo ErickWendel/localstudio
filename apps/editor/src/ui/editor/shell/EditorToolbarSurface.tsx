@@ -71,15 +71,12 @@ export function EditorToolbarSurface({
           <LocalProjectSetupPanel
             {...(vm.localProjectSetupMode === 'duplicate'
               ? {
-                  description:
-                    'Name the duplicate before choosing where to create its folder.',
+                  description: 'Name the duplicate before choosing where to create its folder.',
                   title: 'Duplicate project',
                 }
               : {})}
             initialName={
-              vm.localProjectSetupMode === 'duplicate'
-                ? `${vm.project.name} Copy`
-                : vm.project.name
+              vm.localProjectSetupMode === 'duplicate' ? `${vm.project.name} Copy` : vm.project.name
             }
             onCancel={() => {
               vm.closeLocalProjectSetup();
@@ -129,12 +126,13 @@ export function EditorToolbarSurface({
         });
         void vm.importPowerPoint();
       }}
-      onExportPowerPoint={() => {
+      onExportPowerPoint={(compatibilityTarget = 'powerpoint') => {
         services.analyticsService.capture(postHogEvents.presentationExportedPptx, {
+          compatibility_target: compatibilityTarget,
           project_name: vm.project.name,
           page_count: vm.project.pages.length,
         });
-        void vm.exportPowerPoint();
+        void vm.exportPowerPoint(compatibilityTarget);
       }}
       onExportImages={onExportImages}
       onExportPdf={onExportPdf}
