@@ -2,6 +2,7 @@ import PptxGenJS from 'pptxgenjs';
 import type {
   Asset,
   DesignElement,
+  ElementAnimationBuild,
   Page,
   ProjectDocument,
   ShapeLineEndpoint,
@@ -499,6 +500,76 @@ function collectVisiblePages(project: ProjectDocument) {
   return project.pages.filter((page) => page.visible !== false);
 }
 
+function createInferredVideoPlaybackBuild(
+  elementId: string,
+  trigger: ElementAnimationBuild['trigger'],
+): ElementAnimationBuild {
+  return {
+    delayMs: 0,
+    durationMs: 0,
+    effect: 'reveal',
+    elementId,
+    id: `pptx-video-play-${elementId}`,
+    mediaAction: 'play',
+    trigger,
+  };
+}
+
+function preserveLegacyVideoPlayback(project: ProjectDocument, pages: Page[]) {
+  return pages.map((page) => {
+    const autoplayVideos = pageElementResolver
+      .getVisibleElements(project, page)
+      .filter(
+        (element): element is Extract<DesignElement, { type: 'video' }> =>
+          element.type === 'video' && element.autoplayInPreview,
+      );
+    if (autoplayVideos.length === 0) return page;
+
+    const autoplayVideoIds = new Set(autoplayVideos.map((element) => element.id));
+    const explicitPlaybackIds = new Set(
+      (page.animationBuilds ?? [])
+        .filter((build) => build.mediaAction === 'play')
+        .map((build) => build.elementId),
+    );
+    const normalizedBuilds = (page.animationBuilds ?? []).map((build) => {
+      if (!autoplayVideoIds.has(build.elementId) || explicitPlaybackIds.has(build.elementId)) {
+        return build;
+      }
+      explicitPlaybackIds.add(build.elementId);
+      return { ...build, mediaAction: 'play' as const };
+    });
+    const missingPlaybackVideos = autoplayVideos.filter(
+      (element) => !explicitPlaybackIds.has(element.id),
+    );
+    if (missingPlaybackVideos.length === 0) {
+      return { ...page, animationBuilds: normalizedBuilds };
+    }
+
+    const automaticBuilds = missingPlaybackVideos
+      .filter((element) => !element.startOnClick)
+      .map((element, index) =>
+        createInferredVideoPlaybackBuild(
+          element.id,
+          index === 0 ? 'after-transition' : 'after-previous',
+        ),
+      );
+    const clickBuilds = missingPlaybackVideos
+      .filter((element) => element.startOnClick)
+      .map((element) => createInferredVideoPlaybackBuild(element.id, 'on-click'));
+    const buildsFollowingAutomaticPlayback =
+      automaticBuilds.length > 0 && normalizedBuilds[0]?.trigger === 'after-transition'
+        ? [
+            { ...normalizedBuilds[0], trigger: 'after-previous' as const },
+            ...normalizedBuilds.slice(1),
+          ]
+        : normalizedBuilds;
+    return {
+      ...page,
+      animationBuilds: [...automaticBuilds, ...buildsFollowingAutomaticPlayback, ...clickBuilds],
+    };
+  });
+}
+
 function collectExportStats(project: ProjectDocument, pages: Page[]): PresentationExportStats {
   let animationBuildCount = 0;
   let mediaElementCount = 0;
@@ -649,7 +720,7 @@ export class BrowserPptxExportService {
     project: ProjectDocument,
     options: PresentationExportOptions = {},
   ): Promise<PresentationExportResult> {
-    const pages = collectVisiblePages(project);
+    const pages = preserveLegacyVideoPlayback(project, collectVisiblePages(project));
     const patchPages = collectPackagePatchPages(project, pages);
     const stats = collectExportStats(project, pages);
     const context: ExportContext = {

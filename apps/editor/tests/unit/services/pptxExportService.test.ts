@@ -322,6 +322,52 @@ describe('BrowserPptxExportService', () => {
     );
   });
 
+  it.each([
+    ['after the slide transition', false, 'nodeType="afterEffect"'],
+    ['on click', true, 'nodeType="clickEffect"'],
+  ])('preserves autoplay %s for legacy videos without animation builds', async (_, startOnClick, nodeType) => {
+    const project = createExportProject();
+    const video = project.elements.video;
+    if (!video || video.type !== 'video') throw new Error('Expected a video element.');
+    video.startOnClick = startOnClick;
+    project.pages[0]!.animationBuilds = (project.pages[0]!.animationBuilds ?? []).filter(
+      (build) => build.elementId !== 'video',
+    );
+
+    const result = await new BrowserPptxExportService().exportPowerPoint(project);
+    const entries = await readPptxEntries(result.blob);
+    const slideXml = readEntry(entries, 'ppt/slides/slide1.xml');
+
+    expect(slideXml).toContain('presetClass="mediacall"');
+    expect(slideXml).toContain('cmd="playFrom(0.0)"');
+    expect(slideXml).toContain('<p:video');
+    expect(slideXml).toContain(nodeType);
+  });
+
+  it('preserves autoplay for legacy video builds without a media action', async () => {
+    const project = createExportProject();
+    const videoBuild = project.pages[0]!.animationBuilds?.find(
+      (build) => build.elementId === 'video',
+    );
+    if (!videoBuild) throw new Error('Expected a video animation build.');
+    const { mediaAction: ignoredMediaAction, ...legacyVideoBuild } = videoBuild;
+    void ignoredMediaAction;
+    project.pages[0]!.animationBuilds = [
+      {
+        ...legacyVideoBuild,
+        trigger: 'after-transition',
+      },
+    ];
+
+    const result = await new BrowserPptxExportService().exportPowerPoint(project);
+    const entries = await readPptxEntries(result.blob);
+    const slideXml = readEntry(entries, 'ppt/slides/slide1.xml');
+
+    expect(slideXml).toContain('presetClass="mediacall"');
+    expect(slideXml).toContain('cmd="playFrom(0.0)"');
+    expect(slideXml).toContain('<p:video');
+  });
+
   it('preserves layout artwork, rich text runs, PowerPoint font units, and connector presets', async () => {
     const project = createExportProject();
     const title = project.elements.title;
