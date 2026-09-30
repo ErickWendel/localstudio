@@ -44,12 +44,6 @@ export const pptxAnimationMediaExportFlow = {
     });
     await editor.openTool('Layout');
     await page.getByRole('button', { name: 'generic-video.mp4', exact: true }).click();
-    await editor.openTool('Design');
-    await page
-      .getByRole('tablist', { name: 'Movie inspector sections' })
-      .getByRole('tab', { name: 'Movie' })
-      .click();
-    await page.getByLabel('Selected video start').selectOption('on-click');
     await editor.openTool('Layout');
     await page.getByRole('button', { name: 'generic-animation.gif', exact: true }).click();
 
