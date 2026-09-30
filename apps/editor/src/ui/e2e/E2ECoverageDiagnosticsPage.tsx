@@ -3977,6 +3977,10 @@ async function runBundledPresenterSessionDiagnostic() {
   const popupMessages: unknown[] = [];
   const remoteStates: PresenterRemoteState[] = [];
   const previewBatches: PresenterRemotePreviewBatch[] = [];
+  let resolvePreviewBatch: (() => void) | undefined;
+  const previewBatchPublished = new Promise<void>((resolve) => {
+    resolvePreviewBatch = resolve;
+  });
   let remoteClosed = false;
   let remoteCommand: ((command: PresenterRemoteCommand) => void) | undefined;
   const popupWindow = {
@@ -4012,6 +4016,7 @@ async function runBundledPresenterSessionDiagnostic() {
         }),
         publishPreviewBatch: (batch) => {
           previewBatches.push(batch);
+          resolvePreviewBatch?.();
         },
         publishState: (state) => {
           remoteStates.push(state);
@@ -4053,7 +4058,10 @@ async function runBundledPresenterSessionDiagnostic() {
       requestId: 'preview-request',
       type: 'command',
     });
-    await new Promise((resolve) => window.setTimeout(resolve, 50));
+    await Promise.race([
+      previewBatchPublished,
+      new Promise<void>((resolve) => window.setTimeout(resolve, 1_000)),
+    ]);
     window.dispatchEvent(
       new MessageEvent('message', {
         data: {
