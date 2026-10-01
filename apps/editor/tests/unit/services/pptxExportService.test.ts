@@ -1,5 +1,5 @@
 import { strFromU8, unzipSync } from 'fflate';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ProjectDocument } from '../../../src/domain/documents/model';
 import { BrowserPptxExportService } from '../../../src/services/exporting/pptxExportService';
 
@@ -37,6 +37,10 @@ function readRelationshipTargets(relsXml: string, sourcePath: string) {
     if (target.startsWith('http')) return target;
     return normalizeTargetPath(`${sourcePath.split('/').slice(0, -1).join('/')}/${target}`);
   });
+}
+
+function readContentTypeOverrideTargets(contentTypesXml: string) {
+  return Array.from(contentTypesXml.matchAll(/\bPartName="\/([^"]+)"/g)).map((match) => match[1]!);
 }
 
 function createExportProject(): ProjectDocument {
@@ -269,6 +273,9 @@ describe('BrowserPptxExportService', () => {
     );
 
     const contentTypesXml = readEntry(entries, '[Content_Types].xml');
+    for (const target of readContentTypeOverrideTargets(contentTypesXml)) {
+      expect(entries[target], target).toBeDefined();
+    }
     expect(contentTypesXml).toContain('Extension="gif" ContentType="image/gif"');
     expect(contentTypesXml).toContain('Extension="mp4" ContentType="video/mp4"');
     expect(contentTypesXml).toContain('Extension="mov" ContentType="video/quicktime"');
@@ -286,7 +293,9 @@ describe('BrowserPptxExportService', () => {
     expect(slideXml).toContain('Editable title');
     expect(slideXml).toContain(' u="sng"');
     expect(slideXml).not.toContain('Hidden');
-    expect(slideXml).toContain('<p:transition dur="500" advClick="0" advTm="250"><p:fade/></p:transition>');
+    expect(slideXml).toContain(
+      '<p:transition dur="500" advClick="0" advTm="250"><p:fade/></p:transition>',
+    );
     expect(slideXml).toContain('<p:timing>');
     expect(slideXml).toContain('<a:srcRect l="10000" t="20000" r="20000" b="20000"/>');
     expect(slideXml).toContain('flipH="1"');
@@ -297,6 +306,8 @@ describe('BrowserPptxExportService', () => {
     expect(slideXml).toContain('presetClass="emph"');
     expect(slideXml).toContain('presetClass="mediacall"');
     expect(slideXml).toContain('cmd="playFrom(0.0)"');
+    expect(slideXml).toContain('<a:hlinkClick action="ppaction://media"/>');
+    expect(slideXml).not.toContain('r:id="" action="ppaction://media"');
     expect(slideXml).toContain('nodeType="mainSeq"');
     expect(slideXml).toContain('nodeType="clickEffect"');
     expect(slideXml).toContain('nodeType="afterEffect"');
@@ -325,24 +336,27 @@ describe('BrowserPptxExportService', () => {
   it.each([
     ['after the slide transition', false, 'nodeType="afterEffect"'],
     ['on click', true, 'nodeType="clickEffect"'],
-  ])('preserves autoplay %s for legacy videos without animation builds', async (_, startOnClick, nodeType) => {
-    const project = createExportProject();
-    const video = project.elements.video;
-    if (!video || video.type !== 'video') throw new Error('Expected a video element.');
-    video.startOnClick = startOnClick;
-    project.pages[0]!.animationBuilds = (project.pages[0]!.animationBuilds ?? []).filter(
-      (build) => build.elementId !== 'video',
-    );
+  ])(
+    'preserves autoplay %s for legacy videos without animation builds',
+    async (_, startOnClick, nodeType) => {
+      const project = createExportProject();
+      const video = project.elements.video;
+      if (!video || video.type !== 'video') throw new Error('Expected a video element.');
+      video.startOnClick = startOnClick;
+      project.pages[0]!.animationBuilds = (project.pages[0]!.animationBuilds ?? []).filter(
+        (build) => build.elementId !== 'video',
+      );
 
-    const result = await new BrowserPptxExportService().exportPowerPoint(project);
-    const entries = await readPptxEntries(result.blob);
-    const slideXml = readEntry(entries, 'ppt/slides/slide1.xml');
+      const result = await new BrowserPptxExportService().exportPowerPoint(project);
+      const entries = await readPptxEntries(result.blob);
+      const slideXml = readEntry(entries, 'ppt/slides/slide1.xml');
 
-    expect(slideXml).toContain('presetClass="mediacall"');
-    expect(slideXml).toContain('cmd="playFrom(0.0)"');
-    expect(slideXml).toContain('<p:video');
-    expect(slideXml).toContain(nodeType);
-  });
+      expect(slideXml).toContain('presetClass="mediacall"');
+      expect(slideXml).toContain('cmd="playFrom(0.0)"');
+      expect(slideXml).toContain('<p:video');
+      expect(slideXml).toContain(nodeType);
+    },
+  );
 
   it('preserves autoplay for legacy video builds without a media action', async () => {
     const project = createExportProject();
@@ -565,7 +579,8 @@ describe('BrowserPptxExportService', () => {
     };
     const video = project.elements.video;
     const image = project.elements.image;
-    if (video?.type !== 'video' || image?.type !== 'image') throw new Error('Expected media elements.');
+    if (video?.type !== 'video' || image?.type !== 'image')
+      throw new Error('Expected media elements.');
     video.posterAssetId = 'posterAsset';
     image.clipPath = [
       { type: 'move', x: 0.5, y: 0 },
@@ -638,9 +653,7 @@ describe('BrowserPptxExportService', () => {
     expect(readEntry(entries, '[Content_Types].xml')).toContain(
       'Extension="mp4" ContentType="video/mp4"',
     );
-    expect(readEntry(entries, 'ppt/slides/_rels/slide1.xml.rels')).toContain(
-      'relationships/video',
-    );
+    expect(readEntry(entries, 'ppt/slides/_rels/slide1.xml.rels')).toContain('relationships/video');
   });
 
   it('uses MP4 package parts when imported video metadata says video/unknown and the file name is wrong', async () => {
@@ -659,5 +672,105 @@ describe('BrowserPptxExportService', () => {
     expect(mediaPaths).not.toContain(expect.stringMatching(/media-\d+-\d+\.png$/));
     expect(contentTypes.match(/<Default\s+Extension="png"/g)).toHaveLength(1);
     expect(contentTypes).not.toContain('ContentType="video/png"');
+  });
+
+  it('exports muted videos as animated GIF images for Keynote and Google Slides compatibility', async () => {
+    const project = createExportProject();
+    const video = project.elements.video;
+    if (!video || video.type !== 'video') throw new Error('Expected a video element.');
+    video.muted = true;
+    video.rotation = 15;
+    video.opacity = 0.4;
+
+    const convertVideoToGif = vi.fn().mockResolvedValue({
+      blob: await fetch(tinyGifDataUrl).then((response) => response.blob()),
+      encodedDurationSeconds: 1,
+      frameCount: 8,
+      sourceDurationSeconds: 1,
+    });
+    const result = await new BrowserPptxExportService({ convertVideoToGif }).exportPowerPoint(
+      project,
+      {
+        compatibilityTarget: 'keynote-google-slides',
+      },
+    );
+    const entries = await readPptxEntries(result.blob);
+    const mediaPaths = Object.keys(entries).filter((path) => path.startsWith('ppt/media/'));
+    const slideXml = readEntry(entries, 'ppt/slides/slide1.xml');
+    const slideRelsXml = readEntry(entries, 'ppt/slides/_rels/slide1.xml.rels');
+
+    expect(mediaPaths.some((path) => path.endsWith('.mp4'))).toBe(false);
+    expect(mediaPaths.some((path) => path.endsWith('.gif'))).toBe(true);
+    expect(slideXml).not.toContain('<a:videoFile');
+    expect(slideXml).not.toContain('<p:video');
+    expect(slideXml).not.toContain('cmd="playFrom(0.0)"');
+    expect(slideRelsXml).not.toContain('relationships/video');
+    expect(slideRelsXml).not.toContain('relationships/media');
+    expect(slideRelsXml).toContain('relationships/image');
+    const convertedVideoPicture = slideXml.match(
+      /<p:pic>.*?<p:cNvPr[^>]*name="video"[\s\S]*?<\/p:pic>/,
+    )?.[0];
+    expect(convertedVideoPicture).toBeDefined();
+    expect(convertedVideoPicture).toContain('<a:off x="2667000" y="1905000"/>');
+    expect(convertedVideoPicture).toContain('<a:ext cx="2286000" cy="1333500"/>');
+    expect(convertedVideoPicture).toContain('rot="900000"');
+    expect(convertedVideoPicture).toContain('<a:alphaModFix amt="40000"/>');
+    expect(slideXml.indexOf('name="video"')).toBeLessThan(slideXml.indexOf('name="box"'));
+    expect(convertVideoToGif).toHaveBeenCalledOnce();
+    expect(result.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'pptx-compatibility-video-converted-to-gif',
+          elementId: 'video',
+        }),
+      ]),
+    );
+  });
+
+  it('retains audible videos and warns that Google Slides may import only the poster', async () => {
+    const project = createExportProject();
+    const result = await new BrowserPptxExportService().exportPowerPoint(project, {
+      compatibilityTarget: 'keynote-google-slides',
+    });
+    const entries = await readPptxEntries(result.blob);
+
+    expect(Object.keys(entries).some((path) => path.endsWith('.mp4'))).toBe(true);
+    expect(result.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'pptx-compatibility-video-audio-not-converted',
+          elementId: 'video',
+        }),
+      ]),
+    );
+  });
+
+  it('retains embedded video when the compatibility GIF exceeds the output-size safeguard', async () => {
+    const project = createExportProject();
+    const video = project.elements.video;
+    if (!video || video.type !== 'video') throw new Error('Expected a video element.');
+    video.muted = true;
+    const convertVideoToGif = vi.fn().mockResolvedValue({
+      blob: new Blob([new Uint8Array(15 * 1024 * 1024 + 1)], { type: 'image/gif' }),
+      encodedDurationSeconds: 1,
+      frameCount: 8,
+      sourceDurationSeconds: 1,
+    });
+
+    const result = await new BrowserPptxExportService({ convertVideoToGif }).exportPowerPoint(
+      project,
+      { compatibilityTarget: 'keynote-google-slides' },
+    );
+    const entries = await readPptxEntries(result.blob);
+
+    expect(Object.keys(entries).some((path) => path.endsWith('.mp4'))).toBe(true);
+    expect(result.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'pptx-compatibility-gif-size-limit-exceeded',
+          elementId: 'video',
+        }),
+      ]),
+    );
   });
 });

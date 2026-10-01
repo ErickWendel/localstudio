@@ -176,7 +176,10 @@ export interface ExportService {
   getPageImageFileName(project: ProjectDocument, pageId: string, extension: 'png' | 'jpeg'): string;
   getImagesArchiveFileName(project: ProjectDocument): string;
   getPdfFileName(project: ProjectDocument): string;
-  getPowerPointFileName(project: ProjectDocument): string;
+  getPowerPointFileName(
+    project: ProjectDocument,
+    compatibilityTarget?: PresentationExportCompatibilityTarget,
+  ): string;
   downloadBlob(blob: Blob, fileName: string): void;
   downloadDataUrl(dataUrl: string, fileName: string): void;
 }
@@ -223,8 +226,11 @@ export interface PresentationExportProgress {
 }
 
 export interface PresentationExportOptions {
+  compatibilityTarget?: PresentationExportCompatibilityTarget | undefined;
   onProgress?: (progress: PresentationExportProgress) => void;
 }
+
+export type PresentationExportCompatibilityTarget = 'keynote-google-slides' | 'powerpoint';
 
 export interface PresentationExportService {
   exportPowerPoint(

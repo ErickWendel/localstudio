@@ -11,6 +11,7 @@ import type {
 } from '../../domain/documents/model';
 import { pageElementResolver } from '../../domain/documents/pageElementResolver';
 import type {
+  PresentationExportCompatibilityTarget,
   PresentationExportOptions,
   PresentationExportProgress,
   PresentationExportResult,
@@ -20,15 +21,24 @@ import type {
 import { assetFileUtils } from '../storage/assetFileUtils';
 import type { PptxPackagePatchPage } from './pptxPackagePatcher';
 import { pptxPackagePatcher } from './pptxPackagePatcher';
+import {
+  convertVideoToAnimatedGif,
+  type VideoToAnimatedGifOptions,
+  type VideoToAnimatedGifResult,
+} from './videoToAnimatedGif';
 
 const exportConstants = {
   customLayoutName: 'LOCALSTUDIO_CUSTOM',
   emuPerInch: 914400,
+  maxCompatibilityGifBytes: 15 * 1024 * 1024,
   pixelsPerInch: 144,
   pptxMimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 };
 
 interface ExportContext {
+  compatibilityTarget: PresentationExportCompatibilityTarget;
+  convertedVideoIds: Set<string>;
+  convertVideo: VideoToAnimatedGifConverter;
   mediaIndex: number;
   progress?: ((progress: PresentationExportProgress) => void) | undefined;
   stats: PresentationExportStats;
@@ -36,8 +46,14 @@ interface ExportContext {
 }
 
 interface BrowserPptxExportServiceOptions {
+  convertVideoToGif?: VideoToAnimatedGifConverter;
   createPatchWorker?: () => Worker;
 }
+
+type VideoToAnimatedGifConverter = (
+  source: Blob,
+  options?: VideoToAnimatedGifOptions,
+) => Promise<VideoToAnimatedGifResult>;
 
 type PptxPatchWorkerResponse =
   | {
@@ -102,7 +118,9 @@ function emitProgress(context: ExportContext, progress: PresentationExportProgre
   context.progress?.(progress);
 }
 
-function describeMediaElement(element: Extract<DesignElement, { type: 'gif' | 'image' | 'video' }>) {
+function describeMediaElement(
+  element: Extract<DesignElement, { type: 'gif' | 'image' | 'video' }>,
+) {
   if (element.type === 'gif') return 'animated GIF';
   if (element.type === 'video') return 'video';
   return 'image';
@@ -143,10 +161,34 @@ function inferMediaMimeType(asset: Asset) {
 }
 
 function resolveReadableMimeType(asset: Asset, blob: Blob) {
-  return getSpecificMimeType(blob.type) ?? getSpecificMimeType(asset.mimeType) ?? inferMediaMimeType(asset);
+  return (
+    getSpecificMimeType(blob.type) ??
+    getSpecificMimeType(asset.mimeType) ??
+    inferMediaMimeType(asset)
+  );
 }
 
-async function assetToData(asset: Asset | undefined, warnings: PresentationExportWarning[], element: DesignElement, page: Page) {
+async function assetToData(
+  asset: Asset | undefined,
+  warnings: PresentationExportWarning[],
+  element: DesignElement,
+  page: Page,
+) {
+  const blob = await readAssetBlob(asset, warnings, element, page);
+  if (!blob || !asset) return undefined;
+  const mimeType = resolveReadableMimeType(asset, blob);
+  return {
+    data: blobToBase64Data(mimeType, new Uint8Array(await blob.arrayBuffer())),
+    mimeType,
+  };
+}
+
+async function readAssetBlob(
+  asset: Asset | undefined,
+  warnings: PresentationExportWarning[],
+  element: DesignElement,
+  page: Page,
+) {
   if (!asset?.objectUrl) {
     warnings.push({
       category: 'media',
@@ -157,7 +199,9 @@ async function assetToData(asset: Asset | undefined, warnings: PresentationExpor
     });
     return undefined;
   }
-  const blob = await assetFileUtils.objectUrlToBlobIfReadable(asset.objectUrl, fetch).catch(() => undefined);
+  const blob = await assetFileUtils
+    .objectUrlToBlobIfReadable(asset.objectUrl, fetch)
+    .catch(() => undefined);
   if (!blob) {
     warnings.push({
       category: 'media',
@@ -168,11 +212,7 @@ async function assetToData(asset: Asset | undefined, warnings: PresentationExpor
     });
     return undefined;
   }
-  const mimeType = resolveReadableMimeType(asset, blob);
-  return {
-    data: blobToBase64Data(mimeType, new Uint8Array(await blob.arrayBuffer())),
-    mimeType,
-  };
+  return blob;
 }
 
 async function backgroundAssetToData(
@@ -189,7 +229,9 @@ async function backgroundAssetToData(
     });
     return undefined;
   }
-  const blob = await assetFileUtils.objectUrlToBlobIfReadable(asset.objectUrl, fetch).catch(() => undefined);
+  const blob = await assetFileUtils
+    .objectUrlToBlobIfReadable(asset.objectUrl, fetch)
+    .catch(() => undefined);
   if (!blob) {
     warnings.push({
       category: 'media',
@@ -225,13 +267,7 @@ function getShapeName(element: ShapeElement): PptxGenJS.SHAPE_NAME {
 function getTextStyleOptions(
   style: Pick<
     TextRun,
-    | 'fill'
-    | 'fontFamily'
-    | 'fontSize'
-    | 'fontStyle'
-    | 'fontWeight'
-    | 'highlight'
-    | 'textDecoration'
+    'fill' | 'fontFamily' | 'fontSize' | 'fontStyle' | 'fontWeight' | 'highlight' | 'textDecoration'
   >,
   project: ProjectDocument,
   page: Page,
@@ -298,9 +334,7 @@ function getTextRuns(
             fontWeight: paragraph.fontWeight,
             ...(paragraph.highlight ? { highlight: paragraph.highlight } : {}),
             text: paragraph.text,
-            ...(paragraph.textDecoration
-              ? { textDecoration: paragraph.textDecoration }
-              : {}),
+            ...(paragraph.textDecoration ? { textDecoration: paragraph.textDecoration } : {}),
           },
         ];
     return runs.map((run, runIndex) => ({
@@ -394,8 +428,83 @@ async function addVideoElement(
     stage: 'embedding-media',
     total: context.stats.mediaElementCount,
   });
-  const media = await assetToData(asset, context.warnings, element, page);
-  if (!media) return;
+  const videoBlob = await readAssetBlob(asset, context.warnings, element, page);
+  if (!videoBlob || !asset) return;
+  const mediaMimeType = resolveReadableMimeType(asset, videoBlob);
+  const media = {
+    data: blobToBase64Data(mediaMimeType, new Uint8Array(await videoBlob.arrayBuffer())),
+    mimeType: mediaMimeType,
+  };
+  if (context.compatibilityTarget === 'keynote-google-slides' && element.muted) {
+    try {
+      const conversion = await context.convertVideo(videoBlob, {
+        endSeconds: element.trimEndSeconds,
+        startSeconds: element.trimStartSeconds,
+      });
+      if (conversion.blob.size <= exportConstants.maxCompatibilityGifBytes) {
+        const gifBytes = new Uint8Array(await conversion.blob.arrayBuffer());
+        slide.addImage({
+          ...toPosition(element, project, page),
+          data: blobToBase64Data('image/gif', gifBytes),
+          objectName: element.id,
+          rotate: element.rotation,
+          transparency: getTransparency(element.opacity),
+        });
+        context.convertedVideoIds.add(element.id);
+        context.warnings.push({
+          category: 'fidelity',
+          code: 'pptx-compatibility-video-converted-to-gif',
+          elementId: element.id,
+          message:
+            'Muted video was converted to a looping animated GIF for Keynote and Google Slides compatibility. Audio is not included.',
+          pageId: page.id,
+        });
+        const trimStartSeconds = Math.min(
+          Math.max(0, element.trimStartSeconds),
+          conversion.sourceDurationSeconds,
+        );
+        const requestedEndSeconds = Math.min(
+          conversion.sourceDurationSeconds,
+          Math.max(trimStartSeconds, element.trimEndSeconds ?? conversion.sourceDurationSeconds),
+        );
+        if (conversion.encodedDurationSeconds + 0.05 < requestedEndSeconds - trimStartSeconds) {
+          context.warnings.push({
+            category: 'fidelity',
+            code: 'pptx-compatibility-video-duration-limited',
+            elementId: element.id,
+            message: `Animated GIF fallback was limited to ${conversion.encodedDurationSeconds.toFixed(1)} seconds to control file size.`,
+            pageId: page.id,
+          });
+        }
+        return;
+      }
+      context.warnings.push({
+        category: 'media',
+        code: 'pptx-compatibility-gif-size-limit-exceeded',
+        elementId: element.id,
+        message:
+          'Animated GIF fallback exceeded 15 MB, so the original embedded video was retained.',
+        pageId: page.id,
+      });
+    } catch (error) {
+      context.warnings.push({
+        category: 'media',
+        code: 'pptx-compatibility-video-conversion-failed',
+        elementId: element.id,
+        message: `Video could not be converted to an animated GIF, so the original embedded video was retained: ${error instanceof Error ? error.message : 'Unknown conversion error.'}`,
+        pageId: page.id,
+      });
+    }
+  } else if (context.compatibilityTarget === 'keynote-google-slides') {
+    context.warnings.push({
+      category: 'fidelity',
+      code: 'pptx-compatibility-video-audio-not-converted',
+      elementId: element.id,
+      message:
+        'Video was retained as embedded media because converting it to GIF would discard audible audio. Google Slides may import only its poster.',
+      pageId: page.id,
+    });
+  }
   const poster = element.posterAssetId
     ? await assetToData(project.assets[element.posterAssetId], context.warnings, element, page)
     : undefined;
@@ -416,12 +525,17 @@ async function addVideoElement(
       pageId: page.id,
     });
   }
-  if (element.trimStartSeconds > 0 || element.trimEndSeconds !== undefined || element.repeatMode === 'loop-back-and-forth') {
+  if (
+    element.trimStartSeconds > 0 ||
+    element.trimEndSeconds !== undefined ||
+    element.repeatMode === 'loop-back-and-forth'
+  ) {
     context.warnings.push({
       category: 'fidelity',
       code: 'pptx-video-playback-downgraded',
       elementId: element.id,
-      message: 'PowerPoint export embeds the video but cannot preserve trim windows or back-and-forth repeat mode.',
+      message:
+        'PowerPoint export embeds the video but cannot preserve trim windows or back-and-forth repeat mode.',
       pageId: page.id,
     });
   }
@@ -430,7 +544,8 @@ async function addVideoElement(
       category: 'fidelity',
       code: 'pptx-video-control-downgraded',
       elementId: element.id,
-      message: 'PowerPoint export embeds the video but cannot preserve mute, volume, or poster frame controls.',
+      message:
+        'PowerPoint export embeds the video but cannot preserve mute, volume, or poster frame controls.',
       pageId: page.id,
     });
   }
@@ -570,6 +685,19 @@ function preserveLegacyVideoPlayback(project: ProjectDocument, pages: Page[]) {
   });
 }
 
+function removeConvertedVideoPlaybackBuilds(pages: Page[], convertedVideoIds: Set<string>) {
+  if (convertedVideoIds.size === 0) return pages;
+  return pages.map((page) => {
+    if (!page.animationBuilds) return page;
+    return {
+      ...page,
+      animationBuilds: page.animationBuilds.filter(
+        (build) => !(build.mediaAction === 'play' && convertedVideoIds.has(build.elementId)),
+      ),
+    };
+  });
+}
+
 function collectExportStats(project: ProjectDocument, pages: Page[]): PresentationExportStats {
   let animationBuildCount = 0;
   let mediaElementCount = 0;
@@ -642,7 +770,9 @@ function patchPackageInWorker(
       };
       worker.onerror = (event) => {
         worker.terminate();
-        reject(new Error(event instanceof ErrorEvent ? event.message : 'PPTX patch worker failed.'));
+        reject(
+          new Error(event instanceof ErrorEvent ? event.message : 'PPTX patch worker failed.'),
+        );
       };
       worker.postMessage(
         {
@@ -710,9 +840,11 @@ function collectPackagePatchPages(project: ProjectDocument, pages: Page[]): Pptx
 }
 
 export class BrowserPptxExportService {
+  private readonly convertVideoToGif: VideoToAnimatedGifConverter;
   private readonly createPatchWorker: (() => Worker) | undefined;
 
   constructor(options: BrowserPptxExportServiceOptions = {}) {
+    this.convertVideoToGif = options.convertVideoToGif ?? convertVideoToAnimatedGif;
     this.createPatchWorker = options.createPatchWorker ?? createDefaultPptxPatchWorker;
   }
 
@@ -724,6 +856,9 @@ export class BrowserPptxExportService {
     const patchPages = collectPackagePatchPages(project, pages);
     const stats = collectExportStats(project, pages);
     const context: ExportContext = {
+      compatibilityTarget: options.compatibilityTarget ?? 'powerpoint',
+      convertedVideoIds: new Set(),
+      convertVideo: this.convertVideoToGif,
       mediaIndex: 0,
       progress: options.onProgress,
       stats,
@@ -756,8 +891,10 @@ export class BrowserPptxExportService {
       if (page.speakerNotes?.trim()) slide.addNotes(page.speakerNotes);
       for (const element of pageElementResolver.getVisibleElements(project, page)) {
         if (element.type === 'text') addTextElement(slide, project, page, element);
-        else if (element.type === 'image' || element.type === 'gif') await addImageElement(slide, project, element, page, context);
-        else if (element.type === 'video') await addVideoElement(slide, project, element, page, context);
+        else if (element.type === 'image' || element.type === 'gif')
+          await addImageElement(slide, project, element, page, context);
+        else if (element.type === 'video')
+          await addVideoElement(slide, project, element, page, context);
         else if (element.type === 'shape') addShapeElement(slide, project, page, element);
       }
     }
@@ -779,7 +916,14 @@ export class BrowserPptxExportService {
       label: 'Authoring PowerPoint package',
       stage: 'patching-package',
     });
-    const blob = await patchPackage(baseBlob, pages, patchPages, context, this.createPatchWorker);
+    const packagePages = removeConvertedVideoPlaybackBuilds(pages, context.convertedVideoIds);
+    const blob = await patchPackage(
+      baseBlob,
+      packagePages,
+      patchPages,
+      context,
+      this.createPatchWorker,
+    );
     emitProgress(context, {
       detail: 'Checking media targets, content types, and timing targets.',
       label: 'Validating PowerPoint package',

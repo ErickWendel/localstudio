@@ -2,6 +2,7 @@ import { localStudioAppRoutes } from '@localstudio/app-routes';
 import { localStudioLogoMark } from '@localstudio/brand/logo';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ProjectDocument } from '../../../domain/documents/model';
+import type { PresentationExportCompatibilityTarget } from '../../../services/contracts/interfaces';
 import type {
   MirrorState,
   MirrorSyncProgress,
@@ -51,7 +52,7 @@ interface TopToolbarProps {
   onDuplicateProject?: (() => void) | undefined;
   onExportImages?: (() => void) | undefined;
   onExportPdf?: (() => void) | undefined;
-  onExportPowerPoint?: (() => void) | undefined;
+  onExportPowerPoint?: ((target?: PresentationExportCompatibilityTarget) => void) | undefined;
   onImportPowerPoint?: (() => void) | undefined;
   onImportProject?: (() => void) | undefined;
   onImportRemoteMirror?: (() => void) | undefined;
@@ -66,7 +67,9 @@ interface TopToolbarProps {
   onSaveLocal?: (() => void) | undefined;
   onSaveLocalAs?: (() => void) | undefined;
   onProjectNameChange?: ((name: string) => void) | undefined;
-  onOpenPresenterView?: ((options?: { audienceMode?: 'fullscreen' | 'window' }) => void) | undefined;
+  onOpenPresenterView?:
+    | ((options?: { audienceMode?: 'fullscreen' | 'window' }) => void)
+    | undefined;
   onRedo?: (() => void) | undefined;
   onResetZoom?: (() => void) | undefined;
   onShare?: (() => void) | undefined;
@@ -286,7 +289,14 @@ export function TopToolbar({
           {
             label: isExportingPowerPoint ? 'Exporting PowerPoint...' : 'Powerpoint (.pptx)',
             disabled: isExportingPowerPoint || !onExportPowerPoint,
-            onSelect: onExportPowerPoint,
+            onSelect: () => onExportPowerPoint?.('powerpoint'),
+          },
+          {
+            label: isExportingPowerPoint
+              ? 'Exporting compatibility deck...'
+              : 'Keynote / Google Slides (.pptx)',
+            disabled: isExportingPowerPoint || !onExportPowerPoint,
+            onSelect: () => onExportPowerPoint?.('keynote-google-slides'),
           },
         ],
       },

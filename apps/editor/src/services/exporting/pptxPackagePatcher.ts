@@ -78,6 +78,13 @@ function stripSlideGeneratedTiming(xml: string) {
     .replace(/<p:timing[\s\S]*?<\/p:timing>/g, '');
 }
 
+function removeEmptyMediaHyperlinkRelationshipIds(xml: string) {
+  return xml.replace(
+    /<a:hlinkClick\s+r:id=""\s+action="ppaction:\/\/media"\/>/g,
+    '<a:hlinkClick action="ppaction://media"/>',
+  );
+}
+
 function mapDirection(direction: AnimationDirection | undefined) {
   if (direction === 'left') return 'l';
   if (direction === 'right') return 'r';
@@ -86,7 +93,11 @@ function mapDirection(direction: AnimationDirection | undefined) {
   return undefined;
 }
 
-function mapTransitionEffect(effect: AnimationEffect | undefined, warnings: PresentationExportWarning[], page: Page) {
+function mapTransitionEffect(
+  effect: AnimationEffect | undefined,
+  warnings: PresentationExportWarning[],
+  page: Page,
+) {
   const direction = mapDirection(page.transition?.direction);
   const directionAttribute = direction ? ` dir="${direction}"` : '';
   if (effect === 'fade' || effect === 'dissolve') return '<p:fade/>';
@@ -108,7 +119,9 @@ function buildTransitionXml(page: Page, warnings: PresentationExportWarning[]) {
   const transitionEffectXml = mapTransitionEffect(page.transition.effect, warnings, page);
   if (!transitionEffectXml) return '';
   const attributes = [
-    page.transition.durationMs !== undefined ? `dur="${Math.max(0, page.transition.durationMs)}"` : undefined,
+    page.transition.durationMs !== undefined
+      ? `dur="${Math.max(0, page.transition.durationMs)}"`
+      : undefined,
     page.transition.delayMs > 0 ? `advClick="0"` : `advClick="1"`,
     page.transition.delayMs > 0 ? `advTm="${Math.max(0, page.transition.delayMs)}"` : undefined,
   ].filter(Boolean);
@@ -161,7 +174,8 @@ function getAnimationCommand(
   }
   const duration = Math.max(0, build.durationMs ?? build.delayMs);
   const preset = getAnimationPreset(build);
-  const subtype = preset.presetSubtype === undefined ? '' : ` presetSubtype="${preset.presetSubtype}"`;
+  const subtype =
+    preset.presetSubtype === undefined ? '' : ` presetSubtype="${preset.presetSubtype}"`;
   const visibility = build.kind === 'build-out' ? 'hidden' : 'visible';
   const visibilityBehaviorId = nextTimingId();
   const visibilityCommand = `<p:set><p:cBhvr><p:cTn id="${visibilityBehaviorId}" fill="hold"/><p:tgtEl><p:spTgt spid="${shapeId}"/></p:tgtEl><p:attrNameLst><p:attrName>style.visibility</p:attrName></p:attrNameLst></p:cBhvr><p:to><p:strVal val="${visibility}"/></p:to></p:set>`;
@@ -207,7 +221,8 @@ function buildTimingXml(
     }
     let patchedBuild = build;
     if (!isExportableAnimationEffect(build.effect)) {
-      const downgradedEffect: AnimationEffect = build.effect === 'keyboard-typing' ? 'fade' : 'reveal';
+      const downgradedEffect: AnimationEffect =
+        build.effect === 'keyboard-typing' ? 'fade' : 'reveal';
       patchedBuild = { ...build, effect: downgradedEffect };
       warnings.push({
         category: 'animation',
@@ -349,7 +364,8 @@ function shapePathToCommands(path: ShapePath): VectorPathCommand[] {
 }
 
 function patchCustomGeometry(xml: string, element: PptxPackagePatchElement) {
-  const commands = element.clipPath ?? (element.customPath ? shapePathToCommands(element.customPath) : undefined);
+  const commands =
+    element.clipPath ?? (element.customPath ? shapePathToCommands(element.customPath) : undefined);
   if (!commands || commands.length === 0) return xml;
   const geometry = commandsToCustGeom(commands);
   const escapedId = xmlEscape(element.id);
@@ -379,7 +395,9 @@ function patchSlideXml(
   patchPage: PptxPackagePatchPage | undefined,
   warnings: PresentationExportWarning[],
 ) {
-  let patchedXml = ensureUniqueNonVisualDrawingIds(stripSlideGeneratedTiming(xml));
+  let patchedXml = removeEmptyMediaHyperlinkRelationshipIds(
+    ensureUniqueNonVisualDrawingIds(stripSlideGeneratedTiming(xml)),
+  );
   const transitionXml = buildTransitionXml(page, warnings);
   const elementNameToShapeId = getElementNameToShapeId(patchedXml);
   for (const element of patchPage?.elements ?? []) {
@@ -430,6 +448,17 @@ function ensureContentTypeDefaults(files: PptxZipFiles) {
     )
     .join('');
   xml = xml.replace('</Types>', `${defaultsXml}</Types>`);
+  files[contentTypesPath] = strToU8(xml);
+}
+
+function removeMissingContentTypeOverrides(files: PptxZipFiles) {
+  const contentTypesPath = '[Content_Types].xml';
+  const file = files[contentTypesPath];
+  if (!file) return;
+  const xml = strFromU8(file).replace(
+    /<Override\b[^>]*\bPartName="\/([^"]+)"[^>]*\/>/g,
+    (tag, partName: string) => (files[partName] ? tag : ''),
+  );
   files[contentTypesPath] = strToU8(xml);
 }
 
@@ -535,6 +564,7 @@ function patchPackageBuffer(
 ) {
   const warnings = [...initialWarnings];
   const files = unzipSync(new Uint8Array(buffer)) as PptxZipFiles;
+  removeMissingContentTypeOverrides(files);
   ensureContentTypeDefaults(files);
   const patchPageById = new Map(patchPages.map((page) => [page.pageId, page]));
   const slideShapeIds = new Map<string, Set<string>>();
