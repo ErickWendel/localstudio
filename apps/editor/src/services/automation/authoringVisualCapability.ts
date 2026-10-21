@@ -54,7 +54,7 @@ const maxExportWarnings = 50;
 
 function getFileName(project: ProjectDocument, format: AuthoringExportFormat) {
   if (format === 'pptx' || format === 'pdf') return `${project.name}.${format}`;
-  return `${project.name}-images.zip`;
+  return `${project.name}-${format}-images.zip`;
 }
 
 function getScopedProject(

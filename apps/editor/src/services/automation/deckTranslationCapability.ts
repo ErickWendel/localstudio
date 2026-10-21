@@ -114,11 +114,21 @@ function createCapability(options: DeckLocalizationCapabilityOptions) {
     const projectRevision = options.getProjectRevision(project);
     const targetLanguage = input.targetLanguage.trim() || 'en';
     const sample = getTranslationSample(project);
-    const detectedLanguage = input.sourceLanguage?.trim()
-      ? input.sourceLanguage.trim()
-      : sample
-        ? await options.translatorService.detectLanguage(sample)
-        : 'und';
+    const requestedSourceLanguage = input.sourceLanguage?.trim();
+    // Detect even with an explicit source so a deck already in the target language is left alone;
+    // the explicit source still drives translation because it corrects short-text misdetections.
+    const sampleLanguage = sample
+      ? await options.translatorService.detectLanguage(sample).catch((error: unknown) => {
+          if (requestedSourceLanguage) return undefined;
+          throw error;
+        })
+      : undefined;
+    const targetLanguageSample =
+      sampleLanguage && sampleLanguage !== 'und' && isSameLanguage(sampleLanguage, targetLanguage)
+        ? sampleLanguage
+        : undefined;
+    const detectedLanguage =
+      targetLanguageSample ?? requestedSourceLanguage ?? sampleLanguage ?? 'und';
     if (sample && isSameLanguage(detectedLanguage, targetLanguage)) {
       const slideNumbers = project.pages.map((_page, index) => index + 1);
       return {

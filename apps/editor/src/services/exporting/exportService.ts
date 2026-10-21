@@ -12,8 +12,8 @@ export class BrowserExportService implements ExportService {
     return `${project.name}-${pageName}.${extension}`;
   }
 
-  getImagesArchiveFileName(project: ProjectDocument): string {
-    return `${project.name}-images.zip`;
+  getImagesArchiveFileName(project: ProjectDocument, extension: 'png' | 'jpeg'): string {
+    return `${project.name}-${extension}-images.zip`;
   }
 
   getPdfFileName(project: ProjectDocument): string {

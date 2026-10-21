@@ -307,7 +307,7 @@ test.describe('production WebMCP visual authoring', () => {
     expect(pdfBytes.toString('latin1').match(/\/Type\s*\/Page\b/g) ?? []).toHaveLength(1);
 
     const jpeg = await exportThroughWebMcp(page, { format: 'jpeg', slideRange: 'current' });
-    expect(jpeg.download.suggestedFilename()).toBe(`${deckName}-images.zip`);
+    expect(jpeg.download.suggestedFilename()).toBe(`${deckName}-jpeg-images.zip`);
     expect(jpeg.result).toMatchObject({ format: 'jpeg', slideCount: 1 });
     const jpegFiles = await imageExportDownloadReader.readZip(jpeg.download);
     const jpegNames = Object.keys(jpegFiles);
@@ -318,7 +318,7 @@ test.describe('production WebMCP visual authoring', () => {
     expect(Array.from(jpegBytes.subarray(-2))).toEqual([0xff, 0xd9]);
 
     const png = await exportThroughWebMcp(page, { format: 'png', slideRange: 'all' });
-    expect(png.download.suggestedFilename()).toBe(`${deckName}-images.zip`);
+    expect(png.download.suggestedFilename()).toBe(`${deckName}-png-images.zip`);
     expect(png.result).toMatchObject({ format: 'png', slideCount: 2 });
     const pngFiles = await imageExportDownloadReader.readZip(png.download);
     const pngNames = Object.keys(pngFiles).sort();

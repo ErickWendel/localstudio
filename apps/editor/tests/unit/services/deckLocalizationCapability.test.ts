@@ -509,6 +509,32 @@ describe('deckLocalizationCapability', () => {
     expect(harness.getProject()).toBe(before);
   });
 
+  it('skips a deck already in the target language even when a wrong source is given', async () => {
+    const harness = createHarness();
+    harness.detectLanguage.mockResolvedValueOnce('pt-BR');
+
+    const result = await harness.capability.translateDeckAndNotes(
+      { sourceLanguage: 'en', targetLanguage: 'pt' },
+      harness.report,
+    );
+
+    expect(result).toMatchObject({ detectedLanguage: 'pt-BR', changedSlideCount: 0 });
+    expect(harness.prepareTranslation).not.toHaveBeenCalled();
+  });
+
+  it('keeps translating from an explicit source when language detection fails', async () => {
+    const harness = createHarness();
+    harness.detectLanguage.mockRejectedValueOnce(new Error('detector unavailable'));
+
+    const result = await harness.capability.translateDeckAndNotes(
+      { sourceLanguage: 'en', targetLanguage: 'pt' },
+      harness.report,
+    );
+
+    expect(result).toMatchObject({ detectedLanguage: 'en', changedSlideCount: 1 });
+    expect(harness.prepareTranslation).toHaveBeenCalledWith('en', 'pt', expect.anything());
+  });
+
   it('still translates between distinct scripts of the same language', async () => {
     const harness = createHarness();
     harness.detectLanguage.mockResolvedValueOnce('zh-Hans');
