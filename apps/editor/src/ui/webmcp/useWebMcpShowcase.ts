@@ -49,23 +49,31 @@ function getLocalDemoTools(iframe: HTMLIFrameElement) {
   return isWebMcpToolLikeArray(tools) ? tools : undefined;
 }
 
+const discoveryPolling = {
+  attempts: 60,
+  intervalMs: 250,
+  // Native registration commits asynchronously after the local bridge is published.
+  protocolGraceAttempts: 8,
+} as const;
+
 // The editor frame registers its tools only after the full shell boots, so poll both runtimes
-// until either exposes the catalog. Native WebMCP wins because both are registered together.
+// until either exposes the catalog. Native WebMCP wins whenever the browser provides it.
 async function waitForTools(iframe: HTMLIFrameElement, modelContext?: BrowserModelContext) {
   const origin = new URL(iframe.src).origin;
-  const getProtocolTools = async () =>
-    modelContext ? await modelContext.getTools({ fromOrigins: [origin] }) : undefined;
-  for (let attempt = 0; attempt < 60; attempt += 1) {
-    const protocolTools = await getProtocolTools();
+  let localToolsSeenAt: number | undefined;
+  for (let attempt = 0; attempt < discoveryPolling.attempts; attempt += 1) {
+    const protocolTools = modelContext
+      ? await modelContext.getTools({ fromOrigins: [origin] })
+      : undefined;
     if (protocolTools?.length) return { tools: protocolTools, usedProtocolTools: true };
     const localTools = getLocalDemoTools(iframe);
     if (localTools?.length) {
-      const lateProtocolTools = await getProtocolTools();
-      return lateProtocolTools?.length
-        ? { tools: lateProtocolTools, usedProtocolTools: true }
-        : { tools: localTools, usedProtocolTools: false };
+      localToolsSeenAt ??= attempt;
+      if (!modelContext || attempt - localToolsSeenAt >= discoveryPolling.protocolGraceAttempts) {
+        return { tools: localTools, usedProtocolTools: false };
+      }
     }
-    await new Promise((resolve) => window.setTimeout(resolve, 250));
+    await new Promise((resolve) => window.setTimeout(resolve, discoveryPolling.intervalMs));
   }
   return undefined;
 }

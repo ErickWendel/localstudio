@@ -199,4 +199,32 @@ describe('WebMcpToolAdapter', () => {
     });
     expect(upsertSlideContent).not.toHaveBeenCalled();
   });
+
+  it('explains why the element shape selected by its type discriminator is invalid', async () => {
+    const tool = createAdapter()
+      .createTools()
+      .find((candidate) => candidate.name === 'upsert_slide_content');
+    const element = {
+      elementId: 'title',
+      type: 'text',
+      frame: { x: 0, y: 0, width: 100, height: 40 },
+      zIndex: 1,
+      content: { text: 'Hello' },
+    };
+
+    expect(
+      await tool?.execute({ requestId: 'r1', slideNumber: 1, mode: 'merge', elements: [element] }),
+    ).toMatchObject({ ok: false, message: 'input.elements[0].style is required.' });
+    expect(
+      await tool?.execute({
+        requestId: 'r2',
+        slideNumber: 1,
+        mode: 'merge',
+        elements: [{ ...element, type: 'hologram' }],
+      }),
+    ).toMatchObject({
+      ok: false,
+      message: 'input.elements[0] must match exactly one supported input shape.',
+    });
+  });
 });

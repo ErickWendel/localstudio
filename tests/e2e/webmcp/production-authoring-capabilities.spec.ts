@@ -20,6 +20,7 @@ interface OperationStatus<T> {
   error?: string;
   result?: T;
   state: 'completed' | 'failed' | 'queued' | 'running';
+  warnings?: string[];
 }
 
 interface PresentationState {
@@ -353,6 +354,30 @@ test.describe('production WebMCP authoring capabilities', () => {
         generatedSlideCount: 1,
       },
     });
+    const detectedDescription = await startOperation(page, 'generate_deck_detailed_description', {
+      force: true,
+      slideNumbers: [1],
+    });
+    const describedInDetectedLanguage = await waitForOperation<{
+      descriptions: Array<{ generator: string; language: string; text: string }>;
+      language: string;
+    }>(page, detectedDescription.operationId);
+    expect(describedInDetectedLanguage).toMatchObject({
+      state: 'completed',
+      result: {
+        descriptions: [
+          {
+            generator: 'deterministic-scene-graph-v1',
+            language: 'en',
+            text: expect.stringContaining(sentinel),
+          },
+        ],
+        language: 'en',
+      },
+    });
+    expect(describedInDetectedLanguage.warnings).toEqual(
+      expect.arrayContaining([expect.stringContaining('Local description model is unavailable')]),
+    );
     const renderedBeforeTranslation = await page
       .getByLabel('Slide canvas', { exact: true })
       .locator('canvas')
@@ -378,6 +403,19 @@ test.describe('production WebMCP authoring capabilities', () => {
         translatedDescriptions: 1,
         translatedNotes: 1,
         translatedTextElements: 1,
+      },
+    });
+
+    const repeatedTranslation = await startOperation(page, 'translate_deck_and_notes', {
+      targetLanguage: 'en',
+    });
+    expect(await waitForOperation(page, repeatedTranslation.operationId)).toMatchObject({
+      state: 'completed',
+      result: {
+        changedSlideCount: 0,
+        detectedLanguage: 'en',
+        skippedSlideCount: 1,
+        translatedTextElements: 0,
       },
     });
 
