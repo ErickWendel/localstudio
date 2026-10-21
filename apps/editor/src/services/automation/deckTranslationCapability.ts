@@ -91,6 +91,14 @@ function likelyOverflows(element: Extract<DesignElement, { type: 'text' }>, text
   return requiredLines > availableLines;
 }
 
+// "pt" already satisfies "pt-BR", while distinct scripts or regions such as zh-Hans/zh-Hant do not.
+function isSameLanguage(left: string, right: string) {
+  const [leftBase, ...leftRest] = left.toLowerCase().split(/[-_]/);
+  const [rightBase, ...rightRest] = right.toLowerCase().split(/[-_]/);
+  if (leftBase !== rightBase) return false;
+  return !leftRest.length || !rightRest.length || leftRest.join('-') === rightRest.join('-');
+}
+
 function boundedPush<T>(values: T[], value: T) {
   if (values.length < maximumResultEntries) values.push(value);
 }
@@ -111,7 +119,25 @@ function createCapability(options: DeckLocalizationCapabilityOptions) {
       : sample
         ? await options.translatorService.detectLanguage(sample)
         : 'und';
-    if (sample && detectedLanguage !== targetLanguage) {
+    if (sample && isSameLanguage(detectedLanguage, targetLanguage)) {
+      const slideNumbers = project.pages.map((_page, index) => index + 1);
+      return {
+        targetLanguage,
+        detectedLanguage,
+        changedSlides: [],
+        changedSlideCount: 0,
+        skippedSlides: slideNumbers.slice(0, maximumResultEntries),
+        skippedSlideCount: slideNumbers.length,
+        translatedTextElements: 0,
+        translatedNotes: 0,
+        translatedDescriptions: 0,
+        overflowWarnings: [],
+        failures: [],
+        failureCount: 0,
+        overflowWarningCount: 0,
+      };
+    }
+    if (sample) {
       report({
         stage: 'preparing-translation',
         progress: 2,

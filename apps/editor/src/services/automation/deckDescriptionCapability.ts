@@ -4,6 +4,7 @@ import type {
   ProjectDocument,
   SemanticSlideDescription,
 } from '../../domain/documents/model';
+import type { ModelDownloadProgressDetails } from '../contracts/interfaces';
 import type {
   DeckCapabilityProgressReporter,
   DeckLocalizationCapabilityOptions,
@@ -31,6 +32,9 @@ export interface SlideDescriptionElementFact {
 
 export interface LocalSlideDescriptionGenerator {
   id: string;
+  prepare?(options?: {
+    onProgress?: (progress: number, details?: ModelDownloadProgressDetails) => void;
+  }): Promise<void>;
   generate(input: {
     language: string;
     instruction: string;
@@ -71,6 +75,7 @@ const descriptionLimits = {
   maxResultCharacters: 2_000,
   maxSceneElements: 100,
   maxSceneTextCharacters: 2_000,
+  maxLanguageSampleCharacters: 2_000,
 } as const;
 
 function describeError(error: unknown) {
@@ -165,6 +170,18 @@ async function translatedDeterministicDescription(
   return { language, text: translated.slice(0, descriptionLimits.maxCharacters) };
 }
 
+function getLanguageSample(project: ProjectDocument, pages: Page[]) {
+  const texts = pages.flatMap((page) =>
+    page.elementIds.flatMap((elementId) => {
+      const element = project.elements[elementId];
+      return element?.type === 'text' && element.visible !== false && element.text.trim()
+        ? [element.text.trim()]
+        : [];
+    }),
+  );
+  return texts.join('\n').slice(0, descriptionLimits.maxLanguageSampleCharacters);
+}
+
 function selectSlides(project: ProjectDocument, slideNumbers: number[] | undefined) {
   if (!slideNumbers?.length) {
     return project.pages.map((page, index) => ({ page, slideNumber: index + 1 }));
@@ -188,7 +205,6 @@ function createCapability(options: DeckLocalizationCapabilityOptions) {
   ): Promise<DeckDescriptionResult> {
     const project = options.getProject();
     const projectRevision = options.getProjectRevision(project);
-    const language = input.language?.trim() || 'en';
     const selected = selectSlides(project, input.slideNumbers);
     const nextPages = [...project.pages];
     const generatedSlides: number[] = [];
@@ -201,6 +217,56 @@ function createCapability(options: DeckLocalizationCapabilityOptions) {
     let generatedSlideCount = 0;
     let skippedSlideCount = 0;
     let firstGeneratedSlideNumber: number | undefined;
+    const selectedPages = selected.flatMap(({ page }) => (page ? [page] : []));
+    // Without an explicit language, describe the deck in the language its slides are written in.
+    let language = input.language?.trim() || 'en';
+    const languageSample = input.language?.trim() ? '' : getLanguageSample(project, selectedPages);
+    if (languageSample) {
+      try {
+        const detected = (await options.translatorService.detectLanguage(languageSample)).trim();
+        if (detected && detected !== 'und') language = detected;
+      } catch (error) {
+        warningCount += 1;
+        boundedPush(
+          warnings,
+          `Deck language detection failed: ${describeError(error)} Descriptions use English.`,
+        );
+      }
+    }
+    const isFreshDescription = (page: Page) => {
+      const current = page.semanticDescription;
+      return Boolean(
+        current &&
+        !current.stale &&
+        current.language === language &&
+        current.sourceRevision === options.getSlideRevision(project, page.id),
+      );
+    };
+    let descriptionGenerator = options.descriptionGenerator;
+    const needsGeneration = selectedPages.some((page) => input.force || !isFreshDescription(page));
+    if (descriptionGenerator?.prepare && needsGeneration) {
+      const generatorId = descriptionGenerator.id;
+      report({ stage: 'preparing-description-model', progress: 1, detail: generatorId });
+      try {
+        await descriptionGenerator.prepare({
+          onProgress: (progress, details) =>
+            report({
+              stage: 'preparing-description-model',
+              progress: 1 + Math.round((Math.max(0, Math.min(100, progress)) / 100) * 8),
+              detail: generatorId,
+              ...(details?.loadedBytes !== undefined ? { loadedBytes: details.loadedBytes } : {}),
+              ...(details?.totalBytes !== undefined ? { totalBytes: details.totalBytes } : {}),
+            }),
+        });
+      } catch (error) {
+        warningCount += 1;
+        boundedPush(
+          warnings,
+          `Local description model is unavailable: ${describeError(error)} Deterministic scene-graph descriptions were used.`,
+        );
+        descriptionGenerator = undefined;
+      }
+    }
 
     for (let index = 0; index < selected.length; index += 1) {
       const { page, slideNumber } = selected[index]!;
@@ -214,14 +280,12 @@ function createCapability(options: DeckLocalizationCapabilityOptions) {
         continue;
       }
       const sourceRevision = options.getSlideRevision(project, page.id);
-      const current = page.semanticDescription;
-      const fresh = Boolean(current && !current.stale && current.sourceRevision === sourceRevision);
-      if (!input.force && fresh && current?.language === language) {
+      if (!input.force && isFreshDescription(page)) {
         skippedSlideCount += 1;
         boundedPush(skippedSlides, slideNumber);
         report({
           stage: 'describing-slides',
-          progress: selected.length ? Math.round(((index + 1) / selected.length) * 95) : 95,
+          progress: selected.length ? 10 + Math.round(((index + 1) / selected.length) * 85) : 95,
           current: index + 1,
           total: selected.length,
           detail: `Skipped fresh description for ${page.name}`,
@@ -249,10 +313,10 @@ function createCapability(options: DeckLocalizationCapabilityOptions) {
           return deterministicDescription(scene);
         }
       };
-      if (options.descriptionGenerator) {
+      if (descriptionGenerator) {
         try {
           text = (
-            await options.descriptionGenerator.generate({
+            await descriptionGenerator.generate({
               language,
               instruction:
                 'Describe only facts explicitly present in the provided scene graph. Do not infer identities, intent, emotion, off-canvas content, or image details that are not provided.',
@@ -261,7 +325,7 @@ function createCapability(options: DeckLocalizationCapabilityOptions) {
           ).trim();
           if (!text) throw new Error('The local model returned an empty description.');
           text = text.slice(0, descriptionLimits.maxCharacters);
-          generator = options.descriptionGenerator.id;
+          generator = descriptionGenerator.id;
         } catch (error) {
           failureCount += 1;
           const cause = describeError(error);
@@ -302,7 +366,7 @@ function createCapability(options: DeckLocalizationCapabilityOptions) {
       });
       report({
         stage: 'describing-slides',
-        progress: selected.length ? Math.round(((index + 1) / selected.length) * 95) : 95,
+        progress: selected.length ? 10 + Math.round(((index + 1) / selected.length) * 85) : 95,
         current: index + 1,
         total: selected.length,
         detail: page.name,

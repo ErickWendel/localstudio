@@ -1,3 +1,11 @@
+import { publicBasePath } from '../../app/routing/publicBasePath';
+
+// A small same-origin deck keeps the import demo fast and independent of remote CORS setup.
+function getSampleDeckUrl() {
+  const path = `${publicBasePath.getPublicBasePath()}samples/webmcp-showcase-sample.pptx`;
+  return typeof window === 'undefined' ? path : new URL(path, window.location.origin).href;
+}
+
 export interface WebMcpShowcaseStep {
   execution?: 'exclusive' | 'parallel';
   input: Record<string, unknown>;
@@ -54,13 +62,13 @@ const sections: WebMcpShowcaseSection[] = [
         label: 'Import PowerPoint from URL',
         toolName: 'import_powerpoint_from_url',
         input: {
-          url: 'https://localstudio.erickwendel.com.br/localstudio/public/web-ai-beyond-chat-renderatl-14082026%20%282%29.pptx',
+          url: getSampleDeckUrl(),
         },
       },
       {
         label: 'Translate deck and notes',
         toolName: 'translate_deck_and_notes',
-        input: { sourceLanguage: 'en', targetLanguage: 'pt-BR' },
+        input: { targetLanguage: 'pt-BR' },
       },
       {
         label: 'Upsert slide content',

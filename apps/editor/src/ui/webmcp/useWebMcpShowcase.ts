@@ -13,7 +13,7 @@ interface WebMcpToolLike {
 }
 
 interface BrowserModelContext {
-  executeTool?: (tool: WebMcpToolLike, inputArguments: string) => unknown;
+  executeTool?: (tool: WebMcpToolLike, inputObject: Record<string, unknown>) => unknown;
   getTools(options: { fromOrigins: string[] }): Promise<WebMcpToolLike[]>;
 }
 
@@ -49,11 +49,23 @@ function getLocalDemoTools(iframe: HTMLIFrameElement) {
   return isWebMcpToolLikeArray(tools) ? tools : undefined;
 }
 
-async function waitForLocalDemoTools(iframe: HTMLIFrameElement) {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const tools = getLocalDemoTools(iframe);
-    if (tools?.length) return tools;
-    await new Promise((resolve) => window.setTimeout(resolve, 100));
+// The editor frame registers its tools only after the full shell boots, so poll both runtimes
+// until either exposes the catalog. Native WebMCP wins because both are registered together.
+async function waitForTools(iframe: HTMLIFrameElement, modelContext?: BrowserModelContext) {
+  const origin = new URL(iframe.src).origin;
+  const getProtocolTools = async () =>
+    modelContext ? await modelContext.getTools({ fromOrigins: [origin] }) : undefined;
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const protocolTools = await getProtocolTools();
+    if (protocolTools?.length) return { tools: protocolTools, usedProtocolTools: true };
+    const localTools = getLocalDemoTools(iframe);
+    if (localTools?.length) {
+      const lateProtocolTools = await getProtocolTools();
+      return lateProtocolTools?.length
+        ? { tools: lateProtocolTools, usedProtocolTools: true }
+        : { tools: localTools, usedProtocolTools: false };
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 250));
   }
   return undefined;
 }
@@ -65,7 +77,9 @@ async function callTool(
 ) {
   const modelContext = useProtocolExecution ? getBrowserModelContext() : undefined;
   if (modelContext?.executeTool) {
-    const result = await modelContext.executeTool(tool, JSON.stringify(input));
+    // Chrome 155+ rejects the deprecated JSON-string form; the draft takes a plain object.
+    const result = await modelContext.executeTool(tool, input);
+    if (result === null) return { ok: true, data: { navigated: true } };
     if (typeof result !== 'string') return result;
     try {
       return JSON.parse(result) as unknown;
@@ -139,9 +153,7 @@ export function useWebMcpShowcase() {
   const [actionResults, setActionResults] = useState<Record<string, string>>({});
   const [isDiscovering, setIsDiscovering] = useState(false);
   const runningStepNamesRef = useRef(new Set<string>());
-  const [runningStepNames, setRunningStepNames] = useState<ReadonlySet<string>>(
-    () => new Set(),
-  );
+  const [runningStepNames, setRunningStepNames] = useState<ReadonlySet<string>>(() => new Set());
   const [useProtocolExecution, setUseProtocolExecution] = useState(false);
   const [activeStepName, setActiveStepName] = useState<string | undefined>();
   const [focusedStepName, setFocusedStepName] = useState<string | undefined>();
@@ -204,22 +216,15 @@ export function useWebMcpShowcase() {
     setIsDiscovering(true);
     try {
       setDiscoveryStatus('Discovering tools from LocalStudio...');
-      const modelContext = getBrowserModelContext();
-      const iframeOrigin = new URL(iframe.src).origin;
-      const protocolTools = modelContext
-        ? await modelContext.getTools({ fromOrigins: [iframeOrigin] })
-        : undefined;
-      const discoveredTools = protocolTools?.length
-        ? protocolTools
-        : await waitForLocalDemoTools(iframe);
-      const usedProtocolTools = Boolean(protocolTools?.length);
-      if (!discoveredTools) {
+      const discovery = await waitForTools(iframe, getBrowserModelContext());
+      if (!discovery) {
         setDiscoveryStatus(
           'No WebMCP runtime or same-origin demo tools found. Wait for the editor frame, then try again.',
         );
         setTools([]);
         return;
       }
+      const { tools: discoveredTools, usedProtocolTools } = discovery;
       setTools(discoveredTools);
       setUseProtocolExecution(usedProtocolTools);
       setDiscoveryStatus(
@@ -250,7 +255,11 @@ export function useWebMcpShowcase() {
     setActionStatus(step.toolName, `Running ${step.label}...`);
     setActionResults((current) => ({ ...current, [step.toolName]: '' }));
     try {
-      const result = await callTool(tool, getCommandInput(step, commandValue), useProtocolExecution);
+      const result = await callTool(
+        tool,
+        getCommandInput(step, commandValue),
+        useProtocolExecution,
+      );
       setActionResults((current) => ({ ...current, [step.toolName]: formatPayload(result) }));
       const failure = getToolFailure(result);
       if (failure) {
@@ -271,7 +280,10 @@ export function useWebMcpShowcase() {
           );
           return;
         }
-        setActionStatus(step.toolName, `${step.label} started. Waiting for the operation to finish.`);
+        setActionStatus(
+          step.toolName,
+          `${step.label} started. Waiting for the operation to finish.`,
+        );
         while (true) {
           const operationResult = await callTool(
             operationTool,

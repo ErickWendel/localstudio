@@ -42,4 +42,30 @@ describe('localSlideDescriptionGenerator', () => {
     expect(content).toContain('do not guess it');
     expect(options).toEqual({ max_new_tokens: 1_024 });
   });
+
+  it('rejects output that echoes the scene graph so the deterministic fallback is used', async () => {
+    const runtime: TextGenerationRuntime = {
+      preload: vi.fn(() => Promise.resolve()),
+      generate: vi.fn(() =>
+        Promise.resolve('en\nelement_type: text\nframe:\n  x: 180\nfact: Text reads "Hello".'),
+      ),
+    };
+
+    await expect(
+      localSlideDescriptionGenerator.create(runtime).generate({
+        language: 'en',
+        instruction: 'Use only explicit facts.',
+        scene: {
+          slideId: 'page-1',
+          slideNumber: 1,
+          name: 'Slide 1',
+          width: 1920,
+          height: 1080,
+          background: 'solid color #ffffff',
+          elements: [],
+          omittedElementCount: 0,
+        },
+      }),
+    ).rejects.toThrow('echoed the scene graph');
+  });
 });

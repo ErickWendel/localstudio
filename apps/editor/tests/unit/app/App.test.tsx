@@ -381,10 +381,7 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send Create presentation' }));
 
     await waitFor(() => {
-      expect(executeTool).toHaveBeenCalledWith(
-        createPresentationTool,
-        JSON.stringify({ name: 'Runtime Deck' }),
-      );
+      expect(executeTool).toHaveBeenCalledWith(createPresentationTool, { name: 'Runtime Deck' });
     });
     expect(screen.getByText('Create presentation completed.')).toBeInTheDocument();
   });
@@ -499,7 +496,11 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Images' }));
     fireEvent.click(screen.getByRole('button', { name: 'Send Search stock media' }));
     expect(await screen.findByLabelText('Search stock media result')).toHaveTextContent('unsplash');
-    expect(executeMedia).toHaveBeenLastCalledWith({ kind: 'image', limit: 6, term: 'presentations' });
+    expect(executeMedia).toHaveBeenLastCalledWith({
+      kind: 'image',
+      limit: 6,
+      term: 'presentations',
+    });
   });
 
   it('keeps parallel-safe actions available while an authoring operation is running', async () => {
@@ -520,9 +521,7 @@ describe('App', () => {
     }));
     const executeTool = vi.fn((tool: { name: string }) => {
       if (tool.name === 'translate_deck_and_notes') {
-        return Promise.resolve(
-          JSON.stringify({ ok: true, data: { operationId: 'translate-1' } }),
-        );
+        return Promise.resolve(JSON.stringify({ ok: true, data: { operationId: 'translate-1' } }));
       }
       if (tool.name === 'get_operation_status') return translationFinished;
       return Promise.resolve(JSON.stringify({ ok: true, data: {} }));
@@ -542,7 +541,7 @@ describe('App', () => {
     await waitFor(() =>
       expect(executeTool).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'get_operation_status' }),
-        expect.any(String),
+        expect.objectContaining({ operationId: 'translate-1' }),
       ),
     );
 
@@ -554,7 +553,7 @@ describe('App', () => {
     await waitFor(() =>
       expect(executeTool).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'search_media' }),
-        expect.any(String),
+        expect.objectContaining({ kind: 'image' }),
       ),
     );
 
@@ -593,11 +592,7 @@ describe('App', () => {
       }
       fireEvent.click(screen.getByRole('button', { name: new RegExp(`^Send ${step.label}$`) }));
       await waitFor(() => expect(executeTool).toHaveBeenCalledTimes(index + 1));
-      expect(executeTool).toHaveBeenNthCalledWith(
-        index + 1,
-        tools[index],
-        JSON.stringify(step.input),
-      );
+      expect(executeTool).toHaveBeenNthCalledWith(index + 1, tools[index], step.input);
     }
   });
 });
