@@ -1,6 +1,6 @@
 # WebMCP authoring
 
-WebMCP lets an agent use LocalStudio's real editor commands while you watch the same canvas. The editor exposes 14 narrowly scoped tools with JSON schemas, bounded results, and visible state changes. The showcase at `/editor/webmcp/` provides an editable card for every tool.
+WebMCP lets an agent use LocalStudio's real editor commands while you watch the same canvas. The editor exposes 14 narrowly scoped tools with JSON schemas, bounded results, and visible state changes. The showcase at `/editor/webmcp/` provides an editable card for every tool except `generate_deck_detailed_description`, which agents call directly.
 
 This is an **authoring** integration. Public presentations can contain slide descriptions, transcripts, and authorized recording audio, but the public viewer does not currently register attendee WebMCP tools.
 
@@ -85,7 +85,7 @@ The normal **File > Import > PowerPoint** picker remains available for a person 
 3. Run **Inspect presentation state** and compare the returned slide revision and elements with the canvas.
 4. Run **Import PowerPoint from URL**. Its default URL points at a small four-slide sample served from `/editor/samples/webmcp-showcase-sample.pptx`; replace it with any CORS-enabled PPTX URL. Poll the operation and review page, byte, font, and warning counts.
 5. Run **Inspect AI model status**, then **Prepare AI models** with `{}` if a required model is not ready.
-6. Run **Translate deck and notes** and **Generate detailed descriptions**. Poll both operations; inspect changed/skipped slides, failures, overflow warnings, description language, generator, timestamp, source revision, reviewed state, and freshness.
+6. Run **Translate deck and notes**, then have an agent call `generate_deck_detailed_description` on `/editor/`. Poll both operations; inspect changed/skipped slides, failures, overflow warnings, description language, generator, timestamp, source revision, reviewed state, and freshness.
 7. Run **Focus slide preview** before visual inspection.
 8. Run each export format. Inspect the downloaded PPTX/PDF or PNG/JPEG ZIP rather than relying only on the success message.
 
@@ -96,7 +96,7 @@ Run this small check in every supported agent browser:
 1. Open `/editor/` directly and confirm native discovery returns exactly 14 tools.
 2. Call `create_presentation`, `upsert_slide_content`, `get_presentation_state`, and `get_slide_preview` through the browser's WebMCP interface.
 3. Confirm the state revision and preview render hash agree and visually inspect the same title on the canvas.
-4. Open `/editor/webmcp/` separately and confirm its manual bridge finds the same 14 names and exposes 14 editable cards.
+4. Open `/editor/webmcp/` separately and confirm it discovers the same 14 names and exposes 13 editable cards.
 
 The direct editor route proves browser-native WebMCP. The showcase proves the judge-friendly manual control surface; they are complementary checks.
 
