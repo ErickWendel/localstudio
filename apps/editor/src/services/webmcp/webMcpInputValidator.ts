@@ -111,12 +111,32 @@ function validateValue(
   if (schema.not && !validateValue(schema.not, value, path, depth + 1))
     return `${path} matches a disallowed input shape.`;
   if (schema.oneOf) {
-    const matchCount = schema.oneOf.filter(
-      (candidate) => !validateValue(candidate, value, path, depth + 1),
-    ).length;
+    const errors = schema.oneOf.map((candidate) =>
+      validateValue(candidate, value, path, depth + 1),
+    );
+    const matchCount = errors.filter((error) => !error).length;
+    if (matchCount === 0) {
+      // Agents can only fix an input when told why the shape their discriminator selected failed.
+      const selected = schema.oneOf.flatMap((candidate, index) =>
+        matchesDiscriminator(candidate, value) ? [errors[index]] : [],
+      );
+      if (selected.length === 1 && selected[0]) return selected[0];
+    }
     if (matchCount !== 1) return `${path} must match exactly one supported input shape.`;
   }
   return undefined;
+}
+
+function matchesDiscriminator(schema: JsonSchema, value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const constEntries = Object.entries(schema.properties ?? {}).filter(
+    ([, propertySchema]) => propertySchema.const !== undefined,
+  );
+  const record = value as Record<string, unknown>;
+  return (
+    constEntries.length > 0 &&
+    constEntries.every(([key, propertySchema]) => Object.is(record[key], propertySchema.const))
+  );
 }
 
 function validate(schema: Record<string, unknown>, input: unknown) {

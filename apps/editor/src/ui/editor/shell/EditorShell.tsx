@@ -605,7 +605,7 @@ function EditorDesktopShell({ services }: EditorShellProps) {
       setImageExportRender(undefined);
       services.exportService.downloadBlob(
         editorImageExport.createZipBlob(archiveFiles),
-        services.exportService.getImagesArchiveFileName(vm.project),
+        services.exportService.getImagesArchiveFileName(vm.project, options.format),
       );
       setImageExportPanelOpen(false);
       showImageExportNotice({

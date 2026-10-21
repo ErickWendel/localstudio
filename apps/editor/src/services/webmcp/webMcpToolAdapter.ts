@@ -11,6 +11,7 @@ type AuthoringAutomationController = InstanceType<
 >;
 
 export interface WebMcpToolAnnotations {
+  consequentialHint?: boolean;
   readOnlyHint?: boolean;
   untrustedContentHint?: boolean;
 }
@@ -24,9 +25,13 @@ export interface WebMcpTool {
   title: string;
 }
 
+export interface WebMcpRegisterToolOptions {
+  signal?: AbortSignal;
+}
+
 export interface WebMcpModelContext {
-  registerTool?: (tool: WebMcpTool) => unknown;
-  registerTools?: (tools: WebMcpTool[]) => unknown;
+  registerTool?: (tool: WebMcpTool, options?: WebMcpRegisterToolOptions) => unknown;
+  registerTools?: (tools: WebMcpTool[], options?: WebMcpRegisterToolOptions) => unknown;
 }
 
 export interface WebMcpDemoWindow extends Window {
@@ -69,13 +74,32 @@ function isCleanupCallback(value: unknown): value is () => void {
   return typeof value === 'function';
 }
 
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return Boolean(value) && typeof (value as { then?: unknown }).then === 'function';
+}
+
 function isDuplicateToolNameError(error: unknown) {
   if (!(error instanceof DOMException || error instanceof Error)) return false;
   return error.name === 'InvalidStateError' && error.message.includes('Duplicate tool name');
 }
 
+// The WebMCP draft resolves registerTool() with undefined and unregisters through the abort signal;
+// older runtimes returned a cleanup callback synchronously.
+function trackRegistration(result: unknown, cleanups: Array<() => void>, signal: AbortSignal) {
+  if (isCleanupCallback(result)) {
+    cleanups.push(result);
+    return;
+  }
+  if (!isPromiseLike(result)) return;
+  result.then(undefined, (error: unknown) => {
+    if (signal.aborted || isDuplicateToolNameError(error)) return;
+    console.error('WebMCP tool registration failed.', error);
+  });
+}
+
 const emptyObjectSchema = { type: 'object', additionalProperties: false, properties: {} };
 const operationAnnotations = { readOnlyHint: false, untrustedContentHint: true };
+const consequentialAnnotations = { ...operationAnnotations, consequentialHint: true };
 const readerAnnotations = { readOnlyHint: true, untrustedContentHint: true };
 
 export class WebMcpToolAdapter {
@@ -88,7 +112,7 @@ export class WebMcpToolAdapter {
         title: 'Create presentation',
         description:
           'Create a blank LocalStudio presentation with an explicit name and optional canvas dimensions.',
-        annotations: operationAnnotations,
+        annotations: consequentialAnnotations,
         inputSchema: {
           type: 'object',
           additionalProperties: false,
@@ -150,7 +174,7 @@ export class WebMcpToolAdapter {
         title: 'Import PowerPoint from URL',
         description:
           'Import a PPTX from an authorized HTTP(S), presigned object-storage, or localhost URL using the native PowerPoint workflow.',
-        annotations: operationAnnotations,
+        annotations: consequentialAnnotations,
         inputSchema: {
           type: 'object',
           additionalProperties: false,
@@ -172,8 +196,8 @@ export class WebMcpToolAdapter {
         name: 'translate_deck_and_notes',
         title: 'Translate deck and notes',
         description:
-          'Translate all visible text, speaker notes, and existing semantic descriptions in the presentation.',
-        annotations: operationAnnotations,
+          'Translate all visible text, speaker notes, and existing semantic descriptions in the presentation. Omit sourceLanguage to auto-detect it; slides already in the target language are skipped.',
+        annotations: consequentialAnnotations,
         inputSchema: {
           type: 'object',
           additionalProperties: false,
@@ -195,7 +219,7 @@ export class WebMcpToolAdapter {
         name: 'generate_deck_detailed_description',
         title: 'Generate detailed deck descriptions',
         description:
-          'Generate fresh hidden semantic descriptions from structured slide content for attendee AI grounding.',
+          'Generate fresh hidden semantic descriptions from structured slide content for attendee AI grounding. Omit language to describe slides in the language they are written in.',
         annotations: operationAnnotations,
         inputSchema: {
           type: 'object',
@@ -385,7 +409,7 @@ export class WebMcpToolAdapter {
         title: 'Export presentation',
         description:
           'Export as PPTX, PDF, PNG archive, or JPEG archive using the visible editor render path.',
-        annotations: operationAnnotations,
+        annotations: consequentialAnnotations,
         inputSchema: {
           type: 'object',
           additionalProperties: false,
@@ -450,23 +474,26 @@ export class WebMcpToolAdapter {
   register(modelContext: WebMcpModelContext): () => void {
     const tools = this.createTools();
     const cleanups: Array<() => void> = [];
+    const registration = new AbortController();
+    const options = { signal: registration.signal };
     if (modelContext.registerTools) {
       try {
-        const cleanup = modelContext.registerTools(tools);
-        if (isCleanupCallback(cleanup)) cleanups.push(cleanup);
+        trackRegistration(modelContext.registerTools(tools, options), cleanups, options.signal);
       } catch (error) {
         if (!isDuplicateToolNameError(error)) throw error;
       }
     } else {
       tools.forEach((tool) => {
         try {
-          const cleanup = modelContext.registerTool?.(tool);
-          if (isCleanupCallback(cleanup)) cleanups.push(cleanup);
+          trackRegistration(modelContext.registerTool?.(tool, options), cleanups, options.signal);
         } catch (error) {
           if (!isDuplicateToolNameError(error)) throw error;
         }
       });
     }
-    return () => cleanups.forEach((cleanup) => cleanup());
+    return () => {
+      registration.abort();
+      cleanups.forEach((cleanup) => cleanup());
+    };
   }
 }

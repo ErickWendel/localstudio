@@ -102,12 +102,8 @@ test.describe('WebMCP discover tools journey', () => {
         iframeWidth: iframeBounds.width,
       };
     });
-    expect(editorFrameGeometry.iframeWidth).toBeGreaterThan(
-      editorFrameGeometry.frameWidth - 40,
-    );
-    expect(editorFrameGeometry.iframeHeight).toBeGreaterThan(
-      editorFrameGeometry.frameHeight - 40,
-    );
+    expect(editorFrameGeometry.iframeWidth).toBeGreaterThan(editorFrameGeometry.frameWidth - 40);
+    expect(editorFrameGeometry.iframeHeight).toBeGreaterThan(editorFrameGeometry.frameHeight - 40);
     await page.getByRole('button', { name: 'Discover tools' }).click();
     await expect(
       page.getByText('Discovered 14 tools through the local demo bridge.'),
@@ -148,9 +144,7 @@ test.describe('WebMCP discover tools journey', () => {
     await expect(workflow.getByRole('region', { name: 'Context and progress' })).toBeInViewport();
     await page.getByRole('button', { name: 'Import PowerPoint from URL' }).click();
     const importInput = page.getByLabel('Import PowerPoint from URL command input');
-    await expect(importInput).toHaveValue(
-      /https:\/\/localstudio\.erickwendel\.com\.br\/localstudio\/public\/web-ai-beyond-chat-renderatl-14082026%20%282%29\.pptx/,
-    );
+    await expect(importInput).toHaveValue(/\/editor\/samples\/webmcp-showcase-sample\.pptx/);
     await importInput.fill('{"url":"http://localhost:9100/showcase.pptx"}');
     await page.getByRole('button', { name: 'Send Import PowerPoint from URL' }).click();
     await importRequested;
@@ -171,7 +165,9 @@ test.describe('WebMCP discover tools journey', () => {
     await workflow.getByRole('button', { name: 'Images' }).click();
     await expect(workflow.getByRole('button', { name: 'Send Search stock media' })).toBeEnabled();
     await workflow.getByRole('button', { name: 'Upsert slide content' }).click();
-    await expect(workflow.getByRole('button', { name: 'Send Upsert slide content' })).toBeDisabled();
+    await expect(
+      workflow.getByRole('button', { name: 'Send Upsert slide content' }),
+    ).toBeDisabled();
     await importAction.click();
     releaseImport();
     await expect(importStep.getByRole('status')).toHaveText(
@@ -278,7 +274,7 @@ test.describe('WebMCP discover tools journey', () => {
     page,
   }) => {
     await page.addInitScript((cards) => {
-      const calls: Array<{ inputArguments: string; name: string }> = [];
+      const calls: Array<{ inputObject: unknown; name: string }> = [];
       Object.defineProperty(window, '__webMcpShowcaseCalls', {
         configurable: true,
         value: calls,
@@ -287,12 +283,14 @@ test.describe('WebMCP discover tools journey', () => {
       Object.defineProperty(document, 'modelContext', {
         configurable: true,
         value: {
-          executeTool: (tool: { name: string }, inputArguments: string) => {
-            if (typeof inputArguments !== 'string') {
-              throw new Error('Failed to parse input arguments.');
+          executeTool: (tool: { name: string }, inputObject: unknown) => {
+            // Mirrors Chrome 155+, which rejects the deprecated JSON-string input form.
+            if (!inputObject || typeof inputObject !== 'object' || Array.isArray(inputObject)) {
+              throw new TypeError(
+                "Failed to execute 'executeTool' on 'ModelContext': invalid input object: value is not an object",
+              );
             }
-            JSON.parse(inputArguments);
-            calls.push({ inputArguments, name: tool.name });
+            calls.push({ inputObject, name: tool.name });
             if (tool.name === 'search_media') {
               return Promise.resolve(
                 JSON.stringify({
@@ -358,7 +356,7 @@ test.describe('WebMCP discover tools journey', () => {
       () =>
         (
           window as typeof window & {
-            __webMcpShowcaseCalls: Array<{ inputArguments: string; name: string }>;
+            __webMcpShowcaseCalls: Array<{ inputObject: unknown; name: string }>;
           }
         ).__webMcpShowcaseCalls,
     );
@@ -368,10 +366,10 @@ test.describe('WebMCP discover tools journey', () => {
       ),
     );
     expect(
-      calls.every(({ inputArguments }) => {
-        const input: unknown = JSON.parse(inputArguments);
-        return input && typeof input === 'object';
-      }),
+      calls.every(
+        ({ inputObject }) =>
+          Boolean(inputObject) && typeof inputObject === 'object' && !Array.isArray(inputObject),
+      ),
     ).toBe(true);
   });
 });

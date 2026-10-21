@@ -102,7 +102,7 @@ describe('authoringVisualCapability', () => {
         report,
       ),
     ).resolves.toMatchObject({
-      fileName: `${harness.project.name}-images.zip`,
+      fileName: `${harness.project.name}-jpeg-images.zip`,
       format: 'jpeg',
       slideCount: 1,
       statistics: { frameCount: 3 },

@@ -58,6 +58,7 @@ httpServer.on('request', (request, response) => {
     void serveIndex(app, request, response);
     return;
   }
+  if (isPowerPointRequest(request.url)) forcePowerPointContentType(response);
   app?.server.middlewares(request, response, () => {
     if (!response.headersSent) {
       response.statusCode = 404;
@@ -130,10 +131,33 @@ function shouldServeIndex(url) {
   );
 }
 
+function isPowerPointRequest(url) {
+  if (!url) return false;
+  return new URL(url, 'http://localstudio.invalid').pathname.toLowerCase().endsWith('.pptx');
+}
+
+// Vite's static middleware sends an empty Content-Type for .pptx, which the URL importer rejects.
+function forcePowerPointContentType(response) {
+  const contentType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+  const writeHead = response.writeHead.bind(response);
+  response.writeHead = (statusCode, ...rest) => {
+    const headers = rest.find((value) => value && typeof value === 'object');
+    if (headers) {
+      for (const key of Object.keys(headers)) {
+        if (key.toLowerCase() === 'content-type') delete headers[key];
+      }
+    }
+    response.setHeader('Content-Type', contentType);
+    return writeHead(statusCode, ...rest);
+  };
+}
+
 function injectRuntimeConfig(html) {
   const script = getRuntimeConfigScript();
   if (!script) return html;
-  return html.includes('</head>') ? html.replace('</head>', `${script}</head>`) : `${script}${html}`;
+  return html.includes('</head>')
+    ? html.replace('</head>', `${script}</head>`)
+    : `${script}${html}`;
 }
 
 function getRuntimeConfigScript() {

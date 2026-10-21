@@ -1,6 +1,6 @@
 # WebMCP authoring
 
-WebMCP lets an agent use LocalStudio's real editor commands while you watch the same canvas. The editor exposes 14 narrowly scoped tools with JSON schemas, bounded results, and visible state changes. The showcase at `/editor/webmcp/` provides an editable card for every tool.
+WebMCP lets an agent use LocalStudio's real editor commands while you watch the same canvas. The editor exposes 14 narrowly scoped tools with JSON schemas, bounded results, and visible state changes. The showcase at `/editor/webmcp/` provides an editable card for every tool except `generate_deck_detailed_description`, which agents call directly.
 
 This is an **authoring** integration. Public presentations can contain slide descriptions, transcripts, and authorized recording audio, but the public viewer does not currently register attendee WebMCP tools.
 
@@ -9,7 +9,8 @@ This is an **authoring** integration. Public presentations can contain slide des
 - Use a browser or in-app browser with WebMCP support. In Chrome builds that expose the experimental API, enable the WebMCP testing flag and relaunch.
 - Run LocalStudio with `npm run dev`, then open `http://localhost:5184/editor/webmcp/` for local testing.
 - Allow the embedded same-origin editor to finish loading before selecting **Discover tools**.
-- For native agent discovery, open `http://localhost:5184/editor/?webmcp=1` directly. WebMCP is document-scoped, so a browser agent does not inherit tools registered by the showcase's child iframe.
+- For native agent discovery, open `http://localhost:5184/editor/` directly. The editor registers its tools on every route unless `?webmcp=0` is set. The showcase page can also discover the tools its same-origin editor iframe registers, but agents should work against the editor itself.
+- Chrome 155 and later require `executeTool(tool, inputObject)` to receive a plain object. The deprecated JSON-string form fails with `invalid input object: value is not an object`.
 - Translation, description generation, image generation, and model preparation may require browser AI support, WebGPU, model downloads, and several gigabytes of browser storage.
 - Unsplash and GIPHY search require their respective keys in **Settings > Media integrations**.
 
@@ -22,8 +23,8 @@ All inputs are JSON objects. Unknown fields and invalid types are rejected befor
 | `create_presentation`                | Optional `name`, `width`, `height`                           | Replaces the editor with a blank presentation.                             |
 | `get_presentation_state`             | `detail`, optional slide and pagination fields               | Returns bounded project, slide, element, revision, and freshness state.    |
 | `import_powerpoint_from_url`         | Required HTTP(S) `url`; optional safe `.pptx` `fileName`     | Starts native PPTX import and font resolution.                             |
-| `translate_deck_and_notes`           | Required `targetLanguage`; optional `sourceLanguage`         | Starts translation of visible text, notes, and existing descriptions.      |
-| `generate_deck_detailed_description` | Optional `slideNumbers`, `language`, `force`                 | Starts fresh, revision-linked semantic descriptions.                       |
+| `translate_deck_and_notes`           | Required `targetLanguage`; optional `sourceLanguage`         | Starts translation; auto-detects the source and skips decks already in it. |
+| `generate_deck_detailed_description` | Optional `slideNumbers`, `language`, `force`                 | Starts descriptions in `language` or the deck's detected language.         |
 | `list_authoring_catalog`             | `kind: "fonts"`; or animations plus `elementType`            | Returns bounded usable font or animation metadata.                         |
 | `upsert_slide_content`               | Stable `requestId`, slide, mode, and typed elements          | Atomically merges or replaces exact slide primitives.                      |
 | `generate_image`                     | `prompt`; optional dimensions, seed, and steps               | Starts image generation and returns an asset ID without placing it.        |
@@ -34,7 +35,7 @@ All inputs are JSON objects. Unknown fields and invalid types are rejected befor
 | `export_presentation`                | `format`, optional `slideRange` and `includeAnimationFrames` | Starts a native PPTX/PDF/PNG/JPEG download.                                |
 | `get_operation_status`               | `operationId`, optional `waitForChangeMs`                    | Returns queued, running, completed, or failed operation state.             |
 
-Reader tools are marked read-only. Results containing imported or user-authored content are marked untrusted so slide text and metadata remain evidence rather than instructions.
+Reader tools are marked read-only. `create_presentation`, `import_powerpoint_from_url`, `translate_deck_and_notes`, and `export_presentation` replace, rewrite, or download the deck, so they also set `consequentialHint` for agents that confirm high-impact actions with the user. Results containing imported or user-authored content are marked untrusted so slide text and metadata remain evidence rather than instructions.
 
 ## Long-running operations
 
@@ -82,9 +83,9 @@ The normal **File > Import > PowerPoint** picker remains available for a person 
 1. Open `/editor/webmcp/` and select **Discover tools**. Confirm that 14 tools appear.
 2. Run **Create presentation**, then **Upsert slide content**. Confirm the embedded canvas changes.
 3. Run **Inspect presentation state** and compare the returned slide revision and elements with the canvas.
-4. Optionally import a CORS-enabled PPTX URL. Poll the operation and review page, byte, font, and warning counts.
+4. Run **Import PowerPoint from URL**. Its default URL points at a small four-slide sample served from `/editor/samples/webmcp-showcase-sample.pptx`; replace it with any CORS-enabled PPTX URL. Poll the operation and review page, byte, font, and warning counts.
 5. Run **Inspect AI model status**, then **Prepare AI models** with `{}` if a required model is not ready.
-6. Run **Translate deck and notes** and **Generate detailed descriptions**. Poll both operations; inspect changed/skipped slides, failures, overflow warnings, description language, generator, timestamp, source revision, reviewed state, and freshness.
+6. Run **Translate deck and notes**, then have an agent call `generate_deck_detailed_description` on `/editor/`. Poll both operations; inspect changed/skipped slides, failures, overflow warnings, description language, generator, timestamp, source revision, reviewed state, and freshness.
 7. Run **Focus slide preview** before visual inspection.
 8. Run each export format. Inspect the downloaded PPTX/PDF or PNG/JPEG ZIP rather than relying only on the success message.
 
@@ -92,10 +93,10 @@ The normal **File > Import > PowerPoint** picker remains available for a person 
 
 Run this small check in every supported agent browser:
 
-1. Open `/editor/?webmcp=1` directly and confirm native discovery returns exactly 14 tools.
+1. Open `/editor/` directly and confirm native discovery returns exactly 14 tools.
 2. Call `create_presentation`, `upsert_slide_content`, `get_presentation_state`, and `get_slide_preview` through the browser's WebMCP interface.
 3. Confirm the state revision and preview render hash agree and visually inspect the same title on the canvas.
-4. Open `/editor/webmcp/` separately and confirm its manual bridge finds the same 14 names and exposes 14 editable cards.
+4. Open `/editor/webmcp/` separately and confirm it discovers the same 14 names and exposes 13 editable cards.
 
 The direct editor route proves browser-native WebMCP. The showcase proves the judge-friendly manual control surface; they are complementary checks.
 

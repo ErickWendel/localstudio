@@ -82,6 +82,52 @@ describe('WebMcpToolAdapter', () => {
     expect(registerTool).toHaveBeenCalledTimes(14);
   });
 
+  it('unregisters spec runtimes through the registration abort signal', () => {
+    const signals: AbortSignal[] = [];
+    const registerTool = vi.fn((_tool: WebMcpTool, options?: { signal?: AbortSignal }) => {
+      if (options?.signal) signals.push(options.signal);
+      return Promise.resolve();
+    });
+    const unregister = createAdapter().register({ registerTool });
+
+    expect(signals).toHaveLength(14);
+    expect(signals.every((signal) => !signal.aborted)).toBe(true);
+    unregister();
+    expect(signals.every((signal) => signal.aborted)).toBe(true);
+  });
+
+  it('handles asynchronous registration rejections from spec runtimes', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const duplicate = vi.fn(() =>
+      Promise.reject(new DOMException('Duplicate tool name', 'InvalidStateError')),
+    );
+    createAdapter().register({ registerTool: duplicate });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(consoleError).not.toHaveBeenCalled();
+
+    const denied = vi.fn(() =>
+      Promise.reject(new DOMException('Tools permission denied', 'NotAllowedError')),
+    );
+    createAdapter().register({ registerTool: denied });
+    await vi.waitFor(() => expect(consoleError).toHaveBeenCalledTimes(14));
+    consoleError.mockRestore();
+  });
+
+  it('flags tools that replace, rewrite, or download the deck as consequential', () => {
+    const consequential = createAdapter()
+      .createTools()
+      .filter((tool) => tool.annotations?.consequentialHint)
+      .map((tool) => tool.name);
+
+    expect(consequential).toEqual([
+      'create_presentation',
+      'import_powerpoint_from_url',
+      'translate_deck_and_notes',
+      'export_presentation',
+    ]);
+  });
+
   it('normalizes create presentation input before forwarding it', async () => {
     const createPresentation = vi.fn(() => ({ projectId: 'project-1', name: 'WebMCP Deck' }));
     const adapter = createAdapter(createDelegate({ createPresentation }));
@@ -152,5 +198,33 @@ describe('WebMcpToolAdapter', () => {
       errorCode: 'invalid_input',
     });
     expect(upsertSlideContent).not.toHaveBeenCalled();
+  });
+
+  it('explains why the element shape selected by its type discriminator is invalid', async () => {
+    const tool = createAdapter()
+      .createTools()
+      .find((candidate) => candidate.name === 'upsert_slide_content');
+    const element = {
+      elementId: 'title',
+      type: 'text',
+      frame: { x: 0, y: 0, width: 100, height: 40 },
+      zIndex: 1,
+      content: { text: 'Hello' },
+    };
+
+    expect(
+      await tool?.execute({ requestId: 'r1', slideNumber: 1, mode: 'merge', elements: [element] }),
+    ).toMatchObject({ ok: false, message: 'input.elements[0].style is required.' });
+    expect(
+      await tool?.execute({
+        requestId: 'r2',
+        slideNumber: 1,
+        mode: 'merge',
+        elements: [{ ...element, type: 'hologram' }],
+      }),
+    ).toMatchObject({
+      ok: false,
+      message: 'input.elements[0] must match exactly one supported input shape.',
+    });
   });
 });

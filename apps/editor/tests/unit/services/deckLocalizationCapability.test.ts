@@ -255,7 +255,9 @@ describe('deckLocalizationCapability', () => {
 
     const translatedTitle = harness.getProject().elements['visible-title'];
     expect(translatedTitle).toMatchObject({ text: 'PT: Hello' });
-    expect(translatedTitle?.type === 'text' ? translatedTitle.paragraphs : undefined).toBeUndefined();
+    expect(
+      translatedTitle?.type === 'text' ? translatedTitle.paragraphs : undefined,
+    ).toBeUndefined();
   });
 
   it('reports field failures and marks a description stale after a partial visual translation', async () => {
@@ -484,5 +486,133 @@ describe('deckLocalizationCapability', () => {
     expect(result.generatedSlides).toHaveLength(100);
     expect(result.descriptions).toHaveLength(100);
     expect(harness.getProject().pages[100]?.semanticDescription?.stale).toBe(false);
+  });
+
+  it('skips translation when the deck is already in the target language', async () => {
+    const harness = createHarness();
+    harness.detectLanguage.mockResolvedValueOnce('pt');
+    const before = harness.getProject();
+
+    const result = await harness.capability.translateDeckAndNotes(
+      { targetLanguage: 'pt-BR' },
+      harness.report,
+    );
+
+    expect(result).toMatchObject({
+      detectedLanguage: 'pt',
+      changedSlideCount: 0,
+      skippedSlides: [1, 2],
+      skippedSlideCount: 2,
+      translatedTextElements: 0,
+    });
+    expect(harness.prepareTranslation).not.toHaveBeenCalled();
+    expect(harness.getProject()).toBe(before);
+  });
+
+  it('skips a deck already in the target language even when a wrong source is given', async () => {
+    const harness = createHarness();
+    harness.detectLanguage.mockResolvedValueOnce('pt-BR');
+
+    const result = await harness.capability.translateDeckAndNotes(
+      { sourceLanguage: 'en', targetLanguage: 'pt' },
+      harness.report,
+    );
+
+    expect(result).toMatchObject({ detectedLanguage: 'pt-BR', changedSlideCount: 0 });
+    expect(harness.prepareTranslation).not.toHaveBeenCalled();
+  });
+
+  it('keeps translating from an explicit source when language detection fails', async () => {
+    const harness = createHarness();
+    harness.detectLanguage.mockRejectedValueOnce(new Error('detector unavailable'));
+
+    const result = await harness.capability.translateDeckAndNotes(
+      { sourceLanguage: 'en', targetLanguage: 'pt' },
+      harness.report,
+    );
+
+    expect(result).toMatchObject({ detectedLanguage: 'en', changedSlideCount: 1 });
+    expect(harness.prepareTranslation).toHaveBeenCalledWith('en', 'pt', expect.anything());
+  });
+
+  it('still translates between distinct scripts of the same language', async () => {
+    const harness = createHarness();
+    harness.detectLanguage.mockResolvedValueOnce('zh-Hans');
+
+    const result = await harness.capability.translateDeckAndNotes(
+      { targetLanguage: 'zh-Hant' },
+      harness.report,
+    );
+
+    expect(result.changedSlideCount).toBe(1);
+    expect(harness.prepareTranslation).toHaveBeenCalledWith(
+      'zh-Hans',
+      'zh-Hant',
+      expect.anything(),
+    );
+  });
+
+  it('describes the deck in its detected language when none is requested', async () => {
+    const generate = vi.fn<LocalSlideDescriptionGenerator['generate']>(() =>
+      Promise.resolve('Um título de saudação.'),
+    );
+    const harness = createHarness({ generator: { id: 'local-model', generate } });
+    harness.detectLanguage.mockResolvedValueOnce('pt-BR');
+
+    const result = await harness.capability.generateDeckDetailedDescription(
+      { slideNumbers: [1] },
+      harness.report,
+    );
+
+    expect(harness.detectLanguage).toHaveBeenCalledWith('Hello');
+    expect(generate).toHaveBeenCalledWith(expect.objectContaining({ language: 'pt-BR' }));
+    expect(result).toMatchObject({ language: 'pt-BR', generatedSlides: [1] });
+  });
+
+  it('reports description-model preparation progress before describing slides', async () => {
+    const prepare = vi.fn<NonNullable<LocalSlideDescriptionGenerator['prepare']>>((options) => {
+      options?.onProgress?.(50, { loadedBytes: 5, totalBytes: 10 });
+      return Promise.resolve();
+    });
+    const harness = createHarness({
+      generator: { id: 'local-model', prepare, generate: () => Promise.resolve('A shape.') },
+    });
+
+    await harness.capability.generateDeckDetailedDescription({ slideNumbers: [2] }, harness.report);
+
+    expect(prepare).toHaveBeenCalledTimes(1);
+    expect(harness.report).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stage: 'preparing-description-model',
+        progress: 5,
+        loadedBytes: 5,
+        totalBytes: 10,
+      }),
+    );
+  });
+
+  it('falls back to deterministic descriptions once when the model cannot be prepared', async () => {
+    const generate = vi.fn<LocalSlideDescriptionGenerator['generate']>();
+    const harness = createHarness({
+      generator: {
+        id: 'local-model',
+        prepare: () => Promise.reject(new Error('no WebGPU')),
+        generate,
+      },
+    });
+
+    const result = await harness.capability.generateDeckDetailedDescription(
+      { force: true },
+      harness.report,
+    );
+
+    expect(generate).not.toHaveBeenCalled();
+    expect(result.descriptions.map(({ generator }) => generator)).toEqual([
+      'deterministic-scene-graph-v1',
+      'deterministic-scene-graph-v1',
+    ]);
+    expect(result.warnings).toEqual([
+      'Local description model is unavailable: no WebGPU Deterministic scene-graph descriptions were used.',
+    ]);
   });
 });
