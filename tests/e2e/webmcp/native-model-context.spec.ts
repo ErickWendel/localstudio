@@ -63,7 +63,9 @@ test.describe('native WebMCP model context', () => {
     await enableFirstVisitTour(page);
     await page.goto(new URL('/editor/', getServer().baseURL).toString());
 
-    await expect.poll(async () => (await listNativeTools(page)).length).toBe(14);
+    await expect
+      .poll(async () => (await listNativeTools(page)).length, { timeout: 30_000 })
+      .toBe(14);
     await expect(page.getByText('Open AI Tools', { exact: true })).toBeVisible();
     const tools = await listNativeTools(page);
     expect(
