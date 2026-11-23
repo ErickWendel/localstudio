@@ -36,7 +36,7 @@ on:
   workflow_dispatch:
 
 env:
-  VLT_VERSION: 1.8.0
+  VLT_VERSION: 1.8.2
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -58,10 +58,8 @@ jobs:
         with:
           node-version: 26
 
-      - name: Setup vlt
-        uses: vltpkg/setup-vlt@33ed82786290f7273cdc1442ab01df5cfdd6d538 # v1.0.1
-        with:
-          vlt-version: ${{ env.VLT_VERSION }}
+      - name: Install vlt
+        run: curl -fsSL https://install.vlt.sh | vlt_install=${{ env.VLT_VERSION }} bash
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -103,10 +101,8 @@ jobs:
         with:
           node-version: 26
 
-      - name: Setup vlt
-        uses: vltpkg/setup-vlt@33ed82786290f7273cdc1442ab01df5cfdd6d538 # v1.0.1
-        with:
-          vlt-version: ${{ env.VLT_VERSION }}
+      - name: Install vlt
+        run: curl -fsSL https://install.vlt.sh | vlt_install=${{ env.VLT_VERSION }} bash
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -157,10 +153,8 @@ jobs:
         with:
           node-version: 26
 
-      - name: Setup vlt
-        uses: vltpkg/setup-vlt@33ed82786290f7273cdc1442ab01df5cfdd6d538 # v1.0.1
-        with:
-          vlt-version: ${{ env.VLT_VERSION }}
+      - name: Install vlt
+        run: curl -fsSL https://install.vlt.sh | vlt_install=${{ env.VLT_VERSION }} bash
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -219,10 +213,8 @@ jobs:
         with:
           node-version: 26
 
-      - name: Setup vlt
-        uses: vltpkg/setup-vlt@33ed82786290f7273cdc1442ab01df5cfdd6d538 # v1.0.1
-        with:
-          vlt-version: ${{ env.VLT_VERSION }}
+      - name: Install vlt
+        run: curl -fsSL https://install.vlt.sh | vlt_install=${{ env.VLT_VERSION }} bash
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -357,10 +349,8 @@ jobs:
         with:
           node-version: 26
 
-      - name: Setup vlt
-        uses: vltpkg/setup-vlt@33ed82786290f7273cdc1442ab01df5cfdd6d538 # v1.0.1
-        with:
-          vlt-version: ${{ env.VLT_VERSION }}
+      - name: Install vlt
+        run: curl -fsSL https://install.vlt.sh | vlt_install=${{ env.VLT_VERSION }} bash
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -447,10 +437,8 @@ jobs:
         with:
           node-version: 26
 
-      - name: Setup vlt
-        uses: vltpkg/setup-vlt@33ed82786290f7273cdc1442ab01df5cfdd6d538 # v1.0.1
-        with:
-          vlt-version: ${{ env.VLT_VERSION }}
+      - name: Install vlt
+        run: curl -fsSL https://install.vlt.sh | vlt_install=${{ env.VLT_VERSION }} bash
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -521,10 +509,8 @@ jobs:
         with:
           node-version: 26
 
-      - name: Setup vlt
-        uses: vltpkg/setup-vlt@33ed82786290f7273cdc1442ab01df5cfdd6d538 # v1.0.1
-        with:
-          vlt-version: ${{ env.VLT_VERSION }}
+      - name: Install vlt
+        run: curl -fsSL https://install.vlt.sh | vlt_install=${{ env.VLT_VERSION }} bash
 
       - name: Verify vlt-lock.json matches package.json
         run: vlt install --frozen-lockfile --lockfile-only
@@ -599,10 +585,8 @@ jobs:
         with:
           node-version: 26
 
-      - name: Setup vlt
-        uses: vltpkg/setup-vlt@33ed82786290f7273cdc1442ab01df5cfdd6d538 # v1.0.1
-        with:
-          vlt-version: ${{ env.VLT_VERSION }}
+      - name: Install vlt
+        run: curl -fsSL https://install.vlt.sh | vlt_install=${{ env.VLT_VERSION }} bash
 
       - name: Restore dependency cache
         id: dependency-cache
