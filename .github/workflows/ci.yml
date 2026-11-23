@@ -505,6 +505,86 @@ jobs:
           path: coverage-report
           if-no-files-found: error
 
+  security:
+    name: Supply-chain security audit
+    needs: dependencies
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # Accepted risks, pinned to exact versions so any change is re-reviewed:
+    # - vite@5.4.21: dev-server CVEs; only used by vitepress@1.6.4 (latest stable)
+    #   to build the docs, and 5.4.21 is the last vite 5.x.
+    # - image-size@1.2.1: CWE-835 DoS; required as ^1.2.1 by pptxgenjs@4.0.1
+    #   (latest); the fix only exists in image-size 2.x, which changes the API.
+    env:
+      ACCEPTED_RISKS: ':not([name="vite"][version="5.4.21"]):not([name="image-size"][version="1.2.1"])'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 26
+
+      - name: Setup vlt
+        uses: vltpkg/setup-vlt@33ed82786290f7273cdc1442ab01df5cfdd6d538 # v1.0.1
+        with:
+          vlt-version: ${{ env.VLT_VERSION }}
+
+      - name: Verify vlt-lock.json matches package.json
+        run: vlt install --frozen-lockfile --lockfile-only
+
+      - name: Restore dependency cache
+        id: dependency-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: vlt-dependencies-${{ runner.os }}-node26-${{ hashFiles('vlt-lock.json') }}
+
+      - name: Install dependencies on cache miss
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        run: vlt install --frozen-lockfile
+
+      - name: Enforce dependency policies
+        uses: vltpkg/policies@8c931ca98445eed29d42847ab84da13e968c2b09 # v2.0.2
+        with:
+          # --view=human is required: the action counts output lines, and the
+          # default (json) view prints "[]" for zero matches.
+          queries: |
+            :malware --view=human --expect-results=0
+            :confused --view=human --expect-results=0
+            :severity(critical)${{ env.ACCEPTED_RISKS }} --view=human --expect-results=0
+            :severity(high)${{ env.ACCEPTED_RISKS }} --view=human --expect-results=0
+
+      - name: Show packages that broke a policy
+        if: failure()
+        uses: vltpkg/policies@8c931ca98445eed29d42847ab84da13e968c2b09 # v2.0.2
+        with:
+          show-results: always
+          queries: |
+            :malware --view=human
+            :confused --view=human
+            :severity(critical)${{ env.ACCEPTED_RISKS }} --view=human
+            :severity(high)${{ env.ACCEPTED_RISKS }} --view=human
+
+      - name: Report other supply-chain signals (non-blocking)
+        uses: vltpkg/policies@8c931ca98445eed29d42847ab84da13e968c2b09 # v2.0.2
+        with:
+          show-results: always
+          queries: |
+            :severity(medium) --view=human
+            :squat --view=human
+            :obfuscated --view=human
+            :deprecated --view=human
+            :abandoned --view=human
+            :scripts:not(:built) --view=human
+            :license(copyleft) --view=human
+
   build:
     name: Build
     needs: dependencies
@@ -557,7 +637,7 @@ jobs:
   pages-artifact:
     name: Prepare Pages artifact
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: [build, test, e2e, editor-e2e-coverage]
+    needs: [build, test, e2e, editor-e2e-coverage, security]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -624,7 +704,7 @@ jobs:
   deploy:
     name: Deploy site
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: [lint, typecheck, test, e2e, pages-artifact]
+    needs: [lint, typecheck, test, e2e, pages-artifact, security]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

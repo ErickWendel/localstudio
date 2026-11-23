@@ -44,3 +44,14 @@ so maintainers can see the browser, steps, and failure state clearly.
 Keep PRs focused. Describe the user-visible change, list the checks you ran, and call out browser-specific behavior.
 
 Do not commit generated `dist/`, `coverage/`, `playwright-report/`, or `test-results/` output.
+
+## Dependencies
+
+- Add or upgrade packages with `vlt install <pkg>` and commit both `package.json` and `vlt-lock.json`. Check `vlt outdated`
+  first: it shows security alerts for the current, wanted and latest versions.
+- Avoid versions published in the last few days unless you need a fix from them.
+- Dependency install scripts are blocked by default. If a package really needs one, allow it explicitly with
+  `vlt build '<query>'` (saved to `vlt.json`) and say why in the PR.
+- CI enforces dependency policies with [vltpkg/policies](https://github.com/vltpkg/policies): it fails on malware, manifest confusion and critical/high CVEs. Check locally with
+  `vlt query ':malware'` or `vlt query ':severity(high)'`; the tree shows which dependency pulls a package in. To accept a
+  finding that can't be fixed yet, add the exact `name@version` with a reason to `ACCEPTED_RISKS` in the security job of `.github/workflows/ci.yml`.
