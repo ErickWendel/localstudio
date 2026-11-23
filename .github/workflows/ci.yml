@@ -35,9 +35,6 @@ on:
       - '!**/*.md'
   workflow_dispatch:
 
-env:
-  VLT_VERSION: 1.8.2
-
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -59,7 +56,7 @@ jobs:
           node-version: 26
 
       - name: Install vlt
-        run: curl -fsSL https://install.vlt.sh | vlt_install=${{ env.VLT_VERSION }} bash
+        run: curl -fsSL https://install.vlt.sh | bash
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -102,7 +99,7 @@ jobs:
           node-version: 26
 
       - name: Install vlt
-        run: curl -fsSL https://install.vlt.sh | vlt_install=${{ env.VLT_VERSION }} bash
+        run: curl -fsSL https://install.vlt.sh | bash
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -154,7 +151,7 @@ jobs:
           node-version: 26
 
       - name: Install vlt
-        run: curl -fsSL https://install.vlt.sh | vlt_install=${{ env.VLT_VERSION }} bash
+        run: curl -fsSL https://install.vlt.sh | bash
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -214,7 +211,7 @@ jobs:
           node-version: 26
 
       - name: Install vlt
-        run: curl -fsSL https://install.vlt.sh | vlt_install=${{ env.VLT_VERSION }} bash
+        run: curl -fsSL https://install.vlt.sh | bash
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -350,7 +347,7 @@ jobs:
           node-version: 26
 
       - name: Install vlt
-        run: curl -fsSL https://install.vlt.sh | vlt_install=${{ env.VLT_VERSION }} bash
+        run: curl -fsSL https://install.vlt.sh | bash
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -438,7 +435,7 @@ jobs:
           node-version: 26
 
       - name: Install vlt
-        run: curl -fsSL https://install.vlt.sh | vlt_install=${{ env.VLT_VERSION }} bash
+        run: curl -fsSL https://install.vlt.sh | bash
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -510,7 +507,7 @@ jobs:
           node-version: 26
 
       - name: Install vlt
-        run: curl -fsSL https://install.vlt.sh | vlt_install=${{ env.VLT_VERSION }} bash
+        run: curl -fsSL https://install.vlt.sh | bash
 
       - name: Verify vlt-lock.json matches package.json
         run: vlt install --frozen-lockfile --lockfile-only
@@ -586,7 +583,7 @@ jobs:
           node-version: 26
 
       - name: Install vlt
-        run: curl -fsSL https://install.vlt.sh | vlt_install=${{ env.VLT_VERSION }} bash
+        run: curl -fsSL https://install.vlt.sh | bash
 
       - name: Restore dependency cache
         id: dependency-cache
