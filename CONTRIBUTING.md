@@ -4,9 +4,13 @@ Thanks for helping improve LocalStudio.dev.
 
 ## Local Setup
 
+This repo uses [vlt](https://vlt.sh) as its package manager. It installs from the public npm registry, so no
+login or token is needed (the project `vlt.json` overrides any private registry in your user config). Install it with
+`npm install --global vlt`.
+
 ```bash
-npm ci
-npm run dev
+vlt install
+vlt run dev
 ```
 
 The default dev script starts the landing, editor, and joystick apps together. Use the landing URL as the public entry
@@ -17,10 +21,10 @@ point; `/editor/` and `/joystick/` are proxied to the connected app servers.
 Run the same checks CI runs before opening a pull request:
 
 ```bash
-npm run lint
-npm run typecheck
-npm run test
-npm run build
+vlt run lint
+vlt run typecheck
+vlt run test
+vlt run build
 ```
 
 ## Browser Notes
