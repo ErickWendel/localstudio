@@ -4,7 +4,7 @@ import { App } from '../../../src/App';
 import { sampleProject } from '../../../src/domain/projects/sampleProject';
 import { webMcpShowcaseCatalog } from '../../../src/ui/webmcp/webMcpShowcaseSteps';
 
-const originalMatchMedia = window.matchMedia;
+const originalMatchMedia: unknown = Reflect.get(window, 'matchMedia');
 
 function installWebMcpShowcaseTools() {
   Object.defineProperty(document, 'modelContext', {

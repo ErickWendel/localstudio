@@ -11,7 +11,7 @@ import { editorShellTestHarness } from './EditorShell.test-harness';
 
 const { createAppServices, openLeftTab, selectImageLayer } = editorShellTestHarness;
 
-const originalMatchMedia = window.matchMedia;
+const originalMatchMedia: unknown = Reflect.get(window, 'matchMedia');
 const authoringToolNames = [
   'create_presentation',
   'get_presentation_state',

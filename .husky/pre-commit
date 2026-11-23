@@ -1,3 +1,3 @@
-npm run lint
-npm run typecheck
-npm run test
+vlt run lint
+vlt run typecheck
+vlt run test

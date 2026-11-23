@@ -1,0 +1,10 @@
+{
+  "config": {
+    "registry": "https://registry.npmjs.org/",
+    "registries": {
+      "npm": "https://registry.npmjs.org/"
+    },
+    "default-registry-alias": "npm"
+  },
+  "workspaces": ["apps/*", "packages/*"]
+}

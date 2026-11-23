@@ -157,7 +157,7 @@ export async function runPresenterSessionServiceContractScenario(
   });
   defaultHostService.closePresenterWindow();
 
-  const originalFetch = window.fetch;
+  const originalFetch = Reflect.get(window, 'fetch');
   for (const fetchResult of [
     () => Promise.resolve(new Response('', { status: 503 })),
     () => Promise.resolve(Response.json({ origin: 'https://remote-from-network.test' })),

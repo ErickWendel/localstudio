@@ -78,7 +78,7 @@ httpServer.listen(port, host, () => {
   console.log(`  /`);
   console.log(`  /editor/`);
   console.log(`  /joystick/`);
-  console.log(`  /docs/ via npm run dev:docs`);
+  console.log(`  /docs/ via vlt run dev:docs`);
 });
 
 let shuttingDown = false;
