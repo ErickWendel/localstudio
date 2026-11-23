@@ -200,9 +200,14 @@ keys are persisted locally, so avoid root credentials outside local development.
 
 ## Quick Start
 
+This repo uses [vlt](https://vlt.sh) as its package manager. It installs from the public npm registry, so no
+login or token is needed (the project `vlt.json` overrides any private registry in your user config). Install vlt with
+its official install script, then install dependencies:
+
 ```bash
-npm ci
-npm run dev
+curl -fsSL https://install.vlt.sh | bash
+vlt install
+vlt run dev
 ```
 
 The dev server starts the landing, editor, and joystick apps together. Use the landing URL as the public entry point;
@@ -211,7 +216,7 @@ The dev server starts the landing, editor, and joystick apps together. Use the l
 Disable the editor onboarding tour during local testing with:
 
 ```bash
-VITE_DISABLE_EDITOR_TOUR=true npm run dev
+VITE_DISABLE_EDITOR_TOUR=true vlt run dev
 ```
 
 The tour is already disabled in the automated E2E server so tests do not need to close it before interacting with the
@@ -220,11 +225,11 @@ editor.
 Quality checks:
 
 ```bash
-npm run lint
-npm run typecheck
-npm run test
-npm run test:e2e
-npm run build
+vlt run lint
+vlt run typecheck
+vlt run test
+vlt run test:e2e
+vlt run build
 ```
 
 ## Workspace

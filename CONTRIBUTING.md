@@ -4,9 +4,14 @@ Thanks for helping improve LocalStudio.dev.
 
 ## Local Setup
 
+This repo uses [vlt](https://vlt.sh) as its package manager. It installs from the public npm registry, so no
+login or token is needed (the project `vlt.json` overrides any private registry in your user config). Install vlt with
+its official install script, then install dependencies:
+
 ```bash
-npm ci
-npm run dev
+curl -fsSL https://install.vlt.sh | bash
+vlt install
+vlt run dev
 ```
 
 The default dev script starts the landing, editor, and joystick apps together. Use the landing URL as the public entry
@@ -17,10 +22,10 @@ point; `/editor/` and `/joystick/` are proxied to the connected app servers.
 Run the same checks CI runs before opening a pull request:
 
 ```bash
-npm run lint
-npm run typecheck
-npm run test
-npm run build
+vlt run lint
+vlt run typecheck
+vlt run test
+vlt run build
 ```
 
 ## Browser Notes
@@ -40,3 +45,16 @@ so maintainers can see the browser, steps, and failure state clearly.
 Keep PRs focused. Describe the user-visible change, list the checks you ran, and call out browser-specific behavior.
 
 Do not commit generated `dist/`, `coverage/`, `playwright-report/`, or `test-results/` output.
+
+## Dependencies
+
+- Add or upgrade packages with `vlt install <pkg>` and commit both `package.json` and `vlt-lock.json`. Check `vlt outdated`
+  first: it shows security alerts for the current, wanted and latest versions.
+- Avoid versions published in the last few days unless you need a fix from them.
+- Dependency install scripts are blocked by default. If a package really needs one, allow it explicitly with
+  `vlt build '<query>'` (saved to `vlt.json`) and say why in the PR.
+- CI enforces dependency policies with [vltpkg/policies](https://github.com/vltpkg/policies): it fails on malware,
+  manifest confusion and vulnerabilities of any severity. There is no allowlist. Check locally with
+  `vlt query ':severity(low)'` (or `critical`, `high`, `medium`, `:malware`); the tree shows which dependency pulls a
+  package in. Fix findings by upgrading, or, when a dependency pins a vulnerable transitive version, override it with
+  a `modifiers` entry in `vlt.json` (e.g. `"#pptxgenjs > #image-size": "^2.0.4"`) and verify the dependent still works.

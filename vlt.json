@@ -1,0 +1,14 @@
+{
+  "config": {
+    "registry": "https://registry.npmjs.org/",
+    "registries": {
+      "npm": "https://registry.npmjs.org/"
+    },
+    "default-registry-alias": "npm"
+  },
+  "workspaces": ["apps/*", "packages/*"],
+  "modifiers": {
+    "#es-module-lexer": "^3.0.4",
+    "#image-size": "^2.0.4"
+  }
+}

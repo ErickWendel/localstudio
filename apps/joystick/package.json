@@ -4,15 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm run typecheck && vite build",
+    "build": "vlt run typecheck && vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit --pretty false",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@localstudio/analytics-config": "*",
-    "@localstudio/brand": "*",
-    "@localstudio/presenter-remote": "*",
+    "@localstudio/analytics-config": "workspace:*",
+    "@localstudio/brand": "workspace:*",
+    "@localstudio/presenter-remote": "workspace:*",
     "jsqr": "^1.4.0",
     "lucide-react": "^1.21.0",
     "posthog-js": "^1.407.2",
