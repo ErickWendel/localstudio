@@ -11,7 +11,8 @@ on:
       - 'tests/**'
       - 'eslint.config.js'
       - 'package.json'
-      - 'package-lock.json'
+      - 'vlt-lock.json'
+      - 'vlt.json'
       - 'playwright.config.ts'
       - 'prettier.config.cjs'
       - 'tsconfig.json'
@@ -26,12 +27,16 @@ on:
       - 'tests/**'
       - 'eslint.config.js'
       - 'package.json'
-      - 'package-lock.json'
+      - 'vlt-lock.json'
+      - 'vlt.json'
       - 'playwright.config.ts'
       - 'prettier.config.cjs'
       - 'tsconfig.json'
       - '!**/*.md'
   workflow_dispatch:
+
+env:
+  VLT_VERSION: 1.8.0
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -52,7 +57,11 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 26
-          cache: npm
+
+      - name: Setup vlt
+        uses: vltpkg/setup-vlt@33ed82786290f7273cdc1442ab01df5cfdd6d538 # v1.0.1
+        with:
+          vlt-version: ${{ env.VLT_VERSION }}
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -62,11 +71,11 @@ jobs:
             node_modules
             apps/*/node_modules
             packages/*/node_modules
-          key: npm-dependencies-${{ runner.os }}-node26-${{ hashFiles('package-lock.json') }}
+          key: vlt-dependencies-${{ runner.os }}-node26-${{ hashFiles('vlt-lock.json') }}
 
       - name: Install dependencies
         if: steps.dependency-cache.outputs.cache-hit != 'true'
-        run: npm ci
+        run: vlt install --frozen-lockfile
 
       - name: Save dependency cache
         if: steps.dependency-cache.outputs.cache-hit != 'true'
@@ -94,6 +103,11 @@ jobs:
         with:
           node-version: 26
 
+      - name: Setup vlt
+        uses: vltpkg/setup-vlt@33ed82786290f7273cdc1442ab01df5cfdd6d538 # v1.0.1
+        with:
+          vlt-version: ${{ env.VLT_VERSION }}
+
       - name: Restore dependency cache
         id: dependency-cache
         uses: actions/cache/restore@v5
@@ -102,23 +116,23 @@ jobs:
             node_modules
             apps/*/node_modules
             packages/*/node_modules
-          key: npm-dependencies-${{ runner.os }}-node26-${{ hashFiles('package-lock.json') }}
+          key: vlt-dependencies-${{ runner.os }}-node26-${{ hashFiles('vlt-lock.json') }}
 
       - name: Install dependencies on cache miss
         if: steps.dependency-cache.outputs.cache-hit != 'true'
-        run: npm ci
+        run: vlt install --frozen-lockfile
 
       - name: Restore ESLint cache
         id: eslint-cache
         uses: actions/cache/restore@v5
         with:
           path: .eslintcache
-          key: eslint-${{ runner.os }}-node26-${{ hashFiles('package-lock.json', 'eslint.config.js') }}-${{ github.sha }}
+          key: eslint-${{ runner.os }}-node26-${{ hashFiles('vlt-lock.json', 'eslint.config.js') }}-${{ github.sha }}
           restore-keys: |
-            eslint-${{ runner.os }}-node26-${{ hashFiles('package-lock.json', 'eslint.config.js') }}-
+            eslint-${{ runner.os }}-node26-${{ hashFiles('vlt-lock.json', 'eslint.config.js') }}-
 
       - name: Lint
-        run: npm run lint -- --cache --cache-location .eslintcache --concurrency auto
+        run: vlt run lint -- --cache --cache-location .eslintcache --concurrency auto
 
       - name: Save ESLint cache
         if: steps.eslint-cache.outputs.cache-hit != 'true'
@@ -143,6 +157,11 @@ jobs:
         with:
           node-version: 26
 
+      - name: Setup vlt
+        uses: vltpkg/setup-vlt@33ed82786290f7273cdc1442ab01df5cfdd6d538 # v1.0.1
+        with:
+          vlt-version: ${{ env.VLT_VERSION }}
+
       - name: Restore dependency cache
         id: dependency-cache
         uses: actions/cache/restore@v5
@@ -151,14 +170,14 @@ jobs:
             node_modules
             apps/*/node_modules
             packages/*/node_modules
-          key: npm-dependencies-${{ runner.os }}-node26-${{ hashFiles('package-lock.json') }}
+          key: vlt-dependencies-${{ runner.os }}-node26-${{ hashFiles('vlt-lock.json') }}
 
       - name: Install dependencies on cache miss
         if: steps.dependency-cache.outputs.cache-hit != 'true'
-        run: npm ci
+        run: vlt install --frozen-lockfile
 
       - name: Typecheck
-        run: npm run typecheck
+        run: vlt run typecheck
 
   test:
     name: Unit tests (${{ matrix.label }})
@@ -171,25 +190,25 @@ jobs:
       matrix:
         include:
           - label: landing
-            command: npm run test --workspace @localstudio/landing
+            command: vlt run test -w apps/landing
           - label: editor 1/8
-            command: npm run test --workspace @localstudio/editor -- --shard=1/8
+            command: vlt run test -w apps/editor -- --shard=1/8
           - label: editor 2/8
-            command: npm run test --workspace @localstudio/editor -- --shard=2/8
+            command: vlt run test -w apps/editor -- --shard=2/8
           - label: editor 3/8
-            command: npm run test --workspace @localstudio/editor -- --shard=3/8
+            command: vlt run test -w apps/editor -- --shard=3/8
           - label: editor 4/8
-            command: npm run test --workspace @localstudio/editor -- --shard=4/8
+            command: vlt run test -w apps/editor -- --shard=4/8
           - label: editor 5/8
-            command: npm run test --workspace @localstudio/editor -- --shard=5/8
+            command: vlt run test -w apps/editor -- --shard=5/8
           - label: editor 6/8
-            command: npm run test --workspace @localstudio/editor -- --shard=6/8
+            command: vlt run test -w apps/editor -- --shard=6/8
           - label: editor 7/8
-            command: npm run test --workspace @localstudio/editor -- --shard=7/8
+            command: vlt run test -w apps/editor -- --shard=7/8
           - label: editor 8/8
-            command: npm run test --workspace @localstudio/editor -- --shard=8/8
+            command: vlt run test -w apps/editor -- --shard=8/8
           - label: joystick
-            command: npm run test --workspace @localstudio/joystick
+            command: vlt run test -w apps/joystick
 
     steps:
       - name: Checkout
@@ -200,6 +219,11 @@ jobs:
         with:
           node-version: 26
 
+      - name: Setup vlt
+        uses: vltpkg/setup-vlt@33ed82786290f7273cdc1442ab01df5cfdd6d538 # v1.0.1
+        with:
+          vlt-version: ${{ env.VLT_VERSION }}
+
       - name: Restore dependency cache
         id: dependency-cache
         uses: actions/cache/restore@v5
@@ -208,11 +232,11 @@ jobs:
             node_modules
             apps/*/node_modules
             packages/*/node_modules
-          key: npm-dependencies-${{ runner.os }}-node26-${{ hashFiles('package-lock.json') }}
+          key: vlt-dependencies-${{ runner.os }}-node26-${{ hashFiles('vlt-lock.json') }}
 
       - name: Install dependencies on cache miss
         if: steps.dependency-cache.outputs.cache-hit != 'true'
-        run: npm ci
+        run: vlt install --frozen-lockfile
 
       - name: Test
         run: ${{ matrix.command }}
@@ -333,6 +357,11 @@ jobs:
         with:
           node-version: 26
 
+      - name: Setup vlt
+        uses: vltpkg/setup-vlt@33ed82786290f7273cdc1442ab01df5cfdd6d538 # v1.0.1
+        with:
+          vlt-version: ${{ env.VLT_VERSION }}
+
       - name: Restore dependency cache
         id: dependency-cache
         uses: actions/cache/restore@v5
@@ -341,11 +370,11 @@ jobs:
             node_modules
             apps/*/node_modules
             packages/*/node_modules
-          key: npm-dependencies-${{ runner.os }}-node26-${{ hashFiles('package-lock.json') }}
+          key: vlt-dependencies-${{ runner.os }}-node26-${{ hashFiles('vlt-lock.json') }}
 
       - name: Install dependencies on cache miss
         if: steps.dependency-cache.outputs.cache-hit != 'true'
-        run: npm ci
+        run: vlt install --frozen-lockfile
 
       - name: Download build artifact
         uses: actions/download-artifact@v5
@@ -358,18 +387,18 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: playwright-${{ runner.os }}-${{ hashFiles('vlt-lock.json') }}
           restore-keys: |
             playwright-${{ runner.os }}-
 
       - name: Install Playwright Chromium system dependencies
-        run: npx playwright install-deps chromium
+        run: vlx -- playwright install-deps chromium
 
       - name: Install Playwright Chromium browser
-        run: npx playwright install chromium
+        run: vlx -- playwright install chromium
 
       - name: Playwright E2E coverage test
-        run: npm run ${{ matrix.script }}
+        run: vlt run ${{ matrix.script }}
         env:
           E2E_SERVER: dist
           E2E_COVERAGE_REPORT: ${{ matrix.coverage_report }}
@@ -418,6 +447,11 @@ jobs:
         with:
           node-version: 26
 
+      - name: Setup vlt
+        uses: vltpkg/setup-vlt@33ed82786290f7273cdc1442ab01df5cfdd6d538 # v1.0.1
+        with:
+          vlt-version: ${{ env.VLT_VERSION }}
+
       - name: Restore dependency cache
         id: dependency-cache
         uses: actions/cache/restore@v5
@@ -426,11 +460,11 @@ jobs:
             node_modules
             apps/*/node_modules
             packages/*/node_modules
-          key: npm-dependencies-${{ runner.os }}-node26-${{ hashFiles('package-lock.json') }}
+          key: vlt-dependencies-${{ runner.os }}-node26-${{ hashFiles('vlt-lock.json') }}
 
       - name: Install dependencies on cache miss
         if: steps.dependency-cache.outputs.cache-hit != 'true'
-        run: npm ci
+        run: vlt install --frozen-lockfile
 
       - name: Download build artifact
         uses: actions/download-artifact@v5
@@ -446,7 +480,7 @@ jobs:
           merge-multiple: false
 
       - name: Generate aggregate editor E2E coverage report
-        run: npx playwright test --project=chromium --output=test-results/coverage-report-only tests/e2e/support/coverage-report-only.spec.ts
+        run: vlx -- playwright test --project=chromium --output=test-results/coverage-report-only tests/e2e/support/coverage-report-only.spec.ts
         env:
           E2E_COVERAGE_INPUT_DIR: coverage-input/editor
           E2E_COVERAGE_OUTPUT_DIR: coverage-report/editor
@@ -489,6 +523,11 @@ jobs:
         with:
           node-version: 26
 
+      - name: Setup vlt
+        uses: vltpkg/setup-vlt@33ed82786290f7273cdc1442ab01df5cfdd6d538 # v1.0.1
+        with:
+          vlt-version: ${{ env.VLT_VERSION }}
+
       - name: Restore dependency cache
         id: dependency-cache
         uses: actions/cache/restore@v5
@@ -497,14 +536,14 @@ jobs:
             node_modules
             apps/*/node_modules
             packages/*/node_modules
-          key: npm-dependencies-${{ runner.os }}-node26-${{ hashFiles('package-lock.json') }}
+          key: vlt-dependencies-${{ runner.os }}-node26-${{ hashFiles('vlt-lock.json') }}
 
       - name: Install dependencies on cache miss
         if: steps.dependency-cache.outputs.cache-hit != 'true'
-        run: npm ci
+        run: vlt install --frozen-lockfile
 
       - name: Build
-        run: npm run build
+        run: vlt run build
         env:
           LOCALSTUDIO_BASE_PATH: /
 
