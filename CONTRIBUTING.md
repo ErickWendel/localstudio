@@ -53,6 +53,8 @@ Do not commit generated `dist/`, `coverage/`, `playwright-report/`, or `test-res
 - Avoid versions published in the last few days unless you need a fix from them.
 - Dependency install scripts are blocked by default. If a package really needs one, allow it explicitly with
   `vlt build '<query>'` (saved to `vlt.json`) and say why in the PR.
-- CI enforces dependency policies with [vltpkg/policies](https://github.com/vltpkg/policies): it fails on malware, manifest confusion and critical/high CVEs. Check locally with
-  `vlt query ':malware'` or `vlt query ':severity(high)'`; the tree shows which dependency pulls a package in. To accept a
-  finding that can't be fixed yet, add the exact `name@version` with a reason to `ACCEPTED_RISKS` in the security job of `.github/workflows/ci.yml`.
+- CI enforces dependency policies with [vltpkg/policies](https://github.com/vltpkg/policies): it fails on malware,
+  manifest confusion and vulnerabilities of any severity. There is no allowlist. Check locally with
+  `vlt query ':severity(low)'` (or `critical`, `high`, `medium`, `:malware`); the tree shows which dependency pulls a
+  package in. Fix findings by upgrading, or, when a dependency pins a vulnerable transitive version, override it with
+  a `modifiers` entry in `vlt.json` (e.g. `"#pptxgenjs > #image-size": "^2.0.4"`) and verify the dependent still works.

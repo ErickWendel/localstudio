@@ -511,13 +511,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    # Accepted risks, pinned to exact versions so any change is re-reviewed:
-    # - vite@5.4.21: dev-server CVEs; only used by vitepress@1.6.4 (latest stable)
-    #   to build the docs, and 5.4.21 is the last vite 5.x.
-    # - image-size@1.2.1: CWE-835 DoS; required as ^1.2.1 by pptxgenjs@4.0.1
-    #   (latest); the fix only exists in image-size 2.x, which changes the API.
-    env:
-      ACCEPTED_RISKS: ':not([name="vite"][version="5.4.21"]):not([name="image-size"][version="1.2.1"])'
 
     steps:
       - name: Checkout
@@ -558,8 +551,10 @@ jobs:
           queries: |
             :malware --view=human --expect-results=0
             :confused --view=human --expect-results=0
-            :severity(critical)${{ env.ACCEPTED_RISKS }} --view=human --expect-results=0
-            :severity(high)${{ env.ACCEPTED_RISKS }} --view=human --expect-results=0
+            :severity(critical) --view=human --expect-results=0
+            :severity(high) --view=human --expect-results=0
+            :severity(medium) --view=human --expect-results=0
+            :severity(low) --view=human --expect-results=0
 
       - name: Show packages that broke a policy
         if: failure()
@@ -569,15 +564,16 @@ jobs:
           queries: |
             :malware --view=human
             :confused --view=human
-            :severity(critical)${{ env.ACCEPTED_RISKS }} --view=human
-            :severity(high)${{ env.ACCEPTED_RISKS }} --view=human
+            :severity(critical) --view=human
+            :severity(high) --view=human
+            :severity(medium) --view=human
+            :severity(low) --view=human
 
       - name: Report other supply-chain signals (non-blocking)
         uses: vltpkg/policies@8c931ca98445eed29d42847ab84da13e968c2b09 # v2.0.2
         with:
           show-results: always
           queries: |
-            :severity(medium) --view=human
             :squat --view=human
             :obfuscated --view=human
             :deprecated --view=human

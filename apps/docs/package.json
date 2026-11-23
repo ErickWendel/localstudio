@@ -13,7 +13,7 @@
   "dependencies": {
     "@localstudio/app-routes": "workspace:*",
     "@localstudio/brand": "workspace:*",
-    "vitepress": "^1.6.4",
+    "vitepress": "2.0.0-alpha.21",
     "vue": "^3.5.24"
   }
 }
