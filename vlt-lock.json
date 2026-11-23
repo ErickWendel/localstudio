@@ -787,6 +787,7 @@
     "workspace~apps+docs vue": "prod ^3.5.24 ~npm~vue@3.5.46~peer.6507954991f9b10a",
     "workspace~apps+docs @localstudio/app-routes": "prod workspace:* workspace~packages+app-routes",
     "workspace~apps+docs @localstudio/brand": "prod workspace:* workspace~packages+brand",
+    "workspace~apps+editor peerjs": "dev ^1.5.5 ~npm~peerjs@1.5.5",
     "workspace~apps+editor @giphy/js-fetch-api": "prod ^5.8.0 ~npm~@giphy+js-fetch-api@5.8.0",
     "workspace~apps+editor @huggingface/transformers": "prod ^4.2.0 ~npm~@huggingface+transformers@4.3.2",
     "workspace~apps+editor @types/qrcode": "prod ^1.5.6 ~npm~@types+qrcode@1.5.6",

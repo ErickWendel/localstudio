@@ -31,5 +31,8 @@
     "react-dom": "^19.2.7",
     "react-konva": "^19.2.5",
     "unsplash-js": "^8.0.0"
+  },
+  "devDependencies": {
+    "peerjs": "^1.5.5"
   }
 }
